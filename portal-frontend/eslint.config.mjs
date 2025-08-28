@@ -19,6 +19,17 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  {
+    ignores: [
+      'src/components/ui/**',
+      'eslint.config.mjs',
+      'playwright.config.ts',
+      'postcss.config.mjs',
+      'next.config.ts',
+      'next-env.d.ts',
+      '.next'
+    ],
+  },
   ...compat.config({
     env: {
       node: true,
@@ -205,20 +216,27 @@ const eslintConfig = [
     },
   }),
   {
-  files: ["**/*.{spec,test}.{ts,tsx}"],
-  ...compat.extends("plugin:jest/recommended")[0],
-  languageOptions: {
-    parserOptions: {
-      project: null, // Deaktiviert TS-Projektcheck für Tests
+    files: ['**/*.{spec,test}.{ts,tsx}'],
+    ...compat.extends('plugin:jest/recommended')[0],
+    languageOptions: {
+      parserOptions: {
+        project: null, // Deaktiviert TS-Projektcheck für Tests
+      },
+    },
+    rules: {
+      '@typescript-eslint/naming-convention': 'off',
+      'import/no-extraneous-dependencies': 'off',
+      'max-lines': 'off',
     },
   },
-  rules: {
-    "@typescript-eslint/naming-convention": "off",
-    "import/no-extraneous-dependencies": "off",
-    "max-lines": "off",
+  {
+    files: [
+      'src/components/ui/**', // falls du externe Komponenten dort importierst
+    ],
+    rules: {
+      '@typescript-eslint/naming-convention': 'off',
+    },
   },
-}
-
 ];
 
 export default eslintConfig;
