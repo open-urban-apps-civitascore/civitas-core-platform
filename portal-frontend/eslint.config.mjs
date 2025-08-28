@@ -51,19 +51,21 @@ const eslintConfig = [
 
       '@typescript-eslint/naming-convention': [
         'error',
-        // variables: camelCase or UPPER_CASE for constants
+        // variables: camelCase, PascalCase for Components or UPPER_CASE for constants
         {
           selector: 'variable',
-          format: ['camelCase', 'UPPER_CASE'],
+          format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
           leadingUnderscore: 'allow',
         },
-        // constants: SCREAMING_SNAKE_CASE
         {
-          selector: 'variable',
-          modifiers: ['const'],
-          format: ['UPPER_CASE'],
+          selector: 'objectLiteralProperty',
+          format: null, // no check
+          filter: {
+            regex: '^--', // Properties starting with "--"
+            match: true,
+          },
         },
-        // functions: camelCase, React components: PascalCase
+        // functions: camelCase, react components: PascalCase
         {
           selector: 'function',
           format: ['camelCase', 'PascalCase'],
@@ -79,6 +81,16 @@ const eslintConfig = [
           selector: 'typeLike',
           format: ['PascalCase'],
         },
+        // Context: PascalCase
+        {
+          selector: 'variable',
+          modifiers: ['const'],
+          format: ['PascalCase'],
+          filter: {
+            regex: 'Context$', // Alles, was auf "Context" endet
+            match: true,
+          },
+        },
         // Props: camelCase, except when containing React components, then PascalCase
         {
           selector: 'property',
@@ -89,6 +101,7 @@ const eslintConfig = [
           selector: 'variable',
           types: ['boolean'],
           format: ['camelCase'],
+          leadingUnderscore: 'allow',
           custom: {
             regex: '^(is|has|should|can)[A-Z].*$',
             match: true,
@@ -132,9 +145,8 @@ const eslintConfig = [
       // remove conflicting rule
       '@typescript-eslint/no-unused-vars': 'off',
 
-      // no wildcard or duplicated imports
+      // no duplicated imports
       'import/no-duplicates': 'error',
-      'import/no-namespace': 'error',
 
       // remove conflicting rules
       'import/order': 'off',
@@ -192,6 +204,21 @@ const eslintConfig = [
       ],
     },
   }),
+  {
+  files: ["**/*.{spec,test}.{ts,tsx}"],
+  ...compat.extends("plugin:jest/recommended")[0],
+  languageOptions: {
+    parserOptions: {
+      project: null, // Deaktiviert TS-Projektcheck für Tests
+    },
+  },
+  rules: {
+    "@typescript-eslint/naming-convention": "off",
+    "import/no-extraneous-dependencies": "off",
+    "max-lines": "off",
+  },
+}
+
 ];
 
 export default eslintConfig;
