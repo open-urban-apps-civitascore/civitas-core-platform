@@ -1,0 +1,13 @@
+{
+  // Prettier als Standard-Formatter
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+  // show ESLint problems on typung
+  "eslint.run": "onType",
+
+  // show ESLint status
+  "eslint.alwaysShowStatus": true,
+
+  // ESLint extension runs for .ts and .tsx files
+  "eslint.validate": ["typescript", "typescriptreact"]
+}
