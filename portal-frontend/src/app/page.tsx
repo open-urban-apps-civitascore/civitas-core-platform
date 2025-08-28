@@ -7,6 +7,7 @@ import {
   Search,
   SquareTerminal,
 } from 'lucide-react';
+import Image from 'next/image';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -38,7 +39,7 @@ import {
   SidebarProvider,
 } from '@/components/ui/sidebar';
 
-const example_data = {
+const EXAMPLE_DATA = {
   user: {
     name: 'Civitas',
     email: 'mail@example.com',
@@ -124,7 +125,7 @@ export default function Page() {
             <SidebarContent>
               <SidebarGroup>
                 <SidebarMenu>
-                  {example_data.navMain.map((item) => (
+                  {EXAMPLE_DATA.navMain.map((item) => (
                     <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
                       <SidebarMenuItem>
                         <SidebarMenuButton asChild tooltip={item.title}>
@@ -225,7 +226,7 @@ export default function Page() {
                 <div className="bg-muted/50 aspect-video rounded-xl" />
                 <div className="bg-muted/50 aspect-video rounded-xl" />
                 <div className="bg-muted/50 aspect-video rounded-xl" />
-                <img alt="placeholder" />
+                <Image src="/image.jpg" alt="image" width={100} height={5} />
               </div>
               <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" />
             </div>
