@@ -1,10 +1,16 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import { Command } from '@/components/ui/command'
+  BookOpen,
+  Bot,
+  ChevronRight,
+  ChevronsUpDown,
+  LogOut,
+  Search,
+  SquareTerminal,
+} from 'lucide-react';
+
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Command } from '@/components/ui/command';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,9 +18,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
+} from '@/components/ui/dropdown-menu';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import {
   Sidebar,
   SidebarContent,
@@ -30,21 +36,13 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarProvider,
-} from '@/components/ui/sidebar'
-import {
-  BookOpen,
-  Bot,
-  ChevronRight,
-  ChevronsUpDown,
-  LogOut,
-  Search,
-  SquareTerminal,
-} from 'lucide-react'
+} from '@/components/ui/sidebar';
 
 const example_data = {
   user: {
     name: 'Civitas',
     email: 'mail@example.com',
+    avatar: 'placeholder',
   },
   navMain: [
     {
@@ -92,7 +90,7 @@ const example_data = {
       icon: BookOpen,
     },
   ],
-}
+};
 
 export default function Page() {
   return (
@@ -114,11 +112,7 @@ export default function Page() {
                   Search
                 </Label>
 
-                <SidebarInput
-                  id="search"
-                  placeholder="Type to search..."
-                  className="h-8 pl-7"
-                />
+                <SidebarInput id="search" placeholder="Type to search..." className="h-8 pl-7" />
                 <Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 opacity-50 select-none" />
               </div>
             </form>
@@ -130,12 +124,8 @@ export default function Page() {
             <SidebarContent>
               <SidebarGroup>
                 <SidebarMenu>
-                  {example_data.navMain.map(item => (
-                    <Collapsible
-                      key={item.title}
-                      asChild
-                      defaultOpen={item.isActive}
-                    >
+                  {example_data.navMain.map((item) => (
+                    <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
                       <SidebarMenuItem>
                         <SidebarMenuButton asChild tooltip={item.title}>
                           <a href={item.url}>
@@ -154,7 +144,7 @@ export default function Page() {
 
                             <CollapsibleContent>
                               <SidebarMenuSub>
-                                {item.items?.map(subItem => (
+                                {item.items?.map((subItem) => (
                                   <SidebarMenuSubItem key={subItem.title}>
                                     <SidebarMenuSubButton asChild>
                                       <a href={subItem.url}>
@@ -185,20 +175,14 @@ export default function Page() {
                       >
                         <Avatar className="h-8 w-8 rounded-lg">
                           <AvatarImage
-                            src={example_data.user.avatar}
-                            alt={example_data.user.name}
+                            src={EXAMPLE_DATA.user.avatar}
+                            alt={EXAMPLE_DATA.user.name}
                           />
-                          <AvatarFallback className="rounded-lg">
-                            CN
-                          </AvatarFallback>
+                          <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                         </Avatar>
                         <div className="grid flex-1 text-left text-sm leading-tight">
-                          <span className="truncate font-medium">
-                            {example_data.user.name}
-                          </span>
-                          <span className="truncate text-xs">
-                            {example_data.user.email}
-                          </span>
+                          <span className="truncate font-medium">{EXAMPLE_DATA.user.name}</span>
+                          <span className="truncate text-xs">{EXAMPLE_DATA.user.email}</span>
                         </div>
                         <ChevronsUpDown className="ml-auto size-4" />
                       </SidebarMenuButton>
@@ -212,18 +196,12 @@ export default function Page() {
                       <DropdownMenuLabel className="p-0 font-normal">
                         <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                           <Avatar className="h-8 w-8 rounded-lg">
-                            <AvatarImage alt={example_data.user.name} />
-                            <AvatarFallback className="rounded-lg">
-                              CN
-                            </AvatarFallback>
+                            <AvatarImage alt={EXAMPLE_DATA.user.name} />
+                            <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                           </Avatar>
                           <div className="grid flex-1 text-left text-sm leading-tight">
-                            <span className="truncate font-medium">
-                              {example_data.user.name}
-                            </span>
-                            <span className="truncate text-xs">
-                              {example_data.user.email}
-                            </span>
+                            <span className="truncate font-medium">{EXAMPLE_DATA.user.name}</span>
+                            <span className="truncate text-xs">{EXAMPLE_DATA.user.email}</span>
                           </div>
                         </div>
                       </DropdownMenuLabel>
@@ -247,6 +225,7 @@ export default function Page() {
                 <div className="bg-muted/50 aspect-video rounded-xl" />
                 <div className="bg-muted/50 aspect-video rounded-xl" />
                 <div className="bg-muted/50 aspect-video rounded-xl" />
+                <img alt="placeholder" />
               </div>
               <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" />
             </div>
@@ -254,5 +233,5 @@ export default function Page() {
         </div>
       </SidebarProvider>
     </div>
-  )
+  );
 }
