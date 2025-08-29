@@ -1,10 +1,12 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+"use client";
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import { Command } from '@/components/ui/command'
+} from "@/components/ui/collapsible";
+import { Command } from "@/components/ui/command";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,9 +14,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
+} from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
@@ -30,7 +32,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarProvider,
-} from '@/components/ui/sidebar'
+} from "@/components/ui/sidebar";
 import {
   BookOpen,
   Bot,
@@ -39,60 +41,60 @@ import {
   LogOut,
   Search,
   SquareTerminal,
-} from 'lucide-react'
+} from "lucide-react";
 
-const example_data = {
+export const example_data = {
   user: {
-    name: 'Civitas',
-    email: 'mail@example.com',
+    name: "Civitas",
+    email: "mail@example.com",
   },
   navMain: [
     {
-      title: 'Menu item 1',
-      url: '#',
+      title: "Menu item 1",
+      url: "#",
       icon: SquareTerminal,
       isActive: true,
       items: [
         {
-          title: 'Sub item 1',
-          url: '#',
+          title: "Sub item 1",
+          url: "#",
         },
         {
-          title: 'Sub item 2',
-          url: '#',
+          title: "Sub item 2",
+          url: "#",
         },
         {
-          title: 'Sub item 3',
-          url: '#',
+          title: "Sub item 3",
+          url: "#",
         },
       ],
     },
     {
-      title: 'Menu item 2',
-      url: '#',
+      title: "Menu item 2",
+      url: "#",
       icon: Bot,
       items: [
         {
-          title: 'Sub item 1',
-          url: '#',
+          title: "Sub item 1",
+          url: "#",
         },
         {
-          title: 'Sub item 2',
-          url: '#',
+          title: "Sub item 2",
+          url: "#",
         },
         {
-          title: 'Sub item 3',
-          url: '#',
+          title: "Sub item 3",
+          url: "#",
         },
       ],
     },
     {
-      title: 'Documentation',
-      url: '#',
+      title: "Documentation",
+      url: "#",
       icon: BookOpen,
     },
   ],
-}
+};
 
 export default function Page() {
   return (
@@ -130,7 +132,7 @@ export default function Page() {
             <SidebarContent>
               <SidebarGroup>
                 <SidebarMenu>
-                  {example_data.navMain.map(item => (
+                  {example_data.navMain.map((item) => (
                     <Collapsible
                       key={item.title}
                       asChild
@@ -154,7 +156,7 @@ export default function Page() {
 
                             <CollapsibleContent>
                               <SidebarMenuSub>
-                                {item.items?.map(subItem => (
+                                {item.items?.map((subItem) => (
                                   <SidebarMenuSubItem key={subItem.title}>
                                     <SidebarMenuSubButton asChild>
                                       <a href={subItem.url}>
@@ -254,5 +256,5 @@ export default function Page() {
         </div>
       </SidebarProvider>
     </div>
-  )
+  );
 }
