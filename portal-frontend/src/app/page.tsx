@@ -1,5 +1,4 @@
-"use client";
-
+import { LanguageSelect } from "@/components/language-select/LanguageSelect";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Collapsible,
@@ -16,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
+
 import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
@@ -33,6 +33,7 @@ import {
   SidebarMenuSubItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
+
 import {
   BookOpen,
   Bot,
@@ -42,6 +43,7 @@ import {
   Search,
   SquareTerminal,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export const example_data = {
   user: {
@@ -97,6 +99,7 @@ export const example_data = {
 };
 
 export default function Page() {
+  const t = useTranslations("common");
   return (
     <div className="[--header-height:calc(--spacing(14))]">
       <SidebarProvider className="flex flex-col">
@@ -118,12 +121,13 @@ export default function Page() {
 
                 <SidebarInput
                   id="search"
-                  placeholder="Type to search..."
+                  placeholder={`${t("type-to-search")}...`}
                   className="h-8 pl-7"
                 />
                 <Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 opacity-50 select-none" />
               </div>
             </form>
+            <LanguageSelect />
           </div>
         </header>
 
