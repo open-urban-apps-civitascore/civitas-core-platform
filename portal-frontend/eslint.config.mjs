@@ -29,7 +29,8 @@ const eslintConfig = [
       'postcss.config.mjs',
       'next.config.ts',
       'next-env.d.ts',
-      '.next'
+      'vitest.config.ts',
+      '.next',
     ],
   },
   ...compat.config({
@@ -38,23 +39,14 @@ const eslintConfig = [
       browser: true,
       es2022: true,
     },
-    extends: [
-      'next/core-web-vitals',
-      'plugin:@typescript-eslint/recommended',
-    ],
+    extends: ['next/core-web-vitals', 'plugin:@typescript-eslint/recommended'],
     parser: '@typescript-eslint/parser',
     parserOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
       project: './tsconfig.eslint.json',
     },
-    plugins: [
-      'react',
-      '@typescript-eslint',
-      'import',
-      'unused-imports',
-      'simple-import-sort',
-    ],
+    plugins: ['react', '@typescript-eslint', 'import', 'unused-imports', 'simple-import-sort'],
     rules: {
       // ===================================================
       // NAMING CONVENTIONS
@@ -216,7 +208,7 @@ const eslintConfig = [
     },
   }),
   // config for use with prettier
-    {
+  {
     files: ['**/*.{js,jsx,ts,tsx}'],
     plugins: { prettier: prettierPlugin },
     rules: {
@@ -224,13 +216,13 @@ const eslintConfig = [
       'prettier/prettier': 'warn', // shows prettier rule warnings
     },
   },
-  // config for jest files
+  // config for tests
   {
     files: ['**/*.{spec,test}.{ts,tsx}'],
     ...compat.extends('plugin:jest/recommended')[0],
     languageOptions: {
       parserOptions: {
-        project: null, // Deaktiviert TS-Projektcheck für Tests
+        project: null,
       },
     },
     rules: {
@@ -241,9 +233,7 @@ const eslintConfig = [
   },
   // don't apply eslint config for shadcn components
   {
-    files: [
-      'src/components/ui/**',
-    ],
+    files: ['src/components/ui/**'],
     rules: {
       '@typescript-eslint/naming-convention': 'off',
     },

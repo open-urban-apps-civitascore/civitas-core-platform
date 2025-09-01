@@ -39,7 +39,7 @@ import {
   SidebarProvider,
 } from '@/components/ui/sidebar';
 
-const EXAMPLE_DATA = {
+export const EXAMPLE_DATA = {
   user: {
     name: 'Civitas',
     email: 'mail@example.com',
