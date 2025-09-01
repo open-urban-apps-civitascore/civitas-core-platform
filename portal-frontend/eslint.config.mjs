@@ -10,6 +10,8 @@
 import { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { FlatCompat } from '@eslint/eslintrc';
+import prettierPlugin from 'eslint-plugin-prettier';
+import prettierConfig from 'eslint-config-prettier';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,7 +41,6 @@ const eslintConfig = [
     extends: [
       'next/core-web-vitals',
       'plugin:@typescript-eslint/recommended',
-      'plugin:prettier/recommended',
     ],
     parser: '@typescript-eslint/parser',
     parserOptions: {
@@ -50,7 +51,6 @@ const eslintConfig = [
     plugins: [
       'react',
       '@typescript-eslint',
-      'prettier',
       'import',
       'unused-imports',
       'simple-import-sort',
@@ -215,6 +215,16 @@ const eslintConfig = [
       ],
     },
   }),
+  // config for use with prettier
+    {
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    plugins: { prettier: prettierPlugin },
+    rules: {
+      ...prettierConfig.rules, // turns off colliding eslint rules
+      'prettier/prettier': 'warn', // shows prettier rule warnings
+    },
+  },
+  // config for jest files
   {
     files: ['**/*.{spec,test}.{ts,tsx}'],
     ...compat.extends('plugin:jest/recommended')[0],
@@ -229,9 +239,10 @@ const eslintConfig = [
       'max-lines': 'off',
     },
   },
+  // don't apply eslint config for shadcn components
   {
     files: [
-      'src/components/ui/**', // falls du externe Komponenten dort importierst
+      'src/components/ui/**',
     ],
     rules: {
       '@typescript-eslint/naming-convention': 'off',
