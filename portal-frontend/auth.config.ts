@@ -1,10 +1,10 @@
 import type { NextAuthConfig } from 'next-auth'
-import { refreshAccessToken, isTokenExpired } from './src/lib/auth'
+import { refreshAccessToken, isTokenExpired } from './src/lib/token-utils'
 
 export const authConfig = {
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 10 * 60 * 60, // 10 hours
   },
   pages: {
     signIn: '/login',
@@ -44,7 +44,7 @@ export const authConfig = {
         const refreshResult = await refreshAccessToken(token.refresh_token as string)
         
         if (refreshResult.error) {
-          return { ...token, error: refreshResult.error }
+          return null
         }
 
         return {
