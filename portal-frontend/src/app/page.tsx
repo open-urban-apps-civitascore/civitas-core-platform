@@ -52,46 +52,46 @@ export const example_data = {
   },
   navMain: [
     {
-      title: "Menu item 1",
+      title: "menu-item 1",
       url: "#",
       icon: SquareTerminal,
       isActive: true,
       items: [
         {
-          title: "Sub item 1",
+          title: "sub-item 1",
           url: "#",
         },
         {
-          title: "Sub item 2",
+          title: "sub-item 2",
           url: "#",
         },
         {
-          title: "Sub item 3",
+          title: "sub-item 3",
           url: "#",
         },
       ],
     },
     {
-      title: "Menu item 2",
+      title: "menu-item 2",
       url: "#",
       icon: Bot,
       items: [
         {
-          title: "Sub item 1",
+          title: "sub-item 1",
           url: "#",
         },
         {
-          title: "Sub item 2",
+          title: "sub-item 2",
           url: "#",
         },
         {
-          title: "Sub item 3",
+          title: "sub-item 3",
           url: "#",
         },
       ],
     },
     {
-      title: "Documentation",
+      title: "documentation",
       url: "#",
       icon: BookOpen,
     },
@@ -100,6 +100,16 @@ export const example_data = {
 
 export default function Page() {
   const t = useTranslations("common");
+  const tNav = useTranslations("sidebar");
+
+  const getMenuItemTitle = (
+    item: (typeof example_data.navMain)[number] | { title: string; url: string }
+  ) => {
+    const [name, number] = item.title.split(" ");
+    const title = tNav(name);
+    return `${title} ${number ?? ""}`;
+  };
+
   return (
     <div className="[--header-height:calc(--spacing(14))]">
       <SidebarProvider className="flex flex-col">
@@ -143,10 +153,13 @@ export default function Page() {
                       defaultOpen={item.isActive}
                     >
                       <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={getMenuItemTitle(item)}
+                        >
                           <a href={item.url}>
                             <item.icon />
-                            <span>{item.title}</span>
+                            <span>{getMenuItemTitle(item)}</span>
                           </a>
                         </SidebarMenuButton>
                         {item.items?.length ? (
@@ -161,10 +174,12 @@ export default function Page() {
                             <CollapsibleContent>
                               <SidebarMenuSub>
                                 {item.items?.map((subItem) => (
-                                  <SidebarMenuSubItem key={subItem.title}>
+                                  <SidebarMenuSubItem
+                                    key={getMenuItemTitle(subItem)}
+                                  >
                                     <SidebarMenuSubButton asChild>
                                       <a href={subItem.url}>
-                                        <span>{subItem.title}</span>
+                                        <span>{getMenuItemTitle(subItem)}</span>
                                       </a>
                                     </SidebarMenuSubButton>
                                   </SidebarMenuSubItem>
