@@ -1,10 +1,10 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import { Command } from '@/components/ui/command'
+} from "@/components/ui/collapsible";
+import { Command } from "@/components/ui/command";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,9 +12,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
+} from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
   SidebarContent,
@@ -30,7 +30,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarProvider,
-} from '@/components/ui/sidebar'
+} from "@/components/ui/sidebar";
 import {
   BookOpen,
   Bot,
@@ -133,7 +133,7 @@ export default async function Page() {
 
                             <CollapsibleContent>
                               <SidebarMenuSub>
-                                {item.items?.map(subItem => (
+                                {item.items?.map((subItem) => (
                                   <SidebarMenuSubItem key={subItem.title}>
                                     <SidebarMenuSubButton asChild>
                                       <a href={subItem.url}>
@@ -245,5 +245,5 @@ export default async function Page() {
         </div>
       </SidebarProvider>
     </div>
-  )
+  );
 }
