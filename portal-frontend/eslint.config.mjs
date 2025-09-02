@@ -46,14 +46,7 @@ const eslintConfig = [
       sourceType: 'module',
       project: './tsconfig.eslint.json',
     },
-    plugins: [
-      'react',
-      '@typescript-eslint',
-      'import',
-      'unused-imports',
-      'simple-import-sort',
-      'prefer-arrow-functions',
-    ],
+    plugins: ['react', '@typescript-eslint', 'import', 'unused-imports', 'simple-import-sort'],
     rules: {
       // ===================================================
       // NAMING CONVENTIONS
@@ -195,17 +188,6 @@ const eslintConfig = [
       // prefer arrow functions
       'func-style': ['error', 'expression', { allowArrowFunctions: true }],
       'prefer-arrow-callback': ['error', { allowNamedFunctions: false }],
-      'prefer-arrow-functions/prefer-arrow-functions': [
-        'error',
-        {
-          disallowPrototype: false,
-          allowNamedFunctions: false,
-          allowObjectProperties: false,
-          classPropertiesAllowed: false,
-          returnStyle: 'unchanged',
-          singleReturnOnly: false,
-        },
-      ],
       'react/function-component-definition': [
         'error',
         {
