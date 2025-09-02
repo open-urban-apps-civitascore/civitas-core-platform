@@ -31,6 +31,7 @@ const eslintConfig = [
       'next-env.d.ts',
       'vitest.config.ts',
       '.next',
+      'coverage'
     ],
   },
   ...compat.config({
