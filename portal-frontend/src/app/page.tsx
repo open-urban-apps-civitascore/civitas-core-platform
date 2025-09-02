@@ -93,7 +93,7 @@ export const EXAMPLE_DATA = {
   ],
 };
 
-export default function Page() {
+const Page = () => {
   return (
     <div className="[--header-height:calc(--spacing(14))]">
       <SidebarProvider className="flex flex-col">
@@ -235,4 +235,6 @@ export default function Page() {
       </SidebarProvider>
     </div>
   );
-}
+};
+
+export default Page;

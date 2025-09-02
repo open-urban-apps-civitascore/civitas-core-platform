@@ -18,14 +18,16 @@ export const metadata: Metadata = {
   description: 'The frontend vor CIVITAS/Core v2',
 };
 
-export default function RootLayout({
+const RootLayout = ({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>) {
+}>) => {
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>{children}</body>
     </html>
   );
-}
+};
+
+export default RootLayout;
