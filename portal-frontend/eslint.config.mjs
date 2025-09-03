@@ -250,13 +250,6 @@ const eslintConfig = [
       'max-lines': 'off',
     },
   },
-  // don't apply eslint config for shadcn components
-  {
-    files: ['src/components/ui/**'],
-    rules: {
-      '@typescript-eslint/naming-convention': 'off',
-    },
-  },
 ]
 
 export default eslintConfig
