@@ -25,15 +25,9 @@ const eslintConfig = [
     ignores: [
       'src/components/ui/**',
       'eslint.config.mjs',
-      'playwright.config.ts',
-      'postcss.config.mjs',
-      'next.config.ts',
       'next-env.d.ts',
-      'vitest.config.ts',
-      'auth.config.ts',
       '.next',
       'coverage',
-      'types'
     ],
   },
   ...compat.config({

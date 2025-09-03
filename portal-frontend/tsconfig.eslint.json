@@ -5,6 +5,12 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     ".next/types/**/*.ts",
+    "*.config.ts",
+    "*.config.js",
+    "*.config.mjs",
+    "*.config.cmjs",
+    "types",
+    "*.d.ts"
   ],
   "exclude": ["node_modules", ".next", "dist", "coverage"]
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import type { NextAuthConfig } from 'next-auth'
 
 import { isTokenExpired, refreshAccessToken } from './src/lib/token-utils'
