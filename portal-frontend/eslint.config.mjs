@@ -7,18 +7,18 @@
  * we can change them in consultation with the team.
  */
 
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
-import { FlatCompat } from '@eslint/eslintrc';
-import prettierPlugin from 'eslint-plugin-prettier';
-import prettierConfig from 'eslint-config-prettier';
+import { FlatCompat } from '@eslint/eslintrc'
+import prettierConfig from 'eslint-config-prettier'
+import prettierPlugin from 'eslint-plugin-prettier'
+import { dirname } from 'path'
+import { fileURLToPath } from 'url'
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 const compat = new FlatCompat({
   baseDirectory: __dirname,
-});
+})
 
 const eslintConfig = [
   {
@@ -31,7 +31,7 @@ const eslintConfig = [
       'next-env.d.ts',
       'vitest.config.ts',
       '.next',
-      'coverage'
+      'coverage',
     ],
   },
   ...compat.config({
@@ -224,7 +224,13 @@ const eslintConfig = [
     plugins: { prettier: prettierPlugin },
     rules: {
       ...prettierConfig.rules, // turns off colliding eslint rules
-      'prettier/prettier': 'warn', // shows prettier rule warnings
+      'prettier/prettier': [
+        'warn',
+        {
+          semi: false, // no semicolons
+          arrowParens: 'avoid',
+        },
+      ],
     },
   },
   // config for tests
@@ -249,6 +255,6 @@ const eslintConfig = [
       '@typescript-eslint/naming-convention': 'off',
     },
   },
-];
+]
 
-export default eslintConfig;
+export default eslintConfig
