@@ -1,29 +1,34 @@
 import { getRequestConfig } from "next-intl/server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Locale } from "./locales";
 import { routing } from "./routing";
 
-export default getRequestConfig(async () => {
-  // get locale from cookie or set default value
+// get locale from 1. cookie, 2. accept-language header or 3. default value
+const getLocale = async () => {
   const store = await cookies();
-  const cookieLocale = store.get("NEXT_LOCALE")?.value as Locale;
-  const locale =
-    cookieLocale && routing.locales.includes(cookieLocale)
-      ? cookieLocale
-      : routing.defaultLocale;
+  const cookieLocale = store.get("NEXT_LOCALE")?.value;
+  const headerLocale = (await headers())
+    .get("accept-language")
+    ?.split(",")[0] // e.g. "de-DE,en;q=0.9" → "de-DE"
+    ?.split(";")[0] // e.g. en;q=0.9 -> "en"
+    ?.split("-")[0]; // e.g. "de-DE" -> "de"
+  const defaultLocale = routing.defaultLocale;
 
-  // for multiple message files:
-  const [common, sidebar, languages] = await Promise.all([
-    import(`../messages/${locale}/common.json`),
-    import(`../messages/${locale}/sidebar.json`),
-    import(`../messages/${locale}/languages.json`),
-  ]);
+  if (cookieLocale && (routing.locales as string[]).includes(cookieLocale)) {
+    return cookieLocale as Locale;
+  } else if (
+    headerLocale &&
+    (routing.locales as string[]).includes(headerLocale)
+  ) {
+    return headerLocale as Locale;
+  } else return defaultLocale;
+};
 
-  const messages = {
-    common: common.default,
-    sidebar: sidebar.default,
-    languages: languages.default,
-  };
+// returns translations depending on locale
+export default getRequestConfig(async () => {
+  const locale = await getLocale();
+
+  const messages = (await import(`../messages/${locale}.json`)).default;
 
   return {
     locale,

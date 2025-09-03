@@ -47,7 +47,7 @@ import { auth, signOut } from '../../auth'
 import { useTranslations } from "next-intl";
 import { getTranslations } from "next-intl/server";
 
-const navMain = [
+export const navMain = [
     {
       title: "menu-item 1",
       url: "#",

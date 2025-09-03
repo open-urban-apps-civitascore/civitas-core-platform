@@ -1,0 +1,14 @@
+{
+  "common": {
+    "type-to-search": "Type to search"
+  },
+  "languages": {
+    "german": "German",
+    "english": "English"
+  },
+  "sidebar": {
+    "menu-item": "Menu Item",
+    "sub-item": "Sub Item",
+    "documentation": "Documentation"
+  }
+}
