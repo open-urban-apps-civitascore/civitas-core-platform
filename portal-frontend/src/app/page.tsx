@@ -1,17 +1,9 @@
-import {
-  BookOpen,
-  Bot,
-  ChevronRight,
-  ChevronsUpDown,
-  LogOut,
-  Search,
-  SquareTerminal,
-} from 'lucide-react';
-import Image from 'next/image';
+import { BookOpen, Bot, ChevronRight, ChevronsUpDown, LogOut, Search, SquareTerminal } from 'lucide-react'
+import Image from 'next/image'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Command } from '@/components/ui/command';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Command } from '@/components/ui/command'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +11,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
+} from '@/components/ui/dropdown-menu'
+import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 import {
   Sidebar,
   SidebarContent,
@@ -37,7 +29,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarProvider,
-} from '@/components/ui/sidebar';
+} from '@/components/ui/sidebar'
 
 export const EXAMPLE_DATA = {
   user: {
@@ -91,7 +83,7 @@ export const EXAMPLE_DATA = {
       icon: BookOpen,
     },
   ],
-};
+}
 
 const Page = () => {
   return (
@@ -100,7 +92,10 @@ const Page = () => {
         <header className="bg-background sticky top-0 z-50 flex w-full items-center border-b">
           <div className="flex h-(--header-height) w-full items-center gap-2 px-4">
             <a href="#">
-              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+              <div
+                className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg
+                  rounded-lg"
+              >
                 <Command className="size-4" />
               </div>
             </a>
@@ -125,7 +120,7 @@ const Page = () => {
             <SidebarContent>
               <SidebarGroup>
                 <SidebarMenu>
-                  {EXAMPLE_DATA.navMain.map((item) => (
+                  {EXAMPLE_DATA.navMain.map(item => (
                     <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
                       <SidebarMenuItem>
                         <SidebarMenuButton asChild tooltip={item.title}>
@@ -145,7 +140,7 @@ const Page = () => {
 
                             <CollapsibleContent>
                               <SidebarMenuSub>
-                                {item.items?.map((subItem) => (
+                                {item.items?.map(subItem => (
                                   <SidebarMenuSubItem key={subItem.title}>
                                     <SidebarMenuSubButton asChild>
                                       <a href={subItem.url}>
@@ -175,10 +170,7 @@ const Page = () => {
                         className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                       >
                         <Avatar className="h-8 w-8 rounded-lg">
-                          <AvatarImage
-                            src={EXAMPLE_DATA.user.avatar}
-                            alt={EXAMPLE_DATA.user.name}
-                          />
+                          <AvatarImage src={EXAMPLE_DATA.user.avatar} alt={EXAMPLE_DATA.user.name} />
                           <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                         </Avatar>
                         <div className="grid flex-1 text-left text-sm leading-tight">
@@ -234,7 +226,7 @@ const Page = () => {
         </div>
       </SidebarProvider>
     </div>
-  );
-};
+  )
+}
 
-export default Page;
+export default Page
