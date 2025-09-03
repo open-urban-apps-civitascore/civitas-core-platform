@@ -42,15 +42,12 @@ import {
   LogOut,
   Search,
   SquareTerminal,
-} from "lucide-react";
+} from 'lucide-react'
+import { auth, signOut } from '../../auth'
 import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 
-export const example_data = {
-  user: {
-    name: "Civitas",
-    email: "mail@example.com",
-  },
-  navMain: [
+const navMain = [
     {
       title: "menu-item 1",
       url: "#",
@@ -95,15 +92,16 @@ export const example_data = {
       url: "#",
       icon: BookOpen,
     },
-  ],
-};
+  ]
 
-export default function Page() {
-  const t = useTranslations("common");
-  const tNav = useTranslations("sidebar");
+export default async function Page() {
+  const session = await auth()
+  const user = session?.user
+  const t = await getTranslations("common");
+  const tNav = await getTranslations("sidebar");
 
   const getMenuItemTitle = (
-    item: (typeof example_data.navMain)[number] | { title: string; url: string }
+    item: (typeof navMain)[number] | { title: string; url: string }
   ) => {
     const [name, number] = item.title.split(" ");
     const title = tNav(name);
@@ -146,7 +144,7 @@ export default function Page() {
             <SidebarContent>
               <SidebarGroup>
                 <SidebarMenu>
-                  {example_data.navMain.map((item) => (
+                  {navMain.map(item => (
                     <Collapsible
                       key={item.title}
                       asChild
@@ -206,19 +204,19 @@ export default function Page() {
                       >
                         <Avatar className="h-8 w-8 rounded-lg">
                           <AvatarImage
-                            src={example_data.user.avatar}
-                            alt={example_data.user.name}
+                            src={user?.image || ''}
+                            alt={user?.name || ''}
                           />
                           <AvatarFallback className="rounded-lg">
-                            CN
+                            {user?.name?.charAt(0) || 'G'}
                           </AvatarFallback>
                         </Avatar>
                         <div className="grid flex-1 text-left text-sm leading-tight">
                           <span className="truncate font-medium">
-                            {example_data.user.name}
+                            {user?.name || 'Guest'}
                           </span>
                           <span className="truncate text-xs">
-                            {example_data.user.email}
+                            {user?.email || ''}
                           </span>
                         </div>
                         <ChevronsUpDown className="ml-auto size-4" />
@@ -233,17 +231,20 @@ export default function Page() {
                       <DropdownMenuLabel className="p-0 font-normal">
                         <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                           <Avatar className="h-8 w-8 rounded-lg">
-                            <AvatarImage alt={example_data.user.name} />
+                            <AvatarImage 
+                              src={user?.image || ''} 
+                              alt={user?.name || ''} 
+                            />
                             <AvatarFallback className="rounded-lg">
-                              CN
+                              {user?.name?.charAt(0) || 'G'}
                             </AvatarFallback>
                           </Avatar>
                           <div className="grid flex-1 text-left text-sm leading-tight">
                             <span className="truncate font-medium">
-                              {example_data.user.name}
+                              {user?.name || 'Guest'}
                             </span>
                             <span className="truncate text-xs">
-                              {example_data.user.email}
+                              {user?.email || ''}
                             </span>
                           </div>
                         </div>
@@ -251,10 +252,19 @@ export default function Page() {
 
                       <DropdownMenuSeparator />
 
-                      <DropdownMenuItem>
-                        <LogOut />
-                        Log out
-                      </DropdownMenuItem>
+                      <form
+                        action={async () => {
+                          'use server'
+                          await signOut({ redirectTo: '/login' })
+                        }}
+                      >
+                        <DropdownMenuItem asChild>
+                          <button type="submit" className="w-full flex items-center">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Log out
+                          </button>
+                        </DropdownMenuItem>
+                      </form>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </SidebarMenuItem>
