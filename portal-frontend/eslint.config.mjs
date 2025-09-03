@@ -30,8 +30,10 @@ const eslintConfig = [
       'next.config.ts',
       'next-env.d.ts',
       'vitest.config.ts',
+      'auth.config.ts',
       '.next',
       'coverage',
+      'types'
     ],
   },
   ...compat.config({

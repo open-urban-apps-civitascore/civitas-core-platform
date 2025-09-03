@@ -31,61 +31,40 @@ import {
   SidebarProvider,
 } from '@/components/ui/sidebar'
 
-export const EXAMPLE_DATA = {
-  user: {
-    name: 'Civitas',
-    email: 'mail@example.com',
-    avatar: 'placeholder',
-  },
-  navMain: [
-    {
-      title: 'Menu item 1',
-      url: '#',
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        {
-          title: 'Sub item 1',
-          url: '#',
-        },
-        {
-          title: 'Sub item 2',
-          url: '#',
-        },
-        {
-          title: 'Sub item 3',
-          url: '#',
-        },
-      ],
-    },
-    {
-      title: 'Menu item 2',
-      url: '#',
-      icon: Bot,
-      items: [
-        {
-          title: 'Sub item 1',
-          url: '#',
-        },
-        {
-          title: 'Sub item 2',
-          url: '#',
-        },
-        {
-          title: 'Sub item 3',
-          url: '#',
-        },
-      ],
-    },
-    {
-      title: 'Documentation',
-      url: '#',
-      icon: BookOpen,
-    },
-  ],
-}
+import { auth, signOut } from '../../auth'
 
-const Page = () => {
+export const navMain = [
+  {
+    title: 'Menu item 1',
+    url: '#',
+    icon: SquareTerminal,
+    isActive: true,
+    items: [
+      { title: 'Sub item 1', url: '#' },
+      { title: 'Sub item 2', url: '#' },
+      { title: 'Sub item 3', url: '#' },
+    ],
+  },
+  {
+    title: 'Menu item 2',
+    url: '#',
+    icon: Bot,
+    items: [
+      { title: 'Sub item 1', url: '#' },
+      { title: 'Sub item 2', url: '#' },
+      { title: 'Sub item 3', url: '#' },
+    ],
+  },
+  {
+    title: 'Documentation',
+    url: '#',
+    icon: BookOpen,
+  },
+]
+
+const Page = async () => {
+  const session = await auth()
+  const user = session?.user
   return (
     <div className="[--header-height:calc(--spacing(14))]">
       <SidebarProvider className="flex flex-col">
@@ -120,7 +99,7 @@ const Page = () => {
             <SidebarContent>
               <SidebarGroup>
                 <SidebarMenu>
-                  {EXAMPLE_DATA.navMain.map(item => (
+                  {navMain.map(item => (
                     <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
                       <SidebarMenuItem>
                         <SidebarMenuButton asChild tooltip={item.title}>
@@ -170,12 +149,12 @@ const Page = () => {
                         className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                       >
                         <Avatar className="h-8 w-8 rounded-lg">
-                          <AvatarImage src={EXAMPLE_DATA.user.avatar} alt={EXAMPLE_DATA.user.name} />
-                          <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                          <AvatarImage src={user?.image || ''} alt={user?.name || ''} />
+                          <AvatarFallback className="rounded-lg">{user?.name?.charAt(0) || 'G'}</AvatarFallback>
                         </Avatar>
                         <div className="grid flex-1 text-left text-sm leading-tight">
-                          <span className="truncate font-medium">{EXAMPLE_DATA.user.name}</span>
-                          <span className="truncate text-xs">{EXAMPLE_DATA.user.email}</span>
+                          <span className="truncate font-medium">{user?.name || 'Guest'}</span>
+                          <span className="truncate text-xs">{user?.email || ''}</span>
                         </div>
                         <ChevronsUpDown className="ml-auto size-4" />
                       </SidebarMenuButton>
@@ -189,22 +168,31 @@ const Page = () => {
                       <DropdownMenuLabel className="p-0 font-normal">
                         <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                           <Avatar className="h-8 w-8 rounded-lg">
-                            <AvatarImage alt={EXAMPLE_DATA.user.name} />
-                            <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                            <AvatarImage src={user?.image || ''} alt={user?.name || ''} />
+                            <AvatarFallback className="rounded-lg">{user?.name?.charAt(0) || 'G'}</AvatarFallback>
                           </Avatar>
                           <div className="grid flex-1 text-left text-sm leading-tight">
-                            <span className="truncate font-medium">{EXAMPLE_DATA.user.name}</span>
-                            <span className="truncate text-xs">{EXAMPLE_DATA.user.email}</span>
+                            <span className="truncate font-medium">{user?.name || 'Guest'}</span>
+                            <span className="truncate text-xs">{user?.email || ''}</span>
                           </div>
                         </div>
                       </DropdownMenuLabel>
 
                       <DropdownMenuSeparator />
 
-                      <DropdownMenuItem>
-                        <LogOut />
-                        Log out
-                      </DropdownMenuItem>
+                      <form
+                        action={async () => {
+                          'use server'
+                          await signOut({ redirectTo: '/login' })
+                        }}
+                      >
+                        <DropdownMenuItem asChild>
+                          <button type="submit" className="w-full flex items-center">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Log out
+                          </button>
+                        </DropdownMenuItem>
+                      </form>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </SidebarMenuItem>
