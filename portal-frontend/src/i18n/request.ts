@@ -1,7 +1,7 @@
 import { getRequestConfig } from "next-intl/server";
 import { cookies, headers } from "next/headers";
 import { Locale } from "./locales";
-import { routing } from "./routing";
+import { routing } from "./config";
 
 // get locale from 1. cookie, 2. accept-language header or 3. default value
 const getLocale = async () => {
