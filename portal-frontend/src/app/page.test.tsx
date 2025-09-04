@@ -25,7 +25,6 @@ describe('Page', () => {
     expect(main).toBeDefined()
 
     const sidebarParentItems = screen.getAllByRole('list')
-
     expect(sidebarParentItems.length).toEqual(3)
 
     navMain.forEach(item => {
