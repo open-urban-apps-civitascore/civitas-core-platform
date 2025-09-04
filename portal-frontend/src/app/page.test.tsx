@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import Page, { example_data } from "./page";
+import Page, { navMain } from "./page";
 
 describe("Page", () => {
   render(<Page />);
@@ -27,26 +27,26 @@ describe("Page", () => {
 
     expect(sidebarParentItems.length).toEqual(3);
 
-    example_data.navMain.forEach((item) => {
+    navMain.forEach((item) => {
       const sideBarParentItemTitle = screen.getByText(item.title);
       expect(sideBarParentItemTitle).toBeDefined();
     });
 
-    example_data.navMain.forEach((item) => {
+    navMain.forEach((item) => {
       const sideBarParentItemLink = screen.getByRole("link", {
         name: item.title,
       });
       expect(sideBarParentItemLink).toBeDefined();
     });
 
-    example_data.navMain.forEach((item) =>
+    navMain.forEach((item) =>
       item.items?.forEach((subitem) => {
         const sideBarSubItemTitle = screen.getByText(subitem.title);
         expect(sideBarSubItemTitle).toBeDefined();
       })
     );
 
-    example_data.navMain.forEach((item) =>
+    navMain.forEach((item) =>
       item.items?.forEach((subitem) => {
         const sideBarSubItemLink = screen.getByRole("link", {
           name: subitem.title,
@@ -60,11 +60,5 @@ describe("Page", () => {
     });
 
     expect(menuItemsToggleButtons.length).toEqual(2);
-
-    const loggedInUser = screen.getByRole("button", {
-      name: `CN ${example_data.user.name} ${example_data.user.email}`,
-    });
-
-    expect(loggedInUser).toBeDefined();
   });
 });

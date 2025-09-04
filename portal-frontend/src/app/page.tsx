@@ -1,3 +1,4 @@
+import { LanguageSelect } from "@/components/language-select/LanguageSelect";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Collapsible,
@@ -14,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
+
 import { Separator } from "@/components/ui/separator";
 import {
   Sidebar,
@@ -31,6 +33,7 @@ import {
   SidebarMenuSubItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
+
 import {
   BookOpen,
   Bot,
@@ -41,39 +44,70 @@ import {
   SquareTerminal,
 } from 'lucide-react'
 import { auth, signOut } from '../../auth'
+import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 
-const navMain = [
-  {
-    title: 'Menu item 1',
-    url: '#',
-    icon: SquareTerminal,
-    isActive: true,
-    items: [
-      { title: 'Sub item 1', url: '#' },
-      { title: 'Sub item 2', url: '#' },
-      { title: 'Sub item 3', url: '#' },
-    ],
-  },
-  {
-    title: 'Menu item 2',
-    url: '#',
-    icon: Bot,
-    items: [
-      { title: 'Sub item 1', url: '#' },
-      { title: 'Sub item 2', url: '#' },
-      { title: 'Sub item 3', url: '#' },
-    ],
-  },
-  {
-    title: 'Documentation',
-    url: '#',
-    icon: BookOpen,
-  },
-]
+export const navMain = [
+    {
+      title: "menu-item 1",
+      url: "#",
+      icon: SquareTerminal,
+      isActive: true,
+      items: [
+        {
+          title: "sub-item 1",
+          url: "#",
+        },
+        {
+          title: "sub-item 2",
+          url: "#",
+        },
+        {
+          title: "sub-item 3",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "menu-item 2",
+      url: "#",
+      icon: Bot,
+      items: [
+        {
+          title: "sub-item 1",
+          url: "#",
+        },
+        {
+          title: "sub-item 2",
+          url: "#",
+        },
+        {
+          title: "sub-item 3",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "documentation",
+      url: "#",
+      icon: BookOpen,
+    },
+  ]
 
 export default async function Page() {
   const session = await auth()
   const user = session?.user
+  const t = await getTranslations("common");
+  const tNav = await getTranslations("sidebar");
+
+  const getMenuItemTitle = (
+    item: (typeof navMain)[number] | { title: string; url: string }
+  ) => {
+    const [name, number] = item.title.split(" ");
+    const title = tNav(name);
+    return `${title} ${number ?? ""}`;
+  };
+
   return (
     <div className="[--header-height:calc(--spacing(14))]">
       <SidebarProvider className="flex flex-col">
@@ -95,12 +129,13 @@ export default async function Page() {
 
                 <SidebarInput
                   id="search"
-                  placeholder="Type to search..."
+                  placeholder={`${t("type-to-search")}...`}
                   className="h-8 pl-7"
                 />
                 <Search className="pointer-events-none absolute top-1/2 left-2 size-4 -translate-y-1/2 opacity-50 select-none" />
               </div>
             </form>
+            <LanguageSelect />
           </div>
         </header>
 
@@ -116,10 +151,13 @@ export default async function Page() {
                       defaultOpen={item.isActive}
                     >
                       <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={getMenuItemTitle(item)}
+                        >
                           <a href={item.url}>
                             <item.icon />
-                            <span>{item.title}</span>
+                            <span>{getMenuItemTitle(item)}</span>
                           </a>
                         </SidebarMenuButton>
                         {item.items?.length ? (
@@ -134,10 +172,12 @@ export default async function Page() {
                             <CollapsibleContent>
                               <SidebarMenuSub>
                                 {item.items?.map((subItem) => (
-                                  <SidebarMenuSubItem key={subItem.title}>
+                                  <SidebarMenuSubItem
+                                    key={getMenuItemTitle(subItem)}
+                                  >
                                     <SidebarMenuSubButton asChild>
                                       <a href={subItem.url}>
-                                        <span>{subItem.title}</span>
+                                        <span>{getMenuItemTitle(subItem)}</span>
                                       </a>
                                     </SidebarMenuSubButton>
                                   </SidebarMenuSubItem>
