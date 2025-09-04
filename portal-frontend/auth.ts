@@ -1,5 +1,6 @@
 import NextAuth from 'next-auth'
 import Keycloak from 'next-auth/providers/keycloak'
+
 import { authConfig } from './auth.config'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({

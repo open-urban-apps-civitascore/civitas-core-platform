@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import type { NextAuthConfig } from 'next-auth'
-import { refreshAccessToken, isTokenExpired } from './src/lib/token-utils'
+
+import { isTokenExpired, refreshAccessToken } from './src/lib/token-utils'
 
 export const authConfig = {
   session: {
@@ -14,7 +16,7 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user
       const isOnLogin = nextUrl.pathname === '/login'
       const isPublicPath = isOnLogin || nextUrl.pathname.startsWith('/api/auth')
-      
+
       // Allow public paths
       if (isPublicPath) {
         return true
@@ -37,12 +39,12 @@ export const authConfig = {
       } else {
         // Access_token has expired, try to refresh it
         if (!token.refresh_token) {
-          console.error("Missing refresh_token")
-          return { ...token, error: "RefreshTokenError" }
+          console.error('Missing refresh_token')
+          return { ...token, error: 'RefreshTokenError' }
         }
 
         const refreshResult = await refreshAccessToken(token.refresh_token as string)
-        
+
         if (refreshResult.error) {
           return null
         }
