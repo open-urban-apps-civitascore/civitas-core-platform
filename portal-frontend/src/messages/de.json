@@ -7,8 +7,20 @@
     "english": "Englisch"
   },
   "sidebar": {
+    "home": "Home",
     "menu-item": "Menüpunkt",
     "sub-item": "Unterpunkt",
-    "documentation": "Dokumentation"
+    "documentation": "Dokumentation",
+    "datasets": "Datensätze"
+  },
+  "datasets": {
+    "title": "Datensätze",
+    "subtitle": "Alle verfügbaren Datensätze unserer Organisation",
+    "name": "Name",
+    "dataType": "Datentyp",
+    "dataSteward": "Bereitsteller",
+    "lastUpdated": "Zuletzt aktualisiert",
+    "status": "Status",
+    "distribution": "Distribution"
   }
 }

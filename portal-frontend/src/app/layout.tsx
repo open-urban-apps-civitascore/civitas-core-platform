@@ -5,6 +5,10 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale } from 'next-intl/server'
 
+import { Header } from '@/components/layout/Header'
+import { SideBar } from '@/components/layout/SideBar'
+import { SidebarProvider } from '@/components/ui/sidebar'
+
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
@@ -26,10 +30,19 @@ interface RootLayoutProps {
 
 const RootLayout = async ({ children }: RootLayoutProps) => {
   const locale = await getLocale()
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <NextIntlClientProvider locale={locale}>{children}</NextIntlClientProvider>
+        <div className="[--header-height:calc(--spacing(14))]">
+          <NextIntlClientProvider locale={locale}>
+            <Header />
+            <SidebarProvider className="h-[calc(100svh-var(--header-height))]  min-h-[calc(100svh-var(--header-height))]">
+              <SideBar />
+              <div className="flex flex-1 flex-col gap-4 p-4">{children}</div>
+            </SidebarProvider>
+          </NextIntlClientProvider>
+        </div>
       </body>
     </html>
   )
