@@ -57,9 +57,7 @@ export const authConfig = {
         }
       }
     },
-    session({ session, token }) {
-      session.accessToken = token.access_token as string
-      session.error = token.error as string | undefined
+    session({ session }) {
       return session
     },
   },
