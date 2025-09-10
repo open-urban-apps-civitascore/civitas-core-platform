@@ -28,6 +28,8 @@ const eslintConfig = [
       'next-env.d.ts',
       '.next',
       'coverage',
+      'playwright/.auth/**',
+      'playwright-report',
     ],
   },
   ...compat.config({
