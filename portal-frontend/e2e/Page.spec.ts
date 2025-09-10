@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { TEST_EMAIL, TEST_FIRSTNAME, TEST_LASTNAME } from '../playwright.config'
+
 test.describe('Page', async () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
@@ -32,24 +34,34 @@ test.describe('Page', async () => {
   })
 
   test('renders a footer with account information and popup', async ({ page }) => {
-    await expect(page.locator('div').filter({ hasText: /^CNCivitasmail@example\.com$/ })).toBeVisible()
+    const initials = TEST_FIRSTNAME.charAt(0).toUpperCase()
+
+    const accountButton = page.getByRole('button', {
+      name: `${initials} ${TEST_FIRSTNAME} ${TEST_LASTNAME} ${TEST_EMAIL}`,
+    })
+    await expect(accountButton).toBeVisible()
 
     // Open user menu and check contents
-    await page.getByRole('button', { name: 'CN Civitas mail@example.com' }).click()
-    await expect(page.getByRole('menu', { name: 'CN Civitas mail@example.com' })).toBeVisible()
-    await expect(page.getByLabel('CNCivitasmail@example.com').getByText('Civitas')).toBeVisible()
-    await expect(page.getByLabel('CNCivitasmail@example.com').getByText('mail@example.com')).toBeVisible()
-    await expect(page.getByRole('menuitem', { name: 'Log out' })).toBeVisible()
+    await accountButton.click()
+
+    const accountPopup = page.getByRole('menu', {
+      name: `${initials} ${TEST_FIRSTNAME} ${TEST_LASTNAME} ${TEST_EMAIL}`,
+    })
+    await expect(accountPopup).toBeVisible()
+    // Check if the popup contains the correct user information
+    await expect(accountPopup.getByText(`${TEST_FIRSTNAME} ${TEST_LASTNAME}`)).toBeVisible()
+    await expect(accountPopup.getByText(TEST_EMAIL)).toBeVisible()
+    await expect(accountPopup.getByRole('menuitem', { name: 'Log out' })).toBeVisible()
 
     // Click outside the menu and check if it's closed
     await page.locator('html').click()
-    await expect(page.getByRole('menu', { name: 'CN Civitas mail@example.com' })).not.toBeVisible()
+    await expect(accountPopup).not.toBeVisible()
 
-    await page.getByRole('button', { name: 'CN Civitas mail@example.com' }).click()
-    await expect(page.getByRole('menu', { name: 'CN Civitas mail@example.com' })).toBeVisible()
+    await accountButton.click()
+    await expect(accountPopup).toBeVisible()
 
     // Press Escape and check if the menu is closed
     await page.locator('html').press('Escape')
-    await expect(page.getByRole('menu', { name: 'CN Civitas mail@example.com' })).not.toBeVisible()
+    await expect(accountPopup).not.toBeVisible()
   })
 })
