@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import Page, { navMain } from './page'
+import { navMain } from '@/components/layout/SideBar'
+
+import Page from './page'
 
 describe('Page', () => {
   render(<Page />)

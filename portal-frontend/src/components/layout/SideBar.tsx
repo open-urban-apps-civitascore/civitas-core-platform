@@ -1,7 +1,8 @@
 import { BookOpen, Bot, ChevronRight, ChevronsUpDown, LogOut, SquareTerminal } from 'lucide-react'
+import { User } from 'next-auth'
 import { getTranslations } from 'next-intl/server'
 
-import { auth, signOut } from '@/auth'
+import { signOut } from '@/auth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import {
@@ -83,10 +84,11 @@ export const navMain = [
   },
 ]
 
-export const SideBar = async () => {
-  const session = await auth()
-  const user = session?.user
+interface SidebarProps {
+  user?: User
+}
 
+export const SideBar = async ({ user }: SidebarProps) => {
   const t = await getTranslations('sidebar')
 
   const getMenuItemTitle = (item: (typeof navMain)[number] | { title: string; url: string }) => {
