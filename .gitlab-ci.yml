@@ -1,0 +1,36 @@
+stages: [lint, test, build, cd]
+
+eslint-frontend:
+  image: node:20
+  stage: lint
+  script: |
+    cd portal-frontend
+    set -euo pipefail
+    echo "[]" > eslint-report.json
+
+    corepack enable >/dev/null 2>&1 || true
+    pnpm install --frozen-lockfile
+
+    node_modules/.bin/eslint . --max-warnings=0 --format json -o eslint-report.json
+  artifacts:
+    when: always
+    paths: [portal-frontend/eslint-report.json]
+    expire_in: 1 month
+
+gitleaks:
+  image:
+    name: zricethezav/gitleaks:latest
+    entrypoint: [""]
+  stage: lint
+  rules:
+    - if: '$CI_PIPELINE_SOURCE != "schedule"'
+  script: |
+    cd portal-frontend
+    set -euo pipefail
+    echo "{}" > gitleaks.sarif
+    gitleaks detect --source . --redact --no-banner \
+      --report-format sarif --report-path gitleaks.sarif
+  artifacts:
+    when: always
+    paths: [portal-frontend/gitleaks.sarif]
+    expire_in: 1 month
