@@ -4,6 +4,8 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale } from 'next-intl/server'
+import { SessionProvider } from 'next-auth/react'
+import { SessionManager } from '@/components/session-manager'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -29,7 +31,10 @@ const RootLayout = async ({ children }: RootLayoutProps) => {
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <NextIntlClientProvider locale={locale}>{children}</NextIntlClientProvider>
+        <SessionProvider refetchInterval={240}>
+          <SessionManager />
+          <NextIntlClientProvider locale={locale}>{children}</NextIntlClientProvider>
+        </SessionProvider>
       </body>
     </html>
   )
