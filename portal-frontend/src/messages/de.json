@@ -16,11 +16,21 @@
   "datasets": {
     "title": "Datensätze",
     "subtitle": "Alle verfügbaren Datensätze unserer Organisation",
-    "name": "Name",
-    "dataType": "Datentyp",
-    "dataSteward": "Bereitsteller",
-    "lastUpdated": "Zuletzt aktualisiert",
-    "status": "Status",
-    "distribution": "Distribution"
+    "header": {
+      "name": "Name",
+      "dataRoom": "Datenraum",
+      "department": "Fachbereich",
+      "creator": "Ansprechperson",
+      "lastUpdated": "Zuletzt aktualisiert",
+      "status": "Zugriffsstatus",
+      "approvalProcess": "Freigabeprozess",
+      "distribution": "Distribution"
+    },
+    "values": {
+      "status": {
+        "open": "offen",
+        "closed": "geschlossen"
+      }
+    }
   }
 }

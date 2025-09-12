@@ -16,11 +16,21 @@
   "datasets": {
     "title": "Datasets",
     "subtitle": "All available datasets of our organization",
-    "name": "Name",
-    "dataType": "Data type",
-    "dataSteward": "Data steward",
-    "lastUpdated": "Last updated",
-    "status": "Status",
-    "distribution": "Distribution"
+    "header": {
+      "name": "Name",
+      "dataRoom": "Data Room",
+      "department": "Department",
+      "creator": "Contact Person",
+      "lastUpdated": "Last Updated",
+      "status": "Access Status",
+      "approvalProcess": "Approval Process",
+      "distribution": "Distribution"
+    },
+    "values": {
+      "status": {
+        "open": "open",
+        "closed": "closed"
+      }
+    }
   }
 }
