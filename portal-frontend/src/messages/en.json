@@ -23,7 +23,7 @@
       "creator": "Contact Person",
       "lastUpdated": "Last Updated",
       "status": "Access Status",
-      "approvalProcess": "Approval Process",
+      "releaseProcess": "Release Process",
       "distribution": "Distribution"
     },
     "values": {
@@ -31,6 +31,7 @@
         "open": "open",
         "closed": "closed"
       }
-    }
+    },
+    "newDataset": "New Dataset"
   }
 }

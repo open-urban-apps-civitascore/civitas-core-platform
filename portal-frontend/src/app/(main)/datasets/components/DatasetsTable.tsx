@@ -9,84 +9,25 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { ArrowUpDown } from 'lucide-react'
-import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
-type Status = 'open' | 'closed' | null
-type Creator = { id: string; firstName: string; lastName: string }
-type Distribution = {
-  format: string
-  title: string
-  url: string
-}
-type Category = { id: string; title: string }
+import { Dataset } from '../page'
 
-type Dataset = {
-  id: number
-  name: string
-  dataRoom: string
-  department: string
-  creator: string[]
-  lastUpdated: string
-  status: Status
-  approvalProcess: null
-  distribution: Distribution | null
+interface DatasetsTableProps {
+  datasets: Dataset[]
 }
 
-type DataSetResponse = {
-  id: 1
-  title: string
-  creator: Creator[]
-  issued: string
-  modified: string
-  status: Status
-  distribution: (Distribution & { id: string }) | null
-  catalog: string[]
-  series: Category
-  department: Category
-}
-
-const mapDatasets = (datasets: DataSetResponse[]): Dataset[] =>
-  datasets.map(dataset => ({
-    id: dataset.id,
-    name: dataset.title,
-    dataRoom: dataset.series.title,
-    department: dataset.department.title,
-    creator: dataset.creator.map(creator => `${creator.firstName} ${creator.lastName}`),
-    lastUpdated: dataset.modified,
-    status: dataset.status,
-    approvalProcess: null,
-    distribution: dataset.distribution
-      ? {
-          format: dataset.distribution?.format,
-          title: dataset.distribution?.title,
-          url: dataset.distribution?.url,
-        }
-      : null,
-  }))
-
-const DatasetsTable = () => {
+const DatasetsTable = (props: DatasetsTableProps) => {
+  const { datasets } = props
   const t = useTranslations('datasets')
-  const [datasets, setDatasets] = useState<Dataset[]>([])
+  const locale = useLocale()
   const columnHelper = createColumnHelper<Dataset>()
 
-  useEffect(() => {
-    const getData = async () => {
-      const data = await fetch(
-        `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}/datasets`,
-      )
-      const datasetsResponse: DataSetResponse[] = await data.json()
-      const datasets = mapDatasets(datasetsResponse)
-      setDatasets(datasets)
-    }
-    getData()
-  }, [])
-
-  const columnHeader = <TValue,>(title: string) => {
+  const getColumnHeader = <TValue,>(title: string) => {
     const Header = (ctx: HeaderContext<Dataset, TValue>) => {
       const { column } = ctx
       return (
@@ -107,32 +48,36 @@ const DatasetsTable = () => {
 
   const columns = [
     columnHelper.accessor('id', {
-      header: columnHeader('id'),
+      header: getColumnHeader('id'),
       cell: info => info.getValue(),
       enableHiding: true,
     }),
     columnHelper.accessor('name', {
-      header: columnHeader('name'),
+      header: getColumnHeader('name'),
       cell: info => info.getValue(),
+      meta: { flex: 2 },
     }),
     columnHelper.accessor('dataRoom', {
-      header: columnHeader('dataRoom'),
+      header: getColumnHeader('dataRoom'),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('department', {
-      header: columnHeader('department'),
+      header: getColumnHeader('department'),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('creator', {
-      header: columnHeader('creator'),
+      header: getColumnHeader('creator'),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('lastUpdated', {
-      header: columnHeader('lastUpdated'),
-      cell: info => new Date(info.getValue()).toLocaleDateString(),
+      header: getColumnHeader('lastUpdated'),
+      cell: info => {
+        const formattedDate = new Date(info.getValue()).toLocaleDateString('en-GB')
+        return locale === 'de' ? formattedDate.replaceAll('/', '.') : formattedDate
+      },
     }),
     columnHelper.accessor('status', {
-      header: columnHeader('status'),
+      header: getColumnHeader('status'),
       cell: info => {
         const value = info.getValue()
         switch (value) {
@@ -145,22 +90,24 @@ const DatasetsTable = () => {
         }
       },
     }),
-    columnHelper.accessor('approvalProcess', {
-      header: columnHeader('approvalProcess'),
+    columnHelper.accessor('releaseProcess', {
+      header: getColumnHeader('releaseProcess'),
       cell: '',
     }),
     columnHelper.accessor('distribution', {
-      header: columnHeader('distribution'),
+      header: getColumnHeader('distribution'),
       cell: info => {
         const value = info.getValue()
         if (value) {
           return (
-            <a href={value.url} target="_blank">
+            <>
               <Badge className="mr-3" variant="secondary">
                 {value.format}
               </Badge>
-              {value.title}
-            </a>
+              <a href={value.url} target="_blank" className="underline">
+                {value.title}
+              </a>
+            </>
           )
         } else {
           return ''
@@ -182,13 +129,13 @@ const DatasetsTable = () => {
   })
 
   return (
-    <Table className="w-full">
+    <Table className="w-full overflow-x-auto">
       <TableCaption></TableCaption>
       <TableHeader>
         {table.getHeaderGroups().map(group => (
           <TableRow key={group.id}>
             {group.headers.map(header => (
-              <TableHead key={header.id} className="w-[100px] text-primary-light">
+              <TableHead key={header.id} className="text-primary-light">
                 {flexRender(header.column.columnDef.header, header.getContext())}
               </TableHead>
             ))}
@@ -197,9 +144,11 @@ const DatasetsTable = () => {
       </TableHeader>
       <TableBody>
         {table.getRowModel().rows.map(row => (
-          <TableRow key={row.id}>
+          <TableRow className="h-16" key={row.id}>
             {row.getVisibleCells().map(cell => (
-              <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+              <TableCell className="whitespace-normal" key={cell.id}>
+                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              </TableCell>
             ))}
           </TableRow>
         ))}

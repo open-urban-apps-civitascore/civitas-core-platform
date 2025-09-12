@@ -23,7 +23,7 @@
       "creator": "Ansprechperson",
       "lastUpdated": "Zuletzt aktualisiert",
       "status": "Zugriffsstatus",
-      "approvalProcess": "Freigabeprozess",
+      "releaseProcess": "Freigabeprozess",
       "distribution": "Distribution"
     },
     "values": {
@@ -31,6 +31,7 @@
         "open": "offen",
         "closed": "geschlossen"
       }
-    }
+    },
+    "newDataset": "Neuer Datensatz"
   }
 }

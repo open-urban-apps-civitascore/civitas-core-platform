@@ -36,7 +36,7 @@ const RootLayout = async ({ children }: RootLayoutProps) => {
           <Header />
           <SidebarProvider className="h-[calc(100svh-var(--header-height))]  min-h-[calc(100svh-var(--header-height))]">
             <SideBar user={user} />
-            <div className="flex flex-1 flex-col gap-4 p-4">{children}</div>
+            <div className="flex flex-1 flex-col gap-4 p-4 w-[calc(100%-var(--sidebar-width))]">{children}</div>
           </SidebarProvider>
         </div>
       </body>
