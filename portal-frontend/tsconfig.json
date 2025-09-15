@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -23,16 +19,11 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@/auth": [
-        "./auth.ts"
-      ],
-      "@/auth-config": [
-        "./auth.config.ts"
-      ]
-    }
+      "@/*": ["./src/*"],
+      "@/auth": ["./auth.ts"],
+      "@/auth-config": ["./auth.config.ts"]
+    },
+    "types": ["vitest/globals"]
   },
   "include": [
     "*.ts",
@@ -43,7 +34,5 @@
     "playwright/**/*.ts",
     "e2e/**/*.ts"
   ],
-  "exclude": [
-    "node_modules"
-  ]
+  "exclude": ["node_modules"]
 }

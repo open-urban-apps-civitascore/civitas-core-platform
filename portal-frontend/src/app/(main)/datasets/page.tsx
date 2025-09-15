@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 
 import DatasetsTable from './components/DatasetsTable'
 
-type Status = 'open' | 'closed' | null
+export type Status = 'open' | 'closed' | null
 type Creator = { id: string; firstName: string; lastName: string }
 type Distribution = {
   format: string
@@ -18,7 +18,7 @@ type Distribution = {
 type Category = { id: string; title: string }
 
 export type DatasetResponse = {
-  id: 1
+  id: string
   title: string
   creator: Creator[]
   issued: string
@@ -31,7 +31,7 @@ export type DatasetResponse = {
 }
 
 export type Dataset = {
-  id: number
+  id: string
   name: string
   dataRoom: string
   department: string
@@ -42,7 +42,7 @@ export type Dataset = {
   distribution: Distribution | null
 }
 
-const mapDatasets = (datasets: DatasetResponse[]): Dataset[] =>
+export const mapDatasets = (datasets: DatasetResponse[]): Dataset[] =>
   datasets.map(dataset => ({
     id: dataset.id,
     name: dataset.title,
