@@ -26,6 +26,11 @@
       "releaseProcess": "Freigabeprozess",
       "distribution": "Distribution"
     },
+    "pagination": {
+      "resultsPerPage": "Ergebnisse pro Seite",
+      "page": "Seite",
+      "of": "von"
+    },
     "values": {
       "status": {
         "open": "offen",

@@ -34,7 +34,7 @@ const RootLayout = async ({ children }: RootLayoutProps) => {
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <div className="[--header-height:calc(--spacing(14))]">
           <Header />
-          <SidebarProvider className="h-[calc(100svh-var(--header-height))]  min-h-[calc(100svh-var(--header-height))]">
+          <SidebarProvider className="h-[calc(100svh-var(--header-height)-1px)]  min-h-[calc(100svh-var(--header-height)-1px)]">
             <SideBar user={user} />
             <div className="flex flex-1 flex-col gap-4 p-4 w-[calc(100%-var(--sidebar-width))]">{children}</div>
           </SidebarProvider>

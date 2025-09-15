@@ -8,19 +8,27 @@ import {
 } from '@tanstack/react-table'
 import { ArrowUpDown } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
+import { Dispatch, SetStateAction } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 import { Dataset } from '../page'
+import TablePagination from './TablePagination'
 
 interface DatasetsTableProps {
   datasets: Dataset[]
+  rowCount: number
+  pageSize: number
+  setPageSize: Dispatch<SetStateAction<number>>
+  pageIndex: number
+  setPageIndex: Dispatch<SetStateAction<number>>
 }
 
 const DatasetsTable = (props: DatasetsTableProps) => {
-  const { datasets } = props
+  const { datasets, rowCount, pageIndex, setPageIndex, pageSize, setPageSize } = props
   const t = useTranslations('datasets')
   const locale = useLocale()
   const columnHelper = createColumnHelper<Dataset>()
@@ -119,39 +127,57 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     data: datasets,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    rowCount,
     initialState: {
       columnVisibility: {
         id: false,
       },
     },
+    manualPagination: true,
+    state: { pagination: { pageIndex, pageSize } },
+    onPaginationChange: updater => {
+      const newPagination = typeof updater === 'function' ? updater({ pageIndex, pageSize }) : updater
+      setPageIndex(newPagination.pageIndex)
+      setPageSize(newPagination.pageSize)
+    },
   })
 
   return (
-    <Table className="w-full overflow-x-auto">
-      <TableCaption></TableCaption>
-      <TableHeader>
-        {table.getHeaderGroups().map(group => (
-          <TableRow key={group.id}>
-            {group.headers.map(header => (
-              <TableHead key={header.id} className="text-primary-light">
-                {flexRender(header.column.columnDef.header, header.getContext())}
-              </TableHead>
+    <div className=" flex-col h-full [--pagination-height:calc(--spacing(18))] [--pagination-padding:calc(--spacing(4))]">
+      <ScrollArea className="h-full h-[calc(100%-var(--pagination-height))]">
+        <Table className="w-full">
+          <TableHeader>
+            {table.getHeaderGroups().map(group => (
+              <TableRow key={group.id}>
+                {group.headers.map(header => (
+                  <TableHead key={header.id} className="text-primary-light">
+                    {flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
             ))}
-          </TableRow>
-        ))}
-      </TableHeader>
-      <TableBody>
-        {table.getRowModel().rows.map(row => (
-          <TableRow className="h-16" key={row.id}>
-            {row.getVisibleCells().map(cell => (
-              <TableCell className="whitespace-normal" key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </TableCell>
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map(row => (
+              <TableRow className="h-16" key={row.id}>
+                {row.getVisibleCells().map(cell => (
+                  <TableCell className="whitespace-normal" key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
             ))}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+          </TableBody>
+        </Table>
+      </ScrollArea>
+      <TablePagination
+        className="h-[calc(var(--pagination-height))]"
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        rowCount={rowCount}
+        table={table}
+      />
+    </div>
   )
 }
 

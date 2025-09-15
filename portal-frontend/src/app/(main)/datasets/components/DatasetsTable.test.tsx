@@ -11,7 +11,14 @@ describe('DatasetsTable', () => {
   beforeEach(() => {
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
-        <DatasetsTable datasets={mappedDatasets} />
+        <DatasetsTable
+          datasets={mappedDatasets}
+          rowCount={2}
+          pageIndex={0}
+          pageSize={5}
+          setPageIndex={() => null}
+          setPageSize={() => null}
+        />
       </NextIntlClientProvider>,
     )
   })
