@@ -39,7 +39,7 @@ const TablePagination = (props: TablePaginationProps) => {
         </Select>
       </div>
 
-      <div>
+      <div data-testid="currentPage">
         {t('pagination.page')} {pageIndex + 1} {t('pagination.of')} {totalPages || 1}
       </div>
       <div className="flex space-x-2">

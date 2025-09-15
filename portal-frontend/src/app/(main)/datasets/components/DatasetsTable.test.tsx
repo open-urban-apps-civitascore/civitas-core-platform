@@ -53,10 +53,10 @@ describe('DatasetsTable', () => {
     const dataRow = rows[1]
     const cells = within(dataRow).getAllByRole('cell')
 
-    expect(cells[0]).toHaveTextContent(mappedDatasets[0].name) // name
-    expect(cells[1]).toHaveTextContent(mappedDatasets[0].dataSpace) // name
-    expect(cells[2]).toHaveTextContent(mappedDatasets[0].department) // name
-    expect(cells[3]).toHaveTextContent(mappedDatasets[0].creator[0]) // name
-    expect(cells[4]).toHaveTextContent('10.09.2023') // name
+    expect(cells[0]).toHaveTextContent(mappedDatasets[0].name)
+    expect(cells[1]).toHaveTextContent(mappedDatasets[0].dataSpace)
+    expect(cells[2]).toHaveTextContent(mappedDatasets[0].department)
+    expect(cells[3]).toHaveTextContent(mappedDatasets[0].creator[0])
+    expect(cells[4]).toHaveTextContent('10.09.2023')
   })
 })
