@@ -16,7 +16,7 @@
     "test": "vitest",
     "test:watch": "vitest watch",
     "test:coverage": "vitest --coverage",
-    "json-server": "export $(grep -v '^#' .env.local | xargs) && npx json-server json-server/db.json -p $JSON_SERVER_PORT"
+    "json-server": "source .env.local && npx json-server json-server/db.json -p $JSON_SERVER_PORT"
   },
   "dependencies": {
     "@auth/core": "^0.40.0",
