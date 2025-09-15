@@ -1,5 +1,6 @@
 'use client'
 
+import { SortingState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
@@ -71,19 +72,36 @@ export const mapDatasets = (datasets: DatasetResponse[]): Dataset[] =>
       : null,
   }))
 
+export const getSortParam = (sorting: SortingState) => {
+  if (sorting.length > 0) {
+    const sortingId = sorting[0]?.id === 'name' ? 'title' : 'modified'
+    const sortParam = sorting[0]?.desc ? `&_sort=-${sortingId}` : `&_sort=${sortingId}`
+    return sortParam
+  }
+  return ''
+}
+
 const DatasetsPage = () => {
   const t = useTranslations('datasets')
   const [datasets, setDatasets] = useState<Dataset[]>([])
   const [rowCount, setRowCount] = useState(0)
   const [pageSize, setPageSize] = useState(10)
   const [pageIndex, setPageIndex] = useState(0)
+  const [sorting, setSorting] = useState<SortingState>([])
+
+  useEffect(() => {
+    console.log(sorting)
+  }, [sorting])
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
   useEffect(() => {
+    const sortParams = getSortParam(sorting)
     const getDatasets = async () => {
       try {
-        const datasetsResponse = await fetch(`${URL}/datasets?_page=${pageIndex + 1}&_per_page=${pageSize}`)
+        const datasetsResponse = await fetch(
+          `${URL}/datasets?_page=${pageIndex + 1}&_per_page=${pageSize}${sortParams}`,
+        )
         const datasetsData = await datasetsResponse.json()
         const datasets = mapDatasets(datasetsData.data as DatasetResponse[])
         setDatasets(datasets)
@@ -95,7 +113,7 @@ const DatasetsPage = () => {
       }
     }
     getDatasets()
-  }, [pageIndex, pageSize, URL, rowCount])
+  }, [pageIndex, pageSize, URL, rowCount, sorting])
 
   return (
     <div className="w-full h-full flex-1 [--title-height:calc(--spacing(28))] [--page-padding:calc(--spacing(4))]">
@@ -117,6 +135,8 @@ const DatasetsPage = () => {
           setPageIndex={setPageIndex}
           pageSize={pageSize}
           setPageSize={setPageSize}
+          sorting={sorting}
+          setSorting={setSorting}
         />
       </div>
     </div>

@@ -4,6 +4,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   HeaderContext,
+  SortingState,
   useReactTable,
 } from '@tanstack/react-table'
 import { ArrowUpDown } from 'lucide-react'
@@ -25,10 +26,12 @@ interface DatasetsTableProps {
   setPageSize: Dispatch<SetStateAction<number>>
   pageIndex: number
   setPageIndex: Dispatch<SetStateAction<number>>
+  sorting: SortingState
+  setSorting: Dispatch<SetStateAction<SortingState>>
 }
 
 const DatasetsTable = (props: DatasetsTableProps) => {
-  const { datasets, rowCount, pageIndex, setPageIndex, pageSize, setPageSize } = props
+  const { datasets, rowCount, pageIndex, setPageIndex, pageSize, setPageSize, sorting, setSorting } = props
   const t = useTranslations('datasets')
   const locale = useLocale()
   const columnHelper = createColumnHelper<Dataset>()
@@ -39,13 +42,15 @@ const DatasetsTable = (props: DatasetsTableProps) => {
       return (
         <>
           {title === 'id' ? 'id' : t(`header.${title}`)}
-          <Button
-            className="hover:bg-transparent hover:cursor-pointer"
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-          >
-            <ArrowUpDown />
-          </Button>
+          {(title === 'name' || title === 'lastUpdated') && (
+            <Button
+              className="hover:bg-transparent hover:cursor-pointer"
+              variant="ghost"
+              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            >
+              <ArrowUpDown />
+            </Button>
+          )}
         </>
       )
     }
@@ -134,12 +139,14 @@ const DatasetsTable = (props: DatasetsTableProps) => {
       },
     },
     manualPagination: true,
-    state: { pagination: { pageIndex, pageSize } },
+    manualSorting: true,
+    state: { pagination: { pageIndex, pageSize }, sorting },
     onPaginationChange: updater => {
       const newPagination = typeof updater === 'function' ? updater({ pageIndex, pageSize }) : updater
       setPageIndex(newPagination.pageIndex)
       setPageSize(newPagination.pageSize)
     },
+    onSortingChange: setSorting,
   })
 
   return (
