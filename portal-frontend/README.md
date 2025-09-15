@@ -23,6 +23,12 @@
    pnpm dev
    ```
 
+### Running json server
+For mocking data in the frontend the json-server can be used.
+
+1. Adjust the port in the env variable JSON_SERVER_PORT if you need to use another port.
+2. Start the json-server by running the comman `pnpm json-server`
+
 ## Testing
 
 ### Running e2e-tests
