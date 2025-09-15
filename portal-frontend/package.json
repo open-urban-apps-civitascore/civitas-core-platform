@@ -15,7 +15,8 @@
     "format:check": "prettier --check .",
     "test": "vitest",
     "test:watch": "vitest watch",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "json-server": "source .env.local && npx json-server json-server/db.json -p $JSON_SERVER_PORT"
   },
   "dependencies": {
     "@auth/core": "^0.40.0",
@@ -67,6 +68,7 @@
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-unused-imports": "^4.2.0",
     "happy-dom": "18.0.1",
+    "json-server": "1.0.0-beta.3",
     "prettier": "^3.6.2",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.7",

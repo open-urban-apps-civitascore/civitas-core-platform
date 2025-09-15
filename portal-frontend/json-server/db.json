@@ -1,0 +1,125 @@
+{
+  "datasets": [
+    {
+      "id": 1,
+      "title": "Bebauungspläne der Stadt Musterstadt (XPlanung)",
+      "creator": [{ "id": "1", "firstName": "Maximilian", "lastName": "Müller" }],
+      "issued": "2023-09-10T08:00:00Z",
+      "modified": "2023-09-10T08:00:00Z",
+      "status": null,
+      "distribution": null,
+      "catalog": ["1"],
+      "series": {"id": "1", "title": "Verkehr"},
+      "department": { "id": 1, "title": "Stadtentwicklung" }
+    },
+    {
+      "id": 2,
+      "title": "Spielplätze",
+      "creator": [{ "id": "2", "firstName": "Sophie", "lastName": "Schneider" }],
+      "issued": "2023-01-01T08:00:00Z",
+      "modified": "2023-01-01T08:00:00Z",
+      "status": "open",
+      "distribution": {
+        "id": "2",
+        "format": "DOCX",
+        "title": "Superset",
+        "url": "https://superset.de"
+      },
+      "catalog": ["1"],
+      "series": {"id": "2", "title": "Umwelt"},
+      "department": { "id": 2, "title": "Verkehrsplanung" }
+    },
+    {
+      "id": 3,
+      "title": "Spielplätze",
+      "creator": [{ "id": "3", "firstName": "Leonard", "lastName": "Fischer" }],
+      "issued": "2023-02-15T08:00:00Z",
+      "modified": "2023-02-15T08:00:00Z",
+      "status": "open",
+      "distribution": {
+        "id": "3",
+        "format": "GML",
+        "title": "Masterportal",
+        "url": "https://masterportal.de"
+      },
+      "catalog": ["1"],
+      "series": {"id": "3", "title": "Stadtplanung"},
+      "department": { "id": 3, "title": "Umweltschutz" }
+    },
+    {
+      "id": 4,
+      "title": "Versorgungsleitungen – Trinkwasser",
+      "creator": [{ "id": "4", "firstName": "Anna", "lastName": "Weber" }],
+      "issued": "2023-03-30T08:00:00Z",
+      "modified": "2023-03-30T08:00:00Z",
+      "status": "closed",
+      "distribution": {
+        "id": "4",
+        "format": "PDF",
+        "title": "shapefile",
+        "url": "https://shapefile.de"
+      },
+      "catalog": ["1"],
+      "series": {"id": "1", "title": "Verkehr"},
+      "department": { "id": 4, "title": "Bauaufsicht" }
+    },
+    {
+      "id": 5,
+      "title": "Gewerberegister – öffentlich einsehbare Betriebe",
+      "creator": [{ "id": "5", "firstName": "Lukas", "lastName": "Hoffmann" }],
+      "issued": "2023-04-12T08:00:00Z",
+      "modified": "2023-04-12T08:00:00Z",
+      "status": null,
+      "distribution": null,
+      "catalog": ["1"],
+      "series": {"id": "2", "title": "Umwelt"},
+      "department": { "id": 5, "title": "Öffentliche Sicherheit" }
+    },
+    {
+      "id": 6,
+      "title": "Lärmkartierung – Hauptverkehrsstraßen (Tag/Nacht)",
+      "creator": [{ "id": "6", "firstName": "Marie", "lastName": "Koch" }],
+      "issued": "2023-05-05T08:00:00Z",
+      "modified": "2023-05-05T08:00:00Z",
+      "status": "open",
+      "distribution": {
+        "id": "6",
+        "format": "GeoJSON",
+        "title": "Open Data Portal Masterportal",
+        "url": "https://opendata.de"
+      },
+      "catalog": ["1"],
+      "series": {"id": "3", "title": "Stadtplanung"},
+      "department": { "id": 6, "title": "Soziale Dienste" }
+    },
+    {
+      "id": 7,
+      "title": "Echtzeit-Positionen Busse und Straßenbahnen",
+      "creator": [{ "id": "7", "firstName": "Felix", "lastName": "Richter" }],
+      "issued": "2023-06-20T08:00:00Z",
+      "modified": "2023-06-20T08:00:00Z",
+      "status": null,
+      "distribution": null,
+      "catalog": ["1"],
+      "series": {"id": "3", "title": "Stadtplanung"},
+      "department": { "id": 7, "title": "Bildungswesen" }
+    },
+    {
+      "id": 8,
+      "title": "Bevölkerungsstatistik – Altersgruppen nach Stadtteilen",
+      "creator": [{ "id": "8", "firstName": "Laura", "lastName": "Braun" }],
+      "issued": "2023-07-10T08:00:00Z",
+      "modified": "2023-07-10T08:00:00Z",
+      "status": "open",
+      "distribution": {
+        "id": "8",
+        "format": "zip",
+        "title": "Superset",
+        "url": "https://superset.de"
+      },
+      "catalog": ["1"],
+      "series": {"id": "2", "title": "Umwelt"},
+      "department": { "id": 8, "title": "Gesundheitswesen" }
+    }
+  ]
+}
