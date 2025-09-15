@@ -1,0 +1,93 @@
+
+[
+  {
+    "id": 1,
+    "name": "Straßenbeleuchtung",
+    "dataType": "json",
+    "dataSteward": "Jonas Becker",
+    "lastUpdated": "2025-08-25T21:15:00Z",
+    "status": "open",
+    "distribution": "Masterportal"
+  },
+  {
+    "id": 2,
+    "name": "Parkplatzbelegung",
+    "dataType": "csv",
+    "dataSteward": "Lara König",
+    "lastUpdated": "2025-09-01T08:00:00Z",
+    "status": "open",
+    "distribution": "Open Data Portal"
+  },
+  {
+    "id": 3,
+    "name": "Luftqualität",
+    "dataType": "csv",
+    "dataSteward": "Mehmet Yilmaz",
+    "lastUpdated": "2025-08-20T12:30:00Z",
+    "status": "closed",
+    "distribution": "Superset"
+  },
+  {
+    "id": 4,
+    "name": "Wasserverbrauch",
+    "dataType": "xlsx",
+    "dataSteward": "Elena Wagner",
+    "lastUpdated": "2025-07-14T09:10:00Z",
+    "status": "limited",
+    "distribution": "Masterportal"
+  },
+  {
+    "id": 5,
+    "name": "Energieverbrauch öffentlicher Gebäude",
+    "dataType": "json",
+    "dataSteward": "Nico Braun",
+    "lastUpdated": "2025-06-28T18:00:00Z",
+    "status": "open",
+    "distribution": "Open Data Portal"
+  },
+  {
+    "id": 6,
+    "name": "Echtzeit-Positionen Busse und Straßenbahnen",
+    "dataType": "kml",
+    "dataSteward": "Clara Fischer",
+    "lastUpdated": "2025-08-30T11:45:00Z",
+    "status": "open",
+    "distribution": "Superset"
+  },
+  {
+    "id": 7,
+    "name": "Verkehrsfluss / Staudaten",
+    "dataType": "geojson",
+    "dataSteward": "David Weber",
+    "lastUpdated": "2025-09-03T07:30:00Z",
+    "status": "open",
+    "distribution": "Open Data Portal"
+  },
+  {
+    "id": 8,
+    "name": "Lärmbelastung",
+    "dataType": "csv",
+    "dataSteward": "Mara Hoffmann",
+    "lastUpdated": "2025-08-12T15:20:00Z",
+    "status": "limited",
+    "distribution": "Masterportal"
+  },
+  {
+    "id": 9,
+    "name": "Wetterstationen",
+    "dataType": "json",
+    "dataSteward": "Fatima Özdemir",
+    "lastUpdated": "2025-09-05T05:00:00Z",
+    "status": "open",
+    "distribution": "Superset"
+  },
+  {
+    "id": 10,
+    "name": "Öffentliche E-Ladesäulen",
+    "dataType": "csv",
+    "dataSteward": "Thomas Klein",
+    "lastUpdated": "2025-08-27T20:00:00Z",
+    "status": "closed",
+    "distribution": "Open Data Portal"
+  }
+]

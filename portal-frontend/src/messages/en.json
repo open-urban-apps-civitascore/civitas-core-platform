@@ -7,8 +7,31 @@
     "english": "English"
   },
   "sidebar": {
+    "home": "Home",
     "menu-item": "Menu Item",
     "sub-item": "Sub Item",
-    "documentation": "Documentation"
+    "documentation": "Documentation",
+    "datasets": "Datasets"
+  },
+  "datasets": {
+    "title": "Datasets",
+    "subtitle": "All available datasets of our organization",
+    "header": {
+      "name": "Name",
+      "dataSpace": "Data Space",
+      "department": "Department",
+      "creator": "Contact Person",
+      "lastUpdated": "Last Updated",
+      "status": "Access Status",
+      "releaseProcess": "Release Process",
+      "distribution": "Distribution"
+    },
+    "values": {
+      "status": {
+        "open": "open",
+        "closed": "closed"
+      }
+    },
+    "newDataset": "New Dataset"
   }
 }

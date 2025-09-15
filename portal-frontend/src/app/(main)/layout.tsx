@@ -1,12 +1,10 @@
-import './globals.css'
-
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
-import { SessionProvider } from 'next-auth/react'
-import { NextIntlClientProvider } from 'next-intl'
-import { getLocale } from 'next-intl/server'
 
-import { SessionManager } from '@/components/session-manager'
+import { auth } from '@/auth'
+import { Header } from '@/components/layout/Header'
+import { SideBar } from '@/components/layout/SideBar'
+import { SidebarProvider } from '@/components/ui/sidebar'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -28,15 +26,19 @@ interface RootLayoutProps {
 }
 
 const RootLayout = async ({ children }: RootLayoutProps) => {
-  const locale = await getLocale()
+  const session = await auth()
+  const user = session?.user
 
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <SessionProvider refetchInterval={240}>
-          <SessionManager />
-          <NextIntlClientProvider locale={locale}>{children}</NextIntlClientProvider>
-        </SessionProvider>
+        <div className="[--header-height:calc(--spacing(14))]">
+          <Header />
+          <SidebarProvider className="h-[calc(100svh-var(--header-height))]  min-h-[calc(100svh-var(--header-height))]">
+            <SideBar user={user} />
+            <div className="flex flex-1 flex-col gap-4 p-4 w-[calc(100%-var(--sidebar-width))]">{children}</div>
+          </SidebarProvider>
+        </div>
       </body>
     </html>
   )
