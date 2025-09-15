@@ -33,7 +33,7 @@ export type DatasetResponse = {
 export type Dataset = {
   id: string
   name: string
-  dataRoom: string
+  dataSpace: string
   department: string
   creator: string[]
   lastUpdated: string
@@ -46,7 +46,7 @@ export const mapDatasets = (datasets: DatasetResponse[]): Dataset[] =>
   datasets.map(dataset => ({
     id: dataset.id,
     name: dataset.title,
-    dataRoom: dataset.series.title,
+    dataSpace: dataset.series.title,
     department: dataset.department.title,
     creator: dataset.creator.map(creator => `${creator.firstName} ${creator.lastName}`),
     lastUpdated: dataset.modified,

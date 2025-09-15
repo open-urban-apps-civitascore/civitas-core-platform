@@ -4,7 +4,7 @@ export const mappedDatasets: Dataset[] = [
   {
     id: '1',
     name: 'Bebauungspläne der Stadt Musterstadt (XPlanung)',
-    dataRoom: 'Verkehr',
+    dataSpace: 'Verkehr',
     department: 'Stadtentwicklung',
     creator: ['Maximilian Müller'],
     lastUpdated: '2023-09-10T08:00:00Z',
@@ -15,7 +15,7 @@ export const mappedDatasets: Dataset[] = [
   {
     id: '2',
     name: 'Spielplätze',
-    dataRoom: 'Umwelt',
+    dataSpace: 'Umwelt',
     department: 'Verkehrsplanung',
     creator: ['Sophie Schneider'],
     lastUpdated: '2023-01-01T08:00:00Z',

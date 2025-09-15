@@ -18,7 +18,7 @@
     "subtitle": "Alle verfügbaren Datensätze unserer Organisation",
     "header": {
       "name": "Name",
-      "dataRoom": "Datenraum",
+      "dataSpace": "Datenraum",
       "department": "Fachbereich",
       "creator": "Ansprechperson",
       "lastUpdated": "Zuletzt aktualisiert",

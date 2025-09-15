@@ -1,5 +1,3 @@
-'use client'
-
 import {
   createColumnHelper,
   flexRender,
@@ -57,8 +55,8 @@ const DatasetsTable = (props: DatasetsTableProps) => {
       cell: info => info.getValue(),
       meta: { flex: 2 },
     }),
-    columnHelper.accessor('dataRoom', {
-      header: getColumnHeader('dataRoom'),
+    columnHelper.accessor('dataSpace', {
+      header: getColumnHeader('dataSpace'),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('department', {

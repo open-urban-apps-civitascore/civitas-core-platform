@@ -18,7 +18,7 @@
     "subtitle": "All available datasets of our organization",
     "header": {
       "name": "Name",
-      "dataRoom": "Data Room",
+      "dataSpace": "Data Space",
       "department": "Department",
       "creator": "Contact Person",
       "lastUpdated": "Last Updated",
