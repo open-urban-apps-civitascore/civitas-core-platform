@@ -17,11 +17,11 @@ const dummyTable = {
   getCanNextPage: () => true,
 } as unknown as Table<Dataset>
 
-describe('TablePagination (Render)', () => {
+describe('TablePagination', () => {
   beforeEach(() => {
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
-        <TablePagination table={dummyTable} rowCount={20} pageSize={5} pageIndex={0} />
+        <TablePagination table={dummyTable} totalPages={4} pageSize={5} pageIndex={0} />
       </NextIntlClientProvider>,
     )
   })

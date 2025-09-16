@@ -20,6 +20,7 @@ describe('DatasetsTable', () => {
           setPageSize={() => null}
           sorting={[{ desc: false, id: 'name' }]}
           setSorting={() => null}
+          totalPages={4}
         />
       </NextIntlClientProvider>,
     )
