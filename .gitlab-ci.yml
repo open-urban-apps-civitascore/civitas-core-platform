@@ -10,27 +10,38 @@ eslint-frontend:
 
     corepack enable >/dev/null 2>&1 || true
     pnpm install --frozen-lockfile
+    pnpm add -D eslint-formatter-codeclimate
 
-    node_modules/.bin/eslint . --max-warnings=0 --format json -o eslint-report.json
+    node_modules/.bin/eslint . \
+      --max-warnings=0 \
+      --format node_modules/eslint-formatter-codeclimate \
+      -o eslint-report.json
+
+    cat eslint-report.json
   artifacts:
     when: always
     paths: [portal-frontend/eslint-report.json]
     expire_in: 1 month
+    reports:
+      codequality: portal-frontend/eslint-report.json
 
 gitleaks:
   image:
     name: zricethezav/gitleaks:latest
     entrypoint: [""]
   stage: lint
-  rules:
-    - if: '$CI_PIPELINE_SOURCE != "schedule"'
   script: |
     cd portal-frontend
     set -euo pipefail
     echo "{}" > gitleaks.sarif
+
     gitleaks detect --source . --redact --no-banner \
       --report-format sarif --report-path gitleaks.sarif
+
+    cat gitleaks.sarif
   artifacts:
     when: always
     paths: [portal-frontend/gitleaks.sarif]
     expire_in: 1 month
+    reports:
+      sast: portal-frontend/gitleaks.sarif
