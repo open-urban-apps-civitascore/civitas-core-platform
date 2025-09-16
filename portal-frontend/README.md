@@ -50,3 +50,11 @@ or in the Playwright UI with
 ```bash
 pnpm test:e2e:ui
 ```
+
+
+### Update Local Design Tokens
+To fetch remote design tokens from Figma just run:
+```bash
+pnpm fetch-design-tokens
+```
+This command will fetch the latest version of the current used design tokens.
