@@ -1,6 +1,7 @@
 {
   "common": {
-    "type-to-search": "Zum Suchen tippen"
+    "type-to-search": "Zum Suchen tippen",
+    "search": "Durchsuchen"
   },
   "languages": {
     "german": "Deutsch",

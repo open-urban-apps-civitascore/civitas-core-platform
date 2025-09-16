@@ -1,6 +1,7 @@
 {
   "common": {
-    "type-to-search": "Type to search"
+    "type-to-search": "Type to search",
+    "search": "Search"
   },
   "languages": {
     "german": "German",
