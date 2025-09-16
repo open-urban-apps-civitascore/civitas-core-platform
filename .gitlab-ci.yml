@@ -12,9 +12,9 @@ eslint-frontend:
     pnpm install --frozen-lockfile
     pnpm add -D eslint-formatter-gitlab
 
-    - node_modules/.bin/eslint . \
-        --max-warnings=0 \
-        --format gitlab | tee eslint-report.json
+    node_modules/.bin/eslint . \
+      --max-warnings=0 \
+      --format gitlab | tee eslint-report.json
   artifacts:
     when: always
     paths: [portal-frontend/eslint-report.json]
