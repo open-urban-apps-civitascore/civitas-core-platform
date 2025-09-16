@@ -54,7 +54,6 @@ unit-tests:
     when: always
     reports:
       junit: target/surefire-reports/TEST-*.xml
-      coverage: target/site/jacoco/jacoco.xml
     paths:
       - target/surefire-reports/
       - target/site/jacoco/
@@ -107,8 +106,6 @@ merge-coverage:
     name: "merged-coverage-$CI_COMMIT_SHORT_SHA"
     paths:
       - target/site/jacoco/
-    reports:
-      coverage: target/site/jacoco/jacoco.xml
     expire_in: 1 day
 
 # Build application
@@ -116,6 +113,7 @@ build:
   stage: build
   image: maven:3-eclipse-temurin-21
   needs:
+    - compile
     - unit-tests
     - integration-tests
   dependencies:
