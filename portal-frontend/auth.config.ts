@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import type { NextAuthConfig } from 'next-auth'
-import { isTokenExpired, refreshAccessToken } from './src/lib/token-utils'
 import { JWT } from '@auth/core/jwt'
+import type { NextAuthConfig } from 'next-auth'
+
+import { isTokenExpired, refreshAccessToken } from './src/lib/token-utils'
 
 export const authConfig = {
   session: {
@@ -15,30 +16,29 @@ export const authConfig = {
     async signOut(message) {
       // Handle Keycloak logout when NextAuth signOut is called
       const keycloakIssuer = process.env.KEYCLOAK_ISSUER
-      
+
       if (!keycloakIssuer) {
         console.error('KEYCLOAK_ISSUER environment variable is not set')
         return
       }
       const { token } = message as { token: JWT | null }
 
-
       try {
         const logoutParams = new URLSearchParams({
           client_id: process.env.KEYCLOAK_CLIENT_ID || '',
         })
-        
+
         // Adding id_token_hint if available for seamless logout
         if (token?.id_token) {
           logoutParams.set('id_token_hint', token.id_token as string)
         }
-        
+
         const keycloakLogoutUrl = `${keycloakIssuer}/protocol/openid-connect/logout?${logoutParams.toString()}`
-        
+
         await fetch(keycloakLogoutUrl, {
           method: 'GET',
         })
-        
+
         console.log('Keycloak logout completed')
       } catch (error) {
         console.error('Error during Keycloak logout:', error)
@@ -58,7 +58,7 @@ export const authConfig = {
 
       return isLoggedIn
     },
-    
+
     async jwt({ token, account }) {
       if (account) {
         // First-time login, save the access_token, its expiry, refresh_token, and id_token
