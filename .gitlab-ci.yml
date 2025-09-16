@@ -32,9 +32,8 @@ gitleaks-frontend:
     echo "{}" > gitleaks.sarif
 
     gitleaks detect --source . --redact --no-banner \
-      --report-format sarif --report-path gitleaks.sarif
+      --report-format sarif -v
 
-    cat gitleaks.sarif
   artifacts:
     when: always
     paths: [portal-frontend/gitleaks.sarif]
