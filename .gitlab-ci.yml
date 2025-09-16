@@ -73,13 +73,15 @@ test-frontend:
     - pnpm config set store-dir $PNPM_STORE_DIR
     - pnpm install --frozen-lockfile
     - mkdir -p reports/junit coverage
+
+    # TODO: Remove file at the end as soon all tests are working!!!
     - |
       pnpm vitest --run --coverage \
         --reporter=default --reporter=junit \
         --outputFile=reports/junit/junit.xml \
         --coverage.reporter=cobertura --coverage.reporter=lcov \
-        --coverage.dir=coverage \ # TODO: "/" must be removed as well
-        src/lib/utils.test.ts # TODO: Remove this file as soon all tests are working!!!
+        --coverage.dir=coverage \
+        src/lib/utils.test.ts
   artifacts:
     when: always
     expire_in: 1 month
