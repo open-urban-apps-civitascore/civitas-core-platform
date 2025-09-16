@@ -1,0 +1,4 @@
+# Only ignore secrets that are save to ignore!!! Expired, rotated, ...
+
+3a3a47f7b9d09a67ab99e07f99647035d01dff04:portal-frontend/.env.local.template:generic-api-key:12
+3a3a47f7b9d09a67ab99e07f99647035d01dff04:portal-frontend/.env.local.template:aws-access-token:11
