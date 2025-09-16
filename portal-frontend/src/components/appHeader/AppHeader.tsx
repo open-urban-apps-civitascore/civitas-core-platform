@@ -5,7 +5,7 @@ import { LanguageSelect } from './components/language-select/LanguageSelect'
 
 export const AppHeader = async () => {
   return (
-    <header className="sticky top-0 left-400 bg-transparent w-full">
+    <header className="sticky top-0 left-400 bg-transparent w-full h-[calc(var(--header-height))]">
       <div className="flex mt-3.5">
         <div className="flex flex-1 items-center px-4">
           <div className="flex items-center gap-2 px-4">

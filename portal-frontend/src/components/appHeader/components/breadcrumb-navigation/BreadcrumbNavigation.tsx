@@ -2,6 +2,7 @@
 
 import { Slash } from 'lucide-react'
 import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import React, { useMemo } from 'react'
 
 import {
@@ -14,6 +15,7 @@ import {
 
 export const BreadcrumbNavigation = () => {
   const pathname = usePathname()
+  const t = useTranslations('sidebar')
 
   const breadcrumbs = useMemo(() => {
     return pathname ? pathname.split('/').filter(segment => segment !== '') : []
@@ -42,7 +44,7 @@ export const BreadcrumbNavigation = () => {
             <React.Fragment key={segment}>
               <BreadcrumbItem className={!isLast ? 'hidden md:block' : undefined}>
                 <BreadcrumbLink href={href} aria-current={isLast ? 'page' : undefined}>
-                  {segment}
+                  {t(segment)}
                 </BreadcrumbLink>
               </BreadcrumbItem>
               {!isLast && <CustomBreadcrumbSeparator />}

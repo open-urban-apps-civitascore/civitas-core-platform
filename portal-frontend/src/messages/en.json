@@ -29,6 +29,11 @@
       "releaseProcess": "Release Process",
       "distribution": "Distribution"
     },
+    "pagination": {
+      "resultsPerPage": "Results per page",
+      "page": "Page",
+      "of": "of"
+    },
     "values": {
       "status": {
         "open": "open",
