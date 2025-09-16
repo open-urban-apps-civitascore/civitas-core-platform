@@ -1,12 +1,32 @@
 import { defineConfig, devices } from '@playwright/test'
-
+import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
  */
-// import dotenv from 'dotenv';
-// import path from 'path';
-// dotenv.config({ path: path.resolve(__dirname, '.env') });
+const filename = fileURLToPath(import.meta.url)
+const dirname = path.dirname(filename)
+dotenv.config({ path: path.resolve(dirname, '.env.local'), quiet: true })
+
+if (
+  !process.env.E2E_USERNAME ||
+  !process.env.E2E_PASSWORD ||
+  !process.env.E2E_EMAIL ||
+  !process.env.E2E_FIRSTNAME ||
+  !process.env.E2E_LASTNAME
+) {
+  throw new Error(
+    'E2E_USERNAME, E2E_PASSWORD, E2E_EMAIL, E2E_FIRSTNAME and E2E_LASTNAME environment variables are required',
+  )
+}
+
+export const TEST_USERNAME = process.env.E2E_USERNAME
+export const TEST_PASSWORD = process.env.E2E_PASSWORD
+export const TEST_EMAIL = process.env.E2E_EMAIL
+export const TEST_FIRSTNAME = process.env.E2E_FIRSTNAME
+export const TEST_LASTNAME = process.env.E2E_LASTNAME
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -35,18 +55,35 @@ export default defineConfig({
   /* Configure projects for major browsers */
   projects: [
     {
+      name: 'authSetup',
+      testDir: './playwright',
+      testMatch: /auth\.setup\.ts/,
+    },
+    {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: './playwright/.auth/user.json',
+      },
+      dependencies: ['authSetup'],
     },
 
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        storageState: './playwright/.auth/user.json',
+      },
+      dependencies: ['authSetup'],
     },
 
     {
       name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      use: {
+        ...devices['Desktop Safari'],
+        storageState: './playwright/.auth/user.json',
+      },
+      dependencies: ['authSetup'],
     },
 
     /* Test against mobile viewports. */

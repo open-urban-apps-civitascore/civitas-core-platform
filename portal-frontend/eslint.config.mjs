@@ -28,6 +28,8 @@ const eslintConfig = [
       'next-env.d.ts',
       '.next',
       'coverage',
+      'playwright/.auth/**',
+      'playwright-report',
     ],
   },
   ...compat.config({
@@ -231,7 +233,7 @@ const eslintConfig = [
   },
   // config for tests
   {
-    files: ['**/*.{spec,test}.{ts,tsx}'],
+    files: ['**/*.{spec,test,setup}.{ts,tsx}'],
     ...compat.extends('plugin:jest/recommended')[0],
     languageOptions: {
       parserOptions: {
