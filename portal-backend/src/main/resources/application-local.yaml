@@ -1,7 +1,12 @@
 debug: true
 
-server:
-  port: 8089
+
+logging:
+  level:
+    root: DEBUG
+    org.hibernate: DEBUG
+    org.flywaydb: DEBUG
+
 
 app:
   url: http://localhost:8089
@@ -18,5 +23,5 @@ spring:
       ddl-auto: update  # Local-specific, might want validate/none in other envs
 
 keycloak:
-  realm: iot
+  realm: "iot"
   auth-server-url: http://localhost:8080

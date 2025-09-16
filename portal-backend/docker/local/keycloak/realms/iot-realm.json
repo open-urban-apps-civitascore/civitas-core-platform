@@ -5,16 +5,22 @@
     {
       "clientId": "iot-schema-service",
       "name": "IoT Schema Management Service",
+      "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
-      "bearerOnly": true,
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": false
+      "serviceAccountsEnabled": true,
+      "implicitFlowEnabled": false,
+      "bearerOnly": true,
+      "attributes": {
+        "access.token.lifespan": "300"
+      }
     },
     {
       "clientId": "schema-portal",
       "name": "Schema Management Portal",
+      "enabled": true,
       "protocol": "openid-connect",
       "publicClient": true,
       "standardFlowEnabled": true,

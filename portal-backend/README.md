@@ -21,7 +21,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 **Access Points:**
 - API: http://localhost:8089/v3
 - Swagger: http://localhost:8089/v3/swagger-ui.html
-- Keycloak: http://localhost:8080 (admin/admin)
+- Keycloak: http://localhost:8080
 
 ## 🔧 Configuration
 
