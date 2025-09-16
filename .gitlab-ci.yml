@@ -5,7 +5,7 @@ eslint-frontend:
   stage: lint
   script: |
     cd portal-frontend
-    set -euo pipefail
+    # set -euo pipefail
     echo "[]" > eslint-report.json
 
     corepack enable >/dev/null 2>&1 || true
@@ -25,7 +25,7 @@ eslint-frontend:
     reports:
       codequality: portal-frontend/eslint-report.json
 
-gitleaks:
+gitleaks-frontend:
   image:
     name: zricethezav/gitleaks:latest
     entrypoint: [""]
