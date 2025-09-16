@@ -10,21 +10,18 @@ import { Dataset } from '../page'
 
 interface TablePaginationProps {
   table: Table<Dataset>
-  rowCount: number
   pageSize: number
   pageIndex: number
+  totalPages: number
   className?: HTMLAttributes<HTMLDivElement>['className']
 }
 
 const TablePagination = (props: TablePaginationProps) => {
   const t = useTranslations('datasets')
-  const { table, pageSize, pageIndex, rowCount, className } = props
-  const totalPages = Math.ceil(rowCount / pageSize)
+  const { table, pageSize, pageIndex, className, totalPages } = props
 
   return (
-    <div
-      className={cn('flex items-end justify-end gap-8 text-sm h-[calc(var(--pagination-height))]', className)}
-    >
+    <div className={cn('flex items-end justify-end gap-8 text-sm h-[calc(var(--pagination-height))]', className)}>
       <div className="flex items-center space-x-2">
         <span>{t('pagination.resultsPerPage')}</span>
         <Select value={String(pageSize)} onValueChange={value => table.setPageSize(Number(value))}>

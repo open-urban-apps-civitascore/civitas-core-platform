@@ -23,6 +23,7 @@ interface DatasetsTableProps {
   datasets: Dataset[]
   rowCount: number
   pageSize: number
+  totalPages: number
   setPageSize: Dispatch<SetStateAction<number>>
   pageIndex: number
   setPageIndex: Dispatch<SetStateAction<number>>
@@ -31,7 +32,7 @@ interface DatasetsTableProps {
 }
 
 const DatasetsTable = (props: DatasetsTableProps) => {
-  const { datasets, rowCount, pageIndex, setPageIndex, pageSize, setPageSize, sorting, setSorting } = props
+  const { datasets, rowCount, pageIndex, totalPages, setPageIndex, pageSize, setPageSize, sorting, setSorting } = props
   const t = useTranslations('datasets')
   const locale = useLocale()
   const columnHelper = createColumnHelper<Dataset>()
@@ -152,15 +153,18 @@ const DatasetsTable = (props: DatasetsTableProps) => {
   return (
     <div className="h-full w-full [--pagination-height:calc(--spacing(18))] [--pagination-padding:calc(--spacing(4))]">
       <ScrollArea className="h-full h-[calc(100%-var(--pagination-height))] w-full">
-        <Table className='w-full'>
-          <TableHeader> 
+        <Table>
+          <TableHeader>
             {table.getHeaderGroups().map(group => (
               <TableRow key={group.id}>
                 {group.headers.map((header, i) => (
                   <TableHead
                     key={header.id}
                     className="text-primary-light"
-                    style={{ width: `calc(100% / ${group.headers.length + 1} ${i === 0 ? '* 2' : ''}` }}
+                    style={{
+                      width: `calc(100% / ${group.headers.length + 1}${i === 0 ? ' * 2' : ''})`,
+                      minWidth: i === 0 ? '200px' : '150px',
+                    }}
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
@@ -186,7 +190,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
         className="h-[calc(var(--pagination-height))]"
         pageIndex={pageIndex}
         pageSize={pageSize}
-        rowCount={rowCount}
+        totalPages={totalPages}
         table={table}
       />
     </div>
