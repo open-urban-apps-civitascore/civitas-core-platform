@@ -130,7 +130,7 @@ build-frontend:
       - portal-frontend/.next/
     expire_in: 1 month
 
-package-frontend:
+deploy-frontend:
   image: docker:27-dind
   stage: deploy
   needs: ["build-frontend"]
@@ -142,7 +142,8 @@ package-frontend:
     DOCKER_BUILDKIT: 1
   before_script:
     - docker info
-    - docker buildx create --use --driver docker-container --name multiarch
+    - docker context create buildx-context
+    - docker buildx create --use --driver docker-container --name multiarch buildx-context
     - docker buildx inspect --bootstrap
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
