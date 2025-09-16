@@ -17,6 +17,7 @@ eslint-frontend:
     - echo "[]" > eslint-report.json
 
     - corepack enable >/dev/null 2>&1 || true
+    - pnpm config set store-dir $PNPM_STORE_DIR
     - pnpm store path
     - pnpm install --frozen-lockfile
 
