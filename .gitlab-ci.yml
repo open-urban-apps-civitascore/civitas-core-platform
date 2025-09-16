@@ -10,11 +10,11 @@ eslint-frontend:
 
     corepack enable >/dev/null 2>&1 || true
     pnpm install --frozen-lockfile
-    pnpm add -D eslint-formatter-codeclimate
+    pnpm add -D eslint-formatter-gitlab
 
     node_modules/.bin/eslint . \
       --max-warnings=0 \
-      --format node_modules/eslint-formatter-codeclimate \
+      --format gitlab \
       -o eslint-report.json
 
     cat eslint-report.json
