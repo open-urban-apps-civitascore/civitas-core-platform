@@ -3,15 +3,23 @@ stages: [lint, test, build, cd]
 eslint-frontend:
   image: node:20
   stage: lint
-  script: |
-    cd portal-frontend
-    set -euo pipefail
-    echo "[]" > eslint-report.json
+  variables:
+    PNPM_STORE_DIR: portal-frontend/.pnpm-store
+  cache:
+    key:
+      files:
+        - portal-frontend/pnpm-lock.yaml
+    paths:
+      - portal-frontend/.pnpm-store
+  script:
+    - cd portal-frontend
+    - set -euo pipefail
+    - echo "[]" > eslint-report.json
 
-    corepack enable >/dev/null 2>&1 || true
-    pnpm install --frozen-lockfile
+    - corepack enable >/dev/null 2>&1 || true
+    - pnpm install --frozen-lockfile
 
-    pnpm eslint . \
+    - pnpm eslint . \
       --max-warnings=0 \
       --format gitlab | tee eslint-report.json
   artifacts:
@@ -26,12 +34,12 @@ gitleaks-frontend:
     name: zricethezav/gitleaks:latest
     entrypoint: [""]
   stage: lint
-  script: |
-    cd portal-frontend
-    set -euo pipefail
-    echo "{}" > gitleaks.sarif
+  script:
+    - cd portal-frontend
+    - set -euo pipefail
+    - echo "{}" > gitleaks.sarif
 
-    gitleaks detect --source . --redact --no-banner \
+    - gitleaks detect --source . --redact --no-banner \
       --report-format sarif -v
 
   artifacts:
