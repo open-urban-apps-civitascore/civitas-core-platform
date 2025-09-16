@@ -23,7 +23,7 @@ const TablePagination = (props: TablePaginationProps) => {
 
   return (
     <div
-      className={cn('flex items-center justify-end gap-8 py-4 text-sm h-[calc(var(--pagination-height))]', className)}
+      className={cn('flex items-end justify-end gap-8 text-sm h-[calc(var(--pagination-height))]', className)}
     >
       <div className="flex items-center space-x-2">
         <span>{t('pagination.resultsPerPage')}</span>

@@ -150,9 +150,9 @@ const DatasetsTable = (props: DatasetsTableProps) => {
   })
 
   return (
-    <div className="flex-col h-full [--pagination-height:calc(--spacing(18))] [--pagination-padding:calc(--spacing(4))]">
-      <ScrollArea type='always' className="h-full h-[calc(100%-var(--pagination-height))] w-full">
-        <Table>
+    <div className="h-full w-full [--pagination-height:calc(--spacing(18))] [--pagination-padding:calc(--spacing(4))]">
+      <ScrollArea className="h-full h-[calc(100%-var(--pagination-height))] w-full">
+        <Table className='w-full'>
           <TableHeader> 
             {table.getHeaderGroups().map(group => (
               <TableRow key={group.id}>

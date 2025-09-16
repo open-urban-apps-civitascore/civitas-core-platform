@@ -112,9 +112,9 @@ const DatasetsPage = () => {
   }, [pageIndex, pageSize, URL, rowCount, sorting])
 
   return (
-    <div className="w-full h-full flex-1 [--title-height:calc(--spacing(28))] [--page-padding:calc(--spacing(4))]">
-      <div className="flex items-center justify-between h-[var(--title-height)]">
-        <div className="">
+    <div className="w-full h-full flex-1 [--title-height:calc(--spacing(28))]">
+      <div className="flex justify-between h-[var(--title-height)]">
+        <div>
           <h1 className="text-xl font-semibold my-1">{t('title')}</h1>
           <p className="text-primary-light">{t('subtitle')}</p>
         </div>
@@ -123,7 +123,7 @@ const DatasetsPage = () => {
           {t('newDataset')}
         </Button>
       </div>
-      <div className="h-[calc(100%-var(--title-height))]">
+      <div className="h-[calc(100%-var(--title-height))] w-full">
         <DatasetsTable
           datasets={datasets}
           rowCount={rowCount}
