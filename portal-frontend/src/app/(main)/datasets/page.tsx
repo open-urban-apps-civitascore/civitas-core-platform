@@ -89,10 +89,6 @@ const DatasetsPage = () => {
   const [pageIndex, setPageIndex] = useState(0)
   const [sorting, setSorting] = useState<SortingState>([])
 
-  useEffect(() => {
-    console.log(sorting)
-  }, [sorting])
-
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
   useEffect(() => {
