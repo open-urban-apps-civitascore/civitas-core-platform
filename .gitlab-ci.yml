@@ -19,9 +19,10 @@ eslint-frontend:
     - corepack enable >/dev/null 2>&1 || true
     - pnpm install --frozen-lockfile
 
-    - pnpm eslint . \
-      --max-warnings=0 \
-      --format gitlab | tee eslint-report.json
+    - |
+      pnpm eslint . \
+        --max-warnings=0 \
+        --format gitlab | tee eslint-report.json
   artifacts:
     when: always
     paths: [portal-frontend/eslint-report.json]
@@ -39,8 +40,9 @@ gitleaks-frontend:
     - set -euo pipefail
     - echo "{}" > gitleaks.sarif
 
-    - gitleaks detect --source . --redact --no-banner \
-      --report-format sarif -v
+    - |
+      gitleaks detect --source . --redact --no-banner \
+        --report-format sarif -v
 
   artifacts:
     when: always
