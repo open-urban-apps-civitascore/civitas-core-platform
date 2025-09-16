@@ -151,7 +151,7 @@ deploy-frontend:
     - |
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
-        --tag $CI_REGISTRY/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/frontend-portal:latest \
+        --tag registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/frontend-portal:latest \
         --push \
         .
   after_script:
