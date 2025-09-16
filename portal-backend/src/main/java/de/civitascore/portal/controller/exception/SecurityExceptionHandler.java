@@ -51,7 +51,6 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
         .body(createErrorMap("INVALID_TOKEN", "JWT validation failed"));
   }
 
-  // Helper methods
   private void writeErrorResponse(
       HttpServletResponse response, int status, String error, String message) throws IOException {
     response.setContentType("application/json");

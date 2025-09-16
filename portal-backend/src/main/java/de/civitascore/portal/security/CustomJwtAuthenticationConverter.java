@@ -15,13 +15,24 @@ import org.springframework.stereotype.Component;
 public class CustomJwtAuthenticationConverter
     implements Converter<Jwt, AbstractAuthenticationToken> {
 
+  private static final String CLAIM_PREFERRED_USERNAME = "preferred_username";
+  private static final String CLAIM_EMAIL = "email";
+  private static final String CLAIM_TENANT_ID = "tenantId";
+  private static final String CLAIM_GIVEN_NAME = "given_name";
+  private static final String CLAIM_FAMILY_NAME = "family_name";
+  private static final String CLAIM_REALM_ACCESS = "realm_access";
+  private static final String CLAIM_ROLES = "roles";
+  private static final String ISSUER_REALMS_MARKER = "/realms/";
+  private static final String ROLE_PREFIX = "ROLE_";
+  private static final String DEFAULT_TENANT = "default";
+
   @Override
   public AbstractAuthenticationToken convert(Jwt jwt) {
-    String username = jwt.getClaimAsString("preferred_username");
-    String email = jwt.getClaimAsString("email");
+    String username = jwt.getClaimAsString(CLAIM_PREFERRED_USERNAME);
+    String email = jwt.getClaimAsString(CLAIM_EMAIL);
     String tenant = extractTenantId(jwt);
-    String givenName = jwt.getClaimAsString("given_name");
-    String familyName = jwt.getClaimAsString("family_name");
+    String givenName = jwt.getClaimAsString(CLAIM_GIVEN_NAME);
+    String familyName = jwt.getClaimAsString(CLAIM_FAMILY_NAME);
 
     Set<SimpleGrantedAuthority> authorities = extractAuthorities(jwt);
 
@@ -39,60 +50,35 @@ public class CustomJwtAuthenticationConverter
   }
 
   private String extractTenantId(Jwt jwt) {
-    // First try explicit tenantId claim
-    String tenantId = jwt.getClaimAsString("tenantId");
+    String tenantId = jwt.getClaimAsString(CLAIM_TENANT_ID);
     if (tenantId != null) {
       return tenantId;
     }
 
-    // Fallback: extract from issuer
     if (jwt.getIssuer() != null) {
       String iss = jwt.getIssuer().toString();
-      String marker = "/realms/";
-      int idx = iss.indexOf(marker);
+      int idx = iss.indexOf(ISSUER_REALMS_MARKER);
       if (idx >= 0) {
-        return iss.substring(idx + marker.length());
+        return iss.substring(idx + ISSUER_REALMS_MARKER.length());
       }
     }
-    return "default";
+    return DEFAULT_TENANT;
   }
 
   private Set<SimpleGrantedAuthority> extractAuthorities(Jwt jwt) {
     Set<SimpleGrantedAuthority> authorities = new HashSet<>();
 
-    // Extract realm roles
-    Map<String, Object> realmAccess = jwt.getClaim("realm_access");
-    if (realmAccess != null && realmAccess.get("roles") instanceof List<?>) {
+    Map<String, Object> realmAccess = jwt.getClaim(CLAIM_REALM_ACCESS);
+    if (realmAccess != null && realmAccess.get(CLAIM_ROLES) instanceof List<?>) {
       List<String> realmRoles =
-          ((List<?>) realmAccess.get("roles"))
+          ((List<?>) realmAccess.get(CLAIM_ROLES))
               .stream().filter(String.class::isInstance).map(String.class::cast).toList();
 
       realmRoles.forEach(
-          role -> authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())));
+          role -> authorities.add(new SimpleGrantedAuthority(ROLE_PREFIX + role.toUpperCase())));
     }
 
-    //    // Extract client roles (optional - if you use client-specific roles)
-    //    Map<String, Object> resourceAccess = jwt.getClaim("resource_access");
-    //    if (resourceAccess != null) {
-    //      resourceAccess.values().stream()
-    //          .filter(Map.class::isInstance)
-    //          .map(Map.class::cast)
-    //          .forEach(
-    //              clientAccess -> {
-    //                Object roles = ((Map<String, Object>) clientAccess).get("roles");
-    //                if (roles instanceof List<?>) {
-    //                  ((List<?>) roles)
-    //                      .stream()
-    //                          .filter(String.class::isInstance)
-    //                          .map(String.class::cast)
-    //                          .forEach(
-    //                              role ->
-    //                                  authorities.add(
-    //                                      new SimpleGrantedAuthority("ROLE_" +
-    // role.toUpperCase())));
-    //                }
-    //              });
-    //    }
+    // Optional: Client-specific roles can be extracted here if needed
 
     return authorities;
   }
