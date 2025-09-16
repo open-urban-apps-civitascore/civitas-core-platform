@@ -4,7 +4,7 @@ eslint-frontend:
   image: node:20
   stage: lint
   variables:
-    PNPM_STORE_DIR: portal-frontend/.pnpm-store
+    PNPM_STORE_DIR: .pnpm-store
   cache:
     key:
       files:
