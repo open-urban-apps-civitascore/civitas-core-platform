@@ -5,7 +5,7 @@ eslint-frontend:
   stage: lint
   script: |
     cd portal-frontend
-    # set -euo pipefail
+    set -euo pipefail
     echo "[]" > eslint-report.json
 
     corepack enable >/dev/null 2>&1 || true
@@ -15,7 +15,6 @@ eslint-frontend:
     - node_modules/.bin/eslint . \
         --max-warnings=0 \
         --format gitlab | tee eslint-report.json
-    - test ${PIPESTATUS[0]} -eq 0
   artifacts:
     when: always
     paths: [portal-frontend/eslint-report.json]
