@@ -1,0 +1,38 @@
+test-frontend:
+  image: node:20
+  stage: test
+  needs: ["eslint-frontend", "gitleaks-frontend"]
+  variables:
+    PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
+  cache:
+    key:
+      prefix: frontend-pnpm
+      files:
+        - portal-frontend/pnpm-lock.yaml
+    paths:
+      - portal-frontend/.pnpm-store
+  script:
+    - cd portal-frontend
+    - set -euo pipefail
+    - corepack enable >/dev/null 2>&1 || true
+    - pnpm config set store-dir $PNPM_STORE_DIR
+    - pnpm install --frozen-lockfile
+    - mkdir -p reports/junit coverage
+    - |
+      pnpm vitest --run --coverage \
+        --reporter=default --reporter=junit \
+        --outputFile=reports/junit/junit.xml \
+        --coverage.reporter=cobertura --coverage.reporter=lcov \
+        --coverage.dir=coverage \
+        src/lib/utils.test.ts
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - portal-frontend/reports/junit/
+      - portal-frontend/coverage/
+    reports:
+      junit: portal-frontend/reports/junit/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: portal-frontend/coverage/cobertura-coverage.xml
