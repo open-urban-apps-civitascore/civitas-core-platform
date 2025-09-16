@@ -51,3 +51,29 @@ gitleaks-frontend:
     expire_in: 1 month
     reports:
       sast: portal-frontend/gitleaks.sarif
+
+build-frontend:
+  image: node:20
+  stage: build
+  needs: ["eslint-frontend", "gitleaks-frontend"]
+  variables:
+    NODE_ENV: production
+    PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
+  cache:
+    key:
+      files:
+        - portal-frontend/pnpm-lock.yaml
+    paths:
+      - portal-frontend/.pnpm-store
+  script:
+    - cd portal-frontend
+    - set -euo pipefail
+    - corepack enable >/dev/null 2>&1 || true
+    - pnpm config set store-dir $PNPM_STORE_DIR
+    - pnpm install --frozen-lockfile
+    - pnpm build
+  artifacts:
+    when: on_success
+    paths:
+      - portal-frontend/.next/
+    expire_in: 1 month
