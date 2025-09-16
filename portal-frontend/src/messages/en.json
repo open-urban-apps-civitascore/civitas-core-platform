@@ -10,7 +10,10 @@
     "home": "Home",
     "menu-item": "Menu Item",
     "sub-item": "Sub Item",
+    "data-catalog": "Data Catalog",
+    "all-datasets": "All Datasets",
     "documentation": "Documentation",
+    "logout": "Log out",
     "datasets": "Datasets"
   },
   "datasets": {
