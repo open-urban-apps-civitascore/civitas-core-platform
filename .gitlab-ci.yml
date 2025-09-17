@@ -111,7 +111,7 @@ test-frontend:
 
 # Override the SAST job to use our workflow rules
 # See https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Jobs/SAST.gitlab-ci.yml
-.gitlab-advanced-sast:
+frontend-sast:
   extends: .gitlab-advanced-sast
 
 build-frontend:
