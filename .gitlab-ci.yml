@@ -111,6 +111,7 @@ test-frontend:
 
 # Override the SAST job to use our workflow rules
 sast-frontend:
+  extends: .sast-analyzer
   stage: qa
   needs: ["eslint-frontend", "gitleaks-frontend"]
   rules:
