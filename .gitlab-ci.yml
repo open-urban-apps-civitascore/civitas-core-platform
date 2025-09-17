@@ -113,6 +113,7 @@ test-frontend:
 # See https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Jobs/SAST.gitlab-ci.yml
 frontend-sast:
   extends: .gitlab-advanced-sast
+  stage: qa
 
 build-frontend:
   image: node:20
