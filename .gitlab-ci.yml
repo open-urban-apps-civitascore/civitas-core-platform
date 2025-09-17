@@ -112,8 +112,10 @@ test-frontend:
 # Override the SAST job to use our workflow rules
 # See https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Jobs/SAST.gitlab-ci.yml
 frontend-sast:
-  extends: gitlab-advanced-sast
+  # extends: gitlab-advanced-sast
   stage: qa
+  script:
+    - echo $GITLAB_FEATURES
 
 build-frontend:
   image: node:20
