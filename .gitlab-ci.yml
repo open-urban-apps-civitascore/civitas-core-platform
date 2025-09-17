@@ -12,6 +12,9 @@ workflow:
 
 stages: [lint, test, qa, build, deploy]
 
+variables:
+  GITLAB_ADVANCED_SAST_ENABLED: "true"
+
 eslint-frontend:
   image: node:20
   stage: lint
