@@ -123,7 +123,7 @@ test-frontend:
 build-frontend:
   image: node:20
   stage: build
-  needs: ["test-frontend", "sast-frontend"]
+  needs: ["test-frontend"]
   variables:
     NODE_ENV: production
     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
