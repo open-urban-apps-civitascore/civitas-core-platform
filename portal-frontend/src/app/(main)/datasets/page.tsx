@@ -75,7 +75,6 @@ export const mapDatasets = (datasets: DatasetResponse[]): Dataset[] =>
   }))
 
 export const getSortParam = (sorting: SortingState) => {
-  console.log(sorting)
   if (sorting.length > 0) {
     const sortingId = sorting[0]?.id === 'name' ? 'title' : 'modified'
     const sortParam = `&_sort=${sortingId}`
@@ -99,33 +98,12 @@ const DatasetsPage = () => {
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
+  // adjusts the pageIndex when filtering reduces the totalPages and the user is on a page beyond that limit
   useEffect(() => {
-    if (pageIndex + 1 > totalPages) {
+    if (totalPages > 0 && pageIndex + 1 > totalPages) {
       setPageIndex(totalPages - 1)
     }
   }, [totalPages, pageIndex])
-
-  useEffect(() => {
-    const sortParams = getSortParam(sorting)
-    const searchParam = getSearchParam(searchString)
-    const getDatasets = async () => {
-      try {
-        const datasetsResponse = await fetch(
-          `${URL}/datasets?_page=${pageIndex + 1}&_limit=${pageSize}${sortParams}${searchParam}`,
-        )
-        const datasetsData: DatasetResponse[] = await datasetsResponse.json()
-        const datasets = mapDatasets(datasetsData)
-        setDatasets(datasets)
-        const totalCount = Number(datasetsResponse.headers.get('X-Total-Count')) || 0
-        if (rowCount !== totalCount) {
-          setRowCount(totalCount)
-        }
-      } catch (error) {
-        console.error(error)
-      }
-    }
-    getDatasets()
-  }, [pageIndex, pageSize, URL, rowCount, sorting, searchString])
 
   useEffect(() => {
     const sortParams = getSortParam(sorting)
