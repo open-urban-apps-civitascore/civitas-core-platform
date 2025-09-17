@@ -22,9 +22,7 @@ const TablePagination = (props: TablePaginationProps) => {
   const totalPages = Math.ceil(rowCount / pageSize)
 
   return (
-    <div
-      className={cn('flex items-end justify-end gap-8 text-sm h-[calc(var(--pagination-height))]', className)}
-    >
+    <div className={cn('flex items-end justify-end gap-8 text-sm h-[calc(var(--pagination-height))]', className)}>
       <div className="flex items-center space-x-2">
         <span>{t('pagination.resultsPerPage')}</span>
         <Select value={String(pageSize)} onValueChange={value => table.setPageSize(Number(value))}>
