@@ -131,6 +131,8 @@ frontend-sast:
 frontend-pnpm-audit:
   image: node:20
   stage: qa
+  variables:
+    PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
   cache:
     key:
       prefix: frontend-pnpm
