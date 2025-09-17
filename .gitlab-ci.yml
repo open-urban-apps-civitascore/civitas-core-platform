@@ -129,7 +129,7 @@ frontend-sast:
     - if: $CI_COMMIT_TAG
 
 frontend-pnpm-audit:
-  image: node:20-alpine
+  image: node:20
   stage: qa
   script:
     - cd portal-frontend
