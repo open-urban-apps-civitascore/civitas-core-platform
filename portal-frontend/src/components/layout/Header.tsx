@@ -1,11 +1,11 @@
 import { Search } from 'lucide-react'
 import { getTranslations } from 'next-intl/server'
 
-import { LanguageSelect } from '@/components/language-select/LanguageSelect'
 import { Command } from '@/components/ui/command'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInput } from '@/components/ui/sidebar'
+import { LanguageSelect } from '../appHeader/components/language-select/LanguageSelect'
 
 export const Header = async () => {
   const t = await getTranslations('common')
