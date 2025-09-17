@@ -73,7 +73,6 @@ gitleaks-frontend:
 test-frontend:
   image: node:22
   stage: test
-  needs: ["eslint-frontend", "gitleaks-frontend"]
   variables:
     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
   cache:
@@ -122,47 +121,33 @@ frontend-sast:
       when: never
     - if: $SAST_EXCLUDED_ANALYZERS =~ /gitlab-advanced-sast/
       when: never
+    # Apply our rules
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_TAG
 
+# Override DS rules
+# See https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Jobs/Dependency-Scanning.latest.gitlab-ci.yml
 frontend-ds:
   extends: dependency-scanning
   stage: qa
   rules:
+    # Apply our rules
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_TAG
 
-# frontend-pnpm-audit:
-#   image: node:22
-#   stage: qa
-#   variables:
-#     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
-#   cache:
-#     key:
-#       prefix: frontend-pnpm
-#       files:
-#         - portal-frontend/pnpm-lock.yaml
-#     paths:
-#       - portal-frontend/.pnpm-store
-#   script:
-#     - cd portal-frontend
-#     - set -euo pipefail
-#     - corepack enable >/dev/null 2>&1 || true
-#     - pnpm config set store-dir $PNPM_STORE_DIR
-#     - pnpm install --frozen-lockfile
-#     - pnpm audit || true # Human-readable output for logs, ignore exit code, for report generation
-#     - pnpm audit --json | pnpm gitlab-pnpm-audit-parser -o gl-dependency-scanning.json
-#   artifacts:
-#     when: always
-#     reports:
-#       dependency_scanning: portal-frontend/gl-dependency-scanning.json
-
 build-frontend:
   image: node:22
   stage: build
-  needs: ["test-frontend"]
+  needs:
+    [
+      "eslint-frontend",
+      "test-frontend",
+      "gitleaks-frontend",
+      "frontend-sast",
+      "frontend-ds",
+    ]
   variables:
     NODE_ENV: production
     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
