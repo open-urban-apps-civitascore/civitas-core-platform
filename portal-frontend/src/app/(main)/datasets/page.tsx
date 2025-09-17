@@ -130,17 +130,19 @@ const DatasetsPage = () => {
   return (
     <div className="w-full h-full flex-1 [--title-height:calc(--spacing(20))] [--search-height:calc(--spacing(16))] [--page-padding:calc(--spacing(4))]">
       <div className="flex justify-between h-[var(--title-height)]">
-        <div className="">
+        <div>
           <h1 className="text-xl font-semibold my-1">{t('title')}</h1>
-          <p className="text-primary-light">{t('subtitle')}</p>
+          <p id="datasets-subheading" className="text-primary-light">
+            {t('subtitle')}
+          </p>
         </div>
         <Button variant="secondary">
           <Plus />
           {t('newDataset')}
         </Button>
       </div>
-      <div className="flex items-center h-[calc(var(--search-height))] w-xs">
-        <SearchField setSearchString={setSearchString} />
+      <div role="search" className="flex items-center h-[calc(var(--search-height))] w-xs">
+        <SearchField setSearchString={setSearchString} aria-label={t('searchDatasets')} />
       </div>
       <div className="h-[calc(100%-var(--title-height)-var(--search-height))]">
         <DatasetsTable

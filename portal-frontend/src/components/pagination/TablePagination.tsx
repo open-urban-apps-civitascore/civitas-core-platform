@@ -16,15 +16,19 @@ interface TablePaginationProps {
 }
 
 const TablePagination = (props: TablePaginationProps) => {
-  const t = useTranslations('datasets')
+  const t = useTranslations('pagination')
   const { table, pageSize, pageIndex, className, totalPages } = props
 
   return (
-    <div className={cn('flex items-end justify-end gap-8 text-sm h-[calc(var(--pagination-height))]', className)}>
+    <div
+      className={cn('flex items-end justify-end gap-8 text-sm h-[calc(var(--pagination-height))]', className)}
+      role="navigation"
+      aria-label={t('aria.pagination')}
+    >
       <div className="flex items-center space-x-2">
-        <span>{t('pagination.resultsPerPage')}</span>
+        <span>{t('resultsPerPage')}</span>
         <Select value={String(pageSize)} onValueChange={value => table.setPageSize(Number(value))}>
-          <SelectTrigger className="w-[80px]">
+          <SelectTrigger className="w-[80px]" aria-label={t('aria.resultsPerPage')}>
             <SelectValue placeholder={pageSize} />
           </SelectTrigger>
           <SelectContent>
@@ -38,12 +42,13 @@ const TablePagination = (props: TablePaginationProps) => {
       </div>
 
       <div data-testid="currentPage">
-        {t('pagination.page')} {pageIndex + 1} {t('pagination.of')} {totalPages || 1}
+        {t('page')} {pageIndex + 1} {t('of')} {totalPages || 1}
       </div>
       <div className="flex space-x-2">
         <Button
           variant="outline"
           size="icon"
+          aria-label={t('aria.firstPage')}
           onClick={() => table.setPageIndex(0)}
           disabled={!table.getCanPreviousPage()}
         >
@@ -52,17 +57,25 @@ const TablePagination = (props: TablePaginationProps) => {
         <Button
           variant="outline"
           size="icon"
+          aria-label={t('aria.previousPage')}
           onClick={() => table.previousPage()}
           disabled={!table.getCanPreviousPage()}
         >
           ‹
         </Button>
-        <Button variant="outline" size="icon" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label={t('aria.nextPage')}
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+        >
           ›
         </Button>
         <Button
           variant="outline"
           size="icon"
+          aria-label={t('aria.lastPage')}
           onClick={() => table.setPageIndex(totalPages - 1)}
           disabled={!table.getCanNextPage()}
         >

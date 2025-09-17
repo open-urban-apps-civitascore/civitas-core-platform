@@ -4,6 +4,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   HeaderContext,
+  SortDirection,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
@@ -18,6 +19,17 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 import { Dataset } from '../page'
+
+export const getAriaSort = (sorting: false | SortDirection) => {
+  switch (sorting) {
+    case 'asc':
+      return 'ascending'
+    case 'desc':
+      return 'descending'
+    default:
+      return 'none'
+  }
+}
 
 interface DatasetsTableProps {
   datasets: Dataset[]
@@ -153,18 +165,20 @@ const DatasetsTable = (props: DatasetsTableProps) => {
   return (
     <div className="h-full w-full [--pagination-height:calc(--spacing(18))] [--pagination-padding:calc(--spacing(4))]">
       <ScrollArea className="h-full h-[calc(100%-var(--pagination-height))] w-full">
-        <Table>
+        <Table aria-labelledby="datasets-subheading">
           <TableHeader>
             {table.getHeaderGroups().map(group => (
               <TableRow key={group.id}>
                 {group.headers.map((header, i) => (
                   <TableHead
                     key={header.id}
+                    scope="col"
                     className="text-primary-light"
                     style={{
                       width: `calc(100% / ${group.headers.length + 1}${i === 0 ? ' * 2' : ''})`,
                       minWidth: i === 0 ? '200px' : '150px',
                     }}
+                    aria-sort={getAriaSort(header.column.getIsSorted())}
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>

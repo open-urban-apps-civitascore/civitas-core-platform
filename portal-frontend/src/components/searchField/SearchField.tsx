@@ -1,10 +1,10 @@
 import { useTranslations } from 'next-intl'
-import { Dispatch, HTMLAttributes, SetStateAction, useEffect, useState } from 'react'
+import { Dispatch, InputHTMLAttributes, SetStateAction, useEffect, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { useDebounce } from '@/hooks/useDebounce'
 
-interface SearchFieldProps extends HTMLAttributes<HTMLInputElement> {
+interface SearchFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   setSearchString: Dispatch<SetStateAction<string>>
 }
 
@@ -21,9 +21,10 @@ export const SearchField = (props: SearchFieldProps) => {
   return (
     <Input
       {...inputProps}
-      type="text"
+      type="search"
+      aria-label={inputProps['aria-label'] ?? t('search')}
       value={input}
-      placeholder={`${t('search')}...`}
+      placeholder={inputProps.placeholder ?? `${t('search')}...`}
       onChange={event => setInput(event.target.value)}
     />
   )

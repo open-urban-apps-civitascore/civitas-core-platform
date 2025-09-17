@@ -35,9 +35,9 @@ describe('TablePagination', () => {
   })
 
   it('renders navigation buttons', () => {
-    expect(screen.getByRole('button', { name: '«' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '‹' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '›' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '»' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zur ersten Seite wechseln' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zur vorherigen Seite wechseln' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zur nächsten Seite wechseln' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zur letzten Seite wechseln' })).toBeInTheDocument()
   })
 })
