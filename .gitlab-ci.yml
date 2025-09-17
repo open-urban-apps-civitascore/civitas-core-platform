@@ -113,6 +113,7 @@ test-frontend:
 sast-frontend:
   extends: .sast-analyzer
   stage: qa
+  image: registry.gitlab.com/security-products/sast:latest
   needs: ["eslint-frontend", "gitleaks-frontend"]
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
