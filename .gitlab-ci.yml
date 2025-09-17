@@ -145,8 +145,8 @@ build-frontend:
       "eslint-frontend",
       "test-frontend",
       "gitleaks-frontend",
-      "frontend-sast",
-      "frontend-ds",
+      "gitlab-advanced-sast",
+      "dependency-scanning",
     ]
   variables:
     NODE_ENV: production
