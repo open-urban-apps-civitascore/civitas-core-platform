@@ -150,7 +150,7 @@ frontend-pnpm-audit:
   artifacts:
     when: always
     reports:
-      dependency_scanning: gl-dependency-scanning.json
+      dependency_scanning: portal-frontend/gl-dependency-scanning.json
 
 build-frontend:
   image: node:22
