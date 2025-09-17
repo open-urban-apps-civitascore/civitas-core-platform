@@ -128,6 +128,21 @@ frontend-sast:
     # Run on tag events
     - if: $CI_COMMIT_TAG
 
+frontend-pnpm-audit:
+  image: node:20-alpine
+  stage: qa
+  script:
+    - cd portal-frontend
+    - set -euo pipefail
+    - corepack enable >/dev/null 2>&1 || true
+    - pnpm config set store-dir $PNPM_STORE_DIR
+    - pnpm install --frozen-lockfile
+    - pnpm audit --json | pnpm gitlab-pnpm-audit-parser -o gl-dependency-scanning.json
+  artifacts:
+    when: always
+    reports:
+      dependency_scanning: gl-dependency-scanning.json
+
 build-frontend:
   image: node:20
   stage: build
