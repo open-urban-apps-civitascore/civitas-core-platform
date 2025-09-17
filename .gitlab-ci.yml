@@ -1,3 +1,6 @@
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+
 workflow:
   rules:
     # Run on push to main branch
@@ -6,9 +9,6 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     # Run on tag events
     - if: $CI_COMMIT_TAG
-
-include:
-  - template: Jobs/SAST.gitlab-ci.yml
 
 stages: [lint, test, qa, build, deploy]
 
@@ -109,16 +109,19 @@ test-frontend:
         coverage_format: cobertura
         path: portal-frontend/coverage/cobertura-coverage.xml
 
-#  Trying to force SAST job, because it is not triggered automatically
+# Override the SAST job to use our workflow rules
 sast-frontend:
-  stage: test
-  extends: .sast-analyzer
+  stage: qa
   needs: ["eslint-frontend", "gitleaks-frontend"]
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_TAG
 
 build-frontend:
   image: node:20
   stage: build
-  needs: ["test-frontend"]
+  needs: ["test-frontend", "sast-frontend"]
   variables:
     NODE_ENV: production
     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
