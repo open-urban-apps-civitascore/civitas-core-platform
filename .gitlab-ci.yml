@@ -1,14 +1,14 @@
 include:
   - template: Jobs/SAST.gitlab-ci.yml
 
-workflow:
-  rules:
-    # Run on push to main branch
-    - if: $CI_COMMIT_BRANCH == "main"
-    # Run on merge request branches
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    # Run on tag events
-    - if: $CI_COMMIT_TAG
+# workflow:
+#   rules:
+#     # Run on push to main branch
+#     - if: $CI_COMMIT_BRANCH == "main"
+#     # Run on merge request branches
+#     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+#     # Run on tag events
+#     - if: $CI_COMMIT_TAG
 
 stages: [lint, test, qa, build, deploy]
 
