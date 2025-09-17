@@ -50,29 +50,6 @@ eslint-frontend:
     reports:
       codequality: portal-frontend/eslint-report.json
 
-secret-detection:
-  allow_failure: false
-
-# gitleaks-frontend:
-#   image:
-#     name: zricethezav/gitleaks:latest
-#     entrypoint: [""]
-#   stage: lint
-#   script:
-#     - cd portal-frontend
-#     - set -euo pipefail
-#     - echo "{}" > gitleaks.sarif
-
-#     - |
-#       gitleaks detect --source . --redact --no-banner \
-#         --report-format sarif --report-path gitleaks.sarif -v
-#   artifacts:
-#     when: always
-#     paths: [portal-frontend/gitleaks.sarif]
-#     expire_in: 1 month
-#     reports:
-#       sast: portal-frontend/gitleaks.sarif
-
 test-frontend:
   image: node:22
   stage: test
