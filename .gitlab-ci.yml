@@ -50,6 +50,9 @@ eslint-frontend:
     reports:
       codequality: portal-frontend/eslint-report.json
 
+secret-detection:
+  allow_failure: false
+
 # gitleaks-frontend:
 #   image:
 #     name: zricethezav/gitleaks:latest
