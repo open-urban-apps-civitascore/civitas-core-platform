@@ -113,10 +113,11 @@ test-frontend:
 build-frontend:
   image: node:22
   stage: build
-  needs: [
+  needs:
+    [
       "eslint-frontend",
       "test-frontend",
-      # "gitleaks-frontend",
+      "secret_detection",
       "gitlab-advanced-sast",
       "dependency-scanning",
     ]
