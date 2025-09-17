@@ -146,6 +146,7 @@ frontend-pnpm-audit:
     - corepack enable >/dev/null 2>&1 || true
     - pnpm config set store-dir $PNPM_STORE_DIR
     - pnpm install --frozen-lockfile
+    - pnpm audit || true # Human-readable output for logs, ignore exit code, for report generation
     - pnpm audit --json | pnpm gitlab-pnpm-audit-parser -o gl-dependency-scanning.json
   artifacts:
     when: always
