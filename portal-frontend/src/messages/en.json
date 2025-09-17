@@ -7,8 +7,39 @@
     "english": "English"
   },
   "sidebar": {
+    "home": "Home",
     "menu-item": "Menu Item",
     "sub-item": "Sub Item",
-    "documentation": "Documentation"
+    "data-catalog": "Data Catalog",
+    "all-datasets": "All Datasets",
+    "documentation": "Documentation",
+    "logout": "Log out",
+    "datasets": "Datasets"
+  },
+  "datasets": {
+    "title": "Datasets",
+    "subtitle": "All available datasets of our organization",
+    "header": {
+      "name": "Name",
+      "dataSpace": "Data Space",
+      "department": "Department",
+      "creator": "Contact Person",
+      "lastUpdated": "Last Updated",
+      "status": "Access Status",
+      "releaseProcess": "Release Process",
+      "distribution": "Distribution"
+    },
+    "pagination": {
+      "resultsPerPage": "Results per page",
+      "page": "Page",
+      "of": "of"
+    },
+    "values": {
+      "status": {
+        "open": "open",
+        "closed": "closed"
+      }
+    },
+    "newDataset": "New Dataset"
   }
 }

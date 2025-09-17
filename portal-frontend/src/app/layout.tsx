@@ -2,8 +2,11 @@ import './globals.css'
 
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { SessionProvider } from 'next-auth/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale } from 'next-intl/server'
+
+import { SessionManager } from '@/components/session-manager'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -26,10 +29,14 @@ interface RootLayoutProps {
 
 const RootLayout = async ({ children }: RootLayoutProps) => {
   const locale = await getLocale()
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <NextIntlClientProvider locale={locale}>{children}</NextIntlClientProvider>
+        <SessionProvider refetchInterval={240}>
+          <SessionManager />
+          <NextIntlClientProvider locale={locale}>{children}</NextIntlClientProvider>
+        </SessionProvider>
       </body>
     </html>
   )

@@ -1,20 +1,14 @@
 import react from '@vitejs/plugin-react'
-import path from 'path'
+import tsconfigPaths from 'vite-tsconfig-paths'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tsconfigPaths()],
   test: {
     environment: 'happy-dom',
-    exclude: ['node_modules'],
+    exclude: ['node_modules', 'e2e'],
     passWithNoTests: true,
-  },
-  resolve: {
-    alias: [
-      {
-        find: '@',
-        replacement: path.resolve(__dirname, 'src'),
-      },
-    ],
+    setupFiles: './vitest.setup.ts',
+    globals: true,
   },
 })
