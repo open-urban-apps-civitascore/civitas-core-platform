@@ -11,13 +11,13 @@ import { ArrowUpDown } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Dispatch, SetStateAction } from 'react'
 
+import TablePagination from '@/components/pagination/TablePagination'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 import { Dataset } from '../page'
-import TablePagination from './TablePagination'
 
 interface DatasetsTableProps {
   datasets: Dataset[]

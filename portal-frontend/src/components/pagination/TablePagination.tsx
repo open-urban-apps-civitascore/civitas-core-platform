@@ -2,11 +2,10 @@ import { Table } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { HTMLAttributes } from 'react'
 
+import { Dataset } from '@/app/(main)/datasets/page'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-
-import { Dataset } from '../page'
 
 interface TablePaginationProps {
   table: Table<Dataset>

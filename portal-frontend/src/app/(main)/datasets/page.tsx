@@ -5,10 +5,10 @@ import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { SearchField } from '@/components/searchField/SearchField'
 import { Button } from '@/components/ui/button'
 
 import DatasetsTable from './components/DatasetsTable'
-import { SearchField } from './components/SearchField'
 
 export type Status = 'open' | 'closed' | null
 export type Creator = { id: string; firstName: string; lastName: string }

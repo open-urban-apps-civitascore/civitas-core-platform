@@ -3,9 +3,9 @@ import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it } from 'vitest'
 
+import { Dataset } from '@/app/(main)/datasets/page'
 import messages from '@/messages/de.json'
 
-import { Dataset } from '../page'
 import TablePagination from './TablePagination'
 
 const dummyTable = {
