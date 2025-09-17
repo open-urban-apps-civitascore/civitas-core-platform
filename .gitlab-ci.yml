@@ -61,7 +61,7 @@ gitleaks-frontend:
 
     - |
       gitleaks detect --source . --redact --no-banner \
-        --report-format sarif -v
+        --report-format sarif --report-path gitleaks.sarif -v
 
   artifacts:
     when: always
