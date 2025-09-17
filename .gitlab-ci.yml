@@ -131,6 +131,13 @@ frontend-sast:
 frontend-pnpm-audit:
   image: node:20
   stage: qa
+  cache:
+    key:
+      prefix: frontend-pnpm
+      files:
+        - portal-frontend/pnpm-lock.yaml
+    paths:
+      - portal-frontend/.pnpm-store
   script:
     - cd portal-frontend
     - set -euo pipefail
