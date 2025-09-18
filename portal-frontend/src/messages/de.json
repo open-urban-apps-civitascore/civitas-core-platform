@@ -1,6 +1,7 @@
 {
   "common": {
-    "type-to-search": "Zum Suchen tippen"
+    "type-to-search": "Zum Suchen tippen",
+    "search": "Durchsuchen"
   },
   "languages": {
     "german": "Deutsch",
@@ -19,6 +20,7 @@
   "datasets": {
     "title": "Datensätze",
     "subtitle": "Alle verfügbaren Datensätze unserer Organisation",
+    "searchDatasets": "Datensätze durchsuchen",
     "header": {
       "name": "Name",
       "dataSpace": "Datenraum",
@@ -29,11 +31,6 @@
       "releaseProcess": "Freigabeprozess",
       "distribution": "Distribution"
     },
-    "pagination": {
-      "resultsPerPage": "Ergebnisse pro Seite",
-      "page": "Seite",
-      "of": "von"
-    },
     "values": {
       "status": {
         "open": "offen",
@@ -41,5 +38,18 @@
       }
     },
     "newDataset": "Neuer Datensatz"
+  },
+  "pagination": {
+    "resultsPerPage": "Ergebnisse pro Seite",
+    "page": "Seite",
+    "of": "von",
+    "aria": {
+      "pagination": "Seitenauswahl für Tabelle",
+      "resultsPerPage": "Wähle Ergebnisse pro Seite",
+      "firstPage": "Zur ersten Seite wechseln",
+      "previousPage": "Zur vorherigen Seite wechseln",
+      "nextPage": "Zur nächsten Seite wechseln",
+      "lastPage": "Zur letzten Seite wechseln"
+    }
   }
 }

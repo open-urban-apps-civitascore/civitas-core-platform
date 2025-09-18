@@ -3,9 +3,9 @@ import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it } from 'vitest'
 
+import { Dataset } from '@/app/(main)/datasets/page'
 import messages from '@/messages/de.json'
 
-import { Dataset } from '../page'
 import TablePagination from './TablePagination'
 
 const dummyTable = {
@@ -17,11 +17,11 @@ const dummyTable = {
   getCanNextPage: () => true,
 } as unknown as Table<Dataset>
 
-describe('TablePagination (Render)', () => {
+describe('TablePagination', () => {
   beforeEach(() => {
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
-        <TablePagination table={dummyTable} rowCount={20} pageSize={5} pageIndex={0} />
+        <TablePagination table={dummyTable} totalPages={4} pageSize={5} pageIndex={0} />
       </NextIntlClientProvider>,
     )
   })
@@ -35,9 +35,9 @@ describe('TablePagination (Render)', () => {
   })
 
   it('renders navigation buttons', () => {
-    expect(screen.getByRole('button', { name: '«' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '‹' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '›' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '»' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zur ersten Seite wechseln' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zur vorherigen Seite wechseln' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zur nächsten Seite wechseln' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Zur letzten Seite wechseln' })).toBeInTheDocument()
   })
 })

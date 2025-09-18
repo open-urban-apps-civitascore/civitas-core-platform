@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { mappedDatasets } from '@/__mocks__/datasets/mappedDatasets.mock'
 import messages from '@/messages/de.json'
 
-import DatasetsTable from './DatasetsTable'
+import DatasetsTable, { getAriaSort } from './DatasetsTable'
 
 describe('DatasetsTable', () => {
   beforeEach(() => {
@@ -20,6 +20,7 @@ describe('DatasetsTable', () => {
           setPageSize={() => null}
           sorting={[{ desc: false, id: 'name' }]}
           setSorting={() => null}
+          totalPages={4}
         />
       </NextIntlClientProvider>,
     )
@@ -58,5 +59,13 @@ describe('DatasetsTable', () => {
     expect(cells[2]).toHaveTextContent(mappedDatasets[0].department)
     expect(cells[3]).toHaveTextContent(mappedDatasets[0].creator[0])
     expect(cells[4]).toHaveTextContent('10.09.2023')
+  })
+})
+
+describe('getAriaSort', () => {
+  it('returns the correct value', () => {
+    expect(getAriaSort('asc')).toEqual('ascending')
+    expect(getAriaSort('desc')).toEqual('descending')
+    expect(getAriaSort(false)).toEqual('none')
   })
 })

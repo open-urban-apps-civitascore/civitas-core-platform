@@ -1,6 +1,7 @@
 {
   "common": {
-    "type-to-search": "Type to search"
+    "type-to-search": "Type to search",
+    "search": "Search"
   },
   "languages": {
     "german": "German",
@@ -19,6 +20,7 @@
   "datasets": {
     "title": "Datasets",
     "subtitle": "All available datasets of our organization",
+    "searchDatasets": "Search Datasets",
     "header": {
       "name": "Name",
       "dataSpace": "Data Space",
@@ -29,11 +31,6 @@
       "releaseProcess": "Release Process",
       "distribution": "Distribution"
     },
-    "pagination": {
-      "resultsPerPage": "Results per page",
-      "page": "Page",
-      "of": "of"
-    },
     "values": {
       "status": {
         "open": "open",
@@ -41,5 +38,18 @@
       }
     },
     "newDataset": "New Dataset"
+  },
+  "pagination": {
+    "resultsPerPage": "Results per page",
+    "page": "Page",
+    "of": "of",
+    "aria": {
+      "pagination": "Pagination",
+      "resultsPerPage": "Select results per page",
+      "firstPage": "Go to first page",
+      "previousPage": "Go to previous page",
+      "nextPage": "Go to next page",
+      "lastPage": "Go to last page"
+    }
   }
 }
