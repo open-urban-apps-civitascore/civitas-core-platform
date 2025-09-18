@@ -1,8 +1,8 @@
 logging:
   level:
-    root: Info
-    org.hibernate: DEBUG
-    org.flywaydb: DEBUG
+    root: INFO
+    org.hibernate: INFO
+    org.flywaydb: INFO
 
 app:
   url: http://localhost:8089
