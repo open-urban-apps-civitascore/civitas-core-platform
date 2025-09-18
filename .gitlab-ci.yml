@@ -21,6 +21,7 @@ variables:
 eslint-frontend:
   image: node:22
   stage: lint
+  needs: []
   variables:
     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
   cache:
@@ -50,9 +51,14 @@ eslint-frontend:
     reports:
       codequality: portal-frontend/eslint-report.json
 
+secret_detection:
+  stage: lint
+  needs: []
+
 test-frontend:
   image: node:22
   stage: test
+  needs: []
   variables:
     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
   cache:
@@ -89,6 +95,14 @@ test-frontend:
       coverage_report:
         coverage_format: cobertura
         path: portal-frontend/coverage/cobertura-coverage.xml
+
+gitlab-advanced-sast:
+  stage: qa
+  needs: []
+
+dependency-scanning:
+  stage: qa
+  needs: []
 
 build-frontend:
   image: node:22
