@@ -6,7 +6,7 @@ logging:
 
 server:
   servlet:
-    context-path: /v3
+    context-path: /v2
 
 spring:
   profiles:

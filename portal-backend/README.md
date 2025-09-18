@@ -9,8 +9,14 @@ Spring Boot REST API with OAuth2/Keycloak integration.
 
 ### 1. Start Infrastructure
 ```bash
-cd docker/local/keycloak
-docker-compose -f docker-compose-local.yml up -d
+cd /docker/local/postgres
+docker-compose -f docker-compose-psotgres.yml up -d
+```
+
+It's also necessary to start Keycloak from the 'dev-environment/keycloak' folder:
+```bash
+cd /civitias-core-platform/dev-environment/keycloak
+docker-compose -f docker-compose.yml up -d
 ```
 
 ### 2. Run Application
@@ -19,19 +25,19 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 **Access Points:**
-- API: http://localhost:8089/v3
-- Swagger: http://localhost:8089/v3/swagger-ui.html
+- API: http://localhost:8089/v2
+- Swagger: http://localhost:8089/v2/swagger-ui.html
 - Keycloak: http://localhost:8080
 
 ## 🔧 Configuration
 
 ### Local Services
-| Service | URL | Port | 
-|---------|-----|------|
-| Backend API | localhost:8089/v3 | 8089 | 
-| Keycloak | localhost:8080 | 8080 | 
-| App Database | localhost:5434 | 5434 | 
-| Keycloak DB | localhost:5432 | 5432 | 
+| Service | URL               | Port | 
+|---------|-------------------|------|
+| Backend API | localhost:8089/v2 | 8089 | 
+| Keycloak | localhost:8080    | 8080 | 
+| App Database | localhost:5434    | 5434 | 
+| Keycloak DB | localhost:5432    | 5432 | 
 
 ### Key Configuration
 ```yaml
@@ -44,7 +50,7 @@ spring:
     username: iot
     password: iot
 keycloak:
-  realm: iot
+  realm: civitas-core
   auth-server-url: http://localhost:8080
 ```
 
@@ -77,8 +83,8 @@ mvn spotless:apply          # Format code
 mvn spotless:check          # Check formatting
 
 # Infrastructure
-docker-compose -f docker-compose-local.yml up -d     # Start
-docker-compose -f docker-compose-local.yml down      # Stop
+docker-compose -f docker-compose-postgres.yml up -d     # Start
+docker-compose -f docker-compose-postgres.yml down      # Stop
 ```
 
 ### CI/CD Pipeline
@@ -89,7 +95,8 @@ docker-compose -f docker-compose-local.yml down      # Stop
 ## 🔒 Authentication
 
 ### Keycloak Setup
-The `iot` realm is automatically imported from `docker/local/keycloak/realms/iot-realm.json` when starting the infrastructure.
+
+The `civitas-core` realm is automatically imported from `/civitias-core-platform/dev-environment/keycloak/realm-export.json` when starting the infrastructure.
 
 ### Getting JWT Tokens
 ```bash
@@ -101,7 +108,7 @@ curl -X POST http://localhost:8080/realms/iot/protocol/openid-connect/token \
 ### Using Tokens
 ```bash
 curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-     http://localhost:8089/v3/api/your-endpoint
+     http://localhost:8089/v2/api/your-endpoint
 ```
 
 ## 🏗️ Technology Stack
@@ -115,10 +122,10 @@ curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
 
 ## 📚 API Documentation
 
-- **Swagger UI**: http://localhost:8089/v3/swagger-ui.html
-- **OpenAPI Spec**: http://localhost:8089/v3/api-docs
-- **Health Check**: http://localhost:8089/v3/actuator/health
-- **Metrics**: http://localhost:8089/v3/actuator/prometheus
+- **Swagger UI**: http://localhost:8089/v2/swagger-ui.html
+- **OpenAPI Spec**: http://localhost:8089/v2/api-docs
+- **Health Check**: http://localhost:8089/v2/actuator/health
+- **Metrics**: http://localhost:8089/v2/actuator/prometheus
 
 ## 🔧 Troubleshooting
 

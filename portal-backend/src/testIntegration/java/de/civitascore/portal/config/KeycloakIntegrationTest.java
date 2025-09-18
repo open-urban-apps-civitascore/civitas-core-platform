@@ -40,10 +40,7 @@ class KeycloakIntegrationTest extends BaseKeycloakIntegrationTest {
     void shouldReturn401WithoutToken() {
       ResponseEntity<String> response =
           restTemplate.exchange(
-              "/users/me", // Correct path without /v3 prefix
-              HttpMethod.GET,
-              new HttpEntity<>(new HttpHeaders()),
-              String.class);
+              "/users/me", HttpMethod.GET, new HttpEntity<>(new HttpHeaders()), String.class);
 
       assertThat(response.getStatusCode())
           .as("Should return UNAUTHORIZED status")

@@ -40,7 +40,7 @@ management:
 
 springdoc:
   api-docs:
-    path: /v3/api-docs
+    path: /v2/api-docs
     version: openapi-3-1
   swagger-ui:
     path: /swagger-ui.html
