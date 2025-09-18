@@ -38,7 +38,7 @@ public class SecurityConfig {
                         "/swagger-resources/**",
                         "/webjars/**")
                     .permitAll()
-                    .requestMatchers("/v3/**")
+                    .requestMatchers("/v2/**")
                     .authenticated()
                     .anyRequest()
                     .authenticated())

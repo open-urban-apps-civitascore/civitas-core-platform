@@ -19,7 +19,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     classes = PortalBackendApplication.class)
-@ActiveProfiles("test")
+@ActiveProfiles("test-integration")
 @Testcontainers
 @Import(TestContainerConfiguration.class)
 public abstract class BaseKeycloakIntegrationTest {

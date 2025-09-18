@@ -15,8 +15,8 @@ RUN --mount=type=cache,target=/root/.m2 \
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine
 
-LABEL maintainer="CIVITAS CORE Team"
-LABEL description="CIVITAS CORE Portal Backend - IoT Schema Service"
+LABEL maintainer="CIVITAS/CORE Team"
+LABEL description="CIVITAS/CORE Portal Backend - IoT Schema Service"
 
 # Install dependencies and create user
 ENV TZ=Europe/Berlin
@@ -44,8 +44,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # JVM optimization for containers
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 
-# Set default Spring profile for Docker
-ENV SPRING_PROFILES_ACTIVE=local
 
 # Run the application
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]

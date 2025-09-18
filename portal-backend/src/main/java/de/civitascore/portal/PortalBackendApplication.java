@@ -9,7 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication(scanBasePackages = {"de.civitascore.portal"})
 @OpenAPIDefinition(
     servers = {@Server(url = "${app.url:http://localhost:8089}")},
-    info = @Info(title = "CIVITAS-Core Data Mgmt API", version = "1.0.0"))
+    info = @Info(title = "CIVITAS/CORE Data Management API", version = "2.0.0"))
 public class PortalBackendApplication {
 
   public static void main(String[] args) {

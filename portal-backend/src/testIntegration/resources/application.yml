@@ -10,7 +10,7 @@ server:
 
 spring:
   profiles:
-    active: test
+    active: test-integration
   application:
     name: iot-schema-service
   security:
@@ -35,11 +35,3 @@ management:
     health:
       probes:
         enabled: true
-
-springdoc:
-  api-docs:
-    path: /v3/api-docs
-    version: openapi-3-1
-  swagger-ui:
-    path: /swagger-ui.html
-    enabled: true

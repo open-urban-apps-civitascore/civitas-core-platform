@@ -9,7 +9,7 @@ logging:
 server:
   port: 8089
   servlet:
-    context-path: /v3
+    context-path: /v2
 
 spring:
   profiles:
