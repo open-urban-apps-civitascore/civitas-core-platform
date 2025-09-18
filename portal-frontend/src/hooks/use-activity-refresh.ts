@@ -25,7 +25,7 @@ export const useActivityRefresh = () => {
     }
 
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart']
-    
+
     events.forEach(event => {
       document.addEventListener(event, handleActivity, { passive: true })
     })
