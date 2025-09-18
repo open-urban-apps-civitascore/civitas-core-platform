@@ -14,7 +14,6 @@ spring:
     password: iot
 
   jpa:
-    show-sql: true  # Usually helpful for local development
     hibernate:
       ddl-auto: validate
 

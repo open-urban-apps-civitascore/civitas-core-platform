@@ -18,7 +18,6 @@ class CustomJwtAuthenticationConverterTest {
 
   @Test
   void givenValidJwt_whenConvert_thenReturnCustomAuthenticationToken() {
-    // Given
     Jwt jwt =
         Jwt.withTokenValue("token")
             .header("alg", "RS256")
@@ -32,10 +31,8 @@ class CustomJwtAuthenticationConverterTest {
             .expiresAt(Instant.now().plusSeconds(3600))
             .build();
 
-    // When
     CustomJwtAuthenticationToken result = (CustomJwtAuthenticationToken) converter.convert(jwt);
 
-    // Then
     assertThat(result).isNotNull();
 
     PrincipalUserDetails principal = result.getPrincipal();
