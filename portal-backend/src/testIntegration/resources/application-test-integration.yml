@@ -17,6 +17,6 @@ spring:
 
 logging:
   level:
-    de.civitascore: DEBUG
-    org.springframework.security: DEBUG
+    de.civitascore: INFO
+    org.springframework.security: INFO
     org.testcontainers: INFO

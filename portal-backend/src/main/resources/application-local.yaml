@@ -9,13 +9,15 @@ app:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5434/iot_schema  # Port 5434 for app DB
-    username: iot
-    password: iot
+    url: jdbc:postgresql://localhost:5432/portal_backend
+    username: admin
+    password: admin
 
   jpa:
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate.format_sql: true
 
 keycloak:
   realm: "civitas-core"

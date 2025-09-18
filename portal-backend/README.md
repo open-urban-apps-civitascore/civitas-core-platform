@@ -8,15 +8,20 @@ Spring Boot REST API with OAuth2/Keycloak integration.
 - Java 21, Maven 3.6+, Docker & Docker Compose
 
 ### 1. Start Infrastructure
+
+> **Recommended:**  
+> For a consistent and tested local development setup, use the Docker configurations in the `dev-environment` directory.
+
+Start Postgres:
 ```bash
-cd /docker/local/postgres
-docker-compose -f docker-compose-psotgres.yml up -d
+cd civitas-core-platform/dev-environment/postgres
+docker-compose docker-compose.yml up -d
 ```
 
 It's also necessary to start Keycloak from the 'dev-environment/keycloak' folder:
 ```bash
 cd /civitias-core-platform/dev-environment/keycloak
-docker-compose -f docker-compose.yml up -d
+docker-compose docker-compose.yml up -d
 ```
 
 ### 2. Run Application
@@ -36,8 +41,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 |---------|-------------------|------|
 | Backend API | localhost:8089/v2 | 8089 | 
 | Keycloak | localhost:8080    | 8080 | 
-| App Database | localhost:5434    | 5434 | 
-| Keycloak DB | localhost:5432    | 5432 | 
+| App Database | localhost:5432    | 5432 | 
 
 ### Key Configuration
 ```yaml
@@ -46,9 +50,9 @@ server:
   port: 8089
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5434/iot_schema
-    username: iot
-    password: iot
+    url: jdbc:postgresql://localhost:5432/portal_backend
+    username: admin
+    password: admin
 keycloak:
   realm: civitas-core
   auth-server-url: http://localhost:8080
@@ -132,17 +136,17 @@ curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
 ### Common Issues
 ```bash
 # Check ports
-lsof -i :8089 :8080 :5432 :5434
+lsof -i :8089 :8080 :5432 
 
 # Test database
-docker-compose exec postgres-portal psql -U iot -d iot_schema -c "\dt"
+docker-compose exec postgres-portal psql -U admin -d portal_backend -c "\dt"
 
 # Reset environment
-docker-compose -f docker-compose-local.yml down -v && docker volume prune
+docker-compose -f docker-compose.yml down -v && docker volume prune
 ```
 
 ### Development Workflow
-1. Start infrastructure: `docker-compose -f docker-compose-local.yml up -d`
+1. Start infrastructure: `docker-compose -f docker-compose.yml up -d`
 2. Run application: `mvn spring-boot:run -Dspring-boot.run.profiles=local`
 3. Make changes
 4. Test: `mvn test` (quick) or `mvn verify` (full)

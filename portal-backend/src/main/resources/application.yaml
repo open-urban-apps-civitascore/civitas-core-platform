@@ -1,10 +1,8 @@
-debug: true
-
 logging:
   level:
     root: INFO
-    org.hibernate: WARN
-    org.flywaydb: WARN
+    org.hibernate: INFO
+    org.flywaydb: INFO
 
 server:
   port: 8089
@@ -15,7 +13,7 @@ spring:
   profiles:
     active: local
   application:
-    name: iot-schema-service
+    name: "CIVITAS/CORE Data Management API"
   security:
     oauth2:
       resourceserver:
@@ -23,10 +21,6 @@ spring:
           jwk-set-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}/protocol/openid-connect/certs"
           # Token issuer validation
           issuer-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}"
-
-  jpa:
-    properties:
-      hibernate.format_sql: true
 
 management:
   endpoints:
