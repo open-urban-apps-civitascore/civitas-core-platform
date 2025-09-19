@@ -4,6 +4,7 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   HeaderContext,
+  SortDirection,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
@@ -11,18 +12,30 @@ import { ArrowUpDown } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Dispatch, SetStateAction } from 'react'
 
+import TablePagination from '@/components/pagination/TablePagination'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 import { Dataset } from '../page'
-import TablePagination from './TablePagination'
+
+export const getAriaSort = (sorting: false | SortDirection) => {
+  switch (sorting) {
+    case 'asc':
+      return 'ascending'
+    case 'desc':
+      return 'descending'
+    default:
+      return 'none'
+  }
+}
 
 interface DatasetsTableProps {
   datasets: Dataset[]
   rowCount: number
   pageSize: number
+  totalPages: number
   setPageSize: Dispatch<SetStateAction<number>>
   pageIndex: number
   setPageIndex: Dispatch<SetStateAction<number>>
@@ -31,7 +44,7 @@ interface DatasetsTableProps {
 }
 
 const DatasetsTable = (props: DatasetsTableProps) => {
-  const { datasets, rowCount, pageIndex, setPageIndex, pageSize, setPageSize, sorting, setSorting } = props
+  const { datasets, rowCount, pageIndex, totalPages, setPageIndex, pageSize, setPageSize, sorting, setSorting } = props
   const t = useTranslations('datasets')
   const locale = useLocale()
   const columnHelper = createColumnHelper<Dataset>()
@@ -152,15 +165,20 @@ const DatasetsTable = (props: DatasetsTableProps) => {
   return (
     <div className="h-full w-full [--pagination-height:calc(--spacing(18))] [--pagination-padding:calc(--spacing(4))]">
       <ScrollArea className="h-full h-[calc(100%-var(--pagination-height))] w-full">
-        <Table className="w-full">
+        <Table aria-labelledby="datasets-subheading">
           <TableHeader>
             {table.getHeaderGroups().map(group => (
               <TableRow key={group.id}>
                 {group.headers.map((header, i) => (
                   <TableHead
                     key={header.id}
+                    scope="col"
                     className="text-primary-light"
-                    style={{ width: `calc(100% / ${group.headers.length + 1} ${i === 0 ? '* 2' : ''}` }}
+                    style={{
+                      width: `calc(100% / ${group.headers.length + 1}${i === 0 ? ' * 2' : ''})`,
+                      minWidth: i === 0 ? '200px' : '150px',
+                    }}
+                    aria-sort={getAriaSort(header.column.getIsSorted())}
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
@@ -186,7 +204,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
         className="h-[calc(var(--pagination-height))]"
         pageIndex={pageIndex}
         pageSize={pageSize}
-        rowCount={rowCount}
+        totalPages={totalPages}
         table={table}
       />
     </div>

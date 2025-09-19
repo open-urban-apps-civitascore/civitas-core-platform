@@ -5,18 +5,20 @@ import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { SearchField } from '@/components/searchField/SearchField'
 import { Button } from '@/components/ui/button'
 
 import DatasetsTable from './components/DatasetsTable'
 
 export type Status = 'open' | 'closed' | null
-type Creator = { id: string; firstName: string; lastName: string }
-type Distribution = {
+export type Creator = { id: string; firstName: string; lastName: string }
+export type Distribution = {
   format: string
   title: string
   url: string
 }
-type Category = { id: string; title: string }
+
+export type Category = { id: string; title: string }
 
 export type Catalog = {
   id: string
@@ -75,11 +77,14 @@ export const mapDatasets = (datasets: DatasetResponse[]): Dataset[] =>
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {
     const sortingId = sorting[0]?.id === 'name' ? 'title' : 'modified'
-    const sortParam = sorting[0]?.desc ? `&_sort=-${sortingId}` : `&_sort=${sortingId}`
-    return sortParam
+    const sortParam = `&_sort=${sortingId}`
+    const orderParam = sorting[0]?.desc ? `&_order=desc` : `&_order=asc`
+    return `${sortParam}${orderParam}`
   }
   return ''
 }
+
+export const getSearchParam = (searchString: string) => (searchString ? `&q=${searchString}` : '')
 
 const DatasetsPage = () => {
   const t = useTranslations('datasets')
@@ -88,42 +93,58 @@ const DatasetsPage = () => {
   const [pageSize, setPageSize] = useState(10)
   const [pageIndex, setPageIndex] = useState(0)
   const [sorting, setSorting] = useState<SortingState>([])
+  const [searchString, setSearchString] = useState('')
+  const totalPages = Math.ceil(rowCount / pageSize)
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
+  // adjusts the pageIndex when filtering reduces the totalPages and the user is on a page beyond that limit
+  useEffect(() => {
+    if (totalPages > 0 && pageIndex + 1 > totalPages) {
+      setPageIndex(totalPages - 1)
+    }
+  }, [totalPages, pageIndex])
+
   useEffect(() => {
     const sortParams = getSortParam(sorting)
+    const searchParam = getSearchParam(searchString)
     const getDatasets = async () => {
       try {
         const datasetsResponse = await fetch(
-          `${URL}/datasets?_page=${pageIndex + 1}&_per_page=${pageSize}${sortParams}`,
+          `${URL}/datasets?_page=${pageIndex + 1}&_limit=${pageSize}${sortParams}${searchParam}`,
         )
-        const datasetsData = await datasetsResponse.json()
-        const datasets = mapDatasets(datasetsData.data as DatasetResponse[])
+        const datasetsData: DatasetResponse[] = await datasetsResponse.json()
+        const datasets = mapDatasets(datasetsData)
         setDatasets(datasets)
-        if (rowCount === 0) {
-          setRowCount(datasetsData.items)
+        const totalCount = Number(datasetsResponse.headers.get('X-Total-Count')) || 0
+        if (rowCount !== totalCount) {
+          setRowCount(totalCount)
         }
       } catch (error) {
         console.error(error)
       }
     }
     getDatasets()
-  }, [pageIndex, pageSize, URL, rowCount, sorting])
+  }, [pageIndex, pageSize, URL, rowCount, sorting, searchString])
 
   return (
-    <div className="w-full h-full flex-1 [--title-height:calc(--spacing(28))]">
+    <div className="w-full h-full flex-1 [--title-height:calc(--spacing(20))] [--search-height:calc(--spacing(16))] [--page-padding:calc(--spacing(4))]">
       <div className="flex justify-between h-[var(--title-height)]">
         <div>
-          <h1 className="text-xl font-semibold my-1">{t('title')}</h1>
-          <p className="text-primary-light">{t('subtitle')}</p>
+          <h1 className="my-1">{t('title')}</h1>
+          <p id="datasets-subheading" className="text-primary-light">
+            {t('subtitle')}
+          </p>
         </div>
         <Button variant="secondary">
           <Plus />
           {t('newDataset')}
         </Button>
       </div>
-      <div className="h-[calc(100%-var(--title-height))] w-full">
+      <div role="search" className="flex items-center h-[calc(var(--search-height))] w-xs">
+        <SearchField setSearchString={setSearchString} aria-label={t('searchDatasets')} />
+      </div>
+      <div className="h-[calc(100%-var(--title-height)-var(--search-height))]">
         <DatasetsTable
           datasets={datasets}
           rowCount={rowCount}
@@ -133,6 +154,7 @@ const DatasetsPage = () => {
           setPageSize={setPageSize}
           sorting={sorting}
           setSorting={setSorting}
+          totalPages={totalPages}
         />
       </div>
     </div>

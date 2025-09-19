@@ -1,21 +1,23 @@
 import './globals.css'
 
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google'
 import { SessionProvider } from 'next-auth/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale } from 'next-intl/server'
 
 import { SessionManager } from '@/components/session-manager'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const ibmPlexSans = IBM_Plex_Sans({
+  variable: '--font-ibm-plex-sans',
   subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
 })
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: '--font-ibm-plex-mono',
   subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
 })
 
 export const metadata: Metadata = {
@@ -32,7 +34,7 @@ const RootLayout = async ({ children }: RootLayoutProps) => {
 
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${ibmPlexSans.variable}  ${ibmPlexMono.variable} antialiased`}>
         <SessionProvider refetchInterval={240}>
           <SessionManager />
           <NextIntlClientProvider locale={locale}>{children}</NextIntlClientProvider>
