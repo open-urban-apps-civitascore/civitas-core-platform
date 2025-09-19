@@ -3,6 +3,7 @@
 ### Configuring Keycloak
 
 1. Start keycloak and import the realm-export by running the following command in `dev-environment/keycloak`:
+
    ```bash
    docker compose up
    ```
@@ -24,6 +25,7 @@
    ```
 
 ### Running json server
+
 For mocking data in the frontend the json-server can be used.
 
 1. Adjust the port in the env variable JSON_SERVER_PORT if you need to use another port.
@@ -41,20 +43,24 @@ To run e2e tests locally, ensure that you have
 3. adjusted your local `.env.local` file with the variables matching the user you created in your local Keycloak instance
 
 That's it!  
-You can now run your e2e tests either in the CLI with  
+You can now run your e2e tests either in the CLI with
+
 ```bash
 pnpm test:e2e
 ```
 
-or in the Playwright UI with  
+or in the Playwright UI with
+
 ```bash
 pnpm test:e2e:ui
 ```
 
-
 ### Update Local Design Tokens
+
 To fetch remote design tokens from Figma just run:
+
 ```bash
 pnpm fetch-design-tokens
 ```
+
 This command will fetch the latest version of the current used design tokens.
