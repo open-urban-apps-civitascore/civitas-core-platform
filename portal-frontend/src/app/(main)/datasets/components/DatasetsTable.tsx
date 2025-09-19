@@ -1,22 +1,19 @@
 import {
   createColumnHelper,
-  flexRender,
   getCoreRowModel,
   getSortedRowModel,
-  HeaderContext,
   SortDirection,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
-import { ArrowUpDown } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 import { Dispatch, SetStateAction } from 'react'
 
-import TablePagination from '@/components/pagination/TablePagination'
+import { DataTable } from '@/components/table/DataTable'
+import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import TablePagination from '@/components/table/table-pagination/TablePagination'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 import { Dataset } from '../page'
 
@@ -49,59 +46,43 @@ const DatasetsTable = (props: DatasetsTableProps) => {
   const locale = useLocale()
   const columnHelper = createColumnHelper<Dataset>()
 
-  const getColumnHeader = <TValue,>(title: string) => {
-    const Header = (ctx: HeaderContext<Dataset, TValue>) => {
-      const { column } = ctx
-      return (
-        <>
-          {title === 'id' ? 'id' : t(`header.${title}`)}
-          {(title === 'name' || title === 'lastUpdated') && (
-            <Button
-              className="hover:bg-transparent hover:cursor-pointer"
-              variant="ghost"
-              onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            >
-              <ArrowUpDown />
-            </Button>
-          )}
-        </>
-      )
-    }
-    return Header
-  }
-
   const columns = [
     columnHelper.accessor('id', {
-      header: getColumnHeader('id'),
+      header: 'id',
       cell: info => info.getValue(),
       enableHiding: true,
     }),
     columnHelper.accessor('name', {
-      header: getColumnHeader('name'),
+      header: ({ column }) => <SortableTableHeader column={column} title={t('header.name')} />,
       cell: info => info.getValue(),
-      meta: { flex: 2 },
+      meta: {
+        style: {
+          width: '22.22%',
+          minWidth: '200px',
+        },
+      },
     }),
     columnHelper.accessor('dataSpace', {
-      header: getColumnHeader('dataSpace'),
+      header: t('header.dataSpace'),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('department', {
-      header: getColumnHeader('department'),
+      header: t('header.department'),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('creator', {
-      header: getColumnHeader('creator'),
+      header: t('header.creator'),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('lastUpdated', {
-      header: getColumnHeader('lastUpdated'),
+      header: ({ column }) => <SortableTableHeader column={column} title={t('header.lastUpdated')} />,
       cell: info => {
         const formattedDate = new Date(info.getValue()).toLocaleDateString('en-GB')
         return locale === 'de' ? formattedDate.replaceAll('/', '.') : formattedDate
       },
     }),
     columnHelper.accessor('status', {
-      header: getColumnHeader('status'),
+      header: t('header.status'),
       cell: info => {
         const value = info.getValue()
         switch (value) {
@@ -115,11 +96,11 @@ const DatasetsTable = (props: DatasetsTableProps) => {
       },
     }),
     columnHelper.accessor('releaseProcess', {
-      header: getColumnHeader('releaseProcess'),
+      header: t('header.releaseProcess'),
       cell: '',
     }),
     columnHelper.accessor('distribution', {
-      header: getColumnHeader('distribution'),
+      header: t('header.distribution'),
       cell: info => {
         const value = info.getValue()
         if (value) {
@@ -165,39 +146,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
   return (
     <div className="h-full w-full [--pagination-height:calc(--spacing(18))] [--pagination-padding:calc(--spacing(4))]">
       <ScrollArea className="h-full h-[calc(100%-var(--pagination-height))] w-full">
-        <Table aria-labelledby="datasets-subheading">
-          <TableHeader>
-            {table.getHeaderGroups().map(group => (
-              <TableRow key={group.id}>
-                {group.headers.map((header, i) => (
-                  <TableHead
-                    key={header.id}
-                    scope="col"
-                    className="text-primary-light"
-                    style={{
-                      width: `calc(100% / ${group.headers.length + 1}${i === 0 ? ' * 2' : ''})`,
-                      minWidth: i === 0 ? '200px' : '150px',
-                    }}
-                    aria-sort={getAriaSort(header.column.getIsSorted())}
-                  >
-                    {flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.map(row => (
-              <TableRow className="h-16" key={row.id}>
-                {row.getVisibleCells().map(cell => (
-                  <TableCell className="whitespace-normal" key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable table={table} />
         <ScrollBar orientation="horizontal" />
       </ScrollArea>
       <TablePagination
