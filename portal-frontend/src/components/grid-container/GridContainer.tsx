@@ -10,7 +10,6 @@ interface GrindContainerProps extends Pick<HTMLAttributes<HTMLDivElement>, 'clas
 
 export const GridContainer = (props: GrindContainerProps) => {
   const { children, columns, shouldRespectSearchHeight = true, shouldRespectTitleHeight = true, className } = props
-  // const height = `h-[calc(100%${shouldRespectTitleHeight ? '-var(--title-height)' : ''}${shouldRespectSearchHeight ? '-var(--search-height)' : ''})]`
   const height = `calc(100%${shouldRespectTitleHeight ? ' - var(--title-height)' : ''}${shouldRespectSearchHeight ? ' - var(--search-height)' : ''})`
   const gridCols = `repeat(${columns}, minmax(0, 1fr))`
   return (

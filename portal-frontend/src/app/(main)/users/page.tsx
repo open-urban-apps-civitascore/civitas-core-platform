@@ -10,26 +10,6 @@ import { SearchField } from '@/components/searchField/SearchField'
 
 import UsersTable from './components/UsersTable'
 
-export type Status = 'open' | 'closed' | null
-export type Creator = { id: string; firstName: string; lastName: string }
-export type Distribution = {
-  format: string
-  title: string
-  url: string
-}
-
-export type Category = { id: string; title: string }
-
-export type Catalog = {
-  id: string
-  [`dct:title`]: string
-  [`dct:description`]: string
-  [`dct:publisherId`]: string
-  [`dcat:datasetIds`]: string[]
-  [`dct:issued`]: string
-  [`dct:modified`]: string
-}
-
 export type UserResponse = {
   id: string
   firstName: string
@@ -67,7 +47,7 @@ export const getSortParam = (sorting: SortingState) => {
 
 export const getSearchParam = (searchString: string) => (searchString ? `&q=${searchString}` : '')
 
-const DatasetsPage = () => {
+const UsersPage = () => {
   const t = useTranslations('users')
   const [users, setUsers] = useState<User[]>([])
   const [rowCount, setRowCount] = useState(0)
@@ -91,13 +71,13 @@ const DatasetsPage = () => {
     const searchParam = getSearchParam(searchString)
     const getUsers = async () => {
       try {
-        const userssResponse = await fetch(
+        const usersResponse = await fetch(
           `${URL}/users?_page=${pageIndex + 1}&_limit=${pageSize}${sortParams}${searchParam}`,
         )
-        const usersData: UserResponse[] = await userssResponse.json()
+        const usersData: UserResponse[] = await usersResponse.json()
         const users = mapUsers(usersData)
         setUsers(users)
-        const totalCount = Number(userssResponse.headers.get('X-Total-Count')) || 0
+        const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
         if (rowCount !== totalCount) {
           setRowCount(totalCount)
         }
@@ -132,4 +112,4 @@ const DatasetsPage = () => {
   )
 }
 
-export default DatasetsPage
+export default UsersPage
