@@ -15,13 +15,14 @@
     "all-datasets": "All Datasets",
     "documentation": "Documentation",
     "logout": "Log out",
-    "datasets": "Datasets"
+    "datasets": "Datasets",
+    "users": "Users"
   },
   "datasets": {
     "title": "Datasets",
     "subtitle": "All available datasets of our organization",
     "searchDatasets": "Search Datasets",
-    "header": {
+    "tableHeaders": {
       "name": "Name",
       "dataSpace": "Data Space",
       "department": "Department",
@@ -31,13 +32,22 @@
       "releaseProcess": "Release Process",
       "distribution": "Distribution"
     },
-    "values": {
+    "tableValues": {
       "status": {
         "open": "open",
         "closed": "closed"
       }
     },
     "newDataset": "New Dataset"
+  },
+  "users": {
+    "title": "Users",
+    "tableHeaders": {
+      "displayName": "Display Name",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "E-Mail"
+    }
   },
   "pagination": {
     "resultsPerPage": "Results per page",

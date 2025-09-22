@@ -5,6 +5,8 @@ import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { GridContainer } from '@/components/grid-container/GridContainer'
+import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
 import { Button } from '@/components/ui/button'
 
@@ -127,24 +129,18 @@ const DatasetsPage = () => {
     getDatasets()
   }, [pageIndex, pageSize, URL, rowCount, sorting, searchString])
 
+  const CustomElement = (
+    <Button variant="secondary">
+      <Plus />
+      {t('newDataset')}
+    </Button>
+  )
+
   return (
-    <div className="w-full h-full flex-1 [--title-height:calc(--spacing(20))] [--search-height:calc(--spacing(16))] [--page-padding:calc(--spacing(4))]">
-      <div className="flex justify-between h-[var(--title-height)]">
-        <div>
-          <h1 className="my-1">{t('title')}</h1>
-          <p id="datasets-subheading" className="text-primary-light">
-            {t('subtitle')}
-          </p>
-        </div>
-        <Button variant="secondary">
-          <Plus />
-          {t('newDataset')}
-        </Button>
-      </div>
-      <div role="search" className="flex items-center h-[calc(var(--search-height))] w-xs">
-        <SearchField setSearchString={setSearchString} aria-label={t('searchDatasets')} />
-      </div>
-      <div className="h-[calc(100%-var(--title-height)-var(--search-height))]">
+    <div className="h-full min-h-full max-h-full">
+      <PageHeader title={t('title')} subtitle={t('subtitle')} customElement={CustomElement} />
+      <SearchField setSearchString={setSearchString} aria-label={t('searchDatasets')} />
+      <GridContainer columns={1}>
         <DatasetsTable
           datasets={datasets}
           rowCount={rowCount}
@@ -156,7 +152,7 @@ const DatasetsPage = () => {
           setSorting={setSorting}
           totalPages={totalPages}
         />
-      </div>
+      </GridContainer>
     </div>
   )
 }

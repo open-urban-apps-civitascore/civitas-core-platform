@@ -32,7 +32,8 @@
     "src/**/*.tsx",
     ".next/types/**/*.ts",
     "playwright/**/*.ts",
-    "e2e/**/*.ts"
+    "e2e/**/*.ts",
+    "types"
   ],
   "exclude": ["node_modules"]
 }

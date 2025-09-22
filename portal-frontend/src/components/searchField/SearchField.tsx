@@ -19,13 +19,15 @@ export const SearchField = (props: SearchFieldProps) => {
   }, [debouncedInput, setSearchString])
 
   return (
-    <Input
-      {...inputProps}
-      type="search"
-      aria-label={inputProps['aria-label'] ?? t('search')}
-      value={input}
-      placeholder={inputProps.placeholder ?? `${t('search')}...`}
-      onChange={event => setInput(event.target.value)}
-    />
+    <div role="search" className="flex items-center h-[calc(var(--search-height))] w-xs">
+      <Input
+        {...inputProps}
+        type="search"
+        aria-label={inputProps['aria-label'] ?? t('search')}
+        value={input}
+        placeholder={inputProps.placeholder ?? `${t('search')}...`}
+        onChange={event => setInput(event.target.value)}
+      />
+    </div>
   )
 }
