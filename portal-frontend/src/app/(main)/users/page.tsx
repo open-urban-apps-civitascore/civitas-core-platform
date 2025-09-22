@@ -58,7 +58,7 @@ export const getSortParam = (sorting: SortingState) => {
 
 export const getSearchParam = (searchString: string) => (searchString ? `&q=${searchString}` : '')
 
-const DatasetsPage = () => {
+const UsersPage = () => {
   const t = useTranslations('users')
   const [users, setUsers] = useState<ListUser[]>([])
   const [rowCount, setRowCount] = useState(0)
@@ -82,13 +82,13 @@ const DatasetsPage = () => {
     const searchParam = getSearchParam(searchString)
     const getUsers = async () => {
       try {
-        const userssResponse = await fetch(
+        const usersResponse = await fetch(
           `${URL}/users?_page=${pageIndex + 1}&_limit=${pageSize}${sortParams}${searchParam}`,
         )
-        const usersData: UserResponse[] = await userssResponse.json()
+        const usersData: UserResponse[] = await usersResponse.json()
         const users = mapListUsers(usersData)
         setUsers(users)
-        const totalCount = Number(userssResponse.headers.get('X-Total-Count')) || 0
+        const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
         if (rowCount !== totalCount) {
           setRowCount(totalCount)
         }
@@ -123,4 +123,4 @@ const DatasetsPage = () => {
   )
 }
 
-export default DatasetsPage
+export default UsersPage
