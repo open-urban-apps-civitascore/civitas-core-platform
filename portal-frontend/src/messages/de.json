@@ -44,9 +44,8 @@
     "title": "Nutzer",
     "tableHeaders": {
       "displayName": "Anzeigename",
-      "firstName": "Vorname",
-      "lastName": "Nachname",
-      "email": "E-Mail"
+      "email": "E-Mail",
+      "group": "Gruppe"
     }
   },
   "pagination": {

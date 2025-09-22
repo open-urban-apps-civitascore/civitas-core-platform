@@ -10,24 +10,9 @@ import { SearchField } from '@/components/searchField/SearchField'
 
 import UsersTable from './components/UsersTable'
 
-export type Status = 'open' | 'closed' | null
-export type Creator = { id: string; firstName: string; lastName: string }
-export type Distribution = {
-  format: string
-  title: string
-  url: string
-}
-
-export type Category = { id: string; title: string }
-
-export type Catalog = {
+export type UserGroup = {
   id: string
-  [`dct:title`]: string
-  [`dct:description`]: string
-  [`dct:publisherId`]: string
-  [`dcat:datasetIds`]: string[]
-  [`dct:issued`]: string
-  [`dct:modified`]: string
+  title: string
 }
 
 export type UserResponse = {
@@ -36,23 +21,29 @@ export type UserResponse = {
   lastName: string
   displayName: string
   email: string
+  phone: string
+  title: string
+  authority: string
+  department: string
+  group: UserGroup
+  active: boolean
 }
 
-export type User = {
+export type ListUser = {
   id: string
-  firstName: string
-  lastName: string
   displayName: string
   email: string
+  group: UserGroup
 }
 
-export const mapUsers = (users: UserResponse[]): User[] =>
+export type FormUser = UserResponse
+
+export const mapListUsers = (users: UserResponse[]): ListUser[] =>
   users.map(user => ({
     id: user.id,
-    firstName: user.firstName,
-    lastName: user.lastName,
     displayName: user.displayName,
     email: user.email,
+    group: user.group,
   }))
 
 export const getSortParam = (sorting: SortingState) => {
@@ -69,7 +60,7 @@ export const getSearchParam = (searchString: string) => (searchString ? `&q=${se
 
 const DatasetsPage = () => {
   const t = useTranslations('users')
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers] = useState<ListUser[]>([])
   const [rowCount, setRowCount] = useState(0)
   const [pageSize, setPageSize] = useState(10)
   const [pageIndex, setPageIndex] = useState(0)
@@ -95,7 +86,7 @@ const DatasetsPage = () => {
           `${URL}/users?_page=${pageIndex + 1}&_limit=${pageSize}${sortParams}${searchParam}`,
         )
         const usersData: UserResponse[] = await userssResponse.json()
-        const users = mapUsers(usersData)
+        const users = mapListUsers(usersData)
         setUsers(users)
         const totalCount = Number(userssResponse.headers.get('X-Total-Count')) || 0
         if (rowCount !== totalCount) {

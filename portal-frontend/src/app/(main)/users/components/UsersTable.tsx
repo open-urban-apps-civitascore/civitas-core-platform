@@ -5,16 +5,16 @@ import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 
 import { TableProps } from '../../../../../types/table'
-import { User } from '../page'
+import { ListUser } from '../page'
 
 interface UsersTableProps extends TableProps {
-  users: User[]
+  users: ListUser[]
 }
 
 const UsersTable = (props: UsersTableProps) => {
   const { users, rowCount, pageIndex, totalPages, setPageIndex, pageSize, setPageSize, sorting, setSorting } = props
   const t = useTranslations('users')
-  const columnHelper = createColumnHelper<User>()
+  const columnHelper = createColumnHelper<ListUser>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -32,17 +32,13 @@ const UsersTable = (props: UsersTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('firstName', {
-      header: t('tableHeaders.firstName'),
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor('lastName', {
-      header: t('tableHeaders.lastName'),
-      cell: info => info.getValue(),
-    }),
     columnHelper.accessor('email', {
-      header: t('tableHeaders.email'),
+      header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.email')} />,
       cell: info => info.getValue(),
+    }),
+    columnHelper.accessor('group', {
+      header: t('tableHeaders.group'),
+      cell: info => info.getValue()?.title,
     }),
   ]
 
