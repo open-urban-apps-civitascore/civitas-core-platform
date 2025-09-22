@@ -14,10 +14,5 @@
     "types",
     "*.d.ts"
   ],
-  "exclude": [
-    "node_modules",
-    ".next",
-    "dist",
-    "coverage"
-  ]
+  "exclude": ["node_modules", ".next", "dist", "coverage"]
 }
