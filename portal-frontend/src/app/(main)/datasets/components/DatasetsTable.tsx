@@ -2,7 +2,6 @@ import {
   createColumnHelper,
   getCoreRowModel,
   getSortedRowModel,
-  SortDirection,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
@@ -11,22 +10,9 @@ import { Dispatch, SetStateAction } from 'react'
 
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import TablePagination from '@/components/table/table-pagination/TablePagination'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 
 import { Dataset } from '../page'
-
-export const getAriaSort = (sorting: false | SortDirection) => {
-  switch (sorting) {
-    case 'asc':
-      return 'ascending'
-    case 'desc':
-      return 'descending'
-    default:
-      return 'none'
-  }
-}
 
 interface DatasetsTableProps {
   datasets: Dataset[]
@@ -53,7 +39,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
       enableHiding: true,
     }),
     columnHelper.accessor('name', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('header.name')} />,
+      header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
       cell: info => info.getValue(),
       meta: {
         style: {
@@ -63,44 +49,44 @@ const DatasetsTable = (props: DatasetsTableProps) => {
       },
     }),
     columnHelper.accessor('dataSpace', {
-      header: t('header.dataSpace'),
+      header: t('tableHeaders.dataSpace'),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('department', {
-      header: t('header.department'),
+      header: t('tableHeaders.department'),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('creator', {
-      header: t('header.creator'),
+      header: t('tableHeaders.creator'),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('lastUpdated', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('header.lastUpdated')} />,
+      header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.lastUpdated')} />,
       cell: info => {
         const formattedDate = new Date(info.getValue()).toLocaleDateString('en-GB')
         return locale === 'de' ? formattedDate.replaceAll('/', '.') : formattedDate
       },
     }),
     columnHelper.accessor('status', {
-      header: t('header.status'),
+      header: t('tableHeaders.status'),
       cell: info => {
         const value = info.getValue()
         switch (value) {
           case 'open':
-            return t(`values.status.${value}`)
+            return t(`tableValues.status.${value}`)
           case 'closed':
-            return `🔒 ${t(`values.status.${value}`)}`
+            return `🔒 ${t(`tableValues.status.${value}`)}`
           default:
             return ''
         }
       },
     }),
     columnHelper.accessor('releaseProcess', {
-      header: t('header.releaseProcess'),
+      header: t('tableHeaders.releaseProcess'),
       cell: '',
     }),
     columnHelper.accessor('distribution', {
-      header: t('header.distribution'),
+      header: t('tableHeaders.distribution'),
       cell: info => {
         const value = info.getValue()
         if (value) {
@@ -143,21 +129,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     onSortingChange: setSorting,
   })
 
-  return (
-    <div className="h-full w-full [--pagination-height:calc(--spacing(18))] [--pagination-padding:calc(--spacing(4))]">
-      <ScrollArea className="h-full h-[calc(100%-var(--pagination-height))] w-full">
-        <DataTable table={table} />
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
-      <TablePagination
-        className="h-[calc(var(--pagination-height))]"
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        totalPages={totalPages}
-        table={table}
-      />
-    </div>
-  )
+  return <DataTable table={table} pageIndex={pageIndex} pageSize={pageSize} totalPages={totalPages} />
 }
 
 export default DatasetsTable

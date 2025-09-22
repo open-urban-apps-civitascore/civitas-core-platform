@@ -1,16 +1,14 @@
 'use client'
 
 import { SortingState } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
 import { GridContainer } from '@/components/grid-container/GridContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
-import { Button } from '@/components/ui/button'
 
-import DatasetsTable from './components/DatasetsTable'
+import UsersTable from './components/UsersTable'
 
 export type Status = 'open' | 'closed' | null
 export type Creator = { id: string; firstName: string; lastName: string }
@@ -32,53 +30,34 @@ export type Catalog = {
   [`dct:modified`]: string
 }
 
-export type DatasetResponse = {
+export type UserResponse = {
   id: string
-  title: string
-  creator: Creator[]
-  issued: string
-  modified: string
-  status: Status
-  distribution: (Distribution & { id: string }) | null
-  catalog: string[]
-  series: Category
-  department: Category
+  firstName: string
+  lastName: string
+  displayName: string
+  email: string
 }
 
-export type Dataset = {
+export type User = {
   id: string
-  name: string
-  dataSpace: string
-  department: string
-  creator: string[]
-  lastUpdated: string
-  status: Status
-  releaseProcess: null
-  distribution: Distribution | null
+  firstName: string
+  lastName: string
+  displayName: string
+  email: string
 }
 
-export const mapDatasets = (datasets: DatasetResponse[]): Dataset[] =>
-  datasets.map(dataset => ({
-    id: dataset.id,
-    name: dataset.title,
-    dataSpace: dataset.series.title,
-    department: dataset.department.title,
-    creator: dataset.creator.map(creator => `${creator.firstName} ${creator.lastName}`),
-    lastUpdated: dataset.modified,
-    status: dataset.status,
-    releaseProcess: null,
-    distribution: dataset.distribution
-      ? {
-          format: dataset.distribution?.format,
-          title: dataset.distribution?.title,
-          url: dataset.distribution?.url,
-        }
-      : null,
+export const mapUsers = (users: UserResponse[]): User[] =>
+  users.map(user => ({
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    displayName: user.displayName,
+    email: user.email,
   }))
 
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {
-    const sortingId = sorting[0]?.id === 'name' ? 'title' : 'modified'
+    const sortingId = sorting[0]?.id
     const sortParam = `&_sort=${sortingId}`
     const orderParam = sorting[0]?.desc ? `&_order=desc` : `&_order=asc`
     return `${sortParam}${orderParam}`
@@ -89,8 +68,8 @@ export const getSortParam = (sorting: SortingState) => {
 export const getSearchParam = (searchString: string) => (searchString ? `&q=${searchString}` : '')
 
 const DatasetsPage = () => {
-  const t = useTranslations('datasets')
-  const [datasets, setDatasets] = useState<Dataset[]>([])
+  const t = useTranslations('users')
+  const [users, setUsers] = useState<User[]>([])
   const [rowCount, setRowCount] = useState(0)
   const [pageSize, setPageSize] = useState(10)
   const [pageIndex, setPageIndex] = useState(0)
@@ -110,15 +89,15 @@ const DatasetsPage = () => {
   useEffect(() => {
     const sortParams = getSortParam(sorting)
     const searchParam = getSearchParam(searchString)
-    const getDatasets = async () => {
+    const getUsers = async () => {
       try {
-        const datasetsResponse = await fetch(
-          `${URL}/datasets?_page=${pageIndex + 1}&_limit=${pageSize}${sortParams}${searchParam}`,
+        const userssResponse = await fetch(
+          `${URL}/users?_page=${pageIndex + 1}&_limit=${pageSize}${sortParams}${searchParam}`,
         )
-        const datasetsData: DatasetResponse[] = await datasetsResponse.json()
-        const datasets = mapDatasets(datasetsData)
-        setDatasets(datasets)
-        const totalCount = Number(datasetsResponse.headers.get('X-Total-Count')) || 0
+        const usersData: UserResponse[] = await userssResponse.json()
+        const users = mapUsers(usersData)
+        setUsers(users)
+        const totalCount = Number(userssResponse.headers.get('X-Total-Count')) || 0
         if (rowCount !== totalCount) {
           setRowCount(totalCount)
         }
@@ -126,23 +105,16 @@ const DatasetsPage = () => {
         console.error(error)
       }
     }
-    getDatasets()
+    getUsers()
   }, [pageIndex, pageSize, URL, rowCount, sorting, searchString])
 
-  const CustomElement = (
-    <Button variant="secondary">
-      <Plus />
-      {t('newDataset')}
-    </Button>
-  )
-
   return (
-    <div className="h-full min-h-full max-h-full">
-      <PageHeader title={t('title')} subtitle={t('subtitle')} customElement={CustomElement} />
-      <SearchField setSearchString={setSearchString} aria-label={t('searchDatasets')} />
-      <GridContainer columns={1}>
-        <DatasetsTable
-          datasets={datasets}
+    <div className="w-full h-full">
+      <PageHeader title={t('title')} />
+      <SearchField setSearchString={setSearchString} />
+      <GridContainer columns={2}>
+        <UsersTable
+          users={users}
           rowCount={rowCount}
           pageIndex={pageIndex}
           setPageIndex={setPageIndex}
@@ -152,6 +124,9 @@ const DatasetsPage = () => {
           setSorting={setSorting}
           totalPages={totalPages}
         />
+        <form>
+          <div>Form placeholder</div>
+        </form>
       </GridContainer>
     </div>
   )

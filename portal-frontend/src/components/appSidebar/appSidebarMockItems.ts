@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Building2, Database, LucideProps, SquareTerminal } from 'lucide-react'
+import { BookOpen, Bot, Building2, Database, LucideProps, SquareTerminal, User } from 'lucide-react'
 import { ForwardRefExoticComponent, ReactNode, RefAttributes } from 'react'
 
 export interface NavItems {
@@ -14,6 +14,13 @@ export const appSidebarNavItems = [
     title: 'datasets',
     url: '/datasets',
     icon: Database,
+    isActive: true,
+    items: [],
+  },
+  {
+    title: 'users',
+    url: '/users',
+    icon: User,
     isActive: true,
     items: [],
   },
