@@ -7,12 +7,25 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { TableProps } from '../../../../../types/table'
 import { ListUser } from '../page'
 
-interface UsersTableProps extends TableProps {
+interface UsersTableProps extends TableProps<ListUser> {
   users: ListUser[]
 }
 
 const UsersTable = (props: UsersTableProps) => {
-  const { users, rowCount, pageIndex, totalPages, setPageIndex, pageSize, setPageSize, sorting, setSorting } = props
+  const {
+    users,
+    rowCount,
+    pageIndex,
+    totalPages,
+    setPageIndex,
+    pageSize,
+    setPageSize,
+    sorting,
+    setSorting,
+    rowSelection,
+    setRowSelection,
+    onRowClick,
+  } = props
   const t = useTranslations('users')
   const columnHelper = createColumnHelper<ListUser>()
 
@@ -43,28 +56,40 @@ const UsersTable = (props: UsersTableProps) => {
   ]
 
   const table = useReactTable({
+    getRowId: row => row.id,
     columns: columns,
     data: users,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     rowCount,
     initialState: {
       columnVisibility: {
         id: false,
       },
     },
+    state: { pagination: { pageIndex, pageSize }, sorting, rowSelection },
     manualPagination: true,
     manualSorting: true,
-    state: { pagination: { pageIndex, pageSize }, sorting },
+    enableRowSelection: true,
+    enableMultiRowSelection: false,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     onPaginationChange: updater => {
       const newPagination = typeof updater === 'function' ? updater({ pageIndex, pageSize }) : updater
       setPageIndex(newPagination.pageIndex)
       setPageSize(newPagination.pageSize)
     },
     onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
   })
 
-  return <DataTable table={table} pageIndex={pageIndex} pageSize={pageSize} totalPages={totalPages} />
+  return (
+    <DataTable
+      table={table}
+      pageIndex={pageIndex}
+      pageSize={pageSize}
+      totalPages={totalPages}
+      onRowClick={onRowClick}
+    />
+  )
 }
 
 export default UsersTable

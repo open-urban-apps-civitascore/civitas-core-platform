@@ -1,13 +1,14 @@
 'use client'
 
-import { SortingState } from '@tanstack/react-table'
+import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { GridContainer } from '@/components/grid-container/GridContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
 
+import { UserForm } from './components/UserForm'
 import UsersTable from './components/UsersTable'
 
 export type UserGroup = {
@@ -60,13 +61,15 @@ export const getSearchParam = (searchString: string) => (searchString ? `&q=${se
 
 const UsersPage = () => {
   const t = useTranslations('users')
-  const [users, setUsers] = useState<ListUser[]>([])
+  const [listUsers, setListUsers] = useState<ListUser[]>([])
+  const [userResponse, setUserResponse] = useState<UserResponse[]>([])
   const [rowCount, setRowCount] = useState(0)
   const [pageSize, setPageSize] = useState(10)
   const [pageIndex, setPageIndex] = useState(0)
   const [sorting, setSorting] = useState<SortingState>([])
   const [searchString, setSearchString] = useState('')
   const totalPages = Math.ceil(rowCount / pageSize)
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
@@ -77,6 +80,13 @@ const UsersPage = () => {
     }
   }, [totalPages, pageIndex])
 
+  const selectedUser = useMemo(() => {
+    const rowSelectionIndex = Object.keys(rowSelection)[0]
+    if (userResponse.length > 0 && rowSelectionIndex) {
+      return userResponse.find(user => user.id === rowSelectionIndex)
+    } else return null
+  }, [rowSelection, userResponse])
+
   useEffect(() => {
     const sortParams = getSortParam(sorting)
     const searchParam = getSearchParam(searchString)
@@ -86,8 +96,12 @@ const UsersPage = () => {
           `${URL}/users?_page=${pageIndex + 1}&_limit=${pageSize}${sortParams}${searchParam}`,
         )
         const usersData: UserResponse[] = await usersResponse.json()
+        setUserResponse(usersData)
+        if (usersData.length > 0) {
+          setRowSelection({ [usersData[0].id]: true })
+        }
         const users = mapListUsers(usersData)
-        setUsers(users)
+        setListUsers(users)
         const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
         if (rowCount !== totalCount) {
           setRowCount(totalCount)
@@ -99,13 +113,20 @@ const UsersPage = () => {
     getUsers()
   }, [pageIndex, pageSize, URL, rowCount, sorting, searchString])
 
+  const handleRowClick = (row: Row<ListUser>) => {
+    const isSelected = row.getIsSelected()
+    if (!isSelected) {
+      row.toggleSelected()
+    }
+  }
+
   return (
     <div className="w-full h-full">
       <PageHeader title={t('title')} />
       <SearchField setSearchString={setSearchString} />
       <GridContainer columns={2}>
         <UsersTable
-          users={users}
+          users={listUsers}
           rowCount={rowCount}
           pageIndex={pageIndex}
           setPageIndex={setPageIndex}
@@ -114,10 +135,11 @@ const UsersPage = () => {
           sorting={sorting}
           setSorting={setSorting}
           totalPages={totalPages}
+          rowSelection={rowSelection}
+          setRowSelection={setRowSelection}
+          onRowClick={handleRowClick}
         />
-        <form>
-          <div>Form placeholder</div>
-        </form>
+        {selectedUser && <UserForm user={selectedUser} />}
       </GridContainer>
     </div>
   )
