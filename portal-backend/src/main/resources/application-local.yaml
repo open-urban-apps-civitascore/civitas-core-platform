@@ -1,0 +1,24 @@
+logging:
+  level:
+    root: INFO
+    org.hibernate: INFO
+    org.flywaydb: INFO
+
+app:
+  url: http://localhost:8089
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/portal_backend
+    username: admin
+    password: admin
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.format_sql: true
+
+keycloak:
+  realm: "civitas-core"
+  auth-server-url: http://localhost:8080

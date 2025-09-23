@@ -1,0 +1,11 @@
+debug: true
+
+logging:
+  level:
+    root: Info
+    org.hibernate: DEBUG
+    org.flywaydb: DEBUG
+
+spring:
+  jpa:
+    show-sql: true

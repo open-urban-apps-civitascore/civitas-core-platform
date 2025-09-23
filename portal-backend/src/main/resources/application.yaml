@@ -1,0 +1,41 @@
+logging:
+  level:
+    root: INFO
+    org.hibernate: INFO
+    org.flywaydb: INFO
+
+server:
+  port: 8089
+  servlet:
+    context-path: /v2
+
+spring:
+  profiles:
+    active: local
+  application:
+    name: "CIVITAS/CORE Data Management API"
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}/protocol/openid-connect/certs"
+          # Token issuer validation
+          issuer-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /v2/api-docs
+    version: openapi-3-1
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true

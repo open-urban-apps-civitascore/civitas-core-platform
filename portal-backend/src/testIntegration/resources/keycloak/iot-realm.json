@@ -1,0 +1,64 @@
+{
+  "realm": "iot",
+  "enabled": true,
+  "displayName": "IoT Test Realm",
+  "loginWithEmailAllowed": true,
+  "clients": [
+    {
+      "clientId": "test-client",
+      "name": "Test Client for Integration Tests",
+      "description": "Test client for Spring Boot integration tests",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "test-secret",
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "protocol": "openid-connect",
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "bearerOnly": false,
+      "fullScopeAllowed": true,
+      "attributes": {
+        "access.token.lifespan": "300"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "email": "test@example.com",
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["default-roles-iot"],
+      "attributes": {
+        "tenantId": ["iot"]
+      }
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "default-roles-iot",
+        "description": "Default role for IoT realm users",
+        "composite": false
+      },
+      {
+        "name": "user",
+        "description": "Standard user role"
+      }
+    ]
+  },
+  "defaultRoles": ["default-roles-iot"]
+}
