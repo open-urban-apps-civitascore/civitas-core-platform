@@ -70,6 +70,7 @@ const UsersPage = () => {
   const [searchString, setSearchString] = useState('')
   const totalPages = Math.ceil(rowCount / pageSize)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const rowSelectionIndex = Object.keys(rowSelection)[0]
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
@@ -81,11 +82,10 @@ const UsersPage = () => {
   }, [totalPages, pageIndex])
 
   const selectedUser = useMemo(() => {
-    const rowSelectionIndex = Object.keys(rowSelection)[0]
     if (userResponse.length > 0 && rowSelectionIndex) {
       return userResponse.find(user => user.id === rowSelectionIndex)
     } else return null
-  }, [rowSelection, userResponse])
+  }, [rowSelectionIndex])
 
   useEffect(() => {
     const sortParams = getSortParam(sorting)
@@ -97,7 +97,7 @@ const UsersPage = () => {
         )
         const usersData: UserResponse[] = await usersResponse.json()
         setUserResponse(usersData)
-        if (usersData.length > 0) {
+        if (usersData.length > 0 && !rowSelectionIndex) {
           setRowSelection({ [usersData[0].id]: true })
         }
         const users = mapListUsers(usersData)

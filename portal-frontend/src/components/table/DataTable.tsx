@@ -54,7 +54,7 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                 <TableRow
                   className={`h-16 ${onRowClick ? 'cursor-pointer' : ''}`}
                   key={row.id}
-                  style={{ background: row.getIsSelected() ? 'grey' : 'white' }}
+                  style={{ background: row.getIsSelected() ? 'var(--accent)' : 'white' }}
                   onClick={onRowClick ? () => onRowClick(row) : () => null}
                 >
                   {row.getVisibleCells().map(cell => (
