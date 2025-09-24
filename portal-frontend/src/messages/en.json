@@ -16,7 +16,8 @@
     "documentation": "Documentation",
     "logout": "Log out",
     "datasets": "Datasets",
-    "users": "Users"
+    "users": "User Management",
+    "tenants": "Tenant Management"
   },
   "datasets": {
     "title": "Datasets",

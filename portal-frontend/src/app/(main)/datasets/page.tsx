@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
-import { GridContainer } from '@/components/grid-container/GridContainer'
+import { TableContainer } from '@/components/table-container/TableContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
 import { Button } from '@/components/ui/button'
@@ -140,7 +140,7 @@ const DatasetsPage = () => {
     <div className="h-full min-h-full max-h-full">
       <PageHeader title={t('title')} subtitle={t('subtitle')} customElement={CustomElement} />
       <SearchField setSearchString={setSearchString} aria-label={t('searchDatasets')} />
-      <GridContainer columns={1}>
+      <TableContainer>
         <DatasetsTable
           datasets={datasets}
           rowCount={rowCount}
@@ -152,7 +152,7 @@ const DatasetsPage = () => {
           setSorting={setSorting}
           totalPages={totalPages}
         />
-      </GridContainer>
+      </TableContainer>
     </div>
   )
 }

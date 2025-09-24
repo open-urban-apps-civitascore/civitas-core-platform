@@ -4,12 +4,13 @@ import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 
-import { GridContainer } from '@/components/grid-container/GridContainer'
+import { TableContainer } from '@/components/table-container/TableContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
 
-import { UserForm } from './components/UserForm'
+import { UserForm } from './[userId]/UserForm'
 import UsersTable from './components/UsersTable'
+import { useRouter } from 'next/navigation'
 
 export type UserGroup = {
   id: string
@@ -61,6 +62,7 @@ export const getSearchParam = (searchString: string) => (searchString ? `&q=${se
 
 const UsersPage = () => {
   const t = useTranslations('users')
+  const router = useRouter()
   const [listUsers, setListUsers] = useState<ListUser[]>([])
   const [userResponse, setUserResponse] = useState<UserResponse[]>([])
   const [rowCount, setRowCount] = useState(0)
@@ -114,9 +116,8 @@ const UsersPage = () => {
   }, [pageIndex, pageSize, URL, rowCount, sorting, searchString])
 
   const handleRowClick = (row: Row<ListUser>) => {
-    const isSelected = row.getIsSelected()
-    if (!isSelected) {
-      row.toggleSelected()
+    if (row.id) {
+      router.push(`users/${row.id}`, {})
     }
   }
 
@@ -124,7 +125,7 @@ const UsersPage = () => {
     <div className="w-full h-full">
       <PageHeader title={t('title')} />
       <SearchField setSearchString={setSearchString} />
-      <GridContainer columns={2}>
+      <TableContainer>
         <UsersTable
           users={listUsers}
           rowCount={rowCount}
@@ -139,8 +140,7 @@ const UsersPage = () => {
           setRowSelection={setRowSelection}
           onRowClick={handleRowClick}
         />
-        {selectedUser && <UserForm user={selectedUser} />}
-      </GridContainer>
+      </TableContainer>
     </div>
   )
 }

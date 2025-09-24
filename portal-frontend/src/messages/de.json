@@ -16,7 +16,8 @@
     "documentation": "Dokumentation",
     "logout": "Abmelden",
     "datasets": "Datensätze",
-    "users": "Nutzer"
+    "users": "User Management",
+    "tenants": "Mandanten-Management"
   },
   "datasets": {
     "title": "Datensätze",
