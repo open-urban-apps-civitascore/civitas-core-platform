@@ -5,9 +5,9 @@ import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
-import { TableContainer } from '@/components/table-container/TableContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
+import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 
 import DatasetsTable from './components/DatasetsTable'
@@ -139,7 +139,11 @@ const DatasetsPage = () => {
   return (
     <div className="h-full min-h-full max-h-full">
       <PageHeader title={t('title')} subtitle={t('subtitle')} customElement={CustomElement} />
-      <SearchField setSearchString={setSearchString} aria-label={t('searchDatasets')} />
+      <SearchField
+        searchString={searchString}
+        onChangeSearchString={() => setSearchString}
+        aria-label={t('searchDatasets')}
+      />
       <TableContainer>
         <DatasetsTable
           datasets={datasets}

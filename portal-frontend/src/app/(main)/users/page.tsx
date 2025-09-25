@@ -1,16 +1,17 @@
 'use client'
 
 import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import { TableContainer } from '@/components/table-container/TableContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
+import { TableContainer } from '@/components/table-container/TableContainer'
+import { SEARCH_PARAMS } from '@/const/searchParams'
+import { useRouteParams } from '@/hooks/useSearchParams'
 
-import { UserForm } from './[userId]/UserForm'
 import UsersTable from './components/UsersTable'
-import { useRouter } from 'next/navigation'
 
 export type UserGroup = {
   id: string
@@ -58,50 +59,39 @@ export const getSortParam = (sorting: SortingState) => {
   return ''
 }
 
-export const getSearchParam = (searchString: string) => (searchString ? `&q=${searchString}` : '')
+export const getSearchParam = (searchString: string) => {
+  console.log(searchString)
+  return searchString ? `&q=${searchString}` : ''
+}
 
 const UsersPage = () => {
   const t = useTranslations('users')
   const router = useRouter()
   const [listUsers, setListUsers] = useState<ListUser[]>([])
-  const [userResponse, setUserResponse] = useState<UserResponse[]>([])
   const [rowCount, setRowCount] = useState(0)
-  const [pageSize, setPageSize] = useState(10)
-  const [pageIndex, setPageIndex] = useState(0)
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [searchString, setSearchString] = useState('')
-  const totalPages = Math.ceil(rowCount / pageSize)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const rowSelectionIndex = Object.keys(rowSelection)[0]
+
+  const { setSortingParams, setPaginationParams, pageIndex, pageSize, setSearchParam, sorting, search } =
+    useRouteParams()
+  const totalPages = Math.ceil(rowCount / pageSize)
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-  // adjusts the pageIndex when filtering reduces the totalPages and the user is on a page beyond that limit
   useEffect(() => {
-    if (totalPages > 0 && pageIndex + 1 > totalPages) {
-      setPageIndex(totalPages - 1)
+    const apiParams = new URLSearchParams()
+    apiParams.set(SEARCH_PARAMS.pageIndex, String(pageIndex + 1))
+    apiParams.set(SEARCH_PARAMS.pageSize, String(pageSize))
+    if (sorting[0]) {
+      apiParams.set(SEARCH_PARAMS.sortingId, sorting[0].id)
+      apiParams.set(SEARCH_PARAMS.order, sorting[0].desc ? 'desc' : 'asc')
     }
-  }, [totalPages, pageIndex])
-
-  const selectedUser = useMemo(() => {
-    if (userResponse.length > 0 && rowSelectionIndex) {
-      return userResponse.find(user => user.id === rowSelectionIndex)
-    } else return null
-  }, [rowSelectionIndex])
-
-  useEffect(() => {
-    const sortParams = getSortParam(sorting)
-    const searchParam = getSearchParam(searchString)
+    if (search) {
+      apiParams.set(SEARCH_PARAMS.search, search)
+    }
     const getUsers = async () => {
       try {
-        const usersResponse = await fetch(
-          `${URL}/users?_page=${pageIndex + 1}&_limit=${pageSize}${sortParams}${searchParam}`,
-        )
+        const usersResponse = await fetch(`${URL}/users?${apiParams.toString()}`)
         const usersData: UserResponse[] = await usersResponse.json()
-        setUserResponse(usersData)
-        if (usersData.length > 0 && !rowSelectionIndex) {
-          setRowSelection({ [usersData[0].id]: true })
-        }
         const users = mapListUsers(usersData)
         setListUsers(users)
         const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
@@ -113,7 +103,7 @@ const UsersPage = () => {
       }
     }
     getUsers()
-  }, [pageIndex, pageSize, URL, rowCount, sorting, searchString])
+  }, [pageIndex, pageSize, URL, rowCount, sorting, search])
 
   const handleRowClick = (row: Row<ListUser>) => {
     if (row.id) {
@@ -124,21 +114,20 @@ const UsersPage = () => {
   return (
     <div className="w-full h-full">
       <PageHeader title={t('title')} />
-      <SearchField setSearchString={setSearchString} />
+      <SearchField searchString={search} onChangeSearchString={setSearchParam} />
       <TableContainer>
         <UsersTable
           users={listUsers}
           rowCount={rowCount}
           pageIndex={pageIndex}
-          setPageIndex={setPageIndex}
           pageSize={pageSize}
-          setPageSize={setPageSize}
           sorting={sorting}
-          setSorting={setSorting}
           totalPages={totalPages}
           rowSelection={rowSelection}
           setRowSelection={setRowSelection}
           onRowClick={handleRowClick}
+          onSortingChange={setSortingParams}
+          onPaginationChange={setPaginationParams}
         />
       </TableContainer>
     </div>

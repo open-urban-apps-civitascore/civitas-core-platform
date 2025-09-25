@@ -42,11 +42,20 @@
     "newDataset": "New Dataset"
   },
   "users": {
-    "title": "Users",
-    "tableHeaders": {
+    "title": "User",
+    "newUser": "New User",
+    "searchUsers": "Filter...",
+    "info": {
+      "id": "ID",
       "displayName": "Display Name",
+      "title": "Title",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "authority": "Authority",
+      "department": "Department",
+      "phone": "Telephone Number",
       "email": "E-Mail",
-      "group": "group"
+      "group": "Group"
     }
   },
   "pagination": {

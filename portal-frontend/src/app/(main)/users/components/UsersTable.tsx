@@ -1,4 +1,4 @@
-import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
+import { createColumnHelper, getCoreRowModel, getSortedRowModel, Updater, useReactTable } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
@@ -17,14 +17,12 @@ const UsersTable = (props: UsersTableProps) => {
     rowCount,
     pageIndex,
     totalPages,
-    setPageIndex,
     pageSize,
-    setPageSize,
     sorting,
-    setSorting,
     rowSelection,
-    setRowSelection,
     onRowClick,
+    onPaginationChange,
+    onSortingChange,
   } = props
   const t = useTranslations('users')
   const columnHelper = createColumnHelper<ListUser>()
@@ -36,7 +34,7 @@ const UsersTable = (props: UsersTableProps) => {
       enableHiding: true,
     }),
     columnHelper.accessor('displayName', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.displayName')} />,
+      header: ({ column }) => <SortableTableHeader column={column} title={t('info.displayName')} />,
       cell: info => info.getValue(),
       meta: {
         style: {
@@ -46,14 +44,18 @@ const UsersTable = (props: UsersTableProps) => {
       },
     }),
     columnHelper.accessor('email', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.email')} />,
+      header: ({ column }) => <SortableTableHeader column={column} title={t('info.email')} />,
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('group', {
-      header: t('tableHeaders.group'),
+      header: t('info.group'),
       cell: info => info.getValue()?.title,
     }),
   ]
+
+  const resolveUpdater = <T,>(updater: Updater<T>, old: T): T => {
+    return typeof updater === 'function' ? (updater as (old: T) => T)(old) : updater
+  }
 
   const table = useReactTable({
     getRowId: row => row.id,
@@ -68,17 +70,12 @@ const UsersTable = (props: UsersTableProps) => {
     state: { pagination: { pageIndex, pageSize }, sorting, rowSelection },
     manualPagination: true,
     manualSorting: true,
-    enableRowSelection: true,
-    enableMultiRowSelection: false,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onPaginationChange: updater => {
-      const newPagination = typeof updater === 'function' ? updater({ pageIndex, pageSize }) : updater
-      setPageIndex(newPagination.pageIndex)
-      setPageSize(newPagination.pageSize)
+      onPaginationChange(resolveUpdater(updater, { pageIndex, pageSize }))
     },
-    onSortingChange: setSorting,
-    onRowSelectionChange: setRowSelection,
+    onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
   })
 
   return (

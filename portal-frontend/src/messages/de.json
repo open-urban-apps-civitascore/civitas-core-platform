@@ -42,9 +42,18 @@
     "newDataset": "Neuer Datensatz"
   },
   "users": {
-    "title": "Nutzer",
-    "tableHeaders": {
+    "title": "User",
+    "newUser": "Neuer User",
+    "searchUsers": "Filtern...",
+    "info": {
+      "id": "ID",
       "displayName": "Anzeigename",
+      "title": "Anrede",
+      "firstName": "Vorname",
+      "lastName": "Name",
+      "authority": "Amt",
+      "department": "Abteilung",
+      "phone": "Telefonnummer",
       "email": "E-Mail",
       "group": "Gruppe"
     }
