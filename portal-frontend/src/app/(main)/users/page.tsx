@@ -8,8 +8,8 @@ import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
 import { TableContainer } from '@/components/table-container/TableContainer'
-import { SEARCH_PARAMS } from '@/const/searchParams'
-import { useRouteParams } from '@/hooks/useSearchParams'
+import { QUERY_PARAMS } from '@/const/searchParams'
+import { useQueryParams } from '@/hooks/useQueryParams'
 
 import UsersTable from './components/UsersTable'
 
@@ -67,24 +67,24 @@ const UsersPage = () => {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const { setSortingParams, setPaginationParams, setSearchParam, pageIndex, pageSize, sorting, search } =
-    useRouteParams()
+    useQueryParams()
   const totalPages = Math.ceil(rowCount / pageSize)
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
   useEffect(() => {
     const apiParams = new URLSearchParams()
-    apiParams.set(SEARCH_PARAMS.pageIndex, String(pageIndex))
+    apiParams.set(QUERY_PARAMS.pageIndex, String(pageIndex))
     if (totalPages > 0 && pageIndex + 1 > totalPages) {
       setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
     }
-    apiParams.set(SEARCH_PARAMS.pageSize, String(pageSize))
+    apiParams.set(QUERY_PARAMS.pageSize, String(pageSize))
     if (sorting[0]) {
-      apiParams.set(SEARCH_PARAMS.sortingId, sorting[0].id)
-      apiParams.set(SEARCH_PARAMS.order, sorting[0].desc ? 'desc' : 'asc')
+      apiParams.set(QUERY_PARAMS.sortingId, sorting[0].id)
+      apiParams.set(QUERY_PARAMS.order, sorting[0].desc ? 'desc' : 'asc')
     }
     if (search) {
-      apiParams.set(SEARCH_PARAMS.search, search)
+      apiParams.set(QUERY_PARAMS.search, search)
     }
     const getUsers = async () => {
       try {
