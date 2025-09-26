@@ -10,7 +10,7 @@ export interface TableProps<T> {
   setPageIndex?: Dispatch<SetStateAction<number>>
   sorting: SortingState
   setSorting?: Dispatch<SetStateAction<SortingState>>
-  rowSelection: RowSelectionState
+  rowSelection?: RowSelectionState
   setRowSelection?: Dispatch<SetStateAction<RowSelectionState>>
   onRowClick?: (row: Row<T>) => void
   onPaginationChange: (newPagination: PaginationState) => void

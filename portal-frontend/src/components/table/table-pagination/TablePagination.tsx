@@ -50,21 +50,24 @@ const TablePagination = <T,>(props: TablePaginationProps<T>) => {
           <Button
             variant="outline"
             size="icon"
-            aria-label={t('aria.firstPage')}
-            onClick={() => table.setPageIndex(0)}
-            disabled={!table.getCanPreviousPage()}
-          >
-            «
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
             aria-label={t('aria.previousPage')}
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
           >
             ‹
           </Button>
+          <Select value={String(pageIndex)} onValueChange={value => table.setPageIndex(Number(value))}>
+            <SelectTrigger className="w-[80px]" aria-label={t('aria.resultsPerPage')}>
+              <SelectValue placeholder={pageIndex} />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: totalPages }, (_, i) => i).map(page => (
+                <SelectItem key={page} value={String(page)}>
+                  {page + 1}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             variant="outline"
             size="icon"
@@ -73,15 +76,6 @@ const TablePagination = <T,>(props: TablePaginationProps<T>) => {
             disabled={!table.getCanNextPage()}
           >
             ›
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label={t('aria.lastPage')}
-            onClick={() => table.setPageIndex(totalPages - 1)}
-            disabled={!table.getCanNextPage()}
-          >
-            »
           </Button>
         </div>
       </div>

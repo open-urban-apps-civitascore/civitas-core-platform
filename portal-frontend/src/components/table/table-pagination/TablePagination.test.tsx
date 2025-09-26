@@ -27,7 +27,7 @@ describe('TablePagination', () => {
   })
   it('renders results-per-page select', () => {
     expect(screen.getByText('Ergebnisse pro Seite')).toBeInTheDocument()
-    expect(screen.getByRole('combobox')).toBeInTheDocument()
+    expect(screen.getAllByRole('combobox')).toHaveLength(2)
   })
 
   it('renders current page number', () => {
@@ -35,9 +35,7 @@ describe('TablePagination', () => {
   })
 
   it('renders navigation buttons', () => {
-    expect(screen.getByRole('button', { name: 'Zur ersten Seite wechseln' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Zur vorherigen Seite wechseln' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Zur nächsten Seite wechseln' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Zur letzten Seite wechseln' })).toBeInTheDocument()
   })
 })

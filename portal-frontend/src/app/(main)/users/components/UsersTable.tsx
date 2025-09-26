@@ -1,13 +1,14 @@
-import { createColumnHelper, getCoreRowModel, getSortedRowModel, Updater, useReactTable } from '@tanstack/react-table'
+import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { Check } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-
-import { TableProps } from '../../../../../types/table'
-import { ListUser } from '../page'
 import { Badge } from '@/components/ui/badge'
+import { TableProps } from '@/types/table'
+import { resolveUpdater } from '@/utils/table'
+
+import { ListUser } from '../page'
 
 interface UsersTableProps extends TableProps<ListUser> {
   users: ListUser[]
@@ -55,7 +56,7 @@ const UsersTable = (props: UsersTableProps) => {
     }),
     columnHelper.accessor('role', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.role')} />,
-      cell: info => <Badge variant='secondary'>{info.getValue()}</Badge>,
+      cell: info => <Badge variant="secondary">{info.getValue()}</Badge>,
     }),
     columnHelper.accessor('email', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.email')} />,
@@ -66,10 +67,6 @@ const UsersTable = (props: UsersTableProps) => {
       cell: info => (info.getValue() ? <Check /> : '-'),
     }),
   ]
-
-  const resolveUpdater = <T,>(updater: Updater<T>, old: T): T => {
-    return typeof updater === 'function' ? (updater as (old: T) => T)(old) : updater
-  }
 
   const table = useReactTable({
     getRowId: row => row.id,

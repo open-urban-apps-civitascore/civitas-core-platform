@@ -23,7 +23,7 @@ export const useQueryParams = () => {
 
   const pageSize = useMemo(() => Number(searchParams.get(QUERY_PARAMS.pageSize) ?? 10), [searchParams])
   const pageIndex = useMemo(
-    () => (Number(searchParams.get(QUERY_PARAMS.pageIndex)) ? Number(searchParams.get(QUERY_PARAMS.pageIndex)) : 1),
+    () => (Number(searchParams.get(QUERY_PARAMS.pageIndex)) ? Number(searchParams.get(QUERY_PARAMS.pageIndex)) - 1 : 0),
     [searchParams],
   )
   const sorting: SortingState = useMemo(() => getSortingState(searchParams), [searchParams])
@@ -65,7 +65,7 @@ export const useQueryParams = () => {
   const setApiRequestParams = useCallback(
     (totalPages: number) => {
       const apiParams = new URLSearchParams()
-      apiParams.set(QUERY_PARAMS.pageIndex, String(pageIndex))
+      apiParams.set(QUERY_PARAMS.pageIndex, String(pageIndex + 1))
       if (totalPages > 0 && pageIndex + 1 > totalPages) {
         setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
       }

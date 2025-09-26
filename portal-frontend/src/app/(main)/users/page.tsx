@@ -120,7 +120,7 @@ const UsersPage = () => {
         <UsersTable
           users={listUsers}
           rowCount={rowCount}
-          pageIndex={pageIndex - 1}
+          pageIndex={pageIndex}
           pageSize={pageSize}
           sorting={sorting}
           totalPages={totalPages}
