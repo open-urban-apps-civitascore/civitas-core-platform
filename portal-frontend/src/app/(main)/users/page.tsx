@@ -29,13 +29,17 @@ export type UserResponse = {
   department: string
   group: UserGroup
   active: boolean
+  role: string
 }
 
 export type ListUser = {
   id: string
   displayName: string
+  authority: string
+  department: string
+  role: string
   email: string
-  group: UserGroup
+  isactive: boolean
 }
 
 export type FormUser = UserResponse
@@ -44,8 +48,11 @@ export const mapListUsers = (users: UserResponse[]): ListUser[] =>
   users.map(user => ({
     id: user.id,
     displayName: user.displayName,
+    authority: user.authority,
+    department: user.department,
+    role: user.role,
     email: user.email,
-    group: user.group,
+    isactive: user.active,
   }))
 
 export const getSortParam = (sorting: SortingState) => {

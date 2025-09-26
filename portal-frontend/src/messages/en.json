@@ -53,9 +53,11 @@
       "lastName": "Last Name",
       "authority": "Authority",
       "department": "Department",
+      "role": "System Role",
       "phone": "Telephone Number",
       "email": "E-Mail",
-      "group": "Group"
+      "group": "Group",
+      "active": "Active"
     }
   },
   "pagination": {

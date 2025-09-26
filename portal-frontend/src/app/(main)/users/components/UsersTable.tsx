@@ -1,4 +1,5 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, Updater, useReactTable } from '@tanstack/react-table'
+import { Check } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
@@ -6,6 +7,7 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 
 import { TableProps } from '../../../../../types/table'
 import { ListUser } from '../page'
+import { Badge } from '@/components/ui/badge'
 
 interface UsersTableProps extends TableProps<ListUser> {
   users: ListUser[]
@@ -43,13 +45,25 @@ const UsersTable = (props: UsersTableProps) => {
         },
       },
     }),
+    columnHelper.accessor('authority', {
+      header: ({ column }) => <SortableTableHeader column={column} title={t('info.authority')} />,
+      cell: info => info.getValue(),
+    }),
+    columnHelper.accessor('department', {
+      header: ({ column }) => <SortableTableHeader column={column} title={t('info.department')} />,
+      cell: info => info.getValue(),
+    }),
+    columnHelper.accessor('role', {
+      header: ({ column }) => <SortableTableHeader column={column} title={t('info.role')} />,
+      cell: info => <Badge variant='secondary'>{info.getValue()}</Badge>,
+    }),
     columnHelper.accessor('email', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.email')} />,
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor('group', {
-      header: t('info.group'),
-      cell: info => info.getValue()?.title,
+    columnHelper.accessor('isactive', {
+      header: t('info.active'),
+      cell: info => (info.getValue() ? <Check /> : '-'),
     }),
   ]
 
