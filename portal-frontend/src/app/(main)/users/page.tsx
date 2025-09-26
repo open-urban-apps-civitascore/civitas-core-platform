@@ -97,7 +97,7 @@ const UsersPage = () => {
       }
     }
     getUsers()
-  }, [pageIndex, pageSize, URL, rowCount, sorting, search])
+  }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
 
   const handleRowClick = (row: Row<ListUser>) => {
     if (row.id) {

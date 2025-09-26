@@ -1,6 +1,6 @@
 import { PaginationState, SortingState } from '@tanstack/react-table'
 import { ReadonlyURLSearchParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 
 import { QUERY_PARAMS } from '@/const/searchParams'
 
@@ -50,31 +50,37 @@ export const useQueryParams = () => {
     router.push(`${pathname}?${params.toString()}`)
   }
 
-  const setPaginationParams = (newPagination: PaginationState) => {
-    const params = new URLSearchParams(searchParams)
-    if (newPagination) {
-      params.set(QUERY_PARAMS.pageIndex, String(newPagination.pageIndex + 1))
-      params.set(QUERY_PARAMS.pageSize, String(newPagination.pageSize))
-    }
-    router.push(`${pathname}?${params.toString()}`)
-  }
+  const setPaginationParams = useCallback(
+    (newPagination: PaginationState) => {
+      const params = new URLSearchParams(searchParams)
+      if (newPagination) {
+        params.set(QUERY_PARAMS.pageIndex, String(newPagination.pageIndex + 1))
+        params.set(QUERY_PARAMS.pageSize, String(newPagination.pageSize))
+      }
+      router.push(`${pathname}?${params.toString()}`)
+    },
+    [pathname, router, searchParams],
+  )
 
-  const setApiRequestParams = (totalPages: number) => {
-    const apiParams = new URLSearchParams()
-    apiParams.set(QUERY_PARAMS.pageIndex, String(pageIndex))
-    if (totalPages > 0 && pageIndex + 1 > totalPages) {
-      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
-    }
-    apiParams.set(QUERY_PARAMS.pageSize, String(pageSize))
-    if (sorting[0]) {
-      apiParams.set(QUERY_PARAMS.sortingId, sorting[0].id)
-      apiParams.set(QUERY_PARAMS.order, sorting[0].desc ? 'desc' : 'asc')
-    }
-    if (search) {
-      apiParams.set(QUERY_PARAMS.search, search)
-    }
-    return apiParams
-  }
+  const setApiRequestParams = useCallback(
+    (totalPages: number) => {
+      const apiParams = new URLSearchParams()
+      apiParams.set(QUERY_PARAMS.pageIndex, String(pageIndex))
+      if (totalPages > 0 && pageIndex + 1 > totalPages) {
+        setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
+      }
+      apiParams.set(QUERY_PARAMS.pageSize, String(pageSize))
+      if (sorting[0]) {
+        apiParams.set(QUERY_PARAMS.sortingId, sorting[0].id)
+        apiParams.set(QUERY_PARAMS.order, sorting[0].desc ? 'desc' : 'asc')
+      }
+      if (search) {
+        apiParams.set(QUERY_PARAMS.search, search)
+      }
+      return apiParams
+    },
+    [pageIndex, pageSize, search, setPaginationParams, sorting],
+  )
 
   return {
     setSearchParam,
