@@ -42,7 +42,11 @@ export const useQueryParams = () => {
 
   const setSearchParam = (newSearch: string) => {
     const params = new URLSearchParams(searchParams)
-    params.set(QUERY_PARAMS.search, newSearch)
+    if (newSearch) {
+      params.set(QUERY_PARAMS.search, newSearch)
+    } else {
+      params.delete(QUERY_PARAMS.search)
+    }
     router.push(`${pathname}?${params.toString()}`)
   }
 
@@ -55,5 +59,31 @@ export const useQueryParams = () => {
     router.push(`${pathname}?${params.toString()}`)
   }
 
-  return { setSearchParam, setSortingParams, setPaginationParams, pageIndex, pageSize, sorting, search }
+  const setApiRequestParams = (totalPages: number) => {
+    const apiParams = new URLSearchParams()
+    apiParams.set(QUERY_PARAMS.pageIndex, String(pageIndex))
+    if (totalPages > 0 && pageIndex + 1 > totalPages) {
+      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
+    }
+    apiParams.set(QUERY_PARAMS.pageSize, String(pageSize))
+    if (sorting[0]) {
+      apiParams.set(QUERY_PARAMS.sortingId, sorting[0].id)
+      apiParams.set(QUERY_PARAMS.order, sorting[0].desc ? 'desc' : 'asc')
+    }
+    if (search) {
+      apiParams.set(QUERY_PARAMS.search, search)
+    }
+    return apiParams
+  }
+
+  return {
+    setSearchParam,
+    setSortingParams,
+    setPaginationParams,
+    setApiRequestParams,
+    pageIndex,
+    pageSize,
+    sorting,
+    search,
+  }
 }
