@@ -23,7 +23,7 @@ export const useRouteParams = () => {
 
   const pageSize = useMemo(() => Number(searchParams.get(SEARCH_PARAMS.pageSize) ?? 10), [searchParams])
   const pageIndex = useMemo(
-    () => (Number(searchParams.get(SEARCH_PARAMS.pageIndex)) ? Number(searchParams.get(SEARCH_PARAMS.pageIndex)) : 0),
+    () => (Number(searchParams.get(SEARCH_PARAMS.pageIndex)) ? Number(searchParams.get(SEARCH_PARAMS.pageIndex)) : 1),
     [searchParams],
   )
   const sorting: SortingState = useMemo(() => getSortingState(searchParams), [searchParams])
@@ -42,16 +42,14 @@ export const useRouteParams = () => {
 
   const setSearchParam = (newSearch: string) => {
     const params = new URLSearchParams(searchParams)
-    if (newSearch) {
-      params.set(SEARCH_PARAMS.search, newSearch)
-    }
+    params.set(SEARCH_PARAMS.search, newSearch)
     router.push(`${pathname}?${params.toString()}`)
   }
 
   const setPaginationParams = (newPagination: PaginationState) => {
     const params = new URLSearchParams(searchParams)
     if (newPagination) {
-      params.set(SEARCH_PARAMS.pageIndex, String(newPagination.pageIndex))
+      params.set(SEARCH_PARAMS.pageIndex, String(newPagination.pageIndex + 1))
       params.set(SEARCH_PARAMS.pageSize, String(newPagination.pageSize))
     }
     router.push(`${pathname}?${params.toString()}`)

@@ -59,11 +59,6 @@ export const getSortParam = (sorting: SortingState) => {
   return ''
 }
 
-export const getSearchParam = (searchString: string) => {
-  console.log(searchString)
-  return searchString ? `&q=${searchString}` : ''
-}
-
 const UsersPage = () => {
   const t = useTranslations('users')
   const router = useRouter()
@@ -71,7 +66,7 @@ const UsersPage = () => {
   const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
-  const { setSortingParams, setPaginationParams, pageIndex, pageSize, setSearchParam, sorting, search } =
+  const { setSortingParams, setPaginationParams, setSearchParam, pageIndex, pageSize, sorting, search } =
     useRouteParams()
   const totalPages = Math.ceil(rowCount / pageSize)
 
@@ -79,7 +74,10 @@ const UsersPage = () => {
 
   useEffect(() => {
     const apiParams = new URLSearchParams()
-    apiParams.set(SEARCH_PARAMS.pageIndex, String(pageIndex + 1))
+    apiParams.set(SEARCH_PARAMS.pageIndex, String(pageIndex))
+    if (totalPages > 0 && pageIndex + 1 > totalPages) {
+      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
+    }
     apiParams.set(SEARCH_PARAMS.pageSize, String(pageSize))
     if (sorting[0]) {
       apiParams.set(SEARCH_PARAMS.sortingId, sorting[0].id)
@@ -119,7 +117,7 @@ const UsersPage = () => {
         <UsersTable
           users={listUsers}
           rowCount={rowCount}
-          pageIndex={pageIndex}
+          pageIndex={pageIndex - 1}
           pageSize={pageSize}
           sorting={sorting}
           totalPages={totalPages}
