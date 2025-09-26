@@ -6,13 +6,13 @@ import messages from '@/messages/de.json'
 
 import { SearchField } from './SearchField'
 
-const setSearchString = vi.fn()
+const onChangeSearchString = vi.fn()
 
 describe('SearchField', () => {
   beforeEach(() => {
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
-        <SearchField setSearchString={setSearchString} />
+        <SearchField onChangeSearchString={onChangeSearchString} searchString="" />
       </NextIntlClientProvider>,
     )
   })

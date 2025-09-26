@@ -1,5 +1,5 @@
 import { useTranslations } from 'next-intl'
-import { InputHTMLAttributes, useEffect, useState } from 'react'
+import { InputHTMLAttributes, useEffect, useRef, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -15,8 +15,13 @@ export const SearchField = (props: SearchFieldProps) => {
   const [input, setInput] = useState(searchString)
   const debouncedInput = useDebounce(input, 300)
 
+  const onChangeSearchStringRef = useRef(onChangeSearchString)
   useEffect(() => {
-    onChangeSearchString(debouncedInput)
+    onChangeSearchStringRef.current = onChangeSearchString
+  }, [onChangeSearchString])
+
+  useEffect(() => {
+    onChangeSearchStringRef.current(debouncedInput)
   }, [debouncedInput])
 
   return (

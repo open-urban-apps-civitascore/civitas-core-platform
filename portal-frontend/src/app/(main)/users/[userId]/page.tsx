@@ -14,15 +14,17 @@ const page = async (props: PageProps) => {
     const userResponse = await fetch(`${URL}/${params.slug}`, {
       cache: 'no-store',
     })
-    if (!userResponse) {
-      console.error('No user found')
+    const userData = await userResponse.json()
+    if (!userData || Object.keys(userData).length === 0) {
+      user = null
+    } else {
+      user = userData
     }
-    user = await userResponse.json()
   } catch (error) {
     console.error(error)
   }
 
-  return <div>User Form</div>
+  return <div>{user ? JSON.stringify(user) : 'No user found'}</div>
 }
 
 export default page
