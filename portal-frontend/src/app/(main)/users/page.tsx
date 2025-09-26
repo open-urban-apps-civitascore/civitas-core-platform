@@ -1,8 +1,8 @@
 'use client'
 
 import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
-import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -81,10 +81,10 @@ const UsersPage = () => {
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
   useEffect(() => {
-    const apiParams = setApiRequestParams(totalPages)
+    const params = setApiRequestParams(totalPages)
     const getUsers = async () => {
       try {
-        const usersResponse = await fetch(`${URL}/users?${apiParams.toString()}`)
+        const usersResponse = await fetch(`${URL}/users?${params.toString()}`)
         const usersData: UserResponse[] = await usersResponse.json()
         const users = mapListUsers(usersData)
         setListUsers(users)
