@@ -16,7 +16,8 @@
     "documentation": "Documentation",
     "logout": "Log out",
     "datasets": "Datasets",
-    "users": "Users"
+    "users": "User Management",
+    "tenants": "Tenant Management"
   },
   "datasets": {
     "title": "Datasets",
@@ -41,12 +42,22 @@
     "newDataset": "New Dataset"
   },
   "users": {
-    "title": "Users",
-    "tableHeaders": {
+    "title": "User",
+    "newUser": "New User",
+    "searchUsers": "Filter...",
+    "info": {
+      "id": "ID",
       "displayName": "Display Name",
+      "title": "Title",
       "firstName": "First Name",
       "lastName": "Last Name",
-      "email": "E-Mail"
+      "authority": "Authority",
+      "department": "Department",
+      "role": "System Role",
+      "phone": "Telephone Number",
+      "email": "E-Mail",
+      "group": "Group",
+      "active": "Active"
     }
   },
   "pagination": {

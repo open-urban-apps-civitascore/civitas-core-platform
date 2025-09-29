@@ -1,5 +1,5 @@
 import { ScrollArea } from '@radix-ui/react-scroll-area'
-import { flexRender, SortDirection, Table } from '@tanstack/react-table'
+import { flexRender, Row, SortDirection, Table } from '@tanstack/react-table'
 import { ComponentProps } from 'react'
 
 import { ScrollBar } from '../ui/scroll-area'
@@ -22,10 +22,11 @@ export interface DataTableProps<T> extends ComponentProps<'table'> {
   pageSize: number
   pageIndex: number
   totalPages: number
+  onRowClick?: (row: Row<T>) => void
 }
 
 export const DataTable = <T,>(props: DataTableProps<T>) => {
-  const { table, pageSize, pageIndex, totalPages, ...tableProps } = props
+  const { table, pageSize, pageIndex, totalPages, onRowClick, ...tableProps } = props
   return (
     <div className="@container h-full w-full">
       <div className="h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]">
@@ -50,7 +51,11 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
             </TableHeader>
             <TableBody>
               {table.getRowModel().rows.map(row => (
-                <TableRow className="h-16" key={row.id}>
+                <TableRow
+                  className={`h-16 ${onRowClick ? 'cursor-pointer' : ''}`}
+                  key={row.id}
+                  onClick={onRowClick ? () => onRowClick(row) : () => null}
+                >
                   {row.getVisibleCells().map(cell => (
                     <TableCell className="whitespace-normal" key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}

@@ -18,17 +18,21 @@ export const appSidebarNavItems = [
     items: [],
   },
   {
-    title: 'users',
-    url: '/users',
+    title: 'tenants',
+    url: '',
     icon: User,
     isActive: true,
-    items: [],
+    items: [
+      {
+        title: 'users',
+        url: '/users',
+      },
+    ],
   },
   {
     title: 'menu-item 2',
     url: '#',
     icon: SquareTerminal,
-
     items: [
       {
         title: 'sub-item 1',
