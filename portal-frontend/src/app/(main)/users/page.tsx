@@ -1,14 +1,21 @@
 'use client'
 
-import { SortingState } from '@tanstack/react-table'
+import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
-import { GridContainer } from '@/components/grid-container/GridContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
+import { TableContainer } from '@/components/table-container/TableContainer'
+import { useQueryParams } from '@/hooks/useQueryParams'
 
 import UsersTable from './components/UsersTable'
+
+export type UserGroup = {
+  id: string
+  title: string
+}
 
 export type UserResponse = {
   id: string
@@ -16,23 +23,36 @@ export type UserResponse = {
   lastName: string
   displayName: string
   email: string
+  phone: string
+  title: string
+  authority: string
+  department: string
+  group: UserGroup
+  active: boolean
+  role: string
 }
 
-export type User = {
+export type ListUser = {
   id: string
-  firstName: string
-  lastName: string
   displayName: string
+  authority: string
+  department: string
+  role: string
   email: string
+  isactive: boolean
 }
 
-export const mapUsers = (users: UserResponse[]): User[] =>
+export type FormUser = UserResponse
+
+export const mapListUsers = (users: UserResponse[]): ListUser[] =>
   users.map(user => ({
     id: user.id,
-    firstName: user.firstName,
-    lastName: user.lastName,
     displayName: user.displayName,
+    authority: user.authority,
+    department: user.department,
+    role: user.role,
     email: user.email,
+    isactive: user.active,
   }))
 
 export const getSortParam = (sorting: SortingState) => {
@@ -45,38 +65,36 @@ export const getSortParam = (sorting: SortingState) => {
   return ''
 }
 
-export const getSearchParam = (searchString: string) => (searchString ? `&q=${searchString}` : '')
-
 const UsersPage = () => {
   const t = useTranslations('users')
-  const [users, setUsers] = useState<User[]>([])
+  const router = useRouter()
+  const [listUsers, setListUsers] = useState<ListUser[]>([])
   const [rowCount, setRowCount] = useState(0)
-  const [pageSize, setPageSize] = useState(10)
-  const [pageIndex, setPageIndex] = useState(0)
-  const [sorting, setSorting] = useState<SortingState>([])
-  const [searchString, setSearchString] = useState('')
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+
+  const {
+    setSortingParams,
+    setPaginationParams,
+    setSearchParam,
+    setApiRequestParams,
+    pageIndex,
+    pageSize,
+    sorting,
+    search,
+  } = useQueryParams()
+
   const totalPages = Math.ceil(rowCount / pageSize)
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-  // adjusts the pageIndex when filtering reduces the totalPages and the user is on a page beyond that limit
   useEffect(() => {
-    if (totalPages > 0 && pageIndex + 1 > totalPages) {
-      setPageIndex(totalPages - 1)
-    }
-  }, [totalPages, pageIndex])
-
-  useEffect(() => {
-    const sortParams = getSortParam(sorting)
-    const searchParam = getSearchParam(searchString)
+    const params = setApiRequestParams(totalPages)
     const getUsers = async () => {
       try {
-        const usersResponse = await fetch(
-          `${URL}/users?_page=${pageIndex + 1}&_limit=${pageSize}${sortParams}${searchParam}`,
-        )
+        const usersResponse = await fetch(`${URL}/users?${params.toString()}`)
         const usersData: UserResponse[] = await usersResponse.json()
-        const users = mapUsers(usersData)
-        setUsers(users)
+        const users = mapListUsers(usersData)
+        setListUsers(users)
         const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
         if (rowCount !== totalCount) {
           setRowCount(totalCount)
@@ -86,28 +104,33 @@ const UsersPage = () => {
       }
     }
     getUsers()
-  }, [pageIndex, pageSize, URL, rowCount, sorting, searchString])
+  }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
+
+  const handleRowClick = (row: Row<ListUser>) => {
+    if (row.id) {
+      router.push(`users/${row.id}`, {})
+    }
+  }
 
   return (
     <div className="w-full h-full">
       <PageHeader title={t('title')} />
-      <SearchField setSearchString={setSearchString} />
-      <GridContainer columns={2}>
+      <SearchField searchString={search} onChangeSearchString={setSearchParam} />
+      <TableContainer>
         <UsersTable
-          users={users}
+          users={listUsers}
           rowCount={rowCount}
           pageIndex={pageIndex}
-          setPageIndex={setPageIndex}
           pageSize={pageSize}
-          setPageSize={setPageSize}
           sorting={sorting}
-          setSorting={setSorting}
           totalPages={totalPages}
+          rowSelection={rowSelection}
+          setRowSelection={setRowSelection}
+          onRowClick={handleRowClick}
+          onSortingChange={setSortingParams}
+          onPaginationChange={setPaginationParams}
         />
-        <form>
-          <div>Form placeholder</div>
-        </form>
-      </GridContainer>
+      </TableContainer>
     </div>
   )
 }

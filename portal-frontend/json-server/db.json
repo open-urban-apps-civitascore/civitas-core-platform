@@ -1,2780 +1,4491 @@
 {
   "datasets": [
-    {
+  {
+    "id": 1,
+    "name": "Bebauungspläne der Stadt Musterstadt (XPlanung)",
+    "creator": [
+      {
+        "id": "1",
+        "firstName": "Maximilian",
+        "lastName": "Müller"
+      }
+    ],
+    "issued": "2023-09-10T08:00:00Z",
+    "lastUpdated": "2023-09-10T08:00:00Z",
+    "status": null,
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
       "id": 1,
-      "title": "Bebauungspläne der Stadt Musterstadt (XPlanung)",
-      "creator": [{ "id": "1", "firstName": "Maximilian", "lastName": "Müller" }],
-      "issued": "2023-09-10T08:00:00Z",
-      "modified": "2023-09-10T08:00:00Z",
-      "status": null,
-      "distribution": null,
-      "catalog": ["1"],
-      "series": { "id": "1", "title": "Verkehr" },
-      "department": { "id": 1, "title": "Stadtentwicklung" }
-    },
-    {
-      "id": 2,
-      "title": "Spielplätze",
-      "creator": [{ "id": "2", "firstName": "Sophie", "lastName": "Schneider" }],
-      "issued": "2023-01-01T08:00:00Z",
-      "modified": "2023-01-01T08:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "2",
-        "format": "DOCX",
-        "title": "Superset",
-        "url": "https://superset.de"
-      },
-      "catalog": ["1"],
-      "series": { "id": "2", "title": "Umwelt" },
-      "department": { "id": 2, "title": "Verkehrsplanung" }
-    },
-    {
-      "id": 3,
-      "title": "Spielplätze",
-      "creator": [{ "id": "3", "firstName": "Leonard", "lastName": "Fischer" }],
-      "issued": "2023-02-15T08:00:00Z",
-      "modified": "2023-02-15T08:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "3",
-        "format": "GML",
-        "title": "Masterportal",
-        "url": "https://masterportal.de"
-      },
-      "catalog": ["1"],
-      "series": { "id": "3", "title": "Stadtplanung" },
-      "department": { "id": 3, "title": "Umweltschutz" }
-    },
-    {
-      "id": 4,
-      "title": "Versorgungsleitungen – Trinkwasser",
-      "creator": [{ "id": "4", "firstName": "Anna", "lastName": "Weber" }],
-      "issued": "2023-03-30T08:00:00Z",
-      "modified": "2023-03-30T08:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "4",
-        "format": "PDF",
-        "title": "shapefile",
-        "url": "https://shapefile.de"
-      },
-      "catalog": ["1"],
-      "series": { "id": "1", "title": "Verkehr" },
-      "department": { "id": 4, "title": "Bauaufsicht" }
-    },
-    {
-      "id": 5,
-      "title": "Gewerberegister – öffentlich einsehbare Betriebe",
-      "creator": [{ "id": "5", "firstName": "Lukas", "lastName": "Hoffmann" }],
-      "issued": "2023-04-12T08:00:00Z",
-      "modified": "2023-04-12T08:00:00Z",
-      "status": null,
-      "distribution": null,
-      "catalog": ["1"],
-      "series": { "id": "2", "title": "Umwelt" },
-      "department": { "id": 5, "title": "Öffentliche Sicherheit" }
-    },
-    {
-      "id": 6,
-      "title": "Lärmkartierung – Hauptverkehrsstraßen (Tag/Nacht)",
-      "creator": [{ "id": "6", "firstName": "Marie", "lastName": "Koch" }],
-      "issued": "2023-05-05T08:00:00Z",
-      "modified": "2023-05-05T08:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "6",
-        "format": "GeoJSON",
-        "title": "Open Data Portal Masterportal",
-        "url": "https://opendata.de"
-      },
-      "catalog": ["1"],
-      "series": { "id": "3", "title": "Stadtplanung" },
-      "department": { "id": 6, "title": "Soziale Dienste" }
-    },
-    {
-      "id": 7,
-      "title": "Echtzeit-Positionen Busse und Straßenbahnen",
-      "creator": [{ "id": "7", "firstName": "Felix", "lastName": "Richter" }],
-      "issued": "2023-06-20T08:00:00Z",
-      "modified": "2023-06-20T08:00:00Z",
-      "status": null,
-      "distribution": null,
-      "catalog": ["1"],
-      "series": { "id": "3", "title": "Stadtplanung" },
-      "department": { "id": 7, "title": "Bildungswesen" }
-    },
-    {
-      "id": 8,
-      "title": "Bevölkerungsstatistik – Altersgruppen nach Stadtteilen",
-      "creator": [{ "id": "8", "firstName": "Laura", "lastName": "Braun" }],
-      "issued": "2023-07-10T08:00:00Z",
-      "modified": "2023-07-10T08:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "8",
-        "format": "zip",
-        "title": "Superset",
-        "url": "https://superset.de"
-      },
-      "catalog": ["1"],
-      "series": { "id": "2", "title": "Umwelt" },
-      "department": { "id": 8, "title": "Gesundheitswesen" }
-    },
-
-    {
-      "id": 9,
-      "title": "Tourismuszahlen Besucherzähler",
-      "creator": [
-        {
-          "id": "9",
-          "firstName": "Hannah",
-          "lastName": "Keller"
-        }
-      ],
-      "issued": "2023-01-05T00:00:00Z",
-      "modified": "2023-01-09T00:00:00Z",
-      "status": "closed",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 10,
-      "title": "Unfallstatistik Sensorerfassung",
-      "creator": [
-        {
-          "id": "10",
-          "firstName": "Noah",
-          "lastName": "Schulz"
-        }
-      ],
-      "issued": "2023-09-04T00:00:00Z",
-      "modified": "2023-09-26T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "10",
-        "format": "JSON",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/10"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "4",
-        "title": "Sicherheit"
-      },
-      "department": {
-        "id": 5,
-        "title": "Öffentliche Sicherheit"
-      }
-    },
-    {
-      "id": 11,
-      "title": "Lärmpegel an Hauptverkehrsstraßen",
-      "creator": [
-        {
-          "id": "11",
-          "firstName": "Nina",
-          "lastName": "Hoffmann"
-        }
-      ],
-      "issued": "2023-07-01T00:00:00Z",
-      "modified": "2023-07-08T00:00:00Z",
-      "status": "closed",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 4,
-        "title": "Bauaufsicht"
-      }
-    },
-    {
-      "id": 12,
-      "title": "Krankenhaus Bettenauslastung",
-      "creator": [
-        {
-          "id": "12",
-          "firstName": "Sophie",
-          "lastName": "Schneider"
-        }
-      ],
-      "issued": "2023-06-12T00:00:00Z",
-      "modified": "2023-06-26T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "12",
-        "format": "XML",
-        "title": "Messdaten",
-        "url": "https://sensors.example/12"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 13,
-      "title": "Lärmkartierung Bahnhöfe",
-      "creator": [
-        {
-          "id": "13",
-          "firstName": "Nina",
-          "lastName": "Müller"
-        }
-      ],
-      "issued": "2023-10-16T00:00:00Z",
-      "modified": "2023-10-29T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "13",
-        "format": "XML",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/13"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 4,
-        "title": "Bauaufsicht"
-      }
-    },
-    {
-      "id": 14,
-      "title": "Krankenhaus Bettenauslastung",
-      "creator": [
-        {
-          "id": "14",
-          "firstName": "Lea",
-          "lastName": "Schmidt"
-        }
-      ],
-      "issued": "2023-02-26T00:00:00Z",
-      "modified": "2023-03-11T00:00:00Z",
-      "status": "closed",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 15,
-      "title": "Echtzeitdaten – Busse",
-      "creator": [
-        {
-          "id": "15",
-          "firstName": "Emma",
-          "lastName": "Wolf"
-        }
-      ],
-      "issued": "2023-03-26T00:00:00Z",
-      "modified": "2023-03-29T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "15",
-        "format": "PDF",
-        "title": "API",
-        "url": "https://sensors.example/15"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 16,
-      "title": "Rettungsdienste – Einsatzzeiten",
-      "creator": [
-        {
-          "id": "16",
-          "firstName": "Jannik",
-          "lastName": "Wolf"
-        }
-      ],
-      "issued": "2023-04-26T00:00:00Z",
-      "modified": "2023-05-10T00:00:00Z",
-      "status": "closed",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 17,
-      "title": "Wasserqualität – Flüsse",
-      "creator": [
-        {
-          "id": "17",
-          "firstName": "Paul",
-          "lastName": "Schneider"
-        }
-      ],
-      "issued": "2023-10-20T00:00:00Z",
-      "modified": "2023-10-28T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "17",
-        "format": "PDF",
-        "title": "API",
-        "url": "https://sensors.example/17"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 18,
-      "title": "Straßenbeleuchtung – Defektmeldungen",
-      "creator": [
-        {
-          "id": "18",
-          "firstName": "Emma",
-          "lastName": "Lang"
-        }
-      ],
-      "issued": "2023-01-19T00:00:00Z",
-      "modified": "2023-01-30T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "18",
-        "format": "ZIP",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/18"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 4,
-        "title": "Bauaufsicht"
-      }
-    },
-    {
-      "id": 19,
-      "title": "Luftqualität – NO2-Messungen",
-      "creator": [
-        {
-          "id": "19",
-          "firstName": "Elias",
-          "lastName": "Lang"
-        }
-      ],
-      "issued": "2023-09-19T00:00:00Z",
-      "modified": "2023-10-13T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "19",
-        "format": "GeoJSON",
-        "title": "Messdaten",
-        "url": "https://sensors.example/19"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 20,
-      "title": "Wasserqualität – Flüsse",
-      "creator": [
-        {
-          "id": "20",
-          "firstName": "Finn",
-          "lastName": "Zimmermann"
-        }
-      ],
-      "issued": "2023-04-05T00:00:00Z",
-      "modified": "2023-04-08T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "20",
-        "format": "CSV",
-        "title": "Messdaten",
-        "url": "https://sensors.example/20"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 21,
-      "title": "Defibrillator Nutzungshäufigkeit",
-      "creator": [
-        {
-          "id": "21",
-          "firstName": "Miriam",
-          "lastName": "Wolf"
-        }
-      ],
-      "issued": "2023-10-08T00:00:00Z",
-      "modified": "2023-10-10T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "21",
-        "format": "XML",
-        "title": "Messdaten",
-        "url": "https://sensors.example/21"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 22,
-      "title": "Krankenhaus Bettenauslastung",
-      "creator": [
-        {
-          "id": "22",
-          "firstName": "Jannik",
-          "lastName": "Braun"
-        }
-      ],
-      "issued": "2023-07-01T00:00:00Z",
-      "modified": "2023-07-10T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "22",
-        "format": "GeoJSON",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/22"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 23,
-      "title": "Echtzeitdaten – Busse",
-      "creator": [
-        {
-          "id": "23",
-          "firstName": "Ben",
-          "lastName": "Lehmann"
-        }
-      ],
-      "issued": "2023-05-23T00:00:00Z",
-      "modified": "2023-05-28T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "23",
-        "format": "JSON",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/23"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 2,
-        "title": "Verkehrsplanung"
-      }
-    },
-    {
-      "id": 24,
-      "title": "Rettungsdienste – Einsatzzeiten",
-      "creator": [
-        {
-          "id": "24",
-          "firstName": "Maximilian",
-          "lastName": "Keller"
-        }
-      ],
-      "issued": "2023-06-03T00:00:00Z",
-      "modified": "2023-06-30T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "24",
-        "format": "PDF",
-        "title": "Messdaten",
-        "url": "https://sensors.example/24"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 25,
-      "title": "Echtzeitdaten – Straßenbahnen",
-      "creator": [
-        {
-          "id": "25",
-          "firstName": "Sarah",
-          "lastName": "Peters"
-        }
-      ],
-      "issued": "2023-08-27T00:00:00Z",
-      "modified": "2023-09-20T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "25",
-        "format": "XLSX",
-        "title": "API",
-        "url": "https://sensors.example/25"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 2,
-        "title": "Verkehrsplanung"
-      }
-    },
-    {
-      "id": 26,
-      "title": "Unfallstatistik Sensorerfassung",
-      "creator": [
-        {
-          "id": "26",
-          "firstName": "Jonas",
-          "lastName": "Schulz"
-        }
-      ],
-      "issued": "2023-07-23T00:00:00Z",
-      "modified": "2023-08-16T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "26",
-        "format": "CSV",
-        "title": "Messdaten",
-        "url": "https://sensors.example/26"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "4",
-        "title": "Sicherheit"
-      },
-      "department": {
-        "id": 5,
-        "title": "Öffentliche Sicherheit"
-      }
-    },
-    {
-      "id": 27,
-      "title": "Wasserqualität – Flüsse",
-      "creator": [
-        {
-          "id": "27",
-          "firstName": "Miriam",
-          "lastName": "Weber"
-        }
-      ],
-      "issued": "2023-02-12T00:00:00Z",
-      "modified": "2023-03-12T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "27",
-        "format": "XLSX",
-        "title": "Monitoring Report",
-        "url": "https://sensors.example/27"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 28,
-      "title": "Krankenhaus Bettenauslastung",
-      "creator": [
-        {
-          "id": "28",
-          "firstName": "Hannah",
-          "lastName": "Schmidt"
-        }
-      ],
-      "issued": "2023-05-01T00:00:00Z",
-      "modified": "2023-05-30T00:00:00Z",
-      "status": "open",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 29,
-      "title": "Echtzeitdaten – Straßenbahnen",
-      "creator": [
-        {
-          "id": "29",
-          "firstName": "Isabell",
-          "lastName": "Weber"
-        }
-      ],
-      "issued": "2023-08-13T00:00:00Z",
-      "modified": "2023-08-18T00:00:00Z",
-      "status": "closed",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 30,
-      "title": "Straßenbeleuchtung – Defektmeldungen",
-      "creator": [
-        {
-          "id": "30",
-          "firstName": "Miriam",
-          "lastName": "Meier"
-        }
-      ],
-      "issued": "2023-01-13T00:00:00Z",
-      "modified": "2023-02-08T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "30",
-        "format": "XLSX",
-        "title": "API",
-        "url": "https://sensors.example/30"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 31,
-      "title": "Luftqualität – Feinstaub PM10",
-      "creator": [
-        {
-          "id": "31",
-          "firstName": "Mila",
-          "lastName": "Keller"
-        }
-      ],
-      "issued": "2023-07-18T00:00:00Z",
-      "modified": "2023-08-17T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "31",
-        "format": "JSON",
-        "title": "Messdaten",
-        "url": "https://sensors.example/31"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 32,
-      "title": "Parkplatzauslastung Sensoren",
-      "creator": [
-        {
-          "id": "32",
-          "firstName": "Paul",
-          "lastName": "Keller"
-        }
-      ],
-      "issued": "2023-05-07T00:00:00Z",
-      "modified": "2023-05-27T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "32",
-        "format": "XML",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/32"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 2,
-        "title": "Verkehrsplanung"
-      }
-    },
-    {
-      "id": 33,
-      "title": "Straßenbeleuchtung – Defektmeldungen",
-      "creator": [
-        {
-          "id": "33",
-          "firstName": "David",
-          "lastName": "Zimmermann"
-        }
-      ],
-      "issued": "2023-04-11T00:00:00Z",
-      "modified": "2023-05-04T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "33",
-        "format": "PDF",
-        "title": "Monitoring Report",
-        "url": "https://sensors.example/33"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 4,
-        "title": "Bauaufsicht"
-      }
-    },
-    {
-      "id": 34,
-      "title": "Niederschlagsmengen Sensoren",
-      "creator": [
-        {
-          "id": "34",
-          "firstName": "Leonard",
-          "lastName": "Werner"
-        }
-      ],
-      "issued": "2023-04-14T00:00:00Z",
-      "modified": "2023-04-23T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "34",
-        "format": "XML",
-        "title": "Messdaten",
-        "url": "https://sensors.example/34"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 35,
-      "title": "Echtzeitdaten – Straßenbahnen",
-      "creator": [
-        {
-          "id": "35",
-          "firstName": "Clara",
-          "lastName": "Hartmann"
-        }
-      ],
-      "issued": "2023-06-14T00:00:00Z",
-      "modified": "2023-07-10T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "35",
-        "format": "PDF",
-        "title": "Messdaten",
-        "url": "https://sensors.example/35"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 2,
-        "title": "Verkehrsplanung"
-      }
-    },
-    {
-      "id": 36,
-      "title": "Fahrgastzahlen U-Bahn",
-      "creator": [
-        {
-          "id": "36",
-          "firstName": "Jonas",
-          "lastName": "Keller"
-        }
-      ],
-      "issued": "2023-01-15T00:00:00Z",
-      "modified": "2023-02-13T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "36",
-        "format": "PDF",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/36"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 37,
-      "title": "Luftqualität – Feinstaub PM10",
-      "creator": [
-        {
-          "id": "37",
-          "firstName": "Laura",
-          "lastName": "Zimmermann"
-        }
-      ],
-      "issued": "2023-07-13T00:00:00Z",
-      "modified": "2023-07-19T00:00:00Z",
-      "status": "closed",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 38,
-      "title": "Luftqualität – Ozonwerte",
-      "creator": [
-        {
-          "id": "38",
-          "firstName": "Jonas",
-          "lastName": "Schneider"
-        }
-      ],
-      "issued": "2023-03-13T00:00:00Z",
-      "modified": "2023-03-28T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "38",
-        "format": "PDF",
-        "title": "Monitoring Report",
-        "url": "https://sensors.example/38"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 39,
-      "title": "Luftfeuchtigkeit Innenstadt",
-      "creator": [
-        {
-          "id": "39",
-          "firstName": "Nina",
-          "lastName": "Koch"
-        }
-      ],
-      "issued": "2023-06-05T00:00:00Z",
-      "modified": "2023-06-11T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "39",
-        "format": "CSV",
-        "title": "Messdaten",
-        "url": "https://sensors.example/39"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 40,
-      "title": "Unfallstatistik Sensorerfassung",
-      "creator": [
-        {
-          "id": "40",
-          "firstName": "Moritz",
-          "lastName": "Krause"
-        }
-      ],
-      "issued": "2023-01-22T00:00:00Z",
-      "modified": "2023-02-03T00:00:00Z",
-      "status": "open",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "4",
-        "title": "Sicherheit"
-      },
-      "department": {
-        "id": 5,
-        "title": "Öffentliche Sicherheit"
-      }
-    },
-    {
-      "id": 41,
-      "title": "Fahrgastzahlen U-Bahn",
-      "creator": [
-        {
-          "id": "41",
-          "firstName": "Miriam",
-          "lastName": "Keller"
-        }
-      ],
-      "issued": "2023-05-18T00:00:00Z",
-      "modified": "2023-05-25T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "41",
-        "format": "PDF",
-        "title": "API",
-        "url": "https://sensors.example/41"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 42,
-      "title": "Luftqualität – NO2-Messungen",
-      "creator": [
-        {
-          "id": "42",
-          "firstName": "Clara",
-          "lastName": "Zimmermann"
-        }
-      ],
-      "issued": "2023-04-10T00:00:00Z",
-      "modified": "2023-05-07T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "42",
-        "format": "XML",
-        "title": "Messdaten",
-        "url": "https://sensors.example/42"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 43,
-      "title": "Echtzeitdaten – Busse",
-      "creator": [
-        {
-          "id": "43",
-          "firstName": "Emma",
-          "lastName": "Wolf"
-        }
-      ],
-      "issued": "2023-09-01T00:00:00Z",
-      "modified": "2023-09-12T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "43",
-        "format": "XLSX",
-        "title": "Monitoring Report",
-        "url": "https://sensors.example/43"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 2,
-        "title": "Verkehrsplanung"
-      }
-    },
-    {
-      "id": 44,
-      "title": "Luftqualität – Ozonwerte",
-      "creator": [
-        {
-          "id": "44",
-          "firstName": "Marie",
-          "lastName": "Fischer"
-        }
-      ],
-      "issued": "2023-04-25T00:00:00Z",
-      "modified": "2023-04-26T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "44",
-        "format": "JSON",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/44"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 45,
-      "title": "Rettungsdienste – Einsatzzeiten",
-      "creator": [
-        {
-          "id": "45",
-          "firstName": "Leonard",
-          "lastName": "Braun"
-        }
-      ],
-      "issued": "2023-01-30T00:00:00Z",
-      "modified": "2023-02-27T00:00:00Z",
-      "status": null,
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 46,
-      "title": "Radweg-Nutzungssensoren",
-      "creator": [
-        {
-          "id": "46",
-          "firstName": "Julian",
-          "lastName": "Krüger"
-        }
-      ],
-      "issued": "2023-04-14T00:00:00Z",
-      "modified": "2023-05-06T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "46",
-        "format": "GeoJSON",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/46"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 47,
-      "title": "Notfallmeldungen – Brandmelder",
-      "creator": [
-        {
-          "id": "47",
-          "firstName": "Hannah",
-          "lastName": "Schneider"
-        }
-      ],
-      "issued": "2023-09-14T00:00:00Z",
-      "modified": "2023-10-11T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "47",
-        "format": "XLSX",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/47"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "4",
-        "title": "Sicherheit"
-      },
-      "department": {
-        "id": 5,
-        "title": "Öffentliche Sicherheit"
-      }
-    },
-    {
-      "id": 48,
-      "title": "Lärmkartierung Bahnhöfe",
-      "creator": [
-        {
-          "id": "48",
-          "firstName": "Clara",
-          "lastName": "Wagner"
-        }
-      ],
-      "issued": "2023-07-14T00:00:00Z",
-      "modified": "2023-08-05T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "48",
-        "format": "ZIP",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/48"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 4,
-        "title": "Bauaufsicht"
-      }
-    },
-    {
-      "id": 49,
-      "title": "Luftfeuchtigkeit Innenstadt",
-      "creator": [
-        {
-          "id": "49",
-          "firstName": "Hannah",
-          "lastName": "Becker"
-        }
-      ],
-      "issued": "2023-09-11T00:00:00Z",
-      "modified": "2023-09-27T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "49",
-        "format": "XLSX",
-        "title": "API",
-        "url": "https://sensors.example/49"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 50,
-      "title": "Energieverbrauch – öffentl. Gebäude",
-      "creator": [
-        {
-          "id": "50",
-          "firstName": "Mila",
-          "lastName": "Hartmann"
-        }
-      ],
-      "issued": "2023-09-06T00:00:00Z",
-      "modified": "2023-10-04T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "50",
-        "format": "XML",
-        "title": "API",
-        "url": "https://sensors.example/50"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 4,
-        "title": "Bauaufsicht"
-      }
-    },
-    {
-      "id": 51,
-      "title": "Echtzeitdaten – Busse",
-      "creator": [
-        {
-          "id": "51",
-          "firstName": "Miriam",
-          "lastName": "Lehmann"
-        }
-      ],
-      "issued": "2023-09-03T00:00:00Z",
-      "modified": "2023-09-17T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "51",
-        "format": "CSV",
-        "title": "API",
-        "url": "https://sensors.example/51"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 52,
-      "title": "Parkplatzauslastung Sensoren",
-      "creator": [
-        {
-          "id": "52",
-          "firstName": "Clara",
-          "lastName": "Hartmann"
-        }
-      ],
-      "issued": "2023-02-23T00:00:00Z",
-      "modified": "2023-02-24T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "52",
-        "format": "XLSX",
-        "title": "API",
-        "url": "https://sensors.example/52"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 53,
-      "title": "Grundwasserpegel Monitoring",
-      "creator": [
-        {
-          "id": "53",
-          "firstName": "Philipp",
-          "lastName": "Werner"
-        }
-      ],
-      "issued": "2023-03-02T00:00:00Z",
-      "modified": "2023-03-24T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "53",
-        "format": "GeoJSON",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/53"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 54,
-      "title": "Müllbehälter Füllstände",
-      "creator": [
-        {
-          "id": "54",
-          "firstName": "Julian",
-          "lastName": "Schulz"
-        }
-      ],
-      "issued": "2023-10-21T00:00:00Z",
-      "modified": "2023-11-11T00:00:00Z",
-      "status": null,
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 55,
-      "title": "Verkehrsdichte an Kreuzungen",
-      "creator": [
-        {
-          "id": "55",
-          "firstName": "Clara",
-          "lastName": "Braun"
-        }
-      ],
-      "issued": "2023-04-16T00:00:00Z",
-      "modified": "2023-04-19T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "55",
-        "format": "XML",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/55"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 56,
-      "title": "Echtzeitdaten – Busse",
-      "creator": [
-        {
-          "id": "56",
-          "firstName": "Amelie",
-          "lastName": "Hartmann"
-        }
-      ],
-      "issued": "2023-09-23T00:00:00Z",
-      "modified": "2023-09-29T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "56",
-        "format": "PDF",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/56"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 57,
-      "title": "Unfallstatistik Sensorerfassung",
-      "creator": [
-        {
-          "id": "57",
-          "firstName": "Miriam",
-          "lastName": "Hoffmann"
-        }
-      ],
-      "issued": "2023-08-11T00:00:00Z",
-      "modified": "2023-08-29T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "57",
-        "format": "JSON",
-        "title": "Messdaten",
-        "url": "https://sensors.example/57"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "4",
-        "title": "Sicherheit"
-      },
-      "department": {
-        "id": 5,
-        "title": "Öffentliche Sicherheit"
-      }
-    },
-    {
-      "id": 58,
-      "title": "Verkehrsdichte an Kreuzungen",
-      "creator": [
-        {
-          "id": "58",
-          "firstName": "Amelie",
-          "lastName": "Müller"
-        }
-      ],
-      "issued": "2023-07-02T00:00:00Z",
-      "modified": "2023-07-15T00:00:00Z",
-      "status": "open",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 2,
-        "title": "Verkehrsplanung"
-      }
-    },
-    {
-      "id": 59,
-      "title": "Bevölkerungsbewegungen – anonyme Zählung",
-      "creator": [
-        {
-          "id": "59",
-          "firstName": "Noah",
-          "lastName": "Huber"
-        }
-      ],
-      "issued": "2023-05-13T00:00:00Z",
-      "modified": "2023-05-19T00:00:00Z",
-      "status": null,
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 6,
-        "title": "Soziale Dienste"
-      }
-    },
-    {
-      "id": 60,
-      "title": "Niederschlagsmengen Sensoren",
-      "creator": [
-        {
-          "id": "60",
-          "firstName": "Amelie",
-          "lastName": "Huber"
-        }
-      ],
-      "issued": "2023-05-24T00:00:00Z",
-      "modified": "2023-06-16T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "60",
-        "format": "PDF",
-        "title": "API",
-        "url": "https://sensors.example/60"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 61,
-      "title": "Lärmkartierung Bahnhöfe",
-      "creator": [
-        {
-          "id": "61",
-          "firstName": "Maximilian",
-          "lastName": "Becker"
-        }
-      ],
-      "issued": "2023-03-14T00:00:00Z",
-      "modified": "2023-04-07T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "61",
-        "format": "PDF",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/61"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 4,
-        "title": "Bauaufsicht"
-      }
-    },
-    {
-      "id": 62,
-      "title": "Niederschlagsmengen Sensoren",
-      "creator": [
-        {
-          "id": "62",
-          "firstName": "Amelie",
-          "lastName": "Richter"
-        }
-      ],
-      "issued": "2023-02-18T00:00:00Z",
-      "modified": "2023-03-03T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "62",
-        "format": "JSON",
-        "title": "Messdaten",
-        "url": "https://sensors.example/62"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 63,
-      "title": "Defibrillator Nutzungshäufigkeit",
-      "creator": [
-        {
-          "id": "63",
-          "firstName": "Emma",
-          "lastName": "Zimmermann"
-        }
-      ],
-      "issued": "2023-06-08T00:00:00Z",
-      "modified": "2023-06-14T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "63",
-        "format": "GeoJSON",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/63"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 64,
-      "title": "Lärmpegel an Hauptverkehrsstraßen",
-      "creator": [
-        {
-          "id": "64",
-          "firstName": "Jonas",
-          "lastName": "Huber"
-        }
-      ],
-      "issued": "2023-10-24T00:00:00Z",
-      "modified": "2023-11-07T00:00:00Z",
-      "status": "closed",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 65,
-      "title": "Luftqualität – Ozonwerte",
-      "creator": [
-        {
-          "id": "65",
-          "firstName": "Sarah",
-          "lastName": "Hoffmann"
-        }
-      ],
-      "issued": "2023-01-18T00:00:00Z",
-      "modified": "2023-02-06T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "65",
-        "format": "JSON",
-        "title": "API",
-        "url": "https://sensors.example/65"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 66,
-      "title": "Niederschlagsmengen Sensoren",
-      "creator": [
-        {
-          "id": "66",
-          "firstName": "Miriam",
-          "lastName": "Fischer"
-        }
-      ],
-      "issued": "2023-04-15T00:00:00Z",
-      "modified": "2023-04-29T00:00:00Z",
-      "status": "closed",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 67,
-      "title": "E-Ladestationen – Belegung",
-      "creator": [
-        {
-          "id": "67",
-          "firstName": "Mila",
-          "lastName": "Müller"
-        }
-      ],
-      "issued": "2023-10-16T00:00:00Z",
-      "modified": "2023-11-04T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "67",
-        "format": "CSV",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/67"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 68,
-      "title": "Radweg-Nutzungssensoren",
-      "creator": [
-        {
-          "id": "68",
-          "firstName": "Jonas",
-          "lastName": "Müller"
-        }
-      ],
-      "issued": "2023-09-26T00:00:00Z",
-      "modified": "2023-09-26T00:00:00Z",
-      "status": null,
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 2,
-        "title": "Verkehrsplanung"
-      }
-    },
-    {
-      "id": 69,
-      "title": "Unfallstatistik Sensorerfassung",
-      "creator": [
-        {
-          "id": "69",
-          "firstName": "Maximilian",
-          "lastName": "Keller"
-        }
-      ],
-      "issued": "2023-04-30T00:00:00Z",
-      "modified": "2023-05-19T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "69",
-        "format": "JSON",
-        "title": "Messdaten",
-        "url": "https://sensors.example/69"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "4",
-        "title": "Sicherheit"
-      },
-      "department": {
-        "id": 5,
-        "title": "Öffentliche Sicherheit"
-      }
-    },
-    {
-      "id": 70,
-      "title": "Temperatur an Wetterstationen",
-      "creator": [
-        {
-          "id": "70",
-          "firstName": "Anna",
-          "lastName": "Schmidt"
-        }
-      ],
-      "issued": "2023-07-11T00:00:00Z",
-      "modified": "2023-08-09T00:00:00Z",
-      "status": "open",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 71,
-      "title": "Windgeschwindigkeit Stadtgebiet",
-      "creator": [
-        {
-          "id": "71",
-          "firstName": "Finn",
-          "lastName": "Lang"
-        }
-      ],
-      "issued": "2023-09-14T00:00:00Z",
-      "modified": "2023-10-14T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "71",
-        "format": "JSON",
-        "title": "Monitoring Report",
-        "url": "https://sensors.example/71"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 72,
-      "title": "Niederschlagsmengen Sensoren",
-      "creator": [
-        {
-          "id": "72",
-          "firstName": "Amelie",
-          "lastName": "Lehmann"
-        }
-      ],
-      "issued": "2023-09-18T00:00:00Z",
-      "modified": "2023-10-17T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "72",
-        "format": "ZIP",
-        "title": "API",
-        "url": "https://sensors.example/72"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 73,
-      "title": "Energieverbrauch – öffentl. Gebäude",
-      "creator": [
-        {
-          "id": "73",
-          "firstName": "Finn",
-          "lastName": "Lang"
-        }
-      ],
-      "issued": "2023-03-06T00:00:00Z",
-      "modified": "2023-03-28T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "73",
-        "format": "PDF",
-        "title": "Monitoring Report",
-        "url": "https://sensors.example/73"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 4,
-        "title": "Bauaufsicht"
-      }
-    },
-    {
-      "id": 74,
-      "title": "Luftfeuchtigkeit Innenstadt",
-      "creator": [
-        {
-          "id": "74",
-          "firstName": "Hannah",
-          "lastName": "Hoffmann"
-        }
-      ],
-      "issued": "2023-03-13T00:00:00Z",
-      "modified": "2023-04-01T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "74",
-        "format": "PDF",
-        "title": "Messdaten",
-        "url": "https://sensors.example/74"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 75,
-      "title": "Tourismuszahlen Besucherzähler",
-      "creator": [
-        {
-          "id": "75",
-          "firstName": "Felix",
-          "lastName": "Meier"
-        }
-      ],
-      "issued": "2023-09-08T00:00:00Z",
-      "modified": "2023-09-17T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "75",
-        "format": "XLSX",
-        "title": "API",
-        "url": "https://sensors.example/75"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 76,
-      "title": "Niederschlagsmengen Sensoren",
-      "creator": [
-        {
-          "id": "76",
-          "firstName": "Jonas",
-          "lastName": "Fischer"
-        }
-      ],
-      "issued": "2023-02-25T00:00:00Z",
-      "modified": "2023-03-12T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "76",
-        "format": "GeoJSON",
-        "title": "Messdaten",
-        "url": "https://sensors.example/76"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 77,
-      "title": "Windgeschwindigkeit Stadtgebiet",
-      "creator": [
-        {
-          "id": "77",
-          "firstName": "Lea",
-          "lastName": "Zimmermann"
-        }
-      ],
-      "issued": "2023-04-26T00:00:00Z",
-      "modified": "2023-04-30T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "77",
-        "format": "ZIP",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/77"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 78,
-      "title": "Lärmkartierung Bahnhöfe",
-      "creator": [
-        {
-          "id": "78",
-          "firstName": "Lina",
-          "lastName": "Schulz"
-        }
-      ],
-      "issued": "2023-10-27T00:00:00Z",
-      "modified": "2023-11-16T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "78",
-        "format": "GeoJSON",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/78"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 79,
-      "title": "Parkplatzauslastung Sensoren",
-      "creator": [
-        {
-          "id": "79",
-          "firstName": "Julian",
-          "lastName": "Lang"
-        }
-      ],
-      "issued": "2023-03-10T00:00:00Z",
-      "modified": "2023-04-09T00:00:00Z",
-      "status": "open",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 80,
-      "title": "Lärmpegel an Hauptverkehrsstraßen",
-      "creator": [
-        {
-          "id": "80",
-          "firstName": "Emma",
-          "lastName": "Fischer"
-        }
-      ],
-      "issued": "2023-08-09T00:00:00Z",
-      "modified": "2023-08-14T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "80",
-        "format": "CSV",
-        "title": "API",
-        "url": "https://sensors.example/80"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 4,
-        "title": "Bauaufsicht"
-      }
-    },
-    {
-      "id": 81,
-      "title": "Luftqualität – Ozonwerte",
-      "creator": [
-        {
-          "id": "81",
-          "firstName": "Miriam",
-          "lastName": "Müller"
-        }
-      ],
-      "issued": "2023-08-04T00:00:00Z",
-      "modified": "2023-08-18T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "81",
-        "format": "PDF",
-        "title": "Messdaten",
-        "url": "https://sensors.example/81"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 82,
-      "title": "Lärmkartierung Bahnhöfe",
-      "creator": [
-        {
-          "id": "82",
-          "firstName": "Felix",
-          "lastName": "Schulz"
-        }
-      ],
-      "issued": "2023-09-17T00:00:00Z",
-      "modified": "2023-09-25T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "82",
-        "format": "ZIP",
-        "title": "API",
-        "url": "https://sensors.example/82"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 83,
-      "title": "Straßenbeleuchtung – Defektmeldungen",
-      "creator": [
-        {
-          "id": "83",
-          "firstName": "Miriam",
-          "lastName": "Richter"
-        }
-      ],
-      "issued": "2023-08-15T00:00:00Z",
-      "modified": "2023-08-24T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "83",
-        "format": "CSV",
-        "title": "API",
-        "url": "https://sensors.example/83"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 4,
-        "title": "Bauaufsicht"
-      }
-    },
-    {
-      "id": 84,
-      "title": "Temperatur an Wetterstationen",
-      "creator": [
-        {
-          "id": "84",
-          "firstName": "Sophie",
-          "lastName": "Koch"
-        }
-      ],
-      "issued": "2023-08-09T00:00:00Z",
-      "modified": "2023-08-31T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "84",
-        "format": "XML",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/84"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 85,
-      "title": "Luftqualität – NO2-Messungen",
-      "creator": [
-        {
-          "id": "85",
-          "firstName": "David",
-          "lastName": "Hoffmann"
-        }
-      ],
-      "issued": "2023-02-21T00:00:00Z",
-      "modified": "2023-03-19T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "85",
-        "format": "ZIP",
-        "title": "Monitoring Report",
-        "url": "https://sensors.example/85"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 86,
-      "title": "Bevölkerungsbewegungen – anonyme Zählung",
-      "creator": [
-        {
-          "id": "86",
-          "firstName": "Philipp",
-          "lastName": "Weber"
-        }
-      ],
-      "issued": "2023-02-19T00:00:00Z",
-      "modified": "2023-02-24T00:00:00Z",
-      "status": "closed",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 6,
-        "title": "Soziale Dienste"
-      }
-    },
-    {
-      "id": 87,
-      "title": "Verkehrsdichte an Kreuzungen",
-      "creator": [
-        {
-          "id": "87",
-          "firstName": "Paul",
-          "lastName": "Zimmermann"
-        }
-      ],
-      "issued": "2023-06-29T00:00:00Z",
-      "modified": "2023-07-20T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "87",
-        "format": "XLSX",
-        "title": "Messdaten",
-        "url": "https://sensors.example/87"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 88,
-      "title": "Straßenbeleuchtung – Defektmeldungen",
-      "creator": [
-        {
-          "id": "88",
-          "firstName": "Lea",
-          "lastName": "Zimmermann"
-        }
-      ],
-      "issued": "2023-08-21T00:00:00Z",
-      "modified": "2023-09-05T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "88",
-        "format": "JSON",
-        "title": "Messdaten",
-        "url": "https://sensors.example/88"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 89,
-      "title": "Defibrillator Nutzungshäufigkeit",
-      "creator": [
-        {
-          "id": "89",
-          "firstName": "Lina",
-          "lastName": "Weber"
-        }
-      ],
-      "issued": "2023-07-15T00:00:00Z",
-      "modified": "2023-08-14T00:00:00Z",
-      "status": "open",
-      "distribution": {
-        "id": "89",
-        "format": "JSON",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/89"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 90,
-      "title": "Rettungsdienste – Einsatzzeiten",
-      "creator": [
-        {
-          "id": "90",
-          "firstName": "Clara",
-          "lastName": "Wolf"
-        }
-      ],
-      "issued": "2023-02-25T00:00:00Z",
-      "modified": "2023-03-23T00:00:00Z",
-      "status": null,
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 91,
-      "title": "Grundwasserpegel Monitoring",
-      "creator": [
-        {
-          "id": "91",
-          "firstName": "David",
-          "lastName": "Wagner"
-        }
-      ],
-      "issued": "2023-06-01T00:00:00Z",
-      "modified": "2023-06-21T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "91",
-        "format": "CSV",
-        "title": "API",
-        "url": "https://sensors.example/91"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 92,
-      "title": "Luftqualität – NO2-Messungen",
-      "creator": [
-        {
-          "id": "92",
-          "firstName": "Clara",
-          "lastName": "Keller"
-        }
-      ],
-      "issued": "2023-02-15T00:00:00Z",
-      "modified": "2023-03-13T00:00:00Z",
-      "status": "closed",
-      "distribution": null,
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 3,
-        "title": "Umweltschutz"
-      }
-    },
-    {
-      "id": 93,
-      "title": "Tourismuszahlen Besucherzähler",
-      "creator": [
-        {
-          "id": "93",
-          "firstName": "Maximilian",
-          "lastName": "Krause"
-        }
-      ],
-      "issued": "2023-02-04T00:00:00Z",
-      "modified": "2023-02-08T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "93",
-        "format": "XLSX",
-        "title": "Messdaten",
-        "url": "https://sensors.example/93"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 94,
-      "title": "Rettungsdienste – Einsatzzeiten",
-      "creator": [
-        {
-          "id": "94",
-          "firstName": "Hannah",
-          "lastName": "Richter"
-        }
-      ],
-      "issued": "2023-06-15T00:00:00Z",
-      "modified": "2023-06-19T00:00:00Z",
-      "status": null,
-      "distribution": {
-        "id": "94",
-        "format": "JSON",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/94"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "5",
-        "title": "Gesundheit"
-      },
-      "department": {
-        "id": 8,
-        "title": "Gesundheitswesen"
-      }
-    },
-    {
-      "id": 95,
-      "title": "Parkplatzauslastung Sensoren",
-      "creator": [
-        {
-          "id": "95",
-          "firstName": "Ben",
-          "lastName": "Schneider"
-        }
-      ],
-      "issued": "2023-01-27T00:00:00Z",
-      "modified": "2023-02-06T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "95",
-        "format": "XLSX",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/95"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 96,
-      "title": "Parkplatzauslastung Sensoren",
-      "creator": [
-        {
-          "id": "96",
-          "firstName": "Clara",
-          "lastName": "Richter"
-        }
-      ],
-      "issued": "2023-05-26T00:00:00Z",
-      "modified": "2023-05-28T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "96",
-        "format": "XLSX",
-        "title": "Messdaten",
-        "url": "https://sensors.example/96"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "1",
-        "title": "Verkehr"
-      },
-      "department": {
-        "id": 2,
-        "title": "Verkehrsplanung"
-      }
-    },
-    {
-      "id": 97,
-      "title": "Energieverbrauch – Straßenbeleuchtung",
-      "creator": [
-        {
-          "id": "97",
-          "firstName": "Ben",
-          "lastName": "Lang"
-        }
-      ],
-      "issued": "2023-05-04T00:00:00Z",
-      "modified": "2023-05-14T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "97",
-        "format": "PDF",
-        "title": "Messdaten",
-        "url": "https://sensors.example/97"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 98,
-      "title": "Tourismuszahlen Besucherzähler",
-      "creator": [
-        {
-          "id": "98",
-          "firstName": "Mila",
-          "lastName": "Meier"
-        }
-      ],
-      "issued": "2023-08-31T00:00:00Z",
-      "modified": "2023-09-07T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "98",
-        "format": "CSV",
-        "title": "Sensorservice",
-        "url": "https://sensors.example/98"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 99,
-      "title": "Müllbehälter Füllstände",
-      "creator": [
-        {
-          "id": "99",
-          "firstName": "Jannik",
-          "lastName": "Wolf"
-        }
-      ],
-      "issued": "2023-07-28T00:00:00Z",
-      "modified": "2023-08-06T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "99",
-        "format": "PDF",
-        "title": "Messdaten",
-        "url": "https://sensors.example/99"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "3",
-        "title": "Stadtplanung"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
-    },
-    {
-      "id": 100,
-      "title": "Niederschlagsmengen Sensoren",
-      "creator": [
-        {
-          "id": "100",
-          "firstName": "Lukas",
-          "lastName": "Zimmermann"
-        }
-      ],
-      "issued": "2023-02-15T00:00:00Z",
-      "modified": "2023-02-16T00:00:00Z",
-      "status": "closed",
-      "distribution": {
-        "id": "100",
-        "format": "ZIP",
-        "title": "Messdaten",
-        "url": "https://sensors.example/100"
-      },
-      "catalog": ["1"],
-      "series": {
-        "id": "2",
-        "title": "Umwelt"
-      },
-      "department": {
-        "id": 1,
-        "title": "Stadtentwicklung"
-      }
+      "name": "Stadtentwicklung"
     }
-  ],
+  },
+  {
+    "id": 2,
+    "name": "Spielplätze",
+    "creator": [
+      {
+        "id": "2",
+        "firstName": "Sophie",
+        "lastName": "Schneider"
+      }
+    ],
+    "issued": "2023-01-01T08:00:00Z",
+    "lastUpdated": "2023-01-01T08:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "2",
+      "format": "DOCX",
+      "name": "Superset",
+      "url": "https://superset.de"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 2,
+      "name": "Verkehrsplanung"
+    }
+  },
+  {
+    "id": 3,
+    "name": "Spielplätze",
+    "creator": [
+      {
+        "id": "3",
+        "firstName": "Leonard",
+        "lastName": "Fischer"
+      }
+    ],
+    "issued": "2023-02-15T08:00:00Z",
+    "lastUpdated": "2023-02-15T08:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "3",
+      "format": "GML",
+      "name": "Masterportal",
+      "url": "https://masterportal.de"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 4,
+    "name": "Versorgungsleitungen – Trinkwasser",
+    "creator": [
+      {
+        "id": "4",
+        "firstName": "Anna",
+        "lastName": "Weber"
+      }
+    ],
+    "issued": "2023-03-30T08:00:00Z",
+    "lastUpdated": "2023-03-30T08:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "4",
+      "format": "PDF",
+      "name": "shapefile",
+      "url": "https://shapefile.de"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 4,
+      "name": "Bauaufsicht"
+    }
+  },
+  {
+    "id": 5,
+    "name": "Gewerberegister – öffentlich einsehbare Betriebe",
+    "creator": [
+      {
+        "id": "5",
+        "firstName": "Lukas",
+        "lastName": "Hoffmann"
+      }
+    ],
+    "issued": "2023-04-12T08:00:00Z",
+    "lastUpdated": "2023-04-12T08:00:00Z",
+    "status": null,
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 5,
+      "name": "Öffentliche Sicherheit"
+    }
+  },
+  {
+    "id": 6,
+    "name": "Lärmkartierung – Hauptverkehrsstraßen (Tag/Nacht)",
+    "creator": [
+      {
+        "id": "6",
+        "firstName": "Marie",
+        "lastName": "Koch"
+      }
+    ],
+    "issued": "2023-05-05T08:00:00Z",
+    "lastUpdated": "2023-05-05T08:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "6",
+      "format": "GeoJSON",
+      "name": "Open Data Portal Masterportal",
+      "url": "https://opendata.de"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 6,
+      "name": "Soziale Dienste"
+    }
+  },
+  {
+    "id": 7,
+    "name": "Echtzeit-Positionen Busse und Straßenbahnen",
+    "creator": [
+      {
+        "id": "7",
+        "firstName": "Felix",
+        "lastName": "Richter"
+      }
+    ],
+    "issued": "2023-06-20T08:00:00Z",
+    "lastUpdated": "2023-06-20T08:00:00Z",
+    "status": null,
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 7,
+      "name": "Bildungswesen"
+    }
+  },
+  {
+    "id": 8,
+    "name": "Bevölkerungsstatistik – Altersgruppen nach Stadtteilen",
+    "creator": [
+      {
+        "id": "8",
+        "firstName": "Laura",
+        "lastName": "Braun"
+      }
+    ],
+    "issued": "2023-07-10T08:00:00Z",
+    "lastUpdated": "2023-07-10T08:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "8",
+      "format": "zip",
+      "name": "Superset",
+      "url": "https://superset.de"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 9,
+    "name": "Tourismuszahlen Besucherzähler",
+    "creator": [
+      {
+        "id": "9",
+        "firstName": "Hannah",
+        "lastName": "Keller"
+      }
+    ],
+    "issued": "2023-01-05T00:00:00Z",
+    "lastUpdated": "2023-01-09T00:00:00Z",
+    "status": "closed",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 10,
+    "name": "Unfallstatistik Sensorerfassung",
+    "creator": [
+      {
+        "id": "10",
+        "firstName": "Noah",
+        "lastName": "Schulz"
+      }
+    ],
+    "issued": "2023-09-04T00:00:00Z",
+    "lastUpdated": "2023-09-26T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "10",
+      "format": "JSON",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/10"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "4",
+      "name": "Sicherheit"
+    },
+    "department": {
+      "id": 5,
+      "name": "Öffentliche Sicherheit"
+    }
+  },
+  {
+    "id": 11,
+    "name": "Lärmpegel an Hauptverkehrsstraßen",
+    "creator": [
+      {
+        "id": "11",
+        "firstName": "Nina",
+        "lastName": "Hoffmann"
+      }
+    ],
+    "issued": "2023-07-01T00:00:00Z",
+    "lastUpdated": "2023-07-08T00:00:00Z",
+    "status": "closed",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 4,
+      "name": "Bauaufsicht"
+    }
+  },
+  {
+    "id": 12,
+    "name": "Krankenhaus Bettenauslastung",
+    "creator": [
+      {
+        "id": "12",
+        "firstName": "Sophie",
+        "lastName": "Schneider"
+      }
+    ],
+    "issued": "2023-06-12T00:00:00Z",
+    "lastUpdated": "2023-06-26T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "12",
+      "format": "XML",
+      "name": "Messdaten",
+      "url": "https://sensors.example/12"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 13,
+    "name": "Lärmkartierung Bahnhöfe",
+    "creator": [
+      {
+        "id": "13",
+        "firstName": "Nina",
+        "lastName": "Müller"
+      }
+    ],
+    "issued": "2023-10-16T00:00:00Z",
+    "lastUpdated": "2023-10-29T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "13",
+      "format": "XML",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/13"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 4,
+      "name": "Bauaufsicht"
+    }
+  },
+  {
+    "id": 14,
+    "name": "Krankenhaus Bettenauslastung",
+    "creator": [
+      {
+        "id": "14",
+        "firstName": "Lea",
+        "lastName": "Schmidt"
+      }
+    ],
+    "issued": "2023-02-26T00:00:00Z",
+    "lastUpdated": "2023-03-11T00:00:00Z",
+    "status": "closed",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 15,
+    "name": "Echtzeitdaten – Busse",
+    "creator": [
+      {
+        "id": "15",
+        "firstName": "Emma",
+        "lastName": "Wolf"
+      }
+    ],
+    "issued": "2023-03-26T00:00:00Z",
+    "lastUpdated": "2023-03-29T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "15",
+      "format": "PDF",
+      "name": "API",
+      "url": "https://sensors.example/15"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 16,
+    "name": "Rettungsdienste – Einsatzzeiten",
+    "creator": [
+      {
+        "id": "16",
+        "firstName": "Jannik",
+        "lastName": "Wolf"
+      }
+    ],
+    "issued": "2023-04-26T00:00:00Z",
+    "lastUpdated": "2023-05-10T00:00:00Z",
+    "status": "closed",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 17,
+    "name": "Wasserqualität – Flüsse",
+    "creator": [
+      {
+        "id": "17",
+        "firstName": "Paul",
+        "lastName": "Schneider"
+      }
+    ],
+    "issued": "2023-10-20T00:00:00Z",
+    "lastUpdated": "2023-10-28T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "17",
+      "format": "PDF",
+      "name": "API",
+      "url": "https://sensors.example/17"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 18,
+    "name": "Straßenbeleuchtung – Defektmeldungen",
+    "creator": [
+      {
+        "id": "18",
+        "firstName": "Emma",
+        "lastName": "Lang"
+      }
+    ],
+    "issued": "2023-01-19T00:00:00Z",
+    "lastUpdated": "2023-01-30T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "18",
+      "format": "ZIP",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/18"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 4,
+      "name": "Bauaufsicht"
+    }
+  },
+  {
+    "id": 19,
+    "name": "Luftqualität – NO2-Messungen",
+    "creator": [
+      {
+        "id": "19",
+        "firstName": "Elias",
+        "lastName": "Lang"
+      }
+    ],
+    "issued": "2023-09-19T00:00:00Z",
+    "lastUpdated": "2023-10-13T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "19",
+      "format": "GeoJSON",
+      "name": "Messdaten",
+      "url": "https://sensors.example/19"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 20,
+    "name": "Wasserqualität – Flüsse",
+    "creator": [
+      {
+        "id": "20",
+        "firstName": "Finn",
+        "lastName": "Zimmermann"
+      }
+    ],
+    "issued": "2023-04-05T00:00:00Z",
+    "lastUpdated": "2023-04-08T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "20",
+      "format": "CSV",
+      "name": "Messdaten",
+      "url": "https://sensors.example/20"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 21,
+    "name": "Defibrillator Nutzungshäufigkeit",
+    "creator": [
+      {
+        "id": "21",
+        "firstName": "Miriam",
+        "lastName": "Wolf"
+      }
+    ],
+    "issued": "2023-10-08T00:00:00Z",
+    "lastUpdated": "2023-10-10T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "21",
+      "format": "XML",
+      "name": "Messdaten",
+      "url": "https://sensors.example/21"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 22,
+    "name": "Krankenhaus Bettenauslastung",
+    "creator": [
+      {
+        "id": "22",
+        "firstName": "Jannik",
+        "lastName": "Braun"
+      }
+    ],
+    "issued": "2023-07-01T00:00:00Z",
+    "lastUpdated": "2023-07-10T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "22",
+      "format": "GeoJSON",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/22"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 23,
+    "name": "Echtzeitdaten – Busse",
+    "creator": [
+      {
+        "id": "23",
+        "firstName": "Ben",
+        "lastName": "Lehmann"
+      }
+    ],
+    "issued": "2023-05-23T00:00:00Z",
+    "lastUpdated": "2023-05-28T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "23",
+      "format": "JSON",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/23"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 2,
+      "name": "Verkehrsplanung"
+    }
+  },
+  {
+    "id": 24,
+    "name": "Rettungsdienste – Einsatzzeiten",
+    "creator": [
+      {
+        "id": "24",
+        "firstName": "Maximilian",
+        "lastName": "Keller"
+      }
+    ],
+    "issued": "2023-06-03T00:00:00Z",
+    "lastUpdated": "2023-06-30T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "24",
+      "format": "PDF",
+      "name": "Messdaten",
+      "url": "https://sensors.example/24"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 25,
+    "name": "Echtzeitdaten – Straßenbahnen",
+    "creator": [
+      {
+        "id": "25",
+        "firstName": "Sarah",
+        "lastName": "Peters"
+      }
+    ],
+    "issued": "2023-08-27T00:00:00Z",
+    "lastUpdated": "2023-09-20T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "25",
+      "format": "XLSX",
+      "name": "API",
+      "url": "https://sensors.example/25"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 2,
+      "name": "Verkehrsplanung"
+    }
+  },
+  {
+    "id": 26,
+    "name": "Unfallstatistik Sensorerfassung",
+    "creator": [
+      {
+        "id": "26",
+        "firstName": "Jonas",
+        "lastName": "Schulz"
+      }
+    ],
+    "issued": "2023-07-23T00:00:00Z",
+    "lastUpdated": "2023-08-16T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "26",
+      "format": "CSV",
+      "name": "Messdaten",
+      "url": "https://sensors.example/26"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "4",
+      "name": "Sicherheit"
+    },
+    "department": {
+      "id": 5,
+      "name": "Öffentliche Sicherheit"
+    }
+  },
+  {
+    "id": 27,
+    "name": "Wasserqualität – Flüsse",
+    "creator": [
+      {
+        "id": "27",
+        "firstName": "Miriam",
+        "lastName": "Weber"
+      }
+    ],
+    "issued": "2023-02-12T00:00:00Z",
+    "lastUpdated": "2023-03-12T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "27",
+      "format": "XLSX",
+      "name": "Monitoring Report",
+      "url": "https://sensors.example/27"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 28,
+    "name": "Krankenhaus Bettenauslastung",
+    "creator": [
+      {
+        "id": "28",
+        "firstName": "Hannah",
+        "lastName": "Schmidt"
+      }
+    ],
+    "issued": "2023-05-01T00:00:00Z",
+    "lastUpdated": "2023-05-30T00:00:00Z",
+    "status": "open",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 29,
+    "name": "Echtzeitdaten – Straßenbahnen",
+    "creator": [
+      {
+        "id": "29",
+        "firstName": "Isabell",
+        "lastName": "Weber"
+      }
+    ],
+    "issued": "2023-08-13T00:00:00Z",
+    "lastUpdated": "2023-08-18T00:00:00Z",
+    "status": "closed",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 30,
+    "name": "Straßenbeleuchtung – Defektmeldungen",
+    "creator": [
+      {
+        "id": "30",
+        "firstName": "Miriam",
+        "lastName": "Meier"
+      }
+    ],
+    "issued": "2023-01-13T00:00:00Z",
+    "lastUpdated": "2023-02-08T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "30",
+      "format": "XLSX",
+      "name": "API",
+      "url": "https://sensors.example/30"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 31,
+    "name": "Luftqualität – Feinstaub PM10",
+    "creator": [
+      {
+        "id": "31",
+        "firstName": "Mila",
+        "lastName": "Keller"
+      }
+    ],
+    "issued": "2023-07-18T00:00:00Z",
+    "lastUpdated": "2023-08-17T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "31",
+      "format": "JSON",
+      "name": "Messdaten",
+      "url": "https://sensors.example/31"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 32,
+    "name": "Parkplatzauslastung Sensoren",
+    "creator": [
+      {
+        "id": "32",
+        "firstName": "Paul",
+        "lastName": "Keller"
+      }
+    ],
+    "issued": "2023-05-07T00:00:00Z",
+    "lastUpdated": "2023-05-27T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "32",
+      "format": "XML",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/32"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 2,
+      "name": "Verkehrsplanung"
+    }
+  },
+  {
+    "id": 33,
+    "name": "Straßenbeleuchtung – Defektmeldungen",
+    "creator": [
+      {
+        "id": "33",
+        "firstName": "David",
+        "lastName": "Zimmermann"
+      }
+    ],
+    "issued": "2023-04-11T00:00:00Z",
+    "lastUpdated": "2023-05-04T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "33",
+      "format": "PDF",
+      "name": "Monitoring Report",
+      "url": "https://sensors.example/33"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 4,
+      "name": "Bauaufsicht"
+    }
+  },
+  {
+    "id": 34,
+    "name": "Niederschlagsmengen Sensoren",
+    "creator": [
+      {
+        "id": "34",
+        "firstName": "Leonard",
+        "lastName": "Werner"
+      }
+    ],
+    "issued": "2023-04-14T00:00:00Z",
+    "lastUpdated": "2023-04-23T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "34",
+      "format": "XML",
+      "name": "Messdaten",
+      "url": "https://sensors.example/34"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 35,
+    "name": "Echtzeitdaten – Straßenbahnen",
+    "creator": [
+      {
+        "id": "35",
+        "firstName": "Clara",
+        "lastName": "Hartmann"
+      }
+    ],
+    "issued": "2023-06-14T00:00:00Z",
+    "lastUpdated": "2023-07-10T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "35",
+      "format": "PDF",
+      "name": "Messdaten",
+      "url": "https://sensors.example/35"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 2,
+      "name": "Verkehrsplanung"
+    }
+  },
+  {
+    "id": 36,
+    "name": "Fahrgastzahlen U-Bahn",
+    "creator": [
+      {
+        "id": "36",
+        "firstName": "Jonas",
+        "lastName": "Keller"
+      }
+    ],
+    "issued": "2023-01-15T00:00:00Z",
+    "lastUpdated": "2023-02-13T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "36",
+      "format": "PDF",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/36"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 37,
+    "name": "Luftqualität – Feinstaub PM10",
+    "creator": [
+      {
+        "id": "37",
+        "firstName": "Laura",
+        "lastName": "Zimmermann"
+      }
+    ],
+    "issued": "2023-07-13T00:00:00Z",
+    "lastUpdated": "2023-07-19T00:00:00Z",
+    "status": "closed",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 38,
+    "name": "Luftqualität – Ozonwerte",
+    "creator": [
+      {
+        "id": "38",
+        "firstName": "Jonas",
+        "lastName": "Schneider"
+      }
+    ],
+    "issued": "2023-03-13T00:00:00Z",
+    "lastUpdated": "2023-03-28T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "38",
+      "format": "PDF",
+      "name": "Monitoring Report",
+      "url": "https://sensors.example/38"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 39,
+    "name": "Luftfeuchtigkeit Innenstadt",
+    "creator": [
+      {
+        "id": "39",
+        "firstName": "Nina",
+        "lastName": "Koch"
+      }
+    ],
+    "issued": "2023-06-05T00:00:00Z",
+    "lastUpdated": "2023-06-11T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "39",
+      "format": "CSV",
+      "name": "Messdaten",
+      "url": "https://sensors.example/39"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 40,
+    "name": "Unfallstatistik Sensorerfassung",
+    "creator": [
+      {
+        "id": "40",
+        "firstName": "Moritz",
+        "lastName": "Krause"
+      }
+    ],
+    "issued": "2023-01-22T00:00:00Z",
+    "lastUpdated": "2023-02-03T00:00:00Z",
+    "status": "open",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "4",
+      "name": "Sicherheit"
+    },
+    "department": {
+      "id": 5,
+      "name": "Öffentliche Sicherheit"
+    }
+  },
+  {
+    "id": 41,
+    "name": "Fahrgastzahlen U-Bahn",
+    "creator": [
+      {
+        "id": "41",
+        "firstName": "Miriam",
+        "lastName": "Keller"
+      }
+    ],
+    "issued": "2023-05-18T00:00:00Z",
+    "lastUpdated": "2023-05-25T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "41",
+      "format": "PDF",
+      "name": "API",
+      "url": "https://sensors.example/41"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 42,
+    "name": "Luftqualität – NO2-Messungen",
+    "creator": [
+      {
+        "id": "42",
+        "firstName": "Clara",
+        "lastName": "Zimmermann"
+      }
+    ],
+    "issued": "2023-04-10T00:00:00Z",
+    "lastUpdated": "2023-05-07T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "42",
+      "format": "XML",
+      "name": "Messdaten",
+      "url": "https://sensors.example/42"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 43,
+    "name": "Echtzeitdaten – Busse",
+    "creator": [
+      {
+        "id": "43",
+        "firstName": "Emma",
+        "lastName": "Wolf"
+      }
+    ],
+    "issued": "2023-09-01T00:00:00Z",
+    "lastUpdated": "2023-09-12T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "43",
+      "format": "XLSX",
+      "name": "Monitoring Report",
+      "url": "https://sensors.example/43"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 2,
+      "name": "Verkehrsplanung"
+    }
+  },
+  {
+    "id": 44,
+    "name": "Luftqualität – Ozonwerte",
+    "creator": [
+      {
+        "id": "44",
+        "firstName": "Marie",
+        "lastName": "Fischer"
+      }
+    ],
+    "issued": "2023-04-25T00:00:00Z",
+    "lastUpdated": "2023-04-26T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "44",
+      "format": "JSON",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/44"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 45,
+    "name": "Rettungsdienste – Einsatzzeiten",
+    "creator": [
+      {
+        "id": "45",
+        "firstName": "Leonard",
+        "lastName": "Braun"
+      }
+    ],
+    "issued": "2023-01-30T00:00:00Z",
+    "lastUpdated": "2023-02-27T00:00:00Z",
+    "status": null,
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 46,
+    "name": "Radweg-Nutzungssensoren",
+    "creator": [
+      {
+        "id": "46",
+        "firstName": "Julian",
+        "lastName": "Krüger"
+      }
+    ],
+    "issued": "2023-04-14T00:00:00Z",
+    "lastUpdated": "2023-05-06T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "46",
+      "format": "GeoJSON",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/46"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 47,
+    "name": "Notfallmeldungen – Brandmelder",
+    "creator": [
+      {
+        "id": "47",
+        "firstName": "Hannah",
+        "lastName": "Schneider"
+      }
+    ],
+    "issued": "2023-09-14T00:00:00Z",
+    "lastUpdated": "2023-10-11T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "47",
+      "format": "XLSX",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/47"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "4",
+      "name": "Sicherheit"
+    },
+    "department": {
+      "id": 5,
+      "name": "Öffentliche Sicherheit"
+    }
+  },
+  {
+    "id": 48,
+    "name": "Lärmkartierung Bahnhöfe",
+    "creator": [
+      {
+        "id": "48",
+        "firstName": "Clara",
+        "lastName": "Wagner"
+      }
+    ],
+    "issued": "2023-07-14T00:00:00Z",
+    "lastUpdated": "2023-08-05T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "48",
+      "format": "ZIP",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/48"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 4,
+      "name": "Bauaufsicht"
+    }
+  },
+  {
+    "id": 49,
+    "name": "Luftfeuchtigkeit Innenstadt",
+    "creator": [
+      {
+        "id": "49",
+        "firstName": "Hannah",
+        "lastName": "Becker"
+      }
+    ],
+    "issued": "2023-09-11T00:00:00Z",
+    "lastUpdated": "2023-09-27T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "49",
+      "format": "XLSX",
+      "name": "API",
+      "url": "https://sensors.example/49"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 50,
+    "name": "Energieverbrauch – öffentl. Gebäude",
+    "creator": [
+      {
+        "id": "50",
+        "firstName": "Mila",
+        "lastName": "Hartmann"
+      }
+    ],
+    "issued": "2023-09-06T00:00:00Z",
+    "lastUpdated": "2023-10-04T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "50",
+      "format": "XML",
+      "name": "API",
+      "url": "https://sensors.example/50"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 4,
+      "name": "Bauaufsicht"
+    }
+  },
+  {
+    "id": 51,
+    "name": "Echtzeitdaten – Busse",
+    "creator": [
+      {
+        "id": "51",
+        "firstName": "Miriam",
+        "lastName": "Lehmann"
+      }
+    ],
+    "issued": "2023-09-03T00:00:00Z",
+    "lastUpdated": "2023-09-17T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "51",
+      "format": "CSV",
+      "name": "API",
+      "url": "https://sensors.example/51"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 52,
+    "name": "Parkplatzauslastung Sensoren",
+    "creator": [
+      {
+        "id": "52",
+        "firstName": "Clara",
+        "lastName": "Hartmann"
+      }
+    ],
+    "issued": "2023-02-23T00:00:00Z",
+    "lastUpdated": "2023-02-24T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "52",
+      "format": "XLSX",
+      "name": "API",
+      "url": "https://sensors.example/52"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 53,
+    "name": "Grundwasserpegel Monitoring",
+    "creator": [
+      {
+        "id": "53",
+        "firstName": "Philipp",
+        "lastName": "Werner"
+      }
+    ],
+    "issued": "2023-03-02T00:00:00Z",
+    "lastUpdated": "2023-03-24T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "53",
+      "format": "GeoJSON",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/53"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 54,
+    "name": "Müllbehälter Füllstände",
+    "creator": [
+      {
+        "id": "54",
+        "firstName": "Julian",
+        "lastName": "Schulz"
+      }
+    ],
+    "issued": "2023-10-21T00:00:00Z",
+    "lastUpdated": "2023-11-11T00:00:00Z",
+    "status": null,
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 55,
+    "name": "Verkehrsdichte an Kreuzungen",
+    "creator": [
+      {
+        "id": "55",
+        "firstName": "Clara",
+        "lastName": "Braun"
+      }
+    ],
+    "issued": "2023-04-16T00:00:00Z",
+    "lastUpdated": "2023-04-19T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "55",
+      "format": "XML",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/55"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 56,
+    "name": "Echtzeitdaten – Busse",
+    "creator": [
+      {
+        "id": "56",
+        "firstName": "Amelie",
+        "lastName": "Hartmann"
+      }
+    ],
+    "issued": "2023-09-23T00:00:00Z",
+    "lastUpdated": "2023-09-29T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "56",
+      "format": "PDF",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/56"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 57,
+    "name": "Unfallstatistik Sensorerfassung",
+    "creator": [
+      {
+        "id": "57",
+        "firstName": "Miriam",
+        "lastName": "Hoffmann"
+      }
+    ],
+    "issued": "2023-08-11T00:00:00Z",
+    "lastUpdated": "2023-08-29T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "57",
+      "format": "JSON",
+      "name": "Messdaten",
+      "url": "https://sensors.example/57"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "4",
+      "name": "Sicherheit"
+    },
+    "department": {
+      "id": 5,
+      "name": "Öffentliche Sicherheit"
+    }
+  },
+  {
+    "id": 58,
+    "name": "Verkehrsdichte an Kreuzungen",
+    "creator": [
+      {
+        "id": "58",
+        "firstName": "Amelie",
+        "lastName": "Müller"
+      }
+    ],
+    "issued": "2023-07-02T00:00:00Z",
+    "lastUpdated": "2023-07-15T00:00:00Z",
+    "status": "open",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 2,
+      "name": "Verkehrsplanung"
+    }
+  },
+  {
+    "id": 59,
+    "name": "Bevölkerungsbewegungen – anonyme Zählung",
+    "creator": [
+      {
+        "id": "59",
+        "firstName": "Noah",
+        "lastName": "Huber"
+      }
+    ],
+    "issued": "2023-05-13T00:00:00Z",
+    "lastUpdated": "2023-05-19T00:00:00Z",
+    "status": null,
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 6,
+      "name": "Soziale Dienste"
+    }
+  },
+  {
+    "id": 60,
+    "name": "Niederschlagsmengen Sensoren",
+    "creator": [
+      {
+        "id": "60",
+        "firstName": "Amelie",
+        "lastName": "Huber"
+      }
+    ],
+    "issued": "2023-05-24T00:00:00Z",
+    "lastUpdated": "2023-06-16T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "60",
+      "format": "PDF",
+      "name": "API",
+      "url": "https://sensors.example/60"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 61,
+    "name": "Lärmkartierung Bahnhöfe",
+    "creator": [
+      {
+        "id": "61",
+        "firstName": "Maximilian",
+        "lastName": "Becker"
+      }
+    ],
+    "issued": "2023-03-14T00:00:00Z",
+    "lastUpdated": "2023-04-07T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "61",
+      "format": "PDF",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/61"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 4,
+      "name": "Bauaufsicht"
+    }
+  },
+  {
+    "id": 62,
+    "name": "Niederschlagsmengen Sensoren",
+    "creator": [
+      {
+        "id": "62",
+        "firstName": "Amelie",
+        "lastName": "Richter"
+      }
+    ],
+    "issued": "2023-02-18T00:00:00Z",
+    "lastUpdated": "2023-03-03T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "62",
+      "format": "JSON",
+      "name": "Messdaten",
+      "url": "https://sensors.example/62"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 63,
+    "name": "Defibrillator Nutzungshäufigkeit",
+    "creator": [
+      {
+        "id": "63",
+        "firstName": "Emma",
+        "lastName": "Zimmermann"
+      }
+    ],
+    "issued": "2023-06-08T00:00:00Z",
+    "lastUpdated": "2023-06-14T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "63",
+      "format": "GeoJSON",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/63"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 64,
+    "name": "Lärmpegel an Hauptverkehrsstraßen",
+    "creator": [
+      {
+        "id": "64",
+        "firstName": "Jonas",
+        "lastName": "Huber"
+      }
+    ],
+    "issued": "2023-10-24T00:00:00Z",
+    "lastUpdated": "2023-11-07T00:00:00Z",
+    "status": "closed",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 65,
+    "name": "Luftqualität – Ozonwerte",
+    "creator": [
+      {
+        "id": "65",
+        "firstName": "Sarah",
+        "lastName": "Hoffmann"
+      }
+    ],
+    "issued": "2023-01-18T00:00:00Z",
+    "lastUpdated": "2023-02-06T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "65",
+      "format": "JSON",
+      "name": "API",
+      "url": "https://sensors.example/65"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 66,
+    "name": "Niederschlagsmengen Sensoren",
+    "creator": [
+      {
+        "id": "66",
+        "firstName": "Miriam",
+        "lastName": "Fischer"
+      }
+    ],
+    "issued": "2023-04-15T00:00:00Z",
+    "lastUpdated": "2023-04-29T00:00:00Z",
+    "status": "closed",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 67,
+    "name": "E-Ladestationen – Belegung",
+    "creator": [
+      {
+        "id": "67",
+        "firstName": "Mila",
+        "lastName": "Müller"
+      }
+    ],
+    "issued": "2023-10-16T00:00:00Z",
+    "lastUpdated": "2023-11-04T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "67",
+      "format": "CSV",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/67"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 68,
+    "name": "Radweg-Nutzungssensoren",
+    "creator": [
+      {
+        "id": "68",
+        "firstName": "Jonas",
+        "lastName": "Müller"
+      }
+    ],
+    "issued": "2023-09-26T00:00:00Z",
+    "lastUpdated": "2023-09-26T00:00:00Z",
+    "status": null,
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 2,
+      "name": "Verkehrsplanung"
+    }
+  },
+  {
+    "id": 69,
+    "name": "Unfallstatistik Sensorerfassung",
+    "creator": [
+      {
+        "id": "69",
+        "firstName": "Maximilian",
+        "lastName": "Keller"
+      }
+    ],
+    "issued": "2023-04-30T00:00:00Z",
+    "lastUpdated": "2023-05-19T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "69",
+      "format": "JSON",
+      "name": "Messdaten",
+      "url": "https://sensors.example/69"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "4",
+      "name": "Sicherheit"
+    },
+    "department": {
+      "id": 5,
+      "name": "Öffentliche Sicherheit"
+    }
+  },
+  {
+    "id": 70,
+    "name": "Temperatur an Wetterstationen",
+    "creator": [
+      {
+        "id": "70",
+        "firstName": "Anna",
+        "lastName": "Schmidt"
+      }
+    ],
+    "issued": "2023-07-11T00:00:00Z",
+    "lastUpdated": "2023-08-09T00:00:00Z",
+    "status": "open",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 71,
+    "name": "Windgeschwindigkeit Stadtgebiet",
+    "creator": [
+      {
+        "id": "71",
+        "firstName": "Finn",
+        "lastName": "Lang"
+      }
+    ],
+    "issued": "2023-09-14T00:00:00Z",
+    "lastUpdated": "2023-10-14T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "71",
+      "format": "JSON",
+      "name": "Monitoring Report",
+      "url": "https://sensors.example/71"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 72,
+    "name": "Niederschlagsmengen Sensoren",
+    "creator": [
+      {
+        "id": "72",
+        "firstName": "Amelie",
+        "lastName": "Lehmann"
+      }
+    ],
+    "issued": "2023-09-18T00:00:00Z",
+    "lastUpdated": "2023-10-17T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "72",
+      "format": "ZIP",
+      "name": "API",
+      "url": "https://sensors.example/72"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 73,
+    "name": "Energieverbrauch – öffentl. Gebäude",
+    "creator": [
+      {
+        "id": "73",
+        "firstName": "Finn",
+        "lastName": "Lang"
+      }
+    ],
+    "issued": "2023-03-06T00:00:00Z",
+    "lastUpdated": "2023-03-28T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "73",
+      "format": "PDF",
+      "name": "Monitoring Report",
+      "url": "https://sensors.example/73"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 4,
+      "name": "Bauaufsicht"
+    }
+  },
+  {
+    "id": 74,
+    "name": "Luftfeuchtigkeit Innenstadt",
+    "creator": [
+      {
+        "id": "74",
+        "firstName": "Hannah",
+        "lastName": "Hoffmann"
+      }
+    ],
+    "issued": "2023-03-13T00:00:00Z",
+    "lastUpdated": "2023-04-01T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "74",
+      "format": "PDF",
+      "name": "Messdaten",
+      "url": "https://sensors.example/74"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 75,
+    "name": "Tourismuszahlen Besucherzähler",
+    "creator": [
+      {
+        "id": "75",
+        "firstName": "Felix",
+        "lastName": "Meier"
+      }
+    ],
+    "issued": "2023-09-08T00:00:00Z",
+    "lastUpdated": "2023-09-17T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "75",
+      "format": "XLSX",
+      "name": "API",
+      "url": "https://sensors.example/75"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 76,
+    "name": "Niederschlagsmengen Sensoren",
+    "creator": [
+      {
+        "id": "76",
+        "firstName": "Jonas",
+        "lastName": "Fischer"
+      }
+    ],
+    "issued": "2023-02-25T00:00:00Z",
+    "lastUpdated": "2023-03-12T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "76",
+      "format": "GeoJSON",
+      "name": "Messdaten",
+      "url": "https://sensors.example/76"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 77,
+    "name": "Windgeschwindigkeit Stadtgebiet",
+    "creator": [
+      {
+        "id": "77",
+        "firstName": "Lea",
+        "lastName": "Zimmermann"
+      }
+    ],
+    "issued": "2023-04-26T00:00:00Z",
+    "lastUpdated": "2023-04-30T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "77",
+      "format": "ZIP",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/77"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 78,
+    "name": "Lärmkartierung Bahnhöfe",
+    "creator": [
+      {
+        "id": "78",
+        "firstName": "Lina",
+        "lastName": "Schulz"
+      }
+    ],
+    "issued": "2023-10-27T00:00:00Z",
+    "lastUpdated": "2023-11-16T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "78",
+      "format": "GeoJSON",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/78"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 79,
+    "name": "Parkplatzauslastung Sensoren",
+    "creator": [
+      {
+        "id": "79",
+        "firstName": "Julian",
+        "lastName": "Lang"
+      }
+    ],
+    "issued": "2023-03-10T00:00:00Z",
+    "lastUpdated": "2023-04-09T00:00:00Z",
+    "status": "open",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 80,
+    "name": "Lärmpegel an Hauptverkehrsstraßen",
+    "creator": [
+      {
+        "id": "80",
+        "firstName": "Emma",
+        "lastName": "Fischer"
+      }
+    ],
+    "issued": "2023-08-09T00:00:00Z",
+    "lastUpdated": "2023-08-14T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "80",
+      "format": "CSV",
+      "name": "API",
+      "url": "https://sensors.example/80"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 4,
+      "name": "Bauaufsicht"
+    }
+  },
+  {
+    "id": 81,
+    "name": "Luftqualität – Ozonwerte",
+    "creator": [
+      {
+        "id": "81",
+        "firstName": "Miriam",
+        "lastName": "Müller"
+      }
+    ],
+    "issued": "2023-08-04T00:00:00Z",
+    "lastUpdated": "2023-08-18T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "81",
+      "format": "PDF",
+      "name": "Messdaten",
+      "url": "https://sensors.example/81"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 82,
+    "name": "Lärmkartierung Bahnhöfe",
+    "creator": [
+      {
+        "id": "82",
+        "firstName": "Felix",
+        "lastName": "Schulz"
+      }
+    ],
+    "issued": "2023-09-17T00:00:00Z",
+    "lastUpdated": "2023-09-25T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "82",
+      "format": "ZIP",
+      "name": "API",
+      "url": "https://sensors.example/82"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 83,
+    "name": "Straßenbeleuchtung – Defektmeldungen",
+    "creator": [
+      {
+        "id": "83",
+        "firstName": "Miriam",
+        "lastName": "Richter"
+      }
+    ],
+    "issued": "2023-08-15T00:00:00Z",
+    "lastUpdated": "2023-08-24T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "83",
+      "format": "CSV",
+      "name": "API",
+      "url": "https://sensors.example/83"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 4,
+      "name": "Bauaufsicht"
+    }
+  },
+  {
+    "id": 84,
+    "name": "Temperatur an Wetterstationen",
+    "creator": [
+      {
+        "id": "84",
+        "firstName": "Sophie",
+        "lastName": "Koch"
+      }
+    ],
+    "issued": "2023-08-09T00:00:00Z",
+    "lastUpdated": "2023-08-31T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "84",
+      "format": "XML",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/84"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 85,
+    "name": "Luftqualität – NO2-Messungen",
+    "creator": [
+      {
+        "id": "85",
+        "firstName": "David",
+        "lastName": "Hoffmann"
+      }
+    ],
+    "issued": "2023-02-21T00:00:00Z",
+    "lastUpdated": "2023-03-19T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "85",
+      "format": "ZIP",
+      "name": "Monitoring Report",
+      "url": "https://sensors.example/85"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 86,
+    "name": "Bevölkerungsbewegungen – anonyme Zählung",
+    "creator": [
+      {
+        "id": "86",
+        "firstName": "Philipp",
+        "lastName": "Weber"
+      }
+    ],
+    "issued": "2023-02-19T00:00:00Z",
+    "lastUpdated": "2023-02-24T00:00:00Z",
+    "status": "closed",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 6,
+      "name": "Soziale Dienste"
+    }
+  },
+  {
+    "id": 87,
+    "name": "Verkehrsdichte an Kreuzungen",
+    "creator": [
+      {
+        "id": "87",
+        "firstName": "Paul",
+        "lastName": "Zimmermann"
+      }
+    ],
+    "issued": "2023-06-29T00:00:00Z",
+    "lastUpdated": "2023-07-20T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "87",
+      "format": "XLSX",
+      "name": "Messdaten",
+      "url": "https://sensors.example/87"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 88,
+    "name": "Straßenbeleuchtung – Defektmeldungen",
+    "creator": [
+      {
+        "id": "88",
+        "firstName": "Lea",
+        "lastName": "Zimmermann"
+      }
+    ],
+    "issued": "2023-08-21T00:00:00Z",
+    "lastUpdated": "2023-09-05T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "88",
+      "format": "JSON",
+      "name": "Messdaten",
+      "url": "https://sensors.example/88"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 89,
+    "name": "Defibrillator Nutzungshäufigkeit",
+    "creator": [
+      {
+        "id": "89",
+        "firstName": "Lina",
+        "lastName": "Weber"
+      }
+    ],
+    "issued": "2023-07-15T00:00:00Z",
+    "lastUpdated": "2023-08-14T00:00:00Z",
+    "status": "open",
+    "distribution": {
+      "id": "89",
+      "format": "JSON",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/89"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 90,
+    "name": "Rettungsdienste – Einsatzzeiten",
+    "creator": [
+      {
+        "id": "90",
+        "firstName": "Clara",
+        "lastName": "Wolf"
+      }
+    ],
+    "issued": "2023-02-25T00:00:00Z",
+    "lastUpdated": "2023-03-23T00:00:00Z",
+    "status": null,
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 91,
+    "name": "Grundwasserpegel Monitoring",
+    "creator": [
+      {
+        "id": "91",
+        "firstName": "David",
+        "lastName": "Wagner"
+      }
+    ],
+    "issued": "2023-06-01T00:00:00Z",
+    "lastUpdated": "2023-06-21T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "91",
+      "format": "CSV",
+      "name": "API",
+      "url": "https://sensors.example/91"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 92,
+    "name": "Luftqualität – NO2-Messungen",
+    "creator": [
+      {
+        "id": "92",
+        "firstName": "Clara",
+        "lastName": "Keller"
+      }
+    ],
+    "issued": "2023-02-15T00:00:00Z",
+    "lastUpdated": "2023-03-13T00:00:00Z",
+    "status": "closed",
+    "distribution": null,
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 3,
+      "name": "Umweltschutz"
+    }
+  },
+  {
+    "id": 93,
+    "name": "Tourismuszahlen Besucherzähler",
+    "creator": [
+      {
+        "id": "93",
+        "firstName": "Maximilian",
+        "lastName": "Krause"
+      }
+    ],
+    "issued": "2023-02-04T00:00:00Z",
+    "lastUpdated": "2023-02-08T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "93",
+      "format": "XLSX",
+      "name": "Messdaten",
+      "url": "https://sensors.example/93"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 94,
+    "name": "Rettungsdienste – Einsatzzeiten",
+    "creator": [
+      {
+        "id": "94",
+        "firstName": "Hannah",
+        "lastName": "Richter"
+      }
+    ],
+    "issued": "2023-06-15T00:00:00Z",
+    "lastUpdated": "2023-06-19T00:00:00Z",
+    "status": null,
+    "distribution": {
+      "id": "94",
+      "format": "JSON",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/94"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "5",
+      "name": "Gesundheit"
+    },
+    "department": {
+      "id": 8,
+      "name": "Gesundheitswesen"
+    }
+  },
+  {
+    "id": 95,
+    "name": "Parkplatzauslastung Sensoren",
+    "creator": [
+      {
+        "id": "95",
+        "firstName": "Ben",
+        "lastName": "Schneider"
+      }
+    ],
+    "issued": "2023-01-27T00:00:00Z",
+    "lastUpdated": "2023-02-06T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "95",
+      "format": "XLSX",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/95"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 96,
+    "name": "Parkplatzauslastung Sensoren",
+    "creator": [
+      {
+        "id": "96",
+        "firstName": "Clara",
+        "lastName": "Richter"
+      }
+    ],
+    "issued": "2023-05-26T00:00:00Z",
+    "lastUpdated": "2023-05-28T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "96",
+      "format": "XLSX",
+      "name": "Messdaten",
+      "url": "https://sensors.example/96"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "1",
+      "name": "Verkehr"
+    },
+    "department": {
+      "id": 2,
+      "name": "Verkehrsplanung"
+    }
+  },
+  {
+    "id": 97,
+    "name": "Energieverbrauch – Straßenbeleuchtung",
+    "creator": [
+      {
+        "id": "97",
+        "firstName": "Ben",
+        "lastName": "Lang"
+      }
+    ],
+    "issued": "2023-05-04T00:00:00Z",
+    "lastUpdated": "2023-05-14T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "97",
+      "format": "PDF",
+      "name": "Messdaten",
+      "url": "https://sensors.example/97"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 98,
+    "name": "Tourismuszahlen Besucherzähler",
+    "creator": [
+      {
+        "id": "98",
+        "firstName": "Mila",
+        "lastName": "Meier"
+      }
+    ],
+    "issued": "2023-08-31T00:00:00Z",
+    "lastUpdated": "2023-09-07T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "98",
+      "format": "CSV",
+      "name": "Sensorservice",
+      "url": "https://sensors.example/98"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 99,
+    "name": "Müllbehälter Füllstände",
+    "creator": [
+      {
+        "id": "99",
+        "firstName": "Jannik",
+        "lastName": "Wolf"
+      }
+    ],
+    "issued": "2023-07-28T00:00:00Z",
+    "lastUpdated": "2023-08-06T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "99",
+      "format": "PDF",
+      "name": "Messdaten",
+      "url": "https://sensors.example/99"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "3",
+      "name": "Stadtplanung"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  },
+  {
+    "id": 100,
+    "name": "Niederschlagsmengen Sensoren",
+    "creator": [
+      {
+        "id": "100",
+        "firstName": "Lukas",
+        "lastName": "Zimmermann"
+      }
+    ],
+    "issued": "2023-02-15T00:00:00Z",
+    "lastUpdated": "2023-02-16T00:00:00Z",
+    "status": "closed",
+    "distribution": {
+      "id": "100",
+      "format": "ZIP",
+      "name": "Messdaten",
+      "url": "https://sensors.example/100"
+    },
+    "catalog": ["1"],
+    "series": {
+      "id": "2",
+      "name": "Umwelt"
+    },
+    "department": {
+      "id": 1,
+      "name": "Stadtentwicklung"
+    }
+  }
+],
   "users": [
     {
       "id": "1",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Sophie",
+      "lastName": "Fischer",
+      "displayName": "Sophie Fischer",
+      "email": "sophie.fischer@test.com",
+      "phone": "+49 75 5576070",
+      "title": "Frau",
+      "authority": "Tiefbauamt",
+      "department": "Bauplanung",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "admin",
+      "active": false
     },
     {
       "id": "2",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Markus",
+      "lastName": "Schmidt",
+      "displayName": "Markus Schmidt",
+      "email": "markus.schmidt@test.com",
+      "phone": "+49 164 6822941",
+      "title": "Herr",
+      "authority": "Naturschutzbehörde",
+      "department": "Naturschutz",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemdev",
+      "active": false
     },
     {
       "id": "3",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Michael",
+      "lastName": "Wagner",
+      "displayName": "Michael Wagner",
+      "email": "michael.wagner@test.com",
+      "phone": "+49 78 1583715",
+      "title": "Herr",
+      "authority": "Straßenbauamt",
+      "department": "Bauplanung",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "admin",
+      "active": false
     },
     {
       "id": "4",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Miriam",
+      "lastName": "Koch",
+      "displayName": "Miriam Koch",
+      "email": "miriam.koch@test.com",
+      "phone": "+49 170 8415252",
+      "title": "Frau",
+      "authority": "Luftfahrtamt",
+      "department": "Verkehrssicherheit",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "admin",
+      "active": false
     },
     {
       "id": "5",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Clara",
+      "lastName": "Becker",
+      "displayName": "Clara Becker",
+      "email": "clara.becker@test.com",
+      "phone": "+49 158 3743727",
+      "title": "Frau",
+      "authority": "Luftfahrtamt",
+      "department": "Verkehrssicherheit",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "admin",
+      "active": true
     },
     {
       "id": "6",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Paul",
+      "lastName": "Hoffmann",
+      "displayName": "Paul Hoffmann",
+      "email": "paul.hoffmann@test.com",
+      "phone": "+49 160 3095014",
+      "title": "Herr",
+      "authority": "Straßenverkehrsamt",
+      "department": "Naturschutz",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "standarduser",
+      "active": false
     },
     {
       "id": "7",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Miriam",
+      "lastName": "Becker",
+      "displayName": "Miriam Becker",
+      "email": "miriam.becker@test.com",
+      "phone": "+49 163 8461782",
+      "title": "Frau",
+      "authority": "Wasser- und Schifffahrtsamt",
+      "department": "Genehmigungen",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "admin",
+      "active": false
     },
     {
       "id": "8",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Lukas",
+      "lastName": "Fischer",
+      "displayName": "Lukas Fischer",
+      "email": "lukas.fischer@test.com",
+      "phone": "+49 84 1676823",
+      "title": "Herr",
+      "authority": "Straßenverkehrsamt",
+      "department": "Energie und Klima",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemuser",
+      "active": true
     },
     {
       "id": "9",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Julia",
+      "lastName": "Müller",
+      "displayName": "Julia Müller",
+      "email": "julia.müller@test.com",
+      "phone": "+49 156 4519205",
+      "title": "Frau",
+      "authority": "Umweltamt",
+      "department": "Bauplanung",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "standarduser",
+      "active": false
     },
     {
       "id": "10",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Thomas",
+      "lastName": "Schmidt",
+      "displayName": "Thomas Schmidt",
+      "email": "thomas.schmidt@test.com",
+      "phone": "+49 89 1942127",
+      "title": "Herr",
+      "authority": "Bauamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "systemadmin",
+      "active": true
     },
     {
       "id": "11",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Nina",
+      "lastName": "Schneider",
+      "displayName": "Nina Schneider",
+      "email": "nina.schneider@test.com",
+      "phone": "+49 164 1522602",
+      "title": "Frau",
+      "authority": "Abfallwirtschaftsamt",
+      "department": "Bauplanung",
+      "group": {
+        "id": "4",
+        "title": "Leitung"
+      },
+      "role": "systemuser",
+      "active": false
     },
     {
       "id": "12",
-      "firstName": "Test",
-      "lastName": "User",
-      "displayName": "Test User",
-      "email": "testuser@test.com"
+      "firstName": "Florian",
+      "lastName": "Weber",
+      "displayName": "Florian Weber",
+      "email": "florian.weber@test.com",
+      "phone": "+49 45 6102411",
+      "title": "Herr",
+      "authority": "Wasser- und Schifffahrtsamt",
+      "department": "Genehmigungen",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "systemuser",
+      "active": false
+    },
+    {
+      "id": "13",
+      "firstName": "Markus",
+      "lastName": "Wagner",
+      "displayName": "Markus Wagner",
+      "email": "markus.wagner@test.com",
+      "phone": "+49 75 3772074",
+      "title": "Herr",
+      "authority": "Tiefbauamt",
+      "department": "Technische Überwachung",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemadmin",
+      "active": false
+    },
+    {
+      "id": "14",
+      "firstName": "Markus",
+      "lastName": "Fischer",
+      "displayName": "Markus Fischer",
+      "email": "markus.fischer@test.com",
+      "phone": "+49 78 5952653",
+      "title": "Herr",
+      "authority": "Tiefbauamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "15",
+      "firstName": "Michael",
+      "lastName": "Hoffmann",
+      "displayName": "Michael Hoffmann",
+      "email": "michael.hoffmann@test.com",
+      "phone": "+49 164 3201494",
+      "title": "Herr",
+      "authority": "Naturschutzbehörde",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "4",
+        "title": "Leitung"
+      },
+      "role": "systemadmin",
+      "active": false
+    },
+    {
+      "id": "16",
+      "firstName": "Paul",
+      "lastName": "Schneider",
+      "displayName": "Paul Schneider",
+      "email": "paul.schneider@test.com",
+      "phone": "+49 154 1685736",
+      "title": "Herr",
+      "authority": "Bauamt",
+      "department": "Bauplanung",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "systemdev",
+      "active": true
+    },
+    {
+      "id": "17",
+      "firstName": "Anna",
+      "lastName": "Richter",
+      "displayName": "Anna Richter",
+      "email": "anna.richter@test.com",
+      "phone": "+49 40 9171471",
+      "title": "Frau",
+      "authority": "Naturschutzbehörde",
+      "department": "Energie und Klima",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "admin",
+      "active": true
+    },
+    {
+      "id": "18",
+      "firstName": "Miriam",
+      "lastName": "Schmidt",
+      "displayName": "Miriam Schmidt",
+      "email": "miriam.schmidt@test.com",
+      "phone": "+49 88 6580667",
+      "title": "Frau",
+      "authority": "Naturschutzbehörde",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemdev",
+      "active": false
+    },
+    {
+      "id": "19",
+      "firstName": "Lea",
+      "lastName": "Schmidt",
+      "displayName": "Lea Schmidt",
+      "email": "lea.schmidt@test.com",
+      "phone": "+49 159 7423168",
+      "title": "Frau",
+      "authority": "Straßenverkehrsamt",
+      "department": "Energie und Klima",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "standarduser",
+      "active": true
+    },
+    {
+      "id": "20",
+      "firstName": "Anna",
+      "lastName": "Koch",
+      "displayName": "Anna Koch",
+      "email": "anna.koch@test.com",
+      "phone": "+49 75 7434951",
+      "title": "Frau",
+      "authority": "Naturschutzbehörde",
+      "department": "Energie und Klima",
+      "group": {
+        "id": "4",
+        "title": "Leitung"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "21",
+      "firstName": "Andreas",
+      "lastName": "Hoffmann",
+      "displayName": "Andreas Hoffmann",
+      "email": "andreas.hoffmann@test.com",
+      "phone": "+49 67 6355872",
+      "title": "Herr",
+      "authority": "Straßenbauamt",
+      "department": "Bauplanung",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "22",
+      "firstName": "Florian",
+      "lastName": "Weber",
+      "displayName": "Florian Weber",
+      "email": "florian.weber@test.com",
+      "phone": "+49 39 2942848",
+      "title": "Herr",
+      "authority": "Tiefbauamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "23",
+      "firstName": "Stefan",
+      "lastName": "Becker",
+      "displayName": "Stefan Becker",
+      "email": "stefan.becker@test.com",
+      "phone": "+49 177 6751070",
+      "title": "Herr",
+      "authority": "Wasser- und Schifffahrtsamt",
+      "department": "Technische Überwachung",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "24",
+      "firstName": "Florian",
+      "lastName": "Hoffmann",
+      "displayName": "Florian Hoffmann",
+      "email": "florian.hoffmann@test.com",
+      "phone": "+49 170 2295052",
+      "title": "Herr",
+      "authority": "Gartenbauamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "standarduser",
+      "active": true
+    },
+    {
+      "id": "25",
+      "firstName": "Nina",
+      "lastName": "Schmidt",
+      "displayName": "Nina Schmidt",
+      "email": "nina.schmidt@test.com",
+      "phone": "+49 159 9804765",
+      "title": "Frau",
+      "authority": "Abfallwirtschaftsamt",
+      "department": "Verkehrssicherheit",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "26",
+      "firstName": "Paul",
+      "lastName": "Müller",
+      "displayName": "Paul Müller",
+      "email": "paul.müller@test.com",
+      "phone": "+49 64 8369516",
+      "title": "Herr",
+      "authority": "Gartenbauamt",
+      "department": "Naturschutz",
+      "group": {
+        "id": "4",
+        "title": "Leitung"
+      },
+      "role": "admin",
+      "active": true
+    },
+    {
+      "id": "27",
+      "firstName": "Lea",
+      "lastName": "Weber",
+      "displayName": "Lea Weber",
+      "email": "lea.weber@test.com",
+      "phone": "+49 155 4793981",
+      "title": "Frau",
+      "authority": "Naturschutzbehörde",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "admin",
+      "active": true
+    },
+    {
+      "id": "28",
+      "firstName": "Nina",
+      "lastName": "Hoffmann",
+      "displayName": "Nina Hoffmann",
+      "email": "nina.hoffmann@test.com",
+      "phone": "+49 46 9842501",
+      "title": "Frau",
+      "authority": "Abfallwirtschaftsamt",
+      "department": "Hafensicherheit",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemuser",
+      "active": false
+    },
+    {
+      "id": "29",
+      "firstName": "Daniel",
+      "lastName": "Müller",
+      "displayName": "Daniel Müller",
+      "email": "daniel.müller@test.com",
+      "phone": "+49 67 9732281",
+      "title": "Herr",
+      "authority": "Straßenbauamt",
+      "department": "Genehmigungen",
+      "group": {
+        "id": "4",
+        "title": "Leitung"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "30",
+      "firstName": "Lukas",
+      "lastName": "Wagner",
+      "displayName": "Lukas Wagner",
+      "email": "lukas.wagner@test.com",
+      "phone": "+49 166 5265818",
+      "title": "Herr",
+      "authority": "Gartenbauamt",
+      "department": "Abfallentsorgung",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "standarduser",
+      "active": false
+    },
+    {
+      "id": "31",
+      "firstName": "Markus",
+      "lastName": "Koch",
+      "displayName": "Markus Koch",
+      "email": "markus.koch@test.com",
+      "phone": "+49 40 4128191",
+      "title": "Herr",
+      "authority": "Tiefbauamt",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "admin",
+      "active": true
+    },
+    {
+      "id": "32",
+      "firstName": "Miriam",
+      "lastName": "Koch",
+      "displayName": "Miriam Koch",
+      "email": "miriam.koch@test.com",
+      "phone": "+49 73 9107113",
+      "title": "Frau",
+      "authority": "Gartenbauamt",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "33",
+      "firstName": "Lea",
+      "lastName": "Richter",
+      "displayName": "Lea Richter",
+      "email": "lea.richter@test.com",
+      "phone": "+49 38 2254058",
+      "title": "Frau",
+      "authority": "Straßenbauamt",
+      "department": "Naturschutz",
+      "group": {
+        "id": "4",
+        "title": "Leitung"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "34",
+      "firstName": "Markus",
+      "lastName": "Wagner",
+      "displayName": "Markus Wagner",
+      "email": "markus.wagner@test.com",
+      "phone": "+49 80 7102770",
+      "title": "Herr",
+      "authority": "Gartenbauamt",
+      "department": "Naturschutz",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "admin",
+      "active": true
+    },
+    {
+      "id": "35",
+      "firstName": "Sophie",
+      "lastName": "Richter",
+      "displayName": "Sophie Richter",
+      "email": "sophie.richter@test.com",
+      "phone": "+49 76 4857409",
+      "title": "Frau",
+      "authority": "Gartenbauamt",
+      "department": "Naturschutz",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "36",
+      "firstName": "Sarah",
+      "lastName": "Koch",
+      "displayName": "Sarah Koch",
+      "email": "sarah.koch@test.com",
+      "phone": "+49 154 4146046",
+      "title": "Frau",
+      "authority": "Gartenbauamt",
+      "department": "Hafensicherheit",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "admin",
+      "active": true
+    },
+    {
+      "id": "37",
+      "firstName": "Daniel",
+      "lastName": "Fischer",
+      "displayName": "Daniel Fischer",
+      "email": "daniel.fischer@test.com",
+      "phone": "+49 49 3147315",
+      "title": "Herr",
+      "authority": "Gartenbauamt",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "systemdev",
+      "active": true
+    },
+    {
+      "id": "38",
+      "firstName": "Andreas",
+      "lastName": "Koch",
+      "displayName": "Andreas Koch",
+      "email": "andreas.koch@test.com",
+      "phone": "+49 87 6600739",
+      "title": "Herr",
+      "authority": "Wasser- und Schifffahrtsamt",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "admin",
+      "active": true
+    },
+    {
+      "id": "39",
+      "firstName": "Paul",
+      "lastName": "Becker",
+      "displayName": "Paul Becker",
+      "email": "paul.becker@test.com",
+      "phone": "+49 51 5993410",
+      "title": "Herr",
+      "authority": "Naturschutzbehörde",
+      "department": "Energie und Klima",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "admin",
+      "active": true
+    },
+    {
+      "id": "40",
+      "firstName": "Sophie",
+      "lastName": "Fischer",
+      "displayName": "Sophie Fischer",
+      "email": "sophie.fischer@test.com",
+      "phone": "+49 164 9819552",
+      "title": "Frau",
+      "authority": "Gartenbauamt",
+      "department": "Abfallentsorgung",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "41",
+      "firstName": "Andreas",
+      "lastName": "Schmidt",
+      "displayName": "Andreas Schmidt",
+      "email": "andreas.schmidt@test.com",
+      "phone": "+49 72 2084526",
+      "title": "Herr",
+      "authority": "Umweltamt",
+      "department": "Genehmigungen",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "systemdev",
+      "active": false
+    },
+    {
+      "id": "42",
+      "firstName": "Michael",
+      "lastName": "Weber",
+      "displayName": "Michael Weber",
+      "email": "michael.weber@test.com",
+      "phone": "+49 89 9707296",
+      "title": "Herr",
+      "authority": "Luftfahrtamt",
+      "department": "Energie und Klima",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "systemuser",
+      "active": false
+    },
+    {
+      "id": "43",
+      "firstName": "Miriam",
+      "lastName": "Wagner",
+      "displayName": "Miriam Wagner",
+      "email": "miriam.wagner@test.com",
+      "phone": "+49 156 9332743",
+      "title": "Frau",
+      "authority": "Straßenverkehrsamt",
+      "department": "Technische Überwachung",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "44",
+      "firstName": "Laura",
+      "lastName": "Schneider",
+      "displayName": "Laura Schneider",
+      "email": "laura.schneider@test.com",
+      "phone": "+49 59 9695600",
+      "title": "Frau",
+      "authority": "Naturschutzbehörde",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "systemdev",
+      "active": false
+    },
+    {
+      "id": "45",
+      "firstName": "Florian",
+      "lastName": "Wagner",
+      "displayName": "Florian Wagner",
+      "email": "florian.wagner@test.com",
+      "phone": "+49 88 2342087",
+      "title": "Herr",
+      "authority": "Abfallwirtschaftsamt",
+      "department": "Naturschutz",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "46",
+      "firstName": "Miriam",
+      "lastName": "Müller",
+      "displayName": "Miriam Müller",
+      "email": "miriam.müller@test.com",
+      "phone": "+49 160 6516984",
+      "title": "Frau",
+      "authority": "Tiefbauamt",
+      "department": "Energie und Klima",
+      "group": {
+        "id": "4",
+        "title": "Leitung"
+      },
+      "role": "systemuser",
+      "active": true
+    },
+    {
+      "id": "47",
+      "firstName": "Jan",
+      "lastName": "Koch",
+      "displayName": "Jan Koch",
+      "email": "jan.koch@test.com",
+      "phone": "+49 163 3386130",
+      "title": "Herr",
+      "authority": "Luftfahrtamt",
+      "department": "Energie und Klima",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "systemdev",
+      "active": false
+    },
+    {
+      "id": "48",
+      "firstName": "Miriam",
+      "lastName": "Richter",
+      "displayName": "Miriam Richter",
+      "email": "miriam.richter@test.com",
+      "phone": "+49 162 6113421",
+      "title": "Frau",
+      "authority": "Naturschutzbehörde",
+      "department": "Naturschutz",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemuser",
+      "active": false
+    },
+    {
+      "id": "49",
+      "firstName": "Julia",
+      "lastName": "Schneider",
+      "displayName": "Julia Schneider",
+      "email": "julia.schneider@test.com",
+      "phone": "+49 168 9074816",
+      "title": "Frau",
+      "authority": "Straßenbauamt",
+      "department": "Naturschutz",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "standarduser",
+      "active": false
+    },
+    {
+      "id": "50",
+      "firstName": "Laura",
+      "lastName": "Schneider",
+      "displayName": "Laura Schneider",
+      "email": "laura.schneider@test.com",
+      "phone": "+49 48 9179995",
+      "title": "Frau",
+      "authority": "Luftfahrtamt",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "51",
+      "firstName": "Michael",
+      "lastName": "Richter",
+      "displayName": "Michael Richter",
+      "email": "michael.richter@test.com",
+      "phone": "+49 155 1585845",
+      "title": "Herr",
+      "authority": "Straßenbauamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemuser",
+      "active": false
+    },
+    {
+      "id": "52",
+      "firstName": "Andreas",
+      "lastName": "Schneider",
+      "displayName": "Andreas Schneider",
+      "email": "andreas.schneider@test.com",
+      "phone": "+49 85 3339877",
+      "title": "Herr",
+      "authority": "Tiefbauamt",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "standarduser",
+      "active": true
+    },
+    {
+      "id": "53",
+      "firstName": "Florian",
+      "lastName": "Weber",
+      "displayName": "Florian Weber",
+      "email": "florian.weber@test.com",
+      "phone": "+49 158 6313183",
+      "title": "Herr",
+      "authority": "Umweltamt",
+      "department": "Verkehrssicherheit",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "standarduser",
+      "active": false
+    },
+    {
+      "id": "54",
+      "firstName": "Katharina",
+      "lastName": "Fischer",
+      "displayName": "Katharina Fischer",
+      "email": "katharina.fischer@test.com",
+      "phone": "+49 81 4445724",
+      "title": "Frau",
+      "authority": "Naturschutzbehörde",
+      "department": "Naturschutz",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemuser",
+      "active": false
+    },
+    {
+      "id": "55",
+      "firstName": "Jan",
+      "lastName": "Fischer",
+      "displayName": "Jan Fischer",
+      "email": "jan.fischer@test.com",
+      "phone": "+49 155 7266287",
+      "title": "Herr",
+      "authority": "Naturschutzbehörde",
+      "department": "Energie und Klima",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "systemuser",
+      "active": true
+    },
+    {
+      "id": "56",
+      "firstName": "Clara",
+      "lastName": "Schneider",
+      "displayName": "Clara Schneider",
+      "email": "clara.schneider@test.com",
+      "phone": "+49 160 6644307",
+      "title": "Frau",
+      "authority": "Tiefbauamt",
+      "department": "Bauplanung",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "systemdev",
+      "active": false
+    },
+    {
+      "id": "57",
+      "firstName": "Stefan",
+      "lastName": "Hoffmann",
+      "displayName": "Stefan Hoffmann",
+      "email": "stefan.hoffmann@test.com",
+      "phone": "+49 75 1267565",
+      "title": "Herr",
+      "authority": "Abfallwirtschaftsamt",
+      "department": "Genehmigungen",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "systemuser",
+      "active": false
+    },
+    {
+      "id": "58",
+      "firstName": "Lukas",
+      "lastName": "Fischer",
+      "displayName": "Lukas Fischer",
+      "email": "lukas.fischer@test.com",
+      "phone": "+49 158 7422588",
+      "title": "Herr",
+      "authority": "Straßenbauamt",
+      "department": "Verkehrssicherheit",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemuser",
+      "active": true
+    },
+    {
+      "id": "59",
+      "firstName": "Florian",
+      "lastName": "Koch",
+      "displayName": "Florian Koch",
+      "email": "florian.koch@test.com",
+      "phone": "+49 171 3689860",
+      "title": "Herr",
+      "authority": "Straßenverkehrsamt",
+      "department": "Verkehrssicherheit",
+      "group": {
+        "id": "4",
+        "title": "Leitung"
+      },
+      "role": "standarduser",
+      "active": false
+    },
+    {
+      "id": "60",
+      "firstName": "Thomas",
+      "lastName": "Müller",
+      "displayName": "Thomas Müller",
+      "email": "thomas.müller@test.com",
+      "phone": "+49 53 6802030",
+      "title": "Herr",
+      "authority": "Wasser- und Schifffahrtsamt",
+      "department": "Hafensicherheit",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "61",
+      "firstName": "Katharina",
+      "lastName": "Wagner",
+      "displayName": "Katharina Wagner",
+      "email": "katharina.wagner@test.com",
+      "phone": "+49 179 2020914",
+      "title": "Frau",
+      "authority": "Gartenbauamt",
+      "department": "Technische Überwachung",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "62",
+      "firstName": "Paul",
+      "lastName": "Schneider",
+      "displayName": "Paul Schneider",
+      "email": "paul.schneider@test.com",
+      "phone": "+49 37 6443930",
+      "title": "Herr",
+      "authority": "Gartenbauamt",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "standarduser",
+      "active": true
+    },
+    {
+      "id": "63",
+      "firstName": "Julia",
+      "lastName": "Becker",
+      "displayName": "Julia Becker",
+      "email": "julia.becker@test.com",
+      "phone": "+49 172 5745104",
+      "title": "Frau",
+      "authority": "Wasser- und Schifffahrtsamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "64",
+      "firstName": "Jan",
+      "lastName": "Schmidt",
+      "displayName": "Jan Schmidt",
+      "email": "jan.schmidt@test.com",
+      "phone": "+49 67 9148699",
+      "title": "Herr",
+      "authority": "Straßenverkehrsamt",
+      "department": "Bauplanung",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemuser",
+      "active": false
+    },
+    {
+      "id": "65",
+      "firstName": "Nina",
+      "lastName": "Becker",
+      "displayName": "Nina Becker",
+      "email": "nina.becker@test.com",
+      "phone": "+49 155 8826446",
+      "title": "Frau",
+      "authority": "Naturschutzbehörde",
+      "department": "Hafensicherheit",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "admin",
+      "active": true
+    },
+    {
+      "id": "66",
+      "firstName": "Jan",
+      "lastName": "Hoffmann",
+      "displayName": "Jan Hoffmann",
+      "email": "jan.hoffmann@test.com",
+      "phone": "+49 177 8905694",
+      "title": "Herr",
+      "authority": "Umweltamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemuser",
+      "active": true
+    },
+    {
+      "id": "67",
+      "firstName": "Nina",
+      "lastName": "Becker",
+      "displayName": "Nina Becker",
+      "email": "nina.becker@test.com",
+      "phone": "+49 175 5363508",
+      "title": "Frau",
+      "authority": "Bauamt",
+      "department": "Abfallentsorgung",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "68",
+      "firstName": "Jan",
+      "lastName": "Hoffmann",
+      "displayName": "Jan Hoffmann",
+      "email": "jan.hoffmann@test.com",
+      "phone": "+49 172 9419706",
+      "title": "Herr",
+      "authority": "Wasser- und Schifffahrtsamt",
+      "department": "Verkehrssicherheit",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "systemdev",
+      "active": true
+    },
+    {
+      "id": "69",
+      "firstName": "Thomas",
+      "lastName": "Wagner",
+      "displayName": "Thomas Wagner",
+      "email": "thomas.wagner@test.com",
+      "phone": "+49 34 2910938",
+      "title": "Herr",
+      "authority": "Straßenverkehrsamt",
+      "department": "Bauplanung",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "admin",
+      "active": true
+    },
+    {
+      "id": "70",
+      "firstName": "Paul",
+      "lastName": "Becker",
+      "displayName": "Paul Becker",
+      "email": "paul.becker@test.com",
+      "phone": "+49 46 4220548",
+      "title": "Herr",
+      "authority": "Luftfahrtamt",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "71",
+      "firstName": "Daniel",
+      "lastName": "Fischer",
+      "displayName": "Daniel Fischer",
+      "email": "daniel.fischer@test.com",
+      "phone": "+49 163 4221116",
+      "title": "Herr",
+      "authority": "Naturschutzbehörde",
+      "department": "Energie und Klima",
+      "group": {
+        "id": "4",
+        "title": "Leitung"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "72",
+      "firstName": "Lukas",
+      "lastName": "Weber",
+      "displayName": "Lukas Weber",
+      "email": "lukas.weber@test.com",
+      "phone": "+49 45 1645946",
+      "title": "Herr",
+      "authority": "Straßenbauamt",
+      "department": "Genehmigungen",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "systemdev",
+      "active": true
+    },
+    {
+      "id": "73",
+      "firstName": "Anna",
+      "lastName": "Müller",
+      "displayName": "Anna Müller",
+      "email": "anna.müller@test.com",
+      "phone": "+49 67 1201642",
+      "title": "Frau",
+      "authority": "Bauamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "standarduser",
+      "active": false
+    },
+    {
+      "id": "74",
+      "firstName": "Clara",
+      "lastName": "Schneider",
+      "displayName": "Clara Schneider",
+      "email": "clara.schneider@test.com",
+      "phone": "+49 73 6853699",
+      "title": "Frau",
+      "authority": "Straßenverkehrsamt",
+      "department": "Energie und Klima",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "systemuser",
+      "active": false
+    },
+    {
+      "id": "75",
+      "firstName": "Miriam",
+      "lastName": "Koch",
+      "displayName": "Miriam Koch",
+      "email": "miriam.koch@test.com",
+      "phone": "+49 174 2720792",
+      "title": "Frau",
+      "authority": "Abfallwirtschaftsamt",
+      "department": "Abfallentsorgung",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemuser",
+      "active": true
+    },
+    {
+      "id": "76",
+      "firstName": "Markus",
+      "lastName": "Weber",
+      "displayName": "Markus Weber",
+      "email": "markus.weber@test.com",
+      "phone": "+49 57 2664127",
+      "title": "Herr",
+      "authority": "Straßenverkehrsamt",
+      "department": "Technische Überwachung",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemdev",
+      "active": true
+    },
+    {
+      "id": "77",
+      "firstName": "Jan",
+      "lastName": "Müller",
+      "displayName": "Jan Müller",
+      "email": "jan.müller@test.com",
+      "phone": "+49 72 3178766",
+      "title": "Herr",
+      "authority": "Straßenbauamt",
+      "department": "Genehmigungen",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemuser",
+      "active": false
+    },
+    {
+      "id": "78",
+      "firstName": "Anna",
+      "lastName": "Weber",
+      "displayName": "Anna Weber",
+      "email": "anna.weber@test.com",
+      "phone": "+49 34 2774589",
+      "title": "Frau",
+      "authority": "Tiefbauamt",
+      "department": "Hafensicherheit",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "79",
+      "firstName": "Daniel",
+      "lastName": "Müller",
+      "displayName": "Daniel Müller",
+      "email": "daniel.müller@test.com",
+      "phone": "+49 178 3871076",
+      "title": "Herr",
+      "authority": "Abfallwirtschaftsamt",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemuser",
+      "active": true
+    },
+    {
+      "id": "80",
+      "firstName": "Lukas",
+      "lastName": "Schneider",
+      "displayName": "Lukas Schneider",
+      "email": "lukas.schneider@test.com",
+      "phone": "+49 157 7187253",
+      "title": "Herr",
+      "authority": "Abfallwirtschaftsamt",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "4",
+        "title": "Leitung"
+      },
+      "role": "systemdev",
+      "active": false
+    },
+    {
+      "id": "81",
+      "firstName": "Thomas",
+      "lastName": "Schmidt",
+      "displayName": "Thomas Schmidt",
+      "email": "thomas.schmidt@test.com",
+      "phone": "+49 50 1995552",
+      "title": "Herr",
+      "authority": "Straßenbauamt",
+      "department": "Bauplanung",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "82",
+      "firstName": "Katharina",
+      "lastName": "Koch",
+      "displayName": "Katharina Koch",
+      "email": "katharina.koch@test.com",
+      "phone": "+49 151 5410639",
+      "title": "Frau",
+      "authority": "Straßenverkehrsamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "admin",
+      "active": true
+    },
+    {
+      "id": "83",
+      "firstName": "Stefan",
+      "lastName": "Hoffmann",
+      "displayName": "Stefan Hoffmann",
+      "email": "stefan.hoffmann@test.com",
+      "phone": "+49 168 7995898",
+      "title": "Herr",
+      "authority": "Abfallwirtschaftsamt",
+      "department": "Hafensicherheit",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "systemadmin",
+      "active": true
+    },
+    {
+      "id": "84",
+      "firstName": "Sarah",
+      "lastName": "Wagner",
+      "displayName": "Sarah Wagner",
+      "email": "sarah.wagner@test.com",
+      "phone": "+49 179 7458737",
+      "title": "Frau",
+      "authority": "Straßenbauamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "standarduser",
+      "active": true
+    },
+    {
+      "id": "85",
+      "firstName": "Miriam",
+      "lastName": "Wagner",
+      "displayName": "Miriam Wagner",
+      "email": "miriam.wagner@test.com",
+      "phone": "+49 47 3725028",
+      "title": "Frau",
+      "authority": "Umweltamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "4",
+        "title": "Leitung"
+      },
+      "role": "systemadmin",
+      "active": false
+    },
+    {
+      "id": "86",
+      "firstName": "Lukas",
+      "lastName": "Richter",
+      "displayName": "Lukas Richter",
+      "email": "lukas.richter@test.com",
+      "phone": "+49 79 6492064",
+      "title": "Herr",
+      "authority": "Straßenbauamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemadmin",
+      "active": false
+    },
+    {
+      "id": "87",
+      "firstName": "Paul",
+      "lastName": "Hoffmann",
+      "displayName": "Paul Hoffmann",
+      "email": "paul.hoffmann@test.com",
+      "phone": "+49 156 2227411",
+      "title": "Herr",
+      "authority": "Straßenverkehrsamt",
+      "department": "Abfallentsorgung",
+      "group": {
+        "id": "2",
+        "title": "Technischer Mitarbeiter"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "88",
+      "firstName": "Laura",
+      "lastName": "Fischer",
+      "displayName": "Laura Fischer",
+      "email": "laura.fischer@test.com",
+      "phone": "+49 158 2930295",
+      "title": "Frau",
+      "authority": "Tiefbauamt",
+      "department": "Infrastruktur",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "systemdev",
+      "active": true
+    },
+    {
+      "id": "89",
+      "firstName": "Katharina",
+      "lastName": "Weber",
+      "displayName": "Katharina Weber",
+      "email": "katharina.weber@test.com",
+      "phone": "+49 165 1494160",
+      "title": "Frau",
+      "authority": "Abfallwirtschaftsamt",
+      "department": "Abfallentsorgung",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemuser",
+      "active": true
+    },
+    {
+      "id": "90",
+      "firstName": "Florian",
+      "lastName": "Becker",
+      "displayName": "Florian Becker",
+      "email": "florian.becker@test.com",
+      "phone": "+49 172 9087660",
+      "title": "Herr",
+      "authority": "Luftfahrtamt",
+      "department": "Naturschutz",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemdev",
+      "active": false
+    },
+    {
+      "id": "91",
+      "firstName": "Stefan",
+      "lastName": "Schneider",
+      "displayName": "Stefan Schneider",
+      "email": "stefan.schneider@test.com",
+      "phone": "+49 81 2281617",
+      "title": "Herr",
+      "authority": "Gartenbauamt",
+      "department": "Landschaftspflege",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemuser",
+      "active": false
+    },
+    {
+      "id": "92",
+      "firstName": "Katharina",
+      "lastName": "Schmidt",
+      "displayName": "Katharina Schmidt",
+      "email": "katharina.schmidt@test.com",
+      "phone": "+49 175 4739709",
+      "title": "Frau",
+      "authority": "Gartenbauamt",
+      "department": "Genehmigungen",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "93",
+      "firstName": "Miriam",
+      "lastName": "Hoffmann",
+      "displayName": "Miriam Hoffmann",
+      "email": "miriam.hoffmann@test.com",
+      "phone": "+49 89 6291629",
+      "title": "Frau",
+      "authority": "Umweltamt",
+      "department": "Naturschutz",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemadmin",
+      "active": false
+    },
+    {
+      "id": "94",
+      "firstName": "Daniel",
+      "lastName": "Wagner",
+      "displayName": "Daniel Wagner",
+      "email": "daniel.wagner@test.com",
+      "phone": "+49 44 1579530",
+      "title": "Herr",
+      "authority": "Gartenbauamt",
+      "department": "Verkehrssicherheit",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "systemuser",
+      "active": true
+    },
+    {
+      "id": "95",
+      "firstName": "Katharina",
+      "lastName": "Becker",
+      "displayName": "Katharina Becker",
+      "email": "katharina.becker@test.com",
+      "phone": "+49 165 3362071",
+      "title": "Frau",
+      "authority": "Gartenbauamt",
+      "department": "Abfallentsorgung",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "96",
+      "firstName": "Markus",
+      "lastName": "Müller",
+      "displayName": "Markus Müller",
+      "email": "markus.müller@test.com",
+      "phone": "+49 169 3695491",
+      "title": "Herr",
+      "authority": "Luftfahrtamt",
+      "department": "Verkehrssicherheit",
+      "group": {
+        "id": "5",
+        "title": "Support"
+      },
+      "role": "admin",
+      "active": false
+    },
+    {
+      "id": "97",
+      "firstName": "Sophie",
+      "lastName": "Schneider",
+      "displayName": "Sophie Schneider",
+      "email": "sophie.schneider@test.com",
+      "phone": "+49 51 1118028",
+      "title": "Frau",
+      "authority": "Umweltamt",
+      "department": "Hafensicherheit",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemadmin",
+      "active": false
+    },
+    {
+      "id": "98",
+      "firstName": "Florian",
+      "lastName": "Müller",
+      "displayName": "Florian Müller",
+      "email": "florian.müller@test.com",
+      "phone": "+49 74 5583922",
+      "title": "Herr",
+      "authority": "Umweltamt",
+      "department": "Genehmigungen",
+      "group": {
+        "id": "3",
+        "title": "Sachbearbeiter"
+      },
+      "role": "systemadmin",
+      "active": false
+    },
+    {
+      "id": "99",
+      "firstName": "Paul",
+      "lastName": "Schmidt",
+      "displayName": "Paul Schmidt",
+      "email": "paul.schmidt@test.com",
+      "phone": "+49 33 4798606",
+      "title": "Herr",
+      "authority": "Umweltamt",
+      "department": "Naturschutz",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "systemdev",
+      "active": true
+    },
+    {
+      "id": "100",
+      "firstName": "Julia",
+      "lastName": "Müller",
+      "displayName": "Julia Müller",
+      "email": "julia.müller@test.com",
+      "phone": "+49 163 7998557",
+      "title": "Frau",
+      "authority": "Gartenbauamt",
+      "department": "Verkehrssicherheit",
+      "group": {
+        "id": "1",
+        "title": "Admin"
+      },
+      "role": "admin",
+      "active": false
     }
   ]
 }

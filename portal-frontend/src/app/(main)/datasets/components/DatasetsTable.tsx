@@ -1,33 +1,20 @@
-import {
-  createColumnHelper,
-  getCoreRowModel,
-  getSortedRowModel,
-  SortingState,
-  useReactTable,
-} from '@tanstack/react-table'
+import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { useLocale, useTranslations } from 'next-intl'
-import { Dispatch, SetStateAction } from 'react'
 
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Badge } from '@/components/ui/badge'
+import { TableProps } from '@/types/table'
+import { resolveUpdater } from '@/utils/table'
 
 import { Dataset } from '../page'
 
-interface DatasetsTableProps {
+interface DatasetsTableProps extends TableProps<Dataset> {
   datasets: Dataset[]
-  rowCount: number
-  pageSize: number
-  totalPages: number
-  setPageSize: Dispatch<SetStateAction<number>>
-  pageIndex: number
-  setPageIndex: Dispatch<SetStateAction<number>>
-  sorting: SortingState
-  setSorting: Dispatch<SetStateAction<SortingState>>
 }
 
 const DatasetsTable = (props: DatasetsTableProps) => {
-  const { datasets, rowCount, pageIndex, totalPages, setPageIndex, pageSize, setPageSize, sorting, setSorting } = props
+  const { datasets, rowCount, pageIndex, totalPages, pageSize, sorting, onPaginationChange, onSortingChange } = props
   const t = useTranslations('datasets')
   const locale = useLocale()
   const columnHelper = createColumnHelper<Dataset>()
@@ -96,7 +83,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
                 {value.format}
               </Badge>
               <a href={value.url} target="_blank" className="underline">
-                {value.title}
+                {value.name}
               </a>
             </>
           )
@@ -122,11 +109,9 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     manualSorting: true,
     state: { pagination: { pageIndex, pageSize }, sorting },
     onPaginationChange: updater => {
-      const newPagination = typeof updater === 'function' ? updater({ pageIndex, pageSize }) : updater
-      setPageIndex(newPagination.pageIndex)
-      setPageSize(newPagination.pageSize)
+      onPaginationChange(resolveUpdater(updater, { pageIndex, pageSize }))
     },
-    onSortingChange: setSorting,
+    onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
   })
 
   return <DataTable table={table} pageIndex={pageIndex} pageSize={pageSize} totalPages={totalPages} />

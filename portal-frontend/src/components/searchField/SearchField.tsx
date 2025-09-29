@@ -1,22 +1,28 @@
 import { useTranslations } from 'next-intl'
-import { Dispatch, InputHTMLAttributes, SetStateAction, useEffect, useState } from 'react'
+import { InputHTMLAttributes, useEffect, useRef, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { useDebounce } from '@/hooks/useDebounce'
 
 interface SearchFieldProps extends InputHTMLAttributes<HTMLInputElement> {
-  setSearchString: Dispatch<SetStateAction<string>>
+  searchString: string
+  onChangeSearchString: (seachString: string) => void
 }
 
 export const SearchField = (props: SearchFieldProps) => {
-  const { setSearchString, ...inputProps } = props
+  const { searchString, onChangeSearchString, ...inputProps } = props
   const t = useTranslations('common')
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(searchString)
   const debouncedInput = useDebounce(input, 300)
 
+  const onChangeSearchStringRef = useRef(onChangeSearchString)
   useEffect(() => {
-    setSearchString(debouncedInput)
-  }, [debouncedInput, setSearchString])
+    onChangeSearchStringRef.current = onChangeSearchString
+  }, [onChangeSearchString])
+
+  useEffect(() => {
+    onChangeSearchStringRef.current(debouncedInput)
+  }, [debouncedInput])
 
   return (
     <div role="search" className="flex items-center h-[calc(var(--search-height))] w-xs">

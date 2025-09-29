@@ -23,7 +23,7 @@ export const mappedDatasets: Dataset[] = [
     releaseProcess: null,
     distribution: {
       format: 'DOCX',
-      title: 'Superset',
+      name: 'Superset',
       url: 'https://superset.de',
     },
   },

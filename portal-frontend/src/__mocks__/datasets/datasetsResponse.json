@@ -1,31 +1,31 @@
 [
   {
     "id": "1",
-    "title": "Bebauungspläne der Stadt Musterstadt (XPlanung)",
+    "name": "Bebauungspläne der Stadt Musterstadt (XPlanung)",
     "creator": [{ "id": "1", "firstName": "Maximilian", "lastName": "Müller" }],
     "issued": "2023-09-10T08:00:00Z",
-    "modified": "2023-09-10T08:00:00Z",
+    "lastUpdated": "2023-09-10T08:00:00Z",
     "status": null,
     "distribution": null,
     "catalog": ["1"],
-    "series": { "id": "1", "title": "Verkehr" },
-    "department": { "id": "1", "title": "Stadtentwicklung" }
+    "series": { "id": "1", "name": "Verkehr" },
+    "department": { "id": "1", "name": "Stadtentwicklung" }
   },
   {
     "id": "2",
-    "title": "Spielplätze",
+    "name": "Spielplätze",
     "creator": [{ "id": "2", "firstName": "Sophie", "lastName": "Schneider" }],
     "issued": "2023-01-01T08:00:00Z",
-    "modified": "2023-01-01T08:00:00Z",
+    "lastUpdated": "2023-01-01T08:00:00Z",
     "status": "open",
     "distribution": {
       "id": "2",
       "format": "DOCX",
-      "title": "Superset",
+      "name": "Superset",
       "url": "https://superset.de"
     },
     "catalog": ["1"],
-    "series": { "id": "2", "title": "Umwelt" },
-    "department": { "id": "2", "title": "Verkehrsplanung" }
+    "series": { "id": "2", "name": "Umwelt" },
+    "department": { "id": "2", "name": "Verkehrsplanung" }
   }
 ]
