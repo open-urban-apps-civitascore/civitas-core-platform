@@ -57,6 +57,8 @@
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
+      "selectGroup": "Select a group...",
+
       "active": "Active"
     }
   },

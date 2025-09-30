@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@auth/core": "^0.40.0",
+    "@hookform/resolvers": "^4",
     "@playwright/test": "^1.55.0",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-collapsible": "^1.1.12",
@@ -39,13 +40,16 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "libphonenumber-js": "^1.12.22",
     "lucide-react": "^0.541.0",
     "next": "15.5.0",
     "next-auth": "5.0.0-beta.29",
     "next-intl": "^4.3.5",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "tailwind-merge": "^3.3.1"
+    "react-hook-form": "^7.63.0",
+    "tailwind-merge": "^3.3.1",
+    "zod": "^4.1.11"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

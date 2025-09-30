@@ -1,7 +1,9 @@
 {
   "common": {
     "type-to-search": "Zum Suchen tippen",
-    "search": "Durchsuchen"
+    "search": "Durchsuchen",
+    "cancel": "Abbrechen",
+    "save": "Speichern"
   },
   "languages": {
     "german": "Deutsch",
@@ -57,6 +59,7 @@
       "phone": "Telefonnummer",
       "email": "E-Mail",
       "group": "Gruppe",
+      "selectGroup": "Gruppe wählen...",
       "active": "Aktiv"
     }
   },

@@ -44,7 +44,7 @@ export const BreadcrumbNavigation = () => {
             <React.Fragment key={segment}>
               <BreadcrumbItem className={!isLast ? 'hidden md:block' : undefined}>
                 <BreadcrumbLink href={href} aria-current={isLast ? 'page' : undefined}>
-                  {t(segment)}
+                  {Number(segment) ? segment : t(segment)}
                 </BreadcrumbLink>
               </BreadcrumbItem>
               {!isLast && <CustomBreadcrumbSeparator />}

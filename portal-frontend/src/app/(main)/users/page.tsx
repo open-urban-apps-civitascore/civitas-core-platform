@@ -11,10 +11,16 @@ import { TableContainer } from '@/components/table-container/TableContainer'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
 import UsersTable from './components/UsersTable'
+import { TitleSchemaType } from '@/types/users'
+import { AccessibleSelectProps, SelectOption } from '@/components/form/text-field/Select'
 
-export type UserGroup = {
+export type Category = {
   id: string
   title: string
+}
+
+export type UserAuthority = Category & {
+  department: Category
 }
 
 export type UserResponse = {
@@ -24,10 +30,9 @@ export type UserResponse = {
   displayName: string
   email: string
   phone: string
-  title: string
-  authority: string
-  department: string
-  group: UserGroup
+  title: TitleSchemaType
+  authority: UserAuthority | null
+  group: Category | null
   active: boolean
   role: string
 }
@@ -42,14 +47,12 @@ export type ListUser = {
   isactive: boolean
 }
 
-export type FormUser = UserResponse
-
 export const mapListUsers = (users: UserResponse[]): ListUser[] =>
   users.map(user => ({
     id: user.id,
     displayName: user.displayName,
-    authority: user.authority,
-    department: user.department,
+    authority: user.authority?.title ?? '',
+    department: user.authority?.department.title ?? '',
     role: user.role,
     email: user.email,
     isactive: user.active,

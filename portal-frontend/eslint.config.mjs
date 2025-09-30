@@ -170,6 +170,7 @@ const eslintConfig = [
         {
           rule: '^(is|has|should|can)[A-Z]([A-Za-z0-9]?)',
           validateNested: true,
+          ignore: ['required', 'disabled', 'open', 'readOnly'],
         },
       ],
 
