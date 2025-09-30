@@ -27,6 +27,10 @@ export const appSidebarNavItems = [
         title: 'users',
         url: '/users',
       },
+      {
+        title: 'roles',
+        url: '/roles',
+      },
     ],
   },
   {

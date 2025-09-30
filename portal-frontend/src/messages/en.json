@@ -1,7 +1,13 @@
 {
   "common": {
     "type-to-search": "Type to search",
-    "search": "Search"
+    "search": "Search",
+    "noResults": "No results found.",
+    "actions": {
+      "submit": "Save",
+      "cancel": "Cancel",
+      "delete": "Delete"
+    }
   },
   "languages": {
     "german": "German",
@@ -16,6 +22,9 @@
     "documentation": "Documentation",
     "logout": "Log out",
     "datasets": "Datasets",
+    "roles": "Role Management",
+    "create": "create",
+    "edit": "edit",
     "users": "User Management",
     "tenants": "Tenant Management"
   },
@@ -73,6 +82,36 @@
       "previousPage": "Go to previous page",
       "nextPage": "Go to next page",
       "lastPage": "Go to last page"
+    }
+  },
+  "roles": {
+    "title": "Roles",
+    "newRole": "New Role",
+    "systemRoles": "System Roles",
+    "dataRoles": "Data Roles",
+    "governanceRoles": "Governance Roles",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Description",
+      "permissions": "Permissions",
+      "user": "User",
+      "createdAt": "created"
+    },
+    "form": {
+      "title": { "createRole": "Create Role" },
+      "inputs": {
+        "name": "Name of the Role",
+        "description": "Role Description"
+      },
+      "formErrors": {
+        "name": {
+          "minLength": "Name must be at least 2 characters.",
+          "maxLength": "Name must be at most 30 characters."
+        },
+        "description": {
+          "maxLength": "Description must be at most 100 characters."
+        }
+      }
     }
   }
 }
