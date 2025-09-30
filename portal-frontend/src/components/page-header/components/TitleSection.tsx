@@ -1,11 +1,10 @@
-import { BasePageHeaderProps } from '../PageHeader'
 
-export interface TitleHeaderProps extends BasePageHeaderProps {
+export interface TitleSectionProps {
   title: string
   subtitle?: string
 }
 
-export const TitleSection = (props: TitleHeaderProps) => {
+export const TitleSection = (props: TitleSectionProps) => {
   const { title, subtitle } = props
 
   return (

@@ -1,24 +1,30 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
+import { Button, ButtonProps } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { cn } from '@/lib/utils'
 
-import { BasePageHeaderProps } from '../PageHeader'
+export type Tab = { value: string; label: string }
 
-export interface TabHeaderProps extends BasePageHeaderProps {
-  isTabHeader: true
-  tabs: { value: string; label: string }[]
+export interface TabSectionProps {
+  tabs: Tab[]
   onClick: (tab: string) => void
   selectedTab: string
+  className?: string
 }
 
-export const TabsSection = (props: TabHeaderProps) => {
-  const { tabs, onClick, selectedTab } = props
+export const TabsSection = (props: TabSectionProps) => {
+  const { tabs, onClick, selectedTab, className } = props
 
   const isMobile = useIsMobile()
 
   return (
-    <h1 className={`flex ${isMobile ? 'flex-col' : 'flex-row gap-2'} justify-start  cursor-pointer items-start`}>
+    <h1
+      className={cn(
+        `flex ${isMobile ? 'flex-col' : 'flex-row gap-2'} justify-start  cursor-pointer items-start rounded-md`,
+        className,
+      )}
+    >
       {tabs.map(tab => (
         <Button
           variant="ghost"

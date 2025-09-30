@@ -1,42 +1,38 @@
-import React, { HTMLAttributes, JSX } from 'react'
+import { HTMLAttributes, JSX } from 'react'
 
 import { cn } from '@/lib/utils'
 
-import { TabHeaderProps, TabsSection } from './components/TabsSections'
-import { TitleHeaderProps, TitleSection } from './components/TitleSection'
+import { TabSectionProps, TabsSection } from './components/TabsSections'
+import { TitleSection, TitleSectionProps } from './components/TitleSection'
 
-export interface BasePageHeaderProps extends Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> {
+export type PageHeaderProps = Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & {
+  title?: string
+  subtitle?: string
+  tabs?: TabSectionProps
   customElement?: JSX.Element
-  isTabHeader?: boolean
+  subTabs?: TabSectionProps
 }
 
-type PageHeaderProps = BasePageHeaderProps & (TabHeaderProps | TitleHeaderProps)
-
 export const PageHeader = (props: PageHeaderProps) => {
-  const { customElement, className, style, isTabHeader = false } = props
+  const { title, subtitle, customElement, className, style, tabs, subTabs } = props
 
-  if (isTabHeader && 'tabs' in props && 'onClick' in props && 'selectedTab' in props) {
-    return (
-      <div id="heading" className={cn('flex justify-between h-[var(--title-height)]', className)} style={style}>
-        <TabsSection
-          tabs={props.tabs}
-          onClick={props.onClick}
-          selectedTab={props.selectedTab}
-          isTabHeader={isTabHeader}
-        />
-        {customElement}
+  return (
+    <div id="heading" className={cn('flex justify-between items-center h-[var(--title-height)]', className)} style={style}>
+      <div className='flex flex-col justify-center'>
+        {tabs && <TabsSection tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} />}
+        <div id="heading" className="flex justify-between">
+          {title && <TitleSection title={title} subtitle={subtitle} />}
+        </div>
+        {subTabs && (
+          <TabsSection
+            tabs={subTabs.tabs}
+            selectedTab={subTabs.selectedTab}
+            onClick={subTabs.onClick}
+            className='mt-4 bg-accent'
+          />
+        )}
       </div>
-    )
-  }
-
-  if ('title' in props) {
-    return (
-      <div id="heading" className={cn('flex justify-between h-[var(--title-height)]', className)} style={style}>
-        <TitleSection title={props.title} subtitle={props?.subtitle} isTabHeader={false} />
-        {customElement}
-      </div>
-    )
-  }
-
-  return null
+      {customElement}
+    </div>
+  )
 }
