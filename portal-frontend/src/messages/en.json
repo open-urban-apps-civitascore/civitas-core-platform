@@ -48,7 +48,7 @@
     "info": {
       "id": "ID",
       "displayName": "Display Name",
-      "title": "Title",
+      "title": { "title": "Title", "male": "Mr", "female": "Ms" },
       "firstName": "First Name",
       "lastName": "Last Name",
       "authority": "Authority",

@@ -50,7 +50,7 @@
     "info": {
       "id": "ID",
       "displayName": "Anzeigename",
-      "title": "Anrede",
+      "title": { "title": "Anrede", "male": "Herr", "female": "Frau" },
       "firstName": "Vorname",
       "lastName": "Name",
       "authority": "Amt",
@@ -59,8 +59,13 @@
       "phone": "Telefonnummer",
       "email": "E-Mail",
       "group": "Gruppe",
-      "selectGroup": "Gruppe wählen...",
       "active": "Aktiv"
+    },
+    "form": {
+      "selectTitle": "Titel wählen...",
+      "selectAuthority": "Amt wählen...",
+      "selectDepartment": "Abteilung wählen...",
+      "selectGroup": "Gruppe wählen..."
     }
   },
   "pagination": {

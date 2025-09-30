@@ -1,8 +1,8 @@
 'use client'
 
 import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -10,9 +10,8 @@ import { SearchField } from '@/components/searchField/SearchField'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
-import UsersTable from './components/UsersTable'
 import { TitleSchemaType } from '@/types/users'
-import { AccessibleSelectProps, SelectOption } from '@/components/form/text-field/Select'
+import UsersTable from './components/UsersTable'
 
 export type Category = {
   id: string

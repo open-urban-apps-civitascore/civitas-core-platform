@@ -37,7 +37,7 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
               <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none" disabled>
+              <SelectItem value="none" disabled={required}>
                 {placeholder}
               </SelectItem>
 
