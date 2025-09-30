@@ -5,6 +5,7 @@ import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Badge } from '@/components/ui/badge'
 import { TableProps } from '@/types/table'
+import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
 
 import { Dataset } from '../page'
@@ -49,10 +50,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     }),
     columnHelper.accessor('lastUpdated', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.lastUpdated')} />,
-      cell: info => {
-        const formattedDate = new Date(info.getValue()).toLocaleDateString('en-GB')
-        return locale === 'de' ? formattedDate.replaceAll('/', '.') : formattedDate
-      },
+      cell: info => formatDate(info.getValue(), locale),
     }),
     columnHelper.accessor('status', {
       header: t('tableHeaders.status'),

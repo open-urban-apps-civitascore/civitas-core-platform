@@ -1,7 +1,13 @@
 {
   "common": {
     "type-to-search": "Zum Suchen tippen",
-    "search": "Durchsuchen"
+    "search": "Durchsuchen",
+    "noResults": "Es gibt leider keine Ergebnisse.",
+    "actions": {
+      "submit": "Speichern",
+      "cancel": "Abbrechen",
+      "delete": "Löschen"
+    }
   },
   "languages": {
     "german": "Deutsch",
@@ -16,6 +22,9 @@
     "documentation": "Dokumentation",
     "logout": "Abmelden",
     "datasets": "Datensätze",
+    "roles": "Rollen Management",
+    "create": "erstellen",
+    "edit": "bearbeiten",
     "users": "User Management",
     "tenants": "Mandanten-Management"
   },
@@ -71,6 +80,36 @@
       "previousPage": "Zur vorherigen Seite wechseln",
       "nextPage": "Zur nächsten Seite wechseln",
       "lastPage": "Zur letzten Seite wechseln"
+    }
+  },
+  "roles": {
+    "title": "Rollen",
+    "newRole": "Neue Rolle",
+    "systemRoles": "Systemrollen",
+    "dataRoles": "Datenrollen",
+    "governanceRoles": "Governancerollen",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "permissions": "Berechtigungen",
+      "user": "User",
+      "createdAt": "erstellt"
+    },
+    "form": {
+      "title": { "createRole": "Rolle erstellen" },
+      "inputs": {
+        "name": "Name der Rolle",
+        "description": "Beschreibung der Rolle"
+      },
+      "formErrors": {
+        "name": {
+          "minLength": "Name muss mindestens 2 Zeichen lang sein.",
+          "maxLength": "Name darf höchstens 30 Zeichen lang sein."
+        },
+        "description": {
+          "maxLength": "Beschreibung darf höchstens 100 Zeichen lang sein."
+        }
+      }
     }
   }
 }

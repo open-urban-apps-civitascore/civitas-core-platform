@@ -4,4 +4,5 @@ export const QUERY_PARAMS = {
   sortingId: '_sort',
   order: '_order',
   search: 'q',
+  tabValue: '_tab',
 }

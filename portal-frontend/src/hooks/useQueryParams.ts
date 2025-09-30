@@ -28,6 +28,7 @@ export const useQueryParams = () => {
   )
   const sorting: SortingState = useMemo(() => getSortingState(searchParams), [searchParams])
   const search = useMemo(() => searchParams.get(QUERY_PARAMS.search) ?? '', [searchParams])
+  const tabValue = useMemo(() => searchParams.get(QUERY_PARAMS.tabValue) ?? '', [searchParams])
 
   const setSortingParams = (newSorting: SortingState) => {
     const params = new URLSearchParams(searchParams)
@@ -62,6 +63,16 @@ export const useQueryParams = () => {
     [pathname, router, searchParams],
   )
 
+  const setTabValueParam = (tabValue: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (tabValue) {
+      params.set(QUERY_PARAMS.tabValue, tabValue)
+    } else {
+      params.delete(QUERY_PARAMS.tabValue)
+    }
+    router.push(`${pathname}?${params.toString()}`)
+  }
+
   const setApiRequestParams = useCallback(
     (totalPages: number) => {
       const apiParams = new URLSearchParams()
@@ -87,9 +98,11 @@ export const useQueryParams = () => {
     setSortingParams,
     setPaginationParams,
     setApiRequestParams,
+    setTabValueParam,
     pageIndex,
     pageSize,
     sorting,
     search,
+    tabValue,
   }
 }

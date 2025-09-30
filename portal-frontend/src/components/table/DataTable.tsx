@@ -1,8 +1,10 @@
 import { ScrollArea } from '@radix-ui/react-scroll-area'
 import { flexRender, Row, SortDirection, Table } from '@tanstack/react-table'
+import { useTranslations } from 'next-intl'
 import { ComponentProps } from 'react'
 
 import { ScrollBar } from '../ui/scroll-area'
+import { Skeleton } from '../ui/skeleton'
 import { Table as ShadCnTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import TablePagination from './table-pagination/TablePagination'
 
@@ -22,11 +24,24 @@ export interface DataTableProps<T> extends ComponentProps<'table'> {
   pageSize: number
   pageIndex: number
   totalPages: number
+  isLoading?: boolean
   onRowClick?: (row: Row<T>) => void
 }
 
+const LoadingSkeleton = () => (
+  <>
+    <Skeleton className="h-10 w-full mb-2.5 mt-2" />
+    <Skeleton className="h-10 w-full mb-2.5" />
+    <Skeleton className="h-10 w-full mb-2.5" />
+    <Skeleton className="h-10 w-full" />
+  </>
+)
+
 export const DataTable = <T,>(props: DataTableProps<T>) => {
-  const { table, pageSize, pageIndex, totalPages, onRowClick, ...tableProps } = props
+  const { table, pageSize, pageIndex, totalPages, isLoading, onRowClick, ...tableProps } = props
+
+  const t = useTranslations('common')
+
   return (
     <div className="@container h-full w-full">
       <div className="h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]">
@@ -50,23 +65,32 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
               ))}
             </TableHeader>
             <TableBody>
-              {table.getRowModel().rows.map(row => (
-                <TableRow
-                  className={`h-16 ${onRowClick ? 'cursor-pointer' : ''}`}
-                  key={row.id}
-                  onClick={onRowClick ? () => onRowClick(row) : () => null}
-                >
-                  {row.getVisibleCells().map(cell => (
-                    <TableCell className="whitespace-normal" key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map(row => (
+                  <TableRow
+                    className={`h-16 ${onRowClick ? 'cursor-pointer' : ''}`}
+                    key={row.id}
+                    onClick={onRowClick ? () => onRowClick(row) : () => null}
+                  >
+                    {row.getVisibleCells().map(cell => (
+                      <TableCell className="whitespace-normal" key={cell.id}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={table.getAllColumns().length} className="h-24 text-center">
+                    {isLoading ? <LoadingSkeleton /> : t('noResults')}
+                  </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </ShadCnTable>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
+
         <TablePagination
           className="h-[calc(var(--pagination-height))]"
           pageIndex={pageIndex}

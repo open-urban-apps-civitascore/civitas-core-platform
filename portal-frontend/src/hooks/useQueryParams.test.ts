@@ -135,4 +135,28 @@ describe('useQueryParams', () => {
       `${pathname}?${new URLSearchParams({ [QUERY_PARAMS.pageIndex]: '8', [QUERY_PARAMS.pageSize]: '10' }).toString()}`,
     )
   })
+
+  it('should update tabValue param', () => {
+    const { result } = renderHook(() => useQueryParams())
+    const tabValue = 'mockTab'
+
+    act(() => {
+      result.current.setTabValueParam(tabValue)
+    })
+
+    expect(push).toHaveBeenCalledWith(
+      `${pathname}?${new URLSearchParams({ [QUERY_PARAMS.tabValue]: tabValue }).toString()}`,
+    )
+  })
+
+  it('should remove tabValue param if empty string is passed', () => {
+    mockSearchParams = new URLSearchParams({ [QUERY_PARAMS.tabValue]: 'oldTab' })
+    const { result } = renderHook(() => useQueryParams())
+
+    act(() => {
+      result.current.setTabValueParam('')
+    })
+
+    expect(push).toHaveBeenCalledWith(`${pathname}?`)
+  })
 })
