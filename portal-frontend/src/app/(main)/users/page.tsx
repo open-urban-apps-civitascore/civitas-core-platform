@@ -5,13 +5,15 @@ import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
+import { PageHeader } from '@/components/page-header/PageHeader'
 import { TitleSchemaType } from '@/types/users'
 import UsersTable from './components/UsersTable'
+import { Button } from '@/components/ui/button'
+import { Plus } from 'lucide-react'
 
 export type Category = {
   id: string
@@ -114,9 +116,16 @@ const UsersPage = () => {
     }
   }
 
+  const CustomElement = (
+    <Button variant="secondary">
+      <Plus />
+      {t('newUser')}
+    </Button>
+  )
+
   return (
     <div className="w-full h-full">
-      <PageHeader title={t('title')} />
+      <PageHeader title={t('title')} customElement={CustomElement}/>
       <SearchField searchString={search} onChangeSearchString={setSearchParam} />
       <TableContainer>
         <UsersTable

@@ -66,9 +66,20 @@
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
-      "selectGroup": "Select a group...",
-
       "active": "Active"
+    },
+    "detailsTabs": {
+      "userData": "User Data",
+      "roles": "Roles",
+      "userGroups": "User Groups",
+      "dataspaces": "Datenspaces and Datasets",
+      "account": "Account"
+    },
+    "form": {
+      "selectTitle": "Select titel...",
+      "selectAuthority": "Select authority...",
+      "selectDepartment": "Select department...",
+      "selectGroup": "Select group..."
     }
   },
   "pagination": {

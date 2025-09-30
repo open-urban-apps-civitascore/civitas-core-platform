@@ -68,6 +68,13 @@
       "group": "Gruppe",
       "active": "Aktiv"
     },
+    "detailsTabs": {
+      "userData": "Benutzerdaten",
+      "roles": "Rollen",
+      "userGroups": "Usergruppen",
+      "dataspaces": "Datenräume und -sätze",
+      "account": "Account"
+    },
     "form": {
       "selectTitle": "Titel wählen...",
       "selectAuthority": "Amt wählen...",

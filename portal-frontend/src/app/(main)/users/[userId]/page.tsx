@@ -1,4 +1,5 @@
-import { Authority, FormUser, UserForm } from '../components/UserForm'
+import { UserDetails } from '../components/UserDetails'
+import { Authority, FormUser } from '../components/UserForm'
 import { Category, UserResponse } from '../page'
 
 interface PageProps {
@@ -18,7 +19,6 @@ const transformUserData = (userResponse: UserResponse): FormUser | null =>
     : null
 
 export const getFormData = async (userId: string) => {
-  console.log('get form data')
   try {
     const [userGroupsResponse, authoritiesResponse, userResponse] = await Promise.all([
       fetch(`${URL}/userGroups`, {
@@ -40,9 +40,6 @@ export const getFormData = async (userId: string) => {
       authoritiesResponse.json(),
       userResponse.json(),
     ])
-    console.log('userGroups: ', userGroupsData)
-    console.log('authorities: ', authoritiesData)
-    console.log('userData: ', userData)
     return { userGroupsData, authoritiesData, userData: transformUserData(userData) }
   } catch (error) {
     throw new Error('An error occurred while loading form data')
@@ -52,15 +49,11 @@ export const getFormData = async (userId: string) => {
 const page = async (props: PageProps) => {
   const { params } = props
 
-  const {userData, authoritiesData, userGroupsData} = await getFormData(params.userId)
+  const { userData, authoritiesData, userGroupsData } = await getFormData(params.userId)
 
   const userGroups = userGroupsData?.map(group => ({ label: group.title, value: group.id }))
 
-  return userData ? (
-    <UserForm userData={userData} isEditMode userGroups={userGroups} authorities={authoritiesData} />
-  ) : (
-    <div>User not found</div>
-  )
+  return <UserDetails userData={userData} isEditMode userGroups={userGroups} authorities={authoritiesData} />
 }
 
 export default page

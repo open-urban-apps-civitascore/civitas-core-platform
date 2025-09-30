@@ -5221,5 +5221,172 @@
         { "id": "5", "title": "Schleusenbetrieb" }
       ]
     }
+  ],
+    "roles": [
+    {
+      "id": "1",
+      "name": "SystemAdmin",
+      "description": "SystemAdmin",
+      "tenant": "ExampleCorp",
+      "type": "System",
+      "permissions": [
+        "perm1",
+        "perm2",
+        "perm3",
+        "perm4"
+      ],
+      "user": [
+        "1",
+        "2"
+      ],
+      "createdAt": "2024-06-01T12:00:00Z"
+    },
+    {
+      "id": "2",
+      "name": "SystemDev",
+      "description": "System Developer",
+      "tenant": "ExampleCorp",
+      "type": "System",
+      "permissions": [
+        "perm2",
+        "perm3"
+      ],
+      "user": [
+        "3",
+        "4"
+      ],
+      "createdAt": "2024-06-01T12:00:00Z"
+    },
+    {
+      "id": "3",
+      "name": "StandardUser",
+      "description": "Standard User",
+      "tenant": "ExampleCorp",
+      "type": "System",
+      "permissions": [
+        "perm3"
+      ],
+      "user": [
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "createdAt": "2024-06-01T12:00:00Z"
+    },
+    {
+      "id": 4,
+      "name": "Editor",
+      "description": "Content Editor",
+      "tenant": "ExampleCorp",
+      "type": "Data",
+      "permissions": [
+        "perm4",
+        "perm5",
+        "perm6"
+      ],
+      "user": [
+        "1",
+        "2"
+      ],
+      "createdAt": "2024-06-01T12:00:00Z"
+    },
+    {
+      "id": "5",
+      "name": "Leser:in",
+      "description": "Read-Only User",
+      "tenant": "ExampleCorp",
+      "type": "Data",
+      "permissions": [
+        "perm5",
+        "perm6"
+      ],
+      "user": [
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "createdAt": "2024-06-01T12:00:00Z"
+    },
+    {
+      "id": "6",
+      "name": "DataOwner",
+      "description": "Data Owner",
+      "tenant": "ExampleCorp",
+      "type": "Governance",
+      "permissions": [
+        "perm8",
+        "perm9",
+        "perm10"
+      ],
+      "user": [
+        "1",
+        "2"
+      ],
+      "createdAt": "2024-06-01T12:00:00Z"
+    },
+    {
+      "id": "7",
+      "name": "TestRolle",
+      "description": "Das ist eine Testrolle",
+      "type": "Data",
+      "tenant": "ExampleCorp",
+      "permissions": [
+        "perm1",
+        "perm2"
+      ],
+      "user": [
+        "1",
+        "2"
+      ],
+      "createdAt": "2024-06-01T12:00:00Z"
+    },
+    {
+      "id": "8",
+      "name": "Test 4",
+      "description": "Some more text",
+      "type": "Data",
+      "tenant": "ExampleCorp",
+      "permissions": [
+        "perm1",
+        "perm2"
+      ],
+      "user": [
+        "1",
+        "2"
+      ],
+      "createdAt": "2024-06-01T12:00:00Z"
+    },
+    {
+      "id": "9",
+      "name": "Test 5",
+      "description": "Das ist eine Testrolle",
+      "type": "Data",
+      "tenant": "ExampleCorp",
+      "permissions": [],
+      "user": [],
+      "createdAt": "2024-06-01T12:00:00Z"
+    },
+    {
+      "type": "Governance",
+      "tenant": "ExampleCorp",
+      "user": null,
+      "permissions": null,
+      "createdAt": "2025-09-29T15:15:58.072Z",
+      "name": "Global Data Assignment",
+      "description": "Beschreibungstext",
+      "id": "KERWOWP"
+    }
   ]
 }
