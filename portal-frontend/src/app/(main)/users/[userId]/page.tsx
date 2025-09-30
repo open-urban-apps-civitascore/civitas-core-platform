@@ -1,114 +1,63 @@
-import { SelectOption } from '@/components/form/text-field/Select'
-import { UserAuthority, Category, UserResponse } from '../page'
-import { Authority, UserForm } from './components/UserForm'
-import { TitleSchemaType } from '@/types/users'
+import { Authority, FormUser, UserForm } from '../components/UserForm'
+import { Category, UserResponse } from '../page'
 
-export type FormUser = Omit<UserResponse, 'group' | 'authority' | 'department'> & {
-  group: string | null
-  authority: string
-  department: string
-}
 interface PageProps {
   params: { userId: string }
 }
 
-const defaultFormUser = {
-  id: '',
-  displayName: '',
-  firstName: '',
-  lastName: '',
-  title: 'male' as TitleSchemaType,
-  email: '',
-  active: false,
-  authority: '',
-  department: '',
-  group: '',
-  phone: '',
-  role: 'standarduser',
-}
-
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-const getUserData = async (userId: string) => {
-  console.log('get user data, userId: ', userId)
-  try {
-    const userResponse = await fetch(`${URL}/users/${userId}`, {
-      cache: 'no-store',
-    })
-    const userData: UserResponse = await userResponse.json()
-    console.log('getuserdata: ', userData)
-    if (userData && Object.keys(userData).length > 0) {
-      return userData
-    } else {
-      throw new Error('An error occurred while loading user data')
-    }
-  } catch {
-    throw new Error('An error occurred while loading user data')
-  }
-}
+const transformUserData = (userResponse: UserResponse): FormUser | null =>
+  userResponse && Object.keys(userResponse).length > 0
+    ? {
+        ...userResponse,
+        group: userResponse.group ? userResponse.group.id : '',
+        authority: userResponse.authority ? userResponse.authority.id : '',
+        department: userResponse.authority ? userResponse.authority.department.id : '',
+      }
+    : null
 
-const getUserGroupsData = async () => {
-  console.log('get user groups data')
+export const getFormData = async (userId: string) => {
+  console.log('get form data')
   try {
-    const userGroupsResponse = await fetch(`${URL}/userGroups`, {
-      cache: 'no-store',
-    })
-    const userGroups: Category[] = await userGroupsResponse.json()
-    console.log('getUserGroupsData: ', userGroups)
-    if (userGroups) {
-      return userGroups
-    } else {
-      throw new Error('An error occurred while loading user groups data')
+    const [userGroupsResponse, authoritiesResponse, userResponse] = await Promise.all([
+      fetch(`${URL}/userGroups`, {
+        cache: 'no-store',
+      }),
+      fetch(`${URL}/authorities`, {
+        cache: 'no-store',
+      }),
+      fetch(`${URL}/users/${userId}`, {
+        cache: 'no-store',
+      }),
+    ])
+    if (!userGroupsResponse || !authoritiesResponse || !userResponse) {
+      throw new Error('An error occurred while loading form data')
     }
-  } catch (error) {
-    throw new Error('An error occurred while loading user groups data')
-  }
-}
 
-const getAuthorityData = async () => {
-  console.log('get authority data')
-  try {
-    const authoritiesResponse = await fetch(`${URL}/authorities`, {
-      cache: 'no-store',
-    })
-    const authorities: Authority[] = await authoritiesResponse.json()
-    console.log('getAuthorityData: ', authorities)
-    if (authorities) {
-      return authorities
-    } else {
-      throw new Error('An error occurred while loading user groups data')
-    }
+    const [userGroupsData, authoritiesData, userData]: [Category[], Authority[], UserResponse] = await Promise.all([
+      userGroupsResponse.json(),
+      authoritiesResponse.json(),
+      userResponse.json(),
+    ])
+    console.log('userGroups: ', userGroupsData)
+    console.log('authorities: ', authoritiesData)
+    console.log('userData: ', userData)
+    return { userGroupsData, authoritiesData, userData: transformUserData(userData) }
   } catch (error) {
-    throw new Error('An error occurred while loading user groups data')
+    throw new Error('An error occurred while loading form data')
   }
 }
 
 const page = async (props: PageProps) => {
   const { params } = props
-  const isEditMode = params?.userId !== 'add'
 
-  const userDataResponse = await getUserData(params.userId)
-  const userData = userDataResponse
-    ? {
-        ...userDataResponse,
-        group: userDataResponse.group
-          ?  userDataResponse.group.id
-          : '',
-          authority: userDataResponse.authority ? userDataResponse.authority.id : '',
-          department: userDataResponse.authority ? userDataResponse.authority.department.id : '',
-
-      }
-    : null
-  const userGroupsData = await getUserGroupsData()
-  const authoritiesData = await getAuthorityData()
-  console.log('userGroupsData: ', userGroupsData)
-  console.log('userData: ', userData)
+  const {userData, authoritiesData, userGroupsData} = await getFormData(params.userId)
 
   const userGroups = userGroupsData?.map(group => ({ label: group.title, value: group.id }))
-  const user = userData ?? defaultFormUser
 
   return userData ? (
-    <UserForm userData={user} isEditMode={isEditMode} userGroups={userGroups} authorities={authoritiesData}/>
+    <UserForm userData={userData} isEditMode userGroups={userGroups} authorities={authoritiesData} />
   ) : (
     <div>User not found</div>
   )

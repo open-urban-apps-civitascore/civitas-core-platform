@@ -10,10 +10,15 @@ import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { TitleSchemaType } from '@/types/users'
 
-import { UserFormData, UserFormSchema } from '../../actions'
+import { UserFormData, UserFormSchema } from '../actions'
 import { AccessibleSelectProps, Select } from '@/components/form/text-field/Select'
-import { FormUser } from '../page'
-import { Category, UserAuthority } from '../../page'
+import { Category, UserAuthority, UserResponse } from '../page'
+
+export type FormUser = Omit<UserResponse, 'group' | 'authority' | 'department'> & {
+  group: string | null
+  authority: string
+  department: string
+}
 
 export type Authority = Category & {
   department: Category[]
@@ -22,12 +27,12 @@ export type Authority = Category & {
 interface UserFormProps {
   userData: FormUser
   userGroups: AccessibleSelectProps<FormUser>['options']
-  isEditMode: boolean
+  isEditMode?: boolean
   authorities: Authority[]
 }
 
 export const UserForm = (props: UserFormProps) => {
-  const { userData, userGroups, authorities, isEditMode } = props
+  const { userData, userGroups, authorities, isEditMode=false } = props
   const t = useTranslations('users')
   const [user, setUser] = useState<FormUser>(userData)
   console.log('USERDATA', userData)
