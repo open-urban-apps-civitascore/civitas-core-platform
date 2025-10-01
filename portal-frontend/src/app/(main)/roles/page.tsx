@@ -44,6 +44,7 @@ const RolesPage = () => {
   const totalPages = Math.ceil(rowCount / pageSize)
 
   const [selectedRoleType, setSelectedRoleType] = useState<string>(tabValue || DEFAULT_TAB)
+  const [selectedSubTab, setSelectedSubTab] = useState<string>(tabValue || 'roles')
 
   const getRoles = useCallback(async () => {
     const params = setApiRequestParams(totalPages)
@@ -90,6 +91,14 @@ const RolesPage = () => {
             setTabValueParam(type)
           },
           selectedTab: selectedRoleType,
+        }}
+        subTabs={{
+          tabs: [
+            { value: 'roles', label: t('roles') },
+            { value: 'roleSets', label: t('roleSets') },
+          ],
+          selectedTab: selectedSubTab,
+          onClick: newTab => setSelectedSubTab(newTab),
         }}
         customElement={
           <Button variant="secondary" onClick={() => router.push(`/roles/create/?_tab=${selectedRoleType}`)}>

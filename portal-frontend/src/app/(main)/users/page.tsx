@@ -14,6 +14,7 @@ import { TitleSchemaType } from '@/types/users'
 import UsersTable from './components/UsersTable'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
+import { Tab } from '@/components/page-header/components/TabsSections'
 
 export type Category = {
   id: string
@@ -75,6 +76,17 @@ const UsersPage = () => {
   const [listUsers, setListUsers] = useState<ListUser[]>([])
   const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [selectedTab, setSelectedTab] = useState('users')
+  const tabs: Tab[] = [
+    {
+      value: 'users',
+      label: t('tabs.users'),
+    },
+    {
+      value: 'userGroups',
+      label: t('tabs.groups'),
+    },
+  ]
 
   const {
     setSortingParams,
@@ -116,17 +128,21 @@ const UsersPage = () => {
     }
   }
 
-  const CustomElement = (
-    <Button variant="secondary">
-      <Plus />
-      {t('newUser')}
-    </Button>
-  )
-
   return (
     <div className="w-full h-full">
-      <PageHeader title={t('title')} customElement={CustomElement}/>
-      <SearchField searchString={search} onChangeSearchString={setSearchParam} />
+      <PageHeader
+        title={t('title')}
+        className="[--title-height:calc(--spacing(24))]"
+        tabs={{ tabs: tabs, selectedTab: selectedTab, onClick: newValue => setSelectedTab(newValue) }}
+        shouldShowDivider
+      />
+      <div className='flex justify-between items-center'>
+        <SearchField searchString={search} onChangeSearchString={setSearchParam} />
+        <Button variant="secondary">
+          <Plus />
+          {t('newUser')}
+        </Button>
+      </div>
       <TableContainer>
         <UsersTable
           users={listUsers}

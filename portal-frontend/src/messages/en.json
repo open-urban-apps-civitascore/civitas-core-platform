@@ -52,6 +52,10 @@
   },
   "users": {
     "title": "User",
+    "tabs": {
+      "users": "Users",
+      "groups": "Groups"
+    },
     "newUser": "New User",
     "searchUsers": "Filter...",
     "info": {
@@ -101,6 +105,8 @@
     "systemRoles": "System Roles",
     "dataRoles": "Data Roles",
     "governanceRoles": "Governance Roles",
+    "roles": "Individual Roles",
+    "roleSets": "Role Sets",
     "tableHeaders": {
       "name": "Name",
       "description": "Description",
