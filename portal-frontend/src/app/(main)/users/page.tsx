@@ -35,7 +35,7 @@ export type UserResponse = {
   authority: UserAuthority | null
   group: Category | null
   active: boolean
-  role: string
+  roles: string[]
 }
 
 export type ListUser = {
@@ -43,18 +43,18 @@ export type ListUser = {
   displayName: string
   authority: string
   department: string
-  role: string
+  roles: string[]
   email: string
   isactive: boolean
 }
 
-export const mapListUsers = (users: UserResponse[]): ListUser[] =>
+export const mapListUsers = (users: UserResponse[], rolesMap: Record<string, string>): ListUser[] =>
   users.map(user => ({
     id: user.id,
     displayName: user.displayName,
     authority: user.authority?.title ?? '',
     department: user.authority?.department.title ?? '',
-    role: user.role,
+    roles: user.roles.map(roleId => rolesMap[roleId]),
     email: user.email,
     isactive: user.active,
   }))
@@ -95,9 +95,22 @@ const UsersPage = () => {
     const params = setApiRequestParams(totalPages)
     const getUsers = async () => {
       try {
-        const usersResponse = await fetch(`${URL}/users?${params.toString()}`)
+        // Fetch both users and roles data
+        const [usersResponse, rolesResponse] = await Promise.all([
+          fetch(`${URL}/users?${params.toString()}`),
+          fetch(`${URL}/roles`)
+        ])
+        
         const usersData: UserResponse[] = await usersResponse.json()
-        const users = mapListUsers(usersData)
+        const rolesData = await rolesResponse.json()
+        
+        // Create roles lookup map
+        const rolesMap: Record<string, string> = {}
+        rolesData.forEach((role: any) => {
+          rolesMap[role.id] = role.name
+        })
+        
+        const users = mapListUsers(usersData, rolesMap)
         setListUsers(users)
         const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
         if (rowCount !== totalCount) {

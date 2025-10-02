@@ -6,6 +6,7 @@ import { Authority, FormUser, UserForm } from './UserForm'
 import { AccessibleSelectProps } from '@/components/form/text-field/Select'
 import { useTranslations } from 'next-intl'
 import { Tab } from '@/components/page-header/components/TabsSections'
+import { RolesTab } from './RolesTab'
 
 interface UserDetailsProps {
   userData: FormUser | null
@@ -53,6 +54,7 @@ export const UserDetails = (props: UserDetailsProps) => {
         ) : (
           <div>User not found</div>
         ))}
+      {selectedTab === 'roles' && userData && <RolesTab userId={userData.id} />}
     </div>
   )
 }

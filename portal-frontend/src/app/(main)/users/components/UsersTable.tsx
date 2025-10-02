@@ -54,9 +54,21 @@ const UsersTable = (props: UsersTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.department')} />,
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor('role', {
+    columnHelper.accessor('roles', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.role')} />,
-      cell: info => <Badge variant="secondary">{info.getValue()}</Badge>,
+      cell: info => {
+        const roles = info.getValue()
+        if (!roles || roles.length === 0) return '-'
+        return (
+          <div className="flex flex-wrap gap-1">
+            {roles.map((role, index) => (
+              <Badge key={`${role}-${index}`} variant="secondary">
+                {role}
+              </Badge>
+            ))}
+          </div>
+        )
+      },
     }),
     columnHelper.accessor('email', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.email')} />,

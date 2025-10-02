@@ -80,6 +80,20 @@
       "selectAuthority": "Select authority...",
       "selectDepartment": "Select department...",
       "selectGroup": "Select group..."
+    },
+    "rolesTab": {
+      "loading": "Loading...",
+      "userNotFound": "User not found",
+      "addRoleDialog": {
+        "title": "Add Role - {category}",
+        "description": "Select a role to add to the user from the available {category} roles.",
+        "addButton": "Add"
+      },
+      "categories": {
+        "systemRoles": "System Roles",
+        "dataRoles": "Data Roles", 
+        "governanceRoles": "Governance Roles"
+      }
     }
   },
   "pagination": {
