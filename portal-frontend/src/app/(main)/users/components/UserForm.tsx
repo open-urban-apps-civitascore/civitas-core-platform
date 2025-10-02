@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form'
 import { TextField } from '@/components/form/fields/TextField'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
-import { Category, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+import { Authority, Category, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
 
 import { Select } from '@/components/form/fields/Select'
 import { Switch } from '@/components/form/fields/Switch'
@@ -25,10 +25,6 @@ export type FormUser = Omit<UserResponse, 'authority' | 'department' | 'position
   department: string
   position: string
   positionDescription: string
-}
-
-export type Authority = Category & {
-  departments: Category[]
 }
 
 interface UserFormProps {

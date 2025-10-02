@@ -12,7 +12,7 @@ import { useQueryParams } from '@/hooks/useQueryParams'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Button } from '@/components/ui/button'
-import { TitleSchemaType, UserResponse } from '@/types/users'
+import { Authority, TitleSchemaType, UserResponse } from '@/types/users'
 import { Plus } from 'lucide-react'
 import UsersTable from './components/UsersTable'
 
@@ -26,16 +26,20 @@ export type ListUser = {
   isactive: boolean
 }
 
-export const mapListUsers = (users: UserResponse[]): ListUser[] =>
-  users.map(user => ({
-    id: user.id,
-    displayName: user.displayName,
-    authority: user.authority?.id ?? '',
-    department: user.authority?.department?.id ?? '',
-    role: user.role || '',
-    email: user.email,
-    isactive: user.active,
-  }))
+export const mapListUsers = (users: UserResponse[], authorities: Authority[]): ListUser[] =>
+  users.map(user => {
+    const authority = authorities.find(authority => user.authority?.id === authority.id)
+    const department = authority?.departments.find(department => department.id === user.authority?.department?.id)
+    return {
+      id: user.id,
+      displayName: user.displayName,
+      authority: authority?.title ?? '',
+      department: department?.title ?? '',
+      role: user.role || '',
+      email: user.email,
+      isactive: user.active,
+    }
+  })
 
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {
@@ -80,23 +84,42 @@ const UsersPage = () => {
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-  useEffect(() => {
+  const getUserListData = async () => {
     const params = setApiRequestParams(totalPages)
-    const getUsers = async () => {
-      try {
-        const usersResponse = await fetch(`${URL}/users?${params.toString()}`)
-        const usersData: UserResponse[] = await usersResponse.json()
-        const users = mapListUsers(usersData)
-        setListUsers(users)
-        const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
-        if (rowCount !== totalCount) {
-          setRowCount(totalCount)
-        }
-      } catch (error) {
-        console.error(error)
+
+    try {
+      const [usersResponse, authoritiesResponse] = await Promise.all([
+        fetch(`${URL}/users?${params.toString()}`, {
+          cache: 'no-store',
+        }),
+        fetch(`${URL}/authorities`, {
+          cache: 'no-store',
+        }),
+      ])
+      if (!authoritiesResponse || !usersResponse) {
+        throw new Error('An error occurred while loading form data')
       }
+
+      const [usersData, authoritiesData]: [UserResponse[], Authority[]] = await Promise.all([
+        usersResponse.json(),
+        authoritiesResponse.json(),
+      ])
+
+      const users = mapListUsers(usersData, authoritiesData)
+      setListUsers(users)
+
+      const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
+      if (rowCount !== totalCount) {
+        setRowCount(totalCount)
+      }
+    } catch (error) {
+      console.error(error)
+      throw new Error('An error occurred while loading form data')
     }
-    getUsers()
+  }
+
+  useEffect(() => {
+    getUserListData()
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
 
   const handleRowClick = (row: Row<ListUser>) => {
