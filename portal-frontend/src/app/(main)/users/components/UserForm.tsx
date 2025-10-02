@@ -13,6 +13,7 @@ import { Category, UserFormData, UserFormSchema, UserResponse } from '@/types/us
 import { Select } from '@/components/form/fields/Select'
 import { Switch } from '@/components/form/fields/Switch'
 import { TextArea } from '@/components/form/fields/TextArea'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { mapApiUserData } from '@/utils/users'
 import { useRouter } from 'next/navigation'
 import { createUser, updateUser } from '../actions'
@@ -40,6 +41,7 @@ export const UserForm = (props: UserFormProps) => {
   const router = useRouter()
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
+  const isMobile = useIsMobile()
 
   const [authorities, setAuthorities] = useState<Authority[]>([])
 
@@ -94,7 +96,6 @@ export const UserForm = (props: UserFormProps) => {
     return departments
   }, [watchAuthority, authorities])
 
-
   const handleCreateUser = (userData: UserFormData) => {
     const mappedData = mapApiUserData(userData)
     const { id, ...createUserData } = mappedData
@@ -114,9 +115,9 @@ export const UserForm = (props: UserFormProps) => {
   return (
     <Form {...form}>
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-2 gap-4 space-y-8 mb-4 max-w-3xl">
+        <div className={`grid gap-4 space-y-8 mb-4 max-w-3xl ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
           <TextField form={form} label={t('info.id')} name="id" placeholder={t('info.id')} disabled />
-          <div className='flex w-full justify-between'>
+          <div className="flex w-full justify-between">
             <Select
               id="title-select"
               label={t('info.title.title')}
@@ -155,14 +156,15 @@ export const UserForm = (props: UserFormProps) => {
             name="department"
           />
           <TextField form={form} label={t('info.position')} name="position" placeholder={t('info.position')} />
-          <TextArea
-            form={form}
-            label={t('info.description')}
-            name="positionDescription"
-            placeholder={t('info.description')}
-          />
         </div>
-        <div className="w-full flex gap-2 justify-end">
+        <TextArea
+          className="max-w-lg my-12"
+          form={form}
+          label={t('info.description')}
+          name="positionDescription"
+          placeholder={t('info.description')}
+        />
+        <div className="w-full flex gap-4 justify-end">
           <Button type="reset" variant="secondary" onClick={() => router.back()}>
             {tCommon('actions.cancel')}
           </Button>

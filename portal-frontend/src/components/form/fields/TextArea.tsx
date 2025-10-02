@@ -11,14 +11,14 @@ interface TextAreaProps<T extends FieldValues> extends Omit<InputHTMLAttributes<
 }
 
 export const TextArea = <T extends FieldValues>(props: TextAreaProps<T>) => {
-      const { form, name, placeholder, label } = props
+      const { form, name, placeholder, label, className } = props
 
   return (
      <FormField
       control={form.control}
       name={name}
       render={({ field }) => (
-        <FormItem>
+        <FormItem className={className}>
           <FormLabel>{label}</FormLabel>
           <FormControl>
             <Textarea placeholder={placeholder} {...field} />
