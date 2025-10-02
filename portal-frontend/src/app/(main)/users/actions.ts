@@ -20,18 +20,14 @@ export const createUser = async (userData: CreateUserData) => {
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`)
     }
-
-    //   form.reset()
-
-    //   setTabValueParam(tabValue || DEFAULT_TAB)
-    //   router.push(`/roles?_tab=${tabValue || DEFAULT_TAB}`)
+    const data = await response.json()
+    console.log('successfully created user:', data)
   } catch (error) {
     console.error('Fehler:', error)
   }
 }
 
 export const updateUser = async (updateUserData: UpdateUserData) => {
-  console.log(updateUserData.id)
   try {
     const response = await fetch(`${URL}/users/${updateUserData.id}`, {
       method: 'PUT',
@@ -47,7 +43,7 @@ export const updateUser = async (updateUserData: UpdateUserData) => {
     }
 
     const data = await response.json()
-    console.log('Erfolgreich aktualisiert:', data)
+    console.log('successfully updated user:', data)
   } catch (error) {
     console.error('Fehler:', error)
   }

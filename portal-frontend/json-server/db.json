@@ -3011,22 +3011,23 @@
     {
       "id": "2",
       "firstName": "Markus",
-      "lastName": "Schmidt",
-      "displayName": "Markus Schmidt",
-      "email": "markus.schmidt@test.com",
-      "phone": "+49 164 6822941",
       "title": "male",
+      "lastName": "Schmidt",
+      "email": "markus.schmidt@test.com",
       "authority": {
-        "id": "5",
+        "id": "9",
         "department": {
           "id": "2"
         }
       },
+      "department": "2",
       "group": "1",
-      "role": "systemdev",
+      "phone": "+49 164 6822941",
       "active": false,
       "position": "Biotopschutz-Spezialist",
-      "positionDescription": ""
+      "positionDescription": "Biotopschutz-Spezialist",
+      "role": "systemdev",
+      "displayName": "Markus Schmidt"
     },
     {
       "id": "3",
@@ -5035,27 +5036,27 @@
   "authorities": [
     {
       "id": "1",
-      "title": "Abfallwirtschaftsamt",
+      "title": "Gesundheitsamt",
       "departments": [
         {
           "id": "1",
-          "title": "Restmüllentsorgung"
+          "title": "Infektionsschutz"
         },
         {
           "id": "2",
-          "title": "Biomüll und Kompostierung"
+          "title": "Epidemiologie"
         },
         {
           "id": "3",
-          "title": "Recyclinghöfe"
+          "title": "Hygieneüberwachung"
         },
         {
           "id": "4",
-          "title": "Sondermüll"
+          "title": "Umweltbezogener Gesundheitsschutz"
         },
         {
           "id": "5",
-          "title": "Abfallvermeidung und Aufklärung"
+          "title": "Gesundheitsprävention & Aufklärung"
         }
       ]
     },
