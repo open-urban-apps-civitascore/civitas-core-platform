@@ -8,10 +8,13 @@ import { useForm } from 'react-hook-form'
 import { TextField } from '@/components/form/fields/TextField'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
-import { Category, UpdateUserData, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+import { Category, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
 
 import { Select } from '@/components/form/fields/Select'
+import { Switch } from '@/components/form/fields/Switch'
 import { TextArea } from '@/components/form/fields/TextArea'
+import { mapApiUserData } from '@/utils/users'
+import { useRouter } from 'next/navigation'
 import { createUser, updateUser } from '../actions'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
@@ -34,11 +37,13 @@ interface UserFormProps {
 
 export const UserForm = (props: UserFormProps) => {
   const { userData, isEditMode = false } = props
+  const router = useRouter()
   const t = useTranslations('users')
+  const tCommon = useTranslations('common')
 
   const [authorities, setAuthorities] = useState<Authority[]>([])
 
-  const getFormData = async () => {
+  const getAuthoritiesData = async () => {
     try {
       const authoritiesResponse = await fetch(`${URL}/authorities`, {
         cache: 'no-store',
@@ -56,7 +61,7 @@ export const UserForm = (props: UserFormProps) => {
   }
 
   useEffect(() => {
-    getFormData()
+    getAuthoritiesData()
   }, [])
 
   const titleOptions = [
@@ -77,8 +82,6 @@ export const UserForm = (props: UserFormProps) => {
     },
   })
 
-  console.log(form.getValues())
-
   const watchAuthority = form.watch('authority')
 
   const departmentOptions = useMemo(() => {
@@ -91,35 +94,19 @@ export const UserForm = (props: UserFormProps) => {
     return departments
   }, [watchAuthority, authorities])
 
-  const mapApiUserData = (formData: UserFormData) => {
-    const parsed = UserFormSchema.parse(formData)
-
-    const userData = {
-      ...parsed,
-      group: parsed.group ?? null,
-      authority: parsed.authority
-        ? { id: parsed.authority, department: parsed.department ? { id: parsed.department ?? null } : null }
-        : null,
-      position: parsed.position ?? null,
-      positionDescription: parsed.position ?? null,
-      displayName: `${parsed.firstName} ${parsed.lastName}`,
-    }
-    return userData
-  }
 
   const handleCreateUser = (userData: UserFormData) => {
-    console.log('handleCreateUser: ', userData)
     const mappedData = mapApiUserData(userData)
     const { id, ...createUserData } = mappedData
     createUser(createUserData)
     form.reset()
+    router.push('/users')
   }
 
-
   const handleUpdateUser = (userData: UserFormData) => {
-    console.log('handleUpdateUser: ', userData)
     const updateUserData = mapApiUserData(userData)
     updateUser(updateUserData)
+    router.push('/users')
   }
 
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
@@ -127,7 +114,7 @@ export const UserForm = (props: UserFormProps) => {
   return (
     <Form {...form}>
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-2 gap-4 space-y-8 mb-4">
+        <div className="grid grid-cols-2 gap-4 space-y-8 mb-4 max-w-3xl">
           <TextField form={form} label={t('info.id')} name="id" placeholder={t('info.id')} disabled />
           <div className='flex w-full justify-between'>
             <Select
@@ -175,8 +162,11 @@ export const UserForm = (props: UserFormProps) => {
             placeholder={t('info.description')}
           />
         </div>
-        <div>
-          <Button type="submit">Submit</Button>
+        <div className="w-full flex gap-2 justify-end">
+          <Button type="reset" variant="secondary" onClick={() => router.back()}>
+            {tCommon('actions.cancel')}
+          </Button>
+          <Button type="submit">{tCommon('actions.submit')}</Button>
         </div>
       </form>
     </Form>

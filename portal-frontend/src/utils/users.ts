@@ -11,18 +11,19 @@ export const mapApiUserData = (formData: UserFormData) => {
       ? { id: parsed.authority, department: parsed.department ? { id: parsed.department ?? null } : null }
       : null,
     position: parsed.position ?? null,
-    positionDescription: parsed.positionDescription ?? null,
+    positionDescription: parsed.position ?? null,
     displayName: `${parsed.firstName} ${parsed.lastName}`,
   }
   return userData
 }
 
-
-
-export const mapFormUserData = (userResponse: UserResponse | null): FormUser | null => 
-  userResponse ? {...userResponse,
-  authority: userResponse.authority?.id ?? '',
-  department: userResponse.authority?.department?.id ?? '',
-  position: userResponse.position ?? '',
-  positionDescription: userResponse.positionDescription ?? '',
-} : null
+export const mapFormUserData = (userResponse: UserResponse | null): FormUser | null =>
+  userResponse
+    ? {
+        ...userResponse,
+        authority: userResponse.authority?.id ?? '',
+        department: userResponse.authority?.department?.id ?? '',
+        position: userResponse.position ?? '',
+        positionDescription: userResponse.positionDescription ?? '',
+      }
+    : null
