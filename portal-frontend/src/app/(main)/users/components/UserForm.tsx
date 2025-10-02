@@ -1,16 +1,19 @@
 'use client'
 
+import { parsePhoneNumberFromString } from 'libphonenumber-js'
+import z from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { TextField } from '@/components/form/text-field/TextField'
+import { TextField } from '@/components/form/fields/TextField'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { TitleSchema, UserFormData, UserFormSchema } from '@/types/users'
 
-import { AccessibleSelectProps, Select } from '@/components/form/text-field/Select'
-import { UserFormData, UserFormSchema } from '../actions'
+import { AccessibleSelectProps, Select } from '@/components/form/fields/Select'
+import { TextArea } from '@/components/form/fields/TextArea'
 import { Category, UserResponse } from '../page'
 
 export type FormUser = Omit<UserResponse, 'group' | 'authority' | 'department'> & {
@@ -33,9 +36,6 @@ interface UserFormProps {
 export const UserForm = (props: UserFormProps) => {
   const { userData, userGroups, authorities, isEditMode = false } = props
   const t = useTranslations('users')
-  const [user, setUser] = useState<FormUser>(userData)
-  console.log('USERDATA', userData)
-  console.log('userGroups', userGroups)
 
   const titleOptions = [
     {
@@ -51,7 +51,7 @@ export const UserForm = (props: UserFormProps) => {
   const form = useForm<UserFormData>({
     resolver: zodResolver(UserFormSchema),
     defaultValues: {
-      ...user,
+      ...userData,
     },
   })
 
@@ -69,8 +69,8 @@ export const UserForm = (props: UserFormProps) => {
     return departments
   }, [watchAuthority])
 
-  const onSubmit = (values: UserFormData) => {
-    console.log(form)
+  const onSubmit = (data: UserFormData) => {
+    console.log(data)
   }
 
   return (
@@ -95,6 +95,8 @@ export const UserForm = (props: UserFormProps) => {
             required
           />
           <TextField form={form} label={t('info.lastName')} name="lastName" placeholder={t('info.lastName')} required />
+          <TextField form={form} label={t('info.email')} name="email" placeholder={t('info.email')} required />
+          <TextField form={form} label={t('info.phone')} name="phone" placeholder={t('info.phone')} />
           <Select
             id="authority-select"
             label={t('info.authority')}
@@ -119,8 +121,13 @@ export const UserForm = (props: UserFormProps) => {
             form={form}
             name="group"
           />
-          <TextField form={form} label={t('info.email')} name="email" placeholder={t('info.lastName')} required />
-          <TextField form={form} label={t('info.phone')} name="phone" placeholder={t('info.phone')} />
+          <TextField form={form} label={t('info.position')} name="position" placeholder={t('info.position')} />
+          <TextArea
+            form={form}
+            label={t('info.description')}
+            name="positionDescription"
+            placeholder={t('info.description')}
+          />
         </div>
         <div>
           <Button type="submit">Submit</Button>

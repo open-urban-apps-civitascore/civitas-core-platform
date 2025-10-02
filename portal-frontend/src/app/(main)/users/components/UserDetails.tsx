@@ -3,7 +3,7 @@
 import { PageHeader } from '@/components/page-header/PageHeader'
 import React, { useState } from 'react'
 import { Authority, FormUser, UserForm } from './UserForm'
-import { AccessibleSelectProps } from '@/components/form/text-field/Select'
+import { AccessibleSelectProps } from '@/components/form/fields/Select'
 import { useTranslations } from 'next-intl'
 import { Tab } from '@/components/page-header/components/TabsSections'
 

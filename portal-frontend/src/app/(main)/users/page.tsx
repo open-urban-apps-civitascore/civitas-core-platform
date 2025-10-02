@@ -15,6 +15,7 @@ import UsersTable from './components/UsersTable'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { Tab } from '@/components/page-header/components/TabsSections'
+import { E164Number } from 'libphonenumber-js'
 
 export type Category = {
   id: string
@@ -37,6 +38,8 @@ export type UserResponse = {
   group: Category | null
   active: boolean
   role: string
+  position: string;
+  positionDescription: string;
 }
 
 export type ListUser = {

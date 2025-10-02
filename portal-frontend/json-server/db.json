@@ -2808,7 +2808,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Bauingenieur für Kanalisationsbau",
+      "positionDescription": ""
     },
     {
       "id": "2",
@@ -2831,7 +2833,9 @@
         "title": "Admin"
       },
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Biotopschutz-Spezialist",
+      "positionDescription": ""
     },
     {
       "id": "3",
@@ -2854,7 +2858,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Straßenplaner",
+      "positionDescription": ""
     },
     {
       "id": "4",
@@ -2877,7 +2883,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Luftfahrtprüfer",
+      "positionDescription": ""
     },
     {
       "id": "5",
@@ -2900,7 +2908,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Flugsicherheitsbeauftragter",
+      "positionDescription": ""
     },
     {
       "id": "6",
@@ -2923,7 +2933,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Sachbearbeiter Fahrerlaubnisse",
+      "positionDescription": ""
     },
     {
       "id": "7",
@@ -2946,7 +2958,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Schleusenwärter",
+      "positionDescription": ""
     },
     {
       "id": "8",
@@ -2969,7 +2983,9 @@
         "title": "Admin"
       },
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Fahrzeugtechniker",
+      "positionDescription": ""
     },
     {
       "id": "9",
@@ -2992,7 +3008,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Bodenschutzexperte",
+      "positionDescription": ""
     },
     {
       "id": "10",
@@ -3015,7 +3033,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Bauprüfer",
+      "positionDescription": ""
     },
     {
       "id": "11",
@@ -3038,7 +3058,9 @@
         "title": "Leitung"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Leiter Recyclinghof",
+      "positionDescription": ""
     },
     {
       "id": "12",
@@ -3061,7 +3083,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Wasserqualitätsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "13",
@@ -3084,7 +3108,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Ingenieur Leitungsbau",
+      "positionDescription": ""
     },
     {
       "id": "14",
@@ -3107,7 +3133,9 @@
         "title": "Admin"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Ingenieur Leitungsbau",
+      "positionDescription": ""
     },
     {
       "id": "15",
@@ -3130,7 +3158,9 @@
         "title": "Leitung"
       },
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Forstingenieur",
+      "positionDescription": ""
     },
     {
       "id": "16",
@@ -3153,7 +3183,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Denkmalschutzexperte",
+      "positionDescription": ""
     },
     {
       "id": "17",
@@ -3176,7 +3208,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Klimaschutzkoordinator",
+      "positionDescription": ""
     },
     {
       "id": "18",
@@ -3199,7 +3233,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Klimaschutzkoordinator",
+      "positionDescription": ""
     },
     {
       "id": "19",
@@ -3222,7 +3258,9 @@
         "title": "Support"
       },
       "role": "standarduser",
-      "active": true
+      "active": true,
+      "position": "Kfz-Zulassungsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "20",
@@ -3245,7 +3283,9 @@
         "title": "Leitung"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Artenschutzbeauftragter",
+      "positionDescription": ""
     },
     {
       "id": "21",
@@ -3268,7 +3308,9 @@
         "title": "Support"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Techniker Straßenbeleuchtung",
+      "positionDescription": ""
     },
     {
       "id": "22",
@@ -3291,7 +3333,9 @@
         "title": "Admin"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Mitarbeiter Grundwasserbau",
+      "positionDescription": ""
     },
     {
       "id": "23",
@@ -3314,7 +3358,9 @@
         "title": "Admin"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Wasserqualitätsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "24",
@@ -3337,7 +3383,9 @@
         "title": "Support"
       },
       "role": "standarduser",
-      "active": true
+      "active": true,
+      "position": "Friedhofsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "25",
@@ -3360,7 +3408,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Mitarbeiter Restmüllentsorgung",
+      "positionDescription": ""
     },
     {
       "id": "26",
@@ -3383,7 +3433,9 @@
         "title": "Leitung"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Landschaftsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "27",
@@ -3406,7 +3458,9 @@
         "title": "Support"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Biotopschutz-Spezialist",
+      "positionDescription": ""
     },
     {
       "id": "28",
@@ -3429,7 +3483,9 @@
         "title": "Admin"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Abfallberater",
+      "positionDescription": ""
     },
     {
       "id": "29",
@@ -3452,7 +3508,9 @@
         "title": "Leitung"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Techniker Straßenbeleuchtung",
+      "positionDescription": ""
     },
     {
       "id": "30",
@@ -3475,7 +3533,9 @@
         "title": "Support"
       },
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Spielplatzwart",
+      "positionDescription": ""
     },
     {
       "id": "31",
@@ -3498,7 +3558,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Mitarbeiter Grundwasserbau",
+      "positionDescription": ""
     },
     {
       "id": "32",
@@ -3521,7 +3583,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Baumpfleger",
+      "positionDescription": ""
     },
     {
       "id": "33",
@@ -3544,7 +3608,9 @@
         "title": "Leitung"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Straßenplaner",
+      "positionDescription": ""
     },
     {
       "id": "34",
@@ -3567,7 +3633,9 @@
         "title": "Support"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Friedhofsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "35",
@@ -3590,7 +3658,9 @@
         "title": "Admin"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Landschaftsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "36",
@@ -3613,7 +3683,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Landschaftsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "37",
@@ -3636,7 +3708,9 @@
         "title": "Support"
       },
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Friedhofsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "38",
@@ -3659,7 +3733,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Hafeninspektor",
+      "positionDescription": ""
     },
     {
       "id": "39",
@@ -3682,7 +3758,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Biotopschutz-Spezialist",
+      "positionDescription": ""
     },
     {
       "id": "40",
@@ -3705,7 +3783,9 @@
         "title": "Support"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Friedhofsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "41",
@@ -3728,7 +3808,9 @@
         "title": "Support"
       },
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Luftreinhalteexperte",
+      "positionDescription": ""
     },
     {
       "id": "42",
@@ -3751,7 +3833,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Flughafeninspektor",
+      "positionDescription": ""
     },
     {
       "id": "43",
@@ -3774,7 +3858,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Sachbearbeiter Bußgelder",
+      "positionDescription": ""
     },
     {
       "id": "44",
@@ -3797,7 +3883,9 @@
         "title": "Support"
       },
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Forstingenieur",
+      "positionDescription": ""
     },
     {
       "id": "45",
@@ -3820,7 +3908,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Experte für Biomüll",
+      "positionDescription": ""
     },
     {
       "id": "46",
@@ -3843,7 +3933,9 @@
         "title": "Leitung"
       },
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Ingenieur Leitungsbau",
+      "positionDescription": ""
     },
     {
       "id": "47",
@@ -3866,7 +3958,9 @@
         "title": "Support"
       },
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Flughafeninspektor",
+      "positionDescription": ""
     },
     {
       "id": "48",
@@ -3889,7 +3983,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Forstingenieur",
+      "positionDescription": ""
     },
     {
       "id": "49",
@@ -3912,7 +4008,9 @@
         "title": "Admin"
       },
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Techniker Straßenbeleuchtung",
+      "positionDescription": ""
     },
     {
       "id": "50",
@@ -3935,7 +4033,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Lärmschutzbeauftragter",
+      "positionDescription": ""
     },
     {
       "id": "51",
@@ -3958,7 +4058,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Brückenbauingenieur",
+      "positionDescription": ""
     },
     {
       "id": "52",
@@ -3981,7 +4083,9 @@
         "title": "Support"
       },
       "role": "standarduser",
-      "active": true
+      "active": true,
+      "position": "Ingenieur Leitungsbau",
+      "positionDescription": ""
     },
     {
       "id": "53",
@@ -4004,7 +4108,9 @@
         "title": "Support"
       },
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Lärmschutzbeauftragter",
+      "positionDescription": ""
     },
     {
       "id": "54",
@@ -4027,7 +4133,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Biotopschutz-Spezialist",
+      "positionDescription": ""
     },
     {
       "id": "55",
@@ -4050,7 +4158,9 @@
         "title": "Support"
       },
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Wasserwirtschaftsingenieur",
+      "positionDescription": ""
     },
     {
       "id": "56",
@@ -4073,7 +4183,9 @@
         "title": "Support"
       },
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Ingenieur Leitungsbau",
+      "positionDescription": ""
     },
     {
       "id": "57",
@@ -4096,7 +4208,9 @@
         "title": "Support"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Mitarbeiter Restmüllentsorgung",
+      "positionDescription": ""
     },
     {
       "id": "58",
@@ -4119,7 +4233,9 @@
         "title": "Admin"
       },
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Brückenbauingenieur",
+      "positionDescription": ""
     },
     {
       "id": "59",
@@ -4142,7 +4258,9 @@
         "title": "Leitung"
       },
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Verkehrsüberwacher",
+      "positionDescription": ""
     },
     {
       "id": "60",
@@ -4165,7 +4283,9 @@
         "title": "Admin"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Binnenschifffahrtsinspektor",
+      "positionDescription": ""
     },
     {
       "id": "61",
@@ -4188,7 +4308,9 @@
         "title": "Admin"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Landschaftsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "62",
@@ -4211,7 +4333,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "standarduser",
-      "active": true
+      "active": true,
+      "position": "Friedhofsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "63",
@@ -4234,7 +4358,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Küstenschutztechniker",
+      "positionDescription": ""
     },
     {
       "id": "64",
@@ -4257,7 +4383,9 @@
         "title": "Admin"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Sachbearbeiter Bußgelder",
+      "positionDescription": ""
     },
     {
       "id": "65",
@@ -4280,7 +4408,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Klimaschutzkoordinator",
+      "positionDescription": ""
     },
     {
       "id": "66",
@@ -4303,7 +4433,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Luftreinhalteexperte",
+      "positionDescription": ""
     },
     {
       "id": "67",
@@ -4326,7 +4458,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Bauprüfer",
+      "positionDescription": ""
     },
     {
       "id": "68",
@@ -4349,7 +4483,9 @@
         "title": "Support"
       },
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Binnenschifffahrtsinspektor",
+      "positionDescription": ""
     },
     {
       "id": "69",
@@ -4372,7 +4508,9 @@
         "title": "Support"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Kfz-Zulassungsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "70",
@@ -4395,7 +4533,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Luftfahrtprüfer",
+      "positionDescription": ""
     },
     {
       "id": "71",
@@ -4418,7 +4558,9 @@
         "title": "Leitung"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Wasserwirtschaftsingenieur",
+      "positionDescription": ""
     },
     {
       "id": "72",
@@ -4441,7 +4583,9 @@
         "title": "Support"
       },
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Techniker Straßenbeleuchtung",
+      "positionDescription": ""
     },
     {
       "id": "73",
@@ -4464,7 +4608,9 @@
         "title": "Admin"
       },
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Bauprüfer",
+      "positionDescription": ""
     },
     {
       "id": "74",
@@ -4487,7 +4633,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Kfz-Zulassungsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "75",
@@ -4510,7 +4658,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Leiter Recyclinghof",
+      "positionDescription": ""
     },
     {
       "id": "76",
@@ -4533,7 +4683,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Fahrzeugtechniker",
+      "positionDescription": ""
     },
     {
       "id": "77",
@@ -4556,7 +4708,9 @@
         "title": "Admin"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Straßenplaner",
+      "positionDescription": ""
     },
     {
       "id": "78",
@@ -4579,7 +4733,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Ingenieur Tunnelbau",
+      "positionDescription": ""
     },
     {
       "id": "79",
@@ -4602,7 +4758,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Mitarbeiter Restmüllentsorgung",
+      "positionDescription": ""
     },
     {
       "id": "80",
@@ -4625,7 +4783,9 @@
         "title": "Leitung"
       },
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Experte für Sondermüll",
+      "positionDescription": ""
     },
     {
       "id": "81",
@@ -4648,7 +4808,9 @@
         "title": "Admin"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Brückenbauingenieur",
+      "positionDescription": ""
     },
     {
       "id": "82",
@@ -4671,7 +4833,9 @@
         "title": "Admin"
       },
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Kfz-Zulassungsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "83",
@@ -4694,7 +4858,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Leiter Recyclinghof",
+      "positionDescription": ""
     },
     {
       "id": "84",
@@ -4717,7 +4883,9 @@
         "title": "Support"
       },
       "role": "standarduser",
-      "active": true
+      "active": true,
+      "position": "Straßenunterhaltungsarbeiter",
+      "positionDescription": ""
     },
     {
       "id": "85",
@@ -4740,7 +4908,9 @@
         "title": "Leitung"
       },
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Luftreinhalteexperte",
+      "positionDescription": ""
     },
     {
       "id": "86",
@@ -4763,7 +4933,9 @@
         "title": "Admin"
       },
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Techniker Straßenbeleuchtung",
+      "positionDescription": ""
     },
     {
       "id": "87",
@@ -4786,7 +4958,9 @@
         "title": "Technischer Mitarbeiter"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Sachbearbeiter Bußgelder",
+      "positionDescription": ""
     },
     {
       "id": "88",
@@ -4809,7 +4983,9 @@
         "title": "Support"
       },
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Ingenieur Tunnelbau",
+      "positionDescription": ""
     },
     {
       "id": "89",
@@ -4832,7 +5008,9 @@
         "title": "Admin"
       },
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Mitarbeiter Restmüllentsorgung",
+      "positionDescription": ""
     },
     {
       "id": "90",
@@ -4855,7 +5033,9 @@
         "title": "Admin"
       },
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Flugraumüberwacher",
+      "positionDescription": ""
     },
     {
       "id": "91",
@@ -4878,7 +5058,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Parkanlagenpfleger",
+      "positionDescription": ""
     },
     {
       "id": "92",
@@ -4901,7 +5083,9 @@
         "title": "Support"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Parkanlagenpfleger",
+      "positionDescription": ""
     },
     {
       "id": "93",
@@ -4924,7 +5108,9 @@
         "title": "Admin"
       },
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Umweltpädagoge",
+      "positionDescription": ""
     },
     {
       "id": "94",
@@ -4947,7 +5133,9 @@
         "title": "Support"
       },
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Landschaftsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "95",
@@ -4970,7 +5158,9 @@
         "title": "Admin"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Parkanlagenpfleger",
+      "positionDescription": ""
     },
     {
       "id": "96",
@@ -4993,7 +5183,9 @@
         "title": "Support"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Luftfahrtprüfer",
+      "positionDescription": ""
     },
     {
       "id": "97",
@@ -5016,7 +5208,9 @@
         "title": "Admin"
       },
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Lärmschutzbeauftragter",
+      "positionDescription": ""
     },
     {
       "id": "98",
@@ -5039,7 +5233,9 @@
         "title": "Sachbearbeiter"
       },
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Luftreinhalteexperte",
+      "positionDescription": ""
     },
     {
       "id": "99",
@@ -5062,7 +5258,9 @@
         "title": "Admin"
       },
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Energieberater",
+      "positionDescription": ""
     },
     {
       "id": "100",
@@ -5085,7 +5283,9 @@
         "title": "Admin"
       },
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Parkanlagenpfleger",
+      "positionDescription": ""
     }
   ],
   "userGroups": [

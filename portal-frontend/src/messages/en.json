@@ -7,6 +7,13 @@
       "submit": "Save",
       "cancel": "Cancel",
       "delete": "Delete"
+    },
+    "errors": {
+      "invalidPhone": "Invalid phone number",
+      "invalidEmail": "Invalid E-mail address",
+      "required": "This field is required",
+      "atLeast2": "The input must be at least 2 characters.",
+      "atLeast10": "The input must be at least 10 characters."
     }
   },
   "languages": {
@@ -70,7 +77,9 @@
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
-      "active": "Active"
+      "active": "Active",
+      "position": "Position",
+      "description": "Activity Description"
     },
     "detailsTabs": {
       "userData": "User Data",

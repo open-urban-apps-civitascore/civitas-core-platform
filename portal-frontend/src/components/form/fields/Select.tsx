@@ -25,6 +25,7 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
     <Controller
       control={form.control}
       name={name}
+      rules={{ required: required ? `${label} ist erforderlich` : false }}
       render={({ field }) => (
         <div>
           <label htmlFor={id} className="text-sm font-medium text-gray-700 dark:text-gray-200">

@@ -7,6 +7,13 @@
       "submit": "Speichern",
       "cancel": "Abbrechen",
       "delete": "Löschen"
+    },
+    "errors": {
+      "invalidPhone": "Ungültige Telefonnummer",
+      "invalidEmail": "Ungültige E-Mail Adresse",
+      "required": "Dieses Feld ist erforderlich",
+      "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
+      "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein."
     }
   },
   "languages": {
@@ -70,7 +77,9 @@
       "phone": "Telefonnummer",
       "email": "E-Mail",
       "group": "Gruppe",
-      "active": "Aktiv"
+      "active": "Aktiv",
+      "position": "Position",
+      "description": "Tätigkeitsbeschreibung"
     },
     "detailsTabs": {
       "userData": "Benutzerdaten",
