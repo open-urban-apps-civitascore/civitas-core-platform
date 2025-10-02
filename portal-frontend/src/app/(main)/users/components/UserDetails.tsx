@@ -1,21 +1,18 @@
 'use client'
 
-import { PageHeader } from '@/components/page-header/PageHeader'
-import React, { useState } from 'react'
-import { Authority, FormUser, UserForm } from './UserForm'
-import { AccessibleSelectProps } from '@/components/form/fields/Select'
-import { useTranslations } from 'next-intl'
 import { Tab } from '@/components/page-header/components/TabsSections'
+import { PageHeader } from '@/components/page-header/PageHeader'
+import { useTranslations } from 'next-intl'
+import { useState } from 'react'
+import { FormUser, UserForm } from './UserForm'
 
 interface UserDetailsProps {
   userData: FormUser | null
-  userGroups: AccessibleSelectProps<FormUser>['options']
   isEditMode?: boolean
-  authorities: Authority[]
 }
 
 export const UserDetails = (props: UserDetailsProps) => {
-  const { userData, userGroups, authorities, isEditMode = false } = props
+  const { userData, isEditMode = false } = props
   const t = useTranslations('users')
   const tabs: Tab[] = [
     {
@@ -48,11 +45,7 @@ export const UserDetails = (props: UserDetailsProps) => {
         subTabs={{ tabs: tabs, selectedTab, onClick: newTab => setSelectedTab(newTab) }}
       />
       {selectedTab === 'userData' &&
-        (userData ? (
-          <UserForm userData={userData} isEditMode userGroups={userGroups} authorities={authorities} />
-        ) : (
-          <div>User not found</div>
-        ))}
+        (userData ? <UserForm userData={userData} isEditMode={isEditMode} /> : <div>User not found</div>)}
     </div>
   )
 }

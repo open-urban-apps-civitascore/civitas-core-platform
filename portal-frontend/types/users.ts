@@ -1,6 +1,39 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { z } from 'zod'
 
+export type Category = {
+  id: string
+  title: string
+}
+
+export type UserGroup = Category
+
+export type UserAuthority = {
+  id: string
+  department: {
+    id: string
+  } | null
+} | null
+
+export type UserResponse = {
+  id: string
+  firstName: string
+  lastName: string
+  displayName: string
+  email: string
+  phone: string
+  title: TitleSchemaType
+  authority: UserAuthority | null
+  group: string | null
+  active: boolean
+  role: string | null
+  position: string | null
+  positionDescription: string | null
+}
+
+export type UpdateUserData = UserResponse
+export type CreateUserData = Omit<UpdateUserData, 'id'>
+
 export const TitleSchema = z.enum(['male', 'female'])
 
 export type TitleSchemaType = z.infer<typeof TitleSchema>
@@ -17,7 +50,7 @@ export const PhoneSchema = z.string().superRefine((value, ctx) => {
 })
 
 export const UserFormSchema = z.object({
-  id: z.string().optional(),
+  id: z.string(),
   firstName: z.string().min(2, {
     message: 'common.errors.atLeast2',
   }),
@@ -29,13 +62,20 @@ export const UserFormSchema = z.object({
   email: z.email({
     message: 'common.errors.invalidEmail',
   }),
-  authority: z.string().optional(),
-  department: z.string().optional(),
+  authority: z.string().nullable(),
+  department: z.string().nullable(),
   group: z.string().nullable(),
   phone: PhoneSchema,
   active: z.boolean(),
-  position: z.string().min(2).optional(),
-  positionDescription: z.string().min(10).or(z.literal('')).optional(),
+  position: z.string().min(2).or(z.literal('')).nullable(),
+  positionDescription: z.string().min(10).or(z.literal('')).nullable(),
+  role: z.string().nullable()
 })
 
 export type UserFormData = z.infer<typeof UserFormSchema>
+
+export const UserUpdateFormSchema = UserFormSchema.extend({
+  id: z.string(),
+})
+
+export type UserUpdateFormData = z.infer<typeof UserUpdateFormSchema>

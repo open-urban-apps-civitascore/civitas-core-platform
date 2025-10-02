@@ -2788,8 +2788,8 @@
   ],
   "users": [
     {
-      "id": "1",
-      "firstName": "Sophie",
+      "id": "abcd",
+      "firstName": "Sophia",
       "lastName": "Fischer",
       "displayName": "Sophie Fischer",
       "email": "sophie.fischer@test.com",
@@ -2797,16 +2797,12 @@
       "title": "female",
       "authority": {
         "id": "8",
-        "title": "Tiefbauamt",
         "department": {
-          "id": "1",
-          "title": "Kanalisationsbau"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "admin",
       "active": false,
       "position": "Bauingenieur für Kanalisationsbau",
@@ -2822,16 +2818,12 @@
       "title": "male",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "2",
-          "title": "Biotope"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemdev",
       "active": false,
       "position": "Biotopschutz-Spezialist",
@@ -2847,16 +2839,12 @@
       "title": "male",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "1",
-          "title": "Straßenplanung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "admin",
       "active": false,
       "position": "Straßenplaner",
@@ -2872,16 +2860,12 @@
       "title": "female",
       "authority": {
         "id": "4",
-        "title": "Luftfahrtamt",
         "department": {
-          "id": "3",
-          "title": "Pilotenzulassung"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "admin",
       "active": false,
       "position": "Luftfahrtprüfer",
@@ -2897,16 +2881,12 @@
       "title": "female",
       "authority": {
         "id": "4",
-        "title": "Luftfahrtamt",
         "department": {
-          "id": "1",
-          "title": "Flugsicherheit"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "admin",
       "active": true,
       "position": "Flugsicherheitsbeauftragter",
@@ -2922,16 +2902,12 @@
       "title": "male",
       "authority": {
         "id": "7",
-        "title": "Straßenverkehrsamt",
         "department": {
-          "id": "2",
-          "title": "Fahrerlaubnisse"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "standarduser",
       "active": false,
       "position": "Sachbearbeiter Fahrerlaubnisse",
@@ -2947,16 +2923,12 @@
       "title": "female",
       "authority": {
         "id": "10",
-        "title": "Wasser- und Schifffahrtsamt",
         "department": {
-          "id": "5",
-          "title": "Schleusenbetrieb"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "admin",
       "active": false,
       "position": "Schleusenwärter",
@@ -2972,16 +2944,12 @@
       "title": "male",
       "authority": {
         "id": "7",
-        "title": "Straßenverkehrsamt",
         "department": {
-          "id": "5",
-          "title": "Fahrzeugtechnik"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemuser",
       "active": true,
       "position": "Fahrzeugtechniker",
@@ -2997,16 +2965,12 @@
       "title": "female",
       "authority": {
         "id": "9",
-        "title": "Umweltamt",
         "department": {
-          "id": "3",
-          "title": "Bodenschutz"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "standarduser",
       "active": false,
       "position": "Bodenschutzexperte",
@@ -3022,16 +2986,12 @@
       "title": "male",
       "authority": {
         "id": "2",
-        "title": "Bauamt",
         "department": {
-          "id": "2",
-          "title": "Baugenehmigungen"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "systemadmin",
       "active": true,
       "position": "Bauprüfer",
@@ -3047,16 +3007,12 @@
       "title": "female",
       "authority": {
         "id": "1",
-        "title": "Abfallwirtschaftsamt",
         "department": {
-          "id": "3",
-          "title": "Recyclinghöfe"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "4",
-        "title": "Leitung"
-      },
+      "group": "4",
+
       "role": "systemuser",
       "active": false,
       "position": "Leiter Recyclinghof",
@@ -3072,16 +3028,12 @@
       "title": "male",
       "authority": {
         "id": "10",
-        "title": "Wasser- und Schifffahrtsamt",
         "department": {
-          "id": "4",
-          "title": "Wasserqualität"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "systemuser",
       "active": false,
       "position": "Wasserqualitätsprüfer",
@@ -3097,16 +3049,12 @@
       "title": "male",
       "authority": {
         "id": "8",
-        "title": "Tiefbauamt",
         "department": {
-          "id": "4",
-          "title": "Leitungsbau"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemadmin",
       "active": false,
       "position": "Ingenieur Leitungsbau",
@@ -3122,16 +3070,12 @@
       "title": "male",
       "authority": {
         "id": "8",
-        "title": "Tiefbauamt",
         "department": {
-          "id": "4",
-          "title": "Leitungsbau"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "admin",
       "active": false,
       "position": "Ingenieur Leitungsbau",
@@ -3147,16 +3091,12 @@
       "title": "male",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "3",
-          "title": "Forst- und Waldschutz"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "4",
-        "title": "Leitung"
-      },
+      "group": "4",
+
       "role": "systemadmin",
       "active": false,
       "position": "Forstingenieur",
@@ -3172,16 +3112,12 @@
       "title": "male",
       "authority": {
         "id": "2",
-        "title": "Bauamt",
         "department": {
-          "id": "4",
-          "title": "Denkmalschutz"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "systemdev",
       "active": true,
       "position": "Denkmalschutzexperte",
@@ -3197,16 +3133,12 @@
       "title": "female",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "5",
-          "title": "Klimaschutzprojekte"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "admin",
       "active": true,
       "position": "Klimaschutzkoordinator",
@@ -3222,16 +3154,12 @@
       "title": "female",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "5",
-          "title": "Klimaschutzprojekte"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemdev",
       "active": false,
       "position": "Klimaschutzkoordinator",
@@ -3247,16 +3175,12 @@
       "title": "female",
       "authority": {
         "id": "7",
-        "title": "Straßenverkehrsamt",
         "department": {
-          "id": "1",
-          "title": "Kfz-Zulassung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "standarduser",
       "active": true,
       "position": "Kfz-Zulassungsprüfer",
@@ -3272,16 +3196,12 @@
       "title": "female",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "1",
-          "title": "Artenschutz"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "4",
-        "title": "Leitung"
-      },
+      "group": "4",
+
       "role": "admin",
       "active": false,
       "position": "Artenschutzbeauftragter",
@@ -3297,16 +3217,12 @@
       "title": "male",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "5",
-          "title": "Straßenbeleuchtung"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "admin",
       "active": false,
       "position": "Techniker Straßenbeleuchtung",
@@ -3322,16 +3238,12 @@
       "title": "male",
       "authority": {
         "id": "8",
-        "title": "Tiefbauamt",
         "department": {
-          "id": "5",
-          "title": "Grundwasserbau"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemadmin",
       "active": true,
       "position": "Mitarbeiter Grundwasserbau",
@@ -3347,16 +3259,12 @@
       "title": "male",
       "authority": {
         "id": "10",
-        "title": "Wasser- und Schifffahrtsamt",
         "department": {
-          "id": "4",
-          "title": "Wasserqualität"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemadmin",
       "active": true,
       "position": "Wasserqualitätsprüfer",
@@ -3372,16 +3280,12 @@
       "title": "male",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "2",
-          "title": "Friedhofsgärtnerei"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "standarduser",
       "active": true,
       "position": "Friedhofsgärtner",
@@ -3397,16 +3301,12 @@
       "title": "female",
       "authority": {
         "id": "1",
-        "title": "Abfallwirtschaftsamt",
         "department": {
-          "id": "1",
-          "title": "Restmüllentsorgung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "admin",
       "active": false,
       "position": "Mitarbeiter Restmüllentsorgung",
@@ -3422,16 +3322,12 @@
       "title": "male",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "5",
-          "title": "Blumen- und Grünflächen"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "4",
-        "title": "Leitung"
-      },
+      "group": "4",
+
       "role": "admin",
       "active": true,
       "position": "Landschaftsgärtner",
@@ -3447,16 +3343,12 @@
       "title": "female",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "2",
-          "title": "Biotope"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "admin",
       "active": true,
       "position": "Biotopschutz-Spezialist",
@@ -3472,16 +3364,12 @@
       "title": "female",
       "authority": {
         "id": "1",
-        "title": "Abfallwirtschaftsamt",
         "department": {
-          "id": "5",
-          "title": "Abfallvermeidung und Aufklärung"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemuser",
       "active": false,
       "position": "Abfallberater",
@@ -3497,16 +3385,12 @@
       "title": "male",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "5",
-          "title": "Straßenbeleuchtung"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "4",
-        "title": "Leitung"
-      },
+      "group": "4",
+
       "role": "admin",
       "active": false,
       "position": "Techniker Straßenbeleuchtung",
@@ -3522,16 +3406,12 @@
       "title": "male",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "4",
-          "title": "Spielplätze"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "standarduser",
       "active": false,
       "position": "Spielplatzwart",
@@ -3547,16 +3427,12 @@
       "title": "male",
       "authority": {
         "id": "8",
-        "title": "Tiefbauamt",
         "department": {
-          "id": "5",
-          "title": "Grundwasserbau"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "admin",
       "active": true,
       "position": "Mitarbeiter Grundwasserbau",
@@ -3572,16 +3448,12 @@
       "title": "female",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "3",
-          "title": "Baumpflege"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemadmin",
       "active": true,
       "position": "Baumpfleger",
@@ -3597,16 +3469,12 @@
       "title": "female",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "1",
-          "title": "Straßenplanung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "4",
-        "title": "Leitung"
-      },
+      "group": "4",
+
       "role": "systemadmin",
       "active": true,
       "position": "Straßenplaner",
@@ -3622,16 +3490,12 @@
       "title": "male",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "2",
-          "title": "Friedhofsgärtnerei"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "admin",
       "active": true,
       "position": "Friedhofsgärtner",
@@ -3647,16 +3511,12 @@
       "title": "female",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "5",
-          "title": "Blumen- und Grünflächen"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "admin",
       "active": false,
       "position": "Landschaftsgärtner",
@@ -3672,16 +3532,12 @@
       "title": "female",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "5",
-          "title": "Blumen- und Grünflächen"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "admin",
       "active": true,
       "position": "Landschaftsgärtner",
@@ -3697,16 +3553,12 @@
       "title": "male",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "2",
-          "title": "Friedhofsgärtnerei"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "systemdev",
       "active": true,
       "position": "Friedhofsgärtner",
@@ -3722,16 +3574,12 @@
       "title": "male",
       "authority": {
         "id": "10",
-        "title": "Wasser- und Schifffahrtsamt",
         "department": {
-          "id": "1",
-          "title": "Hafenaufsicht"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "admin",
       "active": true,
       "position": "Hafeninspektor",
@@ -3747,16 +3595,12 @@
       "title": "male",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "2",
-          "title": "Biotope"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "admin",
       "active": true,
       "position": "Biotopschutz-Spezialist",
@@ -3772,16 +3616,12 @@
       "title": "female",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "2",
-          "title": "Friedhofsgärtnerei"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "admin",
       "active": false,
       "position": "Friedhofsgärtner",
@@ -3797,16 +3637,12 @@
       "title": "male",
       "authority": {
         "id": "9",
-        "title": "Umweltamt",
         "department": {
-          "id": "1",
-          "title": "Luftreinhaltung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "systemdev",
       "active": false,
       "position": "Luftreinhalteexperte",
@@ -3822,16 +3658,12 @@
       "title": "male",
       "authority": {
         "id": "4",
-        "title": "Luftfahrtamt",
         "department": {
-          "id": "2",
-          "title": "Flughafenaufsicht"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "systemuser",
       "active": false,
       "position": "Flughafeninspektor",
@@ -3847,16 +3679,12 @@
       "title": "female",
       "authority": {
         "id": "7",
-        "title": "Straßenverkehrsamt",
         "department": {
-          "id": "4",
-          "title": "Bußgeldstelle"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemadmin",
       "active": true,
       "position": "Sachbearbeiter Bußgelder",
@@ -3872,16 +3700,12 @@
       "title": "female",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "3",
-          "title": "Forst- und Waldschutz"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "systemdev",
       "active": false,
       "position": "Forstingenieur",
@@ -3897,16 +3721,12 @@
       "title": "male",
       "authority": {
         "id": "1",
-        "title": "Abfallwirtschaftsamt",
         "department": {
-          "id": "2",
-          "title": "Biomüll und Kompostierung"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "systemadmin",
       "active": true,
       "position": "Experte für Biomüll",
@@ -3922,16 +3742,12 @@
       "title": "female",
       "authority": {
         "id": "8",
-        "title": "Tiefbauamt",
         "department": {
-          "id": "4",
-          "title": "Leitungsbau"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "4",
-        "title": "Leitung"
-      },
+      "group": "4",
+
       "role": "systemuser",
       "active": true,
       "position": "Ingenieur Leitungsbau",
@@ -3947,16 +3763,12 @@
       "title": "male",
       "authority": {
         "id": "4",
-        "title": "Luftfahrtamt",
         "department": {
-          "id": "2",
-          "title": "Flughafenaufsicht"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "systemdev",
       "active": false,
       "position": "Flughafeninspektor",
@@ -3972,16 +3784,12 @@
       "title": "female",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "3",
-          "title": "Forst- und Waldschutz"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemuser",
       "active": false,
       "position": "Forstingenieur",
@@ -3997,16 +3805,12 @@
       "title": "female",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "5",
-          "title": "Straßenbeleuchtung"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "standarduser",
       "active": false,
       "position": "Techniker Straßenbeleuchtung",
@@ -4022,16 +3826,12 @@
       "title": "female",
       "authority": {
         "id": "4",
-        "title": "Luftfahrtamt",
         "department": {
-          "id": "4",
-          "title": "Lärmschutz"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "admin",
       "active": false,
       "position": "Lärmschutzbeauftragter",
@@ -4047,16 +3847,12 @@
       "title": "male",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "3",
-          "title": "Brückenbau"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemuser",
       "active": false,
       "position": "Brückenbauingenieur",
@@ -4072,16 +3868,12 @@
       "title": "male",
       "authority": {
         "id": "8",
-        "title": "Tiefbauamt",
         "department": {
-          "id": "4",
-          "title": "Leitungsbau"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "standarduser",
       "active": true,
       "position": "Ingenieur Leitungsbau",
@@ -4097,16 +3889,12 @@
       "title": "male",
       "authority": {
         "id": "9",
-        "title": "Umweltamt",
         "department": {
-          "id": "2",
-          "title": "Lärmschutz"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "standarduser",
       "active": false,
       "position": "Lärmschutzbeauftragter",
@@ -4122,16 +3910,12 @@
       "title": "female",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "2",
-          "title": "Biotope"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemuser",
       "active": false,
       "position": "Biotopschutz-Spezialist",
@@ -4147,16 +3931,12 @@
       "title": "male",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "4",
-          "title": "Gewässerschutz"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "systemuser",
       "active": true,
       "position": "Wasserwirtschaftsingenieur",
@@ -4172,16 +3952,12 @@
       "title": "female",
       "authority": {
         "id": "8",
-        "title": "Tiefbauamt",
         "department": {
-          "id": "4",
-          "title": "Leitungsbau"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "systemdev",
       "active": false,
       "position": "Ingenieur Leitungsbau",
@@ -4197,16 +3973,12 @@
       "title": "male",
       "authority": {
         "id": "1",
-        "title": "Abfallwirtschaftsamt",
         "department": {
-          "id": "1",
-          "title": "Restmüllentsorgung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "systemuser",
       "active": false,
       "position": "Mitarbeiter Restmüllentsorgung",
@@ -4222,16 +3994,12 @@
       "title": "male",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "3",
-          "title": "Brückenbau"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemuser",
       "active": true,
       "position": "Brückenbauingenieur",
@@ -4247,16 +4015,12 @@
       "title": "male",
       "authority": {
         "id": "7",
-        "title": "Straßenverkehrsamt",
         "department": {
-          "id": "3",
-          "title": "Verkehrsüberwachung"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "4",
-        "title": "Leitung"
-      },
+      "group": "4",
+
       "role": "standarduser",
       "active": false,
       "position": "Verkehrsüberwacher",
@@ -4272,16 +4036,12 @@
       "title": "male",
       "authority": {
         "id": "10",
-        "title": "Wasser- und Schifffahrtsamt",
         "department": {
-          "id": "2",
-          "title": "Binnenschifffahrt"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemadmin",
       "active": true,
       "position": "Binnenschifffahrtsinspektor",
@@ -4297,16 +4057,12 @@
       "title": "female",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "5",
-          "title": "Blumen- und Grünflächen"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "admin",
       "active": false,
       "position": "Landschaftsgärtner",
@@ -4322,16 +4078,12 @@
       "title": "male",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "2",
-          "title": "Friedhofsgärtnerei"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "standarduser",
       "active": true,
       "position": "Friedhofsgärtner",
@@ -4347,16 +4099,12 @@
       "title": "female",
       "authority": {
         "id": "10",
-        "title": "Wasser- und Schifffahrtsamt",
         "department": {
-          "id": "3",
-          "title": "Küstenschutz"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemadmin",
       "active": true,
       "position": "Küstenschutztechniker",
@@ -4372,16 +4120,12 @@
       "title": "male",
       "authority": {
         "id": "7",
-        "title": "Straßenverkehrsamt",
         "department": {
-          "id": "4",
-          "title": "Bußgeldstelle"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemuser",
       "active": false,
       "position": "Sachbearbeiter Bußgelder",
@@ -4397,16 +4141,12 @@
       "title": "female",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "5",
-          "title": "Klimaschutzprojekte"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "admin",
       "active": true,
       "position": "Klimaschutzkoordinator",
@@ -4422,16 +4162,12 @@
       "title": "male",
       "authority": {
         "id": "9",
-        "title": "Umweltamt",
         "department": {
-          "id": "1",
-          "title": "Luftreinhaltung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemuser",
       "active": true,
       "position": "Luftreinhalteexperte",
@@ -4447,16 +4183,12 @@
       "title": "female",
       "authority": {
         "id": "2",
-        "title": "Bauamt",
         "department": {
-          "id": "2",
-          "title": "Baugenehmigungen"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "systemadmin",
       "active": true,
       "position": "Bauprüfer",
@@ -4472,16 +4204,12 @@
       "title": "male",
       "authority": {
         "id": "10",
-        "title": "Wasser- und Schifffahrtsamt",
         "department": {
-          "id": "2",
-          "title": "Binnenschifffahrt"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "systemdev",
       "active": true,
       "position": "Binnenschifffahrtsinspektor",
@@ -4497,16 +4225,12 @@
       "title": "male",
       "authority": {
         "id": "7",
-        "title": "Straßenverkehrsamt",
         "department": {
-          "id": "1",
-          "title": "Kfz-Zulassung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "admin",
       "active": true,
       "position": "Kfz-Zulassungsprüfer",
@@ -4522,16 +4246,12 @@
       "title": "male",
       "authority": {
         "id": "4",
-        "title": "Luftfahrtamt",
         "department": {
-          "id": "3",
-          "title": "Pilotenzulassung"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "admin",
       "active": false,
       "position": "Luftfahrtprüfer",
@@ -4547,16 +4267,12 @@
       "title": "male",
       "authority": {
         "id": "5",
-        "title": "Naturschutzbehörde",
         "department": {
-          "id": "4",
-          "title": "Gewässerschutz"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "4",
-        "title": "Leitung"
-      },
+      "group": "4",
+
       "role": "systemadmin",
       "active": true,
       "position": "Wasserwirtschaftsingenieur",
@@ -4572,16 +4288,12 @@
       "title": "male",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "5",
-          "title": "Straßenbeleuchtung"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "systemdev",
       "active": true,
       "position": "Techniker Straßenbeleuchtung",
@@ -4597,16 +4309,12 @@
       "title": "female",
       "authority": {
         "id": "2",
-        "title": "Bauamt",
         "department": {
-          "id": "2",
-          "title": "Baugenehmigungen"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "standarduser",
       "active": false,
       "position": "Bauprüfer",
@@ -4622,16 +4330,12 @@
       "title": "female",
       "authority": {
         "id": "7",
-        "title": "Straßenverkehrsamt",
         "department": {
-          "id": "1",
-          "title": "Kfz-Zulassung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "systemuser",
       "active": false,
       "position": "Kfz-Zulassungsprüfer",
@@ -4647,16 +4351,12 @@
       "title": "female",
       "authority": {
         "id": "1",
-        "title": "Abfallwirtschaftsamt",
         "department": {
-          "id": "3",
-          "title": "Recyclinghöfe"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemuser",
       "active": true,
       "position": "Leiter Recyclinghof",
@@ -4672,16 +4372,12 @@
       "title": "male",
       "authority": {
         "id": "7",
-        "title": "Straßenverkehrsamt",
         "department": {
-          "id": "5",
-          "title": "Fahrzeugtechnik"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemdev",
       "active": true,
       "position": "Fahrzeugtechniker",
@@ -4697,16 +4393,12 @@
       "title": "male",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "1",
-          "title": "Straßenplanung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemuser",
       "active": false,
       "position": "Straßenplaner",
@@ -4722,16 +4414,12 @@
       "title": "female",
       "authority": {
         "id": "8",
-        "title": "Tiefbauamt",
         "department": {
-          "id": "2",
-          "title": "Tunnelbau"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemadmin",
       "active": true,
       "position": "Ingenieur Tunnelbau",
@@ -4747,16 +4435,12 @@
       "title": "male",
       "authority": {
         "id": "1",
-        "title": "Abfallwirtschaftsamt",
         "department": {
-          "id": "1",
-          "title": "Restmüllentsorgung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemuser",
       "active": true,
       "position": "Mitarbeiter Restmüllentsorgung",
@@ -4772,16 +4456,12 @@
       "title": "male",
       "authority": {
         "id": "1",
-        "title": "Abfallwirtschaftsamt",
         "department": {
-          "id": "4",
-          "title": "Sondermüll"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "4",
-        "title": "Leitung"
-      },
+      "group": "4",
+
       "role": "systemdev",
       "active": false,
       "position": "Experte für Sondermüll",
@@ -4797,16 +4477,12 @@
       "title": "male",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "3",
-          "title": "Brückenbau"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemadmin",
       "active": true,
       "position": "Brückenbauingenieur",
@@ -4822,16 +4498,12 @@
       "title": "female",
       "authority": {
         "id": "7",
-        "title": "Straßenverkehrsamt",
         "department": {
-          "id": "1",
-          "title": "Kfz-Zulassung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "admin",
       "active": true,
       "position": "Kfz-Zulassungsprüfer",
@@ -4847,16 +4519,12 @@
       "title": "male",
       "authority": {
         "id": "1",
-        "title": "Abfallwirtschaftsamt",
         "department": {
-          "id": "3",
-          "title": "Recyclinghöfe"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "systemadmin",
       "active": true,
       "position": "Leiter Recyclinghof",
@@ -4872,16 +4540,12 @@
       "title": "female",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "2",
-          "title": "Straßenunterhaltung"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "standarduser",
       "active": true,
       "position": "Straßenunterhaltungsarbeiter",
@@ -4897,16 +4561,12 @@
       "title": "female",
       "authority": {
         "id": "9",
-        "title": "Umweltamt",
         "department": {
-          "id": "1",
-          "title": "Luftreinhaltung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "4",
-        "title": "Leitung"
-      },
+      "group": "4",
+
       "role": "systemadmin",
       "active": false,
       "position": "Luftreinhalteexperte",
@@ -4922,16 +4582,12 @@
       "title": "male",
       "authority": {
         "id": "6",
-        "title": "Straßenbauamt",
         "department": {
-          "id": "5",
-          "title": "Straßenbeleuchtung"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemadmin",
       "active": false,
       "position": "Techniker Straßenbeleuchtung",
@@ -4947,16 +4603,12 @@
       "title": "male",
       "authority": {
         "id": "7",
-        "title": "Straßenverkehrsamt",
         "department": {
-          "id": "4",
-          "title": "Bußgeldstelle"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
-      },
+      "group": "2",
+
       "role": "admin",
       "active": false,
       "position": "Sachbearbeiter Bußgelder",
@@ -4972,16 +4624,12 @@
       "title": "female",
       "authority": {
         "id": "8",
-        "title": "Tiefbauamt",
         "department": {
-          "id": "2",
-          "title": "Tunnelbau"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "systemdev",
       "active": true,
       "position": "Ingenieur Tunnelbau",
@@ -4997,16 +4645,12 @@
       "title": "female",
       "authority": {
         "id": "1",
-        "title": "Abfallwirtschaftsamt",
         "department": {
-          "id": "1",
-          "title": "Restmüllentsorgung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemuser",
       "active": true,
       "position": "Mitarbeiter Restmüllentsorgung",
@@ -5022,16 +4666,12 @@
       "title": "male",
       "authority": {
         "id": "4",
-        "title": "Luftfahrtamt",
         "department": {
-          "id": "5",
-          "title": "Luftraumüberwachung"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemdev",
       "active": false,
       "position": "Flugraumüberwacher",
@@ -5047,16 +4687,12 @@
       "title": "male",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "1",
-          "title": "Parkanlagen"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemuser",
       "active": false,
       "position": "Parkanlagenpfleger",
@@ -5072,16 +4708,12 @@
       "title": "female",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "1",
-          "title": "Parkanlagen"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "admin",
       "active": false,
       "position": "Parkanlagenpfleger",
@@ -5097,16 +4729,12 @@
       "title": "female",
       "authority": {
         "id": "9",
-        "title": "Umweltamt",
         "department": {
-          "id": "4",
-          "title": "Umweltbildung"
+          "id": "4"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemadmin",
       "active": false,
       "position": "Umweltpädagoge",
@@ -5122,16 +4750,12 @@
       "title": "male",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "5",
-          "title": "Blumen- und Grünflächen"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "systemuser",
       "active": true,
       "position": "Landschaftsgärtner",
@@ -5147,16 +4771,12 @@
       "title": "female",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "1",
-          "title": "Parkanlagen"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "admin",
       "active": false,
       "position": "Parkanlagenpfleger",
@@ -5172,16 +4792,12 @@
       "title": "male",
       "authority": {
         "id": "4",
-        "title": "Luftfahrtamt",
         "department": {
-          "id": "3",
-          "title": "Pilotenzulassung"
+          "id": "3"
         }
       },
-      "group": {
-        "id": "5",
-        "title": "Support"
-      },
+      "group": "5",
+
       "role": "admin",
       "active": false,
       "position": "Luftfahrtprüfer",
@@ -5197,16 +4813,12 @@
       "title": "female",
       "authority": {
         "id": "9",
-        "title": "Umweltamt",
         "department": {
-          "id": "2",
-          "title": "Lärmschutz"
+          "id": "2"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemadmin",
       "active": false,
       "position": "Lärmschutzbeauftragter",
@@ -5222,16 +4834,12 @@
       "title": "male",
       "authority": {
         "id": "9",
-        "title": "Umweltamt",
         "department": {
-          "id": "1",
-          "title": "Luftreinhaltung"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
-      },
+      "group": "3",
+
       "role": "systemadmin",
       "active": false,
       "position": "Luftreinhalteexperte",
@@ -5247,16 +4855,12 @@
       "title": "male",
       "authority": {
         "id": "9",
-        "title": "Umweltamt",
         "department": {
-          "id": "5",
-          "title": "Energieeffizienz"
+          "id": "5"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "systemdev",
       "active": true,
       "position": "Energieberater",
@@ -5272,21 +4876,17 @@
       "title": "female",
       "authority": {
         "id": "3",
-        "title": "Gartenbauamt",
         "department": {
-          "id": "1",
-          "title": "Parkanlagen"
+          "id": "1"
         }
       },
-      "group": {
-        "id": "1",
-        "title": "Admin"
-      },
+      "group": "1",
+
       "role": "admin",
       "active": false,
       "position": "Parkanlagenpfleger",
       "positionDescription": ""
-    }
+    },
   ],
   "userGroups": [
     {
@@ -5315,147 +4915,292 @@
       "id": "1",
       "title": "Abfallwirtschaftsamt",
       "departments": [
-        { "id": "1", "title": "Restmüllentsorgung" },
-        { "id": "2", "title": "Biomüll und Kompostierung" },
-        { "id": "3", "title": "Recyclinghöfe" },
-        { "id": "4", "title": "Sondermüll" },
-        { "id": "5", "title": "Abfallvermeidung und Aufklärung" }
+        {
+          "id": "1",
+          "title": "Restmüllentsorgung"
+        },
+        {
+          "id": "2",
+          "title": "Biomüll und Kompostierung"
+        },
+        {
+          "id": "3",
+          "title": "Recyclinghöfe"
+        },
+        {
+          "id": "4",
+          "title": "Sondermüll"
+        },
+        {
+          "id": "5",
+          "title": "Abfallvermeidung und Aufklärung"
+        }
       ]
     },
     {
       "id": "2",
       "title": "Bauamt",
       "departments": [
-        { "id": "1", "title": "Bauplanung" },
-        { "id": "2", "title": "Baugenehmigungen" },
-        { "id": "3", "title": "Baustellenkontrolle" },
-        { "id": "4", "title": "Denkmalschutz" },
-        { "id": "5", "title": "Stadtentwicklung" }
+        {
+          "id": "1",
+          "title": "Bauplanung"
+        },
+        {
+          "id": "2",
+          "title": "Baugenehmigungen"
+        },
+        {
+          "id": "3",
+          "title": "Baustellenkontrolle"
+        },
+        {
+          "id": "4",
+          "title": "Denkmalschutz"
+        },
+        {
+          "id": "5",
+          "title": "Stadtentwicklung"
+        }
       ]
     },
     {
       "id": "3",
       "title": "Gartenbauamt",
       "departments": [
-        { "id": "1", "title": "Parkanlagen" },
-        { "id": "2", "title": "Friedhofsgärtnerei" },
-        { "id": "3", "title": "Baumpflege" },
-        { "id": "4", "title": "Spielplätze" },
-        { "id": "5", "title": "Blumen- und Grünflächen" }
+        {
+          "id": "1",
+          "title": "Parkanlagen"
+        },
+        {
+          "id": "2",
+          "title": "Friedhofsgärtnerei"
+        },
+        {
+          "id": "3",
+          "title": "Baumpflege"
+        },
+        {
+          "id": "4",
+          "title": "Spielplätze"
+        },
+        {
+          "id": "5",
+          "title": "Blumen- und Grünflächen"
+        }
       ]
     },
     {
       "id": "4",
       "title": "Luftfahrtamt",
       "departments": [
-        { "id": "1", "title": "Flugsicherheit" },
-        { "id": "2", "title": "Flughafenaufsicht" },
-        { "id": "3", "title": "Pilotenzulassung" },
-        { "id": "4", "title": "Lärmschutz" },
-        { "id": "5", "title": "Luftraumüberwachung" }
+        {
+          "id": "1",
+          "title": "Flugsicherheit"
+        },
+        {
+          "id": "2",
+          "title": "Flughafenaufsicht"
+        },
+        {
+          "id": "3",
+          "title": "Pilotenzulassung"
+        },
+        {
+          "id": "4",
+          "title": "Lärmschutz"
+        },
+        {
+          "id": "5",
+          "title": "Luftraumüberwachung"
+        }
       ]
     },
     {
       "id": "5",
       "title": "Naturschutzbehörde",
       "departments": [
-        { "id": "1", "title": "Artenschutz" },
-        { "id": "2", "title": "Biotope" },
-        { "id": "3", "title": "Forst- und Waldschutz" },
-        { "id": "4", "title": "Gewässerschutz" },
-        { "id": "5", "title": "Klimaschutzprojekte" }
+        {
+          "id": "1",
+          "title": "Artenschutz"
+        },
+        {
+          "id": "2",
+          "title": "Biotope"
+        },
+        {
+          "id": "3",
+          "title": "Forst- und Waldschutz"
+        },
+        {
+          "id": "4",
+          "title": "Gewässerschutz"
+        },
+        {
+          "id": "5",
+          "title": "Klimaschutzprojekte"
+        }
       ]
     },
     {
       "id": "6",
       "title": "Straßenbauamt",
       "departments": [
-        { "id": "1", "title": "Straßenplanung" },
-        { "id": "2", "title": "Straßenunterhaltung" },
-        { "id": "3", "title": "Brückenbau" },
-        { "id": "4", "title": "Radwege" },
-        { "id": "5", "title": "Straßenbeleuchtung" }
+        {
+          "id": "1",
+          "title": "Straßenplanung"
+        },
+        {
+          "id": "2",
+          "title": "Straßenunterhaltung"
+        },
+        {
+          "id": "3",
+          "title": "Brückenbau"
+        },
+        {
+          "id": "4",
+          "title": "Radwege"
+        },
+        {
+          "id": "5",
+          "title": "Straßenbeleuchtung"
+        }
       ]
     },
     {
       "id": "7",
       "title": "Straßenverkehrsamt",
       "departments": [
-        { "id": "1", "title": "Kfz-Zulassung" },
-        { "id": "2", "title": "Fahrerlaubnisse" },
-        { "id": "3", "title": "Verkehrsüberwachung" },
-        { "id": "4", "title": "Bußgeldstelle" },
-        { "id": "5", "title": "Fahrzeugtechnik" }
+        {
+          "id": "1",
+          "title": "Kfz-Zulassung"
+        },
+        {
+          "id": "2",
+          "title": "Fahrerlaubnisse"
+        },
+        {
+          "id": "3",
+          "title": "Verkehrsüberwachung"
+        },
+        {
+          "id": "4",
+          "title": "Bußgeldstelle"
+        },
+        {
+          "id": "5",
+          "title": "Fahrzeugtechnik"
+        }
       ]
     },
     {
       "id": "8",
       "title": "Tiefbauamt",
       "departments": [
-        { "id": "1", "title": "Kanalisationsbau" },
-        { "id": "2", "title": "Tunnelbau" },
-        { "id": "3", "title": "Fundamentbau" },
-        { "id": "4", "title": "Leitungsbau" },
-        { "id": "5", "title": "Grundwasserbau" }
+        {
+          "id": "1",
+          "title": "Kanalisationsbau"
+        },
+        {
+          "id": "2",
+          "title": "Tunnelbau"
+        },
+        {
+          "id": "3",
+          "title": "Fundamentbau"
+        },
+        {
+          "id": "4",
+          "title": "Leitungsbau"
+        },
+        {
+          "id": "5",
+          "title": "Grundwasserbau"
+        }
       ]
     },
     {
       "id": "9",
       "title": "Umweltamt",
       "departments": [
-        { "id": "1", "title": "Luftreinhaltung" },
-        { "id": "2", "title": "Lärmschutz" },
-        { "id": "3", "title": "Bodenschutz" },
-        { "id": "4", "title": "Umweltbildung" },
-        { "id": "5", "title": "Energieeffizienz" }
+        {
+          "id": "1",
+          "title": "Luftreinhaltung"
+        },
+        {
+          "id": "2",
+          "title": "Lärmschutz"
+        },
+        {
+          "id": "3",
+          "title": "Bodenschutz"
+        },
+        {
+          "id": "4",
+          "title": "Umweltbildung"
+        },
+        {
+          "id": "5",
+          "title": "Energieeffizienz"
+        }
       ]
     },
     {
       "id": "10",
       "title": "Wasser- und Schifffahrtsamt",
       "departments": [
-        { "id": "1", "title": "Hafenaufsicht" },
-        { "id": "2", "title": "Binnenschifffahrt" },
-        { "id": "3", "title": "Küstenschutz" },
-        { "id": "4", "title": "Wasserqualität" },
-        { "id": "5", "title": "Schleusenbetrieb" }
+        {
+          "id": "1",
+          "title": "Hafenaufsicht"
+        },
+        {
+          "id": "2",
+          "title": "Binnenschifffahrt"
+        },
+        {
+          "id": "3",
+          "title": "Küstenschutz"
+        },
+        {
+          "id": "4",
+          "title": "Wasserqualität"
+        },
+        {
+          "id": "5",
+          "title": "Schleusenbetrieb"
+        }
       ]
     }
   ],
-    "roles": [
+  "roles": [
     {
       "id": "1",
       "name": "SystemAdmin",
       "description": "SystemAdmin",
       "tenant": "ExampleCorp",
       "type": "System",
-      "permissions": [
-        "perm1",
-        "perm2",
-        "perm3",
-        "perm4"
-      ],
-      "user": [
-        "1",
-        "2"
-      ],
+      "permissions": ["perm1", "perm2", "perm3", "perm4"],
+      "user": ["1", "2"],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
       "id": "2",
-      "name": "SystemDev",
-      "description": "System Developer",
-      "tenant": "ExampleCorp",
-      "type": "System",
-      "permissions": [
-        "perm2",
-        "perm3"
-      ],
-      "user": [
-        "3",
-        "4"
-      ],
-      "createdAt": "2024-06-01T12:00:00Z"
+      "firstName": "Markus",
+      "title": "male",
+      "lastName": "Schmitt",
+      "email": "markus.schmidt@test.com",
+      "authority": {
+        "id": "5",
+          "id": "2"
+        
+      "department": "2",
+      "group": "",
+      "phone": "+49 164 6822941",
+      "active": false,
+      "position": "Biotopschutz-Spezialist",
+      "positionDescription": "Biotopschutz-Spezialist",
+      "role": "systemdev",
+      "displayName": "Markus Schmitt"
     },
     {
       "id": "3",
@@ -5463,19 +5208,8 @@
       "description": "Standard User",
       "tenant": "ExampleCorp",
       "type": "System",
-      "permissions": [
-        "perm3"
-      ],
-      "user": [
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "10",
-        "11",
-        "12"
-      ],
+      "permissions": ["perm3"],
+      "user": ["5", "6", "7", "8", "9", "10", "11", "12"],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5484,15 +5218,8 @@
       "description": "Content Editor",
       "tenant": "ExampleCorp",
       "type": "Data",
-      "permissions": [
-        "perm4",
-        "perm5",
-        "perm6"
-      ],
-      "user": [
-        "1",
-        "2"
-      ],
+      "permissions": ["perm4", "perm5", "perm6"],
+      "user": ["1", "2"],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5501,22 +5228,8 @@
       "description": "Read-Only User",
       "tenant": "ExampleCorp",
       "type": "Data",
-      "permissions": [
-        "perm5",
-        "perm6"
-      ],
-      "user": [
-        "3",
-        "4",
-        "5",
-        "6",
-        "7",
-        "8",
-        "9",
-        "10",
-        "11",
-        "12"
-      ],
+      "permissions": ["perm5", "perm6"],
+      "user": ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5525,15 +5238,8 @@
       "description": "Data Owner",
       "tenant": "ExampleCorp",
       "type": "Governance",
-      "permissions": [
-        "perm8",
-        "perm9",
-        "perm10"
-      ],
-      "user": [
-        "1",
-        "2"
-      ],
+      "permissions": ["perm8", "perm9", "perm10"],
+      "user": ["1", "2"],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5542,14 +5248,8 @@
       "description": "Das ist eine Testrolle",
       "type": "Data",
       "tenant": "ExampleCorp",
-      "permissions": [
-        "perm1",
-        "perm2"
-      ],
-      "user": [
-        "1",
-        "2"
-      ],
+      "permissions": ["perm1", "perm2"],
+      "user": ["1", "2"],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5558,14 +5258,8 @@
       "description": "Some more text",
       "type": "Data",
       "tenant": "ExampleCorp",
-      "permissions": [
-        "perm1",
-        "perm2"
-      ],
-      "user": [
-        "1",
-        "2"
-      ],
+      "permissions": ["perm1", "perm2"],
+      "user": ["1", "2"],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5587,6 +5281,16 @@
       "name": "Global Data Assignment",
       "description": "Beschreibungstext",
       "id": "KERWOWP"
+    },
+    {
+      "type": "System",
+      "tenant": "ExampleCorp",
+      "user": null,
+      "permissions": null,
+      "createdAt": "2025-10-02T14:18:37.769Z",
+      "name": "Testrolle",
+      "description": "test",
+      "id": "b81evni"
     }
   ]
 }

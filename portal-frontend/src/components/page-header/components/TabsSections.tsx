@@ -28,7 +28,7 @@ export const TabsSection = (props: TabSectionProps) => {
   return (
     <Tag
       className={cn(
-        `flex justify-start self-start cursor-pointer items-start rounded-md p-1 ${isMobile ? 'flex-col' : 'flex-row gap-2'}`,
+        `max-w-full w-auto flex justify-start gap-2 self-start cursor-pointer items-start rounded-md p-1 flex-nowrap overflow-x-auto`,
         className,
       )}
     >

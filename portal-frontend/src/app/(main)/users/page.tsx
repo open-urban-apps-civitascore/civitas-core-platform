@@ -9,38 +9,12 @@ import { SearchField } from '@/components/searchField/SearchField'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
-import { PageHeader } from '@/components/page-header/PageHeader'
-import { TitleSchemaType } from '@/types/users'
-import UsersTable from './components/UsersTable'
-import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
 import { Tab } from '@/components/page-header/components/TabsSections'
-import { E164Number } from 'libphonenumber-js'
-
-export type Category = {
-  id: string
-  title: string
-}
-
-export type UserAuthority = Category & {
-  department: Category
-}
-
-export type UserResponse = {
-  id: string
-  firstName: string
-  lastName: string
-  displayName: string
-  email: string
-  phone: string
-  title: TitleSchemaType
-  authority: UserAuthority | null
-  group: Category | null
-  active: boolean
-  role: string
-  position: string;
-  positionDescription: string;
-}
+import { PageHeader } from '@/components/page-header/PageHeader'
+import { Button } from '@/components/ui/button'
+import { TitleSchemaType, UserResponse } from '@/types/users'
+import { Plus } from 'lucide-react'
+import UsersTable from './components/UsersTable'
 
 export type ListUser = {
   id: string
@@ -56,9 +30,9 @@ export const mapListUsers = (users: UserResponse[]): ListUser[] =>
   users.map(user => ({
     id: user.id,
     displayName: user.displayName,
-    authority: user.authority?.title ?? '',
-    department: user.authority?.department.title ?? '',
-    role: user.role,
+    authority: user.authority?.id ?? '',
+    department: user.authority?.department?.id ?? '',
+    role: user.role || '',
     email: user.email,
     isactive: user.active,
   }))
@@ -139,9 +113,9 @@ const UsersPage = () => {
         tabs={{ tabs: tabs, selectedTab: selectedTab, onClick: newValue => setSelectedTab(newValue) }}
         shouldShowDivider
       />
-      <div className='flex justify-between items-center'>
+      <div className="flex justify-between items-center">
         <SearchField searchString={search} onChangeSearchString={setSearchParam} />
-        <Button variant="secondary">
+        <Button variant="secondary" onClick={() => router.push('/users/create')}>
           <Plus />
           {t('newUser')}
         </Button>

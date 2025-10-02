@@ -14,7 +14,7 @@ interface TextFieldProps<T extends FieldValues>
 }
 
 export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
-  const { form, name, placeholder, label, required = false } = props
+  const { form, name, placeholder, label, required = false, disabled } = props
   return (
     <FormField
       control={form.control}
@@ -26,7 +26,7 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
             {required && <span className="text-red-500 ml-1">*</span>}
           </FormLabel>
           <FormControl>
-            <Input placeholder={placeholder} {...field} />
+            <Input placeholder={placeholder} {...field} disabled={disabled} />
           </FormControl>
           <FormMessage />
         </FormItem>

@@ -1,25 +1,26 @@
 'use client'
 
-import { parsePhoneNumberFromString } from 'libphonenumber-js'
-import z from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslations } from 'next-intl'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
 import { TextField } from '@/components/form/fields/TextField'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
-import { TitleSchema, UserFormData, UserFormSchema } from '@/types/users'
+import { Category, UpdateUserData, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
 
-import { AccessibleSelectProps, Select } from '@/components/form/fields/Select'
+import { Select } from '@/components/form/fields/Select'
 import { TextArea } from '@/components/form/fields/TextArea'
-import { Category, UserResponse } from '../page'
+import { createUser, updateUser } from '../actions'
 
-export type FormUser = Omit<UserResponse, 'group' | 'authority' | 'department'> & {
-  group: string | null
+const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+
+export type FormUser = Omit<UserResponse, 'authority' | 'department' | 'position' | 'positionDescription'> & {
   authority: string
   department: string
+  position: string
+  positionDescription: string
 }
 
 export type Authority = Category & {
@@ -28,14 +29,35 @@ export type Authority = Category & {
 
 interface UserFormProps {
   userData: FormUser
-  userGroups: AccessibleSelectProps<FormUser>['options']
   isEditMode?: boolean
-  authorities: Authority[]
 }
 
 export const UserForm = (props: UserFormProps) => {
-  const { userData, userGroups, authorities, isEditMode = false } = props
+  const { userData, isEditMode = false } = props
   const t = useTranslations('users')
+
+  const [authorities, setAuthorities] = useState<Authority[]>([])
+
+  const getFormData = async () => {
+    try {
+      const authoritiesResponse = await fetch(`${URL}/authorities`, {
+        cache: 'no-store',
+      })
+      if (!authoritiesResponse) {
+        throw new Error('An error occurred while loading form data')
+      }
+
+      const authoritiesData: Authority[] = await authoritiesResponse.json()
+
+      setAuthorities(authoritiesData)
+    } catch (error) {
+      throw new Error('An error occurred while loading form data')
+    }
+  }
+
+  useEffect(() => {
+    getFormData()
+  }, [])
 
   const titleOptions = [
     {
@@ -55,27 +77,56 @@ export const UserForm = (props: UserFormProps) => {
     },
   })
 
+  console.log(form.getValues())
+
   const watchAuthority = form.watch('authority')
 
   const departmentOptions = useMemo(() => {
     const currentAuthority = authorities.find(authority => authority.id === watchAuthority)
-    console.log('currentAuthority:', currentAuthority)
     const departments =
       currentAuthority?.departments?.map(department => ({
         value: department.id,
         label: department.title,
       })) ?? []
-    console.log('departments:', departments)
     return departments
-  }, [watchAuthority])
+  }, [watchAuthority, authorities])
 
-  const onSubmit = (data: UserFormData) => {
-    console.log(data)
+  const mapApiUserData = (formData: UserFormData) => {
+    const parsed = UserFormSchema.parse(formData)
+
+    const userData = {
+      ...parsed,
+      group: parsed.group ?? null,
+      authority: parsed.authority
+        ? { id: parsed.authority, department: parsed.department ? { id: parsed.department ?? null } : null }
+        : null,
+      position: parsed.position ?? null,
+      positionDescription: parsed.position ?? null,
+      displayName: `${parsed.firstName} ${parsed.lastName}`,
+    }
+    return userData
   }
+
+  const handleCreateUser = (userData: UserFormData) => {
+    console.log('handleCreateUser: ', userData)
+    const mappedData = mapApiUserData(userData)
+    const { id, ...createUserData } = mappedData
+    createUser(createUserData)
+    form.reset()
+  }
+
+
+  const handleUpdateUser = (userData: UserFormData) => {
+    console.log('handleUpdateUser: ', userData)
+    const updateUserData = mapApiUserData(userData)
+    updateUser(updateUserData)
+  }
+
+  const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
+      <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-2 gap-4 space-y-8 mb-4">
           <TextField form={form} label={t('info.id')} name="id" placeholder={t('info.id')} disabled />
           <Select
@@ -112,14 +163,6 @@ export const UserForm = (props: UserFormProps) => {
             placeholder={t('form.selectDepartment')}
             form={form}
             name="department"
-          />
-          <Select
-            id="usergroups-select"
-            label={t('info.group')}
-            options={userGroups}
-            placeholder={t('form.selectGroup')}
-            form={form}
-            name="group"
           />
           <TextField form={form} label={t('info.position')} name="position" placeholder={t('info.position')} />
           <TextArea
