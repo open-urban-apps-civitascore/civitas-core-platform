@@ -129,15 +129,18 @@ export const UserForm = (props: UserFormProps) => {
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-2 gap-4 space-y-8 mb-4">
           <TextField form={form} label={t('info.id')} name="id" placeholder={t('info.id')} disabled />
-          <Select
-            id="title-select"
-            label={t('info.title.title')}
-            options={titleOptions}
-            placeholder={t('form.selectTitle')}
-            form={form}
-            name="title"
-            required
-          />
+          <div className='flex w-full justify-between'>
+            <Select
+              id="title-select"
+              label={t('info.title.title')}
+              options={titleOptions}
+              placeholder={t('form.selectTitle')}
+              form={form}
+              name="title"
+              required
+            />
+            <Switch form={form} name="active" label={t('info.active')} />
+          </div>
           <TextField
             form={form}
             label={t('info.firstName')}
