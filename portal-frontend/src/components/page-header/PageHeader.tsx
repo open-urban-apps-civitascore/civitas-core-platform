@@ -3,7 +3,7 @@ import { HTMLAttributes, JSX } from 'react'
 import { cn } from '@/lib/utils'
 
 import { TabSectionProps, TabsSection } from './components/TabsSections'
-import { TitleSection, TitleSectionProps } from './components/TitleSection'
+import { TitleSection } from './components/TitleSection'
 
 export type PageHeaderProps = Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & {
   title?: string
@@ -19,7 +19,15 @@ export const PageHeader = (props: PageHeaderProps) => {
 
   return (
     <div id="heading" className={cn('flex flex-col h-[var(--title-height)]', className)} style={style}>
-      {tabs && <TabsSection tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} isHeading={!title} className="p-0" />}
+      {tabs && (
+        <TabsSection
+          tabs={tabs.tabs}
+          onClick={tabs.onClick}
+          selectedTab={tabs.selectedTab}
+          isHeading={!title}
+          className="p-0"
+        />
+      )}
       <div id="heading" className={`flex ${title ? 'justify-between mt-1' : 'justify-end'}`}>
         {title && <TitleSection title={title} subtitle={subtitle} />}
         {customElement}
@@ -33,7 +41,7 @@ export const PageHeader = (props: PageHeaderProps) => {
           className={`${title && 'mt-4'} bg-accent`}
         />
       )}
-      {shouldShowDivider && <hr className='mt-auto'/>}
+      {shouldShowDivider && <hr className="mt-auto" />}
     </div>
   )
 }

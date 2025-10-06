@@ -116,6 +116,6 @@ export const useQueryParams = () => {
     sorting,
     search,
     tabValue,
-    subTabValue
+    subTabValue,
   }
 }

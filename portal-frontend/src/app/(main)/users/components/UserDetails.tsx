@@ -1,10 +1,12 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
+import { useEffect, useState } from 'react'
+
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+
 import { FormUser, UserForm } from './UserForm'
 
 interface UserDetailsProps {
@@ -52,7 +54,7 @@ export const UserDetails = (props: UserDetailsProps) => {
 
   useEffect(() => {
     setSelectedTab(subTabValue || tabValues.userData.value)
-  }, [subTabValue])
+  }, [subTabValue, tabValues.userData.value])
 
   const handleSelectTab = (newTab: string) => {
     setSubTabValueParam(newTab)

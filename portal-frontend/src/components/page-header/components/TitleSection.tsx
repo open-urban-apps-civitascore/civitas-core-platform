@@ -1,4 +1,3 @@
-
 export interface TitleSectionProps {
   title: string
   subtitle?: string

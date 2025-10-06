@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react'
-
-import { SelectContent, SelectItem, SelectTrigger, SelectValue, Select as ShadcnSelect } from '@/components/ui/select'
 import { Controller, FieldValues, Path, UseFormReturn } from 'react-hook-form'
+
+import { Select as ShadcnSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
 export type SelectOption = {
@@ -16,6 +16,7 @@ export interface AccessibleSelectProps<T extends FieldValues> {
   options: SelectOption[]
   form: UseFormReturn<T>
   name: Path<T>
+  // eslint-disable-next-line react/boolean-prop-naming
   required?: boolean
   className?: string
 }

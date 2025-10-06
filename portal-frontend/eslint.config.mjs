@@ -108,8 +108,11 @@ const eslintConfig = [
             regex: '^(is|has|should|can)[A-Z].*$',
             match: true,
           },
+          filter: {
+            regex: '^(required|disabled|open|readOnly)$',
+            match: false,
+          },
         },
-
         // Booleans (parameters) start with prefix is/has/should/can
         {
           selector: 'parameter',
@@ -118,6 +121,10 @@ const eslintConfig = [
           custom: {
             regex: '^(is|has|should|can)[A-Z].*$',
             match: true,
+          },
+          filter: {
+            regex: '^(required|disabled|open|readOnly)$',
+            match: false,
           },
         },
       ],
@@ -170,7 +177,6 @@ const eslintConfig = [
         {
           rule: '^(is|has|should|can)[A-Z]([A-Za-z0-9]?)',
           validateNested: true,
-          ignore: ['required', 'disabled', 'open', 'readOnly'],
         },
       ],
 

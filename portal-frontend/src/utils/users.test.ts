@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+
+import { Authority, TitleSchemaType, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+
 import { mapApiUserData, mapFormUserData, mapListUsers } from './users'
-import { UserFormSchema, UserFormData, UserResponse, TitleSchema, TitleSchemaType, Authority } from '@/types/users'
 
 const baseFormData = {
   id: '12345',
@@ -86,7 +88,9 @@ describe('MapListUsers', () => {
     expect(result[0].authority).toBe('')
     expect(result[0].department).toBe('')
 
-    const users2: UserResponse[] = [{ ...baseUserResponse, authority: { ...baseUserResponse.authority, department: null } }]
+    const users2: UserResponse[] = [
+      { ...baseUserResponse, authority: { ...baseUserResponse.authority, department: null } },
+    ]
     const result2 = mapListUsers(users2, authorities)
     expect(result2[0].authority).toBe(authorities[0].title)
     expect(result2[0].department).toBe('')

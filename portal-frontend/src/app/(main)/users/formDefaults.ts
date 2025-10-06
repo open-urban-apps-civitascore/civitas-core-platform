@@ -1,5 +1,6 @@
-import { TitleSchemaType } from "@/types/users";
-import { FormUser } from "./components/UserForm";
+import { TitleSchemaType } from '@/types/users'
+
+import { FormUser } from './components/UserForm'
 
 export const defaultFormUser: FormUser = {
   id: '',
@@ -15,5 +16,5 @@ export const defaultFormUser: FormUser = {
   phone: '',
   role: 'standarduser',
   position: '',
-  positionDescription: ''
+  positionDescription: '',
 }
