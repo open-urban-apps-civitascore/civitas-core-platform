@@ -37,6 +37,7 @@ const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBL
 export const RolesTab = ({ userId }: RolesTabProps) => {
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
+  const tRoles = useTranslations('roles')
   const [user, setUser] = useState<User | null>(null)
   const [originalRoles, setOriginalRoles] = useState<string[]>([])
   const [allRoles, setAllRoles] = useState<Role[]>([])
@@ -239,19 +240,19 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
   return (
     <div className="p-6">
       <RoleCategory
-        title={t('roles.systemRoles')}
+        title={tRoles('systemRoles')}
         category="System"
         colorClass="bg-green-100 text-green-800 border-green-200"
       />
 
       <RoleCategory
-        title={t('roles.dataRoles')}
+        title={tRoles('dataRoles')}
         category="Data"
         colorClass="bg-blue-100 text-blue-800 border-blue-200"
       />
 
       <RoleCategory
-        title={t('roles.governanceRoles')}
+        title={tRoles('governanceRoles')}
         category="Governance"
         colorClass="bg-purple-100 text-purple-800 border-purple-200"
       />
