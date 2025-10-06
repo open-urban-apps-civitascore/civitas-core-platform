@@ -1,6 +1,6 @@
 'use server'
 
-import { CreateUserData, UpdateUserData, UserFormData, UserFormSchema } from '@/types/users'
+import { CreateUserData, UpdateUserData } from '@/types/users'
 
 const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
@@ -23,7 +23,7 @@ export const createUser = async (userData: CreateUserData) => {
     const data = await response.json()
     console.log('successfully created user:', data)
   } catch (error) {
-    console.error('Fehler:', error)
+    console.error('An error occurred while creating new user:', error)
   }
 }
 
@@ -45,6 +45,6 @@ export const updateUser = async (updateUserData: UpdateUserData) => {
     const data = await response.json()
     console.log('successfully updated user:', data)
   } catch (error) {
-    console.error('Fehler:', error)
+    console.error('An error occurred while updateing the user:', error)
   }
 }
