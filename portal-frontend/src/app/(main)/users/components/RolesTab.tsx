@@ -36,12 +36,16 @@ const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBL
 
 export const RolesTab = ({ userId }: RolesTabProps) => {
   const t = useTranslations('users')
+  const tCommon = useTranslations('common')
   const [user, setUser] = useState<User | null>(null)
+  const [originalRoles, setOriginalRoles] = useState<string[]>([])
   const [allRoles, setAllRoles] = useState<Role[]>([])
-  const [isLoading, setLoading] = useState(true)
-  const [savingRoleId, setSavingRoleId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<'System' | 'Data' | 'Governance'>('System')
+
+  const hasChanges = user ? JSON.stringify(user.roles.sort()) !== JSON.stringify(originalRoles.sort()) : false
 
   // Fetch user data and all roles
   useEffect(() => {
@@ -60,11 +64,12 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
         const rolesData = await rolesResponse.json()
 
         setUser(userData)
+        setOriginalRoles(userData.roles)
         setAllRoles(rolesData)
       } catch (error) {
         console.error('Error fetching data:', error)
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     }
 
@@ -87,65 +92,49 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
   }
 
   // Add role to user
-  const addRole = async (roleId: string) => {
+  const addRole = (roleId: string) => {
     if (!user) return
-
-    setSavingRoleId(roleId)
     const updatedRoles = [...user.roles, roleId]
-
-    // Optimistic update
     setUser({ ...user, roles: updatedRoles })
-
-    try {
-      const response = await fetch(`${URL}/users/${userId}`, {
-        method: 'PATCH',
-        headers: {
-          ['Content-Type']: 'application/json',
-        },
-        body: JSON.stringify({ roles: updatedRoles }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to add role')
-      }
-    } catch (error) {
-      console.error('Error adding role:', error)
-      // Rollback on error
-      setUser({ ...user, roles: user.roles })
-    } finally {
-      setSavingRoleId(null)
-    }
   }
 
   // Remove role from user
-  const removeRole = async (roleId: string) => {
+  const removeRole = (roleId: string) => {
+    if (!user) return
+    const updatedRoles = user.roles.filter(id => id !== roleId)
+    setUser({ ...user, roles: updatedRoles })
+  }
+
+  // Save changes to server
+  const handleSave = async () => {
     if (!user) return
 
-    setSavingRoleId(roleId)
-    const updatedRoles = user.roles.filter(id => id !== roleId)
-
-    // Optimistic update
-    setUser({ ...user, roles: updatedRoles })
-
+    setIsSaving(true)
     try {
       const response = await fetch(`${URL}/users/${userId}`, {
         method: 'PATCH',
         headers: {
           ['Content-Type']: 'application/json',
         },
-        body: JSON.stringify({ roles: updatedRoles }),
+        body: JSON.stringify({ roles: user.roles }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to remove role')
+        throw new Error('Failed to save roles')
       }
+
+      setOriginalRoles(user.roles)
     } catch (error) {
-      console.error('Error removing role:', error)
-      // Rollback on error
-      setUser({ ...user, roles: user.roles })
+      console.error('Error saving roles:', error)
     } finally {
-      setSavingRoleId(null)
+      setIsSaving(false)
     }
+  }
+
+  // Cancel changes
+  const handleCancel = () => {
+    if (!user) return
+    setUser({ ...user, roles: originalRoles })
   }
 
   const RoleCategory = ({
@@ -172,9 +161,9 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
                 size="sm"
                 className="h-4 w-4 p-0 ml-2 opacity-70 hover:opacity-100"
                 onClick={() => removeRole(role.id)}
-                disabled={savingRoleId === role.id}
+                disabled={isSaving}
               >
-                {savingRoleId === role.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+                <X className="h-3 w-3" />
               </Button>
             </Badge>
           ))}
@@ -214,14 +203,10 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
                           addRole(role.id)
                           setIsAddRoleOpen(false)
                         }}
-                        disabled={savingRoleId === role.id}
+                        disabled={isSaving}
                         size="sm"
                       >
-                        {savingRoleId === role.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          t('rolesTab.addRoleDialog.addButton')
-                        )}
+                        {t('rolesTab.addRoleDialog.addButton')}
                       </Button>
                     </div>
                   ))}
@@ -270,6 +255,16 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
         category="Governance"
         colorClass="bg-purple-100 text-purple-800 border-purple-200"
       />
+
+      <div className="fixed bottom-6 right-6 flex gap-4">
+        <Button type="button" variant="secondary" onClick={handleCancel} disabled={!hasChanges || isSaving}>
+          {tCommon('actions.cancel')}
+        </Button>
+        <Button type="button" onClick={handleSave} disabled={!hasChanges || isSaving}>
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+          {tCommon('actions.submit')}
+        </Button>
+      </div>
     </div>
   )
 }
