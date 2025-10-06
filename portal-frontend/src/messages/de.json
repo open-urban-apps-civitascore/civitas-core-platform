@@ -7,6 +7,13 @@
       "submit": "Speichern",
       "cancel": "Abbrechen",
       "delete": "Löschen"
+    },
+    "errors": {
+      "invalidPhone": "Ungültige Telefonnummer",
+      "invalidEmail": "Ungültige E-Mail Adresse",
+      "required": "Dieses Feld ist erforderlich",
+      "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
+      "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein."
     }
   },
   "languages": {
@@ -52,12 +59,17 @@
   },
   "users": {
     "title": "User",
+    "tabs": {
+      "users": "User",
+      "groups": "Gruppen"
+    },
     "newUser": "Neuer User",
+    "createUser": "User erstellen",
     "searchUsers": "Filtern...",
     "info": {
       "id": "ID",
       "displayName": "Anzeigename",
-      "title": "Anrede",
+      "title": { "title": "Anrede", "male": "Herr", "female": "Frau" },
       "firstName": "Vorname",
       "lastName": "Name",
       "authority": "Amt",
@@ -66,7 +78,22 @@
       "phone": "Telefonnummer",
       "email": "E-Mail",
       "group": "Gruppe",
-      "active": "Aktiv"
+      "active": "Aktiv",
+      "position": "Position",
+      "description": "Tätigkeitsbeschreibung"
+    },
+    "detailsTabs": {
+      "userData": "Benutzerdaten",
+      "roles": "Rollen",
+      "userGroups": "Usergruppen",
+      "dataspaces": "Datenräume und -sätze",
+      "account": "Account"
+    },
+    "form": {
+      "selectTitle": "Titel wählen...",
+      "selectAuthority": "Amt wählen...",
+      "selectDepartment": "Abteilung wählen...",
+      "selectGroup": "Gruppe wählen..."
     }
   },
   "pagination": {
@@ -88,6 +115,8 @@
     "systemRoles": "Systemrollen",
     "dataRoles": "Datenrollen",
     "governanceRoles": "Governancerollen",
+    "roles": "Einzelrollen",
+    "roleSets": "Rollensets",
     "tableHeaders": {
       "name": "Name",
       "description": "Beschreibung",

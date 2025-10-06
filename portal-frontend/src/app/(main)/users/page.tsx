@@ -1,36 +1,21 @@
 'use client'
 
 import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
+import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
 import { TableContainer } from '@/components/table-container/TableContainer'
+import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
+import { Authority, UserResponse } from '@/types/users'
+import { mapListUsers } from '@/utils/users'
 
 import UsersTable from './components/UsersTable'
-
-export type UserGroup = {
-  id: string
-  title: string
-}
-
-export type UserResponse = {
-  id: string
-  firstName: string
-  lastName: string
-  displayName: string
-  email: string
-  phone: string
-  title: string
-  authority: string
-  department: string
-  group: UserGroup
-  active: boolean
-  role: string
-}
 
 export type ListUser = {
   id: string
@@ -41,19 +26,6 @@ export type ListUser = {
   email: string
   isactive: boolean
 }
-
-export type FormUser = UserResponse
-
-export const mapListUsers = (users: UserResponse[]): ListUser[] =>
-  users.map(user => ({
-    id: user.id,
-    displayName: user.displayName,
-    authority: user.authority,
-    department: user.department,
-    role: user.role,
-    email: user.email,
-    isactive: user.active,
-  }))
 
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {
@@ -71,6 +43,18 @@ const UsersPage = () => {
   const [listUsers, setListUsers] = useState<ListUser[]>([])
   const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [selectedTab, setSelectedTab] = useState('users')
+  const [isLoading, setIsLoading] = useState(true)
+  const tabs: Tab[] = [
+    {
+      value: 'users',
+      label: t('tabs.users'),
+    },
+    {
+      value: 'userGroups',
+      label: t('tabs.groups'),
+    },
+  ]
 
   const {
     setSortingParams,
@@ -87,35 +71,70 @@ const UsersPage = () => {
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-  useEffect(() => {
+  const getUserListData = async () => {
     const params = setApiRequestParams(totalPages)
-    const getUsers = async () => {
-      try {
-        const usersResponse = await fetch(`${URL}/users?${params.toString()}`)
-        const usersData: UserResponse[] = await usersResponse.json()
-        const users = mapListUsers(usersData)
-        setListUsers(users)
-        const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
-        if (rowCount !== totalCount) {
-          setRowCount(totalCount)
-        }
-      } catch (error) {
-        console.error(error)
+
+    try {
+      setIsLoading(true)
+      const [usersResponse, authoritiesResponse] = await Promise.all([
+        fetch(`${URL}/users?${params.toString()}`, {
+          cache: 'no-store',
+        }),
+        fetch(`${URL}/authorities`, {
+          cache: 'no-store',
+        }),
+      ])
+      if (!authoritiesResponse || !usersResponse) {
+        throw new Error('An error occurred while loading form data')
       }
+
+      const [usersData, authoritiesData]: [UserResponse[], Authority[]] = await Promise.all([
+        usersResponse.json(),
+        authoritiesResponse.json(),
+      ])
+
+      const users = mapListUsers(usersData, authoritiesData)
+      setListUsers(users)
+      setIsLoading(false)
+
+      const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
+      if (rowCount !== totalCount) {
+        setRowCount(totalCount)
+      }
+    } catch (error) {
+      console.error(error)
+      setIsLoading(false)
+      throw new Error('An error occurred while loading form data')
     }
-    getUsers()
+  }
+
+  useEffect(() => {
+    getUserListData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
 
   const handleRowClick = (row: Row<ListUser>) => {
     if (row.id) {
-      router.push(`users/${row.id}`, {})
+      const params = setApiRequestParams(totalPages)
+      router.push(`users/${row.id}?${params}`, {})
     }
   }
 
   return (
     <div className="w-full h-full">
-      <PageHeader title={t('title')} />
-      <SearchField searchString={search} onChangeSearchString={setSearchParam} />
+      <PageHeader
+        title={t('title')}
+        className="[--title-height:calc(--spacing(24))]"
+        tabs={{ tabs: tabs, selectedTab: selectedTab, onClick: newValue => setSelectedTab(newValue) }}
+        shouldShowDivider
+      />
+      <div className="flex justify-between items-center">
+        <SearchField searchString={search} onChangeSearchString={setSearchParam} />
+        <Button variant="secondary" onClick={() => router.push('/users/create')}>
+          <Plus />
+          {t('newUser')}
+        </Button>
+      </div>
       <TableContainer>
         <UsersTable
           users={listUsers}
@@ -129,6 +148,7 @@ const UsersPage = () => {
           onRowClick={handleRowClick}
           onSortingChange={setSortingParams}
           onPaginationChange={setPaginationParams}
+          isLoading={isLoading}
         />
       </TableContainer>
     </div>

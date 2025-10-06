@@ -11,7 +11,6 @@ import { TableProps } from '../../../../../types/table'
 
 interface RolesTableProps extends TableProps<RoleResponse> {
   roles: RoleResponse[]
-  isLoading: boolean
 }
 
 export const RolesTable = (props: RolesTableProps) => {

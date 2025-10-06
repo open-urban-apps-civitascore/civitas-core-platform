@@ -2989,37 +2989,43 @@
   "users": [
     {
       "id": "1",
-      "firstName": "Sophie",
+      "firstName": "Sophia",
+      "title": "female",
       "lastName": "Fischer",
-      "displayName": "Sophie Fischer",
       "email": "sophie.fischer@test.com",
-      "phone": "+49 75 5576070",
-      "title": "Frau",
-      "authority": "Tiefbauamt",
-      "department": "Bauplanung",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "authority": {
+        "id": "8",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "3",
+      "phone": "+49 75 5576070",
+      "active": true,
+      "position": "Bauingenieur für Kanalisationsbau",
+      "positionDescription": "Bauingenieur für Kanalisationsbau",
       "role": "admin",
-      "active": false
+      "displayName": "Sophia Fischer"
     },
     {
       "id": "2",
       "firstName": "Markus",
+      "title": "male",
       "lastName": "Schmidt",
-      "displayName": "Markus Schmidt",
       "email": "markus.schmidt@test.com",
-      "phone": "+49 164 6822941",
-      "title": "Herr",
-      "authority": "Naturschutzbehörde",
-      "department": "Naturschutz",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "authority": {
+        "id": "9",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "1",
+      "phone": "+49 164 6822941",
+      "active": false,
+      "position": "Biotopschutz-Spezialist",
+      "positionDescription": "Biotopschutz-Spezialist",
       "role": "systemdev",
-      "active": false
+      "displayName": "Markus Schmidt"
     },
     {
       "id": "3",
@@ -3028,15 +3034,18 @@
       "displayName": "Michael Wagner",
       "email": "michael.wagner@test.com",
       "phone": "+49 78 1583715",
-      "title": "Herr",
-      "authority": "Straßenbauamt",
-      "department": "Bauplanung",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "3",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Straßenplaner",
+      "positionDescription": ""
     },
     {
       "id": "4",
@@ -3045,15 +3054,18 @@
       "displayName": "Miriam Koch",
       "email": "miriam.koch@test.com",
       "phone": "+49 170 8415252",
-      "title": "Frau",
-      "authority": "Luftfahrtamt",
-      "department": "Verkehrssicherheit",
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
+      "title": "female",
+      "authority": {
+        "id": "4",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "2",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Luftfahrtprüfer",
+      "positionDescription": ""
     },
     {
       "id": "5",
@@ -3062,15 +3074,18 @@
       "displayName": "Clara Becker",
       "email": "clara.becker@test.com",
       "phone": "+49 158 3743727",
-      "title": "Frau",
-      "authority": "Luftfahrtamt",
-      "department": "Verkehrssicherheit",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "female",
+      "authority": {
+        "id": "4",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "3",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Flugsicherheitsbeauftragter",
+      "positionDescription": ""
     },
     {
       "id": "6",
@@ -3079,15 +3094,18 @@
       "displayName": "Paul Hoffmann",
       "email": "paul.hoffmann@test.com",
       "phone": "+49 160 3095014",
-      "title": "Herr",
-      "authority": "Straßenverkehrsamt",
-      "department": "Naturschutz",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "7",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "3",
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Sachbearbeiter Fahrerlaubnisse",
+      "positionDescription": ""
     },
     {
       "id": "7",
@@ -3096,15 +3114,18 @@
       "displayName": "Miriam Becker",
       "email": "miriam.becker@test.com",
       "phone": "+49 163 8461782",
-      "title": "Frau",
-      "authority": "Wasser- und Schifffahrtsamt",
-      "department": "Genehmigungen",
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
+      "title": "female",
+      "authority": {
+        "id": "10",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "2",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Schleusenwärter",
+      "positionDescription": ""
     },
     {
       "id": "8",
@@ -3113,15 +3134,18 @@
       "displayName": "Lukas Fischer",
       "email": "lukas.fischer@test.com",
       "phone": "+49 84 1676823",
-      "title": "Herr",
-      "authority": "Straßenverkehrsamt",
-      "department": "Energie und Klima",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "7",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "1",
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Fahrzeugtechniker",
+      "positionDescription": ""
     },
     {
       "id": "9",
@@ -3130,15 +3154,18 @@
       "displayName": "Julia Müller",
       "email": "julia.müller@test.com",
       "phone": "+49 156 4519205",
-      "title": "Frau",
-      "authority": "Umweltamt",
-      "department": "Bauplanung",
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
+      "title": "female",
+      "authority": {
+        "id": "9",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "2",
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Bodenschutzexperte",
+      "positionDescription": ""
     },
     {
       "id": "10",
@@ -3147,15 +3174,18 @@
       "displayName": "Thomas Schmidt",
       "email": "thomas.schmidt@test.com",
       "phone": "+49 89 1942127",
-      "title": "Herr",
-      "authority": "Bauamt",
-      "department": "Infrastruktur",
-      "group": {
+      "title": "male",
+      "authority": {
         "id": "2",
-        "title": "Technischer Mitarbeiter"
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "2",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Bauprüfer",
+      "positionDescription": ""
     },
     {
       "id": "11",
@@ -3164,15 +3194,18 @@
       "displayName": "Nina Schneider",
       "email": "nina.schneider@test.com",
       "phone": "+49 164 1522602",
-      "title": "Frau",
-      "authority": "Abfallwirtschaftsamt",
-      "department": "Bauplanung",
-      "group": {
-        "id": "4",
-        "title": "Leitung"
+      "title": "female",
+      "authority": {
+        "id": "1",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "4",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Leiter Recyclinghof",
+      "positionDescription": ""
     },
     {
       "id": "12",
@@ -3181,15 +3214,18 @@
       "displayName": "Florian Weber",
       "email": "florian.weber@test.com",
       "phone": "+49 45 6102411",
-      "title": "Herr",
-      "authority": "Wasser- und Schifffahrtsamt",
-      "department": "Genehmigungen",
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
+      "title": "male",
+      "authority": {
+        "id": "10",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "2",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Wasserqualitätsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "13",
@@ -3198,15 +3234,18 @@
       "displayName": "Markus Wagner",
       "email": "markus.wagner@test.com",
       "phone": "+49 75 3772074",
-      "title": "Herr",
-      "authority": "Tiefbauamt",
-      "department": "Technische Überwachung",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "8",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "3",
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Ingenieur Leitungsbau",
+      "positionDescription": ""
     },
     {
       "id": "14",
@@ -3215,15 +3254,18 @@
       "displayName": "Markus Fischer",
       "email": "markus.fischer@test.com",
       "phone": "+49 78 5952653",
-      "title": "Herr",
-      "authority": "Tiefbauamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "8",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "1",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Ingenieur Leitungsbau",
+      "positionDescription": ""
     },
     {
       "id": "15",
@@ -3232,15 +3274,18 @@
       "displayName": "Michael Hoffmann",
       "email": "michael.hoffmann@test.com",
       "phone": "+49 164 3201494",
-      "title": "Herr",
-      "authority": "Naturschutzbehörde",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "4",
-        "title": "Leitung"
+      "title": "male",
+      "authority": {
+        "id": "5",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "4",
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Forstingenieur",
+      "positionDescription": ""
     },
     {
       "id": "16",
@@ -3249,15 +3294,18 @@
       "displayName": "Paul Schneider",
       "email": "paul.schneider@test.com",
       "phone": "+49 154 1685736",
-      "title": "Herr",
-      "authority": "Bauamt",
-      "department": "Bauplanung",
-      "group": {
+      "title": "male",
+      "authority": {
         "id": "2",
-        "title": "Technischer Mitarbeiter"
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "2",
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Denkmalschutzexperte",
+      "positionDescription": ""
     },
     {
       "id": "17",
@@ -3266,15 +3314,18 @@
       "displayName": "Anna Richter",
       "email": "anna.richter@test.com",
       "phone": "+49 40 9171471",
-      "title": "Frau",
-      "authority": "Naturschutzbehörde",
-      "department": "Energie und Klima",
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
+      "title": "female",
+      "authority": {
+        "id": "5",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "2",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Klimaschutzkoordinator",
+      "positionDescription": ""
     },
     {
       "id": "18",
@@ -3283,15 +3334,18 @@
       "displayName": "Miriam Schmidt",
       "email": "miriam.schmidt@test.com",
       "phone": "+49 88 6580667",
-      "title": "Frau",
-      "authority": "Naturschutzbehörde",
-      "department": "Landschaftspflege",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "female",
+      "authority": {
+        "id": "5",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "3",
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Klimaschutzkoordinator",
+      "positionDescription": ""
     },
     {
       "id": "19",
@@ -3300,15 +3354,18 @@
       "displayName": "Lea Schmidt",
       "email": "lea.schmidt@test.com",
       "phone": "+49 159 7423168",
-      "title": "Frau",
-      "authority": "Straßenverkehrsamt",
-      "department": "Energie und Klima",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "female",
+      "authority": {
+        "id": "7",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "5",
       "role": "standarduser",
-      "active": true
+      "active": true,
+      "position": "Kfz-Zulassungsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "20",
@@ -3317,15 +3374,18 @@
       "displayName": "Anna Koch",
       "email": "anna.koch@test.com",
       "phone": "+49 75 7434951",
-      "title": "Frau",
-      "authority": "Naturschutzbehörde",
-      "department": "Energie und Klima",
-      "group": {
-        "id": "4",
-        "title": "Leitung"
+      "title": "female",
+      "authority": {
+        "id": "5",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "4",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Artenschutzbeauftragter",
+      "positionDescription": ""
     },
     {
       "id": "21",
@@ -3334,15 +3394,18 @@
       "displayName": "Andreas Hoffmann",
       "email": "andreas.hoffmann@test.com",
       "phone": "+49 67 6355872",
-      "title": "Herr",
-      "authority": "Straßenbauamt",
-      "department": "Bauplanung",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "5",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Techniker Straßenbeleuchtung",
+      "positionDescription": ""
     },
     {
       "id": "22",
@@ -3351,15 +3414,18 @@
       "displayName": "Florian Weber",
       "email": "florian.weber@test.com",
       "phone": "+49 39 2942848",
-      "title": "Herr",
-      "authority": "Tiefbauamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "8",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "1",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Mitarbeiter Grundwasserbau",
+      "positionDescription": ""
     },
     {
       "id": "23",
@@ -3368,15 +3434,18 @@
       "displayName": "Stefan Becker",
       "email": "stefan.becker@test.com",
       "phone": "+49 177 6751070",
-      "title": "Herr",
-      "authority": "Wasser- und Schifffahrtsamt",
-      "department": "Technische Überwachung",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "10",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "1",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Wasserqualitätsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "24",
@@ -3385,15 +3454,18 @@
       "displayName": "Florian Hoffmann",
       "email": "florian.hoffmann@test.com",
       "phone": "+49 170 2295052",
-      "title": "Herr",
-      "authority": "Gartenbauamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "5",
       "role": "standarduser",
-      "active": true
+      "active": true,
+      "position": "Friedhofsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "25",
@@ -3402,15 +3474,18 @@
       "displayName": "Nina Schmidt",
       "email": "nina.schmidt@test.com",
       "phone": "+49 159 9804765",
-      "title": "Frau",
-      "authority": "Abfallwirtschaftsamt",
-      "department": "Verkehrssicherheit",
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
+      "title": "female",
+      "authority": {
+        "id": "1",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "2",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Mitarbeiter Restmüllentsorgung",
+      "positionDescription": ""
     },
     {
       "id": "26",
@@ -3419,15 +3494,18 @@
       "displayName": "Paul Müller",
       "email": "paul.müller@test.com",
       "phone": "+49 64 8369516",
-      "title": "Herr",
-      "authority": "Gartenbauamt",
-      "department": "Naturschutz",
-      "group": {
-        "id": "4",
-        "title": "Leitung"
+      "title": "male",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "4",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Landschaftsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "27",
@@ -3436,15 +3514,18 @@
       "displayName": "Lea Weber",
       "email": "lea.weber@test.com",
       "phone": "+49 155 4793981",
-      "title": "Frau",
-      "authority": "Naturschutzbehörde",
-      "department": "Landschaftspflege",
-      "group": {
+      "title": "female",
+      "authority": {
         "id": "5",
-        "title": "Support"
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "5",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Biotopschutz-Spezialist",
+      "positionDescription": ""
     },
     {
       "id": "28",
@@ -3453,15 +3534,18 @@
       "displayName": "Nina Hoffmann",
       "email": "nina.hoffmann@test.com",
       "phone": "+49 46 9842501",
-      "title": "Frau",
-      "authority": "Abfallwirtschaftsamt",
-      "department": "Hafensicherheit",
-      "group": {
+      "title": "female",
+      "authority": {
         "id": "1",
-        "title": "Admin"
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "1",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Abfallberater",
+      "positionDescription": ""
     },
     {
       "id": "29",
@@ -3470,15 +3554,18 @@
       "displayName": "Daniel Müller",
       "email": "daniel.müller@test.com",
       "phone": "+49 67 9732281",
-      "title": "Herr",
-      "authority": "Straßenbauamt",
-      "department": "Genehmigungen",
-      "group": {
-        "id": "4",
-        "title": "Leitung"
+      "title": "male",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "4",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Techniker Straßenbeleuchtung",
+      "positionDescription": ""
     },
     {
       "id": "30",
@@ -3487,15 +3574,18 @@
       "displayName": "Lukas Wagner",
       "email": "lukas.wagner@test.com",
       "phone": "+49 166 5265818",
-      "title": "Herr",
-      "authority": "Gartenbauamt",
-      "department": "Abfallentsorgung",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "5",
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Spielplatzwart",
+      "positionDescription": ""
     },
     {
       "id": "31",
@@ -3504,15 +3594,18 @@
       "displayName": "Markus Koch",
       "email": "markus.koch@test.com",
       "phone": "+49 40 4128191",
-      "title": "Herr",
-      "authority": "Tiefbauamt",
-      "department": "Landschaftspflege",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "8",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "3",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Mitarbeiter Grundwasserbau",
+      "positionDescription": ""
     },
     {
       "id": "32",
@@ -3521,15 +3614,18 @@
       "displayName": "Miriam Koch",
       "email": "miriam.koch@test.com",
       "phone": "+49 73 9107113",
-      "title": "Frau",
-      "authority": "Gartenbauamt",
-      "department": "Landschaftspflege",
-      "group": {
+      "title": "female",
+      "authority": {
         "id": "3",
-        "title": "Sachbearbeiter"
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "3",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Baumpfleger",
+      "positionDescription": ""
     },
     {
       "id": "33",
@@ -3538,15 +3634,18 @@
       "displayName": "Lea Richter",
       "email": "lea.richter@test.com",
       "phone": "+49 38 2254058",
-      "title": "Frau",
-      "authority": "Straßenbauamt",
-      "department": "Naturschutz",
-      "group": {
-        "id": "4",
-        "title": "Leitung"
+      "title": "female",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "4",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Straßenplaner",
+      "positionDescription": ""
     },
     {
       "id": "34",
@@ -3555,15 +3654,18 @@
       "displayName": "Markus Wagner",
       "email": "markus.wagner@test.com",
       "phone": "+49 80 7102770",
-      "title": "Herr",
-      "authority": "Gartenbauamt",
-      "department": "Naturschutz",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "5",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Friedhofsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "35",
@@ -3572,15 +3674,18 @@
       "displayName": "Sophie Richter",
       "email": "sophie.richter@test.com",
       "phone": "+49 76 4857409",
-      "title": "Frau",
-      "authority": "Gartenbauamt",
-      "department": "Naturschutz",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "female",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "1",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Landschaftsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "36",
@@ -3589,15 +3694,18 @@
       "displayName": "Sarah Koch",
       "email": "sarah.koch@test.com",
       "phone": "+49 154 4146046",
-      "title": "Frau",
-      "authority": "Gartenbauamt",
-      "department": "Hafensicherheit",
-      "group": {
+      "title": "female",
+      "authority": {
         "id": "3",
-        "title": "Sachbearbeiter"
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "3",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Landschaftsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "37",
@@ -3606,15 +3714,18 @@
       "displayName": "Daniel Fischer",
       "email": "daniel.fischer@test.com",
       "phone": "+49 49 3147315",
-      "title": "Herr",
-      "authority": "Gartenbauamt",
-      "department": "Landschaftspflege",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "5",
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Friedhofsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "38",
@@ -3623,15 +3734,18 @@
       "displayName": "Andreas Koch",
       "email": "andreas.koch@test.com",
       "phone": "+49 87 6600739",
-      "title": "Herr",
-      "authority": "Wasser- und Schifffahrtsamt",
-      "department": "Landschaftspflege",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "10",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "3",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Hafeninspektor",
+      "positionDescription": ""
     },
     {
       "id": "39",
@@ -3640,15 +3754,18 @@
       "displayName": "Paul Becker",
       "email": "paul.becker@test.com",
       "phone": "+49 51 5993410",
-      "title": "Herr",
-      "authority": "Naturschutzbehörde",
-      "department": "Energie und Klima",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "5",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "3",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Biotopschutz-Spezialist",
+      "positionDescription": ""
     },
     {
       "id": "40",
@@ -3657,15 +3774,18 @@
       "displayName": "Sophie Fischer",
       "email": "sophie.fischer@test.com",
       "phone": "+49 164 9819552",
-      "title": "Frau",
-      "authority": "Gartenbauamt",
-      "department": "Abfallentsorgung",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "female",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "5",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Friedhofsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "41",
@@ -3674,15 +3794,18 @@
       "displayName": "Andreas Schmidt",
       "email": "andreas.schmidt@test.com",
       "phone": "+49 72 2084526",
-      "title": "Herr",
-      "authority": "Umweltamt",
-      "department": "Genehmigungen",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "9",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "5",
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Luftreinhalteexperte",
+      "positionDescription": ""
     },
     {
       "id": "42",
@@ -3691,15 +3814,18 @@
       "displayName": "Michael Weber",
       "email": "michael.weber@test.com",
       "phone": "+49 89 9707296",
-      "title": "Herr",
-      "authority": "Luftfahrtamt",
-      "department": "Energie und Klima",
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
+      "title": "male",
+      "authority": {
+        "id": "4",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "2",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Flughafeninspektor",
+      "positionDescription": ""
     },
     {
       "id": "43",
@@ -3708,15 +3834,18 @@
       "displayName": "Miriam Wagner",
       "email": "miriam.wagner@test.com",
       "phone": "+49 156 9332743",
-      "title": "Frau",
-      "authority": "Straßenverkehrsamt",
-      "department": "Technische Überwachung",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "female",
+      "authority": {
+        "id": "7",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "3",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Sachbearbeiter Bußgelder",
+      "positionDescription": ""
     },
     {
       "id": "44",
@@ -3725,15 +3854,18 @@
       "displayName": "Laura Schneider",
       "email": "laura.schneider@test.com",
       "phone": "+49 59 9695600",
-      "title": "Frau",
-      "authority": "Naturschutzbehörde",
-      "department": "Infrastruktur",
-      "group": {
+      "title": "female",
+      "authority": {
         "id": "5",
-        "title": "Support"
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "5",
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Forstingenieur",
+      "positionDescription": ""
     },
     {
       "id": "45",
@@ -3742,15 +3874,18 @@
       "displayName": "Florian Wagner",
       "email": "florian.wagner@test.com",
       "phone": "+49 88 2342087",
-      "title": "Herr",
-      "authority": "Abfallwirtschaftsamt",
-      "department": "Naturschutz",
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
+      "title": "male",
+      "authority": {
+        "id": "1",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "2",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Experte für Biomüll",
+      "positionDescription": ""
     },
     {
       "id": "46",
@@ -3759,15 +3894,18 @@
       "displayName": "Miriam Müller",
       "email": "miriam.müller@test.com",
       "phone": "+49 160 6516984",
-      "title": "Frau",
-      "authority": "Tiefbauamt",
-      "department": "Energie und Klima",
-      "group": {
-        "id": "4",
-        "title": "Leitung"
+      "title": "female",
+      "authority": {
+        "id": "8",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "4",
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Ingenieur Leitungsbau",
+      "positionDescription": ""
     },
     {
       "id": "47",
@@ -3776,15 +3914,18 @@
       "displayName": "Jan Koch",
       "email": "jan.koch@test.com",
       "phone": "+49 163 3386130",
-      "title": "Herr",
-      "authority": "Luftfahrtamt",
-      "department": "Energie und Klima",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "4",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "5",
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Flughafeninspektor",
+      "positionDescription": ""
     },
     {
       "id": "48",
@@ -3793,15 +3934,18 @@
       "displayName": "Miriam Richter",
       "email": "miriam.richter@test.com",
       "phone": "+49 162 6113421",
-      "title": "Frau",
-      "authority": "Naturschutzbehörde",
-      "department": "Naturschutz",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "female",
+      "authority": {
+        "id": "5",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "3",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Forstingenieur",
+      "positionDescription": ""
     },
     {
       "id": "49",
@@ -3810,15 +3954,18 @@
       "displayName": "Julia Schneider",
       "email": "julia.schneider@test.com",
       "phone": "+49 168 9074816",
-      "title": "Frau",
-      "authority": "Straßenbauamt",
-      "department": "Naturschutz",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "female",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "1",
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Techniker Straßenbeleuchtung",
+      "positionDescription": ""
     },
     {
       "id": "50",
@@ -3827,15 +3974,18 @@
       "displayName": "Laura Schneider",
       "email": "laura.schneider@test.com",
       "phone": "+49 48 9179995",
-      "title": "Frau",
-      "authority": "Luftfahrtamt",
-      "department": "Landschaftspflege",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "female",
+      "authority": {
+        "id": "4",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "3",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Lärmschutzbeauftragter",
+      "positionDescription": ""
     },
     {
       "id": "51",
@@ -3844,15 +3994,18 @@
       "displayName": "Michael Richter",
       "email": "michael.richter@test.com",
       "phone": "+49 155 1585845",
-      "title": "Herr",
-      "authority": "Straßenbauamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "3",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Brückenbauingenieur",
+      "positionDescription": ""
     },
     {
       "id": "52",
@@ -3861,15 +4014,18 @@
       "displayName": "Andreas Schneider",
       "email": "andreas.schneider@test.com",
       "phone": "+49 85 3339877",
-      "title": "Herr",
-      "authority": "Tiefbauamt",
-      "department": "Landschaftspflege",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "8",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "5",
       "role": "standarduser",
-      "active": true
+      "active": true,
+      "position": "Ingenieur Leitungsbau",
+      "positionDescription": ""
     },
     {
       "id": "53",
@@ -3878,15 +4034,18 @@
       "displayName": "Florian Weber",
       "email": "florian.weber@test.com",
       "phone": "+49 158 6313183",
-      "title": "Herr",
-      "authority": "Umweltamt",
-      "department": "Verkehrssicherheit",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "9",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "5",
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Lärmschutzbeauftragter",
+      "positionDescription": ""
     },
     {
       "id": "54",
@@ -3895,15 +4054,18 @@
       "displayName": "Katharina Fischer",
       "email": "katharina.fischer@test.com",
       "phone": "+49 81 4445724",
-      "title": "Frau",
-      "authority": "Naturschutzbehörde",
-      "department": "Naturschutz",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "female",
+      "authority": {
+        "id": "5",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "3",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Biotopschutz-Spezialist",
+      "positionDescription": ""
     },
     {
       "id": "55",
@@ -3912,15 +4074,18 @@
       "displayName": "Jan Fischer",
       "email": "jan.fischer@test.com",
       "phone": "+49 155 7266287",
-      "title": "Herr",
-      "authority": "Naturschutzbehörde",
-      "department": "Energie und Klima",
-      "group": {
+      "title": "male",
+      "authority": {
         "id": "5",
-        "title": "Support"
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "5",
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Wasserwirtschaftsingenieur",
+      "positionDescription": ""
     },
     {
       "id": "56",
@@ -3929,15 +4094,18 @@
       "displayName": "Clara Schneider",
       "email": "clara.schneider@test.com",
       "phone": "+49 160 6644307",
-      "title": "Frau",
-      "authority": "Tiefbauamt",
-      "department": "Bauplanung",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "female",
+      "authority": {
+        "id": "8",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "5",
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Ingenieur Leitungsbau",
+      "positionDescription": ""
     },
     {
       "id": "57",
@@ -3946,15 +4114,18 @@
       "displayName": "Stefan Hoffmann",
       "email": "stefan.hoffmann@test.com",
       "phone": "+49 75 1267565",
-      "title": "Herr",
-      "authority": "Abfallwirtschaftsamt",
-      "department": "Genehmigungen",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "1",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "5",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Mitarbeiter Restmüllentsorgung",
+      "positionDescription": ""
     },
     {
       "id": "58",
@@ -3963,15 +4134,18 @@
       "displayName": "Lukas Fischer",
       "email": "lukas.fischer@test.com",
       "phone": "+49 158 7422588",
-      "title": "Herr",
-      "authority": "Straßenbauamt",
-      "department": "Verkehrssicherheit",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "1",
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Brückenbauingenieur",
+      "positionDescription": ""
     },
     {
       "id": "59",
@@ -3980,15 +4154,18 @@
       "displayName": "Florian Koch",
       "email": "florian.koch@test.com",
       "phone": "+49 171 3689860",
-      "title": "Herr",
-      "authority": "Straßenverkehrsamt",
-      "department": "Verkehrssicherheit",
-      "group": {
-        "id": "4",
-        "title": "Leitung"
+      "title": "male",
+      "authority": {
+        "id": "7",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "4",
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Verkehrsüberwacher",
+      "positionDescription": ""
     },
     {
       "id": "60",
@@ -3997,15 +4174,18 @@
       "displayName": "Thomas Müller",
       "email": "thomas.müller@test.com",
       "phone": "+49 53 6802030",
-      "title": "Herr",
-      "authority": "Wasser- und Schifffahrtsamt",
-      "department": "Hafensicherheit",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "10",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "1",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Binnenschifffahrtsinspektor",
+      "positionDescription": ""
     },
     {
       "id": "61",
@@ -4014,15 +4194,18 @@
       "displayName": "Katharina Wagner",
       "email": "katharina.wagner@test.com",
       "phone": "+49 179 2020914",
-      "title": "Frau",
-      "authority": "Gartenbauamt",
-      "department": "Technische Überwachung",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "female",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "1",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Landschaftsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "62",
@@ -4031,15 +4214,18 @@
       "displayName": "Paul Schneider",
       "email": "paul.schneider@test.com",
       "phone": "+49 37 6443930",
-      "title": "Herr",
-      "authority": "Gartenbauamt",
-      "department": "Landschaftspflege",
-      "group": {
+      "title": "male",
+      "authority": {
         "id": "3",
-        "title": "Sachbearbeiter"
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "3",
       "role": "standarduser",
-      "active": true
+      "active": true,
+      "position": "Friedhofsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "63",
@@ -4048,15 +4234,18 @@
       "displayName": "Julia Becker",
       "email": "julia.becker@test.com",
       "phone": "+49 172 5745104",
-      "title": "Frau",
-      "authority": "Wasser- und Schifffahrtsamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "female",
+      "authority": {
+        "id": "10",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "3",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Küstenschutztechniker",
+      "positionDescription": ""
     },
     {
       "id": "64",
@@ -4065,15 +4254,18 @@
       "displayName": "Jan Schmidt",
       "email": "jan.schmidt@test.com",
       "phone": "+49 67 9148699",
-      "title": "Herr",
-      "authority": "Straßenverkehrsamt",
-      "department": "Bauplanung",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "7",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "1",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Sachbearbeiter Bußgelder",
+      "positionDescription": ""
     },
     {
       "id": "65",
@@ -4082,15 +4274,18 @@
       "displayName": "Nina Becker",
       "email": "nina.becker@test.com",
       "phone": "+49 155 8826446",
-      "title": "Frau",
-      "authority": "Naturschutzbehörde",
-      "department": "Hafensicherheit",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "female",
+      "authority": {
+        "id": "5",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "3",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Klimaschutzkoordinator",
+      "positionDescription": ""
     },
     {
       "id": "66",
@@ -4099,15 +4294,18 @@
       "displayName": "Jan Hoffmann",
       "email": "jan.hoffmann@test.com",
       "phone": "+49 177 8905694",
-      "title": "Herr",
-      "authority": "Umweltamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "9",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "3",
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Luftreinhalteexperte",
+      "positionDescription": ""
     },
     {
       "id": "67",
@@ -4116,15 +4314,18 @@
       "displayName": "Nina Becker",
       "email": "nina.becker@test.com",
       "phone": "+49 175 5363508",
-      "title": "Frau",
-      "authority": "Bauamt",
-      "department": "Abfallentsorgung",
-      "group": {
+      "title": "female",
+      "authority": {
         "id": "2",
-        "title": "Technischer Mitarbeiter"
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "2",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Bauprüfer",
+      "positionDescription": ""
     },
     {
       "id": "68",
@@ -4133,15 +4334,18 @@
       "displayName": "Jan Hoffmann",
       "email": "jan.hoffmann@test.com",
       "phone": "+49 172 9419706",
-      "title": "Herr",
-      "authority": "Wasser- und Schifffahrtsamt",
-      "department": "Verkehrssicherheit",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "10",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "5",
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Binnenschifffahrtsinspektor",
+      "positionDescription": ""
     },
     {
       "id": "69",
@@ -4150,15 +4354,18 @@
       "displayName": "Thomas Wagner",
       "email": "thomas.wagner@test.com",
       "phone": "+49 34 2910938",
-      "title": "Herr",
-      "authority": "Straßenverkehrsamt",
-      "department": "Bauplanung",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "7",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "5",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Kfz-Zulassungsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "70",
@@ -4167,15 +4374,18 @@
       "displayName": "Paul Becker",
       "email": "paul.becker@test.com",
       "phone": "+49 46 4220548",
-      "title": "Herr",
-      "authority": "Luftfahrtamt",
-      "department": "Landschaftspflege",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "4",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "3",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Luftfahrtprüfer",
+      "positionDescription": ""
     },
     {
       "id": "71",
@@ -4184,15 +4394,18 @@
       "displayName": "Daniel Fischer",
       "email": "daniel.fischer@test.com",
       "phone": "+49 163 4221116",
-      "title": "Herr",
-      "authority": "Naturschutzbehörde",
-      "department": "Energie und Klima",
-      "group": {
-        "id": "4",
-        "title": "Leitung"
+      "title": "male",
+      "authority": {
+        "id": "5",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "4",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Wasserwirtschaftsingenieur",
+      "positionDescription": ""
     },
     {
       "id": "72",
@@ -4201,15 +4414,18 @@
       "displayName": "Lukas Weber",
       "email": "lukas.weber@test.com",
       "phone": "+49 45 1645946",
-      "title": "Herr",
-      "authority": "Straßenbauamt",
-      "department": "Genehmigungen",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "5",
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Techniker Straßenbeleuchtung",
+      "positionDescription": ""
     },
     {
       "id": "73",
@@ -4218,15 +4434,18 @@
       "displayName": "Anna Müller",
       "email": "anna.müller@test.com",
       "phone": "+49 67 1201642",
-      "title": "Frau",
-      "authority": "Bauamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "female",
+      "authority": {
+        "id": "2",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "1",
       "role": "standarduser",
-      "active": false
+      "active": false,
+      "position": "Bauprüfer",
+      "positionDescription": ""
     },
     {
       "id": "74",
@@ -4235,15 +4454,18 @@
       "displayName": "Clara Schneider",
       "email": "clara.schneider@test.com",
       "phone": "+49 73 6853699",
-      "title": "Frau",
-      "authority": "Straßenverkehrsamt",
-      "department": "Energie und Klima",
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
+      "title": "female",
+      "authority": {
+        "id": "7",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "2",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Kfz-Zulassungsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "75",
@@ -4252,15 +4474,18 @@
       "displayName": "Miriam Koch",
       "email": "miriam.koch@test.com",
       "phone": "+49 174 2720792",
-      "title": "Frau",
-      "authority": "Abfallwirtschaftsamt",
-      "department": "Abfallentsorgung",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "female",
+      "authority": {
+        "id": "1",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "3",
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Leiter Recyclinghof",
+      "positionDescription": ""
     },
     {
       "id": "76",
@@ -4269,15 +4494,18 @@
       "displayName": "Markus Weber",
       "email": "markus.weber@test.com",
       "phone": "+49 57 2664127",
-      "title": "Herr",
-      "authority": "Straßenverkehrsamt",
-      "department": "Technische Überwachung",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "7",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "3",
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Fahrzeugtechniker",
+      "positionDescription": ""
     },
     {
       "id": "77",
@@ -4286,15 +4514,18 @@
       "displayName": "Jan Müller",
       "email": "jan.müller@test.com",
       "phone": "+49 72 3178766",
-      "title": "Herr",
-      "authority": "Straßenbauamt",
-      "department": "Genehmigungen",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "1",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Straßenplaner",
+      "positionDescription": ""
     },
     {
       "id": "78",
@@ -4303,15 +4534,18 @@
       "displayName": "Anna Weber",
       "email": "anna.weber@test.com",
       "phone": "+49 34 2774589",
-      "title": "Frau",
-      "authority": "Tiefbauamt",
-      "department": "Hafensicherheit",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "female",
+      "authority": {
+        "id": "8",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "3",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Ingenieur Tunnelbau",
+      "positionDescription": ""
     },
     {
       "id": "79",
@@ -4320,15 +4554,18 @@
       "displayName": "Daniel Müller",
       "email": "daniel.müller@test.com",
       "phone": "+49 178 3871076",
-      "title": "Herr",
-      "authority": "Abfallwirtschaftsamt",
-      "department": "Landschaftspflege",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "1",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "3",
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Mitarbeiter Restmüllentsorgung",
+      "positionDescription": ""
     },
     {
       "id": "80",
@@ -4337,15 +4574,18 @@
       "displayName": "Lukas Schneider",
       "email": "lukas.schneider@test.com",
       "phone": "+49 157 7187253",
-      "title": "Herr",
-      "authority": "Abfallwirtschaftsamt",
-      "department": "Landschaftspflege",
-      "group": {
-        "id": "4",
-        "title": "Leitung"
+      "title": "male",
+      "authority": {
+        "id": "1",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "4",
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Experte für Sondermüll",
+      "positionDescription": ""
     },
     {
       "id": "81",
@@ -4354,15 +4594,18 @@
       "displayName": "Thomas Schmidt",
       "email": "thomas.schmidt@test.com",
       "phone": "+49 50 1995552",
-      "title": "Herr",
-      "authority": "Straßenbauamt",
-      "department": "Bauplanung",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "1",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Brückenbauingenieur",
+      "positionDescription": ""
     },
     {
       "id": "82",
@@ -4371,15 +4614,18 @@
       "displayName": "Katharina Koch",
       "email": "katharina.koch@test.com",
       "phone": "+49 151 5410639",
-      "title": "Frau",
-      "authority": "Straßenverkehrsamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "female",
+      "authority": {
+        "id": "7",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "1",
       "role": "admin",
-      "active": true
+      "active": true,
+      "position": "Kfz-Zulassungsprüfer",
+      "positionDescription": ""
     },
     {
       "id": "83",
@@ -4388,15 +4634,18 @@
       "displayName": "Stefan Hoffmann",
       "email": "stefan.hoffmann@test.com",
       "phone": "+49 168 7995898",
-      "title": "Herr",
-      "authority": "Abfallwirtschaftsamt",
-      "department": "Hafensicherheit",
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
+      "title": "male",
+      "authority": {
+        "id": "1",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "2",
       "role": "systemadmin",
-      "active": true
+      "active": true,
+      "position": "Leiter Recyclinghof",
+      "positionDescription": ""
     },
     {
       "id": "84",
@@ -4405,15 +4654,18 @@
       "displayName": "Sarah Wagner",
       "email": "sarah.wagner@test.com",
       "phone": "+49 179 7458737",
-      "title": "Frau",
-      "authority": "Straßenbauamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "female",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "5",
       "role": "standarduser",
-      "active": true
+      "active": true,
+      "position": "Straßenunterhaltungsarbeiter",
+      "positionDescription": ""
     },
     {
       "id": "85",
@@ -4422,15 +4674,18 @@
       "displayName": "Miriam Wagner",
       "email": "miriam.wagner@test.com",
       "phone": "+49 47 3725028",
-      "title": "Frau",
-      "authority": "Umweltamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "4",
-        "title": "Leitung"
+      "title": "female",
+      "authority": {
+        "id": "9",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "4",
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Luftreinhalteexperte",
+      "positionDescription": ""
     },
     {
       "id": "86",
@@ -4439,15 +4694,18 @@
       "displayName": "Lukas Richter",
       "email": "lukas.richter@test.com",
       "phone": "+49 79 6492064",
-      "title": "Herr",
-      "authority": "Straßenbauamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "6",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "1",
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Techniker Straßenbeleuchtung",
+      "positionDescription": ""
     },
     {
       "id": "87",
@@ -4456,15 +4714,18 @@
       "displayName": "Paul Hoffmann",
       "email": "paul.hoffmann@test.com",
       "phone": "+49 156 2227411",
-      "title": "Herr",
-      "authority": "Straßenverkehrsamt",
-      "department": "Abfallentsorgung",
-      "group": {
-        "id": "2",
-        "title": "Technischer Mitarbeiter"
+      "title": "male",
+      "authority": {
+        "id": "7",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "2",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Sachbearbeiter Bußgelder",
+      "positionDescription": ""
     },
     {
       "id": "88",
@@ -4473,15 +4734,18 @@
       "displayName": "Laura Fischer",
       "email": "laura.fischer@test.com",
       "phone": "+49 158 2930295",
-      "title": "Frau",
-      "authority": "Tiefbauamt",
-      "department": "Infrastruktur",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "female",
+      "authority": {
+        "id": "8",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "5",
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Ingenieur Tunnelbau",
+      "positionDescription": ""
     },
     {
       "id": "89",
@@ -4490,15 +4754,18 @@
       "displayName": "Katharina Weber",
       "email": "katharina.weber@test.com",
       "phone": "+49 165 1494160",
-      "title": "Frau",
-      "authority": "Abfallwirtschaftsamt",
-      "department": "Abfallentsorgung",
-      "group": {
+      "title": "female",
+      "authority": {
         "id": "1",
-        "title": "Admin"
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "1",
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Mitarbeiter Restmüllentsorgung",
+      "positionDescription": ""
     },
     {
       "id": "90",
@@ -4507,15 +4774,18 @@
       "displayName": "Florian Becker",
       "email": "florian.becker@test.com",
       "phone": "+49 172 9087660",
-      "title": "Herr",
-      "authority": "Luftfahrtamt",
-      "department": "Naturschutz",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "4",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "1",
       "role": "systemdev",
-      "active": false
+      "active": false,
+      "position": "Flugraumüberwacher",
+      "positionDescription": ""
     },
     {
       "id": "91",
@@ -4524,15 +4794,18 @@
       "displayName": "Stefan Schneider",
       "email": "stefan.schneider@test.com",
       "phone": "+49 81 2281617",
-      "title": "Herr",
-      "authority": "Gartenbauamt",
-      "department": "Landschaftspflege",
-      "group": {
+      "title": "male",
+      "authority": {
         "id": "3",
-        "title": "Sachbearbeiter"
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "3",
       "role": "systemuser",
-      "active": false
+      "active": false,
+      "position": "Parkanlagenpfleger",
+      "positionDescription": ""
     },
     {
       "id": "92",
@@ -4541,15 +4814,18 @@
       "displayName": "Katharina Schmidt",
       "email": "katharina.schmidt@test.com",
       "phone": "+49 175 4739709",
-      "title": "Frau",
-      "authority": "Gartenbauamt",
-      "department": "Genehmigungen",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "female",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "5",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Parkanlagenpfleger",
+      "positionDescription": ""
     },
     {
       "id": "93",
@@ -4558,15 +4834,18 @@
       "displayName": "Miriam Hoffmann",
       "email": "miriam.hoffmann@test.com",
       "phone": "+49 89 6291629",
-      "title": "Frau",
-      "authority": "Umweltamt",
-      "department": "Naturschutz",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "female",
+      "authority": {
+        "id": "9",
+        "department": {
+          "id": "4"
+        }
       },
+      "group": "1",
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Umweltpädagoge",
+      "positionDescription": ""
     },
     {
       "id": "94",
@@ -4575,15 +4854,18 @@
       "displayName": "Daniel Wagner",
       "email": "daniel.wagner@test.com",
       "phone": "+49 44 1579530",
-      "title": "Herr",
-      "authority": "Gartenbauamt",
-      "department": "Verkehrssicherheit",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "5",
       "role": "systemuser",
-      "active": true
+      "active": true,
+      "position": "Landschaftsgärtner",
+      "positionDescription": ""
     },
     {
       "id": "95",
@@ -4592,15 +4874,18 @@
       "displayName": "Katharina Becker",
       "email": "katharina.becker@test.com",
       "phone": "+49 165 3362071",
-      "title": "Frau",
-      "authority": "Gartenbauamt",
-      "department": "Abfallentsorgung",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "female",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "1",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Parkanlagenpfleger",
+      "positionDescription": ""
     },
     {
       "id": "96",
@@ -4609,15 +4894,18 @@
       "displayName": "Markus Müller",
       "email": "markus.müller@test.com",
       "phone": "+49 169 3695491",
-      "title": "Herr",
-      "authority": "Luftfahrtamt",
-      "department": "Verkehrssicherheit",
-      "group": {
-        "id": "5",
-        "title": "Support"
+      "title": "male",
+      "authority": {
+        "id": "4",
+        "department": {
+          "id": "3"
+        }
       },
+      "group": "5",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Luftfahrtprüfer",
+      "positionDescription": ""
     },
     {
       "id": "97",
@@ -4626,15 +4914,18 @@
       "displayName": "Sophie Schneider",
       "email": "sophie.schneider@test.com",
       "phone": "+49 51 1118028",
-      "title": "Frau",
-      "authority": "Umweltamt",
-      "department": "Hafensicherheit",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "female",
+      "authority": {
+        "id": "9",
+        "department": {
+          "id": "2"
+        }
       },
+      "group": "1",
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Lärmschutzbeauftragter",
+      "positionDescription": ""
     },
     {
       "id": "98",
@@ -4643,15 +4934,18 @@
       "displayName": "Florian Müller",
       "email": "florian.müller@test.com",
       "phone": "+49 74 5583922",
-      "title": "Herr",
-      "authority": "Umweltamt",
-      "department": "Genehmigungen",
-      "group": {
-        "id": "3",
-        "title": "Sachbearbeiter"
+      "title": "male",
+      "authority": {
+        "id": "9",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "3",
       "role": "systemadmin",
-      "active": false
+      "active": false,
+      "position": "Luftreinhalteexperte",
+      "positionDescription": ""
     },
     {
       "id": "99",
@@ -4660,15 +4954,18 @@
       "displayName": "Paul Schmidt",
       "email": "paul.schmidt@test.com",
       "phone": "+49 33 4798606",
-      "title": "Herr",
-      "authority": "Umweltamt",
-      "department": "Naturschutz",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "male",
+      "authority": {
+        "id": "9",
+        "department": {
+          "id": "5"
+        }
       },
+      "group": "1",
       "role": "systemdev",
-      "active": true
+      "active": true,
+      "position": "Energieberater",
+      "positionDescription": ""
     },
     {
       "id": "100",
@@ -4677,15 +4974,323 @@
       "displayName": "Julia Müller",
       "email": "julia.müller@test.com",
       "phone": "+49 163 7998557",
-      "title": "Frau",
-      "authority": "Gartenbauamt",
-      "department": "Verkehrssicherheit",
-      "group": {
-        "id": "1",
-        "title": "Admin"
+      "title": "female",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "1"
+        }
       },
+      "group": "1",
       "role": "admin",
-      "active": false
+      "active": false,
+      "position": "Parkanlagenpfleger",
+      "positionDescription": ""
+    },
+    {
+      "id": "8vj4a2z",
+      "firstName": "Test 1",
+      "title": "male",
+      "lastName": "User 5",
+      "email": "testuser@test.test",
+      "authority": {
+        "id": "3",
+        "department": {
+          "id": "3"
+        }
+      },
+      "department": "3",
+      "group": "",
+      "phone": "+49 164 6822941",
+      "active": false,
+      "position": "",
+      "positionDescription": "",
+      "role": "standarduser",
+      "displayName": "Test 1 User 5"
+    }
+  ],
+  "userGroups": [
+    {
+      "id": "1",
+      "title": "Admin"
+    },
+    {
+      "id": "2",
+      "title": "Technischer Mitarbeiter"
+    },
+    {
+      "id": "3",
+      "title": "Sachbearbeiter"
+    },
+    {
+      "id": "4",
+      "title": "Leitung"
+    },
+    {
+      "id": "5",
+      "title": "Support"
+    }
+  ],
+  "authorities": [
+    {
+      "id": "1",
+      "title": "Abfallwirtschaftsamt",
+      "departments": [
+        {
+          "id": "1",
+          "title": "Restmüllentsorgung"
+        },
+        {
+          "id": "2",
+          "title": "Biomüll und Kompostierung"
+        },
+        {
+          "id": "3",
+          "title": "Recyclinghöfe"
+        },
+        {
+          "id": "4",
+          "title": "Sondermüll"
+        },
+        {
+          "id": "5",
+          "title": "Abfallvermeidung und Aufklärung"
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "title": "Bauamt",
+      "departments": [
+        {
+          "id": "1",
+          "title": "Bauplanung"
+        },
+        {
+          "id": "2",
+          "title": "Baugenehmigungen"
+        },
+        {
+          "id": "3",
+          "title": "Baustellenkontrolle"
+        },
+        {
+          "id": "4",
+          "title": "Denkmalschutz"
+        },
+        {
+          "id": "5",
+          "title": "Stadtentwicklung"
+        }
+      ]
+    },
+    {
+      "id": "3",
+      "title": "Gartenbauamt",
+      "departments": [
+        {
+          "id": "1",
+          "title": "Parkanlagen"
+        },
+        {
+          "id": "2",
+          "title": "Friedhofsgärtnerei"
+        },
+        {
+          "id": "3",
+          "title": "Baumpflege"
+        },
+        {
+          "id": "4",
+          "title": "Spielplätze"
+        },
+        {
+          "id": "5",
+          "title": "Blumen- und Grünflächen"
+        }
+      ]
+    },
+    {
+      "id": "4",
+      "title": "Luftfahrtamt",
+      "departments": [
+        {
+          "id": "1",
+          "title": "Flugsicherheit"
+        },
+        {
+          "id": "2",
+          "title": "Flughafenaufsicht"
+        },
+        {
+          "id": "3",
+          "title": "Pilotenzulassung"
+        },
+        {
+          "id": "4",
+          "title": "Lärmschutz"
+        },
+        {
+          "id": "5",
+          "title": "Luftraumüberwachung"
+        }
+      ]
+    },
+    {
+      "id": "5",
+      "title": "Naturschutzbehörde",
+      "departments": [
+        {
+          "id": "1",
+          "title": "Artenschutz"
+        },
+        {
+          "id": "2",
+          "title": "Biotope"
+        },
+        {
+          "id": "3",
+          "title": "Forst- und Waldschutz"
+        },
+        {
+          "id": "4",
+          "title": "Gewässerschutz"
+        },
+        {
+          "id": "5",
+          "title": "Klimaschutzprojekte"
+        }
+      ]
+    },
+    {
+      "id": "6",
+      "title": "Straßenbauamt",
+      "departments": [
+        {
+          "id": "1",
+          "title": "Straßenplanung"
+        },
+        {
+          "id": "2",
+          "title": "Straßenunterhaltung"
+        },
+        {
+          "id": "3",
+          "title": "Brückenbau"
+        },
+        {
+          "id": "4",
+          "title": "Radwege"
+        },
+        {
+          "id": "5",
+          "title": "Straßenbeleuchtung"
+        }
+      ]
+    },
+    {
+      "id": "7",
+      "title": "Straßenverkehrsamt",
+      "departments": [
+        {
+          "id": "1",
+          "title": "Kfz-Zulassung"
+        },
+        {
+          "id": "2",
+          "title": "Fahrerlaubnisse"
+        },
+        {
+          "id": "3",
+          "title": "Verkehrsüberwachung"
+        },
+        {
+          "id": "4",
+          "title": "Bußgeldstelle"
+        },
+        {
+          "id": "5",
+          "title": "Fahrzeugtechnik"
+        }
+      ]
+    },
+    {
+      "id": "8",
+      "title": "Tiefbauamt",
+      "departments": [
+        {
+          "id": "1",
+          "title": "Kanalisationsbau"
+        },
+        {
+          "id": "2",
+          "title": "Tunnelbau"
+        },
+        {
+          "id": "3",
+          "title": "Fundamentbau"
+        },
+        {
+          "id": "4",
+          "title": "Leitungsbau"
+        },
+        {
+          "id": "5",
+          "title": "Grundwasserbau"
+        }
+      ]
+    },
+    {
+      "id": "9",
+      "title": "Umweltamt",
+      "departments": [
+        {
+          "id": "1",
+          "title": "Luftreinhaltung"
+        },
+        {
+          "id": "2",
+          "title": "Lärmschutz"
+        },
+        {
+          "id": "3",
+          "title": "Bodenschutz"
+        },
+        {
+          "id": "4",
+          "title": "Umweltbildung"
+        },
+        {
+          "id": "5",
+          "title": "Energieeffizienz"
+        }
+      ]
+    },
+    {
+      "id": "10",
+      "title": "Wasser- und Schifffahrtsamt",
+      "departments": [
+        {
+          "id": "1",
+          "title": "Hafenaufsicht"
+        },
+        {
+          "id": "2",
+          "title": "Binnenschifffahrt"
+        },
+        {
+          "id": "3",
+          "title": "Küstenschutz"
+        },
+        {
+          "id": "4",
+          "title": "Wasserqualität"
+        },
+        {
+          "id": "5",
+          "title": "Schleusenbetrieb"
+        }
+      ]
     }
   ],
   "roles": [
@@ -4853,6 +5458,16 @@
       "name": "Global Data Assignment",
       "description": "Beschreibungstext",
       "id": "KERWOWP"
+    },
+    {
+      "type": "System",
+      "tenant": "ExampleCorp",
+      "user": null,
+      "permissions": null,
+      "createdAt": "2025-10-02T14:18:37.769Z",
+      "name": "Testrolle",
+      "description": "test",
+      "id": "b81evni"
     }
   ]
 }
