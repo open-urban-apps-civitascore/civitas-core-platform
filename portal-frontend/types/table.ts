@@ -15,4 +15,5 @@ export interface TableProps<T> {
   onRowClick?: (row: Row<T>) => void
   onPaginationChange: (newPagination: PaginationState) => void
   onSortingChange: (newSorting: SortingState) => void
+  isLoading?: boolean
 }

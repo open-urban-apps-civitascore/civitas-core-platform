@@ -5036,27 +5036,27 @@
   "authorities": [
     {
       "id": "1",
-      "title": "Gesundheitsamt",
+      "title": "Abfallwirtschaftsamt",
       "departments": [
         {
           "id": "1",
-          "title": "Infektionsschutz"
+          "title": "Restmüllentsorgung"
         },
         {
           "id": "2",
-          "title": "Epidemiologie"
+          "title": "Biomüll und Kompostierung"
         },
         {
           "id": "3",
-          "title": "Hygieneüberwachung"
+          "title": "Recyclinghöfe"
         },
         {
           "id": "4",
-          "title": "Umweltbezogener Gesundheitsschutz"
+          "title": "Sondermüll"
         },
         {
           "id": "5",
-          "title": "Gesundheitsprävention & Aufklärung"
+          "title": "Abfallvermeidung und Aufklärung"
         }
       ]
     },

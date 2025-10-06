@@ -39,18 +39,7 @@ const page = async (props: PageProps) => {
   }
 }
 
-// useEffect(() => {
-//   getUserData(userId)
-// }, [])
   const userData = mapFormUserData(await getUserData(userId))
-
-
-    // const handleUpdateUser = (userData: UserFormData) => {
-    //   console.log('handleUpdateUser: ', userData)
-    //   const updateUserData = mapApiUserData(userData)
-    //   updateUser(updateUserData)
-    // }
-  
 
   return <UserDetails userData={userData} isEditMode />
 }

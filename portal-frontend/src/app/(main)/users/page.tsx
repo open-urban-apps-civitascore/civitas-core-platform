@@ -58,6 +58,7 @@ const UsersPage = () => {
   const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [selectedTab, setSelectedTab] = useState('users')
+  const [isLoading, setIsLoading] = useState(true)
   const tabs: Tab[] = [
     {
       value: 'users',
@@ -88,6 +89,7 @@ const UsersPage = () => {
     const params = setApiRequestParams(totalPages)
 
     try {
+      setIsLoading(true)
       const [usersResponse, authoritiesResponse] = await Promise.all([
         fetch(`${URL}/users?${params.toString()}`, {
           cache: 'no-store',
@@ -107,6 +109,7 @@ const UsersPage = () => {
 
       const users = mapListUsers(usersData, authoritiesData)
       setListUsers(users)
+      setIsLoading(false)
 
       const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
       if (rowCount !== totalCount) {
@@ -114,6 +117,7 @@ const UsersPage = () => {
       }
     } catch (error) {
       console.error(error)
+      setIsLoading(false)
       throw new Error('An error occurred while loading form data')
     }
   }
@@ -156,6 +160,7 @@ const UsersPage = () => {
           onRowClick={handleRowClick}
           onSortingChange={setSortingParams}
           onPaginationChange={setPaginationParams}
+          isLoading={isLoading}
         />
       </TableContainer>
     </div>

@@ -97,13 +97,13 @@ export const UserForm = (props: UserFormProps) => {
     const { id, ...createUserData } = mappedData
     createUser(createUserData)
     form.reset()
-    router.push('/users')
+    router.back()
   }
 
   const handleUpdateUser = (userData: UserFormData) => {
     const updateUserData = mapApiUserData(userData)
     updateUser(updateUserData)
-    router.push('/users')
+    router.back()
   }
 
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)

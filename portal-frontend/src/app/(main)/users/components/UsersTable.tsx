@@ -26,6 +26,7 @@ const UsersTable = (props: UsersTableProps) => {
     onRowClick,
     onPaginationChange,
     onSortingChange,
+    isLoading
   } = props
   const t = useTranslations('users')
   const columnHelper = createColumnHelper<ListUser>()
@@ -96,6 +97,7 @@ const UsersTable = (props: UsersTableProps) => {
       pageSize={pageSize}
       totalPages={totalPages}
       onRowClick={onRowClick}
+      isLoading={isLoading}
     />
   )
 }
