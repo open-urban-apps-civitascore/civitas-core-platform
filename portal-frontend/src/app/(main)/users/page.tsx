@@ -12,7 +12,8 @@ import { useQueryParams } from '@/hooks/useQueryParams'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Button } from '@/components/ui/button'
-import { Authority, TitleSchemaType, UserResponse } from '@/types/users'
+import { Authority, UserResponse } from '@/types/users'
+import { mapListUsers } from '@/utils/users'
 import { Plus } from 'lucide-react'
 import UsersTable from './components/UsersTable'
 
@@ -25,21 +26,6 @@ export type ListUser = {
   email: string
   isactive: boolean
 }
-
-export const mapListUsers = (users: UserResponse[], authorities: Authority[]): ListUser[] =>
-  users.map(user => {
-    const authority = authorities.find(authority => user.authority?.id === authority.id)
-    const department = authority?.departments.find(department => department.id === user.authority?.department?.id)
-    return {
-      id: user.id,
-      displayName: user.displayName,
-      authority: authority?.title ?? '',
-      department: department?.title ?? '',
-      role: user.role || '',
-      email: user.email,
-      isactive: user.active,
-    }
-  })
 
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {
@@ -128,7 +114,8 @@ const UsersPage = () => {
 
   const handleRowClick = (row: Row<ListUser>) => {
     if (row.id) {
-      router.push(`users/${row.id}`, {})
+      const params = setApiRequestParams(totalPages)
+      router.push(`users/${row.id}?${params}`, {})
     }
   }
 

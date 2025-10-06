@@ -1,5 +1,3 @@
-// 'use client'
-
 import { UserResponse } from '@/types/users'
 import { mapFormUserData } from '@/utils/users'
 import { UserDetails } from '../components/UserDetails'
@@ -14,8 +12,6 @@ interface PageProps {
 const page = async (props: PageProps) => {
   const { params } = props
   const { userId } = await params
-
-  // const [userData, setUserData] = useState<UserResponse | null>(null)
 
   const getUserData = async (userId: string) => {
   try {
@@ -33,7 +29,6 @@ const page = async (props: PageProps) => {
       throw new Error('User not found')
     }
     return userData
-    // setUserData(userData)
   } catch (error) {
     throw new Error('An error occurred while loading form data')
   }

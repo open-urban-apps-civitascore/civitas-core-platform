@@ -1,5 +1,21 @@
 import { FormUser } from '@/app/(main)/users/components/UserForm'
-import { UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+import { ListUser } from '@/app/(main)/users/page'
+import { Authority, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+
+export const mapListUsers = (users: UserResponse[], authorities: Authority[]): ListUser[] =>
+  users.map(user => {
+    const authority = authorities.find(authority => user.authority?.id === authority.id)
+    const department = authority?.departments.find(department => department.id === user.authority?.department?.id)
+    return {
+      id: user.id,
+      displayName: user.displayName,
+      authority: authority?.title ?? '',
+      department: department?.title ?? '',
+      role: user.role || '',
+      email: user.email,
+      isactive: user.active,
+    }
+  })
 
 export const mapApiUserData = (formData: UserFormData) => {
   const parsed = UserFormSchema.parse(formData)

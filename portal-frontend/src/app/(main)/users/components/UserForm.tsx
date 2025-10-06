@@ -15,8 +15,9 @@ import { Switch } from '@/components/form/fields/Switch'
 import { TextArea } from '@/components/form/fields/TextArea'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { mapApiUserData } from '@/utils/users'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createUser, updateUser } from '../actions'
+import { useQueryParams } from '@/hooks/useQueryParams'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
@@ -38,6 +39,7 @@ export const UserForm = (props: UserFormProps) => {
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
+  const { setApiRequestParams } = useQueryParams()
 
   const [authorities, setAuthorities] = useState<Authority[]>([])
 
@@ -92,18 +94,22 @@ export const UserForm = (props: UserFormProps) => {
     return departments
   }, [watchAuthority, authorities])
 
+  const goToUsersList = () => {
+    const apiParams = setApiRequestParams()
+    router.push(`/users?${apiParams}`)
+  }
+
   const handleCreateUser = (userData: UserFormData) => {
     const mappedData = mapApiUserData(userData)
     const { id, ...createUserData } = mappedData
     createUser(createUserData)
-    form.reset()
-    router.back()
+    router.push('/users')
   }
 
   const handleUpdateUser = (userData: UserFormData) => {
     const updateUserData = mapApiUserData(userData)
     updateUser(updateUserData)
-    router.back()
+    goToUsersList()
   }
 
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
@@ -161,7 +167,7 @@ export const UserForm = (props: UserFormProps) => {
           placeholder={t('info.description')}
         />
         <div className="w-full flex gap-4 justify-end">
-          <Button type="reset" variant="secondary" onClick={() => router.back()}>
+          <Button type="reset" variant="secondary" onClick={() => goToUsersList()}>
             {tCommon('actions.cancel')}
           </Button>
           <Button type="submit">{tCommon('actions.submit')}</Button>
