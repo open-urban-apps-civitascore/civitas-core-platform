@@ -1,4 +1,4 @@
-import { ChangeEvent, EventHandler, InputHTMLAttributes } from 'react'
+import { InputHTMLAttributes } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -10,6 +10,7 @@ interface TextFieldProps<T extends FieldValues>
   name: Path<T>
   placeholder: string
   label: string
+  // eslint-disable-next-line react/boolean-prop-naming
   required?: boolean
 }
 

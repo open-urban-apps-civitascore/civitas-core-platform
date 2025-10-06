@@ -1,6 +1,7 @@
-import { FormControl, FormDescription, FormField, FormItem, FormLabel } from '@/components/ui/form'
+import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
+
+import { FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
 import { Switch as ShadcnSwitch } from '@/components/ui/switch'
-import { FieldValue, FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 interface SwitchProps<T extends FieldValues> {
   form: UseFormReturn<T>
@@ -17,7 +18,7 @@ export const Switch = <T extends FieldValues>(props: SwitchProps<T>) => {
         <FormItem>
           <FormLabel>{label}</FormLabel>
           <FormControl>
-            <ShadcnSwitch checked={field.value} onCheckedChange={field.onChange} className='hover:cursor-pointer'/>
+            <ShadcnSwitch checked={field.value} onCheckedChange={field.onChange} className="hover:cursor-pointer" />
           </FormControl>
         </FormItem>
       )}

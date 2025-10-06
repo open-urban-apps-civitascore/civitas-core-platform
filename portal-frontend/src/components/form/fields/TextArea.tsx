@@ -1,9 +1,11 @@
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Textarea } from '@/components/ui/textarea'
 import React, { InputHTMLAttributes } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
-interface TextAreaProps<T extends FieldValues> extends Omit<InputHTMLAttributes<HTMLTextAreaElement>, 'form' | 'onChange'> {
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Textarea } from '@/components/ui/textarea'
+
+interface TextAreaProps<T extends FieldValues>
+  extends Omit<InputHTMLAttributes<HTMLTextAreaElement>, 'form' | 'onChange'> {
   form: UseFormReturn<T>
   name: Path<T>
   placeholder: string
@@ -11,10 +13,10 @@ interface TextAreaProps<T extends FieldValues> extends Omit<InputHTMLAttributes<
 }
 
 export const TextArea = <T extends FieldValues>(props: TextAreaProps<T>) => {
-      const { form, name, placeholder, label, className } = props
+  const { form, name, placeholder, label, className } = props
 
   return (
-     <FormField
+    <FormField
       control={form.control}
       name={name}
       render={({ field }) => (

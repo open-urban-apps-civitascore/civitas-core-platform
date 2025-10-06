@@ -1,20 +1,20 @@
 'use client'
 
 import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
-import { useTranslations } from 'next-intl'
+import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
-
-import { SearchField } from '@/components/searchField/SearchField'
-import { TableContainer } from '@/components/table-container/TableContainer'
-import { useQueryParams } from '@/hooks/useQueryParams'
 
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
+import { SearchField } from '@/components/searchField/SearchField'
+import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { Authority, Role, UserResponse } from '@/types/users'
+import { useQueryParams } from '@/hooks/useQueryParams'
 import { mapListUsers } from '@/utils/users'
-import { Plus } from 'lucide-react'
+
 import UsersTable from './components/UsersTable'
 
 export type Category = {
@@ -128,6 +128,7 @@ const UsersPage = () => {
 
   useEffect(() => {
     getUserListData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
 
   const handleRowClick = (row: Row<ListUser>) => {

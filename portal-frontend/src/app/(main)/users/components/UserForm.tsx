@@ -1,23 +1,23 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { TextField } from '@/components/form/fields/TextField'
-import { Button } from '@/components/ui/button'
-import { Form } from '@/components/ui/form'
-import { Authority, Category, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
-
 import { Select } from '@/components/form/fields/Select'
 import { Switch } from '@/components/form/fields/Switch'
 import { TextArea } from '@/components/form/fields/TextArea'
+import { TextField } from '@/components/form/fields/TextField'
+import { Button } from '@/components/ui/button'
+import { Form } from '@/components/ui/form'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { mapApiUserData } from '@/utils/users'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { createUser, updateUser } from '../actions'
 import { useQueryParams } from '@/hooks/useQueryParams'
+import { Authority, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+import { mapApiUserData } from '@/utils/users'
+
+import { createUser, updateUser } from '../actions'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
@@ -56,6 +56,7 @@ export const UserForm = (props: UserFormProps) => {
 
       setAuthorities(authoritiesData)
     } catch (error) {
+      console.error(error)
       throw new Error('An error occurred while loading form data')
     }
   }
@@ -101,6 +102,7 @@ export const UserForm = (props: UserFormProps) => {
 
   const handleCreateUser = (userData: UserFormData) => {
     const mappedData = mapApiUserData(userData)
+    // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
     createUser(createUserData)
     router.push('/users')
