@@ -2,40 +2,67 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { TextField } from '@/components/form/text-field/TextField'
+import { TextField } from '@/components/form/fields/TextField'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { Authority, Category, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
 
-import { AccessibleSelectProps, Select } from '@/components/form/text-field/Select'
-import { UserFormData, UserFormSchema } from '../actions'
-import { Category, UserResponse } from '../page'
+import { Select } from '@/components/form/fields/Select'
+import { Switch } from '@/components/form/fields/Switch'
+import { TextArea } from '@/components/form/fields/TextArea'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { mapApiUserData } from '@/utils/users'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { createUser, updateUser } from '../actions'
+import { useQueryParams } from '@/hooks/useQueryParams'
 
-export type FormUser = Omit<UserResponse, 'group' | 'authority' | 'department'> & {
-  group: string | null
+const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+
+export type FormUser = Omit<UserResponse, 'authority' | 'department' | 'position' | 'positionDescription'> & {
   authority: string
   department: string
-}
-
-export type Authority = Category & {
-  departments: Category[]
+  position: string
+  positionDescription: string
 }
 
 interface UserFormProps {
   userData: FormUser
-  userGroups: AccessibleSelectProps<FormUser>['options']
   isEditMode?: boolean
-  authorities: Authority[]
 }
 
 export const UserForm = (props: UserFormProps) => {
-  const { userData, userGroups, authorities, isEditMode = false } = props
+  const { userData, isEditMode = false } = props
+  const router = useRouter()
   const t = useTranslations('users')
-  const [user, setUser] = useState<FormUser>(userData)
-  console.log('USERDATA', userData)
-  console.log('userGroups', userGroups)
+  const tCommon = useTranslations('common')
+  const isMobile = useIsMobile()
+  const { setApiRequestParams } = useQueryParams()
+
+  const [authorities, setAuthorities] = useState<Authority[]>([])
+
+  const getAuthoritiesData = async () => {
+    try {
+      const authoritiesResponse = await fetch(`${URL}/authorities`, {
+        cache: 'no-store',
+      })
+      if (!authoritiesResponse) {
+        throw new Error('An error occurred while loading form data')
+      }
+
+      const authoritiesData: Authority[] = await authoritiesResponse.json()
+
+      setAuthorities(authoritiesData)
+    } catch (error) {
+      throw new Error('An error occurred while loading form data')
+    }
+  }
+
+  useEffect(() => {
+    getAuthoritiesData()
+  }, [])
 
   const titleOptions = [
     {
@@ -51,7 +78,7 @@ export const UserForm = (props: UserFormProps) => {
   const form = useForm<UserFormData>({
     resolver: zodResolver(UserFormSchema),
     defaultValues: {
-      ...user,
+      ...userData,
     },
   })
 
@@ -59,34 +86,51 @@ export const UserForm = (props: UserFormProps) => {
 
   const departmentOptions = useMemo(() => {
     const currentAuthority = authorities.find(authority => authority.id === watchAuthority)
-    console.log('currentAuthority:', currentAuthority)
     const departments =
       currentAuthority?.departments?.map(department => ({
         value: department.id,
         label: department.title,
       })) ?? []
-    console.log('departments:', departments)
     return departments
-  }, [watchAuthority])
+  }, [watchAuthority, authorities])
 
-  const onSubmit = (values: UserFormData) => {
-    console.log(form)
+  const goToUsersList = () => {
+    const apiParams = setApiRequestParams()
+    router.push(`/users?${apiParams}`)
   }
+
+  const handleCreateUser = (userData: UserFormData) => {
+    const mappedData = mapApiUserData(userData)
+    const { id, ...createUserData } = mappedData
+    createUser(createUserData)
+    router.push('/users')
+  }
+
+  const handleUpdateUser = (userData: UserFormData) => {
+    const updateUserData = mapApiUserData(userData)
+    updateUser(updateUserData)
+    goToUsersList()
+  }
+
+  const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-2 gap-4 space-y-8 mb-4">
+      <form onSubmit={handleSubmit}>
+        <div className={`grid gap-4 space-y-8 mb-4 max-w-3xl ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
           <TextField form={form} label={t('info.id')} name="id" placeholder={t('info.id')} disabled />
-          <Select
-            id="title-select"
-            label={t('info.title.title')}
-            options={titleOptions}
-            placeholder={t('form.selectTitle')}
-            form={form}
-            name="title"
-            required
-          />
+          <div className="flex w-full justify-between">
+            <Select
+              id="title-select"
+              label={t('info.title.title')}
+              options={titleOptions}
+              placeholder={t('form.selectTitle')}
+              form={form}
+              name="title"
+              required
+            />
+            <Switch form={form} name="active" label={t('info.active')} />
+          </div>
           <TextField
             form={form}
             label={t('info.firstName')}
@@ -95,6 +139,8 @@ export const UserForm = (props: UserFormProps) => {
             required
           />
           <TextField form={form} label={t('info.lastName')} name="lastName" placeholder={t('info.lastName')} required />
+          <TextField form={form} label={t('info.email')} name="email" placeholder={t('info.email')} required />
+          <TextField form={form} label={t('info.phone')} name="phone" placeholder={t('info.phone')} />
           <Select
             id="authority-select"
             label={t('info.authority')}
@@ -111,19 +157,20 @@ export const UserForm = (props: UserFormProps) => {
             form={form}
             name="department"
           />
-          <Select
-            id="usergroups-select"
-            label={t('info.group')}
-            options={userGroups}
-            placeholder={t('form.selectGroup')}
-            form={form}
-            name="group"
-          />
-          <TextField form={form} label={t('info.email')} name="email" placeholder={t('info.lastName')} required />
-          <TextField form={form} label={t('info.phone')} name="phone" placeholder={t('info.phone')} />
+          <TextField form={form} label={t('info.position')} name="position" placeholder={t('info.position')} />
         </div>
-        <div>
-          <Button type="submit">Submit</Button>
+        <TextArea
+          className="max-w-lg my-12"
+          form={form}
+          label={t('info.description')}
+          name="positionDescription"
+          placeholder={t('info.description')}
+        />
+        <div className="w-full flex gap-4 justify-end">
+          <Button type="reset" variant="secondary" onClick={() => goToUsersList()}>
+            {tCommon('actions.cancel')}
+          </Button>
+          <Button type="submit">{tCommon('actions.submit')}</Button>
         </div>
       </form>
     </Form>

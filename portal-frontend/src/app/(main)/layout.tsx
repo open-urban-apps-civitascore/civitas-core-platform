@@ -16,7 +16,7 @@ const MainLayout = async (props: MainLayoutProps) => {
   return (
     <SidebarProvider>
       <AppSidebar user={user} />
-      <SidebarInset className="h-svh  w-[calc(100%-var(--sidebar-width))] [--header-height:calc(--spacing(13))] [--layout-padding:calc(--spacing(8))]">
+      <SidebarInset className="h-svh  w-[calc(100%-var(--sidebar-width))] [--header-height:calc(--spacing(13))] [--layout-padding:calc(--spacing(6))]">
         <AppHeader />
         <div className="p-[calc(var(--layout-padding))] h-[calc(100%-var(--header-height))] [--title-height:calc(--spacing(30))] [--search-height:calc(--spacing(16))] [--page-padding:calc(--spacing(4))]">
           {children}

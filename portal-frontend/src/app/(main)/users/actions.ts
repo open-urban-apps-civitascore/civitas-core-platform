@@ -1,44 +1,50 @@
-import { E164Number, parsePhoneNumberFromString } from 'libphonenumber-js'
-import z from 'zod'
+'use server'
 
-export const TitleSchema = z.enum(['male', 'female'])
-const PhoneSchema = z.string().transform((value, ctx) => {
-  const phoneNumber = parsePhoneNumberFromString(value, 'DE')
-  if (!phoneNumber || !phoneNumber.isValid()) {
-    ctx.addIssue({
-      code: 'custom',
-      message: 'Ungültige Telefonnummer',
+import { CreateUserData, UpdateUserData, UserFormData, UserFormSchema } from '@/types/users'
+
+const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
+
+export const createUser = async (userData: CreateUserData) => {
+  console.log('User gespeichert:', userData)
+
+  try {
+    const response = await fetch(`${URL}/users`, {
+      method: 'POST',
+      headers: {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
     })
-    return z.NEVER
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+    const data = await response.json()
+    console.log('successfully created user:', data)
+  } catch (error) {
+    console.error('Fehler:', error)
   }
-  return phoneNumber.number as E164Number
-})
+}
 
-export const UserFormSchema = z.object({
-  id: z.string().optional(),
-  firstName: z.string().min(2, {
-    message: 'First name must be at least 2 characters.',
-  }),
-  
-  title: TitleSchema,
-  lastName: z.string().min(2, {
-    message: 'Name must be at least 2 characters.',
-  }),
-  email: z.email({
-    message: 'Please enter a valid email address.',
-  }),
-  authority: z.string().optional(),
-  department: z.string().optional(),
-  group: z
-    .string()
-    .nullable(),
-  phone: PhoneSchema.optional(),
-  isActive: z.boolean().default(true),
-})
+export const updateUser = async (updateUserData: UpdateUserData) => {
+  try {
+    const response = await fetch(`${URL}/users/${updateUserData.id}`, {
+      method: 'PUT',
+      headers: {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updateUserData),
+    })
 
-export type UserFormData = z.infer<typeof UserFormSchema>
+    if (!response.ok) {
+      throw new Error(`HTTP error! ${JSON.stringify(response)}`)
+    }
 
-export const saveUser = async (data: UserFormData) => {
-  const parsed = UserFormSchema.parse(data)
-  console.log('User gespeichert:', parsed)
+    const data = await response.json()
+    console.log('successfully updated user:', data)
+  } catch (error) {
+    console.error('Fehler:', error)
+  }
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { Slash } from 'lucide-react'
-import { usePathname } from 'next/navigation'
+import { useParams, usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import React, { useMemo } from 'react'
 
@@ -15,6 +15,7 @@ import {
 
 export const BreadcrumbNavigation = () => {
   const pathname = usePathname()
+  const params = useParams()
   const t = useTranslations('sidebar')
 
   const breadcrumbs = useMemo(() => {
@@ -39,12 +40,13 @@ export const BreadcrumbNavigation = () => {
         {breadcrumbs.map((segment, index) => {
           const href = `/${breadcrumbs.slice(0, index + 1).join('/')}`
           const isLast = index === breadcrumbs.length - 1
+          const isDynamic = Object.values(params).includes(segment)
 
           return (
             <React.Fragment key={segment}>
               <BreadcrumbItem className={!isLast ? 'hidden md:block' : undefined}>
                 <BreadcrumbLink href={href} aria-current={isLast ? 'page' : undefined}>
-                  {Number(segment) ? segment : t(segment)}
+                  {isDynamic ? segment : t(segment)}
                 </BreadcrumbLink>
               </BreadcrumbItem>
               {!isLast && <CustomBreadcrumbSeparator />}

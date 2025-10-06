@@ -29,6 +29,7 @@ export const useQueryParams = () => {
   const sorting: SortingState = useMemo(() => getSortingState(searchParams), [searchParams])
   const search = useMemo(() => searchParams.get(QUERY_PARAMS.search) ?? '', [searchParams])
   const tabValue = useMemo(() => searchParams.get(QUERY_PARAMS.tabValue) ?? '', [searchParams])
+  const subTabValue = useMemo(() => searchParams.get(QUERY_PARAMS.subTabValue) ?? '', [searchParams])
 
   const setSortingParams = (newSorting: SortingState) => {
     const params = new URLSearchParams(searchParams)
@@ -73,11 +74,21 @@ export const useQueryParams = () => {
     router.push(`${pathname}?${params.toString()}`)
   }
 
+  const setSubTabValueParam = (subTabValue: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (subTabValue) {
+      params.set(QUERY_PARAMS.subTabValue, subTabValue)
+    } else {
+      params.delete(QUERY_PARAMS.subTabValue)
+    }
+    router.push(`${pathname}?${params.toString()}`)
+  }
+
   const setApiRequestParams = useCallback(
-    (totalPages: number) => {
+    (totalPages?: number) => {
       const apiParams = new URLSearchParams()
       apiParams.set(QUERY_PARAMS.pageIndex, String(pageIndex + 1))
-      if (totalPages > 0 && pageIndex + 1 > totalPages) {
+      if (totalPages && totalPages > 0 && pageIndex + 1 > totalPages) {
         setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
       }
       apiParams.set(QUERY_PARAMS.pageSize, String(pageSize))
@@ -99,10 +110,12 @@ export const useQueryParams = () => {
     setPaginationParams,
     setApiRequestParams,
     setTabValueParam,
+    setSubTabValueParam,
     pageIndex,
     pageSize,
     sorting,
     search,
     tabValue,
+    subTabValue
   }
 }

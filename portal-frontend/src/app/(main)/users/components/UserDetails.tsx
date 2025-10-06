@@ -1,60 +1,73 @@
 'use client'
 
-import { PageHeader } from '@/components/page-header/PageHeader'
-import React, { useState } from 'react'
-import { Authority, FormUser, UserForm } from './UserForm'
-import { AccessibleSelectProps } from '@/components/form/text-field/Select'
-import { useTranslations } from 'next-intl'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { RolesTab } from './RolesTab'
+import { PageHeader } from '@/components/page-header/PageHeader'
+import { useQueryParams } from '@/hooks/useQueryParams'
+import { useTranslations } from 'next-intl'
+import { useEffect, useState } from 'react'
+import { FormUser, UserForm } from './UserForm'
 
 interface UserDetailsProps {
   userData: FormUser | null
-  userGroups: AccessibleSelectProps<FormUser>['options']
   isEditMode?: boolean
-  authorities: Authority[]
 }
 
 export const UserDetails = (props: UserDetailsProps) => {
-  const { userData, userGroups, authorities, isEditMode = false } = props
+  const { userData, isEditMode = false } = props
   const t = useTranslations('users')
-  const tabs: Tab[] = [
-    {
+  const { setSubTabValueParam, subTabValue } = useQueryParams()
+
+  console.log(subTabValue)
+
+  const tabValues = {
+    userData: {
       label: t('detailsTabs.userData'),
-      value: 'userData',
+      value: 'userDetails',
     },
-    {
+    roles: {
       label: t('detailsTabs.roles'),
       value: 'roles',
     },
-    {
+    userGroups: {
       label: t('detailsTabs.userGroups'),
       value: 'userGroups',
     },
-    {
+    dataSpaces: {
       label: t('detailsTabs.dataspaces'),
       value: 'dataspaces',
     },
-    {
+    account: {
       label: t('detailsTabs.account'),
       value: 'account',
     },
+  }
+  const tabs: Tab[] = [
+    tabValues.userData,
+    tabValues.roles,
+    tabValues.userGroups,
+    tabValues.dataSpaces,
+    tabValues.account,
   ]
-  const [selectedTab, setSelectedTab] = useState<string>(tabs[0].value)
+  const [selectedTab, setSelectedTab] = useState<string>((subTabValue as string) || tabValues.userData.value)
+
+  useEffect(() => {
+    setSelectedTab(subTabValue || tabValues.userData.value)
+  }, [subTabValue])
+
+  const handleSelectTab = (newTab: string) => {
+    setSubTabValueParam(newTab)
+  }
 
   return (
     <div>
       <PageHeader
         title={userData?.displayName}
-        subTabs={{ tabs: tabs, selectedTab, onClick: newTab => setSelectedTab(newTab) }}
+        subTabs={{ tabs: tabs, selectedTab, onClick: newTab => handleSelectTab(newTab) }}
       />
-      {selectedTab === 'userData' &&
-        (userData ? (
-          <UserForm userData={userData} isEditMode userGroups={userGroups} authorities={authorities} />
-        ) : (
-          <div>User not found</div>
-        ))}
       {selectedTab === 'roles' && userData && <RolesTab userId={userData.id} />}
+      {selectedTab === tabValues.userData.value &&
+        (userData ? <UserForm userData={userData} isEditMode={isEditMode} /> : <div>User not found</div>)}
     </div>
   )
 }

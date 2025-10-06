@@ -2,6 +2,7 @@ import { Check } from 'lucide-react'
 
 import { SelectContent, SelectItem, SelectTrigger, SelectValue, Select as ShadcnSelect } from '@/components/ui/select'
 import { Controller, FieldValues, Path, UseFormReturn } from 'react-hook-form'
+import { cn } from '@/lib/utils'
 
 export type SelectOption = {
   value: string
@@ -16,15 +17,17 @@ export interface AccessibleSelectProps<T extends FieldValues> {
   form: UseFormReturn<T>
   name: Path<T>
   required?: boolean
+  className?: string
 }
 
 export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) => {
-  const { id, label, placeholder = 'Please select...', options, form, name, required = false } = props
+  const { id, label, placeholder = 'Please select...', options, form, name, required = false, className } = props
 
   return (
     <Controller
       control={form.control}
       name={name}
+      rules={{ required: required ? `${label} ist erforderlich` : false }}
       render={({ field }) => (
         <div>
           <label htmlFor={id} className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -33,7 +36,7 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
           </label>
 
           <ShadcnSelect value={field.value} onValueChange={field.onChange}>
-            <SelectTrigger id={id} aria-label={label} className="w-[200px]">
+            <SelectTrigger id={id} aria-label={label} className={cn('w-full', className)}>
               <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>

@@ -7,6 +7,13 @@
       "submit": "Save",
       "cancel": "Cancel",
       "delete": "Delete"
+    },
+    "errors": {
+      "invalidPhone": "Invalid phone number",
+      "invalidEmail": "Invalid E-mail address",
+      "required": "This field is required",
+      "atLeast2": "The input must be at least 2 characters.",
+      "atLeast10": "The input must be at least 10 characters."
     }
   },
   "languages": {
@@ -52,7 +59,12 @@
   },
   "users": {
     "title": "User",
+    "tabs": {
+      "users": "Users",
+      "groups": "Groups"
+    },
     "newUser": "New User",
+    "createUser": "Create User",
     "searchUsers": "Filter...",
     "info": {
       "id": "ID",
@@ -66,7 +78,9 @@
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
-      "active": "Active"
+      "active": "Active",
+      "position": "Position",
+      "description": "Activity Description"
     },
     "detailsTabs": {
       "userData": "User Data",
@@ -115,6 +129,8 @@
     "systemRoles": "System Roles",
     "dataRoles": "Data Roles",
     "governanceRoles": "Governance Roles",
+    "roles": "Individual Roles",
+    "roleSets": "Role Sets",
     "tableHeaders": {
       "name": "Name",
       "description": "Description",
