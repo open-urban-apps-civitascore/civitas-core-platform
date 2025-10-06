@@ -67,7 +67,7 @@ export const UserDetails = (props: UserDetailsProps) => {
         title={userData?.displayName}
         subTabs={{ tabs: tabs, selectedTab, onClick: newTab => handleSelectTab(newTab) }}
       />
-      {selectedTab === 'roles' && userData && <RolesTab userId={userData.id} />}
+      {selectedTab === tabValues.roles.value && userData && <RolesTab userId={userData.id} />}
       {selectedTab === tabValues.userData.value &&
         (userData ? <UserForm userData={userData} isEditMode={isEditMode} /> : <div>User not found</div>)}
     </div>

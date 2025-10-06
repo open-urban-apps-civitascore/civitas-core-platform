@@ -12,15 +12,10 @@ import { SearchField } from '@/components/searchField/SearchField'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { Authority, Role, UserResponse } from '@/types/users'
+import { Authority, Role, UserResponse, Category } from '@/types/users'
 import { mapListUsers } from '@/utils/users'
 
 import UsersTable from './components/UsersTable'
-
-export type Category = {
-  id: string
-  title: string
-}
 
 export type UserAuthority = Category & {
   department: Category

@@ -223,7 +223,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">{t('rolesTab.loading')}</span>
+        <span className="ml-2">{t('common.loading')}</span>
       </div>
     )
   }
@@ -239,19 +239,19 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
   return (
     <div className="p-6">
       <RoleCategory
-        title={t('rolesTab.categories.systemRoles')}
+        title={t('roles.systemRoles')}
         category="System"
         colorClass="bg-green-100 text-green-800 border-green-200"
       />
 
       <RoleCategory
-        title={t('rolesTab.categories.dataRoles')}
+        title={t('roles.dataRoles')}
         category="Data"
         colorClass="bg-blue-100 text-blue-800 border-blue-200"
       />
 
       <RoleCategory
-        title={t('rolesTab.categories.governanceRoles')}
+        title={t('roles.governanceRoles')}
         category="Governance"
         colorClass="bg-purple-100 text-purple-800 border-purple-200"
       />

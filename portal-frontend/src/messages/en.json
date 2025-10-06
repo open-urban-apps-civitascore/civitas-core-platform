@@ -3,6 +3,7 @@
     "type-to-search": "Type to search",
     "search": "Search",
     "noResults": "No results found.",
+    "loading": "Loading...",
     "actions": {
       "submit": "Save",
       "cancel": "Cancel",
@@ -96,17 +97,11 @@
       "selectGroup": "Select group..."
     },
     "rolesTab": {
-      "loading": "Loading...",
       "userNotFound": "User not found",
       "addRoleDialog": {
         "title": "Add Role - {category}",
         "description": "Select a role to add to the user from the available {category} roles.",
         "addButton": "Add"
-      },
-      "categories": {
-        "systemRoles": "System Roles",
-        "dataRoles": "Data Roles", 
-        "governanceRoles": "Governance Roles"
       }
     }
   },
