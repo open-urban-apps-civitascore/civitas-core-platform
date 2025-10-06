@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { mapApiUserData, mapFormUserData } from './users'
-import { UserFormSchema, UserFormData, UserResponse, TitleSchema, TitleSchemaType } from '@/types/users'
+import { mapApiUserData, mapFormUserData, mapListUsers } from './users'
+import { UserFormSchema, UserFormData, UserResponse, TitleSchema, TitleSchemaType, Authority } from '@/types/users'
 
 const baseFormData = {
   id: '12345',
@@ -11,13 +11,88 @@ const baseFormData = {
   email: 'maxmustermann@test.de',
   phone: '+49 152 1111111',
   active: true,
-  positionDescription: null,
   role: 'admin',
   group: '1',
-  authority: 'auth-123',
-  department: 'dep-456',
+  authority: 'auth-1',
+  department: 'dep-1',
   position: 'Manager',
+  positionDescription: '',
 }
+
+const baseUserResponse = {
+  id: '2',
+  firstName: 'Sophia',
+  title: 'female' as TitleSchemaType,
+  lastName: 'Fischer',
+  email: 'sophie.fischer@test.com',
+  authority: {
+    id: 'auth-1',
+    department: {
+      id: 'dep-1',
+    },
+  },
+  group: '3',
+  phone: '+49 75 5576070',
+  active: true,
+  position: 'Bauingenieur für Kanalisationsbau',
+  positionDescription: 'Bauingenieur für Kanalisationsbau',
+  role: 'admin',
+  displayName: 'Sophia Fischer',
+}
+
+const authorities: Authority[] = [
+  {
+    id: 'auth-1',
+    title: 'IT-Abteilung',
+    departments: [
+      { id: 'dep-1', title: 'Backend' },
+      { id: 'dep-2', title: 'Frontend' },
+    ],
+  },
+  {
+    id: 'auth-2',
+    title: 'HR',
+    departments: [
+      { id: 'dep-1', title: 'Recruiting' },
+      { id: 'dep-2', title: 'Payroll' },
+    ],
+  },
+]
+
+describe('MapListUsers', () => {
+  it('should map users correctly with matching authority and department', () => {
+    const users: UserResponse[] = [baseUserResponse]
+
+    const result = mapListUsers(users, authorities)
+
+    expect(result).toEqual([
+      {
+        id: baseUserResponse.id,
+        displayName: baseUserResponse.displayName,
+        authority: authorities[0].title,
+        department: authorities[0].departments[0].title,
+        role: 'admin',
+        email: baseUserResponse.email,
+        isactive: baseUserResponse.active,
+      },
+    ])
+  })
+
+  it('should return empty strings if authority or department are null', () => {
+    const users: UserResponse[] = [{ ...baseUserResponse, authority: null }]
+
+    const result = mapListUsers(users, authorities)
+
+    expect(result[0].authority).toBe('')
+    expect(result[0].department).toBe('')
+
+    const users2: UserResponse[] = [{ ...baseUserResponse, authority: { ...baseUserResponse.authority, department: null } }]
+    const result2 = mapListUsers(users2, authorities)
+    expect(result2[0].authority).toBe(authorities[0].title)
+    expect(result2[0].department).toBe('')
+  })
+})
+
 describe('mapApiUserData', () => {
   it('should map form data correctly to API data', () => {
     const result = mapApiUserData(baseFormData)
@@ -25,9 +100,9 @@ describe('mapApiUserData', () => {
     expect(result).toEqual({
       ...UserFormSchema.parse(baseFormData),
       group: '1',
-      authority: { id: 'auth-123', department: { id: 'dep-456' } },
+      authority: { id: 'auth-1', department: { id: 'dep-1' } },
       position: 'Manager',
-      positionDescription: 'Manager',
+      positionDescription: null,
       displayName: 'Max Mustermann',
     })
   })
@@ -48,7 +123,7 @@ describe('mapFormUserData', () => {
   it('should map API response correctly to form data', () => {
     const userResponse: UserResponse = {
       ...baseFormData,
-      authority: { id: 'auth-999', department: { id: 'dep-888' } },
+      authority: { id: 'auth-2', department: { id: 'dep-1' } },
       position: 'Developer',
       positionDescription: 'Frontend Dev',
       displayName: 'Lisa Schneider',
@@ -58,8 +133,8 @@ describe('mapFormUserData', () => {
 
     expect(result).toEqual({
       ...userResponse,
-      authority: 'auth-999',
-      department: 'dep-888',
+      authority: 'auth-2',
+      department: 'dep-1',
       position: 'Developer',
       positionDescription: 'Frontend Dev',
     })

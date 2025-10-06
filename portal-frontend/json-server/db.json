@@ -2988,7 +2988,7 @@
   ],
   "users": [
     {
-      "id": "abcd",
+      "id": "1",
       "firstName": "Sophia",
       "title": "female",
       "lastName": "Fischer",
@@ -2999,7 +2999,6 @@
           "id": "1"
         }
       },
-      "department": "1",
       "group": "3",
       "phone": "+49 75 5576070",
       "active": true,
@@ -3020,7 +3019,6 @@
           "id": "2"
         }
       },
-      "department": "2",
       "group": "1",
       "phone": "+49 164 6822941",
       "active": false,
