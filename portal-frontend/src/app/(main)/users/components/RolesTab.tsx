@@ -14,18 +14,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { UserResponse } from '@/types/users'
 
 interface Role {
   id: string
   name: string
   description: string
   type: 'System' | 'Data' | 'Governance'
-}
-
-interface User {
-  id: string
-  roles: string[]
-  [key: string]: object | string | string[] | null | undefined
 }
 
 interface RolesTabProps {
@@ -38,7 +33,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
   const tRoles = useTranslations('roles')
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<UserResponse | null>(null)
   const [originalRoles, setOriginalRoles] = useState<string[]>([])
   const [allRoles, setAllRoles] = useState<Role[]>([])
   const [isLoading, setIsLoading] = useState(true)
