@@ -13,7 +13,7 @@ const baseFormData = {
   email: 'maxmustermann@test.de',
   phone: '+49 152 1111111',
   active: true,
-  role: 'admin',
+  roles: ['1'],
   group: '1',
   authority: 'auth-1',
   department: 'dep-1',
@@ -38,7 +38,7 @@ const baseUserResponse = {
   active: true,
   position: 'Bauingenieur für Kanalisationsbau',
   positionDescription: 'Bauingenieur für Kanalisationsbau',
-  role: 'admin',
+  roles: ['1'],
   displayName: 'Sophia Fischer',
 }
 
@@ -64,8 +64,9 @@ const authorities: Authority[] = [
 describe('MapListUsers', () => {
   it('should map users correctly with matching authority and department', () => {
     const users: UserResponse[] = [baseUserResponse]
+    const rolesMap: Record<string, string> = { '1': 'admin', '2': 'user' }
 
-    const result = mapListUsers(users, authorities)
+    const result = mapListUsers(users, authorities, rolesMap)
 
     expect(result).toEqual([
       {
@@ -73,7 +74,7 @@ describe('MapListUsers', () => {
         displayName: baseUserResponse.displayName,
         authority: authorities[0].title,
         department: authorities[0].departments[0].title,
-        role: 'admin',
+        roles: ['admin'],
         email: baseUserResponse.email,
         isactive: baseUserResponse.active,
       },
@@ -82,8 +83,9 @@ describe('MapListUsers', () => {
 
   it('should return empty strings if authority or department are null', () => {
     const users: UserResponse[] = [{ ...baseUserResponse, authority: null }]
+    const rolesMap: Record<string, string> = { '1': 'admin', '2': 'user' }
 
-    const result = mapListUsers(users, authorities)
+    const result = mapListUsers(users, authorities, rolesMap)
 
     expect(result[0].authority).toBe('')
     expect(result[0].department).toBe('')
@@ -91,7 +93,7 @@ describe('MapListUsers', () => {
     const users2: UserResponse[] = [
       { ...baseUserResponse, authority: { ...baseUserResponse.authority, department: null } },
     ]
-    const result2 = mapListUsers(users2, authorities)
+    const result2 = mapListUsers(users2, authorities, rolesMap)
     expect(result2[0].authority).toBe(authorities[0].title)
     expect(result2[0].department).toBe('')
   })

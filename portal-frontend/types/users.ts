@@ -83,7 +83,7 @@ export const UserFormSchema = z.object({
   active: z.boolean(),
   position: z.string().min(2).or(z.literal('')).nullable(),
   positionDescription: z.string().min(10).or(z.literal('')).nullable(),
-  role: z.string().nullable(),
+  roles: z.array(z.string()),
 })
 
 export type UserFormData = z.infer<typeof UserFormSchema>
