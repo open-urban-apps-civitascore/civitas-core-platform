@@ -30,9 +30,19 @@ export type UserResponse = {
   authority: UserAuthority | null
   group: string | null
   active: boolean
-  role: string | null
+  roles: string[]
   position: string | null
   positionDescription: string | null
+}
+export type Role = {
+  id: string
+  name: string
+  description: string
+  tenant: string
+  type: string
+  permissions: string[]
+  user: string[]
+  createdAt: string
 }
 
 export type UpdateUserData = UserResponse
