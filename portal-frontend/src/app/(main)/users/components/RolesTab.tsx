@@ -1,11 +1,19 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import { Loader2, Plus, X } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import React, { useEffect, useState } from 'react'
+
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Plus, X, Loader2 } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 
 interface Role {
   id: string
@@ -17,7 +25,7 @@ interface Role {
 interface User {
   id: string
   roles: string[]
-  [key: string]: any
+  [key: string]: object | string | string[] | null | undefined
 }
 
 interface RolesTabProps {
@@ -30,7 +38,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
   const t = useTranslations('users')
   const [user, setUser] = useState<User | null>(null)
   const [allRoles, setAllRoles] = useState<Role[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setLoading] = useState(true)
   const [savingRoleId, setSavingRoleId] = useState<string | null>(null)
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<'System' | 'Data' | 'Governance'>('System')
@@ -41,7 +49,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
       try {
         const [userResponse, rolesResponse] = await Promise.all([
           fetch(`${URL}/users/${userId}`),
-          fetch(`${URL}/roles`)
+          fetch(`${URL}/roles`),
         ])
 
         if (!userResponse.ok || !rolesResponse.ok) {
@@ -66,20 +74,16 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
   // Get roles by category
   const getRolesByCategory = (category: 'System' | 'Data' | 'Governance') => {
     if (!user || !allRoles) return []
-    
-    const userRoles = allRoles.filter(role => 
-      user.roles.includes(role.id) && role.type === category
-    )
+
+    const userRoles = allRoles.filter(role => user.roles.includes(role.id) && role.type === category)
     return userRoles
   }
 
   // Get available roles for adding (not already assigned)
   const getAvailableRolesByCategory = (category: 'System' | 'Data' | 'Governance') => {
     if (!user || !allRoles) return []
-    
-    return allRoles.filter(role => 
-      !user.roles.includes(role.id) && role.type === category
-    )
+
+    return allRoles.filter(role => !user.roles.includes(role.id) && role.type === category)
   }
 
   // Add role to user
@@ -88,7 +92,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
 
     setSavingRoleId(roleId)
     const updatedRoles = [...user.roles, roleId]
-    
+
     // Optimistic update
     setUser({ ...user, roles: updatedRoles })
 
@@ -96,7 +100,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
       const response = await fetch(`${URL}/users/${userId}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
+          ['Content-Type']: 'application/json',
         },
         body: JSON.stringify({ roles: updatedRoles }),
       })
@@ -119,7 +123,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
 
     setSavingRoleId(roleId)
     const updatedRoles = user.roles.filter(id => id !== roleId)
-    
+
     // Optimistic update
     setUser({ ...user, roles: updatedRoles })
 
@@ -127,7 +131,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
       const response = await fetch(`${URL}/users/${userId}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
+          ['Content-Type']: 'application/json',
         },
         body: JSON.stringify({ roles: updatedRoles }),
       })
@@ -144,14 +148,14 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
     }
   }
 
-  const RoleCategory = ({ 
-    title, 
-    category, 
-    colorClass 
-  }: { 
+  const RoleCategory = ({
+    title,
+    category,
+    colorClass,
+  }: {
     title: string
     category: 'System' | 'Data' | 'Governance'
-    colorClass: string 
+    colorClass: string
   }) => {
     const categoryRoles = getRolesByCategory(category)
     const availableRoles = getAvailableRolesByCategory(category)
@@ -160,12 +164,8 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
       <div className="mb-8">
         <h3 className="text-lg font-semibold mb-4">{title}</h3>
         <div className="flex flex-wrap gap-2 items-center">
-          {categoryRoles.map((role) => (
-            <Badge 
-              key={role.id} 
-              variant="secondary" 
-              className={`${colorClass} relative group`}
-            >
+          {categoryRoles.map(role => (
+            <Badge key={role.id} variant="secondary" className={`${colorClass} relative group`}>
               <span>{role.name}</span>
               <Button
                 variant="ghost"
@@ -174,26 +174,22 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
                 onClick={() => removeRole(role.id)}
                 disabled={savingRoleId === role.id}
               >
-                {savingRoleId === role.id ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <X className="h-3 w-3" />
-                )}
+                {savingRoleId === role.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
               </Button>
             </Badge>
           ))}
-          
+
           {availableRoles.length > 0 && (
-            <Dialog 
+            <Dialog
               open={isAddRoleOpen && selectedCategory === category}
-              onOpenChange={(open) => {
+              onOpenChange={open => {
                 setIsAddRoleOpen(open)
                 if (open) setSelectedCategory(category)
               }}
             >
               <DialogTrigger asChild>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   className="h-6 w-6 p-0 rounded-full"
                   onClick={() => setSelectedCategory(category)}
@@ -204,18 +200,14 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>{t('rolesTab.addRoleDialog.title', { category: title })}</DialogTitle>
-                  <DialogDescription>
-                    {t('rolesTab.addRoleDialog.description', { category: title })}
-                  </DialogDescription>
+                  <DialogDescription>{t('rolesTab.addRoleDialog.description', { category: title })}</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2">
-                  {availableRoles.map((role) => (
+                  {availableRoles.map(role => (
                     <div key={role.id} className="flex items-center justify-between p-2 border rounded">
                       <div>
                         <div className="font-medium">{role.name}</div>
-                        {role.description && (
-                          <div className="text-sm text-muted-foreground">{role.description}</div>
-                        )}
+                        {role.description && <div className="text-sm text-muted-foreground">{role.description}</div>}
                       </div>
                       <Button
                         onClick={() => {
@@ -242,7 +234,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
     )
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -261,22 +253,22 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
 
   return (
     <div className="p-6">
-      <RoleCategory 
-        title={t('rolesTab.categories.systemRoles')} 
-        category="System" 
-        colorClass="bg-green-100 text-green-800 border-green-200" 
+      <RoleCategory
+        title={t('rolesTab.categories.systemRoles')}
+        category="System"
+        colorClass="bg-green-100 text-green-800 border-green-200"
       />
-      
-      <RoleCategory 
-        title={t('rolesTab.categories.dataRoles')} 
-        category="Data" 
-        colorClass="bg-blue-100 text-blue-800 border-blue-200" 
+
+      <RoleCategory
+        title={t('rolesTab.categories.dataRoles')}
+        category="Data"
+        colorClass="bg-blue-100 text-blue-800 border-blue-200"
       />
-      
-      <RoleCategory 
-        title={t('rolesTab.categories.governanceRoles')} 
-        category="Governance" 
-        colorClass="bg-purple-100 text-purple-800 border-purple-200" 
+
+      <RoleCategory
+        title={t('rolesTab.categories.governanceRoles')}
+        category="Governance"
+        colorClass="bg-purple-100 text-purple-800 border-purple-200"
       />
     </div>
   )

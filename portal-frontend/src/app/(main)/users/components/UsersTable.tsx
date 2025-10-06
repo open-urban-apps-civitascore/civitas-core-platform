@@ -62,8 +62,8 @@ const UsersTable = (props: UsersTableProps) => {
         if (!roles || roles.length === 0) return '-'
         return (
           <div className="flex flex-wrap gap-1">
-            {roles.map((role, index) => (
-              <Badge key={`${role}-${index}`} variant="secondary">
+            {roles.map(role => (
+              <Badge key={role} variant="secondary">
                 {role}
               </Badge>
             ))}

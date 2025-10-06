@@ -4,10 +4,10 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
 import { Tab } from '@/components/page-header/components/TabsSections'
-import { RolesTab } from './RolesTab'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
+import { RolesTab } from './RolesTab'
 import { FormUser, UserForm } from './UserForm'
 
 interface UserDetailsProps {

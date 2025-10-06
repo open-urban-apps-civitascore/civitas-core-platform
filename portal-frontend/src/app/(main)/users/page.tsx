@@ -11,8 +11,8 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
-import { Authority, Role, UserResponse } from '@/types/users'
 import { useQueryParams } from '@/hooks/useQueryParams'
+import { Authority, Role, UserResponse } from '@/types/users'
 import { mapListUsers } from '@/utils/users'
 
 import UsersTable from './components/UsersTable'
@@ -107,7 +107,7 @@ const UsersPage = () => {
       ])
 
       const rolesMap: Record<string, string> = {}
-      rolesData.forEach((role: any) => {
+      rolesData.forEach((role: Role) => {
         rolesMap[role.id] = role.name
       })
 
