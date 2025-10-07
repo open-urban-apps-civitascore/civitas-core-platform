@@ -12,17 +12,21 @@ import { SearchField } from '@/components/searchField/SearchField'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { Authority, UserResponse } from '@/types/users'
+import { Authority, Category, Role, UserResponse } from '@/types/users'
 import { mapListUsers } from '@/utils/users'
 
 import UsersTable from './components/UsersTable'
+
+export type UserAuthority = Category & {
+  department: Category
+}
 
 export type ListUser = {
   id: string
   displayName: string
   authority: string
   department: string
-  role: string
+  roles: string[]
   email: string
   isactive: boolean
 }
@@ -76,11 +80,14 @@ const UsersPage = () => {
 
     try {
       setIsLoading(true)
-      const [usersResponse, authoritiesResponse] = await Promise.all([
+      const [usersResponse, authoritiesResponse, rolesResponse] = await Promise.all([
         fetch(`${URL}/users?${params.toString()}`, {
           cache: 'no-store',
         }),
         fetch(`${URL}/authorities`, {
+          cache: 'no-store',
+        }),
+        fetch(`${URL}/roles`, {
           cache: 'no-store',
         }),
       ])
@@ -88,12 +95,18 @@ const UsersPage = () => {
         throw new Error('An error occurred while loading form data')
       }
 
-      const [usersData, authoritiesData]: [UserResponse[], Authority[]] = await Promise.all([
+      const [usersData, authoritiesData, rolesData]: [UserResponse[], Authority[], Role[]] = await Promise.all([
         usersResponse.json(),
         authoritiesResponse.json(),
+        rolesResponse.json(),
       ])
 
-      const users = mapListUsers(usersData, authoritiesData)
+      const rolesMap: Record<string, string> = {}
+      rolesData.forEach((role: Role) => {
+        rolesMap[role.id] = role.name
+      })
+
+      const users = mapListUsers(usersData, authoritiesData, rolesMap)
       setListUsers(users)
       setIsLoading(false)
 

@@ -7,6 +7,7 @@ import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
+import { RolesTab } from './RolesTab'
 import { FormUser, UserForm } from './UserForm'
 
 interface UserDetailsProps {
@@ -66,6 +67,7 @@ export const UserDetails = (props: UserDetailsProps) => {
         title={userData?.displayName}
         subTabs={{ tabs: tabs, selectedTab, onClick: newTab => handleSelectTab(newTab) }}
       />
+      {selectedTab === tabValues.roles.value && userData && <RolesTab userId={userData.id} />}
       {selectedTab === tabValues.userData.value &&
         (userData ? <UserForm userData={userData} isEditMode={isEditMode} /> : <div>User not found</div>)}
     </div>

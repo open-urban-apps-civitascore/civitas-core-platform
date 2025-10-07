@@ -30,9 +30,19 @@ export type UserResponse = {
   authority: UserAuthority | null
   group: string | null
   active: boolean
-  role: string | null
+  roles: string[]
   position: string | null
   positionDescription: string | null
+}
+export type Role = {
+  id: string
+  name: string
+  description: string
+  tenant: string
+  type: string
+  permissions: string[]
+  user: string[]
+  createdAt: string
 }
 
 export type UpdateUserData = UserResponse
@@ -73,7 +83,7 @@ export const UserFormSchema = z.object({
   active: z.boolean(),
   position: z.string().min(2).or(z.literal('')).nullable(),
   positionDescription: z.string().min(10).or(z.literal('')).nullable(),
-  role: z.string().nullable(),
+  roles: z.array(z.string()),
 })
 
 export type UserFormData = z.infer<typeof UserFormSchema>

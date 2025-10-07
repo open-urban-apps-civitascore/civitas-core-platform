@@ -3,6 +3,7 @@
     "type-to-search": "Zum Suchen tippen",
     "search": "Durchsuchen",
     "noResults": "Es gibt leider keine Ergebnisse.",
+    "loading": "Lädt...",
     "actions": {
       "submit": "Speichern",
       "cancel": "Abbrechen",
@@ -94,6 +95,14 @@
       "selectAuthority": "Amt wählen...",
       "selectDepartment": "Abteilung wählen...",
       "selectGroup": "Gruppe wählen..."
+    },
+    "rolesTab": {
+      "userNotFound": "Benutzer nicht gefunden",
+      "addRoleDialog": {
+        "title": "Rolle hinzufügen - {category}",
+        "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen.",
+        "addButton": "Hinzufügen"
+      }
     }
   },
   "pagination": {

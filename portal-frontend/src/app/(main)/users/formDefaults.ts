@@ -14,7 +14,7 @@ export const defaultFormUser: FormUser = {
   department: '',
   group: '',
   phone: '',
-  role: 'standarduser',
+  roles: [],
   position: '',
   positionDescription: '',
 }

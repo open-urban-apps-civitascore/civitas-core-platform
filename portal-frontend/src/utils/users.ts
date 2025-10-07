@@ -2,7 +2,11 @@ import { FormUser } from '@/app/(main)/users/components/UserForm'
 import { ListUser } from '@/app/(main)/users/page'
 import { Authority, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
 
-export const mapListUsers = (users: UserResponse[], authorities: Authority[]): ListUser[] =>
+export const mapListUsers = (
+  users: UserResponse[],
+  authorities: Authority[],
+  rolesMap: Record<string, string>,
+): ListUser[] =>
   users.map(user => {
     const authority = authorities.find(authority => user.authority?.id === authority.id)
     const department = authority?.departments.find(department => department.id === user.authority?.department?.id)
@@ -11,7 +15,7 @@ export const mapListUsers = (users: UserResponse[], authorities: Authority[]): L
       displayName: user.displayName,
       authority: authority?.title ?? '',
       department: department?.title ?? '',
-      role: user.role || '',
+      roles: user.roles.map(roleId => rolesMap[roleId]),
       email: user.email,
       isactive: user.active,
     }
