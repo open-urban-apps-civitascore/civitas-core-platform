@@ -20,7 +20,7 @@ const TablePagination = <T,>(props: TablePaginationProps<T>) => {
 
   return (
     <div
-      className={cn('@container flex items-end justify-end text-sm h-[calc(var(--pagination-height))]', className)}
+      className={cn('@container flex items-center justify-end text-sm h-[calc(var(--pagination-height))]', className)}
       role="navigation"
       aria-label={t('aria.pagination')}
     >

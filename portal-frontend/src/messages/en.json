@@ -67,6 +67,8 @@
     "newUser": "New User",
     "createUser": "Create User",
     "searchUsers": "Filter...",
+    "notFound": "User not found",
+
     "info": {
       "id": "ID",
       "displayName": "Display Name",

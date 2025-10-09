@@ -3,33 +3,31 @@ import { HTMLAttributes, JSX } from 'react'
 import { cn } from '@/lib/utils'
 
 import { TabSectionProps, TabsSection } from './components/TabsSections'
-import { TitleSection } from './components/TitleSection'
 
 export type PageHeaderProps = Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & {
   title?: string
-  subtitle?: string
   tabs?: TabSectionProps
   customElement?: JSX.Element
   subTabs?: TabSectionProps
-  shouldShowDivider?: boolean
 }
 
 export const PageHeader = (props: PageHeaderProps) => {
-  const { title, subtitle, customElement, className, style, tabs, subTabs, shouldShowDivider } = props
+  const { title, customElement, className, style, tabs, subTabs } = props
 
   return (
-    <div id="heading" className={cn('flex flex-col h-[var(--title-height)]', className)} style={style}>
+    <div id="heading" className={cn('flex flex-col h-[var(--title-height)]  border-b-1', className)} style={style}>
       {tabs && (
-        <TabsSection
-          tabs={tabs.tabs}
-          onClick={tabs.onClick}
-          selectedTab={tabs.selectedTab}
-          isHeading={!title}
-          className="p-0"
-        />
+        <TabsSection tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} isHeading={!title} />
       )}
-      <div id="heading" className={`flex ${title ? 'justify-between mt-1' : 'justify-end'}`}>
-        {title && <TitleSection title={title} subtitle={subtitle} />}
+      <div id="heading" className={`flex-1 flex ${title ? 'justify-between mt-1' : 'justify-end'} items-center`}>
+        {title && (
+          <h1
+            id="page-heading"
+            className="bg-transparent my-1 text-3xl font-bold text-center px-[calc(var(--layout-padding))]"
+          >
+            {title}
+          </h1>
+        )}
         {customElement}
       </div>
       {subTabs && (
@@ -41,7 +39,6 @@ export const PageHeader = (props: PageHeaderProps) => {
           className={`${title && 'mt-4'} bg-accent`}
         />
       )}
-      {shouldShowDivider && <hr className="mt-auto" />}
     </div>
   )
 }

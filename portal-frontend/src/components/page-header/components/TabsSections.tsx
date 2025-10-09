@@ -18,15 +18,15 @@ export const TabsSection = (props: TabSectionProps) => {
   const { tabs, onClick, selectedTab, isSubTabsSection = false, isHeading = false, className } = props
 
   const tabsStyles = (tab: Tab) =>
-    `mb-2 px-0 hover:underline hover:bg-white underline-offset-10 decoration-1 ${selectedTab === tab.value ? 'underline decoration-2' : 'text-slate-400'}`
+    `h-[calc(--spacing(12))]  pt-3 border-b-2 border-transparent rounded-none hover:bg-white hover:border-foreground underline-offset-10 decoration-1 ${selectedTab === tab.value ? ' border-foreground' : 'text-slate-400'}`
   const subTabsStyles = (tab: Tab) =>
-    `no-underline px-2 py-1 h-7 hover:bg-white ${selectedTab === tab.value && 'bg-white shadow-sm'}`
+    `rounded-sm no-underline px-2 py-1 h-7 hover:bg-white ${selectedTab === tab.value && 'bg-white shadow-sm'}`
   const Tag = isHeading ? 'h1' : 'div'
 
   return (
     <Tag
       className={cn(
-        `max-w-full w-auto flex justify-start gap-2 self-start cursor-pointer items-start rounded-md p-1 flex-nowrap overflow-x-auto`,
+        `my-[var(--layout-padding)] mx-[calc(var(--layout-padding))] max-w-full w-auto flex justify-start gap-2 self-start cursor-pointer items-end border-b-1 flex-nowrap overflow-x-auto ${isSubTabsSection ? 'rounded-md p-1' : 'w-full'}`,
         className,
       )}
     >
@@ -35,7 +35,8 @@ export const TabsSection = (props: TabSectionProps) => {
           variant="ghost"
           key={tab.value}
           onClick={() => onClick(tab.value)}
-          className={`text-center text-sm rounded-sm font-medium ${isSubTabsSection ? subTabsStyles(tab) : tabsStyles(tab)}`}
+          className={`h-full text-center text-sm  p-[calc(--spacing(2))] font-medium ${isSubTabsSection ? subTabsStyles(tab) : tabsStyles(tab)}`}
+          style={{ margin: 0 }}
           id={`heading-${tab.value}`}
           role="tab"
           aria-selected={selectedTab === tab.value}

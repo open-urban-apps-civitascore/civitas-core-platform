@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { PageBackground } from '@/components/page-background/PageBackground'
+import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchField } from '@/components/searchField/SearchField'
@@ -16,6 +18,7 @@ import { Authority, Category, Role, UserResponse } from '@/types/users'
 import { mapListUsers } from '@/utils/users'
 
 import UsersTable from './components/UsersTable'
+import { SearchHeader } from '@/components/search-field-area/SearchFieldArea'
 
 export type UserAuthority = Category & {
   department: Category
@@ -133,38 +136,39 @@ const UsersPage = () => {
     }
   }
 
+  const CustomElement = (
+    <Button onClick={() => router.push('/users/create')}>
+      <Plus />
+      {t('newUser')}
+    </Button>
+  )
+
   return (
-    <div className="w-full h-full">
+    <PageContainer headerType="withPrimaryTabs">
       <PageHeader
         title={t('title')}
-        className="[--title-height:calc(--spacing(24))]"
         tabs={{ tabs: tabs, selectedTab: selectedTab, onClick: newValue => setSelectedTab(newValue) }}
-        shouldShowDivider
       />
-      <div className="flex justify-between items-center">
-        <SearchField searchString={search} onChangeSearchString={setSearchParam} />
-        <Button variant="secondary" onClick={() => router.push('/users/create')}>
-          <Plus />
-          {t('newUser')}
-        </Button>
-      </div>
-      <TableContainer>
-        <UsersTable
-          users={listUsers}
-          rowCount={rowCount}
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          sorting={sorting}
-          totalPages={totalPages}
-          rowSelection={rowSelection}
-          setRowSelection={setRowSelection}
-          onRowClick={handleRowClick}
-          onSortingChange={setSortingParams}
-          onPaginationChange={setPaginationParams}
-          isLoading={isLoading}
-        />
-      </TableContainer>
-    </div>
+      <PageBackground>
+        <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />
+        <TableContainer>
+          <UsersTable
+            users={listUsers}
+            rowCount={rowCount}
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            sorting={sorting}
+            totalPages={totalPages}
+            rowSelection={rowSelection}
+            setRowSelection={setRowSelection}
+            onRowClick={handleRowClick}
+            onSortingChange={setSortingParams}
+            onPaginationChange={setPaginationParams}
+            isLoading={isLoading}
+          />
+        </TableContainer>
+      </PageBackground>
+    </PageContainer>
   )
 }
 

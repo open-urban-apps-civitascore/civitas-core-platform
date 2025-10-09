@@ -9,6 +9,8 @@ import { useQueryParams } from '@/hooks/useQueryParams'
 
 import { RolesTab } from './RolesTab'
 import { FormUser, UserForm } from './UserForm'
+import { PageBackground } from '@/components/page-background/PageBackground'
+import { PageContainer } from '@/components/page-container/PageContainer'
 
 interface UserDetailsProps {
   userData: FormUser | null
@@ -19,6 +21,15 @@ export const UserDetails = (props: UserDetailsProps) => {
   const { userData, isEditMode = false } = props
   const t = useTranslations('users')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
+  const getTitle = () => {
+    if (!isEditMode) {
+      return t('newUser')
+    } else if (isEditMode && userData) {
+      return userData.displayName
+    } else {
+      return t('notFound')
+    }
+  }
 
   console.log(subTabValue)
 
@@ -62,14 +73,21 @@ export const UserDetails = (props: UserDetailsProps) => {
   }
 
   return (
-    <div>
+    <PageContainer headerType="withSubTabs">
       <PageHeader
-        title={userData?.displayName}
+        title={getTitle()}
         subTabs={{ tabs: tabs, selectedTab, onClick: newTab => handleSelectTab(newTab) }}
       />
-      {selectedTab === tabValues.roles.value && userData && <RolesTab userId={userData.id} />}
-      {selectedTab === tabValues.userData.value &&
-        (userData ? <UserForm userData={userData} isEditMode={isEditMode} /> : <div>User not found</div>)}
-    </div>
+      <PageBackground>
+        {userData ? (
+          <div className="bg-white p-[calc(var(--layout-padding))]">
+            {selectedTab === tabValues.roles.value && <RolesTab userId={userData.id} />}
+            {selectedTab === tabValues.userData.value && <UserForm userData={userData} isEditMode={isEditMode} />}
+          </div>
+        ) : (
+          <div>No data</div>
+        )}
+      </PageBackground>
+    </PageContainer>
   )
 }
