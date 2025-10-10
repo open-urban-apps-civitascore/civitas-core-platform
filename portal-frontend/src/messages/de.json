@@ -34,6 +34,7 @@
     "create": "erstellen",
     "edit": "bearbeiten",
     "users": "User Management",
+    "groups": "Gruppen",
     "tenants": "Mandanten-Management"
   },
   "datasets": {
@@ -104,6 +105,20 @@
         "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen.",
         "addButton": "Hinzufügen"
       }
+    }
+  },
+  "groups": {
+    "title": "Gruppen",
+    "newGroup": "Neue Gruppe",
+    "createGroup": "Gruppe erstellen",
+    "search": "Filtern...",
+    "notFound": "Gruppe nicht gefunden",
+    "info": {
+      "id": "ID",
+      "title": "Name",
+      "users": "Anzahl User",
+      "contact": "Ansprechpartner",
+      "description": "Beschreibung"
     }
   },
   "pagination": {

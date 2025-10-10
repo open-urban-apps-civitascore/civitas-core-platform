@@ -28,6 +28,10 @@ export const appSidebarNavItems = [
         url: '/users',
       },
       {
+        title: 'groups',
+        url: '/groups',
+      },
+      {
         title: 'roles',
         url: '/roles',
       },

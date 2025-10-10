@@ -34,6 +34,7 @@
     "create": "create",
     "edit": "edit",
     "users": "User Management",
+    "groups": "Groups",
     "tenants": "Tenant Management"
   },
   "datasets": {
@@ -105,6 +106,20 @@
         "description": "Select a role to add to the user from the available {category} roles.",
         "addButton": "Add"
       }
+    }
+  },
+    "groups": {
+    "title": "Groups",
+    "newGroup": "New Group",
+    "createGroup": "Create Group",
+    "search": "Filter...",
+    "notFound": "Group not found",
+    "info": {
+      "id": "ID",
+      "title": "Name",
+      "users": "Amount Users",
+      "contact": "Contact",
+      "description": "Description"
     }
   },
   "pagination": {

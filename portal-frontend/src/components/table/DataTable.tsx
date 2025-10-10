@@ -3,6 +3,8 @@ import { flexRender, Row, SortDirection, Table } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { ComponentProps } from 'react'
 
+import { cn } from '@/lib/utils'
+
 import { ScrollBar } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
 import { Table as ShadCnTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
@@ -68,12 +70,15 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map(row => (
                   <TableRow
-                    className={`h-16 ${onRowClick ? 'cursor-pointer' : ''}`}
+                    className={cn(
+                      `h-16 ${onRowClick ? 'cursor-pointer' : ''} ${row.depth > 0 ? 'border-0' : 'border-0 border-t-1'}`,
+                    )}
                     key={row.id}
                     onClick={onRowClick ? () => onRowClick(row) : () => null}
+                    style={{ borderWidth: 0, borderTopWidth: row.depth === 0 ? 1 : 0 }}
                   >
                     {row.getVisibleCells().map(cell => (
-                      <TableCell className="whitespace-normal" key={cell.id}>
+                      <TableCell className="whitespace-normal" key={cell.id} style={cell.column.columnDef.meta?.style}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}
