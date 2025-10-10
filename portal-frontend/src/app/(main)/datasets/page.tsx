@@ -4,8 +4,10 @@ import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { PageBackground } from '@/components/page-background/PageBackground'
+import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchField } from '@/components/searchField/SearchField'
+import { SearchHeader } from '@/components/search-field-area/SearchFieldArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
@@ -117,29 +119,36 @@ const DatasetsPage = () => {
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, setApiRequestParams, totalPages])
 
   const CustomElement = (
-    <Button variant="secondary">
+    <Button>
       <Plus />
       {t('newDataset')}
     </Button>
   )
 
   return (
-    <div className="h-full min-h-full max-h-full">
-      <PageHeader title={t('title')} subtitle={t('subtitle')} customElement={CustomElement} />
-      <SearchField searchString={search} onChangeSearchString={setSearchParam} aria-label={t('searchDatasets')} />
-      <TableContainer>
-        <DatasetsTable
-          datasets={datasets}
-          rowCount={rowCount}
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          sorting={sorting}
-          totalPages={totalPages}
-          onPaginationChange={setPaginationParams}
-          onSortingChange={setSortingParams}
+    <PageContainer headerType="onlyTitle">
+      <PageHeader title={t('title')} />
+      <PageBackground>
+        <SearchHeader
+          searchString={search}
+          onChangeSearchString={setSearchParam}
+          aria-label={t('searchDatasets')}
+          customElement={CustomElement}
         />
-      </TableContainer>
-    </div>
+        <TableContainer>
+          <DatasetsTable
+            datasets={datasets}
+            rowCount={rowCount}
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            sorting={sorting}
+            totalPages={totalPages}
+            onPaginationChange={setPaginationParams}
+            onSortingChange={setSortingParams}
+          />
+        </TableContainer>
+      </PageBackground>
+    </PageContainer>
   )
 }
 

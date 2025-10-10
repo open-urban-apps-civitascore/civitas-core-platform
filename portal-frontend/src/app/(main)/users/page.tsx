@@ -10,7 +10,7 @@ import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchField } from '@/components/searchField/SearchField'
+import { SearchHeader } from '@/components/search-field-area/SearchFieldArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
@@ -18,7 +18,6 @@ import { Authority, Category, Role, UserResponse } from '@/types/users'
 import { mapListUsers } from '@/utils/users'
 
 import UsersTable from './components/UsersTable'
-import { SearchHeader } from '@/components/search-field-area/SearchFieldArea'
 
 export type UserAuthority = Category & {
   department: Category

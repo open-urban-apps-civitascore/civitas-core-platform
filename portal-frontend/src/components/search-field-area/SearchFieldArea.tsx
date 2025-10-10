@@ -1,4 +1,5 @@
 import { ReactNode } from 'react'
+
 import { SearchField, SearchFieldProps } from '../searchField/SearchField'
 
 interface SearchHeaderProps extends SearchFieldProps {

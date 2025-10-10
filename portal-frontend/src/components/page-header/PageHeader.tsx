@@ -1,4 +1,4 @@
-import { HTMLAttributes, JSX } from 'react'
+import { HTMLAttributes } from 'react'
 
 import { cn } from '@/lib/utils'
 
@@ -7,12 +7,11 @@ import { TabSectionProps, TabsSection } from './components/TabsSections'
 export type PageHeaderProps = Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & {
   title?: string
   tabs?: TabSectionProps
-  customElement?: JSX.Element
   subTabs?: TabSectionProps
 }
 
 export const PageHeader = (props: PageHeaderProps) => {
-  const { title, customElement, className, style, tabs, subTabs } = props
+  const { title, className, style, tabs, subTabs } = props
 
   return (
     <div
@@ -35,7 +34,6 @@ export const PageHeader = (props: PageHeaderProps) => {
             {title}
           </h1>
         )}
-        {customElement}
       </div>
       {subTabs && (
         <TabsSection
@@ -43,7 +41,7 @@ export const PageHeader = (props: PageHeaderProps) => {
           selectedTab={subTabs.selectedTab}
           onClick={subTabs.onClick}
           isSubTabsSection={!!subTabs}
-          className={`bg-accent`}
+          className="bg-accent"
         />
       )}
     </div>

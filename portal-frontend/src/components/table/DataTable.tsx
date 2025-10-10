@@ -45,12 +45,8 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
   return (
     <div className="@container h-full w-full">
       <div className="h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]">
-        <ScrollArea className="h-[calc(100%-var(--pagination-height))] w-full">
-          <ShadCnTable
-            aria-labelledby="subheading"
-            tableContainerProps={{ className: 'bg-white rounded-md border-1' }}
-            {...tableProps}
-          >
+        <ScrollArea className="h-[calc(100%-var(--pagination-height))] w-full bg-white rounded-md border-1">
+          <ShadCnTable aria-labelledby="subheading" tableContainerProps={{ className: '' }} {...tableProps}>
             <TableHeader>
               {table.getHeaderGroups().map(group => (
                 <TableRow key={group.id}>

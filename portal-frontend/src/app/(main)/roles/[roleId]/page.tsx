@@ -5,6 +5,9 @@ import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
+import { PageBackground } from '@/components/page-background/PageBackground'
+import { PageContainer } from '@/components/page-container/PageContainer'
+import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
 import { FormRole, RoleResponse, roleSchema, RoleUpdate } from '../../../../../types/roles'
@@ -113,10 +116,12 @@ const EditRolePage = () => {
   }
 
   return (
-    <div>
-      <h1>{selectedRole?.name}</h1>
-      <RolesForm form={form} onSubmit={onSubmit} isEdit={true} deleteRole={() => deleteRole(roleId)} />
-    </div>
+    <PageContainer headerType="onlyTitle">
+      <PageHeader title={selectedRole?.name} />
+      <PageBackground>
+        <RolesForm form={form} onSubmit={onSubmit} isEdit={true} deleteRole={() => deleteRole(roleId)} />
+      </PageBackground>
+    </PageContainer>
   )
 }
 

@@ -6,17 +6,16 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useState } from 'react'
 
+import { PageBackground } from '@/components/page-background/PageBackground'
+import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchField } from '@/components/searchField/SearchField'
+import { SearchHeader } from '@/components/search-field-area/SearchFieldArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
 import { ROLE_TYPES, RoleResponse } from '../../../../types/roles'
 import { RolesTable } from './components/RolesTable'
-import { PageContainer } from '@/components/page-container/PageContainer'
-import { SearchHeader } from '@/components/search-field-area/SearchFieldArea'
-import { PageBackground } from '@/components/page-background/PageBackground'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 

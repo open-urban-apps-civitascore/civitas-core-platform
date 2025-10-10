@@ -3,14 +3,15 @@
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { ContentCard } from '@/components/content-card/ContentCard'
+import { PageBackground } from '@/components/page-background/PageBackground'
+import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
 import { RolesTab } from './RolesTab'
 import { FormUser, UserForm } from './UserForm'
-import { PageBackground } from '@/components/page-background/PageBackground'
-import { PageContainer } from '@/components/page-container/PageContainer'
 
 interface UserDetailsProps {
   userData: FormUser | null
@@ -80,11 +81,13 @@ export const UserDetails = (props: UserDetailsProps) => {
       />
       <PageBackground>
         {userData ? (
-          <div className="bg-white p-[calc(var(--layout-padding))]">
+          // <div className="bg-white p-[calc(var(--layout-padding))] border-1 rounded-sm">
+          <ContentCard>
             {selectedTab === tabValues.roles.value && <RolesTab userId={userData.id} />}
             {selectedTab === tabValues.userData.value && <UserForm userData={userData} isEditMode={isEditMode} />}
-          </div>
+          </ContentCard>
         ) : (
+          // </div>
           <div>No data</div>
         )}
       </PageBackground>
