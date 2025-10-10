@@ -7,19 +7,17 @@ interface PageContainerProps extends HTMLAttributes<HTMLDivElement> {
 }
 export const PageContainer = (props: PageContainerProps) => {
   const { headerType, children, className } = props
-  const titleHeight = 84
-  const primaryTabsHeight = 48
-  const subTabsHeight = 50
+  const tabsAndTitleHeight = 36
+  const layoutPadding = 24
   const getHeaderHeight = () => {
     switch (headerType) {
       case 'onlyTitle':
-        return titleHeight
+        return tabsAndTitleHeight + 2 * layoutPadding
       case 'withPrimaryTabs':
-        return titleHeight + primaryTabsHeight
       case 'withSubTabs':
-        return titleHeight + primaryTabsHeight
+        return 2 * tabsAndTitleHeight + 3 * layoutPadding
       case 'withBothTabsRows':
-        return titleHeight + primaryTabsHeight + subTabsHeight
+        return 3 * tabsAndTitleHeight + 4 * layoutPadding
     }
   }
 
