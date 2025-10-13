@@ -60,11 +60,7 @@
     "newDataset": "Neuer Datensatz"
   },
   "users": {
-    "title": "User",
-    "tabs": {
-      "users": "User",
-      "groups": "Gruppen"
-    },
+    "title": "Übersicht: User",
     "newUser": "Neuer User",
     "createUser": "User erstellen",
     "searchUsers": "Filtern...",
@@ -108,7 +104,7 @@
     }
   },
   "groups": {
-    "title": "Gruppen",
+    "title": "Übersicht: Gruppen",
     "newGroup": "Neue Gruppe",
     "createGroup": "Gruppe erstellen",
     "search": "Filtern...",

@@ -8,7 +8,6 @@ import { useEffect, useState } from 'react'
 
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
-import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
@@ -49,18 +48,7 @@ const UsersPage = () => {
   const [listUsers, setListUsers] = useState<ListUser[]>([])
   const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [selectedTab, setSelectedTab] = useState('users')
   const [isLoading, setIsLoading] = useState(true)
-  const tabs: Tab[] = [
-    {
-      value: 'users',
-      label: t('tabs.users'),
-    },
-    {
-      value: 'userGroups',
-      label: t('tabs.groups'),
-    },
-  ]
 
   const {
     setSortingParams,
@@ -143,11 +131,8 @@ const UsersPage = () => {
   )
 
   return (
-    <PageContainer headerType="withPrimaryTabs">
-      <PageHeader
-        title={t('title')}
-        tabs={{ tabs: tabs, selectedTab: selectedTab, onClick: newValue => setSelectedTab(newValue) }}
-      />
+    <PageContainer headerType="onlyTitle">
+      <PageHeader title={t('title')} />
       <PageBackground>
         <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />
         <TableContainer>
