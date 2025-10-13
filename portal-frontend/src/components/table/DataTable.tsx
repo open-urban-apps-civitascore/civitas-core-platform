@@ -56,7 +56,7 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                     <TableHead
                       key={header.id}
                       scope="col"
-                      className="text-primary-light"
+                      className="text-primary-light px-3"
                       aria-sort={getAriaSort(header.column.getIsSorted())}
                       style={header.column.columnDef.meta?.style}
                     >
@@ -78,7 +78,11 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                     style={{ borderWidth: 0, borderTopWidth: row.depth === 0 ? 1 : 0 }}
                   >
                     {row.getVisibleCells().map(cell => (
-                      <TableCell className="whitespace-normal" key={cell.id} style={cell.column.columnDef.meta?.style}>
+                      <TableCell
+                        className="whitespace-normal px-3"
+                        key={cell.id}
+                        style={cell.column.columnDef.meta?.style}
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}

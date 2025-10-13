@@ -44,10 +44,13 @@ const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('title', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.title')} />,
-      cell: ({ row }: CellContext<GroupResponse, unknown>) => <ExpanderCell row={row} value={row.original.title} />,
+      cell: ({ row }: CellContext<GroupResponse, unknown>) => (
+        <ExpanderCell row={row} value={row.original.title} className="font-medium" />
+      ),
       meta: {
         style: {
           minWidth: '200px',
+          color: 'var(--foreground)',
         },
       },
     }),

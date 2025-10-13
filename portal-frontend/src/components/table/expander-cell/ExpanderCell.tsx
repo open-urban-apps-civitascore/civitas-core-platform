@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import { HTMLAttributes, MouseEvent } from 'react'
 
 import { Button, ButtonProps } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 interface ExpanderCellProps<T extends RowData> extends HTMLAttributes<HTMLDivElement> {
   row: Row<T>
@@ -10,7 +11,7 @@ interface ExpanderCellProps<T extends RowData> extends HTMLAttributes<HTMLDivEle
   value: string
 }
 export const ExpanderCell = <T,>(props: ExpanderCellProps<T>) => {
-  const { row, value, buttonProps, ...divProps } = props
+  const { row, value, buttonProps, className,  ...divProps } = props
   const expanderWidth = `${1.75 + row.depth}rem`
 
   const handleExpanderClick = (e: MouseEvent<HTMLButtonElement>, row: Row<T>) => {
@@ -19,7 +20,7 @@ export const ExpanderCell = <T,>(props: ExpanderCellProps<T>) => {
   }
 
   return (
-    <div className="flex items-center min-w-[200px] w-[35%]" {...divProps}>
+    <div className={cn('flex items-center min-w-[200px] w-[35%]', className)} {...divProps}>
       {row.getCanExpand() ? (
         <>
           <div
