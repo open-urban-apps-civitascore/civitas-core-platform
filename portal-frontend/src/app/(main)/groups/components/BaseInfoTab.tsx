@@ -8,6 +8,7 @@ import { TextArea } from '@/components/form/fields/TextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { FormFieldContainer } from '@/components/form/FormFieldContainer'
 import { GroupData } from '@/types/groups'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 interface BaseInfoTabProps {
   form: UseFormReturn<GroupData>
@@ -16,6 +17,7 @@ interface BaseInfoTabProps {
 export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const { form } = props
   const t = useTranslations('groups')
+  const isMobile = useIsMobile()
 
   return (
     <div>
@@ -28,7 +30,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           label={t('details.name')}
           name="title"
           placeholder={t('details.name')}
-          formItemProps={{ className: 'grid grid-cols-[200px_300px]' }}
+          formItemProps={{ className: isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]' }}
           required
         />
       </FormFieldContainer>
@@ -40,7 +42,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           label={t('details.description')}
           name="description"
           placeholder={t('details.description')}
-          formItemProps={{ className: 'grid grid-cols-[200px_300px]' }}
+          formItemProps={{ className: isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]' }}
           required
         />
       </FormFieldContainer>
@@ -52,7 +54,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           name="contact"
           placeholder={t('details.contact')}
           options={[]}
-          className="grid grid-cols-[200px_300px] gap-2"
+          className={isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]'}
           disabled
         />
       </FormFieldContainer>
