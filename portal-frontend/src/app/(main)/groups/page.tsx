@@ -2,7 +2,6 @@
 
 import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
@@ -29,7 +28,6 @@ export const getSortParam = (sorting: SortingState) => {
 
 const GroupsPage = () => {
   const t = useTranslations('groups')
-  const router = useRouter()
   const [groups, setGroups] = useState<GroupResponse[]>([])
   const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
@@ -86,7 +84,7 @@ const GroupsPage = () => {
 
   const handleRowClick = (row: Row<GroupResponse>) => {
     if (row.id) {
-      const params = setApiRequestParams(totalPages)
+      // const params = setApiRequestParams(totalPages)
       // router.push(`groups/${row.id}?${params}`, {})
     }
   }
