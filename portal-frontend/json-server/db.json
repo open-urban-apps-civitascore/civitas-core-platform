@@ -4809,7 +4809,7 @@
       "displayName": "Test 1 User 5"
     }
   ],
-  "userGroups": [
+  "groups": [
     {
       "id": "1",
       "title": "Admin",
@@ -4820,8 +4820,7 @@
         "id": "1",
         "displayName": "Sophia Fischer"
       },
-      "parent": null,
-      "children": [
+      "subgroups": [
         {
           "id": "7",
           "title": "Systemadministration",
@@ -4832,8 +4831,7 @@
             "id": "20",
             "displayName": "Anna Koch"
           },
-          "parent": "1",
-          "hasChildren": true
+          "subgroups": true
         },
         {
           "id": "8",
@@ -4845,8 +4843,7 @@
             "id": "67",
             "displayName": "Nina Becker"
           },
-          "parent": "1",
-          "hasChildren": false
+          "subgroups": false
         },
         {
           "id": "9",
@@ -4858,8 +4855,7 @@
             "id": "1",
             "displayName": "Sophia Fischer"
           },
-          "parent": "1",
-          "hasChildren": false
+          "subgroups": false
         }
       ]
     },
@@ -4873,8 +4869,7 @@
         "id": "3",
         "displayName": "Michael Wagner"
       },
-      "parent": null,
-      "children": [
+      "subgroups": [
         {
           "id": "10",
           "title": "IT-Infrastruktur",
@@ -4885,8 +4880,7 @@
             "id": "3",
             "displayName": "Michael Wagner"
           },
-          "parent": "2",
-          "hasChildren": false
+          "subgroups": false
         },
         {
           "id": "11",
@@ -4898,8 +4892,7 @@
             "id": "5",
             "displayName": "Clara Becker"
           },
-          "parent": "2",
-          "children": [
+          "subgroups": [
             {
               "id": "16",
               "title": "Frontend-Entwicklung",
@@ -4910,8 +4903,7 @@
                 "id": "34",
                 "displayName": "Markus Wagner"
               },
-              "parent": "11",
-              "hasChildren": false
+              "subgroups": false
             },
             {
               "id": "17",
@@ -4923,8 +4915,7 @@
                 "id": "5",
                 "displayName": "Clara Becker"
               },
-              "parent": "11",
-              "hasChildren": false
+              "subgroups": false
             }
           ]
         }
@@ -4940,8 +4931,7 @@
         "id": "2",
         "displayName": "Markus Schmidt"
       },
-      "parent": null,
-      "hasChildren": false
+      "subgroups": false
     },
     {
       "id": "4",
@@ -4953,8 +4943,7 @@
         "id": "4",
         "displayName": "Miriam Koch"
       },
-      "parent": null,
-      "children": [
+      "subgroups": [
         {
           "id": "12",
           "title": "Teamleitung Technik",
@@ -4965,8 +4954,7 @@
             "id": "4",
             "displayName": "Miriam Koch"
           },
-          "parent": "4",
-          "hasChildren": false
+          "subgroups": false
         },
         {
           "id": "13",
@@ -4978,8 +4966,7 @@
             "id": "8",
             "displayName": "Lukas Fischer"
           },
-          "parent": "4",
-          "hasChildren": false
+          "subgroups": false
         }
       ]
     },
@@ -4993,8 +4980,7 @@
         "id": "5",
         "displayName": "Clara Becker"
       },
-      "parent": null,
-      "children": [
+      "subgroups": [
         {
           "id": "14",
           "title": "First-Level-Support",
@@ -5005,8 +4991,7 @@
             "id": "14",
             "displayName": "Markus Fischer"
           },
-          "parent": "5",
-          "children": [
+          "subgroups": [
             {
               "id": "15",
               "title": "Second-Level-Support",
@@ -5017,8 +5002,7 @@
                 "id": "5",
                 "displayName": "Clara Becker"
               },
-              "parent": "14",
-              "hasChildren": false
+              "subgroups": false
             }
           ]
         }
@@ -5034,8 +5018,7 @@
         "id": "3",
         "displayName": "Michael Wagner"
       },
-      "parent": null,
-      "hasChildren": false
+      "subgroups": false
     }
   ],
   "authorities": [

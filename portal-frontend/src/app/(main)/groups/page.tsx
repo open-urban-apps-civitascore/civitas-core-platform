@@ -55,27 +55,27 @@ const GroupsPage = () => {
 
     try {
       setIsLoading(true)
-      const usersGroupsResponse = await fetch(`${URL}/groups?${params.toString()}`, {
+      const groupsResponse = await fetch(`${URL}/groups?${params.toString()}`, {
         cache: 'no-store',
       })
 
-      if (!usersGroupsResponse) {
+      if (!groupsResponse) {
         throw new Error('An error occurred while loading user groups data')
       }
 
-      const userGroupsData: GroupResponse[] = await usersGroupsResponse.json()
+      const groupsData: GroupResponse[] = await groupsResponse.json()
 
-      setGroups(userGroupsData)
+      setGroups(groupsData)
       setIsLoading(false)
 
-      const totalCount = Number(usersGroupsResponse.headers.get('X-Total-Count')) || 0
+      const totalCount = Number(groupsResponse.headers.get('X-Total-Count')) || 0
       if (rowCount !== totalCount) {
         setRowCount(totalCount)
       }
     } catch (error) {
       console.error(error)
       setIsLoading(false)
-      throw new Error('An error occurred while loading form data')
+      throw new Error('An error occurred while loading groups data')
     }
   }
 
