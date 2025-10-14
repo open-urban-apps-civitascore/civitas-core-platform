@@ -55,7 +55,7 @@ const GroupsPage = () => {
 
     try {
       setIsLoading(true)
-      const usersGroupsResponse = await fetch(`${URL}/userGroups?${params.toString()}`, {
+      const usersGroupsResponse = await fetch(`${URL}/groups?${params.toString()}`, {
         cache: 'no-store',
       })
 
@@ -87,12 +87,12 @@ const GroupsPage = () => {
   const handleRowClick = (row: Row<GroupResponse>) => {
     if (row.id) {
       const params = setApiRequestParams(totalPages)
-      // router.push(`groups/${row.id}?${params}`, {})
+      router.push(`groups/${row.id}?${params}`, {})
     }
   }
 
   const CustomElement = (
-    <Button>
+    <Button onClick={() => router.push('groups/create')}>
       <Plus />
       {t('newGroup')}
     </Button>

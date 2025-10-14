@@ -104,18 +104,29 @@
       }
     }
   },
-    "groups": {
+  "groups": {
     "title": "Overview: Groups",
     "newGroup": "New Group",
     "createGroup": "Create Group",
     "search": "Filter...",
     "notFound": "Group not found",
-    "info": {
+    "list": {
       "id": "ID",
       "title": "Name",
       "users": "Amount Users",
       "contact": "Contact",
       "description": "Description"
+    },
+    "detailsTabs": {
+      "info": "Information",
+      "roles": "Roles",
+      "users": "Users",
+      "subgroups": "Subgroups"
+    },
+    "details": {
+      "name": "Name of the Group",
+      "description": "Group Description",
+      "contact": "Contact"
     }
   },
   "pagination": {

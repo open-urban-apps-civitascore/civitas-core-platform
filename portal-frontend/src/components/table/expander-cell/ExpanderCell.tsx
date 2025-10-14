@@ -11,7 +11,7 @@ interface ExpanderCellProps<T extends RowData> extends HTMLAttributes<HTMLDivEle
   value: string
 }
 export const ExpanderCell = <T,>(props: ExpanderCellProps<T>) => {
-  const { row, value, buttonProps, className,  ...divProps } = props
+  const { row, value, buttonProps, className, ...divProps } = props
   const expanderWidth = `${1.75 + row.depth}rem`
 
   const handleExpanderClick = (e: MouseEvent<HTMLButtonElement>, row: Row<T>) => {

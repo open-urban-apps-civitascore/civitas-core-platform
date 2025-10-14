@@ -109,12 +109,23 @@
     "createGroup": "Gruppe erstellen",
     "search": "Filtern...",
     "notFound": "Gruppe nicht gefunden",
-    "info": {
+    "list": {
       "id": "ID",
       "title": "Name",
       "users": "Anzahl User",
       "contact": "Ansprechpartner",
       "description": "Beschreibung"
+    },
+    "detailsTabs": {
+      "info": "Informationen",
+      "roles": "Rollen",
+      "users": "User",
+      "subgroups": "Untergruppen"
+    },
+    "details": {
+      "name": "Name der Gruppe",
+      "description": "Beschreibung der Gruppe",
+      "contact": "Ansprechpartner"
     }
   },
   "pagination": {
