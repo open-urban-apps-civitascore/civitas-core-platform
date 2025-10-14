@@ -5,5 +5,5 @@ export type GroupResponse = {
   roles: string[]
   users: string[]
   contact: { id: string; displayName: string }
-  children: GroupResponse[] | null
+  subgroups: GroupResponse[] | null
 }

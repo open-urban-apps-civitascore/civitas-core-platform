@@ -43,7 +43,7 @@ const GroupsTable = (props: GroupsTableProps) => {
       enableHiding: true,
     }),
     columnHelper.accessor('title', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('info.title')} />,
+      header: ({ column }) => <SortableTableHeader column={column} title={t('list.title')} />,
       cell: ({ row }: CellContext<GroupResponse, unknown>) => (
         <ExpanderCell row={row} value={row.original.title} className="font-medium" />
       ),
@@ -55,15 +55,15 @@ const GroupsTable = (props: GroupsTableProps) => {
       },
     }),
     columnHelper.accessor('users', {
-      header: t('info.users'),
+      header: t('list.users'),
       cell: info => info.getValue().length,
     }),
     columnHelper.accessor('contact', {
-      header: t('info.contact'),
+      header: t('list.contact'),
       cell: info => info.getValue().displayName,
     }),
     columnHelper.accessor('description', {
-      header: t('info.description'),
+      header: t('list.description'),
       cell: info => info.getValue(),
       meta: {
         style: {
@@ -89,7 +89,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     state: { pagination: { pageIndex, pageSize }, sorting, rowSelection },
     manualPagination: true,
     manualSorting: true,
-    getSubRows: row => row.children || [],
+    getSubRows: row => row.subgroups || [],
     getExpandedRowModel: getExpandedRowModel(),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),

@@ -110,7 +110,7 @@
     "createGroup": "Create Group",
     "search": "Filter...",
     "notFound": "Group not found",
-    "info": {
+    "list": {
       "id": "ID",
       "title": "Name",
       "users": "Amount Users",

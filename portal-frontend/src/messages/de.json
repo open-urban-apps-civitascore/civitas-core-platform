@@ -109,7 +109,7 @@
     "createGroup": "Gruppe erstellen",
     "search": "Filtern...",
     "notFound": "Gruppe nicht gefunden",
-    "info": {
+    "list": {
       "id": "ID",
       "title": "Name",
       "users": "Anzahl User",
