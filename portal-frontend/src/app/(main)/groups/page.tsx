@@ -87,23 +87,26 @@ const GroupsPage = () => {
   const handleRowClick = (row: Row<GroupResponse>) => {
     if (row.id) {
       const params = setApiRequestParams(totalPages)
-      router.push(`groups/${row.id}?${params}`, {})
+      router.push(`groups/${row.id}?${params}`)
     }
   }
 
-  const CustomElement = (
-    <Button onClick={() => router.push('groups/create')}>
-      <Plus />
-      {t('newGroup')}
-    </Button>
-  )
+  const CustomElement = () => {
+    const params = setApiRequestParams(totalPages)
+    return (
+      <Button onClick={() => router.push(`groups/create?${params}`)}>
+        <Plus />
+        {t('newGroup')}
+      </Button>
+    )
+  }
 
   return (
     <PageContainer headerType="onlyTitle">
       <PageHeader title={t('title')} />
       <PageBackground>
         <SearchHeader
-          customElement={CustomElement}
+          customElement={<CustomElement />}
           onChangeSearchString={setSearchParam}
           searchString={search}
           placeholder={t('search')}

@@ -1,3 +1,4 @@
+import { SelectTriggerProps } from '@radix-ui/react-select'
 import { Check } from 'lucide-react'
 import { Controller, FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
@@ -19,10 +20,24 @@ export interface AccessibleSelectProps<T extends FieldValues> {
   // eslint-disable-next-line react/boolean-prop-naming
   required?: boolean
   className?: string
+  // eslint-disable-next-line react/boolean-prop-naming
+  disabled?: boolean
+  selectTriggerProps?: SelectTriggerProps
 }
 
 export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) => {
-  const { id, label, placeholder = 'Please select...', options, form, name, required = false, className } = props
+  const {
+    id,
+    label,
+    placeholder = 'Please select...',
+    options,
+    form,
+    name,
+    required = false,
+    className,
+    disabled = false,
+    selectTriggerProps,
+  } = props
 
   return (
     <Controller
@@ -30,14 +45,19 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
       name={name}
       rules={{ required: required ? `${label} ist erforderlich` : false }}
       render={({ field }) => (
-        <div>
+        <div className={className}>
           <label htmlFor={id} className="text-sm font-medium text-gray-700 dark:text-gray-200">
             {label}
             {required && <span className="text-red-500 ml-1">*</span>}
           </label>
 
           <ShadcnSelect value={field.value} onValueChange={field.onChange}>
-            <SelectTrigger id={id} aria-label={label} className={cn('w-full', className)}>
+            <SelectTrigger
+              id={id}
+              aria-label={label}
+              className={cn('w-full', selectTriggerProps?.className)}
+              disabled={disabled}
+            >
               <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>

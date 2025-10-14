@@ -1,56 +1,61 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useForm, UseFormReturn } from 'react-hook-form'
+import { UseFormReturn } from 'react-hook-form'
 
+import { Select } from '@/components/form/fields/Select'
 import { TextArea } from '@/components/form/fields/TextArea'
 import { TextField } from '@/components/form/fields/TextField'
-import { GroupData, GroupSchema } from '@/types/groups'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Form } from '@/components/ui/form'
-
-const defaultGroup: GroupData = {
-  id: '',
-  title: '',
-  description: '',
-  roles: [],
-  users: [],
-  contact: '',
-  subgroups: [],
-}
+import { FormFieldContainer } from '@/components/form/FormFieldContainer'
+import { GroupData } from '@/types/groups'
 
 interface BaseInfoTabProps {
   form: UseFormReturn<GroupData>
-  //   groupData: GroupData
-  onSubmit: (groupData: GroupData) => void
 }
 
 export const BaseInfoTab = (props: BaseInfoTabProps) => {
-  const { form, onSubmit } = props
+  const { form } = props
   const t = useTranslations('groups')
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid gap-4 space-y-8 mb-4 max-w-3xl grid-cols-1">
-          <TextField
-            form={form}
-            label={t('details.name')}
-            name="title"
-            placeholder={t('details.name')}
-            formItemProps={{ className: 'grid grid-cols-[200px_300px]' }}
-          />
+    <div>
+      <FormFieldContainer className="pt-0 pb-3 text-xl">
+        <h2>{t('details.baseInfo')}</h2>
+      </FormFieldContainer>
+      <FormFieldContainer>
+        <TextField
+          form={form}
+          label={t('details.name')}
+          name="title"
+          placeholder={t('details.name')}
+          formItemProps={{ className: 'grid grid-cols-[200px_300px]' }}
+          required
+        />
+      </FormFieldContainer>
 
-          <TextArea
-            className="max-w-lg my-12"
-            form={form}
-            label={t('details.description')}
-            name="description"
-            placeholder={t('details.description')}
-            formItemProps={{ className: 'grid grid-cols-[200px_300px]' }}
-          />
-        </div>
-      </form>
-    </Form>
+      <FormFieldContainer>
+        <TextArea
+          className="max-w-lg my-12"
+          form={form}
+          label={t('details.description')}
+          name="description"
+          placeholder={t('details.description')}
+          formItemProps={{ className: 'grid grid-cols-[200px_300px]' }}
+          required
+        />
+      </FormFieldContainer>
+      <FormFieldContainer className="border-0">
+        <Select
+          form={form}
+          id="contactSelect"
+          label={t('details.contact')}
+          name="contact"
+          placeholder={t('details.contact')}
+          options={[]}
+          className="grid grid-cols-[200px_300px] gap-2"
+          disabled
+        />
+      </FormFieldContainer>
+    </div>
   )
 }

@@ -124,6 +124,7 @@
       "subgroups": "Subgroups"
     },
     "details": {
+      "baseInfo": "Base Information",
       "name": "Name of the Group",
       "description": "Group Description",
       "contact": "Contact"

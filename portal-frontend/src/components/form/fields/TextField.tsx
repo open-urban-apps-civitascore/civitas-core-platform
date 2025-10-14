@@ -17,7 +17,6 @@ interface TextFieldProps<T extends FieldValues>
 
 export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
   const { form, name, placeholder, label, required = false, formItemProps, disabled } = props
-  console.log(name)
   return (
     <FormField
       control={form.control}

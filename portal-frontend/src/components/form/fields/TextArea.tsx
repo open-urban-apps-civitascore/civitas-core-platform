@@ -14,7 +14,7 @@ interface TextAreaProps<T extends FieldValues>
 }
 
 export const TextArea = <T extends FieldValues>(props: TextAreaProps<T>) => {
-  const { form, name, placeholder, label, formItemProps } = props
+  const { form, name, placeholder, label, required, formItemProps } = props
 
   return (
     <FormField
@@ -22,7 +22,10 @@ export const TextArea = <T extends FieldValues>(props: TextAreaProps<T>) => {
       name={name}
       render={({ field }) => (
         <FormItem className={formItemProps?.className}>
-          <FormLabel>{label}</FormLabel>
+          <FormLabel>
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </FormLabel>
           <FormControl>
             <Textarea placeholder={placeholder} {...field} />
           </FormControl>

@@ -60,7 +60,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('contact', {
       header: t('list.contact'),
-      cell: info => info.getValue().displayName,
+      cell: info => info.getValue()?.displayName,
     }),
     columnHelper.accessor('description', {
       header: t('list.description'),

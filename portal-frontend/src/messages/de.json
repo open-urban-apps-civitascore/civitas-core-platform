@@ -123,6 +123,7 @@
       "subgroups": "Untergruppen"
     },
     "details": {
+      "baseInfo": "Basisinformationen",
       "name": "Name der Gruppe",
       "description": "Beschreibung der Gruppe",
       "contact": "Ansprechpartner"
