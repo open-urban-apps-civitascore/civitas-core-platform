@@ -7,6 +7,7 @@ export type GroupResponse = {
   roles: string[]
   users: string[]
   contact: { id: string; displayName: string } | null
+  parent: string | null
   subgroups: GroupResponse[]
 }
 
@@ -26,6 +27,7 @@ export const GroupSchema = z.object({
       displayName: z.string(),
     })
     .nullable(),
+  parent: z.string().nullable(),
   get subgroups() {
     return z.array(GroupSchema)
   },

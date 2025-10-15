@@ -4,6 +4,8 @@ import { Controller, FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { Select as ShadcnSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
+import { FormField, FormMessage } from '@/components/ui/form'
 
 export type SelectOption = {
   value: string
@@ -23,6 +25,7 @@ export interface AccessibleSelectProps<T extends FieldValues> {
   // eslint-disable-next-line react/boolean-prop-naming
   disabled?: boolean
   selectTriggerProps?: SelectTriggerProps
+  onChange?: (value: string) => void
 }
 
 export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) => {
@@ -37,13 +40,16 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
     className,
     disabled = false,
     selectTriggerProps,
+    onChange,
   } = props
 
+  const t = useTranslations('common')
+
   return (
-    <Controller
+    <FormField
       control={form.control}
       name={name}
-      rules={{ required: required ? `${label} ist erforderlich` : false }}
+      rules={{ required: required ? t('errors.required') : false }}
       render={({ field }) => (
         <div className={className}>
           <label htmlFor={id} className="text-sm font-medium text-gray-700 dark:text-gray-200">
@@ -51,7 +57,7 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
             {required && <span className="text-red-500 ml-1">*</span>}
           </label>
 
-          <ShadcnSelect value={field.value} onValueChange={field.onChange}>
+          <ShadcnSelect value={field.value} onValueChange={onChange ?? field.onChange}>
             <SelectTrigger
               id={id}
               aria-label={label}
@@ -73,6 +79,7 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
               ))}
             </SelectContent>
           </ShadcnSelect>
+          <FormMessage />
         </div>
       )}
     />

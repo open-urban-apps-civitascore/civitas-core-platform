@@ -3022,6 +3022,7 @@
           "id": "2"
         }
       },
+      "department": "2",
       "group": "1",
       "phone": "+49 164 6822941",
       "active": false,
@@ -3079,24 +3080,25 @@
     {
       "id": "5",
       "firstName": "Clara",
-      "lastName": "Becker",
-      "displayName": "Clara Becker",
-      "email": "clara.becker@test.com",
-      "phone": "+49 158 3743727",
       "title": "female",
+      "lastName": "Becker",
+      "email": "clara.becker@test.com",
       "authority": {
         "id": "4",
         "department": {
           "id": "1"
         }
       },
+      "department": "1",
       "group": "3",
+      "phone": "+49 158 3743727",
+      "active": true,
+      "position": "Flugsicherheitsbeauftragter",
+      "positionDescription": null,
       "roles": [
         "1"
       ],
-      "active": true,
-      "position": "Flugsicherheitsbeauftragter",
-      "positionDescription": ""
+      "displayName": "Clara Becker"
     },
     {
       "id": "6",
@@ -5210,6 +5212,41 @@
         "3"
       ],
       "displayName": "Test 1 User 5"
+    },
+    {
+      "firstName": "Test",
+      "title": "male",
+      "lastName": "User",
+      "email": "testuser@test.test",
+      "authority": null,
+      "department": "",
+      "group": null,
+      "phone": "+49 164 6822941",
+      "active": false,
+      "position": null,
+      "positionDescription": null,
+      "roles": [],
+      "displayName": "Test User",
+      "id": "yqiht9Q"
+    },
+    {
+      "id": "-JIioq4",
+      "firstName": "Test 2",
+      "title": "male",
+      "lastName": "User 2",
+      "email": "testuser@test.test",
+      "authority": {
+        "id": "2",
+        "department": null
+      },
+      "department": "",
+      "group": null,
+      "phone": "+49 164 6822941",
+      "active": false,
+      "position": null,
+      "positionDescription": null,
+      "roles": [],
+      "displayName": "Test 2 User 2"
     }
   ],
   "groups": [
@@ -5232,6 +5269,7 @@
         "id": "1",
         "displayName": "Sophia Fischer"
       },
+      "parent": null,
       "subgroups": [
         {
           "id": "7",
@@ -5249,6 +5287,7 @@
             "id": "20",
             "displayName": "Anna Koch"
           },
+          "parent": "1",
           "subgroups": []
         },
         {
@@ -5265,6 +5304,7 @@
             "id": "67",
             "displayName": "Nina Becker"
           },
+          "parent": "1",
           "subgroups": []
         },
         {
@@ -5282,6 +5322,7 @@
             "id": "1",
             "displayName": "Sophia Fischer"
           },
+          "parent": "1",
           "subgroups": []
         }
       ]
@@ -5304,6 +5345,7 @@
         "id": "3",
         "displayName": "Michael Wagner"
       },
+      "parent": null,
       "subgroups": [
         {
           "id": "10",
@@ -5320,6 +5362,7 @@
             "id": "3",
             "displayName": "Michael Wagner"
           },
+          "parent": "2",
           "subgroups": []
         },
         {
@@ -5337,6 +5380,7 @@
             "id": "5",
             "displayName": "Clara Becker"
           },
+          "parent": "2",
           "subgroups": [
             {
               "id": "16",
@@ -5352,6 +5396,7 @@
                 "id": "34",
                 "displayName": "Markus Wagner"
               },
+              "parent": "11",
               "subgroups": []
             },
             {
@@ -5368,6 +5413,7 @@
                 "id": "5",
                 "displayName": "Clara Becker"
               },
+              "parent": "11",
               "subgroups": []
             }
           ]
@@ -5391,6 +5437,7 @@
         "id": "2",
         "displayName": "Markus Schmidt"
       },
+      "parent": null,
       "subgroups": []
     },
     {
@@ -5410,6 +5457,7 @@
         "id": "4",
         "displayName": "Miriam Koch"
       },
+      "parent": null,
       "subgroups": [
         {
           "id": "12",
@@ -5426,6 +5474,7 @@
             "id": "4",
             "displayName": "Miriam Koch"
           },
+          "parent": "4",
           "subgroups": []
         },
         {
@@ -5442,6 +5491,7 @@
             "id": "8",
             "displayName": "Lukas Fischer"
           },
+          "parent": "4",
           "subgroups": []
         }
       ]
@@ -5461,6 +5511,7 @@
         "id": "5",
         "displayName": "Clara Becker"
       },
+      "parent": null,
       "subgroups": [
         {
           "id": "14",
@@ -5476,6 +5527,7 @@
             "id": "14",
             "displayName": "Markus Fischer"
           },
+          "parent": "5",
           "subgroups": [
             {
               "id": "15",
@@ -5491,6 +5543,7 @@
                 "id": "5",
                 "displayName": "Clara Becker"
               },
+              "parent": "14",
               "subgroups": []
             }
           ]
@@ -5514,7 +5567,48 @@
         "id": "3",
         "displayName": "Michael Wagner"
       },
+      "parent": null,
       "subgroups": []
+    },
+    {
+      "title": "Test",
+      "description": "Test Beschreibung",
+      "roles": [],
+      "users": [],
+      "contact": null,
+      "parent": null,
+      "subgroups": [],
+      "id": "563C_7I"
+    },
+    {
+      "title": "New Test",
+      "description": "New Description",
+      "roles": [],
+      "users": [],
+      "contact": null,
+      "parent": null,
+      "subgroups": [],
+      "id": "hdi92w6"
+    },
+    {
+      "id": "E9jU8xd",
+      "title": "New Test 3",
+      "description": "New Description 3",
+      "roles": [],
+      "users": [],
+      "contact": null,
+      "parent": null,
+      "subgroups": []
+    },
+    {
+      "title": "New Test 4",
+      "description": "Test Description",
+      "roles": [],
+      "users": [],
+      "contact": null,
+      "parent": null,
+      "subgroups": [],
+      "id": "JsarHZh"
     }
   ],
   "authorities": [

@@ -64,7 +64,6 @@ const GroupsPage = () => {
       }
 
       const groupsData: GroupResponse[] = await groupsResponse.json()
-
       setGroups(groupsData)
       setIsLoading(false)
 
@@ -85,7 +84,7 @@ const GroupsPage = () => {
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
 
   const handleRowClick = (row: Row<GroupResponse>) => {
-    if (row.id) {
+    if (row.id && !row.original.parent) {
       const params = setApiRequestParams(totalPages)
       router.push(`groups/${row.id}?${params}`)
     }

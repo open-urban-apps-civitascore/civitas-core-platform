@@ -4,6 +4,7 @@ import {
   getCoreRowModel,
   getExpandedRowModel,
   getSortedRowModel,
+  Row,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
@@ -39,6 +40,11 @@ const GroupsTable = (props: GroupsTableProps) => {
   const columns = [
     columnHelper.accessor('id', {
       header: 'id',
+      cell: info => info.getValue(),
+      enableHiding: true,
+    }),
+    columnHelper.accessor('parent', {
+      header: 'parent',
       cell: info => info.getValue(),
       enableHiding: true,
     }),
@@ -84,6 +90,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     initialState: {
       columnVisibility: {
         id: false,
+        parent: false,
       },
     },
     state: { pagination: { pageIndex, pageSize }, sorting, rowSelection },
@@ -99,6 +106,8 @@ const GroupsTable = (props: GroupsTableProps) => {
     onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
   })
 
+  const checkIfRowClickable = (row: Row<GroupResponse>) => !row.original.parent
+
   return (
     <DataTable
       table={table}
@@ -107,6 +116,7 @@ const GroupsTable = (props: GroupsTableProps) => {
       totalPages={totalPages}
       onRowClick={onRowClick}
       isLoading={isLoading}
+      isRowClickable={checkIfRowClickable}
     />
   )
 }

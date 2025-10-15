@@ -11,6 +11,7 @@ const defaultGroup: GroupData = {
   roles: [],
   users: [],
   contact: { id: '', displayName: '' },
+  parent: null,
   subgroups: [],
 }
 

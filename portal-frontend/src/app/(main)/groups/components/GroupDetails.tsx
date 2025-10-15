@@ -76,48 +76,59 @@ const GroupDetails = (props: GroupDetailsProps) => {
     defaultValues: { ...groupData },
   })
 
-  const handleCreateGroup = (formData: GroupData) => {
+  const handleCreateGroup = async (formData: GroupData) => {
     const parsed = GroupSchema.parse(formData)
     const groupData = mapApiGroupData(parsed)
 
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createGroupData } = groupData
-    createGroup(createGroupData)
+    await createGroup(createGroupData)
     goToGroupsList()
   }
 
-  const handleUpdateGroup = (formData: GroupData) => {
+  const handleUpdateGroup = async (formData: GroupData) => {
+    console.log('handleUpdateGroup')
     const parsed = GroupSchema.parse(formData)
     const groupData = mapApiGroupData(parsed)
-    updateGroup(groupData)
+    await updateGroup(groupData)
     goToGroupsList()
   }
 
   const handleSubmit = isUpdateMode ? handleUpdateGroup : handleCreateGroup
 
-  const GroupDetailsContent = () =>
-    groupData ? (
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col justify-between h-full">
-          <ContentCard>
-            {subTabValue === tabValues.info.value ? (
-              <BaseInfoTab form={form} />
-            ) : (
-              <div>{tabValues[subTabValue as keyof typeof tabValues].label}</div>
-            )}
-          </ContentCard>
-
-          <ActionButtons onCancelClick={goToGroupsList} confirmButtonType="submit" />
-        </form>
-      </Form>
-    ) : (
-      <ContentCard>No data</ContentCard>
+  if (!subTabValue) {
+    return (
+      <PageContainer headerType="withSubTabs">
+        <PageHeader title={title} subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: setSubTabValueParam }} />
+        <PageBackground>
+          <LoadingSkeleton />
+        </PageBackground>
+      </PageContainer>
     )
+  }
 
   return (
     <PageContainer headerType="withSubTabs">
       <PageHeader title={title} subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: setSubTabValueParam }} />
-      <PageBackground>{subTabValue ? <GroupDetailsContent /> : <LoadingSkeleton />}</PageBackground>
+      <PageBackground>
+        {groupData ? (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col justify-between h-full">
+              <ContentCard>
+                {subTabValue === tabValues.info.value ? (
+                  <BaseInfoTab form={form} />
+                ) : (
+                  <div>{tabValues[subTabValue as keyof typeof tabValues].label}</div>
+                )}
+              </ContentCard>
+
+              <ActionButtons onCancelClick={goToGroupsList} confirmButtonType="submit" />
+            </form>
+          </Form>
+        ) : (
+          <ContentCard>No data</ContentCard>
+        )}
+      </PageBackground>
     </PageContainer>
   )
 }

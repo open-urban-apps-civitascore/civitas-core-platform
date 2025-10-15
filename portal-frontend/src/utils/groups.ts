@@ -13,7 +13,7 @@ export const mapFormGroupData = (groupResponse: GroupResponse | null): UpdateGro
 export const mapApiGroupData = (formData: GroupData) => {
   const groupData = {
     ...formData,
-    contact: formData.contact.id ? formData.contact : null,
+    contact: formData.contact?.id ? formData.contact : null,
   }
   return groupData
 }

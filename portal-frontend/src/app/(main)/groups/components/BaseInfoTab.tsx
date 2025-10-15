@@ -19,6 +19,10 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const t = useTranslations('groups')
   const isMobile = useIsMobile()
 
+  const handleContactChange = (_value: string) => {
+    form.setValue('contact', null)
+  }
+
   return (
     <div>
       <FormFieldContainer className="pt-0 pb-3 text-xl">
@@ -55,6 +59,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           placeholder={t('details.contact')}
           options={[]}
           className={isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]'}
+          onChange={handleContactChange}
           disabled
         />
       </FormFieldContainer>
