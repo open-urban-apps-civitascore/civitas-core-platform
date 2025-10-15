@@ -1,8 +1,7 @@
 'use client'
 
-import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
+import { RowSelectionState, SortingState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
@@ -13,24 +12,9 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { Authority, Category, Role, UserResponse } from '@/types/users'
-import { mapListUsers } from '@/utils/users'
+import { GroupResponse } from '@/types/groups'
 
-import UsersTable from './components/UsersTable'
-
-export type UserAuthority = Category & {
-  department: Category
-}
-
-export type ListUser = {
-  id: string
-  displayName: string
-  authority: string
-  department: string
-  roles: string[]
-  email: string
-  isactive: boolean
-}
+import GroupsTable from './components/GroupsTable'
 
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {
@@ -42,10 +26,9 @@ export const getSortParam = (sorting: SortingState) => {
   return ''
 }
 
-const UsersPage = () => {
-  const t = useTranslations('users')
-  const router = useRouter()
-  const [listUsers, setListUsers] = useState<ListUser[]>([])
+const GroupsPage = () => {
+  const t = useTranslations('groups')
+  const [groups, setGroups] = useState<GroupResponse[]>([])
   const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -65,68 +48,44 @@ const UsersPage = () => {
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-  const getUserListData = async () => {
+  const getGroupsData = async () => {
     const params = setApiRequestParams(totalPages)
 
     try {
       setIsLoading(true)
-      const [usersResponse, authoritiesResponse, rolesResponse] = await Promise.all([
-        fetch(`${URL}/users?${params.toString()}`, {
-          cache: 'no-store',
-        }),
-        fetch(`${URL}/authorities`, {
-          cache: 'no-store',
-        }),
-        fetch(`${URL}/roles`, {
-          cache: 'no-store',
-        }),
-      ])
-      if (!authoritiesResponse || !usersResponse) {
-        throw new Error('An error occurred while loading form data')
-      }
-
-      const [usersData, authoritiesData, rolesData]: [UserResponse[], Authority[], Role[]] = await Promise.all([
-        usersResponse.json(),
-        authoritiesResponse.json(),
-        rolesResponse.json(),
-      ])
-
-      const rolesMap: Record<string, string> = {}
-      rolesData.forEach((role: Role) => {
-        rolesMap[role.id] = role.name
+      const groupsResponse = await fetch(`${URL}/groups?${params.toString()}`, {
+        cache: 'no-store',
       })
 
-      const users = mapListUsers(usersData, authoritiesData, rolesMap)
-      setListUsers(users)
+      if (!groupsResponse) {
+        throw new Error('An error occurred while loading user groups data')
+      }
+
+      const groupsData: GroupResponse[] = await groupsResponse.json()
+
+      setGroups(groupsData)
       setIsLoading(false)
 
-      const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
+      const totalCount = Number(groupsResponse.headers.get('X-Total-Count')) || 0
       if (rowCount !== totalCount) {
         setRowCount(totalCount)
       }
     } catch (error) {
       console.error(error)
       setIsLoading(false)
-      throw new Error('An error occurred while loading form data')
+      throw new Error('An error occurred while loading groups data')
     }
   }
 
   useEffect(() => {
-    getUserListData()
+    getGroupsData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
 
-  const handleRowClick = (row: Row<ListUser>) => {
-    if (row.id) {
-      const params = setApiRequestParams(totalPages)
-      router.push(`users/${row.id}?${params}`, {})
-    }
-  }
-
   const CustomElement = (
-    <Button onClick={() => router.push('/users/create')}>
+    <Button>
       <Plus />
-      {t('newUser')}
+      {t('newGroup')}
     </Button>
   )
 
@@ -134,10 +93,15 @@ const UsersPage = () => {
     <PageContainer headerType="onlyTitle">
       <PageHeader title={t('title')} />
       <PageBackground>
-        <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />
+        <SearchHeader
+          customElement={CustomElement}
+          onChangeSearchString={setSearchParam}
+          searchString={search}
+          placeholder={t('search')}
+        />
         <TableContainer>
-          <UsersTable
-            users={listUsers}
+          <GroupsTable
+            groups={groups}
             rowCount={rowCount}
             pageIndex={pageIndex}
             pageSize={pageSize}
@@ -145,7 +109,6 @@ const UsersPage = () => {
             totalPages={totalPages}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
-            onRowClick={handleRowClick}
             onSortingChange={setSortingParams}
             onPaginationChange={setPaginationParams}
             isLoading={isLoading}
@@ -156,4 +119,4 @@ const UsersPage = () => {
   )
 }
 
-export default UsersPage
+export default GroupsPage

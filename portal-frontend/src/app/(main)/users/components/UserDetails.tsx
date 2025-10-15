@@ -3,6 +3,9 @@
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { ContentCard } from '@/components/content-card/ContentCard'
+import { PageBackground } from '@/components/page-background/PageBackground'
+import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
@@ -19,8 +22,15 @@ export const UserDetails = (props: UserDetailsProps) => {
   const { userData, isEditMode = false } = props
   const t = useTranslations('users')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
-
-  console.log(subTabValue)
+  const getTitle = () => {
+    if (!isEditMode) {
+      return t('newUser')
+    } else if (isEditMode && userData) {
+      return userData.displayName
+    } else {
+      return t('notFound')
+    }
+  }
 
   const tabValues = {
     userData: {
@@ -62,14 +72,21 @@ export const UserDetails = (props: UserDetailsProps) => {
   }
 
   return (
-    <div>
+    <PageContainer headerType="withSubTabs">
       <PageHeader
-        title={userData?.displayName}
+        title={getTitle()}
         subTabs={{ tabs: tabs, selectedTab, onClick: newTab => handleSelectTab(newTab) }}
       />
-      {selectedTab === tabValues.roles.value && userData && <RolesTab userId={userData.id} />}
-      {selectedTab === tabValues.userData.value &&
-        (userData ? <UserForm userData={userData} isEditMode={isEditMode} /> : <div>User not found</div>)}
-    </div>
+      <PageBackground>
+        {userData ? (
+          <ContentCard>
+            {selectedTab === tabValues.roles.value && <RolesTab userId={userData.id} />}
+            {selectedTab === tabValues.userData.value && <UserForm userData={userData} isEditMode={isEditMode} />}
+          </ContentCard>
+        ) : (
+          <div>No data</div>
+        )}
+      </PageBackground>
+    </PageContainer>
   )
 }

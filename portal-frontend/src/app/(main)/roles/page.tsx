@@ -6,8 +6,10 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useState } from 'react'
 
+import { PageBackground } from '@/components/page-background/PageBackground'
+import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchField } from '@/components/searchField/SearchField'
+import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
@@ -27,6 +29,13 @@ const RolesPage = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+
+  const tabsValues = {
+    systemRoles: { value: ROLE_TYPES.SYSTEM, label: t('systemRoles') },
+    dataRoles: { value: ROLE_TYPES.DATA, label: t('dataRoles') },
+    governanceRoles: { value: ROLE_TYPES.GOVERNANCE, label: t('governanceRoles') },
+  }
+  const tabs = [tabsValues.systemRoles, tabsValues.dataRoles, tabsValues.governanceRoles]
 
   const {
     setSortingParams,
@@ -78,14 +87,11 @@ const RolesPage = () => {
   }
 
   return (
-    <div className="w-full h-full">
+    <PageContainer headerType="withBothTabsRows">
       <PageHeader
+        title={tabs.find(tab => tab.value === selectedRoleType)?.label}
         tabs={{
-          tabs: [
-            { value: ROLE_TYPES.SYSTEM, label: t('systemRoles') },
-            { value: ROLE_TYPES.DATA, label: t('dataRoles') },
-            { value: ROLE_TYPES.GOVERNANCE, label: t('governanceRoles') },
-          ],
+          tabs,
           onClick: type => {
             setSelectedRoleType(type)
             setTabValueParam(type)
@@ -100,31 +106,35 @@ const RolesPage = () => {
           selectedTab: selectedSubTab,
           onClick: newTab => setSelectedSubTab(newTab),
         }}
-        customElement={
-          <Button variant="secondary" onClick={() => router.push(`/roles/create/?_tab=${selectedRoleType}`)}>
-            <Plus /> {t('newRole')}
-          </Button>
-        }
       />
-
-      <SearchField searchString={search} onChangeSearchString={setSearchParam} />
-      <TableContainer>
-        <RolesTable
-          roles={listRoles}
-          isLoading={isLoading}
-          rowCount={rowCount}
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          totalPages={totalPages}
-          sorting={sorting}
-          onRowClick={handleRowClick}
-          rowSelection={rowSelection}
-          setRowSelection={setRowSelection}
-          onSortingChange={setSortingParams}
-          onPaginationChange={setPaginationParams}
+      <PageBackground>
+        <SearchHeader
+          searchString={search}
+          onChangeSearchString={setSearchParam}
+          customElement={
+            <Button onClick={() => router.push(`/roles/create/?_tab=${selectedRoleType}`)}>
+              <Plus /> {t('newRole')}
+            </Button>
+          }
         />
-      </TableContainer>
-    </div>
+        <TableContainer>
+          <RolesTable
+            roles={listRoles}
+            isLoading={isLoading}
+            rowCount={rowCount}
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            totalPages={totalPages}
+            sorting={sorting}
+            onRowClick={handleRowClick}
+            rowSelection={rowSelection}
+            setRowSelection={setRowSelection}
+            onSortingChange={setSortingParams}
+            onPaginationChange={setPaginationParams}
+          />
+        </TableContainer>
+      </PageBackground>
+    </PageContainer>
   )
 }
 export default RolesPage

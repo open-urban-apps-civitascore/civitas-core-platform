@@ -3,6 +3,8 @@ import { flexRender, Row, SortDirection, Table } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { ComponentProps } from 'react'
 
+import { cn } from '@/lib/utils'
+
 import { ScrollBar } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
 import { Table as ShadCnTable, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
@@ -45,8 +47,8 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
   return (
     <div className="@container h-full w-full">
       <div className="h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]">
-        <ScrollArea className="h-[calc(100%-var(--pagination-height))] w-full">
-          <ShadCnTable aria-labelledby="subheading" {...tableProps}>
+        <ScrollArea className="h-[calc(100%-var(--pagination-height))] w-full bg-white rounded-md border-1">
+          <ShadCnTable aria-labelledby="subheading" tableContainerProps={{ className: '' }} {...tableProps}>
             <TableHeader>
               {table.getHeaderGroups().map(group => (
                 <TableRow key={group.id}>
@@ -54,7 +56,7 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                     <TableHead
                       key={header.id}
                       scope="col"
-                      className="text-primary-light"
+                      className="text-primary-light px-3"
                       aria-sort={getAriaSort(header.column.getIsSorted())}
                       style={header.column.columnDef.meta?.style}
                     >
@@ -68,12 +70,19 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
               {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map(row => (
                   <TableRow
-                    className={`h-16 ${onRowClick ? 'cursor-pointer' : ''}`}
+                    className={cn(
+                      `h-16 ${onRowClick ? 'cursor-pointer' : ''} ${row.depth > 0 ? 'border-0' : 'border-0 border-t-1'}`,
+                    )}
                     key={row.id}
                     onClick={onRowClick ? () => onRowClick(row) : () => null}
+                    style={{ borderWidth: 0, borderTopWidth: row.depth === 0 ? 1 : 0 }}
                   >
                     {row.getVisibleCells().map(cell => (
-                      <TableCell className="whitespace-normal" key={cell.id}>
+                      <TableCell
+                        className="whitespace-normal px-3"
+                        key={cell.id}
+                        style={cell.column.columnDef.meta?.style}
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}

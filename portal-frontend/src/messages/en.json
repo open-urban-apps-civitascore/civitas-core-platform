@@ -34,6 +34,7 @@
     "create": "create",
     "edit": "edit",
     "users": "User Management",
+    "groups": "Groups",
     "tenants": "Tenant Management"
   },
   "datasets": {
@@ -59,14 +60,12 @@
     "newDataset": "New Dataset"
   },
   "users": {
-    "title": "User",
-    "tabs": {
-      "users": "Users",
-      "groups": "Groups"
-    },
+    "title": "Overview: Users",
     "newUser": "New User",
     "createUser": "Create User",
     "searchUsers": "Filter...",
+    "notFound": "User not found",
+
     "info": {
       "id": "ID",
       "displayName": "Display Name",
@@ -103,6 +102,20 @@
         "description": "Select a role to add to the user from the available {category} roles.",
         "addButton": "Add"
       }
+    }
+  },
+    "groups": {
+    "title": "Overview: Groups",
+    "newGroup": "New Group",
+    "createGroup": "Create Group",
+    "search": "Filter...",
+    "notFound": "Group not found",
+    "list": {
+      "id": "ID",
+      "title": "Name",
+      "users": "Amount Users",
+      "contact": "Contact",
+      "description": "Description"
     }
   },
   "pagination": {

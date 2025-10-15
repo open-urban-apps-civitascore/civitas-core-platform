@@ -1,36 +1,39 @@
-import { HTMLAttributes, JSX } from 'react'
+import { HTMLAttributes } from 'react'
 
 import { cn } from '@/lib/utils'
 
 import { TabSectionProps, TabsSection } from './components/TabsSections'
-import { TitleSection } from './components/TitleSection'
 
 export type PageHeaderProps = Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & {
   title?: string
-  subtitle?: string
   tabs?: TabSectionProps
-  customElement?: JSX.Element
   subTabs?: TabSectionProps
-  shouldShowDivider?: boolean
 }
 
 export const PageHeader = (props: PageHeaderProps) => {
-  const { title, subtitle, customElement, className, style, tabs, subTabs, shouldShowDivider } = props
+  const { title, className, style, tabs, subTabs } = props
 
   return (
-    <div id="heading" className={cn('flex flex-col h-[var(--title-height)]', className)} style={style}>
-      {tabs && (
-        <TabsSection
-          tabs={tabs.tabs}
-          onClick={tabs.onClick}
-          selectedTab={tabs.selectedTab}
-          isHeading={!title}
-          className="p-0"
-        />
+    <div
+      id="heading"
+      className={cn(
+        'flex flex-col gap-[var(--layout-padding)] h-[var(--title-height)] py-[var(--layout-padding)] border-b-1',
+        className,
       )}
-      <div id="heading" className={`flex ${title ? 'justify-between mt-1' : 'justify-end'}`}>
-        {title && <TitleSection title={title} subtitle={subtitle} />}
-        {customElement}
+      style={style}
+    >
+      {tabs && (
+        <TabsSection tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} isHeading={!title} />
+      )}
+      <div
+        id="heading"
+        className={`flex-1 flex ${title ? 'justify-between' : 'justify-end'} items-center px-[var(--layout-padding)]`}
+      >
+        {title && (
+          <h1 id="page-heading" className=" bg-transparent text-3xl font-bold text-center m-0">
+            {title}
+          </h1>
+        )}
       </div>
       {subTabs && (
         <TabsSection
@@ -38,10 +41,9 @@ export const PageHeader = (props: PageHeaderProps) => {
           selectedTab={subTabs.selectedTab}
           onClick={subTabs.onClick}
           isSubTabsSection={!!subTabs}
-          className={`${title && 'mt-4'} bg-accent`}
+          className="bg-accent"
         />
       )}
-      {shouldShowDivider && <hr className="mt-auto" />}
     </div>
   )
 }

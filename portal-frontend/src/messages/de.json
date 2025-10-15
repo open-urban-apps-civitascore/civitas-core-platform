@@ -34,6 +34,7 @@
     "create": "erstellen",
     "edit": "bearbeiten",
     "users": "User Management",
+    "groups": "Gruppen",
     "tenants": "Mandanten-Management"
   },
   "datasets": {
@@ -59,14 +60,11 @@
     "newDataset": "Neuer Datensatz"
   },
   "users": {
-    "title": "User",
-    "tabs": {
-      "users": "User",
-      "groups": "Gruppen"
-    },
+    "title": "Übersicht: User",
     "newUser": "Neuer User",
     "createUser": "User erstellen",
     "searchUsers": "Filtern...",
+    "notFound": "User nicht gefunden",
     "info": {
       "id": "ID",
       "displayName": "Anzeigename",
@@ -103,6 +101,20 @@
         "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen.",
         "addButton": "Hinzufügen"
       }
+    }
+  },
+  "groups": {
+    "title": "Übersicht: Gruppen",
+    "newGroup": "Neue Gruppe",
+    "createGroup": "Gruppe erstellen",
+    "search": "Filtern...",
+    "notFound": "Gruppe nicht gefunden",
+    "list": {
+      "id": "ID",
+      "title": "Name",
+      "users": "Anzahl User",
+      "contact": "Ansprechpartner",
+      "description": "Beschreibung"
     }
   },
   "pagination": {

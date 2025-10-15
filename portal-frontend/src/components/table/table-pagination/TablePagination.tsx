@@ -20,16 +20,16 @@ const TablePagination = <T,>(props: TablePaginationProps<T>) => {
 
   return (
     <div
-      className={cn('@container flex items-end justify-end text-sm h-[calc(var(--pagination-height))]', className)}
+      className={cn('@container flex items-center justify-end text-sm h-[calc(var(--pagination-height))]', className)}
       role="navigation"
       aria-label={t('aria.pagination')}
     >
       <div className="flex items-center gap-x-8 gap-y-2 justify-center @max-md:flex-wrap">
         <div className="flex items-center gap-8">
           <div className="flex items-center space-x-2">
-            <span className="@max-md:hidden ">{t('resultsPerPage')}</span>
+            <span className="@max-md:hidden">{t('resultsPerPage')}</span>
             <Select value={String(pageSize)} onValueChange={value => table.setPageSize(Number(value))}>
-              <SelectTrigger className="w-[80px]" aria-label={t('aria.resultsPerPage')}>
+              <SelectTrigger className="w-[80px] bg-white" aria-label={t('aria.resultsPerPage')}>
                 <SelectValue placeholder={pageSize} />
               </SelectTrigger>
               <SelectContent>
@@ -57,7 +57,7 @@ const TablePagination = <T,>(props: TablePaginationProps<T>) => {
             ‹
           </Button>
           <Select value={String(pageIndex)} onValueChange={value => table.setPageIndex(Number(value))}>
-            <SelectTrigger className="w-[80px]" aria-label={t('aria.resultsPerPage')}>
+            <SelectTrigger className="w-[80px] bg-white" aria-label={t('aria.resultsPerPage')}>
               <SelectValue placeholder={pageIndex} />
             </SelectTrigger>
             <SelectContent>

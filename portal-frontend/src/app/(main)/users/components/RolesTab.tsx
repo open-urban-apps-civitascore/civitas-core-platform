@@ -233,7 +233,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
   }
 
   return (
-    <div className="p-6">
+    <div>
       <RoleCategory
         title={tRoles('systemRoles')}
         category="System"
