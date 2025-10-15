@@ -32,8 +32,6 @@ export const UserDetails = (props: UserDetailsProps) => {
     }
   }
 
-  console.log(subTabValue)
-
   const tabValues = {
     userData: {
       label: t('detailsTabs.userData'),
@@ -81,13 +79,11 @@ export const UserDetails = (props: UserDetailsProps) => {
       />
       <PageBackground>
         {userData ? (
-          // <div className="bg-white p-[calc(var(--layout-padding))] border-1 rounded-sm">
           <ContentCard>
             {selectedTab === tabValues.roles.value && <RolesTab userId={userData.id} />}
             {selectedTab === tabValues.userData.value && <UserForm userData={userData} isEditMode={isEditMode} />}
           </ContentCard>
         ) : (
-          // </div>
           <div>No data</div>
         )}
       </PageBackground>

@@ -1,6 +1,6 @@
 'use client'
 
-import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
+import { RowSelectionState, SortingState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
@@ -82,13 +82,6 @@ const GroupsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
 
-  const handleRowClick = (row: Row<GroupResponse>) => {
-    if (row.id) {
-      // const params = setApiRequestParams(totalPages)
-      // router.push(`groups/${row.id}?${params}`, {})
-    }
-  }
-
   const CustomElement = (
     <Button>
       <Plus />
@@ -116,7 +109,6 @@ const GroupsPage = () => {
             totalPages={totalPages}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
-            onRowClick={handleRowClick}
             onSortingChange={setSortingParams}
             onPaginationChange={setPaginationParams}
             isLoading={isLoading}
