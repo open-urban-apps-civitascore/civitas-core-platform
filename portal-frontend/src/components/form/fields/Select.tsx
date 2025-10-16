@@ -32,7 +32,7 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
   const {
     id,
     label,
-    placeholder = 'Please select...',
+    placeholder,
     options,
     form,
     name,
