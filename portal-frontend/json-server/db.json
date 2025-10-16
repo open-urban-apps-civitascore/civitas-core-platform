@@ -5254,22 +5254,16 @@
       "id": "1",
       "title": "Admin",
       "description": "Verwaltet Systemkonfigurationen, Benutzerrechte und sicherheitsrelevante Einstellungen. Verantwortlich für die Gesamtadministration der Plattform.",
-      "roles": [
-        "1",
-        "4",
-        "6"
-      ],
-      "users": [
-        "1",
-        "20",
-        "45",
-        "67"
-      ],
       "contact": {
         "id": "1",
         "displayName": "Sophia Fischer"
       },
       "parent": null,
+      "roles": [
+        "1",
+        "4",
+        "6"
+      ],
       "subgroups": [
         {
           "id": "7",
@@ -5325,6 +5319,12 @@
           "parent": "1",
           "subgroups": []
         }
+      ],
+      "users": [
+        "1",
+        "20",
+        "45",
+        "67"
       ]
     },
     {
@@ -5569,46 +5569,6 @@
       },
       "parent": null,
       "subgroups": []
-    },
-    {
-      "title": "Test",
-      "description": "Test Beschreibung",
-      "roles": [],
-      "users": [],
-      "contact": null,
-      "parent": null,
-      "subgroups": [],
-      "id": "563C_7I"
-    },
-    {
-      "title": "New Test",
-      "description": "New Description",
-      "roles": [],
-      "users": [],
-      "contact": null,
-      "parent": null,
-      "subgroups": [],
-      "id": "hdi92w6"
-    },
-    {
-      "id": "E9jU8xd",
-      "title": "New Test 3",
-      "description": "New Description 3",
-      "roles": [],
-      "users": [],
-      "contact": null,
-      "parent": null,
-      "subgroups": []
-    },
-    {
-      "title": "New Test 4",
-      "description": "Test Description",
-      "roles": [],
-      "users": [],
-      "contact": null,
-      "parent": null,
-      "subgroups": [],
-      "id": "JsarHZh"
     }
   ],
   "authorities": [
