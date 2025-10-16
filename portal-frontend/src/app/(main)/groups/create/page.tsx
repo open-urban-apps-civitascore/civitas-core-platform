@@ -1,10 +1,10 @@
 import { getTranslations } from 'next-intl/server'
 
-import { GroupData } from '@/types/groups'
+import { Group } from '@/types/groups'
 
 import GroupDetails from '../components/GroupDetails'
 
-const defaultGroup: GroupData = {
+const defaultGroup: Group = {
   id: '',
   title: '',
   description: '',
