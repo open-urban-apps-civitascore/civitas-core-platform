@@ -1,5 +1,4 @@
-import { GroupResponse } from '@/types/groups'
-import { mapFormGroupData } from '@/utils/groups'
+import { Group } from '@/types/groups'
 
 import GroupDetails from '../components/GroupDetails'
 
@@ -23,7 +22,7 @@ const UpdateGroupPage = async (props: UpdateGroupPageProps) => {
         throw new Error('An error occurred while loading form data')
       }
 
-      const groupData: GroupResponse = await groupResponse.json()
+      const groupData: Group = await groupResponse.json()
 
       if (!groupData || Object.keys(groupData).length === 0) {
         throw new Error('Group not found')
@@ -35,7 +34,7 @@ const UpdateGroupPage = async (props: UpdateGroupPageProps) => {
     }
   }
 
-  const groupData = mapFormGroupData(await getGroupData())
+  const groupData = await getGroupData()
 
   return <GroupDetails title={groupData?.title || ''} groupData={groupData} isEditMode />
 }

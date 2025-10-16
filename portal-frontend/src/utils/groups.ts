@@ -1,19 +1,11 @@
-import { GroupBaseInfo, GroupData, GroupResponse, UpdateGroupData } from '@/types/groups'
+import { Group } from '@/types/groups'
 
-export const mapFormGroupData = (groupResponse: GroupResponse | null): UpdateGroupData | null =>
+export const mapGroupDetailsData = (groupResponse: Group | null): Group | null =>
   groupResponse
     ? {
         ...groupResponse,
         contact: groupResponse.contact || { id: '', displayName: '' },
         roles: groupResponse.roles || [],
-        subgroups: groupResponse.subgroups.flatMap(subgroup => mapFormGroupData(subgroup) ?? []),
+        subgroups: groupResponse.subgroups.flatMap(subgroup => mapGroupDetailsData(subgroup) ?? []),
       }
     : null
-
-export const mapApiGroupBaseInfoData = (formData: GroupBaseInfo) => {
-  const groupBaseInfo = {
-    ...formData,
-    contact: formData.contact?.id ? formData.contact : null,
-  }
-  return groupBaseInfo
-}

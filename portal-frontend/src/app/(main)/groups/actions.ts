@@ -1,10 +1,10 @@
 'use server'
 
-import { CreateGroupBaseInfoData, UpdateGroupBaseInfoData } from '@/types/groups'
+import { CreateGroupData, UpdateGroupData } from '@/types/groups'
 
 const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
-export const createGroup = async (groupData: CreateGroupBaseInfoData) => {
+export const createGroup = async (groupData: CreateGroupData) => {
   try {
     const response = await fetch(`${URL}/groups`, {
       method: 'POST',
@@ -20,12 +20,14 @@ export const createGroup = async (groupData: CreateGroupBaseInfoData) => {
     }
     const data = await response.json()
     console.log('successfully created group:', data)
+    return data
   } catch (error) {
     console.error('An error occurred while creating new group:', error)
+    throw new Error(JSON.stringify(error, null, 4))
   }
 }
 
-export const updateGroup = async (updateGroupData: UpdateGroupBaseInfoData) => {
+export const updateGroup = async (updateGroupData: UpdateGroupData) => {
   try {
     const response = await fetch(`${URL}/groups/${updateGroupData.id}`, {
       method: 'PUT',
@@ -42,7 +44,9 @@ export const updateGroup = async (updateGroupData: UpdateGroupBaseInfoData) => {
 
     const data = await response.json()
     console.log('successfully updated user:', data)
+    return data
   } catch (error) {
-    console.error('An error occurred while updateing the user:', error)
+    console.error('An error occurred while updating the user:', error)
+    throw new Error(JSON.stringify(error, null, 4))
   }
 }

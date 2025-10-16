@@ -10,7 +10,7 @@ import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { GroupData } from '@/types/groups'
+import { Group } from '@/types/groups'
 
 import { BaseInfoTab } from './BaseInfoTab'
 
@@ -23,7 +23,7 @@ const LoadingSkeleton = () => (
 
 interface GroupDetailsProps {
   title: string
-  groupData: GroupData | null
+  groupData: Group | null
   isEditMode?: boolean
 }
 const GroupDetails = (props: GroupDetailsProps) => {

@@ -19,10 +19,11 @@ interface ConfirmButtons extends HTMLAttributes<HTMLDivElement> {
 
 type ActionButtonsProps = (FormButtonProps | ConfirmButtons) & {
   onCancelClick: () => void
+  isConfirmButtonDisabled?: boolean
 }
 
 export const ActionButtons = (props: ActionButtonsProps) => {
-  const { confirmButtonType, onCancelClick, className } = props
+  const { confirmButtonType, onCancelClick, isConfirmButtonDisabled = false, className } = props
   const t = useTranslations('common')
   return (
     <div className={cn('flex w-full justify-end', className)}>
@@ -30,7 +31,11 @@ export const ActionButtons = (props: ActionButtonsProps) => {
         <Button type="reset" variant="secondary" onClick={onCancelClick}>
           {t('actions.cancel')}
         </Button>
-        <Button type={confirmButtonType} onClick={confirmButtonType === 'button' ? props.onConfirmClick : undefined}>
+        <Button
+          type={confirmButtonType}
+          onClick={confirmButtonType === 'button' ? props.onConfirmClick : undefined}
+          disabled={isConfirmButtonDisabled}
+        >
           {t('actions.submit')}
         </Button>
       </ContentCard>

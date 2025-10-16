@@ -13,7 +13,7 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { GroupResponse } from '@/types/groups'
+import { Group } from '@/types/groups'
 
 import GroupsTable from './components/GroupsTable'
 
@@ -30,7 +30,7 @@ export const getSortParam = (sorting: SortingState) => {
 const GroupsPage = () => {
   const t = useTranslations('groups')
   const router = useRouter()
-  const [groups, setGroups] = useState<GroupResponse[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
   const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -63,7 +63,7 @@ const GroupsPage = () => {
         throw new Error('An error occurred while loading user groups data')
       }
 
-      const groupsData: GroupResponse[] = await groupsResponse.json()
+      const groupsData: Group[] = await groupsResponse.json()
       setGroups(groupsData)
       setIsLoading(false)
 
@@ -83,7 +83,7 @@ const GroupsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
 
-  const handleRowClick = (row: Row<GroupResponse>) => {
+  const handleRowClick = (row: Row<Group>) => {
     if (row.id && !row.original.parent) {
       const params = setApiRequestParams(totalPages)
       router.push(`groups/${row.id}?${params}`)

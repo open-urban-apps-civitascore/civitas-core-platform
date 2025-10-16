@@ -12,12 +12,12 @@ import { useTranslations } from 'next-intl'
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { GroupResponse } from '@/types/groups'
+import { Group } from '@/types/groups'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
-interface GroupsTableProps extends TableProps<GroupResponse> {
-  groups: GroupResponse[]
+interface GroupsTableProps extends TableProps<Group> {
+  groups: Group[]
 }
 
 const GroupsTable = (props: GroupsTableProps) => {
@@ -35,7 +35,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     isLoading,
   } = props
   const t = useTranslations('groups')
-  const columnHelper = createColumnHelper<GroupResponse>()
+  const columnHelper = createColumnHelper<Group>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -50,7 +50,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('title', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('list.title')} />,
-      cell: ({ row }: CellContext<GroupResponse, unknown>) => (
+      cell: ({ row }: CellContext<Group, unknown>) => (
         <ExpanderCell row={row} value={row.original.title} className="font-medium" />
       ),
       meta: {
@@ -106,7 +106,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
   })
 
-  const checkIfRowClickable = (row: Row<GroupResponse>) => !row.original.parent
+  const checkIfRowClickable = (row: Row<Group>) => !row.original.parent
 
   return (
     <DataTable

@@ -1,11 +1,11 @@
 import { SelectTriggerProps } from '@radix-ui/react-select'
 import { Check } from 'lucide-react'
-import { Controller, FieldValues, Path, UseFormReturn } from 'react-hook-form'
+import { useTranslations } from 'next-intl'
+import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
+import { FormField, FormMessage } from '@/components/ui/form'
 import { Select as ShadcnSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { useTranslations } from 'next-intl'
-import { FormField, FormMessage } from '@/components/ui/form'
 
 export type SelectOption = {
   value: string
@@ -50,38 +50,40 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
       control={form.control}
       name={name}
       rules={{ required: required ? t('errors.required') : false }}
-      render={({ field }) => (
-        <div className={className}>
-          <label htmlFor={id} className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            {label}
-            {required && <span className="text-red-500 ml-1">*</span>}
-          </label>
+      render={({ field }) => {
+        return (
+          <div className={className}>
+            <label htmlFor={id} className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              {label}
+              {required && <span className="text-red-500 ml-1">*</span>}
+            </label>
 
-          <ShadcnSelect value={field.value} onValueChange={onChange ?? field.onChange}>
-            <SelectTrigger
-              id={id}
-              aria-label={label}
-              className={cn('w-full', selectTriggerProps?.className)}
-              disabled={disabled}
-            >
-              <SelectValue placeholder={placeholder} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none" disabled={required}>
-                {placeholder}
-              </SelectItem>
-
-              {options.map(option => (
-                <SelectItem key={option.value} value={option.value}>
-                  <span>{option.label}</span>
-                  <Check className="ml-auto h-4 w-4 opacity-0 group-data-[state=checked]:opacity-100" />
+            <ShadcnSelect value={field.value.id} onValueChange={onChange ?? field.onChange}>
+              <SelectTrigger
+                id={id}
+                aria-label={label}
+                className={cn('w-full', selectTriggerProps?.className)}
+                disabled={disabled}
+              >
+                <SelectValue placeholder={placeholder} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" disabled={required}>
+                  {placeholder}
                 </SelectItem>
-              ))}
-            </SelectContent>
-          </ShadcnSelect>
-          <FormMessage />
-        </div>
-      )}
+
+                {options.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <span>{option.label}</span>
+                    <Check className="ml-auto h-4 w-4 opacity-0 group-data-[state=checked]:opacity-100" />
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </ShadcnSelect>
+            <FormMessage />
+          </div>
+        )
+      }}
     />
   )
 }
