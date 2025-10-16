@@ -1,10 +1,10 @@
 'use server'
 
-import { CreateGroupData, UpdateGroupData } from '@/types/groups'
+import { CreateGroupBaseInfoData, UpdateGroupBaseInfoData } from '@/types/groups'
 
 const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
-export const createGroup = async (groupData: CreateGroupData) => {
+export const createGroup = async (groupData: CreateGroupBaseInfoData) => {
   try {
     const response = await fetch(`${URL}/groups`, {
       method: 'POST',
@@ -25,7 +25,7 @@ export const createGroup = async (groupData: CreateGroupData) => {
   }
 }
 
-export const updateGroup = async (updateGroupData: UpdateGroupData) => {
+export const updateGroup = async (updateGroupData: UpdateGroupBaseInfoData) => {
   try {
     const response = await fetch(`${URL}/groups/${updateGroupData.id}`, {
       method: 'PUT',

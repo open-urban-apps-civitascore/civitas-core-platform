@@ -37,7 +37,7 @@ const UpdateGroupPage = async (props: UpdateGroupPageProps) => {
 
   const groupData = mapFormGroupData(await getGroupData())
 
-  return <GroupDetails title={groupData?.title || ''} groupData={groupData} isUpdateMode />
+  return <GroupDetails title={groupData?.title || ''} groupData={groupData} isEditMode />
 }
 
 export default UpdateGroupPage

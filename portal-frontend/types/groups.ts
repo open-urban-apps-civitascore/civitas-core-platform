@@ -36,3 +36,23 @@ export const GroupSchema = z.object({
 export type GroupData = z.infer<typeof GroupSchema>
 export type UpdateGroupData = GroupData
 export type CreateGroupData = Omit<GroupData, 'id'>
+
+export const GroupBaseInfoSchema = z.object({
+  id: z.string(),
+  title: z.string().min(2, {
+    message: 'common.errors.atLeast2',
+  }),
+  description: z.string().min(10, {
+    message: 'common.errors.atLeast10',
+  }),
+  contact: z
+    .object({
+      id: z.string(),
+      displayName: z.string(),
+    })
+    .nullable(),
+})
+
+export type GroupBaseInfo = z.infer<typeof GroupBaseInfoSchema>
+export type UpdateGroupBaseInfoData = GroupBaseInfo
+export type CreateGroupBaseInfoData = Omit<GroupBaseInfo, 'id'>

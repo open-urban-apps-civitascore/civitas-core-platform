@@ -1,4 +1,4 @@
-import { GroupData, GroupResponse, UpdateGroupData } from '@/types/groups'
+import { GroupBaseInfo, GroupData, GroupResponse, UpdateGroupData } from '@/types/groups'
 
 export const mapFormGroupData = (groupResponse: GroupResponse | null): UpdateGroupData | null =>
   groupResponse
@@ -10,10 +10,10 @@ export const mapFormGroupData = (groupResponse: GroupResponse | null): UpdateGro
       }
     : null
 
-export const mapApiGroupData = (formData: GroupData) => {
-  const groupData = {
+export const mapApiGroupBaseInfoData = (formData: GroupBaseInfo) => {
+  const groupBaseInfo = {
     ...formData,
     contact: formData.contact?.id ? formData.contact : null,
   }
-  return groupData
+  return groupBaseInfo
 }
