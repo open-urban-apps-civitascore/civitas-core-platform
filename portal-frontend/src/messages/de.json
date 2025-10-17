@@ -127,6 +127,15 @@
       "name": "Name der Gruppe",
       "description": "Beschreibung der Gruppe",
       "contact": "Ansprechpartner"
+    },
+    "roles": {
+      "groupInfo": "Gruppe Informationen",
+      "userNotFound": "Benutzer nicht gefunden",
+      "addRoleDialog": {
+        "title": "Rolle hinzufügen - {category}",
+        "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen.",
+        "addButton": "Hinzufügen"
+      }
     }
   },
   "pagination": {

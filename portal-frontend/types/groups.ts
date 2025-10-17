@@ -14,6 +14,11 @@ export type Group = {
 export type UpdateGroupData = Group
 export type CreateGroupData = Omit<Group, 'id'>
 
+export interface GroupTabProps {
+  groupData: Group
+  onCancel: () => void
+}
+
 export const GroupBaseInfoSchema = z.object({
   id: z.string(),
   title: z.string().min(2, {
