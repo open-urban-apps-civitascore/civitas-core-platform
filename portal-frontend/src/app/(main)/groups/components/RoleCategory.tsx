@@ -36,7 +36,7 @@ export const RoleCategory = (props: RolesCategoryProps) => {
   const availableRoles = allRoles.filter(role => !groupRoles.includes(role.id) && role.type === category)
 
   return (
-    <DetailsFieldContainer className='min-h-21 flex itme-center '>
+    <DetailsFieldContainer className="min-h-21 flex itme-center ">
       <div className="flex items-center">
         <h3 className="w-[228px] text-sm">{title}</h3>
         <div className="flex flex-wrap gap-2 items-center">
