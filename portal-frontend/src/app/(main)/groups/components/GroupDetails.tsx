@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 
@@ -30,8 +29,7 @@ interface GroupDetailsProps {
 }
 const GroupDetails = (props: GroupDetailsProps) => {
   const { title, groupData, isEditMode = false } = props
-  const { subTabValue, setSubTabValueParam, setApiRequestParams } = useQueryParams()
-  const router = useRouter()
+  const { subTabValue, setSubTabValueParam } = useQueryParams()
 
   const t = useTranslations('groups')
   const tabValues: Record<'info' | 'roles' | 'users' | 'subgroups', Tab> = {
@@ -72,10 +70,10 @@ const GroupDetails = (props: GroupDetailsProps) => {
   } else {
     switch (subTabValue) {
       case tabValues.info.value:
-        Content = <BaseInfoTab isEditMode={isEditMode} groupData={groupData}/>
+        Content = <BaseInfoTab isEditMode={isEditMode} groupData={groupData} />
         break
       case tabValues.roles.value:
-        Content = <RolesTab groupData={groupData}/>
+        Content = <RolesTab groupData={groupData} />
         break
       case tabValues.users.value:
       case tabValues.subgroups.value:
