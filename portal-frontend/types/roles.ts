@@ -11,7 +11,7 @@ export type RoleType = (typeof ROLE_TYPES)[keyof typeof ROLE_TYPES]
 export type BaseRole = {
   id: string
   name: string
-  description: string
+  description?: string
   type: RoleType
 }
 
