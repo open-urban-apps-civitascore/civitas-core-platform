@@ -47,7 +47,7 @@ interface BaseInfoTabProps extends GroupTabProps {
 }
 
 export const BaseInfoTab = (props: BaseInfoTabProps) => {
-  const { groupData, isEditMode, onCancel } = props
+  const { groupData, isEditMode } = props
   const t = useTranslations('groups')
   const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
@@ -167,9 +167,10 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           </DetailsFieldContainer>
         </ContentCard>
         <ActionButtons
-          onCancelClick={onCancel}
+          onCancelClick={() => form.reset()}
           confirmButtonType="submit"
           isConfirmButtonDisabled={!form.formState.isDirty}
+          isCancelButtonDisabled={!form.formState.isDirty}
         />
       </form>
     </Form>

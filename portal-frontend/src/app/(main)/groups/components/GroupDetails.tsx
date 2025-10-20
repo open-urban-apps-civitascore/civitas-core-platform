@@ -65,11 +65,6 @@ const GroupDetails = (props: GroupDetailsProps) => {
     }
   }, [subTabValue, tabs, setSubTabValueParam])
 
-  const onCancel = () => {
-    const apiParams = setApiRequestParams()
-    router.push(`/groups?${apiParams}`)
-  }
-
   let Content = <LoadingSkeleton />
 
   if (!groupData) {
@@ -77,10 +72,10 @@ const GroupDetails = (props: GroupDetailsProps) => {
   } else {
     switch (subTabValue) {
       case tabValues.info.value:
-        Content = <BaseInfoTab isEditMode={isEditMode} groupData={groupData} onCancel={onCancel} />
+        Content = <BaseInfoTab isEditMode={isEditMode} groupData={groupData}/>
         break
       case tabValues.roles.value:
-        Content = <RolesTab groupData={groupData} onCancel={onCancel} />
+        Content = <RolesTab groupData={groupData}/>
         break
       case tabValues.users.value:
       case tabValues.subgroups.value:

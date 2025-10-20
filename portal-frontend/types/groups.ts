@@ -16,7 +16,7 @@ export type CreateGroupData = Omit<Group, 'id'>
 
 export interface GroupTabProps {
   groupData: Group
-  onCancel: () => void
+  onCancel?: () => void
 }
 
 export const GroupBaseInfoSchema = z.object({

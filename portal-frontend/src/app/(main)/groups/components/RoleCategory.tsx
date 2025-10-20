@@ -4,6 +4,7 @@ import { Plus, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
+import type { DetailsFieldContainerProps } from '@/components/form/DetailsFieldContainer'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,9 +16,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 import { BaseRole, RoleType } from '@/types/roles'
 
-interface RolesCategoryProps {
+interface RolesCategoryProps extends DetailsFieldContainerProps {
   title: string
   groupRoles: string[]
   category: RoleType
@@ -27,7 +29,7 @@ interface RolesCategoryProps {
 }
 
 export const RoleCategory = (props: RolesCategoryProps) => {
-  const { category, title, groupRoles, allRoles, onAddRole, onRemoveRole } = props
+  const { category, title, groupRoles, allRoles, onAddRole, onRemoveRole, className } = props
   const t = useTranslations('groups')
   const [isSaving, _setIsSaving] = useState(false)
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false)
@@ -36,7 +38,7 @@ export const RoleCategory = (props: RolesCategoryProps) => {
   const availableRoles = allRoles.filter(role => !groupRoles.includes(role.id) && role.type === category)
 
   return (
-    <DetailsFieldContainer className="min-h-21 flex itme-center ">
+    <DetailsFieldContainer className={cn('min-h-21 flex itme-center', className)}>
       <div className="flex items-center">
         <h3 className="w-[228px] text-sm">{title}</h3>
         <div className="flex flex-wrap gap-2 items-center">

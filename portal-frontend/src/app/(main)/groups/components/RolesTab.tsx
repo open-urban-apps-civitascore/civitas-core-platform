@@ -1,6 +1,5 @@
 'use client'
 
-import { Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -8,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { Group, GroupTabProps } from '@/types/groups'
 
 import { updateGroup } from '../actions'
@@ -23,9 +23,8 @@ interface Role {
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 export const RolesTab = (props: GroupTabProps) => {
-  const { groupData, onCancel } = props
+  const { groupData } = props
   const t = useTranslations('groups')
-  const tCommon = useTranslations('common')
   const tRoles = useTranslations('roles')
   const originalRoles = groupData.roles
   const router = useRouter()
@@ -84,12 +83,7 @@ export const RolesTab = (props: GroupTabProps) => {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">{tCommon('loading')}</span>
-      </div>
-    )
+    return <LoadingSpinner className="h-full" />
   }
 
   if (!group) {
@@ -131,12 +125,14 @@ export const RolesTab = (props: GroupTabProps) => {
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
           allRoles={allRoles}
+          className="border-0"
         />
       </ContentCard>
       <ActionButtons
-        onCancelClick={onCancel}
+        onCancelClick={() => setGroup({ ...group, roles: originalRoles })}
         confirmButtonType="button"
         isConfirmButtonDisabled={!hasChanges}
+        isCancelButtonDisabled={!hasChanges}
         onConfirmClick={handleUpdateGroup}
       />
     </div>
