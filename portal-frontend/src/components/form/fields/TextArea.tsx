@@ -1,4 +1,4 @@
-import React, { InputHTMLAttributes } from 'react'
+import React, { DetailedHTMLProps, HTMLAttributes, InputHTMLAttributes } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -10,18 +10,22 @@ interface TextAreaProps<T extends FieldValues>
   name: Path<T>
   placeholder: string
   label: string
+  formItemProps?: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>
 }
 
 export const TextArea = <T extends FieldValues>(props: TextAreaProps<T>) => {
-  const { form, name, placeholder, label, className } = props
+  const { form, name, placeholder, label, required, formItemProps } = props
 
   return (
     <FormField
       control={form.control}
       name={name}
       render={({ field }) => (
-        <FormItem className={className}>
-          <FormLabel>{label}</FormLabel>
+        <FormItem className={formItemProps?.className}>
+          <FormLabel>
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </FormLabel>
           <FormControl>
             <Textarea placeholder={placeholder} {...field} />
           </FormControl>

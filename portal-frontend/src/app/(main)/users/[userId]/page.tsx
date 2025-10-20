@@ -3,7 +3,7 @@ import { mapFormUserData } from '@/utils/users'
 
 import { UserDetails } from '../components/UserDetails'
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
 interface PageProps {
   params: Promise<{ userId: string }>

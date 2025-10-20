@@ -104,7 +104,7 @@
       }
     }
   },
-    "groups": {
+  "groups": {
     "title": "Overview: Groups",
     "newGroup": "New Group",
     "createGroup": "Create Group",
@@ -116,6 +116,18 @@
       "users": "Amount Users",
       "contact": "Contact",
       "description": "Description"
+    },
+    "detailsTabs": {
+      "info": "Information",
+      "roles": "Roles",
+      "users": "Users",
+      "subgroups": "Subgroups"
+    },
+    "details": {
+      "baseInfo": "Base Information",
+      "name": "Name of the Group",
+      "description": "Group Description",
+      "contact": "Contact"
     }
   },
   "pagination": {

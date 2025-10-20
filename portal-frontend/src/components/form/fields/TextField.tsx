@@ -1,4 +1,4 @@
-import { InputHTMLAttributes } from 'react'
+import { DetailedHTMLProps, HTMLAttributes, InputHTMLAttributes } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -12,16 +12,17 @@ interface TextFieldProps<T extends FieldValues>
   label: string
   // eslint-disable-next-line react/boolean-prop-naming
   required?: boolean
+  formItemProps?: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>
 }
 
 export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
-  const { form, name, placeholder, label, required = false, disabled } = props
+  const { form, name, placeholder, label, required = false, formItemProps, disabled } = props
   return (
     <FormField
       control={form.control}
       name={name}
       render={({ field }) => (
-        <FormItem>
+        <FormItem className={formItemProps?.className}>
           <FormLabel>
             {label}
             {required && <span className="text-red-500 ml-1">*</span>}

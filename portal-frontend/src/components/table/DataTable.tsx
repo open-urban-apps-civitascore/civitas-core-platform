@@ -27,6 +27,7 @@ export interface DataTableProps<T> extends ComponentProps<'table'> {
   pageIndex: number
   totalPages: number
   isLoading?: boolean
+  isRowClickable?: (row: Row<T>) => boolean
   onRowClick?: (row: Row<T>) => void
 }
 
@@ -40,7 +41,16 @@ const LoadingSkeleton = () => (
 )
 
 export const DataTable = <T,>(props: DataTableProps<T>) => {
-  const { table, pageSize, pageIndex, totalPages, isLoading, onRowClick, ...tableProps } = props
+  const {
+    table,
+    pageSize,
+    pageIndex,
+    totalPages,
+    isLoading,
+    onRowClick,
+    isRowClickable = () => true,
+    ...tableProps
+  } = props
 
   const t = useTranslations('common')
 
@@ -71,10 +81,10 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                 table.getRowModel().rows.map(row => (
                   <TableRow
                     className={cn(
-                      `h-16 ${onRowClick ? 'cursor-pointer' : ''} ${row.depth > 0 ? 'border-0' : 'border-0 border-t-1'}`,
+                      `h-16 ${onRowClick && isRowClickable(row) ? 'cursor-pointer' : ''} ${row.depth > 0 ? 'border-0' : 'border-0 border-t-1'}`,
                     )}
                     key={row.id}
-                    onClick={onRowClick ? () => onRowClick(row) : () => null}
+                    onClick={onRowClick && isRowClickable(row) ? () => onRowClick(row) : () => null}
                     style={{ borderWidth: 0, borderTopWidth: row.depth === 0 ? 1 : 0 }}
                   >
                     {row.getVisibleCells().map(cell => (

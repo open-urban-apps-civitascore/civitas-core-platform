@@ -115,6 +115,18 @@
       "users": "Anzahl User",
       "contact": "Ansprechpartner",
       "description": "Beschreibung"
+    },
+    "detailsTabs": {
+      "info": "Informationen",
+      "roles": "Rollen",
+      "users": "User",
+      "subgroups": "Untergruppen"
+    },
+    "details": {
+      "baseInfo": "Basisinformationen",
+      "name": "Name der Gruppe",
+      "description": "Beschreibung der Gruppe",
+      "contact": "Ansprechpartner"
     }
   },
   "pagination": {

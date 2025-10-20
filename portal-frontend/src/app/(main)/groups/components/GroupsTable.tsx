@@ -4,6 +4,7 @@ import {
   getCoreRowModel,
   getExpandedRowModel,
   getSortedRowModel,
+  Row,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
@@ -11,12 +12,12 @@ import { useTranslations } from 'next-intl'
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { GroupResponse } from '@/types/groups'
+import { Group } from '@/types/groups'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
-interface GroupsTableProps extends TableProps<GroupResponse> {
-  groups: GroupResponse[]
+interface GroupsTableProps extends TableProps<Group> {
+  groups: Group[]
 }
 
 const GroupsTable = (props: GroupsTableProps) => {
@@ -34,7 +35,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     isLoading,
   } = props
   const t = useTranslations('groups')
-  const columnHelper = createColumnHelper<GroupResponse>()
+  const columnHelper = createColumnHelper<Group>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -42,9 +43,14 @@ const GroupsTable = (props: GroupsTableProps) => {
       cell: info => info.getValue(),
       enableHiding: true,
     }),
+    columnHelper.accessor('parent', {
+      header: 'parent',
+      cell: info => info.getValue(),
+      enableHiding: true,
+    }),
     columnHelper.accessor('title', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('list.title')} />,
-      cell: ({ row }: CellContext<GroupResponse, unknown>) => (
+      cell: ({ row }: CellContext<Group, unknown>) => (
         <ExpanderCell row={row} value={row.original.title} className="font-medium" />
       ),
       meta: {
@@ -60,7 +66,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('contact', {
       header: t('list.contact'),
-      cell: info => info.getValue().displayName,
+      cell: info => info.getValue()?.displayName,
     }),
     columnHelper.accessor('description', {
       header: t('list.description'),
@@ -84,6 +90,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     initialState: {
       columnVisibility: {
         id: false,
+        parent: false,
       },
     },
     state: { pagination: { pageIndex, pageSize }, sorting, rowSelection },
@@ -99,6 +106,8 @@ const GroupsTable = (props: GroupsTableProps) => {
     onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
   })
 
+  const checkIfRowClickable = (row: Row<Group>) => !row.original.parent
+
   return (
     <DataTable
       table={table}
@@ -107,6 +116,7 @@ const GroupsTable = (props: GroupsTableProps) => {
       totalPages={totalPages}
       onRowClick={onRowClick}
       isLoading={isLoading}
+      isRowClickable={checkIfRowClickable}
     />
   )
 }

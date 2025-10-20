@@ -168,7 +168,7 @@ export const UserForm = (props: UserFormProps) => {
           name="positionDescription"
           placeholder={t('info.description')}
         />
-        <div className="w-full flex gap-4 justify-end">
+        <div className="w-full flex gap-4 justify-end pt-8">
           <Button type="reset" variant="secondary" onClick={() => goToUsersList()}>
             {tCommon('actions.cancel')}
           </Button>
