@@ -1,21 +1,28 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { FieldErrors, useForm } from 'react-hook-form'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
+import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { Select } from '@/components/form/fields/Select'
 import { TextArea } from '@/components/form/fields/TextArea'
 import { TextField } from '@/components/form/fields/TextField'
-import { FormFieldContainer } from '@/components/form/FormFieldContainer'
 import { Form } from '@/components/ui/form'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { useQueryParams } from '@/hooks/useQueryParams'
-import { CreateGroupData, Group, GroupBaseInfo, GroupBaseInfoSchema, UpdateGroupData } from '@/types/groups'
+import {
+  CreateGroupData,
+  Group,
+  GroupBaseInfo,
+  GroupBaseInfoSchema,
+  GroupTabProps,
+  UpdateGroupData,
+} from '@/types/groups'
 
 import { createGroup, updateGroup } from '../actions'
 
@@ -35,18 +42,18 @@ const transformData = (formData: GroupBaseInfo) => {
   }
 }
 
-interface BaseInfoTabProps {
-  groupData: Group
+interface BaseInfoTabProps extends GroupTabProps {
   isEditMode: boolean
 }
 
 export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const { groupData, isEditMode } = props
   const t = useTranslations('groups')
+  const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
   const router = useRouter()
-  const { setApiRequestParams } = useQueryParams()
   const availableContacts: { value: string; label: string }[] = []
+  const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<GroupBaseInfo>({
     resolver: zodResolver(GroupBaseInfoSchema),
@@ -60,6 +67,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   const handleCreateGroup = async (formData: GroupBaseInfo) => {
     try {
+      setIsLoading(true)
       const transformedGroupData = transformData(formData)
       // eslint-disable-next-line unused-imports/no-unused-vars
       const { id, ...groupData } = transformedGroupData
@@ -68,11 +76,14 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
       router.push(`/groups/${response.id}`)
     } catch (error) {
       console.error('An error occurred while creating the group: ', error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleUpdateGroup = async (formData: GroupBaseInfo) => {
     try {
+      setIsLoading(true)
       const transformedGroupData = transformData(formData)
       const updateGroupData: UpdateGroupData = {
         ...transformedGroupData,
@@ -85,12 +96,9 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
       router.refresh()
     } catch (error) {
       console.error('An error occurred while updating the group: ', error)
+    } finally {
+      setIsLoading(false)
     }
-  }
-
-  const goToGroupsList = () => {
-    const apiParams = setApiRequestParams()
-    router.push(`/groups?${apiParams}`)
   }
 
   const handleSubmit = isEditMode ? handleUpdateGroup : handleCreateGroup
@@ -98,6 +106,14 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   const handleContactChange = (_value: string) => {
     form.setValue('contact', { id: '', displayName: '' })
+  }
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">{tCommon('loading')}</span>
+      </div>
+    )
   }
 
   return (
@@ -107,10 +123,10 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
         className="flex flex-col justify-between h-full"
       >
         <ContentCard>
-          <FormFieldContainer className="pt-0 pb-3 text-xl">
+          <DetailsFieldContainer className="pt-0 pb-3 text-xl">
             <h2>{t('details.baseInfo')}</h2>
-          </FormFieldContainer>
-          <FormFieldContainer>
+          </DetailsFieldContainer>
+          <DetailsFieldContainer>
             <TextField
               form={form}
               label={t('details.name')}
@@ -121,9 +137,9 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               }}
               required
             />
-          </FormFieldContainer>
+          </DetailsFieldContainer>
 
-          <FormFieldContainer>
+          <DetailsFieldContainer>
             <TextArea
               className="max-w-lg my-12"
               form={form}
@@ -135,8 +151,8 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               }}
               required
             />
-          </FormFieldContainer>
-          <FormFieldContainer className="border-0">
+          </DetailsFieldContainer>
+          <DetailsFieldContainer className="border-0">
             <Select
               form={form}
               id="contactSelect"
@@ -148,12 +164,13 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               onChange={handleContactChange}
               disabled
             />
-          </FormFieldContainer>
+          </DetailsFieldContainer>
         </ContentCard>
         <ActionButtons
-          onCancelClick={goToGroupsList}
+          onCancelClick={() => form.reset()}
           confirmButtonType="submit"
           isConfirmButtonDisabled={!form.formState.isDirty}
+          isCancelButtonDisabled={!form.formState.isDirty}
         />
       </form>
     </Form>

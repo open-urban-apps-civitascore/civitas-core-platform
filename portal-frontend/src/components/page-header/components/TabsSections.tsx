@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-export type Tab = { value: string; label: string }
+export type Tab = { value: string; label: string; isActive?: boolean }
 
 export interface TabSectionProps {
   tabs: Tab[]
@@ -31,7 +31,7 @@ export const TabsSection = (props: TabSectionProps) => {
     >
       <Tag
         className={cn(
-          ` max-w-full w-auto flex justify-start gap-2 self-start cursor-pointer items-end flex-nowrap overflow-x-auto ${isSubTabsSection && 'rounded-md p-1'}  `,
+          ` max-w-full w-auto flex justify-start gap-2 self-start items-end flex-nowrap overflow-x-auto ${isSubTabsSection && 'rounded-md p-1'}  `,
           className,
         )}
       >
@@ -40,12 +40,13 @@ export const TabsSection = (props: TabSectionProps) => {
             variant="ghost"
             key={tab.value}
             onClick={() => onClick(tab.value)}
-            className={`h-full text-center text-sm  font-medium ${isSubTabsSection ? subTabsStyles(tab) : tabsStyles(tab)}`}
+            className={`h-full text-center text-sm font-medium ${isSubTabsSection ? subTabsStyles(tab) : tabsStyles(tab)}`}
             style={{ margin: 0 }}
             id={`heading-${tab.value}`}
             role="tab"
             aria-selected={selectedTab === tab.value}
             tabIndex={0}
+            disabled={!tab.isActive}
           >
             {tab.label}
           </Button>

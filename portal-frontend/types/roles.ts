@@ -8,11 +8,14 @@ export const ROLE_TYPES = {
 
 export type RoleType = (typeof ROLE_TYPES)[keyof typeof ROLE_TYPES]
 
-export type RoleResponse = {
+export type BaseRole = {
   id: string
   name: string
   description?: string
   type: RoleType
+}
+
+export type RoleResponse = BaseRole & {
   tenant: string
   permissions: string[] | null
   user: string[] | null

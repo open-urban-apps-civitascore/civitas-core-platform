@@ -13,6 +13,7 @@ import { useQueryParams } from '@/hooks/useQueryParams'
 import { Group } from '@/types/groups'
 
 import { BaseInfoTab } from './BaseInfoTab'
+import { RolesTab } from './RolesTab'
 
 const LoadingSkeleton = () => (
   <div>
@@ -31,26 +32,30 @@ const GroupDetails = (props: GroupDetailsProps) => {
   const { subTabValue, setSubTabValueParam } = useQueryParams()
 
   const t = useTranslations('groups')
-  const tabValues = {
+  const tabValues: Record<'info' | 'roles' | 'users' | 'subgroups', Tab> = {
     info: {
       value: 'info',
       label: t('detailsTabs.info'),
+      isActive: true,
     },
     roles: {
       value: 'roles',
       label: t('detailsTabs.roles'),
+      isActive: isEditMode,
     },
     users: {
       value: 'users',
       label: t('detailsTabs.users'),
+      isActive: isEditMode,
     },
     subgroups: {
       value: 'subgroups',
       label: t('detailsTabs.subgroups'),
+      isActive: isEditMode,
     },
   }
 
-  const tabs: Tab[] = Object.values(tabValues)
+  const tabs = Object.values(tabValues)
 
   useEffect(() => {
     if (!subTabValue) {
@@ -58,31 +63,33 @@ const GroupDetails = (props: GroupDetailsProps) => {
     }
   }, [subTabValue, tabs, setSubTabValueParam])
 
-  if (!subTabValue) {
+  let Content = <LoadingSkeleton />
+
+  if (!groupData) {
+    Content = <ContentCard>No data</ContentCard>
+  } else {
+    switch (subTabValue) {
+      case tabValues.info.value:
+        Content = <BaseInfoTab isEditMode={isEditMode} groupData={groupData} />
+        break
+      case tabValues.roles.value:
+        Content = <RolesTab groupData={groupData} />
+        break
+      case tabValues.users.value:
+      case tabValues.subgroups.value:
+        Content = <ContentCard>{tabValues[subTabValue as keyof typeof tabValues].label}</ContentCard>
+        break
+      default:
+        break
+    }
+
     return (
       <PageContainer headerType="withSubTabs">
         <PageHeader title={title} subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: setSubTabValueParam }} />
-        <PageBackground>
-          <LoadingSkeleton />
-        </PageBackground>
+        <PageBackground>{Content}</PageBackground>
       </PageContainer>
     )
   }
-
-  return (
-    <PageContainer headerType="withSubTabs">
-      <PageHeader title={title} subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: setSubTabValueParam }} />
-      <PageBackground>
-        {groupData && subTabValue === tabValues.info.value && (
-          <BaseInfoTab isEditMode={isEditMode} groupData={groupData} />
-        )}
-        {groupData && subTabValue !== tabValues.info.value && (
-          <ContentCard>{tabValues[subTabValue as keyof typeof tabValues].label}</ContentCard>
-        )}
-        {!groupData && <ContentCard>No data</ContentCard>}
-      </PageBackground>
-    </PageContainer>
-  )
 }
 
 export default GroupDetails

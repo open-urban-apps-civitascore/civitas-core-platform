@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useForm } from 'react-hook-form'
 
+import { PageBackground } from '@/components/page-background/PageBackground'
+import { PageContainer } from '@/components/page-container/PageContainer'
+import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
 import { FormRole, RoleInput, roleSchema, RoleType } from '../../../../../types/roles'
@@ -64,10 +67,12 @@ const CreateRolePage = () => {
   }
 
   return (
-    <div>
-      <h1>{t('form.title.createRole')}</h1>
-      <RolesForm form={form} onSubmit={onSubmit} isEdit={false} />
-    </div>
+    <PageContainer headerType="onlyTitle">
+      <PageHeader title={t('form.title.createRole')} />
+      <PageBackground>
+        <RolesForm form={form} onSubmit={onSubmit} isEdit={true} />
+      </PageBackground>
+    </PageContainer>
   )
 }
 
