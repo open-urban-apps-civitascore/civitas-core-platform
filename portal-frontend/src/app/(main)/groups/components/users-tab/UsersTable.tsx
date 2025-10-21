@@ -1,16 +1,16 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { Check } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { Badge } from '@/components/ui/badge'
 import { TableProps } from '@/types/table'
-import { ListUser } from '@/types/users'
+import { GroupListUser } from '@/types/users'
+import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
 
-interface UsersTableProps extends TableProps<ListUser> {
-  users: ListUser[]
+interface UsersTableProps extends TableProps<GroupListUser> {
+  users: GroupListUser[]
 }
 
 const UsersTable = (props: UsersTableProps) => {
@@ -27,8 +27,10 @@ const UsersTable = (props: UsersTableProps) => {
     onSortingChange,
     isLoading,
   } = props
-  const t = useTranslations('users')
-  const columnHelper = createColumnHelper<ListUser>()
+  const locale = useLocale()
+  const t = useTranslations('groups')
+  const tUsers = useTranslations('users')
+  const columnHelper = createColumnHelper<GroupListUser>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -37,7 +39,7 @@ const UsersTable = (props: UsersTableProps) => {
       enableHiding: true,
     }),
     columnHelper.accessor('displayName', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('info.displayName')} />,
+      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.displayName')} />,
       cell: info => info.getValue(),
       meta: {
         style: {
@@ -47,35 +49,23 @@ const UsersTable = (props: UsersTableProps) => {
       },
     }),
     columnHelper.accessor('authority', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('info.authority')} />,
+      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.authority')} />,
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('department', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('info.department')} />,
+      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.department')} />,
       cell: info => info.getValue(),
-    }),
-    columnHelper.accessor('roles', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('info.role')} />,
-      cell: info => {
-        const roles = info.getValue()
-        if (!roles || roles.length === 0) return '-'
-        return (
-          <div className="flex flex-wrap gap-1">
-            {roles.map(role => (
-              <Badge key={role} variant="secondary">
-                {role}
-              </Badge>
-            ))}
-          </div>
-        )
-      },
     }),
     columnHelper.accessor('email', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('info.email')} />,
+      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.email')} />,
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor('isactive', {
-      header: t('info.active'),
+    columnHelper.accessor('assignedAt', {
+      header: ({ column }) => <SortableTableHeader column={column} title={t('users.assignedAt')} />,
+      cell: info => formatDate(info.getValue(), locale),
+    }),
+    columnHelper.accessor('isActive', {
+      header: tUsers('info.active'),
       cell: info => (info.getValue() ? <Check /> : '-'),
     }),
   ]

@@ -137,6 +137,10 @@
         "description": "Select a role to add to the user from the available {category} roles.",
         "addButton": "Add"
       }
+    },
+    "users": {
+      "assign": "Assign User",
+      "assignedAt": "Member since"
     }
   },
   "pagination": {

@@ -38,7 +38,7 @@ export const RolesTab = (props: GroupTabProps) => {
     [group, originalRoles],
   )
 
-  // Fetch user data and all roles
+  // Fetch all roles
   useEffect(() => {
     const fetchData = async () => {
       try {

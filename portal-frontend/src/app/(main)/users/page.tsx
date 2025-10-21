@@ -13,23 +13,14 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { Authority, Category, Role, UserResponse } from '@/types/users'
+import { Role } from '@/types/roles'
+import { Authority, Category, ListUser, UserResponse } from '@/types/users'
 import { mapListUsers } from '@/utils/users'
 
 import UsersTable from './components/UsersTable'
 
 export type UserAuthority = Category & {
   department: Category
-}
-
-export type ListUser = {
-  id: string
-  displayName: string
-  authority: string
-  department: string
-  roles: string[]
-  email: string
-  isactive: boolean
 }
 
 export const getSortParam = (sorting: SortingState) => {

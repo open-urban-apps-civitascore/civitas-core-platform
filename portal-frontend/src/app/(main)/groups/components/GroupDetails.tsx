@@ -14,6 +14,7 @@ import { Group } from '@/types/groups'
 
 import { BaseInfoTab } from './BaseInfoTab'
 import { RolesTab } from './RolesTab'
+import { UsersTab } from './users-tab/UsersTab'
 
 const LoadingSkeleton = () => (
   <div>
@@ -76,6 +77,8 @@ const GroupDetails = (props: GroupDetailsProps) => {
         Content = <RolesTab groupData={groupData} />
         break
       case tabValues.users.value:
+        Content = <UsersTab groupData={groupData} />
+        break
       case tabValues.subgroups.value:
         Content = <ContentCard>{tabValues[subTabValue as keyof typeof tabValues].label}</ContentCard>
         break

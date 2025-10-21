@@ -136,6 +136,10 @@
         "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen.",
         "addButton": "Hinzufügen"
       }
+    },
+    "users": {
+      "assign": "User hinzufügen",
+      "assignedAt": "Mitglied seit"
     }
   },
   "pagination": {

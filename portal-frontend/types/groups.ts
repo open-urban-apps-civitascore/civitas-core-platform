@@ -5,7 +5,7 @@ export type Group = {
   title: string
   description: string
   roles: string[]
-  users: string[]
+  users: { id: string; assignedAt: string }[]
   contact: { id: string; displayName: string } | null
   parent: string | null
   subgroups: Group[]

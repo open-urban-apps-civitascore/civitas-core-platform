@@ -34,19 +34,31 @@ export type UserResponse = {
   position: string | null
   positionDescription: string | null
 }
-export type Role = {
-  id: string
-  name: string
-  description: string
-  tenant: string
-  type: string
-  permissions: string[]
-  user: string[]
-  createdAt: string
-}
 
 export type UpdateUserData = UserResponse
 export type CreateUserData = Omit<UpdateUserData, 'id'>
+
+export type ListUser = {
+  id: string
+  displayName: string
+  authority: string
+  department: string
+  roles: string[]
+  email: string
+  isActive: boolean
+}
+
+export type GroupListUser = Omit<ListUser, 'roles'> & {
+  assignedAt: string
+}
+
+export type GroupUser = {
+  id: string
+  displayName: string
+  email: string
+  authority: UserAuthority | null
+  isActive: boolean
+}
 
 export const TitleSchema = z.enum(['male', 'female'])
 
