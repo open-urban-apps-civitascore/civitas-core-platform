@@ -1,0 +1,26 @@
+import { Plus } from 'lucide-react'
+import React, { HTMLAttributes } from 'react'
+
+import { cn } from '@/lib/utils'
+
+import { Button } from '../ui/button'
+
+interface NoDataPageProps extends HTMLAttributes<HTMLDivElement> {
+  title: string
+  subTitle?: string
+  buttonText?: string
+  onButtonClick?: () => void
+}
+export const NoDataPage = (props: NoDataPageProps) => {
+  const { title, subTitle, buttonText, onButtonClick, ...divProps } = props
+  return (
+    <div className={cn('h-full flex flex-col justify-center items-center', divProps.className)}>
+      <p className="text-xl font-semibold mb-2">{title}</p>
+      <p className="text-[muted-foreground] mb-12">{subTitle}</p>
+      <Button onClick={onButtonClick}>
+        <Plus />
+        {buttonText}
+      </Button>
+    </div>
+  )
+}

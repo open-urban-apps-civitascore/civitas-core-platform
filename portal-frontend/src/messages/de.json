@@ -139,7 +139,9 @@
     },
     "users": {
       "assign": "User hinzufügen",
-      "assignedAt": "Mitglied seit"
+      "assignedAt": "Mitglied seit",
+      "noUsers": "Keine User",
+      "noUsersSub": "Keine User in dieser Gruppe enthalten"
     }
   },
   "pagination": {

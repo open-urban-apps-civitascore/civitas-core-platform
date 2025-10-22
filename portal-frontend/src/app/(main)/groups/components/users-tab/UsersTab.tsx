@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
@@ -74,9 +75,13 @@ export const UsersTab = (props: UsersTabProps) => {
   }
 
   useEffect(() => {
-    getUserListData()
+    if (originalUsers.length > 0) {
+      getUserListData()
+    } else {
+      setIsLoading(false)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
+  }, [pageIndex, pageSize, rowCount, sorting, search, totalPages, setApiRequestParams])
 
   const CustomElement = (
     <Button onClick={() => {}}>
@@ -84,6 +89,9 @@ export const UsersTab = (props: UsersTabProps) => {
       {t('users.assign')}
     </Button>
   )
+  if (users.length === 0 && !isLoading) {
+    return <NoDataPage title={t('users.noUsers')} subTitle={t('users.noUsersSub')} buttonText={t('users.assign')} />
+  }
 
   return (
     <div>

@@ -140,7 +140,9 @@
     },
     "users": {
       "assign": "Assign User",
-      "assignedAt": "Member since"
+      "assignedAt": "Member since",
+      "noUsers": "No Users",
+      "noUsersSub": "No users assigned to this group"
     }
   },
   "pagination": {
