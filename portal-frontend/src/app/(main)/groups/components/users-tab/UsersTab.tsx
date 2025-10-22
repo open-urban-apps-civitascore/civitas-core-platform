@@ -12,6 +12,7 @@ import { Group, GroupTabProps } from '@/types/groups'
 import { Authority, GroupListUser, UserResponse } from '@/types/users'
 import { mapGroupListUsers } from '@/utils/users'
 
+import { AssignUsersModal } from './AssignUsersModal'
 import UsersTable from './UsersTable'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
@@ -26,6 +27,7 @@ export const UsersTab = (props: UsersTabProps) => {
   const [users, setUsers] = useState<GroupListUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [rowCount, setRowCount] = useState(0)
+  const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false)
 
   const {
     setSortingParams,
@@ -90,7 +92,22 @@ export const UsersTab = (props: UsersTabProps) => {
     </Button>
   )
   if (users.length === 0 && !isLoading) {
-    return <NoDataPage title={t('users.noUsers')} subTitle={t('users.noUsersSub')} buttonText={t('users.assign')} />
+    return (
+      <div className="h-full">
+        <NoDataPage
+          title={t('users.noUsers')}
+          subTitle={t('users.noUsersSub')}
+          buttonText={t('users.assign')}
+          onButtonClick={() => setIsAssignUsersOpen(true)}
+        />
+        <AssignUsersModal
+          originalUsers={originalUsers}
+          groupTitle={groupData.title}
+          open={isAssignUsersOpen}
+          onOpenChange={() => setIsAssignUsersOpen(!isAssignUsersOpen)}
+        />
+      </div>
+    )
   }
 
   return (

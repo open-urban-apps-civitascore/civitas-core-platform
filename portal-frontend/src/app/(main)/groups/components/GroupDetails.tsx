@@ -13,7 +13,7 @@ import { useQueryParams } from '@/hooks/useQueryParams'
 import { Group } from '@/types/groups'
 
 import { BaseInfoTab } from './BaseInfoTab'
-import { RolesTab } from './RolesTab'
+import { RolesTab } from './roles-tab/RolesTab'
 import { UsersTab } from './users-tab/UsersTab'
 
 const LoadingSkeleton = () => (

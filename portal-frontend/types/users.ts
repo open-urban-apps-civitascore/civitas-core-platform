@@ -52,6 +52,13 @@ export type GroupListUser = Omit<ListUser, 'roles'> & {
   assignedAt: string
 }
 
+export type GroupAssignmentUser = {
+  id: string
+  displayName: string
+  email: string
+  isActive: boolean
+}
+
 export type GroupUser = {
   id: string
   displayName: string

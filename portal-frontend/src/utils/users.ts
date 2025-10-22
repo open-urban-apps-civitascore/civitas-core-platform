@@ -1,5 +1,13 @@
 import { FormUser } from '@/app/(main)/users/components/UserForm'
-import { Authority, GroupListUser, ListUser, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+import {
+  Authority,
+  GroupAssignmentUser,
+  GroupListUser,
+  ListUser,
+  UserFormData,
+  UserFormSchema,
+  UserResponse,
+} from '@/types/users'
 
 export const mapListUsers = (
   users: UserResponse[],
@@ -36,6 +44,16 @@ export const mapGroupListUsers = (
       email: user.email,
       isActive: user.active,
       assignedAt: userAssignments.find(assignment => assignment.id === user.id)?.assignedAt ?? '',
+    }
+  })
+
+export const mapGoupAssignmentUsers = (users: UserResponse[]): GroupAssignmentUser[] =>
+  users.map(user => {
+    return {
+      id: user.id,
+      displayName: user.displayName,
+      email: user.email,
+      isActive: user.active,
     }
   })
 

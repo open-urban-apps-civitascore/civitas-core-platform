@@ -140,6 +140,7 @@
     },
     "users": {
       "assign": "Assign User",
+      "toGroup": "to group",
       "assignedAt": "Member since",
       "noUsers": "No Users",
       "noUsersSub": "No users assigned to this group"

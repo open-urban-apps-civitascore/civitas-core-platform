@@ -139,6 +139,7 @@
     },
     "users": {
       "assign": "User hinzufügen",
+      "toGroup": "zur Gruppe",
       "assignedAt": "Mitglied seit",
       "noUsers": "Keine User",
       "noUsersSub": "Keine User in dieser Gruppe enthalten"

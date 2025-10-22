@@ -74,7 +74,7 @@ const UsersTable = (props: UsersTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.email')} />,
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor('isactive', {
+    columnHelper.accessor('isActive', {
       header: t('info.active'),
       cell: info => (info.getValue() ? <Check /> : '-'),
     }),

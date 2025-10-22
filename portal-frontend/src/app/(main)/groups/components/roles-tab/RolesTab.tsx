@@ -10,7 +10,7 @@ import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { Group, GroupTabProps } from '@/types/groups'
 
-import { updateGroup } from '../actions'
+import { updateGroup } from '../../actions'
 import { RoleCategory } from './RoleCategory'
 
 interface Role {
