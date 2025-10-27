@@ -32,26 +32,31 @@ export const UserDetails = (props: UserDetailsProps) => {
     }
   }
 
-  const tabValues = {
+  const tabValues: Record<'userData' | 'roles' | 'userGroups' | 'dataSpaces' | 'account', Tab> = {
     userData: {
       label: t('detailsTabs.userData'),
       value: 'userDetails',
+      isActive: true,
     },
     roles: {
       label: t('detailsTabs.roles'),
       value: 'roles',
+      isActive: isEditMode,
     },
     userGroups: {
       label: t('detailsTabs.userGroups'),
       value: 'userGroups',
+      isActive: isEditMode,
     },
     dataSpaces: {
       label: t('detailsTabs.dataspaces'),
       value: 'dataspaces',
+      isActive: isEditMode,
     },
     account: {
       label: t('detailsTabs.account'),
       value: 'account',
+      isActive: isEditMode,
     },
   }
   const tabs: Tab[] = [
