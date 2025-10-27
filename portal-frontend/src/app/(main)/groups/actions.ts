@@ -51,9 +51,6 @@ export const updateGroup = async (updateGroupData: UpdateGroupData) => {
   }
 }
 
-// this implementation has to be changed when the backend is impemented
-// all users list shouldn't be fetched
-// already assigned users have to keep their assignment date (handle in backend)
 export const patchGroupUsers = async (groupId: string, updateUserData: { id: string; assignedAt: string }[]) => {
   try {
     const response = await fetch(`${URL}/groups/${groupId}`, {
