@@ -13,8 +13,8 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
+import { ROLE_TYPES, RoleResponse } from '@/types/roles'
 
-import { ROLE_TYPES, RoleResponse } from '../../../../types/roles'
 import { RolesTable } from './components/RolesTable'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
