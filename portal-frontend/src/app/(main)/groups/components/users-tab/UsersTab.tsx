@@ -1,5 +1,6 @@
 'use client'
 
+import { RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -7,6 +8,7 @@ import { useEffect, useState } from 'react'
 
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Group, GroupTabProps } from '@/types/groups'
@@ -14,7 +16,7 @@ import { Authority, GroupListUser, UserResponse } from '@/types/users'
 import { mapGroupListUsers } from '@/utils/users'
 
 import { patchGroupUsers } from '../../actions'
-import { AssignUsersModal, UserSelection } from './AssignUsersModal'
+import { AssignUsersModal } from './AssignUsersModal'
 import UsersTable from './UsersTable'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
@@ -96,13 +98,15 @@ export const UsersTab = (props: UsersTabProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageSize, rowCount, sorting, search, totalPages, setApiRequestParams, originalUsers])
 
-  const handleUpdateGroupUsers = async (userSelection: UserSelection) => {
+  const handleUpdateGroupUsers = async (userSelection: RowSelectionState) => {
     setIsLoading(true)
     setIsUpdatingGroupUsers(true)
-    const OriginalUserIds = groupData.users.map(user => user.id)
-
+    const selectedUserIds = Object.keys(userSelection).filter(key => userSelection[key])
+    const selectedUserInfo = selectedUserIds.map(userId => ({ id: userId, assignedAt: new Date().toISOString() }))
+    console.log(selectedUserIds)
+    const updateUserData = selectedUserInfo.concat(originalUsers)
     try {
-      await patchGroupUsers(groupData.id, userSelection, OriginalUserIds)
+      await patchGroupUsers(groupData.id, updateUserData)
       router.refresh()
     } catch {
       console.error('An error occurred while updating group users')
@@ -141,19 +145,21 @@ export const UsersTab = (props: UsersTabProps) => {
   }
 
   return (
-    <div>
+    <div className="h-full">
       <SearchHeader searchString={search} onChangeSearchString={setSearchParam} customElement={CustomElement} />
-      <UsersTable
-        users={users}
-        rowCount={rowCount}
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        sorting={sorting}
-        totalPages={totalPages}
-        onSortingChange={setSortingParams}
-        onPaginationChange={setPaginationParams}
-        isLoading={isLoading}
-      />
+      <TableContainer>
+        <UsersTable
+          users={users}
+          rowCount={rowCount}
+          pageIndex={pageIndex}
+          pageSize={pageSize}
+          sorting={sorting}
+          totalPages={totalPages}
+          onSortingChange={setSortingParams}
+          onPaginationChange={setPaginationParams}
+          isLoading={isLoading}
+        />
+      </TableContainer>
       <AssignUsersModal
         isUpdating={isUpdatingGroupUsers}
         originalUsers={originalUsers}

@@ -4,18 +4,19 @@ import {
   getCoreRowModel,
   getSortedRowModel,
   PaginationState,
+  RowSelectionState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
 import { Check } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { QUERY_PARAMS } from '@/const/searchParams'
@@ -26,25 +27,18 @@ import { mapGoupAssignmentUsers } from '@/utils/users'
 export type UserSelection = { selectAll: boolean; selectedIds: string[]; excludedIds: string[] }
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
-const reduceValues = (values: string[]) =>
-  values.reduce(
-    (acc, id) => {
-      acc[id] = true
-      return acc
-    },
-    {} as Record<string, boolean>,
-  )
 
 interface AssignUsersModalProps extends DialogProps {
   originalUsers: { id: string; assignedAt: string }[]
   groupTitle: string
-  onUpdateUsers: (userSelection: UserSelection) => void
+  onUpdateUsers: (userSelection: RowSelectionState) => void
   isUpdating?: boolean
 }
 
 export const AssignUsersModal = (props: AssignUsersModalProps) => {
   const { originalUsers, groupTitle, open, onOpenChange = () => {}, onUpdateUsers, isUpdating = false } = props
   const t = useTranslations('groups')
+  const tCommon = useTranslations('common')
   const tUsers = useTranslations('users')
   const [users, setUsers] = useState<GroupAssignmentUser[]>([])
   const [pageIndex, setPageIndex] = useState(0)
@@ -53,8 +47,9 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
   const [sorting, setSorting] = useState<SortingState>([])
   const [rowCount, setRowCount] = useState(0)
   const [searchString, setSearchString] = useState('')
-  const [selection, setSelection] = useState<UserSelection>({ selectAll: false, selectedIds: [], excludedIds: [] })
+  const [selection, setSelection] = useState<RowSelectionState>({})
   const totalPages = Math.ceil(rowCount / pageSize)
+  const selectAllCheckbox = useRef<HTMLButtonElement>(null)
 
   const getRequestParams = () => {
     const requestParams = new URLSearchParams()
@@ -96,6 +91,12 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
   }
 
   useEffect(() => {
+    if (!open) {
+      setSelection({})
+    }
+  }, [open])
+
+  useEffect(() => {
     getUserListData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageSize, rowCount, sorting, totalPages, searchString, originalUsers])
@@ -105,12 +106,12 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     setPageSize(newPagination.pageSize)
   }
 
-  const handleToggleCheckAll = () => {
-    setSelection(prev => ({
-      selectAll: !prev.selectAll,
-      selectedIds: [],
-      excludedIds: [],
-    }))
+  // for accessibility: avoid losing focus after toggeling checkboxes via keyboard
+  const setFocus = (elementId: string) => {
+    requestAnimationFrame(() => {
+      const element = document.getElementById(elementId)
+      element?.focus()
+    })
   }
 
   const columnHelper = createColumnHelper<GroupAssignmentUser>()
@@ -119,20 +120,23 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     columnHelper.accessor('id', {
       header: () => (
         <Checkbox
+          ref={selectAllCheckbox}
           checked={
-            (selection.selectAll && selection.excludedIds.length === 0) ||
-            (!selection.selectAll && selection.selectedIds.length > 0 && 'indeterminate') ||
-            (selection.selectAll && selection.excludedIds.length > 0 && 'indeterminate')
+            table.getIsAllPageRowsSelected() ? true : table.getIsSomePageRowsSelected() ? 'indeterminate' : false
           }
-          onCheckedChange={handleToggleCheckAll}
-          aria-label="Select all"
+          onCheckedChange={value => table.toggleAllPageRowsSelected(!!value)}
+          id="selectAll"
         />
       ),
       cell: ({ row }) => (
         <Checkbox
           checked={row.getIsSelected()}
-          onCheckedChange={value => row.toggleSelected(!!value)}
-          aria-label="Select row"
+          onCheckedChange={value => {
+            row.toggleSelected(!!value)
+            setFocus(row.id)
+          }}
+          aria-label={`Select user ${row.original.displayName}`}
+          id={row.id}
         />
       ),
       enableSorting: false,
@@ -158,33 +162,6 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     }),
   ]
 
-  const handleRowSelectionChange = (newSelection: Record<string, boolean>) => {
-    let selectedIds: string[] = []
-    let excludedIds: string[] = []
-    if (selection.selectAll) {
-      const excludedUsers = users.filter(user => !newSelection[user.id])
-      excludedIds = excludedUsers.map(user => user.id)
-    } else {
-      selectedIds = Object.keys(newSelection).filter(id => newSelection[id])
-    }
-    setSelection(prev => ({
-      ...prev,
-      selectedIds,
-      excludedIds,
-    }))
-  }
-
-  const rowSelection = useMemo<Record<string, boolean>>(() => {
-    if (selection.selectAll) {
-      const selectedUsers = users.filter(user => !selection.excludedIds.find(id => id === user.id))
-      return reduceValues(selectedUsers.map(u => u.id))
-    }
-    if (selection.selectedIds.length > 0) {
-      return reduceValues(selection.selectedIds)
-    }
-    return {}
-  }, [selection, users])
-
   const table = useReactTable({
     getRowId: row => row.id,
     columns: columns,
@@ -193,7 +170,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     state: {
       pagination: { pageIndex, pageSize },
       sorting,
-      rowSelection: rowSelection,
+      rowSelection: selection,
     },
     manualPagination: true,
     manualSorting: true,
@@ -202,13 +179,13 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     onPaginationChange: updater => {
       hanldePagination(resolveUpdater(updater, { pageIndex, pageSize }))
     },
-    onRowSelectionChange: updater => handleRowSelectionChange(resolveUpdater(updater, rowSelection)),
+    onRowSelectionChange: setSelection,
     onSortingChange: updater => setSorting(resolveUpdater(updater, sorting)),
   })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="block sm:max-w-[95%] sm:w-[95%] md:max-w-[1061px] h-[80%] max-h-[743px]  [--title-height:64px] [--actionbutton-height:62px]">
+      <DialogContent className="block sm:max-w-[95%] sm:w-[95%] md:max-w-[1061px] h-[80%] max-h-[743px]  [--title-height:64px] [--button-height:36px]">
         <DialogHeader>
           <DialogTitle>{t('users.assign')}</DialogTitle>
           <DialogDescription>
@@ -220,7 +197,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
           onChangeSearchString={newSearchString => setSearchString(newSearchString)}
           className="my-2"
         />
-        <div className="h-[calc(100%-var(--search-height)-var(--title-height)-var(--actionbutton-height))]">
+        <div className="h-[calc(100%-var(--search-height)-var(--title-height)-var(--button-height))]">
           {isUpdating ? (
             <LoadingSpinner className="h-full" />
           ) : (
@@ -233,14 +210,11 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
             />
           )}
         </div>
-        <ActionButtons
-          confirmButtonType="button"
-          onCancelClick={() => onOpenChange(false)}
-          onConfirmClick={() => onUpdateUsers(selection)}
-          hasCard={false}
-          isCancelButtonDisabled={isUpdating || isLoadingUsersList}
-          isConfirmButtonDisabled={isUpdating || isLoadingUsersList}
-        />
+        <div className="flex justify-end">
+          <Button onClick={() => onUpdateUsers(selection)} disabled={isUpdating || isLoadingUsersList}>
+            {tCommon('actions.add')}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )

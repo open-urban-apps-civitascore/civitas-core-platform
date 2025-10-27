@@ -202,7 +202,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
                         disabled={isSaving}
                         size="sm"
                       >
-                        {t('rolesTab.addRoleDialog.addButton')}
+                        {tCommon('actions.add')}
                       </Button>
                     </div>
                   ))}

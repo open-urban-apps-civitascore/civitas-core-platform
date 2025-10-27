@@ -46,7 +46,7 @@ export const TabsSection = (props: TabSectionProps) => {
             role="tab"
             aria-selected={selectedTab === tab.value}
             tabIndex={0}
-            disabled={!tab.isActive}
+            disabled={tab.isActive === false}
           >
             {tab.label}
           </Button>

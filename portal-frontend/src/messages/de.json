@@ -7,7 +7,8 @@
     "actions": {
       "submit": "Speichern",
       "cancel": "Abbrechen",
-      "delete": "Löschen"
+      "delete": "Löschen",
+      "add": "Hinzufügen"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -98,8 +99,7 @@
       "userNotFound": "Benutzer nicht gefunden",
       "addRoleDialog": {
         "title": "Rolle hinzufügen - {category}",
-        "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen.",
-        "addButton": "Hinzufügen"
+        "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen."
       }
     }
   },
@@ -133,8 +133,7 @@
       "userNotFound": "Benutzer nicht gefunden",
       "addRoleDialog": {
         "title": "Rolle hinzufügen - {category}",
-        "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen.",
-        "addButton": "Hinzufügen"
+        "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen."
       }
     },
     "users": {
