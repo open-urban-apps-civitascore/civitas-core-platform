@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { TableProps } from '@/types/table'
 import { ListUser } from '@/types/users'
 import { resolveUpdater } from '@/utils/table'
+import { StatusLabel } from '@/components/status-label/StatusLabel'
 
 interface UsersTableProps extends TableProps<ListUser> {
   users: ListUser[]
@@ -76,7 +77,7 @@ const UsersTable = (props: UsersTableProps) => {
     }),
     columnHelper.accessor('isActive', {
       header: t('info.active'),
-      cell: info => (info.getValue() ? <Check /> : '-'),
+      cell: info => <StatusLabel isChecked={info.getValue()} />,
     }),
   ]
 

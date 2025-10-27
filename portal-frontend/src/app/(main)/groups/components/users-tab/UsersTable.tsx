@@ -8,6 +8,7 @@ import { TableProps } from '@/types/table'
 import { GroupListUser } from '@/types/users'
 import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
+import { StatusLabel } from '@/components/status-label/StatusLabel'
 
 interface UsersTableProps extends TableProps<GroupListUser> {
   users: GroupListUser[]
@@ -66,7 +67,7 @@ const UsersTable = (props: UsersTableProps) => {
     }),
     columnHelper.accessor('isActive', {
       header: tUsers('info.active'),
-      cell: info => (info.getValue() ? <Check /> : '-'),
+      cell: info => <StatusLabel isChecked={info.getValue()} />,
     }),
   ]
 
