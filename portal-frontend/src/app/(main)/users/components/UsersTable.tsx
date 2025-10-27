@@ -1,14 +1,13 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
-import { Check } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Badge } from '@/components/ui/badge'
 import { TableProps } from '@/types/table'
 import { ListUser } from '@/types/users'
 import { resolveUpdater } from '@/utils/table'
-import { StatusLabel } from '@/components/status-label/StatusLabel'
 
 interface UsersTableProps extends TableProps<ListUser> {
   users: ListUser[]
