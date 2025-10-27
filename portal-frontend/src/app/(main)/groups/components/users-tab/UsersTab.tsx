@@ -1,6 +1,7 @@
 'use client'
 
 import { Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
@@ -12,7 +13,8 @@ import { Group, GroupTabProps } from '@/types/groups'
 import { Authority, GroupListUser, UserResponse } from '@/types/users'
 import { mapGroupListUsers } from '@/utils/users'
 
-import { AssignUsersModal } from './AssignUsersModal'
+import { patchGroupUsers } from '../../actions'
+import { AssignUsersModal, UserSelection } from './AssignUsersModal'
 import UsersTable from './UsersTable'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
@@ -22,12 +24,14 @@ interface UsersTabProps extends GroupTabProps {
 }
 export const UsersTab = (props: UsersTabProps) => {
   const { groupData } = props
+  const router = useRouter()
   const originalUsers = groupData.users
   const t = useTranslations('groups')
   const [users, setUsers] = useState<GroupListUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [rowCount, setRowCount] = useState(0)
   const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false)
+  const [isUpdatingGroupUsers, setIsUpdatingGroupUsers] = useState(false)
 
   const {
     setSortingParams,
@@ -76,6 +80,13 @@ export const UsersTab = (props: UsersTabProps) => {
     }
   }
 
+  // closes the user assignment modal after update
+  useEffect(() => {
+    if (isUpdatingGroupUsers === false) {
+      setIsAssignUsersOpen(false)
+    }
+  }, [isUpdatingGroupUsers])
+
   useEffect(() => {
     if (originalUsers.length > 0) {
       getUserListData()
@@ -83,15 +94,32 @@ export const UsersTab = (props: UsersTabProps) => {
       setIsLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, rowCount, sorting, search, totalPages, setApiRequestParams])
+  }, [pageIndex, pageSize, rowCount, sorting, search, totalPages, setApiRequestParams, originalUsers])
+
+  const handleUpdateGroupUsers = async (userSelection: UserSelection) => {
+    setIsLoading(true)
+    setIsUpdatingGroupUsers(true)
+    const OriginalUserIds = groupData.users.map(user => user.id)
+
+    try {
+      await patchGroupUsers(groupData.id, userSelection, OriginalUserIds)
+      router.refresh()
+    } catch {
+      console.error('An error occurred while updating group users')
+    } finally {
+      setIsLoading(false)
+      setIsUpdatingGroupUsers(false)
+    }
+  }
 
   const CustomElement = (
-    <Button onClick={() => {}}>
+    <Button onClick={() => setIsAssignUsersOpen(true)}>
       <Plus />
       {t('users.assign')}
     </Button>
   )
-  if (users.length === 0 && !isLoading) {
+
+  if (users.length === 0) {
     return (
       <div className="h-full">
         <NoDataPage
@@ -101,10 +129,12 @@ export const UsersTab = (props: UsersTabProps) => {
           onButtonClick={() => setIsAssignUsersOpen(true)}
         />
         <AssignUsersModal
+          isUpdating={isUpdatingGroupUsers}
           originalUsers={originalUsers}
           groupTitle={groupData.title}
           open={isAssignUsersOpen}
-          onOpenChange={() => setIsAssignUsersOpen(!isAssignUsersOpen)}
+          onOpenChange={setIsAssignUsersOpen}
+          onUpdateUsers={handleUpdateGroupUsers}
         />
       </div>
     )
@@ -123,6 +153,14 @@ export const UsersTab = (props: UsersTabProps) => {
         onSortingChange={setSortingParams}
         onPaginationChange={setPaginationParams}
         isLoading={isLoading}
+      />
+      <AssignUsersModal
+        isUpdating={isUpdatingGroupUsers}
+        originalUsers={originalUsers}
+        groupTitle={groupData.title}
+        open={isAssignUsersOpen}
+        onOpenChange={setIsAssignUsersOpen}
+        onUpdateUsers={handleUpdateGroupUsers}
       />
     </div>
   )
