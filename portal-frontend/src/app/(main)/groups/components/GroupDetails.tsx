@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -58,17 +58,21 @@ const GroupDetails = (props: GroupDetailsProps) => {
 
   const tabs = Object.values(tabValues)
 
+  const defaultTab = tabValues.info.value
+
+  const isBlockedTab = useMemo(() => !isEditMode && subTabValue !== defaultTab, [isEditMode, subTabValue, defaultTab])
+
   useEffect(() => {
-    if (!subTabValue) {
+    if (!subTabValue || isBlockedTab) {
       setSubTabValueParam(tabs[0].value)
     }
-  }, [subTabValue, tabs, setSubTabValueParam])
+  }, [subTabValue, tabs, setSubTabValueParam, isBlockedTab])
 
   let Content = <LoadingSkeleton />
 
   if (!groupData) {
     Content = <ContentCard>No data</ContentCard>
-  } else {
+  } else if (!isBlockedTab) {
     switch (subTabValue) {
       case tabValues.info.value:
         Content = <BaseInfoTab isEditMode={isEditMode} groupData={groupData} />
@@ -85,14 +89,14 @@ const GroupDetails = (props: GroupDetailsProps) => {
       default:
         break
     }
-
-    return (
-      <PageContainer headerType="withSubTabs">
-        <PageHeader title={title} subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: setSubTabValueParam }} />
-        <PageBackground>{Content}</PageBackground>
-      </PageContainer>
-    )
   }
+
+  return (
+    <PageContainer headerType="withSubTabs">
+      <PageHeader title={title} subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: setSubTabValueParam }} />
+      <PageBackground>{Content}</PageBackground>
+    </PageContainer>
+  )
 }
 
 export default GroupDetails

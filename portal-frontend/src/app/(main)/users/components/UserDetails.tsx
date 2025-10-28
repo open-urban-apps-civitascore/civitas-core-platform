@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -66,11 +66,16 @@ export const UserDetails = (props: UserDetailsProps) => {
     tabValues.dataSpaces,
     tabValues.account,
   ]
-  const [selectedTab, setSelectedTab] = useState<string>((subTabValue as string) || tabValues.userData.value)
+
+  const defaultTab = tabValues.userData.value
+
+  const isBlockedTab = useMemo(() => !isEditMode && subTabValue !== defaultTab, [isEditMode, subTabValue, defaultTab])
 
   useEffect(() => {
-    setSelectedTab(subTabValue || tabValues.userData.value)
-  }, [subTabValue, tabValues.userData.value])
+    if (!subTabValue || isBlockedTab) {
+      setSubTabValueParam(defaultTab)
+    }
+  }, [subTabValue, setSubTabValueParam, defaultTab, isBlockedTab])
 
   const handleSelectTab = (newTab: string) => {
     setSubTabValueParam(newTab)
@@ -80,13 +85,13 @@ export const UserDetails = (props: UserDetailsProps) => {
     <PageContainer headerType="withSubTabs">
       <PageHeader
         title={getTitle()}
-        subTabs={{ tabs: tabs, selectedTab, onClick: newTab => handleSelectTab(newTab) }}
+        subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: newTab => handleSelectTab(newTab) }}
       />
       <PageBackground>
         {userData ? (
           <ContentCard>
-            {selectedTab === tabValues.roles.value && <RolesTab userId={userData.id} />}
-            {selectedTab === tabValues.userData.value && <UserForm userData={userData} isEditMode={isEditMode} />}
+            {subTabValue === tabValues.roles.value && isEditMode && <RolesTab userId={userData.id} />}
+            {subTabValue === tabValues.userData.value && <UserForm userData={userData} isEditMode={isEditMode} />}
           </ContentCard>
         ) : (
           <div>No data</div>
