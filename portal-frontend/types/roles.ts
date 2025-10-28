@@ -1,7 +1,5 @@
 import z from 'zod'
 
-import { Category } from './users'
-
 export const ROLE_TYPES = {
   SYSTEM: 'system',
   DATA: 'data',
@@ -50,10 +48,3 @@ export const roleSchema = z.object({
 })
 
 export type FormRole = z.infer<typeof roleSchema>
-
-export type Permission = {
-  id: string
-  title: string
-  category: Category
-  type: (typeof ROLE_TYPES)[keyof typeof ROLE_TYPES]
-}

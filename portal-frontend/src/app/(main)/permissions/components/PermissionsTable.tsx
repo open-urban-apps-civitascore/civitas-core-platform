@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Button } from '@/components/ui/button'
-import { Permission } from '@/types/roles'
+import { Permission } from '@/types/permissions'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
@@ -52,7 +52,7 @@ export const PermissionsTable = (props: PermissionsTableProps) => {
     }),
     columnHelper.accessor('category', {
       header: () => t('tableHeaders.category'),
-      cell: info => info.getValue(),
+      cell: info => info.getValue().title,
     }),
     {
       id: 'action',
