@@ -6,17 +6,6 @@ import net.kaczmarzyk.spring.data.jpa.domain.*;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Or;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 
-/**
- * User filtering specification.
- *
- * <p>Supported query parameters: - id: exact match (supports comma-separated list) - email: exact
- * match (case-insensitive) - firstName: partial match (case-insensitive) - lastName: partial match
- * (case-insensitive) - active: exact match (true/false) - externalId: exact match - createdAtFrom:
- * created after date - createdAtTo: created before date - q: search in firstName, lastName, or
- * email
- *
- * <p>Example: GET /api/users?firstName=John&active=true&createdAtFrom=2024-01-01
- */
 @Spec(path = "email", params = "email", spec = EqualIgnoreCase.class)
 interface UserEmailSpec extends TenantAwareSpec<User> {}
 

@@ -5,7 +5,6 @@ import de.civitascore.portal.repository.specification.base.BaseSpec;
 import net.kaczmarzyk.spring.data.jpa.domain.*;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 
-/** Tenant filtering specification. */
 @Spec(path = "name", params = "name", spec = LikeIgnoreCase.class)
 interface TenantNameSpec extends BaseSpec<Tenant> {}
 

@@ -75,17 +75,16 @@ public class TenantController
 
   @Override
   public ResponseEntity<TenantOutputDTO> update(
-          @PathVariable String s, @Valid @RequestBody TenantInputDTO input) {
+      @PathVariable String s, @Valid @RequestBody TenantInputDTO input) {
     return ResponseEntity.noContent().build();
   }
 
   @Override
   public ResponseEntity<TenantOutputDTO> patch(
-          @PathVariable String s, @RequestBody TenantInputDTO input) {
-    return ResponseEntity.noContent().build();  }
+      @PathVariable String s, @RequestBody TenantInputDTO input) {
+    return ResponseEntity.noContent().build();
+  }
 
   @Override
-  public void delete(@PathVariable String s) {
-     }
-
+  public void delete(@PathVariable String s) {}
 }

@@ -5,10 +5,6 @@ import de.civitascore.portal.repository.specification.base.TenantAwareSpec;
 import net.kaczmarzyk.spring.data.jpa.domain.*;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 
-/**
- * Assignment filtering specification. Inherits: id, createdAt, modifiedAt, tenantId from base
- * specs.
- */
 @Spec(path = "role.id", params = "roleId", spec = Equal.class)
 interface AssignmentRoleIdSpec extends TenantAwareSpec<Assignment> {}
 
