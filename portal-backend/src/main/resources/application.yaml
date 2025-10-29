@@ -11,7 +11,7 @@ server:
 
 spring:
   profiles:
-    active: local
+    active: local, postgres
   application:
     name: "CIVITAS/CORE Data Management API"
   security:
@@ -21,6 +21,13 @@ spring:
           jwk-set-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}/protocol/openid-connect/certs"
           # Token issuer validation
           issuer-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}"
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=10000,expireAfterWrite=300s
+    cache-names:
+      - permissions
+      - scopedPermissions
 
 management:
   endpoints:

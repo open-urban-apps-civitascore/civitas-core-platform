@@ -4,6 +4,7 @@ import de.civitascore.portal.controller.exception.SecurityExceptionHandler;
 import de.civitascore.portal.security.CustomJwtAuthenticationConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -14,6 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@EnableJpaAuditing(auditorAwareRef = "auditorAwareImpl")
 public class SecurityConfig {
 
   private final CustomJwtAuthenticationConverter customJwtConverter;
@@ -33,12 +35,13 @@ public class SecurityConfig {
                         "/actuator/health/**",
                         "/actuator/info",
                         "/v2/api-docs/**",
+                        "/v3/api-docs/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html",
                         "/swagger-resources/**",
                         "/webjars/**")
                     .permitAll()
-                    .requestMatchers("/v2/**")
+                    .requestMatchers("/v2/**", "/api/**")
                     .authenticated()
                     .anyRequest()
                     .authenticated())

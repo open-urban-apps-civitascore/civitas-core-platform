@@ -23,7 +23,6 @@ class KeycloakIntegrationTest extends BaseKeycloakIntegrationTest {
     @DisplayName("Should start all required containers successfully")
     void shouldStartContainers() {
       assertThat(postgres.isRunning()).as("PostgreSQL container should be running").isTrue();
-
       assertThat(keycloak.isRunning()).as("Keycloak container should be running").isTrue();
 
       String authServerUrl = keycloak.getAuthServerUrl();
@@ -58,9 +57,7 @@ class KeycloakIntegrationTest extends BaseKeycloakIntegrationTest {
               "/users/me", HttpMethod.GET, new HttpEntity<>(headers), PrincipalUserDetails.class);
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
-
       assertThat(response.getBody()).as("Response body should not be null").isNotNull();
-
       assertThat(response.getBody().getUsername())
           .as("Username should match expected value")
           .isEqualTo("testuser");
