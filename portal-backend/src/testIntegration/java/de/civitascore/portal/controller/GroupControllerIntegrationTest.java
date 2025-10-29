@@ -501,7 +501,6 @@ class GroupControllerIntegrationTest
     }
   }
 
-
   @Nested
   @DisplayName("Edge Cases and Error Handling")
   class EdgeCasesTests {

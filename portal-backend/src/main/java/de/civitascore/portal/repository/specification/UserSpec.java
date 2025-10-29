@@ -33,9 +33,9 @@ interface UserActiveSpec extends TenantAwareSpec<User> {}
 interface UserExternalIdSpec extends TenantAwareSpec<User> {}
 
 @Or({
-        @Spec(path = "firstName", params = "username", spec = LikeIgnoreCase.class),
-        @Spec(path = "lastName", params = "username", spec = LikeIgnoreCase.class),
-        @Spec(path = "email", params = "username", spec = LikeIgnoreCase.class)
+  @Spec(path = "firstName", params = "q", spec = LikeIgnoreCase.class),
+  @Spec(path = "lastName", params = "q", spec = LikeIgnoreCase.class),
+  @Spec(path = "email", params = "q", spec = LikeIgnoreCase.class)
 })
 interface UserQuickSearchSpec extends TenantAwareSpec<User> {}
 

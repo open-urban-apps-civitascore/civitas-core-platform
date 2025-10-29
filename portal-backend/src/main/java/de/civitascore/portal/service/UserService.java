@@ -6,8 +6,6 @@ import de.civitascore.portal.model.input.UserInputDTO;
 import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
-import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +30,6 @@ public class UserService extends TenantAwareService<User, String, UserInputDTO> 
   protected String getEntityName() {
     return "User";
   }
-
 
   @Override
   protected User preSave(User entity) {

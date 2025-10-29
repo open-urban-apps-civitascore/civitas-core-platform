@@ -68,7 +68,7 @@ public class UserController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "ext-123")),
     @Parameter(
-        name = "username",
+        name = "q",
         description = "Search in firstName, lastName, or email (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "john"))

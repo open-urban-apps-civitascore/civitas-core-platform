@@ -6,9 +6,7 @@ import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
-import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -33,22 +31,6 @@ public class DataSpaceService extends TenantAwareService<DataSpace, String, Data
   @Override
   protected String getEntityName() {
     return "DataSpace";
-  }
-
-  public Optional<DataSpace> findByTitle(String name, String tenantId) {
-    return dataSpaceRepository.findByTitleAndTenantId(name, tenantId);
-  }
-
-  public Optional<DataSpace> findByExternalId(String externalId, String tenantId) {
-    return dataSpaceRepository.findByExternalIdAndTenantId(externalId, tenantId);
-  }
-
-  public List<DataSpace> findByOwner(String ownerId, String tenantId) {
-    return dataSpaceRepository.findByOwnerIdAndTenantId(ownerId, tenantId);
-  }
-
-  public List<DataSpace> findRootDataSpaces(String tenantId) {
-    return dataSpaceRepository.findByParentDataSpaceIsNullAndTenantId(tenantId);
   }
 
   @Override

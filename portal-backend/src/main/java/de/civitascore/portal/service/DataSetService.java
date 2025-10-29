@@ -7,9 +7,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -35,18 +33,6 @@ public class DataSetService extends TenantAwareService<DataSet, String, DataSetI
   @Override
   protected String getEntityName() {
     return "DataSet";
-  }
-
-  public Optional<DataSet> findByTitle(String name, String tenantId) {
-    return dataSetRepository.findByTitleAndTenantId(name, tenantId);
-  }
-
-  public Optional<DataSet> findByExternalId(String externalId, String tenantId) {
-    return dataSetRepository.findByExternalIdAndTenantId(externalId, tenantId);
-  }
-
-  public List<DataSet> findByOwner(String ownerId, String tenantId) {
-    return dataSetRepository.findByOwnerIdAndTenantId(ownerId, tenantId);
   }
 
   @Override

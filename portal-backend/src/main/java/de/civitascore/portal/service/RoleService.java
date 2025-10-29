@@ -1,16 +1,13 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.RoleMapper;
-import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -35,18 +32,6 @@ public class RoleService extends TenantAwareService<Role, String, RoleInputDTO> 
   @Override
   protected String getEntityName() {
     return "Role";
-  }
-
-  public Optional<Role> findByTitle(String name, String tenantId) {
-    return roleRepository.findByTitleAndTenantId(name, tenantId);
-  }
-
-  public List<Role> findByType(RoleType type, String tenantId) {
-    return roleRepository.findByRoleTypeAndTenantId(type, tenantId);
-  }
-
-  public List<Role> findDefaultRoles(String tenantId) {
-    return roleRepository.findByIsDefaultTrueAndTenantId(tenantId);
   }
 
   @Override

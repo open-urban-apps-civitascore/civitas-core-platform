@@ -68,11 +68,8 @@ public abstract class BaseControllerIntegrationTest<
     }
   }
 
-  /**
-   * Override this method to perform additional cleanup for specific entities.
-   */
-  protected void performAdditionalCleanup() {
-  }
+  /** Override this method to perform additional cleanup for specific entities. */
+  protected void performAdditionalCleanup() {}
 
   protected HttpHeaders createAuthHeaders() {
     String token = getValidAccessToken();
