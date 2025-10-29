@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -73,17 +74,18 @@ public class TenantController
   }
 
   @Override
-  public ResponseEntity<TenantOutputDTO> update(String s, TenantInputDTO input) {
-    return super.update(s, input);
+  public ResponseEntity<TenantOutputDTO> update(
+          @PathVariable String s, @Valid @RequestBody TenantInputDTO input) {
+    return ResponseEntity.noContent().build();
   }
 
   @Override
-  public ResponseEntity<TenantOutputDTO> patch(String s, TenantInputDTO input) {
-    return super.patch(s, input);
-  }
+  public ResponseEntity<TenantOutputDTO> patch(
+          @PathVariable String s, @RequestBody TenantInputDTO input) {
+    return ResponseEntity.noContent().build();  }
 
   @Override
-  public void delete(String s) {
-    super.delete(s);
-  }
+  public void delete(@PathVariable String s) {
+     }
+
 }
