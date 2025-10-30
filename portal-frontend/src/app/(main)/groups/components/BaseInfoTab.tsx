@@ -10,7 +10,7 @@ import { FieldErrors, useForm } from 'react-hook-form'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { Select } from '@/components/form/fields/Select'
+import { AutoComplete, SelectItem } from '@/components/form/fields/AutoComplete'
 import { TextArea } from '@/components/form/fields/TextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { Form } from '@/components/ui/form'
@@ -23,8 +23,11 @@ import {
   GroupTabProps,
   UpdateGroupData,
 } from '@/types/groups'
+import { UserResponse } from '@/types/users'
 
 import { createGroup, updateGroup } from '../actions'
+
+const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 const getGroupBaseInfo = (groupData: Group): GroupBaseInfo => ({
   id: groupData.id,
@@ -52,8 +55,10 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
   const router = useRouter()
-  const availableContacts: { value: string; label: string }[] = []
   const [isLoading, setIsLoading] = useState(false)
+  const [isContactListOpen, setIsContactListOpen] = useState(false)
+  const [contacts, setContacts] = useState<SelectItem[]>([])
+  const [searchString, setSearchString] = useState('')
 
   const form = useForm<GroupBaseInfo>({
     resolver: zodResolver(GroupBaseInfoSchema),
@@ -64,6 +69,10 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
     form.reset(getGroupBaseInfo(groupData))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupData])
+
+  useEffect(() => {
+    console.log(contacts)
+  }, [contacts])
 
   const handleCreateGroup = async (formData: GroupBaseInfo) => {
     try {
@@ -104,9 +113,39 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const handleSubmit = isEditMode ? handleUpdateGroup : handleCreateGroup
   const handleValidationErrors = (errors: FieldErrors<Group>) => console.error('Validation errors: ', errors)
 
-  const handleContactChange = (_value: string) => {
-    form.setValue('contact', { id: '', displayName: '' })
+  const handleSelectContact = (newSelection: SelectItem) => {
+    form.setValue('contact', { id: newSelection.value, displayName: newSelection.label })
   }
+
+  const getContacts = async (searchString: string) => {
+    try {
+      const queryParam = `displayName_like=${searchString}`
+      const usersResponse = await fetch(`${URL}/users?${queryParam}`)
+      if (!usersResponse.ok) {
+        throw new Error('Error fetching contacts data')
+      }
+
+      const contactsData: UserResponse[] = await usersResponse.json()
+      const contacts = contactsData.map(contact => ({ value: contact.id, label: contact.displayName }))
+
+      return contacts
+    } catch (error) {
+      console.error('Error fetching contacts data:', error)
+      throw new Error('Error fetching contacts data')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleContactInputChange = async (value: string) => {
+    if (value.length >= 3) {
+      setSearchString(value)
+      const contacts = await getContacts(value)
+      setContacts(contacts)
+      setIsContactListOpen(true)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -153,16 +192,19 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
             />
           </DetailsFieldContainer>
           <DetailsFieldContainer className="border-0">
-            <Select
+            <AutoComplete
+              id="contact"
+              isOpen={isContactListOpen}
+              listItems={contacts}
               form={form}
-              id="contactSelect"
-              label={t('details.contact')}
               name="contact"
               placeholder={t('details.contact')}
-              options={availableContacts}
-              className={isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]'}
-              onChange={handleContactChange}
-              disabled
+              label={t('details.contact')}
+              required={true}
+              onOpenChange={setIsContactListOpen}
+              onInputChange={handleContactInputChange}
+              onSelectItem={handleSelectContact}
+              input={searchString}
             />
           </DetailsFieldContainer>
         </ContentCard>
