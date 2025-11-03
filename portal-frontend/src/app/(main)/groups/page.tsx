@@ -17,6 +17,8 @@ import { Group } from '@/types/groups'
 
 import GroupsTable from './components/GroupsTable'
 
+const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {
     const sortingId = sorting[0]?.id
@@ -39,7 +41,7 @@ const GroupsPage = () => {
     setSortingParams,
     setPaginationParams,
     setSearchParam,
-    setApiRequestParams,
+    getApiRequestParamsByUrl,
     pageIndex,
     pageSize,
     sorting,
@@ -48,10 +50,15 @@ const GroupsPage = () => {
 
   const totalPages = Math.ceil(rowCount / pageSize)
 
-  const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+  useEffect(() => {
+    if (totalPages && totalPages > 0 && pageIndex + 1 > totalPages) {
+      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages, pageIndex, pageSize])
 
   const getGroupsData = async () => {
-    const params = setApiRequestParams(totalPages)
+    const params = getApiRequestParamsByUrl()
 
     try {
       setIsLoading(true)
@@ -81,17 +88,17 @@ const GroupsPage = () => {
   useEffect(() => {
     getGroupsData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
+  }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
 
   const handleRowClick = (row: Row<Group>) => {
     if (row.id && !row.original.parent) {
-      const params = setApiRequestParams(totalPages)
+      const params = getApiRequestParamsByUrl()
       router.push(`groups/${row.id}?${params}`)
     }
   }
 
   const CustomElement = () => {
-    const params = setApiRequestParams(totalPages)
+    const params = getApiRequestParamsByUrl()
     return (
       <Button onClick={() => router.push(`groups/create?${params}`)}>
         <Plus />

@@ -84,31 +84,42 @@ export const useQueryParams = () => {
     router.push(`${pathname}?${params.toString()}`)
   }
 
-  const setApiRequestParams = useCallback(
-    (totalPages?: number) => {
-      const apiParams = new URLSearchParams()
-      apiParams.set(QUERY_PARAMS.pageIndex, String(pageIndex + 1))
-      if (totalPages && totalPages > 0 && pageIndex + 1 > totalPages) {
-        setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
-      }
-      apiParams.set(QUERY_PARAMS.pageSize, String(pageSize))
-      if (sorting[0]) {
-        apiParams.set(QUERY_PARAMS.sortingId, sorting[0].id)
-        apiParams.set(QUERY_PARAMS.order, sorting[0].desc ? 'desc' : 'asc')
-      }
-      if (search) {
-        apiParams.set(QUERY_PARAMS.search, search)
-      }
-      return apiParams
-    },
-    [pageIndex, pageSize, search, setPaginationParams, sorting],
-  )
+  type ApiRequestParams = {
+    pageIndex: number
+    pageSize: number
+    search?: string
+    sorting?: SortingState
+  }
+
+  const getApiRequestParams = useCallback((params: ApiRequestParams) => {
+    const apiParams = new URLSearchParams()
+    apiParams.set(QUERY_PARAMS.pageIndex, String(params.pageIndex + 1))
+    apiParams.set(QUERY_PARAMS.pageSize, String(params.pageSize))
+    if (params.sorting?.[0]) {
+      apiParams.set(QUERY_PARAMS.sortingId, params.sorting[0].id)
+      apiParams.set(QUERY_PARAMS.order, params.sorting[0].desc ? 'desc' : 'asc')
+    }
+    if (params.search) {
+      apiParams.set(QUERY_PARAMS.search, params.search)
+    }
+    return apiParams
+  }, [])
+
+  const getApiRequestParamsByUrl = useCallback(() => {
+    return getApiRequestParams({
+      pageIndex,
+      pageSize,
+      search,
+      sorting,
+    })
+  }, [pageIndex, pageSize, search, sorting, getApiRequestParams])
 
   return {
     setSearchParam,
     setSortingParams,
     setPaginationParams,
-    setApiRequestParams,
+    getApiRequestParams,
+    getApiRequestParamsByUrl,
     setTabValueParam,
     setSubTabValueParam,
     pageIndex,

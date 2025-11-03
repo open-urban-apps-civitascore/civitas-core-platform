@@ -5,7 +5,7 @@ import { CreateUserData, UpdateUserData } from '@/types/users'
 const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
 export const createUser = async (userData: CreateUserData) => {
-  console.log('User gespeichert:', userData)
+  console.log('User saved:', userData)
 
   try {
     const response = await fetch(`${URL}/users`, {

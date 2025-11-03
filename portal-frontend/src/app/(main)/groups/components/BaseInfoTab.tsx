@@ -169,8 +169,8 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
         <ActionButtons
           onCancelClick={() => form.reset()}
           confirmButtonType="submit"
-          isConfirmButtonDisabled={!form.formState.isDirty}
-          isCancelButtonDisabled={!form.formState.isDirty}
+          isConfirmButtonDisabled={!form.formState.isDirty || isLoading}
+          isCancelButtonDisabled={!form.formState.isDirty || isLoading}
         />
       </form>
     </Form>

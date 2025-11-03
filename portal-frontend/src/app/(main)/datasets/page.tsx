@@ -87,7 +87,7 @@ const DatasetsPage = () => {
     setSortingParams,
     setPaginationParams,
     setSearchParam,
-    setApiRequestParams,
+    getApiRequestParamsByUrl,
     pageIndex,
     pageSize,
     sorting,
@@ -99,7 +99,7 @@ const DatasetsPage = () => {
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
   useEffect(() => {
-    const params = setApiRequestParams(totalPages)
+    const params = getApiRequestParamsByUrl(totalPages)
 
     const getDatasets = async () => {
       try {
@@ -116,7 +116,7 @@ const DatasetsPage = () => {
       }
     }
     getDatasets()
-  }, [pageIndex, pageSize, URL, rowCount, sorting, search, setApiRequestParams, totalPages])
+  }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl, totalPages])
 
   const CustomElement = (
     <Button>
