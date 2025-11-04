@@ -15,6 +15,7 @@ import { TextArea } from '@/components/form/fields/TextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { Form } from '@/components/ui/form'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { cn } from '@/lib/utils'
 import {
   CreateGroupData,
   Group,
@@ -28,6 +29,7 @@ import { UserResponse } from '@/types/users'
 import { createGroup, updateGroup } from '../actions'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+const MIN_LENGTH = 2
 
 const getGroupBaseInfo = (groupData: Group): GroupBaseInfo => ({
   id: groupData.id,
@@ -126,7 +128,15 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
       }
 
       const contactsData: UserResponse[] = await usersResponse.json()
-      const contacts = contactsData.map(contact => ({ value: contact.id, label: contact.displayName }))
+      const contacts = contactsData.map(contact => ({
+        value: contact.id,
+        label: (
+          <div>
+            <p>{contact.displayName}</p>
+            <p className="font-xs opacity-60">{contact.email}</p>
+          </div>
+        ),
+      }))
 
       return contacts
     } catch (error) {
@@ -138,11 +148,13 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   }
 
   const handleContactInputChange = async (value: string) => {
-    if (value.length >= 3) {
-      setSearchString(value)
+    setSearchString(value)
+    if (value.length >= MIN_LENGTH) {
       const contacts = await getContacts(value)
       setContacts(contacts)
       setIsContactListOpen(true)
+    } else {
+      setContacts([])
     }
   }
 
@@ -191,20 +203,23 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               required
             />
           </DetailsFieldContainer>
-          <DetailsFieldContainer className="border-0">
+          <DetailsFieldContainer className="border-0 relative">
             <AutoComplete
+              className={cn('gap-2', isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]')}
               id="contact"
+              popoverContentProps={{ className: 'w-[var(--radix-popover-trigger-width)]' }}
               isOpen={isContactListOpen}
               listItems={contacts}
               form={form}
               name="contact"
-              placeholder={t('details.contact')}
-              label={t('details.contact')}
+              placeholder={t('details.contact.placeholder')}
+              label={t('details.contact.label')}
               required={true}
               onOpenChange={setIsContactListOpen}
               onInputChange={handleContactInputChange}
               onSelectItem={handleSelectContact}
               input={searchString}
+              minLength={MIN_LENGTH}
             />
           </DetailsFieldContainer>
         </ContentCard>

@@ -3,6 +3,7 @@ import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 interface TextFieldProps<T extends FieldValues>
   extends Omit<InputHTMLAttributes<HTMLInputElement>, 'form' | 'onChange'> {
@@ -22,7 +23,7 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
       control={form.control}
       name={name}
       render={({ field }) => (
-        <FormItem className={formItemProps?.className}>
+        <FormItem className={cn(' gap-y-0', formItemProps?.className)}>
           <FormLabel>
             {label}
             {required && <span className="text-red-500 ml-1">*</span>}

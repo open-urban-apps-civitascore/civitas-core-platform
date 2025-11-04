@@ -16,7 +16,9 @@
       "invalidEmail": "Ungültige E-Mail Adresse",
       "required": "Dieses Feld ist erforderlich",
       "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
-      "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein."
+      "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
+      "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
+      "notFound": "Keine {items} gefunden"
     }
   },
   "languages": {
@@ -128,7 +130,7 @@
       "baseInfo": "Basisinformationen",
       "name": "Name der Gruppe",
       "description": "Beschreibung der Gruppe",
-      "contact": "Ansprechpartner"
+      "contact": { "label": "Ansprechpartner", "placeholder": "Nach Name oder Email suchen" }
     },
     "roles": {
       "groupInfo": "Gruppe Informationen",
