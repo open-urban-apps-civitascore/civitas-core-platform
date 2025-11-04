@@ -43,7 +43,31 @@ export const updateGroup = async (updateGroupData: UpdateGroupData) => {
     }
 
     const data = await response.json()
-    console.log('successfully updated user:', data)
+    console.log('successfully updated group:', data)
+    return data
+  } catch (error) {
+    console.error('An error occurred while updating the user:', error)
+    throw new Error(JSON.stringify(error, null, 4))
+  }
+}
+
+export const patchGroupUsers = async (groupId: string, updateUserData: { id: string; assignedAt: string }[]) => {
+  try {
+    const response = await fetch(`${URL}/groups/${groupId}`, {
+      method: 'PATCH',
+      headers: {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ users: updateUserData }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! ${JSON.stringify(response)}`)
+    }
+
+    const data = await response.json()
+    console.log('successfully updated group:', data)
     return data
   } catch (error) {
     console.error('An error occurred while updating the user:', error)

@@ -31,6 +31,7 @@ interface RolesCategoryProps extends DetailsFieldContainerProps {
 export const RoleCategory = (props: RolesCategoryProps) => {
   const { category, title, groupRoles, allRoles, onAddRole, onRemoveRole, className } = props
   const t = useTranslations('groups')
+  const tCommon = useTranslations('common')
   const [isSaving, _setIsSaving] = useState(false)
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false)
 
@@ -93,7 +94,7 @@ export const RoleCategory = (props: RolesCategoryProps) => {
                         disabled={isSaving}
                         size="sm"
                       >
-                        {t('roles.addRoleDialog.addButton')}
+                        {tCommon('actions.add')}
                       </Button>
                     </div>
                   ))}

@@ -1,6 +1,13 @@
 import { FormUser } from '@/app/(main)/users/components/UserForm'
-import { ListUser } from '@/app/(main)/users/page'
-import { Authority, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+import {
+  Authority,
+  GroupAssignmentUser,
+  GroupListUser,
+  ListUser,
+  UserFormData,
+  UserFormSchema,
+  UserResponse,
+} from '@/types/users'
 
 export const mapListUsers = (
   users: UserResponse[],
@@ -17,7 +24,36 @@ export const mapListUsers = (
       department: department?.title ?? '',
       roles: user.roles.map(roleId => rolesMap[roleId]),
       email: user.email,
-      isactive: user.active,
+      isActive: user.active,
+    }
+  })
+
+export const mapGroupListUsers = (
+  users: UserResponse[],
+  authorities: Authority[],
+  userAssignments: { id: string; assignedAt: string }[],
+): GroupListUser[] =>
+  users.map(user => {
+    const authority = authorities.find(authority => user.authority?.id === authority.id)
+    const department = authority?.departments.find(department => department.id === user.authority?.department?.id)
+    return {
+      id: user.id,
+      displayName: user.displayName,
+      authority: authority?.title ?? '',
+      department: department?.title ?? '',
+      email: user.email,
+      isActive: user.active,
+      assignedAt: userAssignments.find(assignment => assignment.id === user.id)?.assignedAt ?? '',
+    }
+  })
+
+export const mapGoupAssignmentUsers = (users: UserResponse[]): GroupAssignmentUser[] =>
+  users.map(user => {
+    return {
+      id: user.id,
+      displayName: user.displayName,
+      email: user.email,
+      isActive: user.active,
     }
   })
 

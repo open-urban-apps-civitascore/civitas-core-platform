@@ -40,13 +40,16 @@ export const TabsSection = (props: TabSectionProps) => {
             variant="ghost"
             key={tab.value}
             onClick={() => onClick(tab.value)}
-            className={`h-full text-center text-sm font-medium ${isSubTabsSection ? subTabsStyles(tab) : tabsStyles(tab)}`}
+            className={cn(
+              'h-full text-center text-sm font-medium disabled:pointer-events-auto disabled:cursor-not-allowed',
+              isSubTabsSection ? subTabsStyles(tab) : tabsStyles(tab),
+            )}
             style={{ margin: 0 }}
             id={`heading-${tab.value}`}
             role="tab"
             aria-selected={selectedTab === tab.value}
             tabIndex={0}
-            disabled={!tab.isActive}
+            disabled={tab.isActive === false}
           >
             {tab.label}
           </Button>

@@ -1,26 +1,20 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { Skeleton } from '@/components/ui/skeleton'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Group } from '@/types/groups'
 
 import { BaseInfoTab } from './BaseInfoTab'
-import { RolesTab } from './RolesTab'
-
-const LoadingSkeleton = () => (
-  <div>
-    <Skeleton />
-    <Skeleton />
-  </div>
-)
+import { RolesTab } from './roles-tab/RolesTab'
+import { UsersTab } from './users-tab/UsersTab'
 
 interface GroupDetailsProps {
   title: string
@@ -57,17 +51,20 @@ const GroupDetails = (props: GroupDetailsProps) => {
 
   const tabs = Object.values(tabValues)
 
+  const defaultTab = tabValues.info.value
+
+  const isBlockedTab = useMemo(() => !isEditMode && subTabValue !== defaultTab, [isEditMode, subTabValue, defaultTab])
+
   useEffect(() => {
-    if (!subTabValue) {
+    if (!subTabValue || isBlockedTab) {
       setSubTabValueParam(tabs[0].value)
     }
-  }, [subTabValue, tabs, setSubTabValueParam])
+  }, [subTabValue, tabs, setSubTabValueParam, isBlockedTab])
 
-  let Content = <LoadingSkeleton />
-
+  let Content = <LoadingSpinner className="h-full" />
   if (!groupData) {
     Content = <ContentCard>No data</ContentCard>
-  } else {
+  } else if (!isBlockedTab) {
     switch (subTabValue) {
       case tabValues.info.value:
         Content = <BaseInfoTab isEditMode={isEditMode} groupData={groupData} />
@@ -76,20 +73,22 @@ const GroupDetails = (props: GroupDetailsProps) => {
         Content = <RolesTab groupData={groupData} />
         break
       case tabValues.users.value:
+        Content = <UsersTab groupData={groupData} />
+        break
       case tabValues.subgroups.value:
         Content = <ContentCard>{tabValues[subTabValue as keyof typeof tabValues].label}</ContentCard>
         break
       default:
         break
     }
-
-    return (
-      <PageContainer headerType="withSubTabs">
-        <PageHeader title={title} subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: setSubTabValueParam }} />
-        <PageBackground>{Content}</PageBackground>
-      </PageContainer>
-    )
   }
+
+  return (
+    <PageContainer headerType="withSubTabs">
+      <PageHeader title={title} subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: setSubTabValueParam }} />
+      <PageBackground>{Content}</PageBackground>
+    </PageContainer>
+  )
 }
 
 export default GroupDetails

@@ -26,6 +26,17 @@ export type RoleInput = Omit<RoleResponse, 'id'>
 
 export type RoleUpdate = RoleResponse
 
+export type Role = {
+  id: string
+  name: string
+  description: string
+  tenant: string
+  type: string
+  permissions: string[]
+  user: string[]
+  createdAt: string
+}
+
 export const roleSchema = z.object({
   name: z
     .string()

@@ -1,5 +1,7 @@
 import { ReactNode } from 'react'
 
+import { cn } from '@/lib/utils'
+
 import { SearchField, SearchFieldProps } from '../searchField/SearchField'
 
 interface SearchHeaderProps extends SearchFieldProps {
@@ -7,9 +9,11 @@ interface SearchHeaderProps extends SearchFieldProps {
 }
 
 export const SearchHeader = (props: SearchHeaderProps) => {
-  const { customElement, ...searchFieldProps } = props
+  const { customElement, className, ...searchFieldProps } = props
   return (
-    <div className="flex justify-between items-end bg-muted  h-[calc(var(--search-height))] pb-[calc(--spacing(4))]">
+    <div
+      className={cn('flex justify-between items-end h-[calc(var(--search-height))] pb-[calc(--spacing(4))]', className)}
+    >
       <SearchField {...searchFieldProps} />
       {customElement}
     </div>

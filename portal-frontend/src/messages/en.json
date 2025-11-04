@@ -7,7 +7,8 @@
     "actions": {
       "submit": "Save",
       "cancel": "Cancel",
-      "delete": "Delete"
+      "delete": "Delete",
+      "add": "Add"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
@@ -99,8 +100,7 @@
       "userNotFound": "User not found",
       "addRoleDialog": {
         "title": "Add Role - {category}",
-        "description": "Select a role to add to the user from the available {category} roles.",
-        "addButton": "Add"
+        "description": "Select a role to add to the user from the available {category} roles."
       }
     }
   },
@@ -134,9 +134,15 @@
       "userNotFound": "User not found",
       "addRoleDialog": {
         "title": "Add Role - {category}",
-        "description": "Select a role to add to the user from the available {category} roles.",
-        "addButton": "Add"
+        "description": "Select a role to add to the user from the available {category} roles."
       }
+    },
+    "users": {
+      "assign": "Assign User",
+      "toGroup": "to group",
+      "assignedAt": "Member since",
+      "noUsers": "No Users",
+      "noUsersSub": "No users assigned to this group"
     }
   },
   "pagination": {
