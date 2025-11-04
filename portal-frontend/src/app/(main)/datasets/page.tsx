@@ -11,6 +11,7 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
+import { isPageIndexHigherThanTotalPages } from '@/utils/table'
 
 import DatasetsTable from './components/DatasetsTable'
 
@@ -96,10 +97,17 @@ const DatasetsPage = () => {
 
   const totalPages = Math.ceil(rowCount / pageSize)
 
+  useEffect(() => {
+    if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
+      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages, pageIndex, pageSize])
+
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
   useEffect(() => {
-    const params = getApiRequestParamsByUrl(totalPages)
+    const params = getApiRequestParamsByUrl()
 
     const getDatasets = async () => {
       try {
@@ -116,7 +124,7 @@ const DatasetsPage = () => {
       }
     }
     getDatasets()
-  }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl, totalPages])
+  }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
 
   const CustomElement = (
     <Button>

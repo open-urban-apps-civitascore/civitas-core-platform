@@ -14,6 +14,7 @@ import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Group } from '@/types/groups'
+import { isPageIndexHigherThanTotalPages } from '@/utils/table'
 
 import GroupsTable from './components/GroupsTable'
 
@@ -51,7 +52,7 @@ const GroupsPage = () => {
   const totalPages = Math.ceil(rowCount / pageSize)
 
   useEffect(() => {
-    if (totalPages && totalPages > 0 && pageIndex + 1 > totalPages) {
+    if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
       setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
