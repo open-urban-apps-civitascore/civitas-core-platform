@@ -2,8 +2,8 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { FieldErrors, useForm } from 'react-hook-form'
 
@@ -34,19 +34,26 @@ const MIN_LENGTH = 2
 const getGroupBaseInfo = (groupData: Group): GroupBaseInfo => ({
   id: groupData.id,
   title: groupData.title,
-  description: groupData.description,
-  contact: groupData.contact ?? { id: '', displayName: '' },
+  description: groupData.description || '',
+  contact: groupData.contact,
 })
 
-const transformData = (formData: GroupBaseInfo) => {
-  const parsed = GroupBaseInfoSchema.parse(formData)
+const getContactListItems = (contacts: Contact[]) =>
+  contacts.map(contact => ({
+    value: contact.id,
+    label: (
+      <div>
+        <p>{contact.displayName}</p>
+        <p className="font-xs opacity-60">{contact.email}</p>
+      </div>
+    ),
+  }))
 
-  return {
-    ...parsed,
-    contact: parsed.contact?.id ? parsed.contact : null,
-  }
+type Contact = {
+  id: string
+  displayName: string
+  email: string
 }
-
 interface BaseInfoTabProps extends GroupTabProps {
   isEditMode: boolean
 }
@@ -59,30 +66,70 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [isContactListOpen, setIsContactListOpen] = useState(false)
-  const [contacts, setContacts] = useState<SelectItem[]>([])
-  const [searchString, setSearchString] = useState('')
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
+  const [contacts, setContacts] = useState<Contact[]>([])
+  const [contactListItems, setContactListItems] = useState<SelectItem[]>([])
+  const [contactInput, setContactInput] = useState('')
 
   const form = useForm<GroupBaseInfo>({
     resolver: zodResolver(GroupBaseInfoSchema),
     defaultValues: { ...getGroupBaseInfo(groupData) },
   })
 
-  useEffect(() => {
-    form.reset(getGroupBaseInfo(groupData))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupData])
+  const resetAutocomplete = (contact: Contact | null) => {
+    setContacts(contact ? [contact] : [])
+    setContactListItems(getContactListItems(contact ? [contact] : []))
+    setContactInput(contact?.displayName || '')
+  }
 
   useEffect(() => {
-    console.log(contacts)
-  }, [contacts])
+    form.setValue('contact', selectedContact?.id || null)
+  }, [selectedContact, form])
+
+  useEffect(() => {
+    const getInitialContact = async (id: string) => {
+      try {
+        const usersResponse = await fetch(`${URL}/users/${id}`)
+        if (!usersResponse.ok) {
+          throw new Error('Error fetching contacts data')
+        }
+        const contactData: UserResponse = await usersResponse.json()
+        const contact = {
+          id: contactData.id,
+          displayName: contactData.displayName,
+          email: contactData.email,
+        }
+        setSelectedContact(contact)
+        form.reset(getGroupBaseInfo(groupData))
+        resetAutocomplete(contact)
+      } catch (error) {
+        console.error('Error fetching contact data:', error)
+        throw new Error('Error fetching contact data')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (groupData.contact) {
+      getInitialContact(groupData.contact)
+    } else {
+      form.reset(getGroupBaseInfo(groupData))
+    }
+  }, [groupData, form])
 
   const handleCreateGroup = async (formData: GroupBaseInfo) => {
     try {
       setIsLoading(true)
-      const transformedGroupData = transformData(formData)
       // eslint-disable-next-line unused-imports/no-unused-vars
-      const { id, ...groupData } = transformedGroupData
-      const createGroupData: CreateGroupData = { ...groupData, parent: null, roles: [], subgroups: [], users: [] }
+      const { id, ...groupData } = formData
+      const createGroupData: CreateGroupData = {
+        ...groupData,
+        description: groupData.description,
+        parent: null,
+        roles: [],
+        subgroups: [],
+        users: [],
+      }
       const response = await createGroup(createGroupData)
       router.push(`/groups/${response.id}`)
     } catch (error) {
@@ -95,9 +142,9 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const handleUpdateGroup = async (formData: GroupBaseInfo) => {
     try {
       setIsLoading(true)
-      const transformedGroupData = transformData(formData)
       const updateGroupData: UpdateGroupData = {
-        ...transformedGroupData,
+        ...formData,
+        description: formData.description,
         parent: groupData.parent,
         roles: groupData.roles,
         subgroups: groupData.subgroups,
@@ -112,13 +159,6 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
     }
   }
 
-  const handleSubmit = isEditMode ? handleUpdateGroup : handleCreateGroup
-  const handleValidationErrors = (errors: FieldErrors<Group>) => console.error('Validation errors: ', errors)
-
-  const handleSelectContact = (newSelection: SelectItem) => {
-    form.setValue('contact', { id: newSelection.value, displayName: newSelection.label })
-  }
-
   const getContacts = async (searchString: string) => {
     try {
       const queryParam = `displayName_like=${searchString}`
@@ -126,18 +166,12 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
       if (!usersResponse.ok) {
         throw new Error('Error fetching contacts data')
       }
-
       const contactsData: UserResponse[] = await usersResponse.json()
       const contacts = contactsData.map(contact => ({
-        value: contact.id,
-        label: (
-          <div>
-            <p>{contact.displayName}</p>
-            <p className="font-xs opacity-60">{contact.email}</p>
-          </div>
-        ),
+        id: contact.id,
+        displayName: contact.displayName,
+        email: contact.email,
       }))
-
       return contacts
     } catch (error) {
       console.error('Error fetching contacts data:', error)
@@ -147,16 +181,45 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
     }
   }
 
+  const updateContactList = async (value: string) => {
+    setContactInput(value)
+    const contacts = await getContacts(value)
+    const listItems = getContactListItems(contacts)
+    setContacts(contacts)
+    setContactListItems(listItems)
+  }
+
   const handleContactInputChange = async (value: string) => {
-    setSearchString(value)
-    if (value.length >= MIN_LENGTH) {
-      const contacts = await getContacts(value)
-      setContacts(contacts)
-      setIsContactListOpen(true)
+    setIsContactListOpen(true)
+    if (value.trim().length >= MIN_LENGTH) {
+      updateContactList(value)
     } else {
+      setContactInput(value)
+      form.setValue('contact', null)
+      setSelectedContact(null)
       setContacts([])
+      setContactListItems([])
     }
   }
+
+  const handleSelectContact = (newSelection: SelectItem) => {
+    form.setValue('contact', newSelection.value, { shouldDirty: true })
+    const selectedContact = contacts.find(contact => contact.id === newSelection.value)
+    if (selectedContact) {
+      setSelectedContact(selectedContact)
+      setContactInput(selectedContact.displayName)
+      updateContactList(selectedContact.displayName)
+    }
+  }
+
+  const handleAutocompleteBlur = () => {
+    if (selectedContact && contactInput !== selectedContact?.displayName) {
+      updateContactList(selectedContact?.displayName)
+    }
+  }
+
+  const handleSubmit = isEditMode ? handleUpdateGroup : handleCreateGroup
+  const handleValidationErrors = (errors: FieldErrors<Group>) => console.error('Validation errors: ', errors)
 
   if (isLoading) {
     return (
@@ -200,7 +263,6 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               formItemProps={{
                 className: isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]',
               }}
-              required
             />
           </DetailsFieldContainer>
           <DetailsFieldContainer className="border-0 relative">
@@ -209,24 +271,24 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               id="contact"
               popoverContentProps={{ className: 'w-[var(--radix-popover-trigger-width)]' }}
               isOpen={isContactListOpen}
-              listItems={contacts}
+              listItems={contactListItems}
               form={form}
               name="contact"
               placeholder={t('details.contact.placeholder')}
               label={t('details.contact.label')}
-              required={true}
+              inputValue={contactInput}
+              minLength={MIN_LENGTH}
               onOpenChange={setIsContactListOpen}
               onInputChange={handleContactInputChange}
               onSelectItem={handleSelectContact}
-              input={searchString}
-              minLength={MIN_LENGTH}
+              onBlur={handleAutocompleteBlur}
             />
           </DetailsFieldContainer>
         </ContentCard>
         <ActionButtons
           onCancelClick={() => form.reset()}
           confirmButtonType="submit"
-          isConfirmButtonDisabled={!form.formState.isDirty}
+          isConfirmButtonDisabled={!form.formState.isDirty && form.getValues().contact === groupData.contact}
           isCancelButtonDisabled={!form.formState.isDirty}
         />
       </form>

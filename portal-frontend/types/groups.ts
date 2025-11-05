@@ -6,7 +6,7 @@ export type Group = {
   description: string
   roles: string[]
   users: { id: string; assignedAt: string }[]
-  contact: { id: string; displayName: string } | null
+  contact: string | null
   parent: string | null
   subgroups: Group[]
 }
@@ -24,13 +24,8 @@ export const GroupBaseInfoSchema = z.object({
   title: z.string().min(2, {
     message: 'common.errors.atLeast2',
   }),
-  description: z.string().min(10, {
-    message: 'common.errors.atLeast10',
-  }),
-  contact: z.object({
-    id: z.string(),
-    displayName: z.string(),
-  }),
+  description: z.string(),
+  contact: z.string().nullable(),
 })
 
 export type GroupBaseInfo = z.infer<typeof GroupBaseInfoSchema>

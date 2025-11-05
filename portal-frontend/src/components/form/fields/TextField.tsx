@@ -31,7 +31,7 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
           <FormControl>
             <Input placeholder={placeholder} {...field} disabled={disabled} />
           </FormControl>
-          <FormMessage />
+          <FormMessage className="mt-2" />
         </FormItem>
       )}
     />
