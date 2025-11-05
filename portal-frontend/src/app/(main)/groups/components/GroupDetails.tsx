@@ -12,6 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Group } from '@/types/groups'
 
+import Image from 'next/image'
+import Icon from '../../../../../public/svg/info.svg'
 import { BaseInfoTab } from './BaseInfoTab'
 import { RolesTab } from './roles-tab/RolesTab'
 import { UsersTab } from './users-tab/UsersTab'
@@ -94,7 +96,15 @@ const GroupDetails = (props: GroupDetailsProps) => {
   return (
     <PageContainer headerType="withSubTabs">
       <PageHeader title={title} subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: setSubTabValueParam }} />
-      <PageBackground>{Content}</PageBackground>
+      <PageBackground className="flex flex-col">
+        {!isEditMode && (
+          <ContentCard className="flex gap-2 p-4 mb-5 text-sm">
+            <Image src={Icon} alt="Info icon" width={20} height={20} />
+            {t('createHint')}
+          </ContentCard>
+        )}
+        {Content}
+      </PageBackground>
     </PageContainer>
   )
 }

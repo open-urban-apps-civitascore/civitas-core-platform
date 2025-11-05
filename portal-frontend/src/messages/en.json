@@ -114,6 +114,7 @@
     "createGroup": "Create Group",
     "search": "Filter...",
     "notFound": "Group not found",
+    "createHint": "Please fill in the base information for activating roles, users and user groups.",
     "list": {
       "id": "ID",
       "title": "Name",

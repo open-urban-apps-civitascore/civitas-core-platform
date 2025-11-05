@@ -113,6 +113,7 @@
     "createGroup": "Gruppe erstellen",
     "search": "Filtern...",
     "notFound": "Gruppe nicht gefunden",
+    "createHint": "Bitte die Basisinformationen ausfüllen, um Rollen, User und Untergruppen zu aktivieren.",
     "list": {
       "id": "ID",
       "title": "Name",
