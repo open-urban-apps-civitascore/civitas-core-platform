@@ -38,20 +38,21 @@ const PermissionsPage = () => {
     setSortingParams,
     setPaginationParams,
     setSearchParam,
-    setApiRequestParams,
+    getApiRequestParamsByUrl,
     setTabValueParam,
+    setTotalPages,
     pageIndex,
     pageSize,
     sorting,
     search,
     tabValue,
+    totalPages,
   } = useQueryParams()
 
   const [permissionType, setPermissionsType] = useState<string>(tabValue || DEFAULT_TAB)
-  const totalPages = Math.ceil(rowCount / pageSize)
 
   const getPermissions = async () => {
-    const params = setApiRequestParams(totalPages)
+    const params = getApiRequestParamsByUrl()
 
     try {
       setIsLoading(true)
@@ -70,6 +71,7 @@ const PermissionsPage = () => {
       const totalCount = Number(permissionResponse.headers.get('X-Total-Count')) || 0
       if (rowCount !== totalCount) {
         setRowCount(totalCount)
+        setTotalPages(Math.ceil(totalCount / pageSize) || 1)
       }
     } catch (error) {
       console.error(error)

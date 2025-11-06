@@ -43,14 +43,14 @@ const RolesPage = () => {
     setSearchParam,
     getApiRequestParamsByUrl,
     setTabValueParam,
+    setTotalPages,
     pageIndex,
     pageSize,
     sorting,
     search,
     tabValue,
+    totalPages,
   } = useQueryParams()
-
-  const totalPages = Math.ceil(rowCount / pageSize)
 
   useEffect(() => {
     if (totalPages && totalPages > 0 && pageIndex + 1 > totalPages) {
@@ -76,14 +76,15 @@ const RolesPage = () => {
       if (rowCount !== totalCount) {
         setRowCount(totalCount)
       }
-
+      setTotalPages(Math.ceil(totalCount / pageSize) || 1)
       setIsLoading(false)
     } catch (error) {
       console.error(error)
 
       setIsLoading(false)
     }
-  }, [getApiRequestParamsByUrl, selectedRoleType, rowCount])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getApiRequestParamsByUrl, selectedRoleType, rowCount, pageSize])
 
   useEffect(() => {
     getRoles()
