@@ -10,6 +10,10 @@ public class AppConfig {
 
     private final Properties properties;
 
+    public AppConfig(Properties properties) {
+		this.properties = properties;
+    }
+
     public AppConfig(String configFile) {
         this.properties = new Properties();
         try (InputStream input = getClass().getClassLoader().getResourceAsStream(configFile)) {
@@ -38,8 +42,8 @@ public class AppConfig {
         return adapterClasses;
     }
 
-    public String getConsumerClass() {
-        return properties.getProperty("consumer.class");
+    public String getEventHandlerClass() {
+        return properties.getProperty("eventhandler.class");
     }
 
     public String getProperty(String key) {

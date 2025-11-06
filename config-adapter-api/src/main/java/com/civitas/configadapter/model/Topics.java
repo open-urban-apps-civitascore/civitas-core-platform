@@ -6,7 +6,7 @@ public final class Topics {
         // Utility class, prevent instantiation
     }
 
-    // User events
+    // User events   
     public static final String USER_CREATED = "core.civitas.idm.user.created";
     public static final String USER_UPDATED = "core.civitas.idm.user.updated";
     public static final String USER_DELETED = "core.civitas.idm.user.deleted";

@@ -61,7 +61,7 @@ public class Application {
 			throw new RuntimeException("No adapters configured. Please specify 'adapters' or 'adapter.class' property");
 		}
 
-		String consumerClass = config.getConsumerClass();
+		String consumerClass = config.getEventHandlerClass();
 		logger.info("Creating {} adapter(s) with consumer: {}", adapterClasses.size(), consumerClass);
 
 		List<EventConsumer> consumers = new ArrayList<>();

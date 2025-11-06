@@ -17,24 +17,31 @@ import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.config.AppConfig;
 import com.civitas.configadapter.core.CloudEventProcessor;
 import com.civitas.configadapter.messaging.EventConsumer;
+import com.civitas.configadapter.messaging.EventPublisher;
 
 import io.cloudevents.CloudEvent;
 import io.cloudevents.kafka.CloudEventDeserializer;
+import io.cloudevents.kafka.CloudEventSerializer;
 
-public class KafkaEventConsumer implements EventConsumer {
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 
-	private static final Logger logger = LoggerFactory.getLogger(KafkaEventConsumer.class);
+public class KafkaEventHandler implements EventConsumer, EventPublisher {
+
+	private static final Logger logger = LoggerFactory.getLogger(KafkaEventHandler.class);
 
 	private static final String KAFKA_GROUP_ID = "kafka.group.id";
 	private static final String KAFKA_BOOTSTRAP_SERVERS = "kafka.bootstrap.servers";
 
     private final KafkaConsumer<String, CloudEvent> kafkaConsumer;
+    private final KafkaProducer<String, CloudEvent> kafkaProducer;
     private final ConfigAdapter adapter;
     private final CloudEventProcessor processor;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Thread consumerThread;
 
-    public KafkaEventConsumer(AppConfig config, ConfigAdapter adapter) {
+    public KafkaEventHandler(AppConfig config, ConfigAdapter adapter) {
         this.adapter = adapter;
         this.processor = new CloudEventProcessor(adapter);
 
@@ -51,6 +58,19 @@ public class KafkaEventConsumer implements EventConsumer {
 
         List<String> topicList = new ArrayList<>(adapter.getSubscribedTopics());
         kafkaConsumer.subscribe(topicList);
+
+        // Initialize producer for publishing events
+        Properties producerProps = new Properties();
+        producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, config.getProperty(KAFKA_BOOTSTRAP_SERVERS, "localhost:9092"));
+        producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, org.apache.kafka.common.serialization.StringSerializer.class.getName());
+        producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CloudEventSerializer.class.getName());
+        producerProps.put(ProducerConfig.ACKS_CONFIG, "all");
+        producerProps.put(ProducerConfig.RETRIES_CONFIG, 3);
+
+        this.kafkaProducer = new KafkaProducer<>(producerProps);
+
+        // Inject this publisher into the adapter
+        adapter.setEventPublisher(this);
 
         logger.info("Kafka event consumer initialized for adapter {} with {} topic(s): {}",
             adapter.getClass().getSimpleName(), topicList.size(), topicList);
@@ -72,7 +92,7 @@ public class KafkaEventConsumer implements EventConsumer {
 
                 records.forEach(record -> {
                     try {
-                        processor.handleEvent(record.value());
+                        processor.handleEvent(record.topic(), record.value());
                     } catch (Exception e) {
                         logger.error("Error handling CloudEvent: {}", record.value().getId(), e);
                     }
@@ -100,8 +120,32 @@ public class KafkaEventConsumer implements EventConsumer {
     }
 
     @Override
+    public void publish(String topic, CloudEvent event) {
+        try {
+            ProducerRecord<String, CloudEvent> record = new ProducerRecord<>(topic, event.getId(), event);
+            kafkaProducer.send(record, (metadata, exception) -> {
+                if (exception != null) {
+                    logger.error("Failed to publish event {} to topic {}", event.getId(), topic, exception);
+                } else {
+                    logger.debug("Published event {} to topic {} partition {} offset {}",
+                        event.getId(), metadata.topic(), metadata.partition(), metadata.offset());
+                }
+            });
+        } catch (Exception e) {
+            logger.error("Error publishing event {} to topic {}", event.getId(), topic, e);
+        }
+    }
+
+    @Override
     public void close() {
         stop();
+        try {
+            kafkaProducer.flush();
+            kafkaProducer.close();
+            logger.info("Kafka producer closed");
+        } catch (Exception e) {
+            logger.error("Error closing Kafka producer", e);
+        }
         try {
             kafkaConsumer.close();
             logger.info("Kafka consumer closed");

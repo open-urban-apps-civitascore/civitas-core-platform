@@ -1,12 +1,10 @@
 package com.civitas.configadapter.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public record ConfigEvent(
-    @JsonProperty("action") String action,
-    @JsonProperty("realm") String realm,
-    @JsonProperty("resourceType") String resourceType,
-    @JsonProperty("resourceId") String resourceId,
-    @JsonProperty("data") Object data
-) {
-}
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record ConfigEvent (
+    @JsonProperty("metadata") Metadata metadata,
+    @JsonProperty("payload") Payload payload
+) {}
