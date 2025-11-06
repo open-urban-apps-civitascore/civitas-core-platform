@@ -39,7 +39,7 @@ export const UsersTab = (props: UsersTabProps) => {
     setSortingParams,
     setPaginationParams,
     setSearchParam,
-    setApiRequestParams,
+    getApiRequestParamsByUrl,
     pageIndex,
     pageSize,
     sorting,
@@ -50,7 +50,7 @@ export const UsersTab = (props: UsersTabProps) => {
 
   const getUserListData = async () => {
     try {
-      const apiParams = setApiRequestParams()
+      const apiParams = getApiRequestParamsByUrl()
       const idParams = originalUsers.map(user => `id=${user.id}`).join('&')
       const [usersResponse, authoritiesResponse] = await Promise.all([
         fetch(`${URL}/users?${idParams}&${apiParams}`, {
@@ -96,14 +96,13 @@ export const UsersTab = (props: UsersTabProps) => {
       setIsLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, rowCount, sorting, search, totalPages, setApiRequestParams, originalUsers])
+  }, [pageIndex, pageSize, sorting, search, originalUsers])
 
   const handleUpdateGroupUsers = async (userSelection: RowSelectionState) => {
     setIsLoading(true)
     setIsUpdatingGroupUsers(true)
     const selectedUserIds = Object.keys(userSelection).filter(key => userSelection[key])
     const selectedUserInfo = selectedUserIds.map(userId => ({ id: userId, assignedAt: new Date().toISOString() }))
-    console.log(selectedUserIds)
     const updateUserData = selectedUserInfo.concat(originalUsers)
     try {
       await patchGroupUsers(groupData.id, updateUserData)
@@ -123,7 +122,7 @@ export const UsersTab = (props: UsersTabProps) => {
     </Button>
   )
 
-  if (users.length === 0) {
+  if (!isLoading && users.length === 0 && originalUsers.length === 0) {
     return (
       <div className="h-full">
         <NoDataPage

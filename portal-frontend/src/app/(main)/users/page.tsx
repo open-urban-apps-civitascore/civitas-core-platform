@@ -15,9 +15,12 @@ import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Role } from '@/types/roles'
 import { Authority, Category, ListUser, UserResponse } from '@/types/users'
+import { isPageIndexHigherThanTotalPages } from '@/utils/table'
 import { mapListUsers } from '@/utils/users'
 
 import UsersTable from './components/UsersTable'
+
+const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 export type UserAuthority = Category & {
   department: Category
@@ -45,7 +48,7 @@ const UsersPage = () => {
     setSortingParams,
     setPaginationParams,
     setSearchParam,
-    setApiRequestParams,
+    getApiRequestParamsByUrl,
     pageIndex,
     pageSize,
     sorting,
@@ -54,10 +57,15 @@ const UsersPage = () => {
 
   const totalPages = Math.ceil(rowCount / pageSize)
 
-  const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+  useEffect(() => {
+    if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
+      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages, pageIndex, pageSize])
 
   const getUserListData = async () => {
-    const params = setApiRequestParams(totalPages)
+    const params = getApiRequestParamsByUrl()
 
     try {
       setIsLoading(true)
@@ -105,11 +113,11 @@ const UsersPage = () => {
   useEffect(() => {
     getUserListData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, URL, rowCount, sorting, search, totalPages, setApiRequestParams])
+  }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
 
   const handleRowClick = (row: Row<ListUser>) => {
     if (row.id) {
-      const params = setApiRequestParams(totalPages)
+      const params = getApiRequestParamsByUrl()
       router.push(`users/${row.id}?${params}`, {})
     }
   }

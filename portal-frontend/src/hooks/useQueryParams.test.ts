@@ -112,7 +112,7 @@ describe('useQueryParams', () => {
     })
     const { result } = renderHook(() => useQueryParams())
 
-    const params = result.current.setApiRequestParams(5)
+    const params = result.current.getApiRequestParamsByUrl(5)
     expect(params.get(QUERY_PARAMS.pageIndex)).toBe('1')
     expect(params.get(QUERY_PARAMS.pageSize)).toBe('25')
     expect(params.get(QUERY_PARAMS.sortingId)).toBe('title')
@@ -128,7 +128,7 @@ describe('useQueryParams', () => {
     const { result } = renderHook(() => useQueryParams())
 
     act(() => {
-      result.current.setApiRequestParams(8)
+      result.current.getApiRequestParamsByUrl(8)
     })
 
     expect(push).toHaveBeenCalledWith(

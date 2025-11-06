@@ -4,24 +4,17 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { Skeleton } from '@/components/ui/skeleton'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Group } from '@/types/groups'
 
 import { BaseInfoTab } from './BaseInfoTab'
 import { RolesTab } from './roles-tab/RolesTab'
 import { UsersTab } from './users-tab/UsersTab'
-
-const LoadingSkeleton = () => (
-  <div>
-    <Skeleton />
-    <Skeleton />
-  </div>
-)
 
 interface GroupDetailsProps {
   title: string
@@ -68,8 +61,7 @@ const GroupDetails = (props: GroupDetailsProps) => {
     }
   }, [subTabValue, tabs, setSubTabValueParam, isBlockedTab])
 
-  let Content = <LoadingSkeleton />
-
+  let Content = <LoadingSpinner className="h-full" />
   if (!groupData) {
     Content = <ContentCard>No data</ContentCard>
   } else if (!isBlockedTab) {
