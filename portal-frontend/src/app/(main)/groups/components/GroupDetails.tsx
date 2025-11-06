@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo } from 'react'
 
@@ -12,7 +13,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Group } from '@/types/groups'
 
-import Image from 'next/image'
 import Icon from '../../../../../public/svg/info.svg'
 import { BaseInfoTab } from './BaseInfoTab'
 import { RolesTab } from './roles-tab/RolesTab'

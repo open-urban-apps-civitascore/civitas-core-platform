@@ -6,7 +6,7 @@ export type Group = {
   description: string
   roles: string[]
   users: { id: string; assignedAt: string }[]
-  contact: string | null
+  contact: { id: string; displayName: string } | null
   parent: string | null
   subgroups: Group[]
 }
@@ -19,7 +19,7 @@ export interface GroupTabProps {
   onCancel?: () => void
 }
 
-export const GroupBaseInfoSchema = z.object({
+export const GroupBaseFormDataSchema = z.object({
   id: z.string(),
   title: z.string().min(2, {
     message: 'common.errors.atLeast2',
@@ -28,4 +28,4 @@ export const GroupBaseInfoSchema = z.object({
   contact: z.string().nullable(),
 })
 
-export type GroupBaseInfo = z.infer<typeof GroupBaseInfoSchema>
+export type GroupBaseFormData = z.infer<typeof GroupBaseFormDataSchema>

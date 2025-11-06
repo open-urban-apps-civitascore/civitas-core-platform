@@ -2,8 +2,8 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Loader2 } from 'lucide-react'
-import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { FieldErrors, useForm } from 'react-hook-form'
 
@@ -19,24 +19,18 @@ import { cn } from '@/lib/utils'
 import {
   CreateGroupData,
   Group,
-  GroupBaseInfo,
-  GroupBaseInfoSchema,
+  GroupBaseFormData,
+  GroupBaseFormDataSchema,
   GroupTabProps,
   UpdateGroupData,
 } from '@/types/groups'
 import { UserResponse } from '@/types/users'
+import { mapGroupToBaseFormData } from '@/utils/groups'
 
 import { createGroup, updateGroup } from '../actions'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 const MIN_LENGTH = 2
-
-const getGroupBaseInfo = (groupData: Group): GroupBaseInfo => ({
-  id: groupData.id,
-  title: groupData.title,
-  description: groupData.description || '',
-  contact: groupData.contact,
-})
 
 const getContactListItems = (contacts: Contact[]) =>
   contacts.map(contact => ({
@@ -71,9 +65,9 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const [contactListItems, setContactListItems] = useState<SelectItem[]>([])
   const [contactInput, setContactInput] = useState('')
 
-  const form = useForm<GroupBaseInfo>({
-    resolver: zodResolver(GroupBaseInfoSchema),
-    defaultValues: { ...getGroupBaseInfo(groupData) },
+  const form = useForm<GroupBaseFormData>({
+    resolver: zodResolver(GroupBaseFormDataSchema),
+    defaultValues: { ...mapGroupToBaseFormData(groupData) },
   })
 
   const resetAutocomplete = (contact: Contact | null) => {
@@ -100,7 +94,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           email: contactData.email,
         }
         setSelectedContact(contact)
-        form.reset(getGroupBaseInfo(groupData))
+        form.reset(mapGroupToBaseFormData(groupData))
         resetAutocomplete(contact)
       } catch (error) {
         console.error('Error fetching contact data:', error)
@@ -111,17 +105,20 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
     }
 
     if (groupData.contact) {
-      getInitialContact(groupData.contact)
+      getInitialContact(groupData.contact.id)
     } else {
-      form.reset(getGroupBaseInfo(groupData))
+      form.reset(mapGroupToBaseFormData(groupData))
     }
   }, [groupData, form])
 
-  const handleCreateGroup = async (formData: GroupBaseInfo) => {
+  const handleCreateGroup = async (formData: GroupBaseFormData) => {
     try {
       setIsLoading(true)
       // eslint-disable-next-line unused-imports/no-unused-vars
-      const { id, ...groupData } = formData
+      const { id, ...groupData } = {
+        ...formData,
+        contact: selectedContact ? { id: selectedContact.id, displayName: selectedContact.displayName } : null,
+      }
       const createGroupData: CreateGroupData = {
         ...groupData,
         description: groupData.description,
@@ -139,12 +136,12 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
     }
   }
 
-  const handleUpdateGroup = async (formData: GroupBaseInfo) => {
+  const handleUpdateGroup = async (formData: GroupBaseFormData) => {
     try {
       setIsLoading(true)
       const updateGroupData: UpdateGroupData = {
         ...formData,
-        description: formData.description,
+        contact: selectedContact ? { id: selectedContact.id, displayName: selectedContact.displayName } : null,
         parent: groupData.parent,
         roles: groupData.roles,
         subgroups: groupData.subgroups,
@@ -288,7 +285,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
         <ActionButtons
           onCancelClick={() => form.reset()}
           confirmButtonType="submit"
-          isConfirmButtonDisabled={!form.formState.isDirty && form.getValues().contact === groupData.contact}
+          isConfirmButtonDisabled={!form.formState.isDirty && form.getValues().contact === groupData.contact?.id}
           isCancelButtonDisabled={!form.formState.isDirty}
         />
       </form>

@@ -28,7 +28,7 @@ export const TextArea = <T extends FieldValues>(props: TextAreaProps<T>) => {
           </FormLabel>
           <div>
             <FormControl>
-              <Textarea placeholder={placeholder} {...field}/>
+              <Textarea placeholder={placeholder} {...field} />
             </FormControl>
             <FormMessage className="mt-2" />
           </div>
