@@ -28,6 +28,7 @@ import { UserResponse } from '@/types/users'
 import { mapGroupToBaseFormData } from '@/utils/groups'
 
 import { createGroup, updateGroup } from '../actions'
+import { useDebounce } from '@/hooks/useDebounce'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 const MIN_LENGTH = 2
@@ -64,6 +65,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [contactListItems, setContactListItems] = useState<SelectItem[]>([])
   const [contactInput, setContactInput] = useState('')
+  const debouncedInput = useDebounce(contactInput, 300)
 
   const form = useForm<GroupBaseFormData>({
     resolver: zodResolver(GroupBaseFormDataSchema),
@@ -110,6 +112,17 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
       form.reset(mapGroupToBaseFormData(groupData))
     }
   }, [groupData, form])
+
+  useEffect(() => {
+    if (debouncedInput.trim().length >= MIN_LENGTH) {
+      getContacts(debouncedInput)
+    } else {
+      form.setValue('contact', null)
+      setSelectedContact(null)
+      setContacts([])
+      setContactListItems([])
+    }
+  }, [debouncedInput, form])
 
   const handleCreateGroup = async (formData: GroupBaseFormData) => {
     try {
@@ -169,7 +182,8 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
         displayName: contact.displayName,
         email: contact.email,
       }))
-      return contacts
+      setContacts(contacts)
+      setContactListItems(getContactListItems(contacts))
     } catch (error) {
       console.error('Error fetching contacts data:', error)
       throw new Error('Error fetching contacts data')
@@ -178,25 +192,9 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
     }
   }
 
-  const updateContactList = async (value: string) => {
-    setContactInput(value)
-    const contacts = await getContacts(value)
-    const listItems = getContactListItems(contacts)
-    setContacts(contacts)
-    setContactListItems(listItems)
-  }
-
   const handleContactInputChange = async (value: string) => {
     setIsContactListOpen(true)
-    if (value.trim().length >= MIN_LENGTH) {
-      updateContactList(value)
-    } else {
-      setContactInput(value)
-      form.setValue('contact', null)
-      setSelectedContact(null)
-      setContacts([])
-      setContactListItems([])
-    }
+    setContactInput(value)
   }
 
   const handleSelectContact = (newSelection: SelectItem) => {
@@ -205,13 +203,12 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
     if (selectedContact) {
       setSelectedContact(selectedContact)
       setContactInput(selectedContact.displayName)
-      updateContactList(selectedContact.displayName)
     }
   }
 
   const handleAutocompleteBlur = () => {
     if (selectedContact && contactInput !== selectedContact?.displayName) {
-      updateContactList(selectedContact?.displayName)
+      setContactInput(selectedContact?.displayName)
     }
   }
 
@@ -220,7 +217,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex items-center justify-center p-8 h-full">
         <Loader2 className="h-8 w-8 animate-spin" />
         <span className="ml-2">{tCommon('loading')}</span>
       </div>
