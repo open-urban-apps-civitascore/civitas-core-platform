@@ -2,7 +2,6 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useParams, useRouter } from 'next/navigation'
-import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -26,7 +25,6 @@ const dataSpaceSchema = z.object({
 })
 
 const EditDataSpacePage = () => {
-  const t = useTranslations('dataspaces')
   const router = useRouter()
   const params = useParams<{ dataspaceId: string }>()
   const { dataspaceId } = params
