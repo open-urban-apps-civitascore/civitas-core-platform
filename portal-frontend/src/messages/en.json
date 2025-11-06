@@ -36,6 +36,7 @@
     "edit": "edit",
     "users": "User Management",
     "groups": "Groups",
+    "dataspaces": "DataSpaces",
     "tenants": "Tenant Management"
   },
   "datasets": {
@@ -156,6 +157,24 @@
       "previousPage": "Go to previous page",
       "nextPage": "Go to next page",
       "lastPage": "Go to last page"
+    }
+  },
+  "dataspaces": {
+    "title": "DataSpaces",
+    "newDataSpace": "New DataSpace",
+    "createDataSpace": "Create DataSpace",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Description",
+      "protected": "Protected"
+    },
+    "form": {
+      "inputs": {
+        "name": "DataSpace Name",
+        "description": "DataSpace Description",
+        "protected": "Protect DataSpace",
+        "protectedDescription": "Protected DataSpaces require elevated permissions for access"
+      }
     }
   },
   "roles": {

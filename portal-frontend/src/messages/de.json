@@ -36,6 +36,7 @@
     "edit": "bearbeiten",
     "users": "User Management",
     "groups": "Gruppen",
+    "dataspaces": "DataSpaces",
     "tenants": "Mandanten-Management"
   },
   "datasets": {
@@ -155,6 +156,24 @@
       "previousPage": "Zur vorherigen Seite wechseln",
       "nextPage": "Zur nächsten Seite wechseln",
       "lastPage": "Zur letzten Seite wechseln"
+    }
+  },
+  "dataspaces": {
+    "title": "DataSpaces",
+    "newDataSpace": "Neuer DataSpace",
+    "createDataSpace": "DataSpace erstellen",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "protected": "Geschützt"
+    },
+    "form": {
+      "inputs": {
+        "name": "Name des DataSpace",
+        "description": "DataSpace Beschreibung",
+        "protected": "DataSpace schützen",
+        "protectedDescription": "Geschützte DataSpaces erfordern erweiterte Berechtigungen für den Zugriff"
+      }
     }
   },
   "roles": {

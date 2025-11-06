@@ -35,6 +35,10 @@ export const appSidebarNavItems = [
         title: 'roles',
         url: '/roles',
       },
+      {
+        title: 'dataspaces',
+        url: '/dataspaces',
+      },
     ],
   },
   {
