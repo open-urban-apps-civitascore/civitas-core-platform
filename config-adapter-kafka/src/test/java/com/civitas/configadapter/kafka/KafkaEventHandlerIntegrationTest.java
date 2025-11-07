@@ -78,6 +78,7 @@ class KafkaEventHandlerIntegrationTest {
         producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
         producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CloudEventSerializer.class.getName());
+        // Don't specify encoding - use default binary mode
         testProducer = new KafkaProducer<>(producerProps);
     }
 

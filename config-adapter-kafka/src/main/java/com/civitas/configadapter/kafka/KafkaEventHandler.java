@@ -66,6 +66,8 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
         producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CloudEventSerializer.class.getName());
         producerProps.put(ProducerConfig.ACKS_CONFIG, "all");
         producerProps.put(ProducerConfig.RETRIES_CONFIG, 3);
+        // Don't set encoding - let CloudEventSerializer use its default behavior
+        // The serializer will choose binary or structured mode based on the CloudEvent
 
         this.kafkaProducer = new KafkaProducer<>(producerProps);
 
@@ -123,6 +125,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
     public void publish(String topic, CloudEvent event) {
         try {
             ProducerRecord<String, CloudEvent> record = new ProducerRecord<>(topic, event.getId(), event);
+
             kafkaProducer.send(record, (metadata, exception) -> {
                 if (exception != null) {
                     logger.error("Failed to publish event {} to topic {}", event.getId(), topic, exception);

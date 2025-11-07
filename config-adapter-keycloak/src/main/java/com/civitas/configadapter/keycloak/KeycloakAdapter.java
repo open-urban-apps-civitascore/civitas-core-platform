@@ -369,12 +369,14 @@ public class KeycloakAdapter implements ConfigAdapter {
         }
 
         try {
+            // Include minimal data body - Kafka treats NULL values as tombstones
+            // which causes the deserializer to return NULL
             CloudEvent resultEvent = CloudEventBuilder.v1()
                 .withId(UUID.randomUUID().toString())
                 .withSource(URI.create("civitas.config-adapter.keycloak"))
                 .withType("core.civitas.idm.processing.result")
                 .withTime(OffsetDateTime.now())
-                .withDataContentType("application/json")
+                .withData("application/json", "{}".getBytes())
                 .withExtension("correlationid", originalEvent.metadata().correlationId())
                 .withExtension("originalmessageid", originalEvent.metadata().messageId())
                 .withExtension("status", "SUCCESS")
@@ -398,12 +400,14 @@ public class KeycloakAdapter implements ConfigAdapter {
         }
 
         try {
+            // Include minimal data body - Kafka treats NULL values as tombstones
+            // which causes the deserializer to return NULL
             CloudEvent resultEvent = CloudEventBuilder.v1()
                 .withId(UUID.randomUUID().toString())
                 .withSource(URI.create("civitas.config-adapter.keycloak"))
                 .withType("core.civitas.idm.processing.result")
                 .withTime(OffsetDateTime.now())
-                .withDataContentType("application/json")
+                .withData("application/json", "{}".getBytes())
                 .withExtension("correlationid", originalEvent.metadata().correlationId())
                 .withExtension("originalmessageid", originalEvent.metadata().messageId())
                 .withExtension("status", "FAILURE")

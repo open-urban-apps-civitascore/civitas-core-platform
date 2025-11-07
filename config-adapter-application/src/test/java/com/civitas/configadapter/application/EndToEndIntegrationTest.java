@@ -110,6 +110,7 @@ class EndToEndIntegrationTest {
         producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
         producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CloudEventSerializer.class.getName());
+        // Don't specify encoding - use default binary mode
         producer = new KafkaProducer<>(producerProps);
 
         // Create Kafka consumer for reading result events
@@ -119,8 +120,12 @@ class EndToEndIntegrationTest {
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, CloudEventDeserializer.class.getName());
         consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        // Deserializer will auto-detect encoding mode from CloudEvent headers
         resultConsumer = new KafkaConsumer<>(consumerProps);
         resultConsumer.subscribe(Collections.singletonList("result.topic"));
+
+        // Poll once to trigger topic creation and partition assignment
+        resultConsumer.poll(Duration.ofMillis(100));
 
         // Create Keycloak client for verification
         keycloakClient = Keycloak.getInstance(
@@ -131,12 +136,22 @@ class EndToEndIntegrationTest {
                 "admin-cli"
         );
 
-        // Give consumer time to start
-        Thread.sleep(2000);
+        // Give consumer time to start and topics to be created
+        Thread.sleep(3000);
     }
 
     @AfterEach
     void tearDown() {
+        // Clean up any test realms (ignore errors if they don't exist)
+        if (keycloakClient != null) {
+            try {
+                cleanupTestRealms();
+            } catch (Exception e) {
+                // Ignore cleanup errors
+            }
+            keycloakClient.close();
+        }
+
         if (consumer != null) {
             consumer.close();
         }
@@ -146,8 +161,24 @@ class EndToEndIntegrationTest {
         if (resultConsumer != null) {
             resultConsumer.close();
         }
-        if (keycloakClient != null) {
-            keycloakClient.close();
+    }
+
+    private void cleanupTestRealms() {
+        // Try to delete test realms - don't fail if they don't exist
+        String[] testRealms = {
+            "e2e-test-realm",
+            "user-e2e-realm",
+            "client-realm",
+            "seq-test-realm",
+            "correlation-test-realm"
+        };
+
+        for (String realm : testRealms) {
+            try {
+                keycloakClient.realm(realm).remove();
+            } catch (Exception e) {
+                // Realm doesn't exist or already deleted
+            }
         }
     }
 
@@ -165,7 +196,7 @@ class EndToEndIntegrationTest {
                 "realm",
                 "CREATE",
                 realmRep,
-                "correlation-123"
+                "correlation123"
         );
 
         CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_CREATED);
@@ -175,7 +206,7 @@ class EndToEndIntegrationTest {
         producer.flush();
 
         // Then - wait for result event
-        CloudEvent resultEvent = waitForResultEvent("correlation-123", 15000);
+        CloudEvent resultEvent = waitForResultEvent("correlation123", 15000);
         assertNotNull(resultEvent, "Result event should be published");
         assertEquals("SUCCESS", resultEvent.getExtension("status"));
         assertEquals("e2e-test-realm", resultEvent.getExtension("resourceid"));
@@ -209,7 +240,7 @@ class EndToEndIntegrationTest {
                 "user",
                 "CREATE",
                 userRep,
-                "correlation-user-123"
+                "correlationuser123"
         );
 
         CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.USER_CREATED);
@@ -219,7 +250,7 @@ class EndToEndIntegrationTest {
         producer.flush();
 
         // Then - wait for result event
-        CloudEvent resultEvent = waitForResultEvent("correlation-user-123", 15000);
+        CloudEvent resultEvent = waitForResultEvent("correlationuser123", 15000);
         assertNotNull(resultEvent, "Result event should be published");
         assertEquals("SUCCESS", resultEvent.getExtension("status"));
         assertEquals("e2euser", resultEvent.getExtension("resourceid"));
@@ -244,7 +275,7 @@ class EndToEndIntegrationTest {
                 "realm",
                 "UPDATE",
                 realmRep,
-                "correlation-error-123"
+                "correlationerror123"
         );
 
         CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_UPDATED);
@@ -254,7 +285,7 @@ class EndToEndIntegrationTest {
         producer.flush();
 
         // Then - wait for error result event
-        CloudEvent resultEvent = waitForResultEvent("correlation-error-123", 15000);
+        CloudEvent resultEvent = waitForResultEvent("correlationerror123", 15000);
         assertNotNull(resultEvent, "Error result event should be published");
         assertEquals("FAILURE", resultEvent.getExtension("status"));
         assertNotNull(resultEvent.getExtension("errorcode"));
@@ -265,7 +296,7 @@ class EndToEndIntegrationTest {
     @Order(4)
     void shouldPreserveCorrelationIdThroughoutFlow() throws Exception {
         // Given
-        String correlationId = "test-correlation-" + UUID.randomUUID();
+        String correlationId = "testcorrelation" + UUID.randomUUID();
         String messageId = UUID.randomUUID().toString();
 
         RealmRepresentation realmRep = new RealmRepresentation();
@@ -404,18 +435,30 @@ class EndToEndIntegrationTest {
 
     private CloudEvent waitForResultEvent(String correlationId, long timeoutMs) {
         long startTime = System.currentTimeMillis();
+        int pollCount = 0;
+
+        System.out.println("Waiting for result event with correlationId: " + correlationId);
 
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             ConsumerRecords<String, CloudEvent> records = resultConsumer.poll(Duration.ofMillis(1000));
+            pollCount++;
+
+            System.out.println("Poll #" + pollCount + ": received " + records.count() + " record(s)");
 
             for (ConsumerRecord<String, CloudEvent> record : records) {
                 CloudEvent event = record.value();
-                if (event != null && correlationId.equals(event.getExtension("correlationid"))) {
+                if (event == null) {
+                    continue;
+                }
+
+                String eventCorrelationId = (String) event.getExtension("correlationid");
+                if (correlationId.equals(eventCorrelationId)) {
                     return event;
                 }
             }
         }
 
+        System.out.println("Timeout waiting for result event after " + pollCount + " polls");
         return null;
     }
 
