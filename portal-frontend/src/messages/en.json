@@ -62,12 +62,14 @@
   },
   "users": {
     "title": "Overview: Users",
-    "newUser": "New User",
+    "newUser": "Create User",
     "createUser": "Create User",
     "searchUsers": "Filter...",
     "notFound": "User not found",
 
     "info": {
+      "header": "User Information",
+      "subheader": "Personal details and general information.",
       "id": "ID",
       "displayName": "Display Name",
       "title": { "title": "Title", "male": "Mr", "female": "Ms" },

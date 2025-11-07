@@ -12,9 +12,11 @@ import { useQueryParams } from '@/hooks/useQueryParams'
 
 import { RolesTab } from './RolesTab'
 import { FormUser, UserForm } from './UserForm'
+import { UserResponse } from '@/types/users'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 
 interface UserDetailsProps {
-  userData: FormUser | null
+  userData: UserResponse | null
   isEditMode?: boolean
 }
 
@@ -81,22 +83,29 @@ export const UserDetails = (props: UserDetailsProps) => {
     setSubTabValueParam(newTab)
   }
 
+  let Content = <LoadingSpinner className="h-full" />
+  if (!userData) {
+    Content = <ContentCard>No data</ContentCard>
+  } else if (!isBlockedTab) {
+    switch (subTabValue) {
+      case tabValues.userData.value:
+        Content = <UserForm userData={userData} isEditMode={isEditMode} />
+        break
+      case tabValues.roles.value:
+        Content = <RolesTab userId={userData.id} />
+        break
+      default:
+        break
+    }
+  }
+
   return (
-    <PageContainer headerType="withSubTabs">
+    <PageContainer headerType="withSubTabs" className='overflow-hidden'>
       <PageHeader
         title={getTitle()}
         subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: newTab => handleSelectTab(newTab) }}
       />
-      <PageBackground>
-        {userData ? (
-          <ContentCard>
-            {subTabValue === tabValues.roles.value && isEditMode && <RolesTab userId={userData.id} />}
-            {subTabValue === tabValues.userData.value && <UserForm userData={userData} isEditMode={isEditMode} />}
-          </ContentCard>
-        ) : (
-          <div>No data</div>
-        )}
-      </PageBackground>
+      <PageBackground className='overflow-y-auto'>{Content}</PageBackground>
     </PageContainer>
   )
 }

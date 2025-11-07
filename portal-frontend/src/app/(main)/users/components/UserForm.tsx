@@ -15,21 +15,24 @@ import { Form } from '@/components/ui/form'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Authority, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
-import { mapApiUserData } from '@/utils/users'
+import { mapFormUserToApiData, mapUserToFormData } from '@/utils/users'
 
 import { createUser, updateUser } from '../actions'
+import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { ContentCard } from '@/components/content-card/ContentCard'
+import { ActionButtons } from '@/components/action-buttons/ActionButtons'
+import { readonly } from 'zod'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-export type FormUser = Omit<UserResponse, 'authority' | 'department' | 'position' | 'positionDescription'> & {
+export type FormUser = Omit<UserResponse, 'authority' | 'department' | 'position' | 'positionDescription' | 'roles'> & {
   authority: string
   department: string
-  position: string
   positionDescription: string
 }
 
 interface UserFormProps {
-  userData: FormUser
+  userData: UserResponse
   isEditMode?: boolean
 }
 
@@ -38,8 +41,8 @@ export const UserForm = (props: UserFormProps) => {
   const router = useRouter()
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
-  const isMobile = useIsMobile()
   const { getApiRequestParamsByUrl } = useQueryParams()
+  const [isReadOnly, setIsReadOnly] = useState(isEditMode)
 
   const [authorities, setAuthorities] = useState<Authority[]>([])
 
@@ -78,9 +81,7 @@ export const UserForm = (props: UserFormProps) => {
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(UserFormSchema),
-    defaultValues: {
-      ...userData,
-    },
+    defaultValues: mapUserToFormData(userData),
   })
 
   const watchAuthority = form.watch('authority')
@@ -100,16 +101,16 @@ export const UserForm = (props: UserFormProps) => {
     router.push(`/users?${apiParams}`)
   }
 
-  const handleCreateUser = (userData: UserFormData) => {
-    const mappedData = mapApiUserData(userData)
+  const handleCreateUser = (formData: UserFormData) => {
+    const mappedData: UserResponse = { ...mapFormUserToApiData(formData), group: userData.group }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
     createUser(createUserData)
     router.push('/users')
   }
 
-  const handleUpdateUser = (userData: UserFormData) => {
-    const updateUserData = mapApiUserData(userData)
+  const handleUpdateUser = (formData: UserFormData) => {
+    const updateUserData = { ...mapFormUserToApiData(formData), group: userData.group }
     updateUser(updateUserData)
     goToUsersList()
   }
@@ -119,9 +120,22 @@ export const UserForm = (props: UserFormProps) => {
   return (
     <Form {...form}>
       <form onSubmit={handleSubmit}>
-        <div className={`grid gap-4 space-y-8 mb-4 max-w-3xl ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-          <TextField form={form} label={t('info.id')} name="id" placeholder={t('info.id')} disabled />
-          <div className="flex w-full justify-between">
+        <ContentCard>
+          <DetailsFieldContainer className="pt-0 pb-8 text-xl">
+            <h2>{t('info.header')}</h2>
+            <p className="text-sm text-muted-foreground pt-1">{t('info.subheader')}</p>
+          </DetailsFieldContainer>
+          <DetailsFieldContainer>
+            <TextField
+              form={form}
+              label={t('info.id')}
+              name="id"
+              placeholder={t('info.id')}
+              disabled
+              readOnly={isReadOnly}
+            />
+          </DetailsFieldContainer>
+          <DetailsFieldContainer>
             <Select
               id="title-select"
               label={t('info.title.title')}
@@ -129,51 +143,88 @@ export const UserForm = (props: UserFormProps) => {
               placeholder={t('form.selectTitle')}
               form={form}
               name="title"
-              required
+              required={!isReadOnly}
+              disabled={isReadOnly}
             />
-            <Switch form={form} name="active" label={t('info.active')} />
-          </div>
-          <TextField
-            form={form}
-            label={t('info.firstName')}
-            name="firstName"
-            placeholder={t('info.firstName')}
-            required
-          />
-          <TextField form={form} label={t('info.lastName')} name="lastName" placeholder={t('info.lastName')} required />
-          <TextField form={form} label={t('info.email')} name="email" placeholder={t('info.email')} required />
-          <TextField form={form} label={t('info.phone')} name="phone" placeholder={t('info.phone')} />
-          <Select
-            id="authority-select"
-            label={t('info.authority')}
-            options={authorities.map(authority => ({ value: authority.id, label: authority.title }))}
-            placeholder={t('form.selectAuthority')}
-            form={form}
-            name="authority"
-          />
-          <Select
-            id="department-select"
-            label={t('info.department')}
-            options={departmentOptions}
-            placeholder={t('form.selectDepartment')}
-            form={form}
-            name="department"
-          />
-          <TextField form={form} label={t('info.position')} name="position" placeholder={t('info.position')} />
-        </div>
-        <TextArea
-          className="max-w-lg my-12"
-          form={form}
-          label={t('info.description')}
-          name="positionDescription"
-          placeholder={t('info.description')}
-        />
-        <div className="w-full flex gap-4 justify-end pt-8">
-          <Button type="reset" variant="secondary" onClick={() => goToUsersList()}>
-            {tCommon('actions.cancel')}
-          </Button>
-          <Button type="submit">{tCommon('actions.submit')}</Button>
-        </div>
+          </DetailsFieldContainer>
+          <DetailsFieldContainer>
+            <TextField
+              form={form}
+              label={t('info.firstName')}
+              name="firstName"
+              placeholder={t('info.firstName')}
+              required={!isReadOnly}
+              disabled={isReadOnly}
+            />
+          </DetailsFieldContainer>
+          <DetailsFieldContainer>
+            <TextField
+              form={form}
+              label={t('info.lastName')}
+              name="lastName"
+              placeholder={t('info.lastName')}
+              required={!isReadOnly}
+              disabled={isReadOnly}
+            />
+          </DetailsFieldContainer>
+          <DetailsFieldContainer>
+            <TextField
+              form={form}
+              label={t('info.email')}
+              name="email"
+              placeholder={t('info.email')}
+              required={!isReadOnly}
+              disabled={isReadOnly}
+            />
+          </DetailsFieldContainer>
+          <DetailsFieldContainer>
+            <TextField
+              form={form}
+              label={t('info.phone')}
+              name="phone"
+              placeholder={t('info.phone')}
+              disabled={isReadOnly}
+            />
+          </DetailsFieldContainer>
+          <DetailsFieldContainer>
+            <Select
+              id="authority-select"
+              label={t('info.authority')}
+              options={authorities.map(authority => ({ value: authority.id, label: authority.title }))}
+              placeholder={t('form.selectAuthority')}
+              form={form}
+              name="authority"
+              disabled={isReadOnly}
+            />
+          </DetailsFieldContainer>
+          <DetailsFieldContainer>
+            <Select
+              id="department-select"
+              label={t('info.department')}
+              options={departmentOptions}
+              placeholder={t('form.selectDepartment')}
+              form={form}
+              name="department"
+              disabled={isReadOnly}
+            />
+          </DetailsFieldContainer>
+          <DetailsFieldContainer>
+            <TextArea
+              className="max-w-lg my-12"
+              form={form}
+              label={t('info.description')}
+              name="positionDescription"
+              placeholder={t('info.description')}
+              disabled={isReadOnly}
+            />
+          </DetailsFieldContainer>
+          <DetailsFieldContainer className="border-b-0">
+            <Switch form={form} name="active" label={t('info.active')} isReadOnly={isReadOnly} />
+          </DetailsFieldContainer>
+        </ContentCard>
+        {!isReadOnly && (
+          <ActionButtons confirmButtonType="submit" onCancelClick={goToUsersList} hasCard className="mt-6" />
+        )}
       </form>
     </Form>
   )

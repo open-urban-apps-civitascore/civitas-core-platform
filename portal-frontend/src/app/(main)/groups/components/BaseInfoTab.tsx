@@ -127,16 +127,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
             <h2>{t('details.baseInfo')}</h2>
           </DetailsFieldContainer>
           <DetailsFieldContainer>
-            <TextField
-              form={form}
-              label={t('details.name')}
-              name="title"
-              placeholder={t('details.name')}
-              formItemProps={{
-                className: isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]',
-              }}
-              required
-            />
+            <TextField form={form} label={t('details.name')} name="title" placeholder={t('details.name')} required />
           </DetailsFieldContainer>
 
           <DetailsFieldContainer>
@@ -146,9 +137,6 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               label={t('details.description')}
               name="description"
               placeholder={t('details.description')}
-              formItemProps={{
-                className: isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]',
-              }}
               required
             />
           </DetailsFieldContainer>

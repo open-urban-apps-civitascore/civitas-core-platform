@@ -62,11 +62,20 @@
   },
   "users": {
     "title": "Übersicht: User",
-    "newUser": "Neuer User",
+    "newUser": "User erstellen",
     "createUser": "User erstellen",
     "searchUsers": "Filtern...",
     "notFound": "User nicht gefunden",
+    "detailsTabs": {
+      "userData": "Benutzerdaten",
+      "roles": "Rollen",
+      "userGroups": "Usergruppen",
+      "dataspaces": "Datenräume und -sätze",
+      "account": "Account"
+    },
     "info": {
+      "header": "User Informationen",
+      "subheader": "Persönliche Angaben und allgemeine Informationen.",
       "id": "ID",
       "displayName": "Anzeigename",
       "title": { "title": "Anrede", "male": "Herr", "female": "Frau" },
@@ -81,13 +90,6 @@
       "active": "Aktiv",
       "position": "Position",
       "description": "Tätigkeitsbeschreibung"
-    },
-    "detailsTabs": {
-      "userData": "Benutzerdaten",
-      "roles": "Rollen",
-      "userGroups": "Usergruppen",
-      "dataspaces": "Datenräume und -sätze",
-      "account": "Account"
     },
     "form": {
       "selectTitle": "Titel wählen...",
