@@ -2,8 +2,8 @@
 
 import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -13,7 +13,6 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { Role } from '@/types/roles'
 import { Authority, Category, ListUser, UserResponse } from '@/types/users'
 import { isPageIndexHigherThanTotalPages } from '@/utils/table'
 import { mapListUsers } from '@/utils/users'
@@ -69,14 +68,11 @@ const UsersPage = () => {
 
     try {
       setIsLoading(true)
-      const [usersResponse, authoritiesResponse, rolesResponse] = await Promise.all([
+      const [usersResponse, authoritiesResponse] = await Promise.all([
         fetch(`${URL}/users?${params.toString()}`, {
           cache: 'no-store',
         }),
         fetch(`${URL}/authorities`, {
-          cache: 'no-store',
-        }),
-        fetch(`${URL}/roles`, {
           cache: 'no-store',
         }),
       ])
@@ -84,18 +80,12 @@ const UsersPage = () => {
         throw new Error('An error occurred while loading form data')
       }
 
-      const [usersData, authoritiesData, rolesData]: [UserResponse[], Authority[], Role[]] = await Promise.all([
+      const [usersData, authoritiesData]: [UserResponse[], Authority[]] = await Promise.all([
         usersResponse.json(),
         authoritiesResponse.json(),
-        rolesResponse.json(),
       ])
 
-      const rolesMap: Record<string, string> = {}
-      rolesData.forEach((role: Role) => {
-        rolesMap[role.id] = role.name
-      })
-
-      const users = mapListUsers(usersData, authoritiesData, rolesMap)
+      const users = mapListUsers(usersData, authoritiesData)
       setListUsers(users)
       setIsLoading(false)
 

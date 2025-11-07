@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { Authority, TitleSchemaType, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
 
-import { mapApiUserData, mapFormUserData, mapListUsers } from './users'
+import { mapApiUserData, mapUserToFormData, mapListUsers } from './users'
 
 const baseFormData = {
   id: '12345',
@@ -135,7 +135,7 @@ describe('mapFormUserData', () => {
       displayName: 'Lisa Schneider',
     }
 
-    const result = mapFormUserData(userResponse)
+    const result = mapUserToFormData(userResponse)
 
     expect(result).toEqual({
       ...userResponse,
@@ -147,7 +147,7 @@ describe('mapFormUserData', () => {
   })
 
   it('should return null if the user data is null', () => {
-    expect(mapFormUserData(null)).toBeNull()
+    expect(mapUserToFormData(null)).toBeNull()
   })
 
   it('should return set the form field value to "" if the DB value is null', () => {
@@ -159,7 +159,7 @@ describe('mapFormUserData', () => {
       positionDescription: null,
     }
 
-    const result = mapFormUserData(userResponse)
+    const result = mapUserToFormData(userResponse)
 
     expect(result?.group).toBe('')
     expect(result?.authority).toBe('')

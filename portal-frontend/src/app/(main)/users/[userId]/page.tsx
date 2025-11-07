@@ -1,5 +1,5 @@
 import { UserResponse } from '@/types/users'
-import { mapFormUserData } from '@/utils/users'
+import { mapUserToFormData } from '@/utils/users'
 
 import { UserDetails } from '../components/UserDetails'
 
@@ -35,7 +35,7 @@ const page = async (props: PageProps) => {
     }
   }
 
-  const userData = mapFormUserData(await getUserData(userId))
+  const userData = await getUserData(userId)
 
   return <UserDetails userData={userData} isEditMode />
 }

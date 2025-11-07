@@ -1,4 +1,3 @@
-import { FormUser } from '@/app/(main)/users/components/UserForm'
 import {
   Authority,
   GroupAssignmentUser,
@@ -9,11 +8,7 @@ import {
   UserResponse,
 } from '@/types/users'
 
-export const mapListUsers = (
-  users: UserResponse[],
-  authorities: Authority[],
-  rolesMap: Record<string, string>,
-): ListUser[] =>
+export const mapListUsers = (users: UserResponse[], authorities: Authority[]): ListUser[] =>
   users.map(user => {
     const authority = authorities.find(authority => user.authority?.id === authority.id)
     const department = authority?.departments.find(department => department.id === user.authority?.department?.id)
@@ -22,7 +17,6 @@ export const mapListUsers = (
       displayName: user.displayName,
       authority: authority?.title ?? '',
       department: department?.title ?? '',
-      roles: user.roles.map(roleId => rolesMap[roleId]),
       email: user.email,
       isActive: user.active,
     }
@@ -57,30 +51,29 @@ export const mapGoupAssignmentUsers = (users: UserResponse[]): GroupAssignmentUs
     }
   })
 
-export const mapApiUserData = (formData: UserFormData) => {
+export const mapFormUserToApiData = (formData: UserFormData) => {
   const parsed = UserFormSchema.parse(formData)
 
   const userData = {
     ...parsed,
-    group: parsed.group || null,
     authority: parsed.authority
       ? { id: parsed.authority, department: parsed.department ? { id: parsed.department } : null }
       : null,
-    position: parsed.position || null,
     positionDescription: parsed.positionDescription || null,
     displayName: `${parsed.firstName} ${parsed.lastName}`,
   }
   return userData
 }
 
-export const mapFormUserData = (userResponse: UserResponse | null): FormUser | null =>
-  userResponse
-    ? {
-        ...userResponse,
-        group: userResponse.group || '',
-        authority: userResponse.authority?.id || '',
-        department: userResponse.authority?.department?.id || '',
-        position: userResponse.position || '',
-        positionDescription: userResponse.positionDescription || '',
-      }
-    : null
+export const mapUserToFormData = (userResponse: UserResponse | null): UserFormData => ({
+  id: userResponse?.id || '',
+  firstName: userResponse?.firstName || '',
+  lastName: userResponse?.lastName || '',
+  email: userResponse?.email || '',
+  phone: userResponse?.phone || '',
+  title: userResponse?.title || 'male',
+  active: userResponse?.active || false,
+  authority: userResponse?.authority?.id || '',
+  department: userResponse?.authority?.department?.id || '',
+  positionDescription: userResponse?.positionDescription || '',
+})

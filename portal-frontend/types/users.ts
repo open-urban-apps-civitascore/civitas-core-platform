@@ -30,8 +30,6 @@ export type UserResponse = {
   authority: UserAuthority | null
   group: string | null
   active: boolean
-  roles: string[]
-  position: string | null
   positionDescription: string | null
 }
 
@@ -43,7 +41,6 @@ export type ListUser = {
   displayName: string
   authority: string
   department: string
-  roles: string[]
   email: string
   isActive: boolean
 }
@@ -84,11 +81,11 @@ export const PhoneSchema = z.string().superRefine((value, ctx) => {
 
 export const UserFormSchema = z.object({
   id: z.string(),
+  title: TitleSchema,
   firstName: z.string().min(2, {
     message: 'common.errors.atLeast2',
   }),
 
-  title: TitleSchema,
   lastName: z.string().min(2, {
     message: 'common.errors.atLeast2',
   }),
@@ -97,12 +94,9 @@ export const UserFormSchema = z.object({
   }),
   authority: z.string().nullable(),
   department: z.string().nullable(),
-  group: z.string().nullable(),
   phone: PhoneSchema,
   active: z.boolean(),
-  position: z.string().min(2).or(z.literal('')).nullable(),
   positionDescription: z.string().min(10).or(z.literal('')).nullable(),
-  roles: z.array(z.string()),
 })
 
 export type UserFormData = z.infer<typeof UserFormSchema>
