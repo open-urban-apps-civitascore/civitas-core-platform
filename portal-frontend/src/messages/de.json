@@ -162,16 +162,6 @@
       "lastPage": "Zur letzten Seite wechseln"
     }
   },
-  "permissions": {
-    "title": "Berechtigungen",
-    "systemPermissions": "Systemberechtigungen",
-    "dataPermissions": "Datenberechtigungen",
-    "governancePermissions": "Governanceberechtigungen",
-    "tableHeaders": {
-      "title": "Name",
-      "category": "Kategorie"
-    }
-  },
   "roles": {
     "title": "Rollen",
     "newRole": "Neue Rolle",

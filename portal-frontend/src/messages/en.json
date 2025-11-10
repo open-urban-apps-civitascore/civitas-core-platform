@@ -163,16 +163,6 @@
       "lastPage": "Go to last page"
     }
   },
-  "permissions": {
-    "title": "Permissions",
-    "systemPermissions": "System Permissions",
-    "dataPermissions": "Daten Permissions",
-    "governancePermissions": "Governance Permissions",
-    "tableHeaders": {
-      "title": "Name",
-      "category": "Category"
-    }
-  },
   "roles": {
     "title": "Roles",
     "newRole": "New Role",
