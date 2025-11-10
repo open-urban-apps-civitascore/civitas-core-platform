@@ -15,6 +15,7 @@ import { TextArea } from '@/components/form/fields/TextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { Form } from '@/components/ui/form'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { useDebounce } from '@/hooks/useDebounce'
 import { cn } from '@/lib/utils'
 import {
   CreateGroupData,
@@ -28,7 +29,6 @@ import { UserResponse } from '@/types/users'
 import { mapGroupToBaseFormData } from '@/utils/groups'
 
 import { createGroup, updateGroup } from '../actions'
-import { useDebounce } from '@/hooks/useDebounce'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 const MIN_LENGTH = 2

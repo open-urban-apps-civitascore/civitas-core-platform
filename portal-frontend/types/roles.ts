@@ -1,9 +1,9 @@
 import z from 'zod'
 
 export const ROLE_TYPES = {
-  SYSTEM: 'system',
-  DATA: 'data',
-  GOVERNANCE: 'governance',
+  SYSTEM: 'System',
+  DATA: 'Data',
+  GOVERNANCE: 'Governance',
 } as const
 
 export type RoleType = (typeof ROLE_TYPES)[keyof typeof ROLE_TYPES]
