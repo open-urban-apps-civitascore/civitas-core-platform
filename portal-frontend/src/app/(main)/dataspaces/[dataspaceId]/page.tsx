@@ -4,25 +4,15 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useParams, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
 
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 
-import { DataSpace, DataSpaceFormData } from '../../../../../types/dataspaces'
+import { DataSpace, DataSpaceFormData, dataSpaceSchema } from '../../../../../types/dataspaces'
 import { DataSpaceForm } from '../components/DataSpaceForm'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
-
-const dataSpaceSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters.').max(50, 'Name must be at most 50 characters.'),
-  description: z
-    .string()
-    .min(10, 'Description must be at least 10 characters.')
-    .max(500, 'Description must be at most 500 characters.'),
-  protected: z.boolean(),
-})
 
 const EditDataSpacePage = () => {
   const router = useRouter()
@@ -69,9 +59,11 @@ const EditDataSpacePage = () => {
 
   useEffect(() => {
     if (selectedDataSpace) {
-      form.setValue('name', selectedDataSpace.name)
-      form.setValue('description', selectedDataSpace.description || '')
-      form.setValue('protected', selectedDataSpace.protected || false)
+      form.reset({
+        name: selectedDataSpace.name,
+        description: selectedDataSpace.description || '',
+        protected: selectedDataSpace.protected || false,
+      })
     }
   }, [selectedDataSpace, form])
 
