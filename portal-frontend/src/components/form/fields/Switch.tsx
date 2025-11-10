@@ -23,10 +23,7 @@ export const Switch = <T extends FieldValues>(props: SwitchProps<T>) => {
       name={name}
       render={({ field }) => (
         <FormItem
-          className={cn(
-            isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]',
-            formItemProps?.className,
-          )}
+          className={cn(isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_auto]', formItemProps?.className)}
         >
           <FormLabel>{label}</FormLabel>
           <FormControl>

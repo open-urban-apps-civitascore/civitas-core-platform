@@ -62,15 +62,15 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
               {required && <span className="text-red-500 ml-1">*</span>}
             </FormLabel>
 
-            <ShadcnSelect value={field.value.id} onValueChange={onChange ?? field.onChange}>
+            <ShadcnSelect value={field.value} onValueChange={onChange ?? field.onChange}>
               <SelectTrigger
                 id={id}
                 aria-label={label}
                 className={cn(
-                  'w-full disabled:opacity-100 disabled:border-hidden disabled:shadow-none disabled:h-4  disabled:py-0',
+                  'w-full disabled:opacity-100 disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0 disabled:pointer-events-none',
                   selectTriggerProps?.className,
                 )}
-                style={{height: disabled ? '20px' : ''}}
+                style={{ height: disabled ? '20px' : '' }}
                 disabled={disabled}
               >
                 <SelectValue placeholder={placeholder} />

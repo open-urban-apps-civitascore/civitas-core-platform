@@ -8,7 +8,8 @@
       "submit": "Speichern",
       "cancel": "Abbrechen",
       "delete": "Löschen",
-      "add": "Hinzufügen"
+      "add": "Hinzufügen",
+      "edit": "Bearbeiten"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -87,9 +88,13 @@
       "phone": "Telefonnummer",
       "email": "E-Mail",
       "group": "Gruppe",
-      "active": "Aktiv",
       "position": "Position",
-      "description": "Tätigkeitsbeschreibung"
+      "description": "Tätigkeitsbeschreibung",
+      "status": {
+        "title": "Status",
+        "active": "Aktiv",
+        "inactive": "Inaktiv"
+      }
     },
     "form": {
       "selectTitle": "Titel wählen...",

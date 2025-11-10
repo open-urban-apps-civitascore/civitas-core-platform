@@ -8,7 +8,8 @@
       "submit": "Save",
       "cancel": "Cancel",
       "delete": "Delete",
-      "add": "Add"
+      "add": "Add",
+      "edit": "Edit"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
@@ -81,9 +82,13 @@
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
-      "active": "Active",
       "position": "Position",
-      "description": "Activity Description"
+      "description": "Activity Description",
+      "status": {
+        "title": "Status",
+        "active": "Active",
+        "inactive": "Inactive"
+      }
     },
     "detailsTabs": {
       "userData": "User Data",

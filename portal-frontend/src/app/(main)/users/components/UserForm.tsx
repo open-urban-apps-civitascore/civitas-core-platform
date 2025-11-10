@@ -1,8 +1,8 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
@@ -12,16 +12,17 @@ import { TextArea } from '@/components/form/fields/TextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
-import { useIsMobile } from '@/hooks/use-mobile'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Authority, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
 import { mapFormUserToApiData, mapUserToFormData } from '@/utils/users'
 
-import { createUser, updateUser } from '../actions'
-import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { ContentCard } from '@/components/content-card/ContentCard'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
-import { readonly } from 'zod'
+import { ContentCard } from '@/components/content-card/ContentCard'
+import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
+import { SquarePen } from 'lucide-react'
+import { createUser, updateUser } from '../actions'
+import { cn } from '@/lib/utils'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
@@ -84,8 +85,21 @@ export const UserForm = (props: UserFormProps) => {
     defaultValues: mapUserToFormData(userData),
   })
 
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const watchStatus = form.watch('active')
   const watchAuthority = form.watch('authority')
 
+  // adjust selected department when authority gets changed
+  // remove department when new authority selected, reset initial department when initial aurhority selected
+  useEffect(() => {
+    if (watchAuthority !== userData.authority?.id) {
+      form.setValue('department', '')
+    } else {
+      form.resetField('department')
+    }
+  }, [watchAuthority, form, userData])
+
+  // set form options for field 'department' depending on the currently selected authority
   const departmentOptions = useMemo(() => {
     const currentAuthority = authorities.find(authority => authority.id === watchAuthority)
     const departments =
@@ -101,29 +115,48 @@ export const UserForm = (props: UserFormProps) => {
     router.push(`/users?${apiParams}`)
   }
 
-  const handleCreateUser = (formData: UserFormData) => {
+  const handleCancelClick = () => {
+    if (isEditMode) {
+      form.reset()
+      setIsReadOnly(true)
+    } else {
+      goToUsersList()
+    }
+  }
+
+  const handleCreateUser = async (formData: UserFormData) => {
     const mappedData: UserResponse = { ...mapFormUserToApiData(formData), group: userData.group }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
-    createUser(createUserData)
+    await createUser(createUserData)
     router.push('/users')
   }
 
-  const handleUpdateUser = (formData: UserFormData) => {
+  const handleUpdateUser = async (formData: UserFormData) => {
     const updateUserData = { ...mapFormUserToApiData(formData), group: userData.group }
-    updateUser(updateUserData)
-    goToUsersList()
+    await updateUser(updateUserData)
+    setIsReadOnly(true)
   }
 
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
+
+  const EditButton = (
+    <Button variant="outline" type="button" onClick={() => setIsReadOnly(false)}>
+      <SquarePen />
+      {tCommon('actions.edit')}
+    </Button>
+  )
 
   return (
     <Form {...form}>
       <form onSubmit={handleSubmit}>
         <ContentCard>
-          <DetailsFieldContainer className="pt-0 pb-8 text-xl">
-            <h2>{t('info.header')}</h2>
-            <p className="text-sm text-muted-foreground pt-1">{t('info.subheader')}</p>
+          <DetailsFieldContainer className="pt-0 pb-4 text-xl">
+            <SubHeader
+              title={t('info.header')}
+              subtitle={t('info.subheader')}
+              customElement={isEditMode && isReadOnly && EditButton}
+            />
           </DetailsFieldContainer>
           <DetailsFieldContainer>
             <TextField
@@ -218,12 +251,13 @@ export const UserForm = (props: UserFormProps) => {
               disabled={isReadOnly}
             />
           </DetailsFieldContainer>
-          <DetailsFieldContainer className="border-b-0">
-            <Switch form={form} name="active" label={t('info.active')} isReadOnly={isReadOnly} />
+          <DetailsFieldContainer className="border-b-0 flex items-center">
+            <Switch form={form} name="active" label={t('info.status.title')} isReadOnly={isReadOnly}/>
+            <span className={cn('ml-3 text-sm', isReadOnly && 'text-muted-foreground')}>{watchStatus ? t('info.status.active') : t('info.status.inactive')}</span>
           </DetailsFieldContainer>
         </ContentCard>
         {!isReadOnly && (
-          <ActionButtons confirmButtonType="submit" onCancelClick={goToUsersList} hasCard className="mt-6" />
+          <ActionButtons confirmButtonType="submit" onCancelClick={handleCancelClick} hasCard className="mt-6" />
         )}
       </form>
     </Form>

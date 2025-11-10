@@ -16,23 +16,15 @@ import { UserResponse } from '@/types/users'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 
 interface UserDetailsProps {
+  title: string
   userData: UserResponse | null
   isEditMode?: boolean
 }
 
 export const UserDetails = (props: UserDetailsProps) => {
-  const { userData, isEditMode = false } = props
+  const { title, userData, isEditMode = false } = props
   const t = useTranslations('users')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
-  const getTitle = () => {
-    if (!isEditMode) {
-      return t('newUser')
-    } else if (isEditMode && userData) {
-      return userData.displayName
-    } else {
-      return t('notFound')
-    }
-  }
 
   const tabValues: Record<'userData' | 'roles' | 'userGroups' | 'dataSpaces' | 'account', Tab> = {
     userData: {
@@ -100,12 +92,12 @@ export const UserDetails = (props: UserDetailsProps) => {
   }
 
   return (
-    <PageContainer headerType="withSubTabs" className='overflow-hidden'>
+    <PageContainer headerType="withSubTabs" className="overflow-hidden">
       <PageHeader
-        title={getTitle()}
+        title={title}
         subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: newTab => handleSelectTab(newTab) }}
       />
-      <PageBackground className='overflow-y-auto'>{Content}</PageBackground>
+      <PageBackground className="overflow-y-auto">{Content}</PageBackground>
     </PageContainer>
   )
 }
