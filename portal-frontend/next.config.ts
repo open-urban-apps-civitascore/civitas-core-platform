@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: https:",
+              "img-src 'self' data:",
               "font-src 'self' data:",
               "connect-src 'self'",
               // This directive prevents loading of legacy plugin technologies
