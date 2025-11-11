@@ -9,17 +9,10 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { Group, GroupTabProps } from '@/types/groups'
+import { BaseRole, ROLE_TYPES } from '@/types/roles'
 
 import { updateGroup } from '../../actions'
 import { RoleCategory } from './RoleCategory'
-import { ROLE_TYPES } from '@/types/roles'
-
-interface Role {
-  id: string
-  name: string
-  description: string
-  type: 'System' | 'Data' | 'Governance'
-}
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
@@ -31,7 +24,7 @@ export const RolesTab = (props: GroupTabProps) => {
   const router = useRouter()
   const [group, setGroup] = useState<Group>(groupData)
 
-  const [allRoles, setAllRoles] = useState<Role[]>([])
+  const [allRoles, setAllRoles] = useState<BaseRole[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   const hasChanges = useMemo(
