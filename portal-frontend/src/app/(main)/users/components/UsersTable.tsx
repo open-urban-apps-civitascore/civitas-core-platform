@@ -67,7 +67,7 @@ const UsersTable = (props: UsersTableProps) => {
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('isActive', {
-      header: t('info.active'),
+      header: t('info.status.title'),
       cell: info => <StatusLabel isChecked={info.getValue()} />,
     }),
   ]

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { Item } from './common'
+
 export type Group = {
   id: string
   title: string
@@ -9,6 +11,7 @@ export type Group = {
   contact: { id: string; displayName: string } | null
   parent: string | null
   subgroups: Group[]
+  dataspace: Item
 }
 
 export type UpdateGroupData = Group

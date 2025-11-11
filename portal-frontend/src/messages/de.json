@@ -70,7 +70,7 @@
     "detailsTabs": {
       "userData": "Benutzerdaten",
       "roles": "Rollen",
-      "userGroups": "Usergruppen",
+      "groups": "Gruppen",
       "dataspaces": "Datenräume und -sätze",
       "account": "Account"
     },
@@ -102,11 +102,13 @@
       "selectDepartment": "Abteilung wählen...",
       "selectGroup": "Gruppe wählen..."
     },
-    "rolesTab": {
-      "userNotFound": "Benutzer nicht gefunden",
-      "addRoleDialog": {
-        "title": "Rolle hinzufügen - {category}",
-        "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen."
+    "roles": {
+      "title": "Übersicht: Rollen",
+      "rolesTables": {
+        "role": "Rolle",
+        "inherited": "Vererbt",
+        "group": "Gruppe",
+        "assignment": "Zuordnung"
       }
     }
   },

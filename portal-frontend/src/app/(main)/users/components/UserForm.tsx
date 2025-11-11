@@ -1,28 +1,28 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useTranslations } from 'next-intl'
+import { SquarePen } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
-
-import { Select } from '@/components/form/fields/Select'
-import { Switch } from '@/components/form/fields/Switch'
-import { TextArea } from '@/components/form/fields/TextArea'
-import { TextField } from '@/components/form/fields/TextField'
-import { Button } from '@/components/ui/button'
-import { Form } from '@/components/ui/form'
-import { useQueryParams } from '@/hooks/useQueryParams'
-import { Authority, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
-import { mapFormUserToApiData, mapUserToFormData } from '@/utils/users'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { Select } from '@/components/form/fields/Select'
+import { Switch } from '@/components/form/fields/Switch'
+import { TextArea } from '@/components/form/fields/TextArea'
+import { TextField } from '@/components/form/fields/TextField'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
-import { SquarePen } from 'lucide-react'
-import { createUser, updateUser } from '../actions'
+import { Button } from '@/components/ui/button'
+import { Form } from '@/components/ui/form'
+import { useQueryParams } from '@/hooks/useQueryParams'
 import { cn } from '@/lib/utils'
+import { Authority, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+import { mapFormUserToApiData, mapUserToFormData } from '@/utils/users'
+
+import { createUser, updateUser } from '../actions'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
@@ -252,8 +252,10 @@ export const UserForm = (props: UserFormProps) => {
             />
           </DetailsFieldContainer>
           <DetailsFieldContainer className="border-b-0 flex items-center">
-            <Switch form={form} name="active" label={t('info.status.title')} isReadOnly={isReadOnly}/>
-            <span className={cn('ml-3 text-sm', isReadOnly && 'text-muted-foreground')}>{watchStatus ? t('info.status.active') : t('info.status.inactive')}</span>
+            <Switch form={form} name="active" label={t('info.status.title')} isReadOnly={isReadOnly} />
+            <span className={cn('ml-3 text-sm', isReadOnly && 'text-muted-foreground')}>
+              {watchStatus ? t('info.status.active') : t('info.status.inactive')}
+            </span>
           </DetailsFieldContainer>
         </ContentCard>
         {!isReadOnly && (

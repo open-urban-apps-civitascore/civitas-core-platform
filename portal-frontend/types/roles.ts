@@ -1,9 +1,11 @@
 import z from 'zod'
 
+import { Item } from './common'
+
 export const ROLE_TYPES = {
-  SYSTEM: 'System',
-  DATA: 'Data',
-  GOVERNANCE: 'Governance',
+  SYSTEM: 'system',
+  DATA: 'data',
+  GOVERNANCE: 'governance',
 } as const
 
 export type RoleType = (typeof ROLE_TYPES)[keyof typeof ROLE_TYPES]
@@ -20,6 +22,15 @@ export type RoleResponse = BaseRole & {
   permissions: string[] | null
   user: string[] | null
   createdAt: string
+}
+
+export type UserRolesTableData = {
+  id: string
+  name: string
+  group: string | null
+  dataspace: Item | null
+  inherited: boolean
+  type: RoleType
 }
 
 export type RoleInput = Omit<RoleResponse, 'id'>

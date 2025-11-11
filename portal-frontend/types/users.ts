@@ -1,15 +1,12 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { z } from 'zod'
 
-export type Category = {
-  id: string
-  title: string
-}
+import { Item } from './common'
 
-export type UserGroup = Category
+export type UserGroup = Item
 
-export type Authority = Category & {
-  departments: Category[]
+export type Authority = Item & {
+  departments: Item[]
 }
 
 export type UserAuthority = {
@@ -28,7 +25,7 @@ export type UserResponse = {
   phone: string
   title: TitleSchemaType
   authority: UserAuthority | null
-  group: string | null
+  groups: string[]
   active: boolean
   positionDescription: string | null
 }

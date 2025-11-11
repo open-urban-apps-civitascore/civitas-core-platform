@@ -9,10 +9,10 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
-
-import { RolesTab } from './RolesTab'
-import { FormUser, UserForm } from './UserForm'
 import { UserResponse } from '@/types/users'
+
+import { RolesTab } from './roles-tab/RolesTab'
+import { UserForm } from './UserForm'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 
 interface UserDetailsProps {
@@ -26,19 +26,14 @@ export const UserDetails = (props: UserDetailsProps) => {
   const t = useTranslations('users')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
 
-  const tabValues: Record<'userData' | 'roles' | 'userGroups' | 'dataSpaces' | 'account', Tab> = {
+  const tabValues: Record<'userData' | 'roles' | 'groups' | 'dataSpaces' | 'account', Tab> = {
     userData: {
       label: t('detailsTabs.userData'),
       value: 'userDetails',
       isActive: true,
     },
-    roles: {
-      label: t('detailsTabs.roles'),
-      value: 'roles',
-      isActive: isEditMode,
-    },
-    userGroups: {
-      label: t('detailsTabs.userGroups'),
+    groups: {
+      label: t('detailsTabs.groups'),
       value: 'userGroups',
       isActive: isEditMode,
     },
@@ -47,19 +42,18 @@ export const UserDetails = (props: UserDetailsProps) => {
       value: 'dataspaces',
       isActive: isEditMode,
     },
+    roles: {
+      label: t('detailsTabs.roles'),
+      value: 'roles',
+      isActive: isEditMode,
+    },
     account: {
       label: t('detailsTabs.account'),
       value: 'account',
       isActive: isEditMode,
     },
   }
-  const tabs: Tab[] = [
-    tabValues.userData,
-    tabValues.roles,
-    tabValues.userGroups,
-    tabValues.dataSpaces,
-    tabValues.account,
-  ]
+  const tabs: Tab[] = [tabValues.userData, tabValues.groups, tabValues.dataSpaces, tabValues.roles, tabValues.account]
 
   const defaultTab = tabValues.userData.value
 
@@ -84,9 +78,10 @@ export const UserDetails = (props: UserDetailsProps) => {
         Content = <UserForm userData={userData} isEditMode={isEditMode} />
         break
       case tabValues.roles.value:
-        Content = <RolesTab userId={userData.id} />
+        Content = <RolesTab groupIds={userData.groups} />
         break
       default:
+        Content = <ContentCard>No data</ContentCard>
         break
     }
   }

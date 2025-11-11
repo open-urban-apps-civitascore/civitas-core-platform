@@ -93,7 +93,7 @@
     "detailsTabs": {
       "userData": "User Data",
       "roles": "Roles",
-      "userGroups": "User Groups",
+      "groups": "Groups",
       "dataspaces": "Datenspaces and Datasets",
       "account": "Account"
     },
@@ -103,11 +103,13 @@
       "selectDepartment": "Select department...",
       "selectGroup": "Select group..."
     },
-    "rolesTab": {
-      "userNotFound": "User not found",
-      "addRoleDialog": {
-        "title": "Add Role - {category}",
-        "description": "Select a role to add to the user from the available {category} roles."
+    "roles": {
+      "title": "Overview: Roles",
+      "rolesTables": {
+        "role": "Role",
+        "inherited": "Inherited",
+        "group": "Group",
+        "assignment": "Assignment"
       }
     }
   },
