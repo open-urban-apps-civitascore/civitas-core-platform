@@ -1,8 +1,7 @@
 package com.civitas.configadapter.examples;
 
-import com.civitas.configadapter.adapter.ConfigAdapter;
+import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.config.AppConfig;
-import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.Topics;
 import io.cloudevents.CloudEvent;
@@ -20,7 +19,7 @@ import java.util.UUID;
  * Useful for testing, debugging, and as a reference implementation.
  * Demonstrates how to use EventPublisher to send result/error events.
  */
-public class DummyLogAdapter implements ConfigAdapter {
+public class DummyLogAdapter extends AbstractConfigAdapter {
 
     private static final Logger logger = LoggerFactory.getLogger(DummyLogAdapter.class);
 
@@ -30,9 +29,8 @@ public class DummyLogAdapter implements ConfigAdapter {
         Topics.USER_DELETED
     );
 
-    private EventPublisher eventPublisher;
-
     public DummyLogAdapter(AppConfig config) {
+        super(config);
         logger.info("DummyLogAdapter initialized - will log all received events");
         logger.info("Subscribed to {} topics: {}", SUBSCRIBED_TOPICS.size(), SUBSCRIBED_TOPICS);
     }
@@ -40,12 +38,6 @@ public class DummyLogAdapter implements ConfigAdapter {
     @Override
     public List<String> getSubscribedTopics() {
         return SUBSCRIBED_TOPICS;
-    }
-
-    @Override
-    public void setEventPublisher(EventPublisher publisher) {
-        this.eventPublisher = publisher;
-        logger.info("EventPublis her injected into DummyLogAdapter");
     }
 
     @Override
@@ -61,7 +53,7 @@ public class DummyLogAdapter implements ConfigAdapter {
 
         // Publish a result event if resultTopic is specified
         String resultTopic = event.metadata().resultTopic();
-        if (eventPublisher != null && topic != null && !resultTopic.isEmpty()) {
+        if (getEventPublisher() != null && topic != null && !resultTopic.isEmpty()) {
             try {
                 CloudEvent resultEvent = CloudEventBuilder.v1()
                     .withId(UUID.randomUUID().toString())
@@ -74,7 +66,7 @@ public class DummyLogAdapter implements ConfigAdapter {
                     .withExtension("adapter", "DummyLogAdapter")
                     .build();
 
-				eventPublisher.publish(resultTopic, resultEvent);
+				getEventPublisher().publish(resultTopic, resultEvent);
                 logger.debug("Published result event to topic {} for {}", resultTopic, event.metadata().messageId());
             } catch (Exception e) {
                 logger.error("Failed to publish result event", e);

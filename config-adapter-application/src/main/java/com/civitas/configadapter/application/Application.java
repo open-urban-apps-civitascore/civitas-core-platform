@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.config.AppConfig;
 import com.civitas.configadapter.messaging.EventConsumer;
+import com.civitas.configadapter.messaging.EventPublisher;
 
 public class Application {
 
@@ -61,8 +62,29 @@ public class Application {
 			throw new RuntimeException("No adapters configured. Please specify 'adapters' or 'adapter.class' property");
 		}
 
-		String consumerClass = config.getEventHandlerClass();
-		logger.info("Creating {} adapter(s) with consumer: {}", adapterClasses.size(), consumerClass);
+		// Determine configuration mode: combined or separate consumer/publisher
+		String eventHandlerClass = config.getEventHandlerClass();
+		String eventConsumerClass = config.getEventConsumerClass();
+		String eventPublisherClass = config.getEventPublisherClass();
+
+		if (eventHandlerClass != null && (eventConsumerClass != null || eventPublisherClass != null)) {
+			throw new RuntimeException(
+				"Configuration error: Cannot specify both 'eventhandler.class' and separate 'eventconsumer.class' or 'eventpublisher.class'");
+		}
+
+		boolean useCombinedHandler = eventHandlerClass != null;
+
+		if (useCombinedHandler) {
+			logger.info("Using combined event handler: {}", eventHandlerClass);
+		} else {
+			if (eventConsumerClass == null) {
+				throw new RuntimeException("No event consumer configured. Please specify 'eventhandler.class' or 'eventconsumer.class'");
+			}
+			logger.info("Using separate consumer: {} and publisher: {}",
+				eventConsumerClass, eventPublisherClass != null ? eventPublisherClass : "none");
+		}
+
+		logger.info("Creating {} adapter(s)", adapterClasses.size());
 
 		List<EventConsumer> consumers = new ArrayList<>();
 
@@ -81,7 +103,25 @@ public class Application {
 				logger.info("Adapter {} subscribes to {} topic(s): {}", adapter.getClass().getSimpleName(),
 						topics.size(), topics);
 
-				EventConsumer consumer = createConsumer(config, consumerClass, adapter);
+				EventConsumer consumer;
+				if (useCombinedHandler) {
+					// Combined handler: single class implements both EventConsumer and EventPublisher
+					consumer = createConsumer(config, eventHandlerClass, adapter);
+				} else {
+					// Separate consumer and publisher
+					EventPublisher publisher = null;
+					if (eventPublisherClass != null) {
+						publisher = createPublisher(config, eventPublisherClass);
+					}
+
+					// Inject publisher into adapter
+					if (publisher != null) {
+						adapter.setEventPublisher(publisher);
+					}
+
+					consumer = createConsumer(config, eventConsumerClass, adapter);
+				}
+
 				consumers.add(consumer);
 
 				logger.info("Successfully created consumer for adapter: {}", adapterClass);
@@ -103,13 +143,41 @@ public class Application {
 			throws ClassNotFoundException, InstantiationException, IllegalAccessException, InvocationTargetException,
 			NoSuchMethodException {
 		Class<?> consumerClazz = Class.forName(consumerClass);
+
+		// Verify that the class implements EventConsumer interface
+		if (!EventConsumer.class.isAssignableFrom(consumerClazz)) {
+			throw new IllegalArgumentException(
+				String.format("Class %s does not implement EventConsumer interface", consumerClass));
+		}
+
 		return (EventConsumer) consumerClazz.getConstructor(AppConfig.class, ConfigAdapter.class).newInstance(config,
 				adapter);
+	}
+
+	private static EventPublisher createPublisher(AppConfig config, String publisherClass)
+			throws ClassNotFoundException, InstantiationException, IllegalAccessException, InvocationTargetException,
+			NoSuchMethodException {
+		Class<?> publisherClazz = Class.forName(publisherClass);
+
+		// Verify that the class implements EventPublisher interface
+		if (!EventPublisher.class.isAssignableFrom(publisherClazz)) {
+			throw new IllegalArgumentException(
+				String.format("Class %s does not implement EventPublisher interface", publisherClass));
+		}
+
+		return (EventPublisher) publisherClazz.getConstructor(AppConfig.class).newInstance(config);
 	}
 
 	private static ConfigAdapter createAdapter(AppConfig config, String adapterClass) throws ClassNotFoundException,
 			InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
 		Class<?> adapterClazz = Class.forName(adapterClass);
+
+		// Verify that the class implements ConfigAdapter interface
+		if (!ConfigAdapter.class.isAssignableFrom(adapterClazz)) {
+			throw new IllegalArgumentException(
+				String.format("Class %s does not implement ConfigAdapter interface", adapterClass));
+		}
+
 		return (ConfigAdapter) adapterClazz.getConstructor(AppConfig.class).newInstance(config);
 	}
 }

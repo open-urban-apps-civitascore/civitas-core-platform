@@ -46,6 +46,14 @@ public class AppConfig {
         return properties.getProperty("eventhandler.class");
     }
 
+    public String getEventConsumerClass() {
+        return properties.getProperty("eventconsumer.class");
+    }
+
+    public String getEventPublisherClass() {
+        return properties.getProperty("eventpublisher.class");
+    }
+
     public String getProperty(String key) {
         return properties.getProperty(key);
     }

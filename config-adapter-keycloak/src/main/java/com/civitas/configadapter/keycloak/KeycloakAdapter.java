@@ -9,9 +9,8 @@ import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.civitas.configadapter.adapter.ConfigAdapter;
+import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.config.AppConfig;
-import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.Topics;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,7 +27,7 @@ import java.util.UUID;
  * Keycloak adapter that processes configuration messages and manages Keycloak resources.
  * Supports CREATE, UPDATE, and DELETE operations for realms, clients, and users.
  */
-public class KeycloakAdapter implements ConfigAdapter {
+public class KeycloakAdapter extends AbstractConfigAdapter {
 
     private static final Logger logger = LoggerFactory.getLogger(KeycloakAdapter.class);
 
@@ -56,9 +55,9 @@ public class KeycloakAdapter implements ConfigAdapter {
 
     private final Keycloak keycloakClient;
     private final ObjectMapper objectMapper;
-    private EventPublisher eventPublisher;
 
     public KeycloakAdapter(AppConfig config) {
+        super(config);
         this.keycloakClient = KeycloakBuilder.builder()
             .serverUrl(config.getProperty(KEYCLOAK_URL, "http://localhost:8080"))
             .realm(config.getProperty(KEYCLOAK_REALM, "master"))
@@ -70,12 +69,6 @@ public class KeycloakAdapter implements ConfigAdapter {
 
         logger.info("Keycloak adapter initialized for: {}", config.getProperty(KEYCLOAK_URL, "http://localhost:8080"));
         logger.info("Subscribed to {} Kafka topics: {}", SUBSCRIBED_TOPICS.size(), SUBSCRIBED_TOPICS);
-    }
-
-    @Override
-    public void setEventPublisher(EventPublisher publisher) {
-        this.eventPublisher = publisher;
-        logger.info("EventPublisher injected into KeycloakAdapter");
     }
 
     @Override
@@ -364,7 +357,7 @@ public class KeycloakAdapter implements ConfigAdapter {
     // ============== RESULT PUBLISHING ==============
 
     private void publishSuccessResult(ConfigEvent originalEvent, String message, String resourceId) {
-        if (eventPublisher == null || originalEvent.metadata().resultTopic() == null) {
+        if (getEventPublisher() == null || originalEvent.metadata().resultTopic() == null) {
             return;
         }
 
@@ -386,7 +379,7 @@ public class KeycloakAdapter implements ConfigAdapter {
                 .withExtension("targetresource", originalEvent.payload().targetResource())
                 .build();
 
-            eventPublisher.publish(originalEvent.metadata().resultTopic(), resultEvent);
+            getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
             logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
 
         } catch (Exception e) {
@@ -395,7 +388,7 @@ public class KeycloakAdapter implements ConfigAdapter {
     }
 
     private void publishErrorResult(ConfigEvent originalEvent, String errorCode, String errorMessage) {
-        if (eventPublisher == null || originalEvent.metadata().resultTopic() == null) {
+        if (getEventPublisher() == null || originalEvent.metadata().resultTopic() == null) {
             return;
         }
 
@@ -417,7 +410,7 @@ public class KeycloakAdapter implements ConfigAdapter {
                 .withExtension("targetresource", originalEvent.payload().targetResource())
                 .build();
 
-            eventPublisher.publish(originalEvent.metadata().resultTopic(), resultEvent);
+            getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
             logger.debug("Published FAILURE result to topic: {}", originalEvent.metadata().resultTopic());
 
         } catch (Exception e) {
