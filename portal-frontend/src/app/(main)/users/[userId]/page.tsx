@@ -1,8 +1,6 @@
 import { UserResponse } from '@/types/users'
-import { mapUserToFormData } from '@/utils/users'
 
 import { UserDetails } from '../components/UserDetails'
-import { getTranslations } from 'next-intl/server'
 
 const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
@@ -38,7 +36,7 @@ const UserDetailsPage = async (props: PageProps) => {
 
   const userData = await getUserData(userId)
 
-  return <UserDetails userData={userData} isEditMode title={userData.displayName}/>
+  return <UserDetails userData={userData} isEditMode title={userData.displayName} />
 }
 
 export default UserDetailsPage

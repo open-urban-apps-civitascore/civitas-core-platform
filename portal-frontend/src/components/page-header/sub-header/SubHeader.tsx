@@ -1,5 +1,6 @@
-import { cn } from '@/lib/utils'
 import { HTMLAttributes, ReactNode } from 'react'
+
+import { cn } from '@/lib/utils'
 
 interface SubHeaderProps extends HTMLAttributes<HTMLDivElement> {
   title: string

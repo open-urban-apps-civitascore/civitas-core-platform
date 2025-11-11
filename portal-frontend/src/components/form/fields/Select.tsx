@@ -5,8 +5,8 @@ import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Select as ShadcnSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { cn } from '@/lib/utils'
 
 export type SelectOption = {
   value: string

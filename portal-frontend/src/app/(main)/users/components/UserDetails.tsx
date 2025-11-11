@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
@@ -13,7 +14,6 @@ import { UserResponse } from '@/types/users'
 
 import { RolesTab } from './roles-tab/RolesTab'
 import { UserForm } from './UserForm'
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 
 interface UserDetailsProps {
   title: string

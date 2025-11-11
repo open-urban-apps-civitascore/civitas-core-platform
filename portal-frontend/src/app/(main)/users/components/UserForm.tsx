@@ -125,7 +125,7 @@ export const UserForm = (props: UserFormProps) => {
   }
 
   const handleCreateUser = async (formData: UserFormData) => {
-    const mappedData: UserResponse = { ...mapFormUserToApiData(formData), group: userData.group }
+    const mappedData: UserResponse = { ...mapFormUserToApiData(formData), groups: userData.groups }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
     await createUser(createUserData)
@@ -133,7 +133,7 @@ export const UserForm = (props: UserFormProps) => {
   }
 
   const handleUpdateUser = async (formData: UserFormData) => {
-    const updateUserData = { ...mapFormUserToApiData(formData), group: userData.group }
+    const updateUserData = { ...mapFormUserToApiData(formData), groups: userData.groups }
     await updateUser(updateUserData)
     setIsReadOnly(true)
   }

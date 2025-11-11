@@ -1,11 +1,11 @@
+import { DetailedHTMLProps, HTMLAttributes } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
+import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
 import { Switch as ShadcnSwitch } from '@/components/ui/switch'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-import { DetailedHTMLProps, HTMLAttributes } from 'react'
-import { StatusLabel } from '@/components/status-label/StatusLabel'
 
 interface SwitchProps<T extends FieldValues> {
   form: UseFormReturn<T>

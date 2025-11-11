@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { Authority, TitleSchemaType, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
 
-import { mapApiUserData, mapUserToFormData, mapListUsers } from './users'
+import { mapApiUserData, mapListUsers, mapUserToFormData } from './users'
 
 const baseFormData = {
   id: '12345',

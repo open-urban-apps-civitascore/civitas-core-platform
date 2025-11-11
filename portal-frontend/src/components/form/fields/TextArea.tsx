@@ -3,8 +3,8 @@ import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { cn } from '@/lib/utils'
 
 interface TextAreaProps<T extends FieldValues>
   extends Omit<InputHTMLAttributes<HTMLTextAreaElement>, 'form' | 'onChange'> {
