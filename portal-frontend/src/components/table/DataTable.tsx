@@ -81,7 +81,7 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                 table.getRowModel().rows.map(row => (
                   <TableRow
                     className={cn(
-                      `h-16 ${onRowClick && isRowClickable(row) ? 'cursor-pointer' : ''} ${row.depth > 0 ? 'border-0' : 'border-0 border-t-1'}`,
+                      `group h-16 ${onRowClick && isRowClickable(row) ? 'cursor-pointer' : ''} ${row.depth > 0 ? 'border-0' : 'border-0 border-t-1'}`,
                     )}
                     key={row.id}
                     onClick={onRowClick && isRowClickable(row) ? () => onRowClick(row) : () => null}

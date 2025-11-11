@@ -9,7 +9,8 @@
       "cancel": "Abbrechen",
       "delete": "Löschen",
       "add": "Hinzufügen",
-      "edit": "Bearbeiten"
+      "edit": "Bearbeiten",
+      "open": "öffnen"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -32,6 +33,7 @@
     "documentation": "Dokumentation",
     "logout": "Abmelden",
     "datasets": "Datensätze",
+    "permissions": "Berechtigungen",
     "roles": "Rollen Management",
     "create": "erstellen",
     "edit": "bearbeiten",
@@ -164,6 +166,16 @@
       "previousPage": "Zur vorherigen Seite wechseln",
       "nextPage": "Zur nächsten Seite wechseln",
       "lastPage": "Zur letzten Seite wechseln"
+    }
+  },
+  "permissions": {
+    "title": "Berechtigungen",
+    "systemPermissions": "Systemberechtigungen",
+    "dataPermissions": "Datenberechtigungen",
+    "governancePermissions": "Governanceberechtigungen",
+    "tableHeaders": {
+      "title": "Name",
+      "category": "Kategorie"
     }
   },
   "roles": {

@@ -9,7 +9,8 @@
       "cancel": "Cancel",
       "delete": "Delete",
       "add": "Add",
-      "edit": "Edit"
+      "edit": "Edit",
+      "open": "open"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
@@ -32,6 +33,7 @@
     "documentation": "Documentation",
     "logout": "Log out",
     "datasets": "Datasets",
+    "permissions": "Permissions",
     "roles": "Role Management",
     "create": "create",
     "edit": "edit",
@@ -165,6 +167,16 @@
       "previousPage": "Go to previous page",
       "nextPage": "Go to next page",
       "lastPage": "Go to last page"
+    }
+  },
+  "permissions": {
+    "title": "Permissions",
+    "systemPermissions": "System Permissions",
+    "dataPermissions": "Daten Permissions",
+    "governancePermissions": "Governance Permissions",
+    "tableHeaders": {
+      "title": "Name",
+      "category": "Category"
     }
   },
   "roles": {
