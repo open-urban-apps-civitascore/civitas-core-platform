@@ -1,6 +1,6 @@
 import { PaginationState, SortingState } from '@tanstack/react-table'
 import { ReadonlyURLSearchParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { QUERY_PARAMS } from '@/const/searchParams'
 
@@ -30,6 +30,15 @@ export const useQueryParams = () => {
   const search = useMemo(() => searchParams.get(QUERY_PARAMS.search) ?? '', [searchParams])
   const tabValue = useMemo(() => searchParams.get(QUERY_PARAMS.tabValue) ?? '', [searchParams])
   const subTabValue = useMemo(() => searchParams.get(QUERY_PARAMS.subTabValue) ?? '', [searchParams])
+
+  const [totalPages, setTotalPages] = useState(1)
+
+  useEffect(() => {
+    if (totalPages && totalPages > 0 && pageIndex + 1 > totalPages) {
+      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages, pageIndex, pageSize])
 
   const setSortingParams = (newSorting: SortingState) => {
     const params = new URLSearchParams(searchParams)
@@ -122,11 +131,13 @@ export const useQueryParams = () => {
     getApiRequestParamsByUrl,
     setTabValueParam,
     setSubTabValueParam,
+    setTotalPages,
     pageIndex,
     pageSize,
     sorting,
     search,
     tabValue,
     subTabValue,
+    totalPages,
   }
 }

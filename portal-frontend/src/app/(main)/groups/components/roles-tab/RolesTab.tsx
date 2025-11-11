@@ -9,6 +9,7 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { Group, GroupTabProps } from '@/types/groups'
+import { RoleType } from '@/types/roles'
 
 import { updateGroup } from '../../actions'
 import { RoleCategory } from './RoleCategory'
@@ -17,7 +18,7 @@ interface Role {
   id: string
   name: string
   description: string
-  type: 'System' | 'Data' | 'Governance'
+  type: RoleType
 }
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
@@ -102,7 +103,7 @@ export const RolesTab = (props: GroupTabProps) => {
         </DetailsFieldContainer>
         <RoleCategory
           title={tRoles('systemRoles')}
-          category="System"
+          category="system"
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
@@ -111,7 +112,7 @@ export const RolesTab = (props: GroupTabProps) => {
 
         <RoleCategory
           title={tRoles('dataRoles')}
-          category="Data"
+          category="data"
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
@@ -120,7 +121,7 @@ export const RolesTab = (props: GroupTabProps) => {
 
         <RoleCategory
           title={tRoles('governanceRoles')}
-          category="Governance"
+          category="governance"
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
