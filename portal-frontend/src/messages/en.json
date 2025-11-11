@@ -107,6 +107,7 @@
     },
     "roles": {
       "title": "Overview: Roles",
+      "noRolesAssigned": "No {roleType} assigned",
       "rolesTables": {
         "role": "Role",
         "inherited": "Inherited",

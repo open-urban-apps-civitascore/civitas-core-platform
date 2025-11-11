@@ -93,7 +93,13 @@ export const UserFormSchema = z.object({
   department: z.string().nullable(),
   phone: PhoneSchema,
   active: z.boolean(),
-  positionDescription: z.string().min(10).or(z.literal('')).nullable(),
+  positionDescription: z
+    .string()
+    .min(10, {
+      message: 'common.errors.atLeast10',
+    })
+    .or(z.literal(''))
+    .nullable(),
 })
 
 export type UserFormData = z.infer<typeof UserFormSchema>

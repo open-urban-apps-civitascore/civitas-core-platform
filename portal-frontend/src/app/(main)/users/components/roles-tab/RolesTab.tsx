@@ -97,6 +97,7 @@ export const RolesTab = (props: RolesTabProps) => {
         rolesType={ROLE_TYPES.GOVERNANCE}
         roles={roles.filter(role => role.type === ROLE_TYPES.GOVERNANCE)}
         isLoading={isLoading}
+        className="border-b-0"
       />
     </ContentCard>
   )

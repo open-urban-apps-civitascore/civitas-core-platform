@@ -85,9 +85,15 @@ export const UserForm = (props: UserFormProps) => {
     defaultValues: mapUserToFormData(userData),
   })
 
+  useEffect(() => {
+    form.reset(mapUserToFormData(userData))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userData])
+
   // eslint-disable-next-line @typescript-eslint/naming-convention
   const watchStatus = form.watch('active')
   const watchAuthority = form.watch('authority')
+  const watch = form.watch()
 
   // adjust selected department when authority gets changed
   // remove department when new authority selected, reset initial department when initial aurhority selected
@@ -98,6 +104,16 @@ export const UserForm = (props: UserFormProps) => {
       form.resetField('department')
     }
   }, [watchAuthority, form, userData])
+
+  // checks if changed phone number without whitespaces is the same as initial phone number or if any other field has been changed
+  const isFormDirty = useMemo(() => {
+    const dirtyFields = form.formState.dirtyFields
+    const isPhoneFieldDirty =
+      dirtyFields.phone && form.getValues('phone').replace(/\s+/g, '') !== userData.phone.replace(/\s+/g, '')
+    const isNonPhoneFieldDirty = Object.keys(dirtyFields).find(field => field !== 'phone')
+    return isNonPhoneFieldDirty || isPhoneFieldDirty
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watch, form, userData.phone])
 
   // set form options for field 'department' depending on the currently selected authority
   const departmentOptions = useMemo(() => {
@@ -110,18 +126,9 @@ export const UserForm = (props: UserFormProps) => {
     return departments
   }, [watchAuthority, authorities])
 
-  const goToUsersList = () => {
+  const handleCancelClick = () => {
     const apiParams = getApiRequestParamsByUrl()
     router.push(`/users?${apiParams}`)
-  }
-
-  const handleCancelClick = () => {
-    if (isEditMode) {
-      form.reset()
-      setIsReadOnly(true)
-    } else {
-      goToUsersList()
-    }
   }
 
   const handleCreateUser = async (formData: UserFormData) => {
@@ -135,6 +142,8 @@ export const UserForm = (props: UserFormProps) => {
   const handleUpdateUser = async (formData: UserFormData) => {
     const updateUserData = { ...mapFormUserToApiData(formData), groups: userData.groups }
     await updateUser(updateUserData)
+    // refresh view for setting updated user data as default form data
+    router.refresh()
     setIsReadOnly(true)
   }
 
@@ -259,7 +268,13 @@ export const UserForm = (props: UserFormProps) => {
           </DetailsFieldContainer>
         </ContentCard>
         {!isReadOnly && (
-          <ActionButtons confirmButtonType="submit" onCancelClick={handleCancelClick} hasCard className="mt-6" />
+          <ActionButtons
+            confirmButtonType="submit"
+            isConfirmButtonDisabled={!isFormDirty}
+            onCancelClick={handleCancelClick}
+            hasCard
+            className="mt-6"
+          />
         )}
       </form>
     </Form>

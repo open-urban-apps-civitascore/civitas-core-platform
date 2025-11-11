@@ -110,7 +110,8 @@
         "role": "Rolle",
         "inherited": "Vererbt",
         "group": "Gruppe",
-        "assignment": "Zuordnung"
+        "assignment": "Zuordnung",
+        "noRolesAssigned": "Keine {roleType} zugewiesen"
       }
     }
   },

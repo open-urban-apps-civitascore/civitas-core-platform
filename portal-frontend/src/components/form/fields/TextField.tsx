@@ -35,15 +35,17 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
             {label}
             {required && <span className="text-red-500 ml-1">*</span>}
           </FormLabel>
-          <FormControl>
-            <Input
-              className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0 "
-              placeholder={placeholder}
-              {...field}
-              disabled={disabled}
-            />
-          </FormControl>
-          <FormMessage />
+          <div>
+            <FormControl>
+              <Input
+                className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0 "
+                placeholder={placeholder}
+                {...field}
+                disabled={disabled}
+              />
+            </FormControl>
+            <FormMessage className="mt-2" />
+          </div>
         </FormItem>
       )}
     />
