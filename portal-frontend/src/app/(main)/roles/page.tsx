@@ -41,22 +41,29 @@ const RolesPage = () => {
     setSortingParams,
     setPaginationParams,
     setSearchParam,
-    setApiRequestParams,
+    getApiRequestParamsByUrl,
     setTabValueParam,
+    setTotalPages,
     pageIndex,
     pageSize,
     sorting,
     search,
     tabValue,
+    totalPages,
   } = useQueryParams()
 
-  const totalPages = Math.ceil(rowCount / pageSize)
+  useEffect(() => {
+    if (totalPages && totalPages > 0 && pageIndex + 1 > totalPages) {
+      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalPages, pageIndex, pageSize])
 
   const [selectedRoleType, setSelectedRoleType] = useState<string>(tabValue || DEFAULT_TAB)
   const [selectedSubTab, setSelectedSubTab] = useState<string>(tabValue || 'roles')
 
   const getRoles = useCallback(async () => {
-    const params = setApiRequestParams(totalPages)
+    const params = getApiRequestParamsByUrl()
 
     try {
       setIsLoading(true)
@@ -69,14 +76,15 @@ const RolesPage = () => {
       if (rowCount !== totalCount) {
         setRowCount(totalCount)
       }
-
+      setTotalPages(Math.ceil(totalCount / pageSize) || 1)
       setIsLoading(false)
     } catch (error) {
       console.error(error)
 
       setIsLoading(false)
     }
-  }, [setApiRequestParams, totalPages, selectedRoleType, rowCount])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getApiRequestParamsByUrl, selectedRoleType, rowCount, pageSize])
 
   useEffect(() => {
     getRoles()

@@ -39,7 +39,7 @@ export const UserForm = (props: UserFormProps) => {
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
-  const { setApiRequestParams } = useQueryParams()
+  const { getApiRequestParamsByUrl } = useQueryParams()
 
   const [authorities, setAuthorities] = useState<Authority[]>([])
 
@@ -96,7 +96,7 @@ export const UserForm = (props: UserFormProps) => {
   }, [watchAuthority, authorities])
 
   const goToUsersList = () => {
-    const apiParams = setApiRequestParams()
+    const apiParams = getApiRequestParamsByUrl()
     router.push(`/users?${apiParams}`)
   }
 

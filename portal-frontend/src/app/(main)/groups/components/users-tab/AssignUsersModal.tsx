@@ -8,20 +8,20 @@ import {
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
-import { Check } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 
+import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { QUERY_PARAMS } from '@/const/searchParams'
+import { useQueryParams } from '@/hooks/useQueryParams'
 import { GroupAssignmentUser, UserResponse } from '@/types/users'
-import { resolveUpdater } from '@/utils/table'
+import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
 import { mapGoupAssignmentUsers } from '@/utils/users'
 
 export type UserSelection = { selectAll: boolean; selectedIds: string[]; excludedIds: string[] }
@@ -43,29 +43,19 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
   const [users, setUsers] = useState<GroupAssignmentUser[]>([])
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
-  const [isLoadingUsersList, setIsLoadingUsersList] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
   const [sorting, setSorting] = useState<SortingState>([])
   const [rowCount, setRowCount] = useState(0)
   const [searchString, setSearchString] = useState('')
   const [selection, setSelection] = useState<RowSelectionState>({})
   const totalPages = Math.ceil(rowCount / pageSize)
   const selectAllCheckbox = useRef<HTMLButtonElement>(null)
-
-  const getRequestParams = () => {
-    const requestParams = new URLSearchParams()
-    requestParams.set(QUERY_PARAMS.pageSize, pageSize.toString())
-    requestParams.set(QUERY_PARAMS.pageIndex, (pageIndex + 1).toString())
-    if (sorting[0]) {
-      requestParams.set(QUERY_PARAMS.sortingId, sorting[0].id)
-      requestParams.set(QUERY_PARAMS.order, sorting[0].desc ? 'desc' : 'asc')
-    }
-    return requestParams
-  }
+  const { getApiRequestParams } = useQueryParams()
 
   // this implementation has to be adjusted when the backend is implemented
   // only unassigned users have to be returned from the backend directly
   const getUserListData = async () => {
-    const requestParams = getRequestParams()
+    const requestParams = getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString })
     try {
       const usersResponse = await fetch(`${URL}/users?${requestParams.toString()}`, {
         cache: 'no-store',
@@ -86,7 +76,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     } catch (error) {
       console.error('An error occurred while fetching users data:', error)
     } finally {
-      setIsLoadingUsersList(false)
+      setIsLoading(false)
     }
   }
 
@@ -97,11 +87,18 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
   }, [open])
 
   useEffect(() => {
+    if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
+      setPageIndex(totalPages - 1)
+    }
+  }, [pageIndex, totalPages])
+
+  useEffect(() => {
+    setIsLoading(true)
     getUserListData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, rowCount, sorting, totalPages, searchString, originalUsers])
+  }, [pageIndex, pageSize, rowCount, sorting, searchString, originalUsers])
 
-  const hanldePagination = (newPagination: PaginationState) => {
+  const handlePagination = (newPagination: PaginationState) => {
     setPageIndex(newPagination.pageIndex)
     setPageSize(newPagination.pageSize)
   }
@@ -158,7 +155,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     }),
     columnHelper.accessor('isActive', {
       header: tUsers('info.active'),
-      cell: info => (info.getValue() ? <Check /> : '-'),
+      cell: info => <StatusLabel isChecked={info.getValue()} />,
     }),
   ]
 
@@ -177,7 +174,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onPaginationChange: updater => {
-      hanldePagination(resolveUpdater(updater, { pageIndex, pageSize }))
+      handlePagination(resolveUpdater(updater, { pageIndex, pageSize }))
     },
     onRowSelectionChange: setSelection,
     onSortingChange: updater => setSorting(resolveUpdater(updater, sorting)),
@@ -185,7 +182,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="block sm:max-w-[95%] sm:w-[95%] md:max-w-[1061px] h-[80%] max-h-[743px]  [--title-height:64px] [--button-height:36px]">
+      <DialogContent className="block sm:max-w-[95%] sm:w-[95%] md:max-w-[1061px] h-[80%] max-h-[743px]  [--title-height:64px] [--button-height:60px]">
         <DialogHeader>
           <DialogTitle>{t('users.assign')}</DialogTitle>
           <DialogDescription>
@@ -206,15 +203,18 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
               pageIndex={pageIndex}
               pageSize={pageSize}
               totalPages={totalPages}
-              isLoading={isLoadingUsersList}
+              isLoading={isLoading}
             />
           )}
         </div>
-        <div className="flex justify-end">
-          <Button onClick={() => onUpdateUsers(selection)} disabled={isUpdating || isLoadingUsersList}>
-            {tCommon('actions.add')}
-          </Button>
-        </div>
+        <ActionButtons
+          confirmButtonType="button"
+          onConfirmClick={() => onUpdateUsers(selection)}
+          onCancelClick={() => onOpenChange(false)}
+          isConfirmButtonDisabled={isUpdating || isLoading}
+          hasCard={false}
+          confirmButtonTitle={tCommon('actions.add')}
+        />
       </DialogContent>
     </Dialog>
   )
