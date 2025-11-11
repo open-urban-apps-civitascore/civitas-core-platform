@@ -63,10 +63,9 @@ export const DataSpaceForm = (props: DataSpaceFormProps) => {
             <div className="ml-auto">
               <ActionButtons
                 confirmButtonType="submit"
-                onCancelClick={() => router.back()}
+                onCancelClick={() => router.push('/dataspaces')}
                 hasCard={false}
-                isConfirmButtonDisabled={!form.formState.isDirty || !form.formState.isValid}
-                isCancelButtonDisabled={!form.formState.isDirty}
+                isConfirmButtonDisabled={!form.formState.isDirty}
               />
             </div>
           </div>

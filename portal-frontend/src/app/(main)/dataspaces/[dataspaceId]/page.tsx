@@ -81,8 +81,6 @@ const EditDataSpacePage = () => {
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`)
       }
-
-      router.push('/dataspaces')
     } catch (error) {
       console.error('Error updating dataspace:', error)
     }
@@ -108,10 +106,12 @@ const EditDataSpacePage = () => {
     }
   }
 
-  const onSubmit = (values: DataSpaceFormData) => {
+  const onSubmit = async (values: DataSpaceFormData) => {
     if (!selectedDataSpace) return
 
-    updateDataSpace(dataspaceId, { ...selectedDataSpace, ...values })
+    await updateDataSpace(dataspaceId, { ...selectedDataSpace, ...values })
+    form.reset(values)
+    router.refresh()
   }
 
   return (
