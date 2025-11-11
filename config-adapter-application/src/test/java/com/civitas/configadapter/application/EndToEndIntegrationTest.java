@@ -96,6 +96,13 @@ class EndToEndIntegrationTest {
         props.setProperty("keycloak.username", "admin");
         props.setProperty("keycloak.password", "admin");
         props.setProperty("keycloak.client.id", "admin-cli");
+        props.setProperty("keycloak.topics", String.join(",",
+            Topics.USER_CREATED, Topics.USER_UPDATED, Topics.USER_DELETED,
+            Topics.USER_LOCKED, Topics.USER_UNLOCKED,
+            Topics.USER_PASSWORD_CHANGED, Topics.USER_PASSWORD_RESET,
+            Topics.REALM_CREATED, Topics.REALM_UPDATED, Topics.REALM_DELETED,
+            Topics.CLIENT_CREATED, Topics.CLIENT_UPDATED, Topics.CLIENT_DELETED
+        ));
         AppConfig config = new AppConfig(props);
 
         // Create adapter

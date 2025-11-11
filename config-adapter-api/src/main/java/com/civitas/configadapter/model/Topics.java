@@ -1,5 +1,7 @@
 package com.civitas.configadapter.model;
 
+import java.util.List;
+
 public final class Topics {
 
     private Topics() {
@@ -34,4 +36,45 @@ public final class Topics {
     public static final String ROLE_CREATED = "core.civitas.idm.role.created";
     public static final String ROLE_UPDATED = "core.civitas.idm.role.updated";
     public static final String ROLE_DELETED = "core.civitas.idm.role.deleted";
+
+    /**
+     * Immutable list of all available topics.
+     * Used for validation of configured topics.
+     */
+    public static final List<String> ALL_TOPICS = List.of(
+        // User events
+        USER_CREATED,
+        USER_UPDATED,
+        USER_DELETED,
+        USER_LOCKED,
+        USER_UNLOCKED,
+        USER_PASSWORD_CHANGED,
+        USER_PASSWORD_RESET,
+        // Realm events
+        REALM_CREATED,
+        REALM_UPDATED,
+        REALM_DELETED,
+        // Client events
+        CLIENT_CREATED,
+        CLIENT_UPDATED,
+        CLIENT_DELETED,
+        // Group events
+        GROUP_CREATED,
+        GROUP_UPDATED,
+        GROUP_DELETED,
+        // Role events
+        ROLE_CREATED,
+        ROLE_UPDATED,
+        ROLE_DELETED
+    );
+
+    /**
+     * Validates if a topic is a known topic.
+     *
+     * @param topic the topic to validate
+     * @return true if the topic is valid, false otherwise
+     */
+    public static boolean isValidTopic(String topic) {
+        return ALL_TOPICS.contains(topic);
+    }
 }

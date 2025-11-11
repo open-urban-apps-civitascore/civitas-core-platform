@@ -275,6 +275,11 @@ class KafkaEventHandlerIntegrationTest {
         EventPublisher eventPublisher;
 
         @Override
+        public String getName() {
+            return "test";
+        }
+
+        @Override
         public List<String> getSubscribedTopics() {
             return subscribedTopics;
         }

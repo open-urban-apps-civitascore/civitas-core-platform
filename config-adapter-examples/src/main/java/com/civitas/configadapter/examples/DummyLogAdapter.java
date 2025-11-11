@@ -1,18 +1,18 @@
 package com.civitas.configadapter.examples;
 
-import com.civitas.configadapter.adapter.AbstractConfigAdapter;
-import com.civitas.configadapter.config.AppConfig;
-import com.civitas.configadapter.model.ConfigEvent;
-import com.civitas.configadapter.model.Topics;
-import io.cloudevents.CloudEvent;
-import io.cloudevents.core.builder.CloudEventBuilder;
+import java.net.URI;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.UUID;
+import com.civitas.configadapter.adapter.AbstractConfigAdapter;
+import com.civitas.configadapter.config.AppConfig;
+import com.civitas.configadapter.model.ConfigEvent;
+
+import io.cloudevents.CloudEvent;
+import io.cloudevents.core.builder.CloudEventBuilder;
 
 /**
  * Simple example adapter that logs received events and publishes result events.
@@ -23,21 +23,12 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
 
     private static final Logger logger = LoggerFactory.getLogger(DummyLogAdapter.class);
 
-    private static final List<String> SUBSCRIBED_TOPICS = List.of(
-        Topics.USER_CREATED,
-        Topics.USER_UPDATED,
-        Topics.USER_DELETED
-    );
+    private static final String ADAPTER_NAME = "dummylog";
 
     public DummyLogAdapter(AppConfig config) {
-        super(config);
-        logger.info("DummyLogAdapter initialized - will log all received events");
-        logger.info("Subscribed to {} topics: {}", SUBSCRIBED_TOPICS.size(), SUBSCRIBED_TOPICS);
-    }
-
-    @Override
-    public List<String> getSubscribedTopics() {
-        return SUBSCRIBED_TOPICS;
+        super(config, ADAPTER_NAME);
+        logger.info("DummyLogAdapter '{}' initialized - will log all received events", getName());
+        logger.info("Subscribed to {} topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
     }
 
     @Override

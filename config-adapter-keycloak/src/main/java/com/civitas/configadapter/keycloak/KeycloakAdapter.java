@@ -1,5 +1,9 @@
 package com.civitas.configadapter.keycloak;
 
+import java.net.URI;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.admin.client.resource.RealmResource;
@@ -12,16 +16,10 @@ import org.slf4j.LoggerFactory;
 import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.config.AppConfig;
 import com.civitas.configadapter.model.ConfigEvent;
-import com.civitas.configadapter.model.Topics;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
-
-import java.net.URI;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Keycloak adapter that processes configuration messages and manages Keycloak resources.
@@ -31,49 +29,24 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
     private static final Logger logger = LoggerFactory.getLogger(KeycloakAdapter.class);
 
-    private static final String KEYCLOAK_URL = "keycloak.url";
-    private static final String KEYCLOAK_REALM = "keycloak.realm";
-    private static final String KEYCLOAK_USERNAME = "keycloak.username";
-    private static final String KEYCLOAK_PASSWORD = "keycloak.password";
-    private static final String KEYCLOAK_CLIENT_ID = "keycloak.client.id";
-
-    private static final List<String> SUBSCRIBED_TOPICS = List.of(
-        Topics.USER_CREATED,
-        Topics.USER_UPDATED,
-        Topics.USER_DELETED,
-        Topics.USER_LOCKED,
-        Topics.USER_UNLOCKED,
-        Topics.USER_PASSWORD_CHANGED,
-        Topics.USER_PASSWORD_RESET,
-        Topics.REALM_CREATED,
-        Topics.REALM_UPDATED,
-        Topics.REALM_DELETED,
-        Topics.CLIENT_CREATED,
-        Topics.CLIENT_UPDATED,
-        Topics.CLIENT_DELETED
-    );
+    private static final String ADAPTER_NAME = "keycloak";
 
     private final Keycloak keycloakClient;
     private final ObjectMapper objectMapper;
 
     public KeycloakAdapter(AppConfig config) {
-        super(config);
+        super(config, ADAPTER_NAME);
         this.keycloakClient = KeycloakBuilder.builder()
-            .serverUrl(config.getProperty(KEYCLOAK_URL, "http://localhost:8080"))
-            .realm(config.getProperty(KEYCLOAK_REALM, "master"))
-            .username(config.getProperty(KEYCLOAK_USERNAME, "admin"))
-            .password(config.getProperty(KEYCLOAK_PASSWORD, "admin"))
-            .clientId(config.getProperty(KEYCLOAK_CLIENT_ID, "admin-cli"))
+            .serverUrl(getAdapterProperty("url", "http://localhost:8080"))
+            .realm(getAdapterProperty("realm", "master"))
+            .username(getAdapterProperty("username", "admin"))
+            .password(getAdapterProperty("password", "admin"))
+            .clientId(getAdapterProperty("client.id", "admin-cli"))
             .build();
         this.objectMapper = new ObjectMapper();
 
-        logger.info("Keycloak adapter initialized for: {}", config.getProperty(KEYCLOAK_URL, "http://localhost:8080"));
-        logger.info("Subscribed to {} Kafka topics: {}", SUBSCRIBED_TOPICS.size(), SUBSCRIBED_TOPICS);
-    }
-
-    @Override
-    public List<String> getSubscribedTopics() {
-        return SUBSCRIBED_TOPICS;
+        logger.info("Keycloak adapter '{}' initialized for: {}", getName(), getAdapterProperty("url", "http://localhost:8080"));
+        logger.info("Subscribed to {} Kafka topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
     }
 
     @Override
