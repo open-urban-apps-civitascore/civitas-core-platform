@@ -129,9 +129,8 @@ export const RolesTab = (props: GroupTabProps) => {
         />
       </ContentCard>
       <ActionButtons
-        onCancelClick={() => setGroup({ ...group, roles: originalRoles })}
+        onCancelClick={() => router.push('/groups')}
         confirmButtonType="button"
-        isConfirmButtonDisabled={!hasChanges}
         isCancelButtonDisabled={!hasChanges}
         onConfirmClick={handleUpdateGroup}
       />

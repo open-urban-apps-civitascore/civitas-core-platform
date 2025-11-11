@@ -280,10 +280,9 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           </DetailsFieldContainer>
         </ContentCard>
         <ActionButtons
-          onCancelClick={() => form.reset()}
+          onCancelClick={() => router.push('/groups')}
           confirmButtonType="submit"
           isConfirmButtonDisabled={!form.formState.isDirty && form.getValues().contact === groupData.contact?.id}
-          isCancelButtonDisabled={!form.formState.isDirty}
         />
       </form>
     </Form>
