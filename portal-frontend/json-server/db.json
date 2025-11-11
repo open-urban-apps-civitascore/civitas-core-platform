@@ -6359,7 +6359,7 @@
       "name": "SystemAdmin",
       "description": "SystemAdmin",
       "tenant": "ExampleCorp",
-      "type": "System",
+      "type": "system",
       "permissions": [
         "perm1",
         "perm2",
@@ -6377,7 +6377,7 @@
       "name": "SystemDev",
       "description": "System Developer",
       "tenant": "ExampleCorp",
-      "type": "System",
+      "type": "system",
       "permissions": [
         "perm2",
         "perm3"
@@ -6393,7 +6393,7 @@
       "name": "StandardUser",
       "description": "Standard User",
       "tenant": "ExampleCorp",
-      "type": "System",
+      "type": "system",
       "permissions": [
         "perm3"
       ],
@@ -6414,7 +6414,7 @@
       "name": "Editor",
       "description": "Content Editor",
       "tenant": "ExampleCorp",
-      "type": "Data",
+      "type": "data",
       "permissions": [
         "perm4",
         "perm5",
@@ -6431,7 +6431,7 @@
       "name": "Leser:in",
       "description": "Read-Only User",
       "tenant": "ExampleCorp",
-      "type": "Data",
+      "type": "data",
       "permissions": [
         "perm5",
         "perm6"
@@ -6455,7 +6455,7 @@
       "name": "DataOwner",
       "description": "Data Owner",
       "tenant": "ExampleCorp",
-      "type": "Governance",
+      "type": "governance",
       "permissions": [
         "perm8",
         "perm9",
@@ -6471,7 +6471,7 @@
       "id": "7",
       "name": "TestRolle",
       "description": "Das ist eine Testrolle",
-      "type": "Data",
+      "type": "data",
       "tenant": "ExampleCorp",
       "permissions": [
         "perm1",
@@ -6487,7 +6487,7 @@
       "id": "8",
       "name": "Test 4",
       "description": "Some more text",
-      "type": "Data",
+      "type": "data",
       "tenant": "ExampleCorp",
       "permissions": [
         "perm1",
@@ -6503,14 +6503,14 @@
       "id": "9",
       "name": "Test 5",
       "description": "Das ist eine Testrolle",
-      "type": "Data",
+      "type": "data",
       "tenant": "ExampleCorp",
       "permissions": [],
       "user": [],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
-      "type": "Governance",
+      "type": "governance",
       "tenant": "ExampleCorp",
       "user": null,
       "permissions": null,
@@ -6520,7 +6520,7 @@
       "id": "KERWOWP"
     },
     {
-      "type": "System",
+      "type": "system",
       "tenant": "ExampleCorp",
       "user": null,
       "permissions": null,
