@@ -12,6 +12,7 @@ import { Group, GroupTabProps } from '@/types/groups'
 
 import { updateGroup } from '../../actions'
 import { RoleCategory } from './RoleCategory'
+import { ROLE_TYPES } from '@/types/roles'
 
 interface Role {
   id: string
@@ -102,7 +103,7 @@ export const RolesTab = (props: GroupTabProps) => {
         </DetailsFieldContainer>
         <RoleCategory
           title={tRoles('systemRoles')}
-          category="System"
+          category={ROLE_TYPES.SYSTEM}
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
@@ -111,7 +112,7 @@ export const RolesTab = (props: GroupTabProps) => {
 
         <RoleCategory
           title={tRoles('dataRoles')}
-          category="Data"
+          category={ROLE_TYPES.DATA}
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
@@ -120,7 +121,7 @@ export const RolesTab = (props: GroupTabProps) => {
 
         <RoleCategory
           title={tRoles('governanceRoles')}
-          category="Governance"
+          category={ROLE_TYPES.GOVERNANCE}
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
