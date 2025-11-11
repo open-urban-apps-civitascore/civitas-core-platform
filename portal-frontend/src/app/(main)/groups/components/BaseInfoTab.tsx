@@ -59,6 +59,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
   const router = useRouter()
+  const [defaultGroupData, setDefaultGroupData] = useState(groupData)
   const [isLoading, setIsLoading] = useState(false)
   const [isContactListOpen, setIsContactListOpen] = useState(false)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
@@ -69,7 +70,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   const form = useForm<GroupBaseFormData>({
     resolver: zodResolver(GroupBaseFormDataSchema),
-    defaultValues: { ...mapGroupToBaseFormData(groupData) },
+    defaultValues: { ...mapGroupToBaseFormData(defaultGroupData) },
   })
 
   const resetAutocomplete = (contact: Contact | null) => {
@@ -96,7 +97,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           email: contactData.email,
         }
         setSelectedContact(contact)
-        form.reset(mapGroupToBaseFormData(groupData))
+        form.reset(mapGroupToBaseFormData(defaultGroupData))
         resetAutocomplete(contact)
       } catch (error) {
         console.error('Error fetching contact data:', error)
@@ -106,12 +107,12 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
       }
     }
 
-    if (groupData.contact) {
-      getInitialContact(groupData.contact.id)
+    if (defaultGroupData.contact) {
+      getInitialContact(defaultGroupData.contact.id)
     } else {
-      form.reset(mapGroupToBaseFormData(groupData))
+      form.reset(mapGroupToBaseFormData(defaultGroupData))
     }
-  }, [groupData, form])
+  }, [defaultGroupData, form])
 
   useEffect(() => {
     if (debouncedInput.trim().length >= MIN_LENGTH) {
@@ -155,13 +156,14 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
       const updateGroupData: UpdateGroupData = {
         ...formData,
         contact: selectedContact ? { id: selectedContact.id, displayName: selectedContact.displayName } : null,
-        parent: groupData.parent,
-        roles: groupData.roles,
-        subgroups: groupData.subgroups,
-        users: groupData.users,
+        parent: defaultGroupData.parent,
+        roles: defaultGroupData.roles,
+        subgroups: defaultGroupData.subgroups,
+        users: defaultGroupData.users,
       }
       await updateGroup(updateGroupData)
-      router.refresh()
+      setDefaultGroupData(updateGroupData)
+      form.reset({ ...mapGroupToBaseFormData(updateGroupData) })
     } catch (error) {
       console.error('An error occurred while updating the group: ', error)
     } finally {
@@ -282,7 +284,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
         <ActionButtons
           onCancelClick={() => router.push('/groups')}
           confirmButtonType="submit"
-          isConfirmButtonDisabled={!form.formState.isDirty && form.getValues().contact === groupData.contact?.id}
+          isConfirmButtonDisabled={!form.formState.isDirty && form.getValues().contact === defaultGroupData.contact?.id}
         />
       </form>
     </Form>

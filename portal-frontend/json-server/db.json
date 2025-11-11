@@ -5259,16 +5259,29 @@
         "displayName": "Sophia Fischer"
       },
       "parent": null,
-      "roles": ["1", "4", "6"],
+      "roles": [
+        "1",
+        "4",
+        "6"
+      ],
       "subgroups": [
         {
           "id": "7",
           "title": "Systemadministration",
           "description": "Verantwortlich für Server, Netzwerke und IT-Sicherheitsrichtlinien. Führt regelmäßige Wartungen und Backups durch.",
-          "roles": ["1", "4"],
+          "roles": [
+            "1",
+            "4"
+          ],
           "users": [
-            { "id": "20", "assignedAt": "2025-10-21T14:30:45.123Z" },
-            { "id": "45", "assignedAt": "2025-10-21T14:30:45.123Z" }
+            {
+              "id": "20",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            },
+            {
+              "id": "45",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            }
           ],
           "contact": {
             "id": "20",
@@ -5281,8 +5294,15 @@
           "id": "8",
           "title": "Benutzerverwaltung",
           "description": "Kümmert sich um die Verwaltung von Benutzerkonten, Zugriffsrechten und Gruppenmitgliedschaften.",
-          "roles": ["2"],
-          "users": [{ "id": "67", "assignedAt": "2025-10-21T14:30:45.123Z" }],
+          "roles": [
+            "2"
+          ],
+          "users": [
+            {
+              "id": "67",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            }
+          ],
           "contact": {
             "id": "67",
             "displayName": "Nina Becker"
@@ -5294,8 +5314,16 @@
           "id": "9",
           "title": "Sicherheitsmanagement",
           "description": "Überwacht sicherheitsrelevante Ereignisse und setzt Richtlinien zum Datenschutz und zur Systemintegrität um.",
-          "roles": ["2", "6"],
-          "users": [{ "id": "1", "assignedAt": "2025-10-21T14:30:45.123Z" }],
+          "roles": [
+            "2",
+            "6"
+          ],
+          "users": [
+            {
+              "id": "1",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            }
+          ],
           "contact": {
             "id": "1",
             "displayName": "Sophia Fischer"
@@ -5305,37 +5333,55 @@
         }
       ],
       "users": [
-        { "id": "1", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "20", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "45", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "67", "assignedAt": "2025-10-21T14:30:45.123Z" }
+        {
+          "id": "1",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "20",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "45",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "67",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        }
       ]
     },
     {
       "id": "2",
       "title": "Technischer Mitarbeiter",
       "description": "Betreut die technische Infrastruktur, führt Wartungsarbeiten durch und unterstützt bei der Implementierung neuer Systeme und Anwendungen.",
-      "roles": ["2", "4"],
-      "users": [
-        { "id": "3", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "5", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "22", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "34", "assignedAt": "2025-10-21T14:30:45.123Z" }
-      ],
       "contact": {
         "id": "3",
         "displayName": "Michael Wagner"
       },
       "parent": null,
+      "roles": [
+        "2",
+        "4",
+        4
+      ],
       "subgroups": [
         {
           "id": "10",
           "title": "IT-Infrastruktur",
           "description": "Pflegt Hardware, Netzwerke und Cloud-Umgebungen. Zuständig für den stabilen Betrieb der technischen Systeme.",
-          "roles": ["2"],
+          "roles": [
+            "2"
+          ],
           "users": [
-            { "id": "3", "assignedAt": "2025-10-21T14:30:45.123Z" },
-            { "id": "22", "assignedAt": "2025-10-21T14:30:45.123Z" }
+            {
+              "id": "3",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            },
+            {
+              "id": "22",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            }
           ],
           "contact": {
             "id": "3",
@@ -5348,10 +5394,18 @@
           "id": "11",
           "title": "Softwareentwicklung",
           "description": "Entwickelt und wartet interne Tools und Anwendungen zur Prozessoptimierung.",
-          "roles": ["2"],
+          "roles": [
+            "2"
+          ],
           "users": [
-            { "id": "5", "assignedAt": "2025-10-21T14:30:45.123Z" },
-            { "id": "34", "assignedAt": "2025-10-21T14:30:45.123Z" }
+            {
+              "id": "5",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            },
+            {
+              "id": "34",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            }
           ],
           "contact": {
             "id": "5",
@@ -5363,8 +5417,15 @@
               "id": "16",
               "title": "Frontend-Entwicklung",
               "description": "Verantwortlich für die Gestaltung und Implementierung der Benutzeroberflächen interner Anwendungen. Fokus auf Usability, Performance und responsives Design.",
-              "roles": ["2"],
-              "users": [{ "id": "34", "assignedAt": "2025-10-21T14:30:45.123Z" }],
+              "roles": [
+                "2"
+              ],
+              "users": [
+                {
+                  "id": "34",
+                  "assignedAt": "2025-10-21T14:30:45.123Z"
+                }
+              ],
               "contact": {
                 "id": "34",
                 "displayName": "Markus Wagner"
@@ -5376,8 +5437,15 @@
               "id": "17",
               "title": "Backend-Entwicklung",
               "description": "Entwickelt und wartet serverseitige Komponenten, APIs und Datenbankschnittstellen. Verantwortlich für Performance, Skalierbarkeit und Sicherheit der Anwendung.",
-              "roles": ["2"],
-              "users": [{ "id": "5", "assignedAt": "2025-10-21T14:30:45.123Z" }],
+              "roles": [
+                "2"
+              ],
+              "users": [
+                {
+                  "id": "5",
+                  "assignedAt": "2025-10-21T14:30:45.123Z"
+                }
+              ],
               "contact": {
                 "id": "5",
                 "displayName": "Clara Becker"
@@ -5387,17 +5455,47 @@
             }
           ]
         }
+      ],
+      "users": [
+        {
+          "id": "3",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "5",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "22",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "34",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        }
       ]
     },
     {
       "id": "3",
       "title": "Sachbearbeiter",
       "description": "Bearbeitet administrative Vorgänge, pflegt Kundendaten und unterstützt interne Prozesse im Tagesgeschäft.",
-      "roles": ["4", "6"],
+      "roles": [
+        "4",
+        "6"
+      ],
       "users": [
-        { "id": "2", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "11", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "54", "assignedAt": "2025-10-21T14:30:45.123Z" }
+        {
+          "id": "2",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "11",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "54",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        }
       ],
       "contact": {
         "id": "2",
@@ -5410,13 +5508,24 @@
       "id": "4",
       "title": "Leitung",
       "description": "Verantwortlich für die strategische und operative Führung der jeweiligen Abteilung. Trifft Entscheidungen, koordiniert Teams und überwacht Zielerreichung.",
-      "roles": ["1", "6"],
-      "users": [
-        { "id": "4", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "8", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "21", "assignedAt": "2025-10-21T14:30:45.123Z" }
+      "roles": [
+        "1",
+        "6"
       ],
-
+      "users": [
+        {
+          "id": "4",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "8",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "21",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        }
+      ],
       "contact": {
         "id": "4",
         "displayName": "Miriam Koch"
@@ -5427,10 +5536,18 @@
           "id": "12",
           "title": "Teamleitung Technik",
           "description": "Leitet die technischen Mitarbeiterteams, priorisiert Aufgaben und koordiniert Ressourcen.",
-          "roles": ["6"],
+          "roles": [
+            "6"
+          ],
           "users": [
-            { "id": "4", "assignedAt": "2025-10-21T14:30:45.123Z" },
-            { "id": "21", "assignedAt": "2025-10-21T14:30:45.123Z" }
+            {
+              "id": "4",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            },
+            {
+              "id": "21",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            }
           ],
           "contact": {
             "id": "4",
@@ -5443,8 +5560,15 @@
           "id": "13",
           "title": "Projektmanagement",
           "description": "Plant, überwacht und steuert interne Projekte. Verantwortlich für Zeit- und Budgetplanung.",
-          "roles": ["6"],
-          "users": [{ "id": "8", "assignedAt": "2025-10-21T14:30:45.123Z" }],
+          "roles": [
+            "6"
+          ],
+          "users": [
+            {
+              "id": "8",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            }
+          ],
           "contact": {
             "id": "8",
             "displayName": "Lukas Fischer"
@@ -5458,10 +5582,18 @@
       "id": "5",
       "title": "Support",
       "description": "Unterstützt Benutzer bei technischen und fachlichen Fragen, bearbeitet Anfragen und sorgt für eine schnelle Problemlösung im täglichen Betrieb.",
-      "roles": ["4"],
+      "roles": [
+        "4"
+      ],
       "users": [
-        { "id": "5", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "14", "assignedAt": "2025-10-21T14:30:45.123Z" }
+        {
+          "id": "5",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "14",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        }
       ],
       "contact": {
         "id": "5",
@@ -5473,8 +5605,15 @@
           "id": "14",
           "title": "First-Level-Support",
           "description": "Bearbeitet eingehende Supportanfragen, erfasst Tickets und löst Standardprobleme im Erstkontakt.",
-          "roles": ["4"],
-          "users": [{ "id": "14", "assignedAt": "2025-10-21T14:30:45.123Z" }],
+          "roles": [
+            "4"
+          ],
+          "users": [
+            {
+              "id": "14",
+              "assignedAt": "2025-10-21T14:30:45.123Z"
+            }
+          ],
           "contact": {
             "id": "14",
             "displayName": "Markus Fischer"
@@ -5485,8 +5624,15 @@
               "id": "15",
               "title": "Second-Level-Support",
               "description": "Bearbeitet komplexe technische Probleme, die vom First-Level weitergeleitet werden, und arbeitet eng mit der IT-Abteilung zusammen.",
-              "roles": ["4"],
-              "users": [{ "id": "5", "assignedAt": "2025-10-21T14:30:45.123Z" }],
+              "roles": [
+                "4"
+              ],
+              "users": [
+                {
+                  "id": "5",
+                  "assignedAt": "2025-10-21T14:30:45.123Z"
+                }
+              ],
               "contact": {
                 "id": "5",
                 "displayName": "Clara Becker"
@@ -5502,12 +5648,26 @@
       "id": "6",
       "title": "User",
       "description": "Reguläre Benutzer mit eingeschränkten Zugriffsrechten. Nutzen die bereitgestellten Systeme und Anwendungen zur täglichen Arbeit.",
-      "roles": ["5"],
+      "roles": [
+        "5"
+      ],
       "users": [
-        { "id": "6", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "7", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "12", "assignedAt": "2025-10-21T14:30:45.123Z" },
-        { "id": "9", "assignedAt": "2025-10-21T14:30:45.123Z" }
+        {
+          "id": "6",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "7",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "12",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "9",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        }
       ],
       "contact": {
         "id": "3",
@@ -5779,96 +5939,72 @@
       ]
     }
   ],
-  "permissions": [
+  "dataspaces": [
     {
       "id": "1",
-      "title": "Permission 1",
-      "category": {"id": "1", "title": "Category 1"},
-      "type": "system"
+      "name": "Naturschutz",
+      "description": "Der DataSpace enthält Grundlagendaten, Klimaanalysen, Planungshinweise und weitere Informationen zum Naturschutz in der Region.",
+      "protected": true
     },
     {
       "id": "2",
-      "title": "Permission 2",
-      "category": {"id": "2", "title": "Category 2"},
-      "type": "system"
+      "name": "Verkehrsplanung",
+      "description": "Daten zur städtischen Verkehrsplanung, Mobilitätskonzepte und Verkehrsanalysen für eine nachhaltige Stadtentwicklung. ",
+      "protected": true
     },
     {
       "id": "3",
-      "title": "Permission 3",
-      "category": {"id": "3", "title": "Category 3"},
-      "type": "system"
+      "name": "Stadtentwicklung",
+      "description": "Planungsdaten und Konzepte für die zukünftige Entwicklung der Stadt, einschließlich Bauprojekte und Flächennutzung.",
+      "protected": true
     },
     {
       "id": "4",
-      "title": "Permission 4",
-      "category": {"id": "4", "title": "Category 4"},
-      "type": "system"
+      "name": "Umweltmonitoring",
+      "description": "Messdaten zur Luftqualität, Lärmbelastung und anderen Umweltparametern zur Überwachung der städtischen Umweltsituation.",
+      "protected": false
     },
     {
       "id": "5",
-      "title": "Permission 5",
-      "category": {"id": "5", "title": "Category 5"},
-      "type": "system"
+      "name": "Bürgerdienste",
+      "description": "Informationen und Daten zur Bereitstellung von Bürgerdiensten und zur Verbesserung der Verwaltungsabläufe.",
+      "protected": true
     },
     {
       "id": "6",
-      "title": "Permission 6",
-      "category": {"id": "1", "title": "Category 1"},
-      "type": "data"
+      "name": "Energiemanagement",
+      "description": "Energieverbrauchsdaten und -analysen für öffentliche Gebäude und Infrastruktur zur Optimierung der Energieeffizienz.",
+      "protected": false
     },
     {
       "id": "7",
-      "title": "Permission 7",
-      "category": {"id": "2", "title": "Category 2"},
-      "type": "data"
+      "name": "Wasserwirtschaft",
+      "description": "Daten zur Wasserversorgung, Abwassermanagement und Hochwasserschutz in der Kommune.",
+      "protected": true
     },
     {
       "id": "8",
-      "title": "Permission 8",
-      "category": {"id": "3", "title": "Category 3"},
-      "type": "data"
+      "name": "Bildungswesen",
+      "description": "Bildungsstatistiken, Schulentwicklungsplanung und Ressourcenverwaltung für städtische Bildungseinrichtungen.",
+      "protected": false
     },
     {
       "id": "9",
-      "title": "Permission 9",
-      "category": {"id": "4", "title": "Category 4"},
-      "type": "data"
+      "name": "Gesundheitsdaten",
+      "description": "Aggregierte Gesundheitsstatistiken und Informationen zur öffentlichen Gesundheitsversorgung.",
+      "protected": true
     },
     {
       "id": "10",
-      "title": "Permission 10",
-      "category": {"id": "5", "title": "Category 5"},
-      "type": "data"
+      "name": "Tourismus",
+      "description": "Tourismuszahlen, Besucherstatistiken und Daten zur touristischen Infrastruktur der Stadt.",
+      "protected": false
     },
     {
-      "id": "11",
-      "title": "Permission 11",
-      "category": {"id": "1", "title": "Category 1"},
-      "type": "governance"
-    },
-    {
-      "id": "12",
-      "title": "Permission 12",
-      "category": {"id": "2", "title": "Category 2"},
-      "type": "governance"
-    },
-    {
-      "id": "13",
-      "title": "Permission 13",
-      "category": {"id": "3", "title": "Category 3"},
-      "type": "governance"
-    },
-    {
-      "id": "14",
-      "title": "Permission 14",
-      "category": {"id": "4", "title": "Category 4"},
-      "type": "governance"
-    },
-    {
-      "id": "15",
-      "title": "Permission 15",
-      "category": {"id": "5", "title": "Category 5"},
-      "type": "governance"
+      "id": "1762358504364",
+      "name": "test",
+      "description": "test 12355",
+      "protected": false
     }
   ],
   "roles": [
@@ -5878,8 +6014,16 @@
       "description": "SystemAdmin",
       "tenant": "ExampleCorp",
       "type": "system",
-      "permissions": ["perm1", "perm2", "perm3", "perm4"],
-      "user": ["1", "2"],
+      "permissions": [
+        "perm1",
+        "perm2",
+        "perm3",
+        "perm4"
+      ],
+      "user": [
+        "1",
+        "2"
+      ],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5888,8 +6032,14 @@
       "description": "System Developer",
       "tenant": "ExampleCorp",
       "type": "system",
-      "permissions": ["perm2", "perm3"],
-      "user": ["3", "4"],
+      "permissions": [
+        "perm2",
+        "perm3"
+      ],
+      "user": [
+        "3",
+        "4"
+      ],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5898,8 +6048,19 @@
       "description": "Standard User",
       "tenant": "ExampleCorp",
       "type": "system",
-      "permissions": ["perm3"],
-      "user": ["5", "6", "7", "8", "9", "10", "11", "12"],
+      "permissions": [
+        "perm3"
+      ],
+      "user": [
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5908,8 +6069,15 @@
       "description": "Content Editor",
       "tenant": "ExampleCorp",
       "type": "data",
-      "permissions": ["perm4", "perm5", "perm6"],
-      "user": ["1", "2"],
+      "permissions": [
+        "perm4",
+        "perm5",
+        "perm6"
+      ],
+      "user": [
+        "1",
+        "2"
+      ],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5918,8 +6086,22 @@
       "description": "Read-Only User",
       "tenant": "ExampleCorp",
       "type": "data",
-      "permissions": ["perm5", "perm6"],
-      "user": ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
+      "permissions": [
+        "perm5",
+        "perm6"
+      ],
+      "user": [
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5928,8 +6110,15 @@
       "description": "Data Owner",
       "tenant": "ExampleCorp",
       "type": "governance",
-      "permissions": ["perm8", "perm9", "perm10"],
-      "user": ["1", "2"],
+      "permissions": [
+        "perm8",
+        "perm9",
+        "perm10"
+      ],
+      "user": [
+        "1",
+        "2"
+      ],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5938,8 +6127,14 @@
       "description": "Das ist eine Testrolle",
       "type": "data",
       "tenant": "ExampleCorp",
-      "permissions": ["perm1", "perm2"],
-      "user": ["1", "2"],
+      "permissions": [
+        "perm1",
+        "perm2"
+      ],
+      "user": [
+        "1",
+        "2"
+      ],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
@@ -5948,8 +6143,14 @@
       "description": "Some more text",
       "type": "data",
       "tenant": "ExampleCorp",
-      "permissions": ["perm1", "perm2"],
-      "user": ["1", "2"],
+      "permissions": [
+        "perm1",
+        "perm2"
+      ],
+      "user": [
+        "1",
+        "2"
+      ],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
