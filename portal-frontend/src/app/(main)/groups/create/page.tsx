@@ -12,6 +12,7 @@ const defaultGroup: Group = {
   users: [],
   contact: { id: '', displayName: '' },
   parent: null,
+  dataspace: null,
   subgroups: [],
 }
 

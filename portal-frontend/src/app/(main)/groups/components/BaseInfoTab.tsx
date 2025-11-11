@@ -10,7 +10,7 @@ import { FieldErrors, useForm } from 'react-hook-form'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { Select } from '@/components/form/fields/Select'
+import { Select, SelectOption } from '@/components/form/fields/Select'
 import { TextArea } from '@/components/form/fields/TextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { Form } from '@/components/ui/form'
@@ -30,15 +30,16 @@ const getGroupBaseInfo = (groupData: Group): GroupBaseInfo => ({
   id: groupData.id,
   title: groupData.title,
   description: groupData.description,
-  contact: groupData.contact ?? { id: '', displayName: '' },
+  contact: groupData.contact?.id || '',
 })
 
-const transformData = (formData: GroupBaseInfo) => {
+const transformData = (formData: GroupBaseInfo, availableContacts: SelectOption[]) => {
   const parsed = GroupBaseInfoSchema.parse(formData)
+  const matchingContact = availableContacts.find(contact => contact.value === formData.contact)
 
   return {
     ...parsed,
-    contact: parsed.contact?.id ? parsed.contact : null,
+    contact: matchingContact ? { id: matchingContact.value, displayName: matchingContact.label } : null,
   }
 }
 
@@ -52,7 +53,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
   const router = useRouter()
-  const availableContacts: { value: string; label: string }[] = []
+  const availableContacts: SelectOption[] = []
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<GroupBaseInfo>({
@@ -68,10 +69,17 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const handleCreateGroup = async (formData: GroupBaseInfo) => {
     try {
       setIsLoading(true)
-      const transformedGroupData = transformData(formData)
+      const transformedGroupData = transformData(formData, availableContacts)
       // eslint-disable-next-line unused-imports/no-unused-vars
       const { id, ...groupData } = transformedGroupData
-      const createGroupData: CreateGroupData = { ...groupData, parent: null, roles: [], subgroups: [], users: [] }
+      const createGroupData: CreateGroupData = {
+        ...groupData,
+        parent: null,
+        roles: [],
+        subgroups: [],
+        users: [],
+        dataspace: null,
+      }
       const response = await createGroup(createGroupData)
       router.push(`/groups/${response.id}`)
     } catch (error) {
@@ -84,13 +92,14 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const handleUpdateGroup = async (formData: GroupBaseInfo) => {
     try {
       setIsLoading(true)
-      const transformedGroupData = transformData(formData)
+      const transformedGroupData = transformData(formData, availableContacts)
       const updateGroupData: UpdateGroupData = {
         ...transformedGroupData,
         parent: groupData.parent,
         roles: groupData.roles,
         subgroups: groupData.subgroups,
         users: groupData.users,
+        dataspace: null,
       }
       await updateGroup(updateGroupData)
       router.refresh()
@@ -105,7 +114,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const handleValidationErrors = (errors: FieldErrors<Group>) => console.error('Validation errors: ', errors)
 
   const handleContactChange = (_value: string) => {
-    form.setValue('contact', { id: '', displayName: '' })
+    form.setValue('contact', '')
   }
   if (isLoading) {
     return (

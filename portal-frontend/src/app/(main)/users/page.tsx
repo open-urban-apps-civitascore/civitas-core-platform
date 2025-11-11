@@ -2,8 +2,8 @@
 
 import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -13,7 +13,8 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { Authority, Category, ListUser, UserResponse } from '@/types/users'
+import { Item } from '@/types/common'
+import { Authority, ListUser, UserResponse } from '@/types/users'
 import { isPageIndexHigherThanTotalPages } from '@/utils/table'
 import { mapListUsers } from '@/utils/users'
 
@@ -21,8 +22,8 @@ import UsersTable from './components/UsersTable'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-export type UserAuthority = Category & {
-  department: Category
+export type UserAuthority = Item & {
+  department: Item
 }
 
 export const getSortParam = (sorting: SortingState) => {

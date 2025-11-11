@@ -11,7 +11,7 @@ export type Group = {
   contact: { id: string; displayName: string } | null
   parent: string | null
   subgroups: Group[]
-  dataspace: Item
+  dataspace: Item | null
 }
 
 export type UpdateGroupData = Group
@@ -30,10 +30,7 @@ export const GroupBaseInfoSchema = z.object({
   description: z.string().min(10, {
     message: 'common.errors.atLeast10',
   }),
-  contact: z.object({
-    id: z.string(),
-    displayName: z.string(),
-  }),
+  contact: z.string(),
 })
 
 export type GroupBaseInfo = z.infer<typeof GroupBaseInfoSchema>
