@@ -43,6 +43,7 @@ export const UserForm = (props: UserFormProps) => {
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
   const { getApiRequestParamsByUrl } = useQueryParams()
+  const [defaultUserData, setDefaultUserData] = useState(userData)
   const [isReadOnly, setIsReadOnly] = useState(isEditMode)
 
   const [authorities, setAuthorities] = useState<Authority[]>([])
@@ -82,13 +83,13 @@ export const UserForm = (props: UserFormProps) => {
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(UserFormSchema),
-    defaultValues: mapUserToFormData(userData),
+    defaultValues: mapUserToFormData(defaultUserData),
   })
 
   useEffect(() => {
-    form.reset(mapUserToFormData(userData))
+    form.reset(mapUserToFormData(defaultUserData))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userData])
+  }, [defaultUserData])
 
   // eslint-disable-next-line @typescript-eslint/naming-convention
   const watchStatus = form.watch('active')
@@ -98,22 +99,22 @@ export const UserForm = (props: UserFormProps) => {
   // adjust selected department when authority gets changed
   // remove department when new authority selected, reset initial department when initial aurhority selected
   useEffect(() => {
-    if (watchAuthority !== userData.authority?.id) {
+    if (watchAuthority !== defaultUserData.authority?.id) {
       form.setValue('department', '')
     } else {
       form.resetField('department')
     }
-  }, [watchAuthority, form, userData])
+  }, [watchAuthority, form, defaultUserData])
 
   // checks if changed phone number without whitespaces is the same as initial phone number or if any other field has been changed
   const isFormDirty = useMemo(() => {
     const dirtyFields = form.formState.dirtyFields
     const isPhoneFieldDirty =
-      dirtyFields.phone && form.getValues('phone').replace(/\s+/g, '') !== userData.phone.replace(/\s+/g, '')
+      dirtyFields.phone && form.getValues('phone').replace(/\s+/g, '') !== defaultUserData.phone.replace(/\s+/g, '')
     const isNonPhoneFieldDirty = Object.keys(dirtyFields).find(field => field !== 'phone')
     return isNonPhoneFieldDirty || isPhoneFieldDirty
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watch, form, userData.phone])
+  }, [watch, form, defaultUserData.phone])
 
   // set form options for field 'department' depending on the currently selected authority
   const departmentOptions = useMemo(() => {
@@ -132,7 +133,7 @@ export const UserForm = (props: UserFormProps) => {
   }
 
   const handleCreateUser = async (formData: UserFormData) => {
-    const mappedData: UserResponse = { ...mapFormUserToApiData(formData), groups: userData.groups }
+    const mappedData: UserResponse = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
     await createUser(createUserData)
@@ -140,10 +141,10 @@ export const UserForm = (props: UserFormProps) => {
   }
 
   const handleUpdateUser = async (formData: UserFormData) => {
-    const updateUserData = { ...mapFormUserToApiData(formData), groups: userData.groups }
+    const updateUserData = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
     await updateUser(updateUserData)
-    // refresh view for setting updated user data as default form data
-    router.refresh()
+    setDefaultUserData(updateUserData)
+    form.reset(mapUserToFormData(defaultUserData))
     setIsReadOnly(true)
   }
 

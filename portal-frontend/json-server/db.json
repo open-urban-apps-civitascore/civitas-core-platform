@@ -3003,7 +3003,7 @@
         "1",
         "2",
         "3",
-        "zQe8zBc",
+        "zQe8zBc"
       ],
       "phone": "+49 75 5576070",
       "active": [],
@@ -3028,15 +3028,13 @@
         }
       },
       "department": "2",
-      "phone": "+49 164 6822941",
+      "phone": "+49 164 682294",
       "active": true,
       "positionDescription": "Biotopschutz-Spezialist",
       "displayName": "Markus Schmidt",
       "groups": [
-        "1",
-        "2",
         "3",
-        "zQe8zBc",
+        "zQe8zBc"
       ]
     },
     {
@@ -5748,35 +5746,14 @@
     },
     {
       "id": "2",
-      "title": "Technischer Mitarbeiter",
+      "title": "Technischer Mitarbeiter ",
       "description": "Betreut die technische Infrastruktur, führt Wartungsarbeiten durch und unterstützt bei der Implementierung neuer Systeme und Anwendungen.",
+      "contact": null,
+      "parent": null,
       "roles": [
         "2",
         "4"
       ],
-      "users": [
-        {
-          "id": "3",
-          "assignedAt": "2025-10-21T14:30:45.123Z"
-        },
-        {
-          "id": "5",
-          "assignedAt": "2025-10-21T14:30:45.123Z"
-        },
-        {
-          "id": "22",
-          "assignedAt": "2025-10-21T14:30:45.123Z"
-        },
-        {
-          "id": "34",
-          "assignedAt": "2025-10-21T14:30:45.123Z"
-        }
-      ],
-      "contact": {
-        "id": "3",
-        "displayName": "Michael Wagner"
-      },
-      "parent": null,
       "subgroups": [
         {
           "id": "10",
@@ -5867,7 +5844,26 @@
             }
           ]
         }
-      ]
+      ],
+      "users": [
+        {
+          "id": "3",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "5",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "22",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        },
+        {
+          "id": "34",
+          "assignedAt": "2025-10-21T14:30:45.123Z"
+        }
+      ],
+      "dataspace": null
     },
     {
       "id": "3",
