@@ -115,8 +115,6 @@ class AssignmentControllerIntegrationTest
     roleInput.setName("Test Role " + System.currentTimeMillis());
     roleInput.setDescription("Test role for assignment");
     roleInput.setRoleType(RoleType.DATA);
-    roleInput.setUserModifiable(true);
-    roleInput.setIsDefault(true);
 
     HttpHeaders headers = createAuthHeaders();
     HttpEntity<RoleInputDTO> request = new HttpEntity<>(roleInput, headers);
@@ -234,12 +232,14 @@ class AssignmentControllerIntegrationTest
     @DisplayName("Should create assignment with metadata")
     void shouldCreateAssignmentWithMetadata() {
       AssignmentInputDTO input = createValidInput();
-      input.setMetadata("{\"key\": \"value\"}");
+      input.setIsInherited(true);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getCreatedAt()).isNotNull();
+      assertThat(response.getBody().getIsInherited()).isTrue();
     }
 
     @Test
@@ -249,12 +249,13 @@ class AssignmentControllerIntegrationTest
       input.setGroupId("non-existent-group");
       input.setRoleId(createTestRole());
       input.setScopeType(ScopeType.TENANT);
+      input.setIsInherited(false);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND or BAD_REQUEST status")
-          .isIn(HttpStatus.NOT_FOUND, HttpStatus.BAD_REQUEST);
+          .isIn(HttpStatus.NOT_FOUND);
     }
 
     @Test
@@ -269,7 +270,7 @@ class AssignmentControllerIntegrationTest
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND or BAD_REQUEST status")
-          .isIn(HttpStatus.NOT_FOUND, HttpStatus.BAD_REQUEST);
+          .isIn(HttpStatus.NOT_FOUND);
     }
   }
 

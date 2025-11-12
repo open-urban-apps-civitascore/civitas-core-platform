@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class RoleService extends BaseTenantAwareService<Role, String, RoleInputDTO> {
+public class RoleService extends BaseTenantAwareService<Role, RoleInputDTO> {
 
   private final RoleRepository roleRepository;
   private final RoleMapper roleMapper;

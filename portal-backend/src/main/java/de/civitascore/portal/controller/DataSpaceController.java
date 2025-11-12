@@ -51,11 +51,6 @@ public class DataSpaceController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "production")),
     @Parameter(
-        name = "title",
-        description = "Filter by title (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Production Data")),
-    @Parameter(
         name = "description",
         description = "Filter by description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,

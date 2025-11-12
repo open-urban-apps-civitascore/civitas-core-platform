@@ -4,6 +4,7 @@ import dasniko.testcontainers.keycloak.KeycloakContainer;
 import de.civitascore.portal.PortalBackendApplication;
 import de.civitascore.portal.util.KeycloakTokenHelper;
 import de.civitascore.portal.util.TestContainerConfiguration;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +15,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(
@@ -23,95 +23,68 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @ActiveProfiles("test-integration")
 @Testcontainers
 @Import(TestContainerConfiguration.class)
+@Slf4j
 public abstract class BaseKeycloakIntegrationTest {
 
-  @Container protected static PostgreSQLContainer<?> postgres;
+  // Use static containers to share across tests and ensure stable startup
+  protected static final PostgreSQLContainer<?> POSTGRES;
+  protected static final KeycloakContainer KEYCLOAK;
 
-  @Container protected static KeycloakContainer keycloak;
+  static {
+    POSTGRES =
+        new PostgreSQLContainer<>("postgres:15")
+            .withDatabaseName("iot_schema")
+            .withUsername("iot")
+            .withPassword("iot");
+
+    KEYCLOAK =
+        new KeycloakContainer("quay.io/keycloak/keycloak:26.3.4")
+            .withRealmImportFile("keycloak/iot-realm.json");
+
+    // Start them explicitly before Spring Boot config phase
+    POSTGRES.start();
+    KEYCLOAK.start();
+
+    log.info("Test Containers Started");
+    log.debug("PostgreSQL URL: " + POSTGRES.getJdbcUrl());
+    log.debug("Keycloak URL: " + KEYCLOAK.getAuthServerUrl());
+  }
 
   @Autowired protected TestRestTemplate restTemplate;
 
   protected KeycloakTokenHelper tokenHelper;
 
-  private static volatile boolean containersInitialized = false;
-  private static final Object LOCK = new Object();
-
-  static {
-    synchronized (LOCK) {
-      if (!containersInitialized) {
-        // Initialize containers from beans
-        postgres =
-            new PostgreSQLContainer<>("postgres:15")
-                .withDatabaseName("iot_schema")
-                .withUsername("iot")
-                .withPassword("iot")
-                .withReuse(true); // Reuse for better performance and consistency
-
-        keycloak =
-            new KeycloakContainer("quay.io/keycloak/keycloak:26.3.4")
-                .withRealmImportFile("keycloak/iot-realm.json")
-                .withReuse(true); // Reuse for better performance and consistency
-
-        postgres.start();
-        keycloak.start();
-
-        containersInitialized = true;
-
-        System.out.println("=== Test Containers Started ===");
-        System.out.println("PostgreSQL URL: " + postgres.getJdbcUrl());
-        System.out.println("Keycloak URL: " + keycloak.getAuthServerUrl());
-      }
-    }
-  }
-
   @DynamicPropertySource
   static void configureProperties(DynamicPropertyRegistry registry) {
-    // Ensure containers are running
-    if (!postgres.isRunning() || !keycloak.isRunning()) {
-      throw new IllegalStateException("Test containers are not running!");
-    }
-
-    // Configure DataSource properties
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
+    // Register container properties after they're started
+    registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+    registry.add("spring.datasource.username", POSTGRES::getUsername);
+    registry.add("spring.datasource.password", POSTGRES::getPassword);
     registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
 
-    // Get Keycloak URLs - use the actual running instance
-    String authServerUrl = keycloak.getAuthServerUrl();
+    String authServerUrl = KEYCLOAK.getAuthServerUrl();
     String issuerUri = authServerUrl + "/realms/iot";
     String jwkSetUri = issuerUri + "/protocol/openid-connect/certs";
 
-    System.out.println("=== Configuring Spring Security OAuth2 ===");
-    System.out.println("Keycloak Auth Server URL: " + authServerUrl);
-    System.out.println("JWT Issuer URI: " + issuerUri);
-    System.out.println("JWK Set URI: " + jwkSetUri);
-
-    // Configure Keycloak JWT properties with ACTUAL container URLs
     registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", () -> issuerUri);
     registry.add("spring.security.oauth2.resourceserver.jwt.jwk-set-uri", () -> jwkSetUri);
   }
 
   @BeforeEach
   void setUp() {
-    // Verify containers are still running
-    if (!postgres.isRunning() || !keycloak.isRunning()) {
+    if (!POSTGRES.isRunning() || !KEYCLOAK.isRunning()) {
       throw new IllegalStateException("Test containers stopped unexpectedly!");
     }
 
-    tokenHelper = new KeycloakTokenHelper(keycloak);
-    System.out.println(
-        "✓ PostgreSQL running: " + postgres.isRunning() + " at " + postgres.getJdbcUrl());
-    System.out.println(
-        "✓ Keycloak running: " + keycloak.isRunning() + " at " + keycloak.getAuthServerUrl());
+    tokenHelper = new KeycloakTokenHelper(KEYCLOAK);
+
+    log.info("PostgreSQL running at " + POSTGRES.getJdbcUrl());
+    log.info("Keycloak running at " + KEYCLOAK.getAuthServerUrl());
   }
 
   @AfterAll
   static void tearDown() {
-    // Containers will be stopped automatically by Testcontainers
-    // Only log the shutdown
-    System.out.println("=== Test Containers Cleanup ===");
-    System.out.println("Containers will be stopped by Testcontainers framework");
+    log.info("Test Containers will be stopped automatically by Testcontainers");
   }
 
   protected String getValidAccessToken() {

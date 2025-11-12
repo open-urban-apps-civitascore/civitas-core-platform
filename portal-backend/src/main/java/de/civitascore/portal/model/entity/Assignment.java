@@ -6,8 +6,6 @@ import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.base.ScopedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
@@ -28,8 +26,7 @@ import lombok.Setter;
     indexes = {
       @Index(name = "idx_assignment_group", columnList = "group_id"),
       @Index(name = "idx_assignment_role", columnList = "role_id"),
-      @Index(name = "idx_assignment_scope", columnList = "scope_type, scope_id"),
-      @Index(name = "idx_assignment_type", columnList = "assignment_type")
+      @Index(name = "idx_assignment_scope", columnList = "scope_type, scope_id")
     })
 @Getter
 @Setter
@@ -43,10 +40,6 @@ public class Assignment extends ScopedEntity {
   @JoinColumn(name = "role_id", nullable = false)
   private Role role;
 
-  @Enumerated(EnumType.STRING)
-  @Column(name = "assignment_type", nullable = false)
-  private AssignmentType assignmentType;
-
   @Column(name = "is_inherited", nullable = false)
   private Boolean isInherited = false;
 
@@ -54,8 +47,19 @@ public class Assignment extends ScopedEntity {
   @JoinColumn(name = "parent_assignment_id")
   private Assignment parentAssignment;
 
-  @Column(name = "metadata", columnDefinition = "TEXT")
-  private String metadata;
+  /**
+   * Derives the assignment type based on the role type. Binary assignments: System roles assigned
+   * to user groups (tenant scope) Ternary assignments: Data/Governance roles assigned to
+   * datasets/dataspaces
+   *
+   * @return BINARY for system roles, TERNARY for data and governance roles
+   */
+  public AssignmentType getAssignmentType() {
+    if (role == null || role.getRoleType() == null) {
+      return null;
+    }
+    return role.getRoleType() == RoleType.SYSTEM ? AssignmentType.BINARY : AssignmentType.TERNARY;
+  }
 
   @PrePersist
   protected void validateBeforePersist() {
@@ -71,12 +75,12 @@ public class Assignment extends ScopedEntity {
 
   private void validateAssignment() {
     if (role.getRoleType() == RoleType.SYSTEM) {
-      assignmentType = AssignmentType.BINARY;
+      // Binary assignment: System roles must use TENANT scope
       if (getScopeType() != ScopeType.TENANT) {
         throw new IllegalStateException(role.getRoleType() + " roles must use TENANT scope");
       }
     } else {
-      assignmentType = AssignmentType.TERNARY;
+      // Ternary assignment: Data/Governance roles require explicit scope
       if (getScopeType() == null) {
         throw new IllegalStateException(role.getRoleType() + " roles require explicit scope");
       }

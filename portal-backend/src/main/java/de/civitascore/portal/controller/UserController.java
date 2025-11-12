@@ -100,7 +100,7 @@ public class UserController
   }
 
   @Override
-  protected BaseTenantAwareService<User, String, UserInputDTO> getService() {
+  protected BaseTenantAwareService<User, UserInputDTO> getService() {
     return userService;
   }
 

@@ -13,7 +13,5 @@ public class RoleOutputDTO extends BaseOutputDTO {
   private String description;
   private RoleType roleType;
   private List<PermissionSummaryDTO> permissions;
-  private Boolean isDefault;
-  private Boolean userModifiable;
   private String tenantId;
 }

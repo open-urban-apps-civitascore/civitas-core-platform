@@ -15,6 +15,7 @@ public class GroupOutputDTO extends BaseOutputDTO {
   private String tenantId;
   private UserSummaryDTO contactUser;
   private GroupSummaryDTO parentGroup;
+  private List<GroupSummaryDTO> childGroups;
   private List<UserSummaryDTO> members;
-  private List<RoleSummaryDTO> systemRoles;
+  private List<RoleSummaryDTO> roles;
 }

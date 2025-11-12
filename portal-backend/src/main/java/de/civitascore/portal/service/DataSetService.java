@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class DataSetService extends BaseTenantAwareService<DataSet, String, DataSetInputDTO> {
+public class DataSetService extends BaseTenantAwareService<DataSet, DataSetInputDTO> {
 
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;

@@ -250,7 +250,7 @@ class DataSetControllerIntegrationTest
           Map.of(
               "page", "0",
               "size", "5",
-              "sort", "title,asc");
+              "sort", "name,asc");
 
       ResponseEntity<RestPage<DataSetOutputDTO>> response = performGetAll(params);
 
@@ -310,7 +310,7 @@ class DataSetControllerIntegrationTest
       String dataSetId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("title", "PatchedDataSet");
+      patchMap.put("name", "PatchedDataSet");
       patchMap.put("description", "Patched description");
 
       ResponseEntity<DataSetOutputDTO> response = performPatch(dataSetId, patchMap);

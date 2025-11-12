@@ -15,5 +15,5 @@ public class GroupInputDTO extends BaseInputDTO {
   private String contactUserId;
   private String parentGroupId;
   private List<String> memberIds;
-  private List<String> systemRoleIds;
+  private List<String> roleIds;
 }

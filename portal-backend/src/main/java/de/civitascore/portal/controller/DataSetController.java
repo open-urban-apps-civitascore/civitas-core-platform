@@ -40,11 +40,6 @@ public class DataSetController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "sensor-data")),
     @Parameter(
-        name = "title",
-        description = "Filter by title (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Sensor Data")),
-    @Parameter(
         name = "description",
         description = "Filter by description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
@@ -65,7 +60,7 @@ public class DataSetController
   }
 
   @Override
-  protected BaseTenantAwareService<DataSet, String, DataSetInputDTO> getService() {
+  protected BaseTenantAwareService<DataSet, DataSetInputDTO> getService() {
     return dataSetService;
   }
 

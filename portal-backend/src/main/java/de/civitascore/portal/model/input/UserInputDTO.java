@@ -19,5 +19,4 @@ public class UserInputDTO extends BaseInputDTO {
   private String externalId;
   private Boolean active;
   private List<String> groupIds;
-  private String metadata;
 }

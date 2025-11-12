@@ -15,8 +15,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class AssignmentService
-    extends BaseTenantAwareService<Assignment, String, AssignmentInputDTO> {
+public class AssignmentService extends BaseTenantAwareService<Assignment, AssignmentInputDTO> {
 
   private final AssignmentRepository assignmentRepository;
   private final AssignmentMapper assignmentMapper;
@@ -56,7 +55,8 @@ public class AssignmentService
 
     if (input.getParentAssignmentId() != null) {
       entity.setParentAssignment(
-          assignmentRepository.getReferenceById(input.getParentAssignmentId()));
+          assignmentRepository.getReferenceByIdAndTenantIdOrThrow(
+              input.getParentAssignmentId(), getCurrentTenantId()));
     } else {
       entity.setParentAssignment(null);
     }

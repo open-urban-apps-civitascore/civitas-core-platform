@@ -237,7 +237,7 @@ class GroupControllerIntegrationTest
           Map.of(
               "page", "0",
               "size", "5",
-              "sort", "title,asc");
+              "sort", "name,asc");
 
       ResponseEntity<RestPage<GroupOutputDTO>> response = performGetAll(params);
 
@@ -308,7 +308,7 @@ class GroupControllerIntegrationTest
       String groupId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("title", "PatchedGroup");
+      patchMap.put("name", "PatchedGroup");
       patchMap.put("description", "Patched description");
 
       ResponseEntity<GroupOutputDTO> response = performPatch(groupId, patchMap);

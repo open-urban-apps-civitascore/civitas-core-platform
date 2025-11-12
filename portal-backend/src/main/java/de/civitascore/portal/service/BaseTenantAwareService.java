@@ -5,7 +5,7 @@ import de.civitascore.portal.mapper.DtoMapper;
 import de.civitascore.portal.model.entity.base.TenantAwareEntity;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.repository.TenantAwareRepository;
-import java.io.Serializable;
+import de.civitascore.portal.util.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,15 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
  * BaseInputDTO)} hook.
  *
  * @param <E> the entity type extending TenantAwareEntity
- * @param <ID> the ID type
  * @param <I> the input DTO type
  */
 @Slf4j
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public abstract class BaseTenantAwareService<
-        E extends TenantAwareEntity, ID extends Serializable, I extends BaseInputDTO>
-    extends BaseService<E, ID, I> {
+public abstract class BaseTenantAwareService<E extends TenantAwareEntity, I extends BaseInputDTO>
+    extends BaseService<E, String, I> {
 
   /**
    * Called after converting input DTO to entity, before saving.
@@ -47,7 +45,7 @@ public abstract class BaseTenantAwareService<
   }
 
   @Override
-  protected abstract TenantAwareRepository<E, ID> getRepository();
+  protected abstract TenantAwareRepository<E, String> getRepository();
 
   @Override
   protected abstract DtoMapper<I, ?, E> getMapper();
@@ -82,5 +80,36 @@ public abstract class BaseTenantAwareService<
     String tenantId = getCurrentTenantId();
     entity.setTenantId(tenantId);
     log.trace("Set tenant ID '{}' on entity {}", tenantId, entity.getClass().getSimpleName());
+  }
+
+  /**
+   * Get a reference to an entity by ID without loading it from the database. This returns a JPA
+   * proxy that will only be loaded when accessed.
+   *
+   * <p>This override validates that the entity exists within the current tenant before returning
+   * the reference, ensuring tenant isolation.
+   *
+   * @param id the entity ID
+   * @return a reference to the entity (lazy proxy)
+   * @throws jakarta.persistence.EntityNotFoundException if entity not found in current tenant
+   */
+  @Override
+  public E getReferenceById(String id) {
+    E entity = getRepository().getReferenceByIdAndTenantIdOrThrow(id, getCurrentTenantId());
+    if (entity == null) {
+      throw new ResourceNotFoundException(getEntityName(), id);
+    }
+    return entity;
+  }
+
+  /**
+   * Check if an entity exists by ID within the current tenant.
+   *
+   * @param id the entity ID
+   * @return true if the entity exists in the current tenant, false otherwise
+   */
+  @Override
+  public boolean existsById(String id) {
+    return getRepository().existsByIdAndTenantId(id, getCurrentTenantId());
   }
 }

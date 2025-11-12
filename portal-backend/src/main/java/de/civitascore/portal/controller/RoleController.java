@@ -39,11 +39,6 @@ public class RoleController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "admin")),
     @Parameter(
-        name = "title",
-        description = "Filter by title (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Administrator")),
-    @Parameter(
         name = "description",
         description = "Filter by description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
@@ -64,7 +59,7 @@ public class RoleController
   }
 
   @Override
-  protected BaseTenantAwareService<Role, String, RoleInputDTO> getService() {
+  protected BaseTenantAwareService<Role, RoleInputDTO> getService() {
     return roleService;
   }
 

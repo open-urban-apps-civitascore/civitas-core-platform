@@ -39,11 +39,6 @@ public class GroupController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "Engineering")),
     @Parameter(
-        name = "title",
-        description = "Filter by title (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Engineering Team")),
-    @Parameter(
         name = "description",
         description = "Filter by description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
@@ -74,7 +69,7 @@ public class GroupController
   }
 
   @Override
-  protected BaseTenantAwareService<Group, String, GroupInputDTO> getService() {
+  protected BaseTenantAwareService<Group, GroupInputDTO> getService() {
     return groupService;
   }
 

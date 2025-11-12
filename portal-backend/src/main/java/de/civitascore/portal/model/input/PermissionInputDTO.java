@@ -14,7 +14,4 @@ public class PermissionInputDTO extends BaseInputDTO {
   private String description;
 
   @NotNull(message = "Permission type is required") private PermissionType permissionType;
-
-  private Boolean userModifiable;
-  private Boolean isDefault;
 }

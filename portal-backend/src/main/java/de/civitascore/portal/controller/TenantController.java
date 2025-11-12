@@ -1,5 +1,6 @@
 package de.civitascore.portal.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.portal.model.entity.Tenant;
 import de.civitascore.portal.model.input.TenantInputDTO;
 import de.civitascore.portal.model.output.TenantOutputDTO;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -55,6 +57,26 @@ public class TenantController
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
     return super.getAll(spec, pageable);
+  }
+
+  @Override
+  public ResponseEntity<TenantOutputDTO> create(TenantInputDTO input) {
+    throw new UnsupportedOperationException("Create not supported for Tenant");
+  }
+
+  @Override
+  public ResponseEntity<TenantOutputDTO> update(String s, TenantInputDTO input) {
+    throw new UnsupportedOperationException("Full update not supported for Tenant");
+  }
+
+  @Override
+  public ResponseEntity<TenantOutputDTO> patch(String s, JsonNode updates) throws IOException {
+    throw new UnsupportedOperationException("Patch update not supported for Tenant");
+  }
+
+  @Override
+  public void delete(String s) {
+    throw new UnsupportedOperationException("Delete not supported for Tenant");
   }
 
   @Override

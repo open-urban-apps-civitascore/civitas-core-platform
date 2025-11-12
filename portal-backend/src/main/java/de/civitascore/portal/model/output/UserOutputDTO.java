@@ -16,5 +16,4 @@ public class UserOutputDTO extends BaseOutputDTO {
   private Boolean active;
   private String tenantId;
   private List<GroupSummaryDTO> groups;
-  private String metadata;
 }

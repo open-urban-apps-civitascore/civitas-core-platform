@@ -12,8 +12,10 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -38,10 +40,10 @@ public class Group extends NamedEntity {
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
-      name = "group_system_roles",
+      name = "group_roles",
       joinColumns = @JoinColumn(name = "group_id"),
       inverseJoinColumns = @JoinColumn(name = "role_id"))
-  private Set<Role> systemRoles = new HashSet<>();
+  private Set<Role> roles = new HashSet<>();
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "contact_user_id")
@@ -56,5 +58,17 @@ public class Group extends NamedEntity {
       fetch = FetchType.LAZY,
       cascade = CascadeType.ALL,
       orphanRemoval = true)
+  @Setter(AccessLevel.NONE) // Custom setter needed for orphanRemoval
   private Set<Group> childGroups = new HashSet<>();
+
+  /**
+   * Custom setter for childGroups to properly handle orphanRemoval. Hibernate requires that the
+   * collection instance remains the same, while only its contents are modified.
+   */
+  public void setChildGroups(Collection<Group> childGroups) {
+    this.childGroups.clear();
+    if (childGroups != null) {
+      this.childGroups.addAll(childGroups);
+    }
+  }
 }

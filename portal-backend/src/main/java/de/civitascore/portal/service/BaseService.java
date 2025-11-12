@@ -102,7 +102,7 @@ public abstract class BaseService<T, ID extends Serializable, I extends BaseInpu
    * <p>This method uses lifecycle hooks:
    *
    * <ul>
-   *   <li>{@link #preProcessLoad(Serializable)} - actions before loading
+   *   <li>{@link #preProcessLoad(Serializable)} - load and optionally process entity
    *   <li>{@link #postLoad(Object)} - customize entity after loading
    * </ul>
    *
@@ -111,11 +111,10 @@ public abstract class BaseService<T, ID extends Serializable, I extends BaseInpu
    * @throws ResourceNotFoundException if entity not found
    */
   public T findById(ID id) {
-    preProcessLoad(id);
-    T entity =
-        getRepository()
-            .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id.toString()));
+    T entity = preProcessLoad(id);
+    if (entity == null) {
+      throw new ResourceNotFoundException(getEntityName(), id.toString());
+    }
     return postLoad(entity);
   }
 
@@ -162,9 +161,10 @@ public abstract class BaseService<T, ID extends Serializable, I extends BaseInpu
    *
    * @param id the entity ID
    * @return a reference to the entity (lazy proxy)
+   * @throws jakarta.persistence.EntityNotFoundException if entity not found
    */
   public T getReferenceById(ID id) {
-    return getRepository().getReferenceById(id);
+    return getRepository().getReferenceByIdOrThrow(id);
   }
 
   /**
@@ -246,10 +246,11 @@ public abstract class BaseService<T, ID extends Serializable, I extends BaseInpu
   }
 
   /**
-   * Pre-process before loading entity by ID.
+   * Load entity by ID from database. Override this method to add custom loading logic or caching.
+   * The returned entity will be passed to {@link #postLoad(Object)}.
    *
    * @param id the entity ID
-   * @return the loaded entity or null
+   * @return the loaded entity or null if not found
    */
   protected T preProcessLoad(ID id) {
     return getRepository().findById(id).orElse(null);

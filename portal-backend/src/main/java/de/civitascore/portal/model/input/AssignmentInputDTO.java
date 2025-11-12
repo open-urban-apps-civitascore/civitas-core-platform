@@ -18,5 +18,4 @@ public class AssignmentInputDTO extends BaseInputDTO {
   private String scopeId;
   private Boolean isInherited;
   private String parentAssignmentId;
-  private String metadata;
 }

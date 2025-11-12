@@ -17,6 +17,5 @@ public class AssignmentOutputDTO extends BaseOutputDTO {
   private AssignmentType assignmentType;
   private Boolean isInherited;
   private AssignmentOutputDTO parentAssignment;
-  private String metadata;
   private String tenantId;
 }

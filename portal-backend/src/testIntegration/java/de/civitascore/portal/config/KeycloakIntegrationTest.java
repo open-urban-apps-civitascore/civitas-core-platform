@@ -22,10 +22,10 @@ class KeycloakIntegrationTest extends BaseKeycloakIntegrationTest {
     @Test
     @DisplayName("Should start all required containers successfully")
     void shouldStartContainers() {
-      assertThat(postgres.isRunning()).as("PostgreSQL container should be running").isTrue();
-      assertThat(keycloak.isRunning()).as("Keycloak container should be running").isTrue();
+      assertThat(POSTGRES.isRunning()).as("PostgreSQL container should be running").isTrue();
+      assertThat(KEYCLOAK.isRunning()).as("Keycloak container should be running").isTrue();
 
-      String authServerUrl = keycloak.getAuthServerUrl();
+      String authServerUrl = KEYCLOAK.getAuthServerUrl();
       assertThat(authServerUrl).as("Auth server URL should be available").isNotEmpty();
     }
   }

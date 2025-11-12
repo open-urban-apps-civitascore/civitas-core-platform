@@ -41,8 +41,6 @@ class PermissionControllerIntegrationTest
     input.setName("Test Permission " + System.currentTimeMillis());
     input.setDescription("A test permission for integration testing");
     input.setPermissionType(PermissionType.DATA);
-    input.setIsDefault(false);
-    input.setUserModifiable(true);
     return input;
   }
 
@@ -60,8 +58,6 @@ class PermissionControllerIntegrationTest
     input.setName("Updated Permission");
     input.setDescription("Updated description");
     input.setPermissionType(PermissionType.SYSTEM);
-    input.setUserModifiable(true);
-    input.setIsDefault(true);
     return input;
   }
 
@@ -169,13 +165,13 @@ class PermissionControllerIntegrationTest
     @DisplayName("Should create default permission")
     void shouldCreateDefaultPermission() {
       PermissionInputDTO input = createValidInput();
-      input.setIsDefault(true);
+      input.setDescription("TestDescription");
 
       ResponseEntity<PermissionOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getIsDefault()).isTrue();
+      assertThat(response.getBody().getDescription()).isEqualTo(input.getDescription());
     }
   }
 
@@ -246,7 +242,7 @@ class PermissionControllerIntegrationTest
           Map.of(
               "page", "0",
               "size", "5",
-              "sort", "title,asc");
+              "sort", "name,asc");
 
       ResponseEntity<RestPage<PermissionOutputDTO>> response = performGetAll(params);
 
@@ -303,7 +299,7 @@ class PermissionControllerIntegrationTest
       String permissionId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("title", "PatchedPermission");
+      patchMap.put("name", "PatchedPermission");
       patchMap.put("description", "Patched description");
 
       ResponseEntity<PermissionOutputDTO> response = performPatch(permissionId, patchMap);
@@ -467,14 +463,12 @@ class PermissionControllerIntegrationTest
     void shouldHandleSystemPermissionType() {
       PermissionInputDTO input = createValidInput();
       input.setPermissionType(PermissionType.SYSTEM);
-      input.setUserModifiable(false);
 
       ResponseEntity<PermissionOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getPermissionType()).isEqualTo(PermissionType.SYSTEM);
-      assertThat(response.getBody().getUserModifiable()).isFalse();
     }
 
     @Test

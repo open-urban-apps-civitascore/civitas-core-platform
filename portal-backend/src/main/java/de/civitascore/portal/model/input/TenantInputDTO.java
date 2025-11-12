@@ -12,5 +12,4 @@ public class TenantInputDTO extends BaseInputDTO {
   private String description;
   private Boolean active;
   private String externalId;
-  private String settings;
 }

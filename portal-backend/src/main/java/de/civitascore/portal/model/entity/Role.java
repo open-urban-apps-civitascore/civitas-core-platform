@@ -27,10 +27,7 @@ import lombok.Setter;
         @UniqueConstraint(
             name = "uk_role_name_tenant",
             columnNames = {"name", "tenant_id"}),
-    indexes = {
-      @Index(name = "idx_role_type", columnList = "role_type"),
-      @Index(name = "idx_role_default", columnList = "is_default")
-    })
+    indexes = {@Index(name = "idx_role_type", columnList = "role_type")})
 @Getter
 @Setter
 @NamedEntityGraph(
@@ -48,10 +45,4 @@ public class Role extends NamedEntity {
       joinColumns = @JoinColumn(name = "role_id"),
       inverseJoinColumns = @JoinColumn(name = "permission_id"))
   private Set<Permission> permissions = new HashSet<>();
-
-  @Column(name = "is_default", nullable = false)
-  private Boolean isDefault = false;
-
-  @Column(name = "user_modifiable", nullable = false)
-  private Boolean userModifiable = true;
 }

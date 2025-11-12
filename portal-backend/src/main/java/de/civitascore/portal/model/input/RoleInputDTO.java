@@ -17,6 +17,4 @@ public class RoleInputDTO extends BaseInputDTO {
   @NotNull(message = "Role type is required") private RoleType roleType;
 
   private List<String> permissionIds;
-  private Boolean isDefault;
-  private Boolean userModifiable;
 }

@@ -52,9 +52,6 @@ public class User extends TenantAwareEntity {
   @ManyToMany(fetch = FetchType.LAZY, mappedBy = "members")
   private Set<Group> groups = new HashSet<>();
 
-  @Column(name = "metadata", columnDefinition = "TEXT")
-  private String metadata;
-
   public String getFullName() {
     return firstName + " " + lastName;
   }

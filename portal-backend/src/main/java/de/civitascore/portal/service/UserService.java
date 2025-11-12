@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class UserService extends BaseTenantAwareService<User, String, UserInputDTO> {
+public class UserService extends BaseTenantAwareService<User, UserInputDTO> {
 
   private final UserRepository userRepository;
   private final UserMapper userMapper;

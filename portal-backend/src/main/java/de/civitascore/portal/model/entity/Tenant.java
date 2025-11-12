@@ -31,7 +31,4 @@ public class Tenant extends BaseEntity {
 
   @Column(name = "external_id")
   private String externalId;
-
-  @Column(name = "settings", columnDefinition = "TEXT")
-  private String settings;
 }

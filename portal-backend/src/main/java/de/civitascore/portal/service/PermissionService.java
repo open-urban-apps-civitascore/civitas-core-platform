@@ -16,8 +16,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class PermissionService
-    extends BaseTenantAwareService<Permission, String, PermissionInputDTO> {
+public class PermissionService extends BaseTenantAwareService<Permission, PermissionInputDTO> {
 
   private final PermissionRepository permissionRepository;
   private final PermissionMapper permissionMapper;

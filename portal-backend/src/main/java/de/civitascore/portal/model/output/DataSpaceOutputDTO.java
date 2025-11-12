@@ -15,6 +15,5 @@ public class DataSpaceOutputDTO extends BaseOutputDTO {
   private DataSpaceSummaryDTO parentDataSpace;
   private List<DataSpaceSummaryDTO> childDataSpaces;
   private String externalId;
-  private String metadata;
   private String tenantId;
 }

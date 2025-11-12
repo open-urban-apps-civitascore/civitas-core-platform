@@ -12,8 +12,10 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -45,11 +47,20 @@ public class DataSpace extends NamedEntity {
       fetch = FetchType.LAZY,
       cascade = CascadeType.ALL,
       orphanRemoval = true)
+  @Setter(AccessLevel.NONE) // Custom setter needed for orphanRemoval
   private Set<DataSpace> childDataSpaces = new HashSet<>();
+
+  /**
+   * Custom setter for childDataSpaces to properly handle orphanRemoval. Hibernate requires that the
+   * collection instance remains the same, while only its contents are modified.
+   */
+  public void setChildDataSpaces(Collection<DataSpace> childDataSpaces) {
+    this.childDataSpaces.clear();
+    if (childDataSpaces != null) {
+      this.childDataSpaces.addAll(childDataSpaces);
+    }
+  }
 
   @Column(name = "external_id")
   private String externalId;
-
-  @Column(name = "metadata", columnDefinition = "TEXT")
-  private String metadata;
 }

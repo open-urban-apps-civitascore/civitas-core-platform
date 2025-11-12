@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class DataSpaceService extends BaseTenantAwareService<DataSpace, String, DataSpaceInputDTO> {
+public class DataSpaceService extends BaseTenantAwareService<DataSpace, DataSpaceInputDTO> {
 
   private final DataSpaceRepository dataSpaceRepository;
   private final DataSpaceMapper dataSpaceMapper;

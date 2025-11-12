@@ -22,7 +22,6 @@ import org.springframework.security.core.GrantedAuthority;
             columnNames = {"name", "tenant_id"}),
     indexes = {
       @Index(name = "idx_permission_type", columnList = "permission_type"),
-      @Index(name = "idx_permission_modifiable", columnList = "user_modifiable")
     })
 @Getter
 @Setter
@@ -31,12 +30,6 @@ public class Permission extends NamedEntity implements GrantedAuthority {
   @Enumerated(EnumType.STRING)
   @Column(name = "permission_type", nullable = false)
   private PermissionType permissionType;
-
-  @Column(name = "user_modifiable", nullable = false)
-  private Boolean userModifiable = false;
-
-  @Column(name = "is_default", nullable = false)
-  private Boolean isDefault = false;
 
   @Override
   public String getAuthority() {

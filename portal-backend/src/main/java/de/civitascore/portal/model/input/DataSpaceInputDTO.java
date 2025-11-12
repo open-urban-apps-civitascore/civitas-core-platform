@@ -13,5 +13,4 @@ public class DataSpaceInputDTO extends BaseInputDTO {
   private String ownerUserId;
   private String parentDataSpaceId;
   private String externalId;
-  private String metadata;
 }

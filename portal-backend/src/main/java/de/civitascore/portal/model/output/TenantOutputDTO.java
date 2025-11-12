@@ -10,5 +10,4 @@ public class TenantOutputDTO extends BaseOutputDTO {
   private String description;
   private Boolean active;
   private String externalId;
-  private String settings;
 }

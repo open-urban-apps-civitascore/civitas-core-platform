@@ -37,10 +37,18 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, Stri
           entity.getMembers().stream().map(userMapper::toSummary).collect(Collectors.toList()));
     }
 
-    // Map systemRoles
-    if (entity.getSystemRoles() != null && !entity.getSystemRoles().isEmpty()) {
-      output.setSystemRoles(
-          entity.getSystemRoles().stream().map(roleMapper::toSummary).collect(Collectors.toList()));
+    // Map roles
+    if (entity.getRoles() != null && !entity.getRoles().isEmpty()) {
+      output.setRoles(
+          entity.getRoles().stream().map(roleMapper::toSummary).collect(Collectors.toList()));
+    }
+
+    // Map childGroups
+    if (entity.getChildGroups() != null && !entity.getChildGroups().isEmpty()) {
+      output.setChildGroups(
+          entity.getChildGroups().stream()
+              .map(groupMapper::toSummary)
+              .collect(Collectors.toList()));
     }
 
     return output;

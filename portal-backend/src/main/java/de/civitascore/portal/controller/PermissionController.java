@@ -40,18 +40,13 @@ public class PermissionController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "read")),
     @Parameter(
-        name = "title",
-        description = "Filter by title (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Read Access")),
-    @Parameter(
         name = "description",
         description = "Filter by description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "Allows read access")),
     @Parameter(
         name = "q",
-        description = "Search in title or description (partial match, case-insensitive).",
+        description = "Search in name or description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "read"))
   })
@@ -65,7 +60,7 @@ public class PermissionController
   }
 
   @Override
-  protected BaseTenantAwareService<Permission, String, PermissionInputDTO> getService() {
+  protected BaseTenantAwareService<Permission, PermissionInputDTO> getService() {
     return permissionService;
   }
 

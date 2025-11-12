@@ -42,8 +42,6 @@ class RoleControllerIntegrationTest
     input.setName("test_role_" + System.currentTimeMillis());
     input.setDescription("A test role for integration testing");
     input.setRoleType(RoleType.GOVERNANCE);
-    input.setIsDefault(false);
-    input.setUserModifiable(true);
     return input;
   }
 
@@ -61,8 +59,6 @@ class RoleControllerIntegrationTest
     input.setName("Updated Role");
     input.setDescription("Updated description");
     input.setRoleType(RoleType.GOVERNANCE);
-    input.setUserModifiable(true);
-    input.setIsDefault(true);
     return input;
   }
 
@@ -180,15 +176,15 @@ class RoleControllerIntegrationTest
 
     @Test
     @DisplayName("Should create default role")
-    void shouldCreateDefaultRole() {
+    void shouldCreateRole() {
       RoleInputDTO input = createValidInput();
-      input.setIsDefault(true);
+      input.setName("TestName");
 
       ResponseEntity<RoleOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getIsDefault()).isTrue();
+      assertThat(response.getBody().getName()).isEqualTo(input.getName());
     }
   }
 
@@ -259,7 +255,7 @@ class RoleControllerIntegrationTest
           Map.of(
               "page", "0",
               "size", "5",
-              "sort", "title,asc");
+              "sort", "name,asc");
 
       ResponseEntity<RestPage<RoleOutputDTO>> response = performGetAll(params);
 
@@ -316,7 +312,7 @@ class RoleControllerIntegrationTest
       String roleId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("title", "PatchedRole");
+      patchMap.put("name", "PatchedRole");
       patchMap.put("description", "Patched description");
 
       ResponseEntity<RoleOutputDTO> response = performPatch(roleId, patchMap);
@@ -491,14 +487,12 @@ class RoleControllerIntegrationTest
     void shouldHandleSystemRoleType() {
       RoleInputDTO input = createValidInput();
       input.setRoleType(RoleType.SYSTEM);
-      input.setUserModifiable(false);
 
       ResponseEntity<RoleOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getRoleType()).isEqualTo(RoleType.SYSTEM);
-      assertThat(response.getBody().getUserModifiable()).isFalse();
     }
 
     @Test

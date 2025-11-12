@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class GroupService extends BaseTenantAwareService<Group, String, GroupInputDTO> {
+public class GroupService extends BaseTenantAwareService<Group, GroupInputDTO> {
 
   private final GroupRepository groupRepository;
   private final GroupMapper groupMapper;
@@ -73,11 +73,10 @@ public class GroupService extends BaseTenantAwareService<Group, String, GroupInp
     }
 
     // Set system roles
-    if (Objects.nonNull(input.getSystemRoleIds())) {
-      entity.setSystemRoles(new HashSet<>());
-      if (!input.getSystemRoleIds().isEmpty()) {
-        entity.setSystemRoles(
-            new HashSet<>(roleService.getRepository().findAllById(input.getSystemRoleIds())));
+    if (Objects.nonNull(input.getRoleIds())) {
+      entity.setRoles(new HashSet<>());
+      if (!input.getRoleIds().isEmpty()) {
+        entity.setRoles(new HashSet<>(roleService.getRepository().findAllById(input.getRoleIds())));
       }
     }
 
@@ -101,8 +100,8 @@ public class GroupService extends BaseTenantAwareService<Group, String, GroupInp
 
   /**
    * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
-   * Group along with contactUser, parentGroup, members and systemRoles in a single JOIN query,
-   * preventing N+1 query problems.
+   * Group along with contactUser, parentGroup, members and roles in a single JOIN query, preventing
+   * N+1 query problems.
    */
   @Override
   public Group findById(String id) {

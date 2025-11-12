@@ -159,12 +159,13 @@ class DataSpaceControllerIntegrationTest
     @DisplayName("Should create dataspace with metadata")
     void shouldCreateDataSpaceWithMetadata() {
       DataSpaceInputDTO input = createValidInput();
-      input.setMetadata("{\"key\": \"value\"}");
+      input.setName("TestDataSpace");
 
       ResponseEntity<DataSpaceOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getName()).isEqualTo(input.getName());
     }
   }
 
@@ -235,7 +236,7 @@ class DataSpaceControllerIntegrationTest
           Map.of(
               "page", "0",
               "size", "5",
-              "sort", "title,asc");
+              "sort", "name,asc");
 
       ResponseEntity<RestPage<DataSpaceOutputDTO>> response = performGetAll(params);
 
@@ -292,7 +293,7 @@ class DataSpaceControllerIntegrationTest
       String dataSpaceId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("title", "PatchedDataSpace");
+      patchMap.put("name", "PatchedDataSpace");
       patchMap.put("description", "Patched description");
 
       ResponseEntity<DataSpaceOutputDTO> response = performPatch(dataSpaceId, patchMap);
