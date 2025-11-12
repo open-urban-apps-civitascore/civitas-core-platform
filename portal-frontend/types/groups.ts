@@ -11,6 +11,15 @@ export type Group = {
   subgroups: Group[]
 }
 
+export type UserGroupsListData = {
+  id: string
+  title: string
+  description: string
+  roles: string[]
+  memberSince: string
+  contact: { id: string; displayName: string } | null
+}
+
 export type UpdateGroupData = Group
 export type CreateGroupData = Omit<Group, 'id'>
 

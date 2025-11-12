@@ -103,6 +103,15 @@
         "title": "Rolle hinzufügen - {category}",
         "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen."
       }
+    },
+    "groupsTab": {
+      "title": "Gruppenmitgliedschaft",
+      "addGroup": "Gruppe hinzufügen",
+      "name": "Name",
+      "memberSince": "Mitglied seit",
+      "contact": "Ansprechpartner",
+      "description": "Beschreibung",
+      "roles": "Rollen"
     }
   },
   "groups": {
