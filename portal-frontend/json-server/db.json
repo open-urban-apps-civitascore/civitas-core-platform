@@ -5356,14 +5356,13 @@
       "title": "Technischer Mitarbeiter",
       "description": "Betreut die technische Infrastruktur, führt Wartungsarbeiten durch und unterstützt bei der Implementierung neuer Systeme und Anwendungen.",
       "contact": {
-        "id": "3",
-        "displayName": "Michael Wagner"
+        "id": "15",
+        "displayName": "Michael Hoffmann"
       },
       "parent": null,
       "roles": [
         "2",
-        "4",
-        4
+        "4"
       ],
       "subgroups": [
         {
@@ -5940,6 +5939,74 @@
     }
   ],
   "dataspaces": [
+    {
+      "id": "1",
+      "name": "Naturschutz",
+      "description": "Der DataSpace enthält Grundlagendaten, Klimaanalysen, Planungshinweise und weitere Informationen zum Naturschutz in der Region.",
+      "protected": true
+    },
+    {
+      "id": "2",
+      "name": "Verkehrsplanung",
+      "description": "Daten zur städtischen Verkehrsplanung, Mobilitätskonzepte und Verkehrsanalysen für eine nachhaltige Stadtentwicklung.",
+      "protected": false
+    },
+    {
+      "id": "3",
+      "name": "Stadtentwicklung",
+      "description": "Planungsdaten und Konzepte für die zukünftige Entwicklung der Stadt, einschließlich Bauprojekte und Flächennutzung.",
+      "protected": true
+    },
+    {
+      "id": "4",
+      "name": "Umweltmonitoring",
+      "description": "Messdaten zur Luftqualität, Lärmbelastung und anderen Umweltparametern zur Überwachung der städtischen Umweltsituation.",
+      "protected": false
+    },
+    {
+      "id": "5",
+      "name": "Bürgerdienste",
+      "description": "Informationen und Daten zur Bereitstellung von Bürgerdiensten und zur Verbesserung der Verwaltungsabläufe.",
+      "protected": true
+    },
+    {
+      "id": "6",
+      "name": "Energiemanagement",
+      "description": "Energieverbrauchsdaten und -analysen für öffentliche Gebäude und Infrastruktur zur Optimierung der Energieeffizienz.",
+      "protected": false
+    },
+    {
+      "id": "7",
+      "name": "Wasserwirtschaft",
+      "description": "Daten zur Wasserversorgung, Abwassermanagement und Hochwasserschutz in der Kommune.",
+      "protected": true
+    },
+    {
+      "id": "8",
+      "name": "Bildungswesen",
+      "description": "Bildungsstatistiken, Schulentwicklungsplanung und Ressourcenverwaltung für städtische Bildungseinrichtungen.",
+      "protected": false
+    },
+    {
+      "id": "9",
+      "name": "Gesundheitsdaten",
+      "description": "Aggregierte Gesundheitsstatistiken und Informationen zur öffentlichen Gesundheitsversorgung.",
+      "protected": true
+    },
+    {
+      "id": "10",
+      "name": "Tourismus",
+      "description": "Tourismuszahlen, Besucherstatistiken und Daten zur touristischen Infrastruktur der Stadt.",
+      "protected": false
+    },
+    {
+      "id": "1762358504364",
+      "name": "test",
+      "description": "test 12355",
+      "protected": false
+    }
+  ],
+  "permissions": [
     {
       "id": "1",
       "name": "Naturschutz",

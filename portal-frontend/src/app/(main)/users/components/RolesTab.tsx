@@ -14,14 +14,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { BaseRole, ROLE_TYPES, RoleType } from '@/types/roles'
 import { UserResponse } from '@/types/users'
-
-interface Role {
-  id: string
-  name: string
-  description: string
-  type: 'System' | 'Data' | 'Governance'
-}
 
 interface RolesTabProps {
   userId: string
@@ -35,11 +29,11 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
   const tRoles = useTranslations('roles')
   const [user, setUser] = useState<UserResponse | null>(null)
   const [originalRoles, setOriginalRoles] = useState<string[]>([])
-  const [allRoles, setAllRoles] = useState<Role[]>([])
+  const [allRoles, setAllRoles] = useState<BaseRole[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState<'System' | 'Data' | 'Governance'>('System')
+  const [selectedCategory, setSelectedCategory] = useState<RoleType>('system')
 
   const hasChanges = user ? JSON.stringify(user.roles.sort()) !== JSON.stringify(originalRoles.sort()) : false
 
@@ -73,7 +67,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
   }, [userId])
 
   // Get roles by category
-  const getRolesByCategory = (category: 'System' | 'Data' | 'Governance') => {
+  const getRolesByCategory = (category: RoleType) => {
     if (!user || !allRoles) return []
 
     const userRoles = allRoles.filter(role => user.roles.includes(role.id) && role.type === category)
@@ -81,7 +75,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
   }
 
   // Get available roles for adding (not already assigned)
-  const getAvailableRolesByCategory = (category: 'System' | 'Data' | 'Governance') => {
+  const getAvailableRolesByCategory = (category: RoleType) => {
     if (!user || !allRoles) return []
 
     return allRoles.filter(role => !user.roles.includes(role.id) && role.type === category)
@@ -133,15 +127,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
     setUser({ ...user, roles: originalRoles })
   }
 
-  const RoleCategory = ({
-    title,
-    category,
-    colorClass,
-  }: {
-    title: string
-    category: 'System' | 'Data' | 'Governance'
-    colorClass: string
-  }) => {
+  const RoleCategory = ({ title, category, colorClass }: { title: string; category: RoleType; colorClass: string }) => {
     const categoryRoles = getRolesByCategory(category)
     const availableRoles = getAvailableRolesByCategory(category)
 
@@ -236,19 +222,19 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
     <div>
       <RoleCategory
         title={tRoles('systemRoles')}
-        category="System"
+        category={ROLE_TYPES.SYSTEM}
         colorClass="bg-green-100 text-green-800 border-green-200"
       />
 
       <RoleCategory
         title={tRoles('dataRoles')}
-        category="Data"
+        category={ROLE_TYPES.DATA}
         colorClass="bg-blue-100 text-blue-800 border-blue-200"
       />
 
       <RoleCategory
         title={tRoles('governanceRoles')}
-        category="Governance"
+        category={ROLE_TYPES.GOVERNANCE}
         colorClass="bg-purple-100 text-purple-800 border-purple-200"
       />
 
