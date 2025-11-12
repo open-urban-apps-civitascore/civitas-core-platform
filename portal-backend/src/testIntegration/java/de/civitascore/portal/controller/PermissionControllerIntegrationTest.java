@@ -95,7 +95,7 @@ class PermissionControllerIntegrationTest
 
       PermissionOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
-      assertThat(output.getName()).as("Title should match input").isEqualTo(input.getName());
+      assertThat(output.getName()).as("Name should match input").isEqualTo(input.getName());
       assertThat(output.getPermissionType())
           .as("Permission type should match input")
           .isEqualTo(input.getPermissionType());
@@ -144,10 +144,10 @@ class PermissionControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to create duplicate permission with same title in same tenant")
+    @DisplayName("Should fail to create duplicate permission with same Name in same tenant")
     void shouldFailToCreateDuplicatePermission() {
       PermissionInputDTO input = createValidInput();
-      input.setName("Unique Permission Title");
+      input.setName("Unique Permission Name");
 
       // Create first permission
       ResponseEntity<PermissionOutputDTO> firstResponse = performCreate(input);
@@ -192,7 +192,7 @@ class PermissionControllerIntegrationTest
 
       PermissionOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(permissionId);
-      assertThat(output.getName()).as("Title should be present").isNotNull();
+      assertThat(output.getName()).as("Name should be present").isNotNull();
     }
 
     @Test
@@ -269,7 +269,7 @@ class PermissionControllerIntegrationTest
 
       PermissionOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should remain the same").isEqualTo(permissionId);
-      assertThat(output.getName()).as("Title should be updated").isEqualTo(updateInput.getName());
+      assertThat(output.getName()).as("Name should be updated").isEqualTo(updateInput.getName());
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
@@ -525,8 +525,8 @@ class PermissionControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle empty title as invalid")
-    void shouldHandleEmptyTitle() {
+    @DisplayName("Should handle empty Name as invalid")
+    void shouldHandleEmptyTName() {
       PermissionInputDTO input = createValidInput();
       input.setName("");
 

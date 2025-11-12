@@ -96,7 +96,7 @@ class DataSetControllerIntegrationTest
 
       DataSetOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
-      assertThat(output.getName()).as("Title should match input").isEqualTo(input.getName());
+      assertThat(output.getName()).as("Name should match input").isEqualTo(input.getName());
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo(input.getDescription());
@@ -200,7 +200,7 @@ class DataSetControllerIntegrationTest
 
       DataSetOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(dataSetId);
-      assertThat(output.getName()).as("Title should be present").isNotNull();
+      assertThat(output.getName()).as("Name should be present").isNotNull();
     }
 
     @Test
@@ -277,7 +277,7 @@ class DataSetControllerIntegrationTest
 
       DataSetOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should remain the same").isEqualTo(dataSetId);
-      assertThat(output.getName()).as("Title should be updated").isEqualTo(updateInput.getName());
+      assertThat(output.getName()).as("Name should be updated").isEqualTo(updateInput.getName());
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
@@ -352,7 +352,7 @@ class DataSetControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDescription()).isEqualTo("New description");
       assertThat(response.getBody().getName())
-          .as("Title should remain unchanged")
+          .as("Name should remain unchanged")
           .isEqualTo(initialDataSet.getName());
     }
 

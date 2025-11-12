@@ -21,7 +21,7 @@ interface NamedEntityNameSpec<T> extends TenantAwareSpec<T> {}
 interface NamedEntityDescriptionSpec<T> extends TenantAwareSpec<T> {}
 
 @Spec(path = "name", params = "q", spec = LikeIgnoreCase.class)
-interface NamedEntityTitleSearchSpec<T> extends TenantAwareSpec<T> {}
+interface NamedEntityNameSearchSpec<T> extends TenantAwareSpec<T> {}
 
 @Spec(path = "description", params = "q", spec = LikeIgnoreCase.class)
 interface NamedEntityDescriptionSearchSpec<T> extends TenantAwareSpec<T> {}
@@ -29,5 +29,5 @@ interface NamedEntityDescriptionSearchSpec<T> extends TenantAwareSpec<T> {}
 public interface NamedEntitySpec<T>
     extends NamedEntityNameSpec<T>,
         NamedEntityDescriptionSpec<T>,
-        NamedEntityTitleSearchSpec<T>,
+        NamedEntityNameSearchSpec<T>,
         NamedEntityDescriptionSearchSpec<T> {}

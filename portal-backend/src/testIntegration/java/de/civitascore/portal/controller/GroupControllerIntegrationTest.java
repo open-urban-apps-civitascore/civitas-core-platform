@@ -46,7 +46,7 @@ class GroupControllerIntegrationTest
   @Override
   protected GroupInputDTO createInvalidInput() {
     GroupInputDTO input = new GroupInputDTO();
-    input.setDescription("Invalid group without title");
+    input.setDescription("Invalid group without Name");
     return input;
   }
 
@@ -92,7 +92,7 @@ class GroupControllerIntegrationTest
 
       GroupOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
-      assertThat(output.getName()).as("Title should match input").isEqualTo(input.getName());
+      assertThat(output.getName()).as("Name should match input").isEqualTo(input.getName());
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo(input.getDescription());
@@ -106,7 +106,7 @@ class GroupControllerIntegrationTest
 
     @Test
     @DisplayName("Should fail to create group with missing required field")
-    void shouldFailToCreateGroupWithMissingTitle() {
+    void shouldFailToCreateGroupWithMissingName() {
       GroupInputDTO input = createInvalidInput();
 
       ResponseEntity<GroupOutputDTO> response = performCreate(input);
@@ -154,10 +154,10 @@ class GroupControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to create duplicate group with same title in same tenant")
+    @DisplayName("Should fail to create duplicate group with same Name in same tenant")
     void shouldFailToCreateDuplicateGroup() {
       GroupInputDTO input = createValidInput();
-      input.setName("Unique Group Title");
+      input.setName("Unique Group Name");
 
       ResponseEntity<GroupOutputDTO> firstResponse = performCreate(input);
       assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -187,7 +187,7 @@ class GroupControllerIntegrationTest
 
       GroupOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(groupId);
-      assertThat(output.getName()).as("Title should be present").isNotNull();
+      assertThat(output.getName()).as("Name should be present").isNotNull();
     }
 
     @Test
@@ -246,13 +246,13 @@ class GroupControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should filter groups by title")
-    void shouldFilterGroupsByTitle() {
+    @DisplayName("Should filter groups by Name")
+    void shouldFilterGroupsByName() {
       GroupInputDTO input = createValidInput();
       input.setName("Searchable Group");
       performCreate(input);
 
-      Map<String, String> params = Map.of("title", "Searchable");
+      Map<String, String> params = Map.of("name", "Searchable");
 
       ResponseEntity<RestPage<GroupOutputDTO>> response = performGetAll(params);
 
@@ -278,7 +278,7 @@ class GroupControllerIntegrationTest
 
       GroupOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should remain the same").isEqualTo(groupId);
-      assertThat(output.getName()).as("Title should be updated").isEqualTo(updateInput.getName());
+      assertThat(output.getName()).as("Name should be updated").isEqualTo(updateInput.getName());
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
@@ -350,7 +350,7 @@ class GroupControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDescription()).isEqualTo("New description");
       assertThat(response.getBody().getName())
-          .as("Title should remain unchanged")
+          .as("Name should remain unchanged")
           .isEqualTo(initialGroup.getName());
     }
 
@@ -616,8 +616,8 @@ class GroupControllerIntegrationTest
   class EdgeCasesTests {
 
     @Test
-    @DisplayName("Should handle special characters in title")
-    void shouldHandleSpecialCharactersInTitle() {
+    @DisplayName("Should handle special characters in Name")
+    void shouldHandleSpecialCharactersInName() {
       GroupInputDTO input = createValidInput();
       input.setName("Group with special chars: äöü ß @#$%");
 
@@ -640,28 +640,28 @@ class GroupControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle empty title as invalid")
-    void shouldHandleEmptyTitle() {
+    @DisplayName("Should handle empty Name as invalid")
+    void shouldHandleEmptyName() {
       GroupInputDTO input = createValidInput();
       input.setName("");
 
       ResponseEntity<GroupOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode())
-          .as("Empty title should be rejected")
+          .as("Empty Name should be rejected")
           .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
-    @DisplayName("Should handle whitespace-only title as invalid")
-    void shouldHandleWhitespaceOnlyTitle() {
+    @DisplayName("Should handle whitespace-only Name as invalid")
+    void shouldHandleWhitespaceOnlyName() {
       GroupInputDTO input = createValidInput();
       input.setName("   ");
 
       ResponseEntity<GroupOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode())
-          .as("Whitespace-only title should be rejected")
+          .as("Whitespace-only Name should be rejected")
           .isEqualTo(HttpStatus.BAD_REQUEST);
     }
   }

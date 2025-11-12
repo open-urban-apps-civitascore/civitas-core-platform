@@ -39,11 +39,11 @@ public class PermissionService extends BaseTenantAwareService<Permission, Permis
 
   @Override
   protected Permission preSave(Permission entity) {
-    validateUniqueTitle(entity);
+    validateUniqueName(entity);
     return super.preSave(entity);
   }
 
-  private void validateUniqueTitle(Permission entity) {
+  private void validateUniqueName(Permission entity) {
     permissionRepository
         .findByNameAndTenantId(entity.getName(), entity.getTenantId())
         .ifPresent(
@@ -69,10 +69,6 @@ public class PermissionService extends BaseTenantAwareService<Permission, Permis
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
             "name", "Name cannot be null or blank", existingEntity.getId().toString());
-      }
-      if (jsonNode.has("title") && StringUtils.isBlank(jsonNode.get("title").asText())) {
-        throw new InvalidInputException(
-            "title", "Title cannot be null or blank", existingEntity.getId().toString());
       }
       if (jsonNode.has("permissionType") && jsonNode.get("permissionType").isNull()) {
         throw new InvalidInputException(

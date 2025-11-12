@@ -96,7 +96,7 @@ class RoleControllerIntegrationTest
 
       RoleOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
-      assertThat(output.getName()).as("Title should match input").isEqualTo(input.getName());
+      assertThat(output.getName()).as("Name should match input").isEqualTo(input.getName());
       assertThat(output.getRoleType())
           .as("Role type should match input")
           .isEqualTo(input.getRoleType());
@@ -157,10 +157,10 @@ class RoleControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should fail to create duplicate role with same title in same tenant")
+    @DisplayName("Should fail to create duplicate role with same Name in same tenant")
     void shouldFailToCreateDuplicateRole() {
       RoleInputDTO input = createValidInput();
-      input.setName("Unique Role Title");
+      input.setName("Unique Role Name");
 
       // Create first role
       ResponseEntity<RoleOutputDTO> firstResponse = performCreate(input);
@@ -205,7 +205,7 @@ class RoleControllerIntegrationTest
 
       RoleOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(roleId);
-      assertThat(output.getName()).as("Title should be present").isNotNull();
+      assertThat(output.getName()).as("Name should be present").isNotNull();
     }
 
     @Test
@@ -282,7 +282,7 @@ class RoleControllerIntegrationTest
 
       RoleOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should remain the same").isEqualTo(roleId);
-      assertThat(output.getName()).as("Title should be updated").isEqualTo(updateInput.getName());
+      assertThat(output.getName()).as("Name should be updated").isEqualTo(updateInput.getName());
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
@@ -354,7 +354,7 @@ class RoleControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDescription()).isEqualTo("New description");
       assertThat(response.getBody().getName())
-          .as("Title should remain unchanged")
+          .as("Name should remain unchanged")
           .isEqualTo(initialRole.getName());
     }
 
@@ -549,8 +549,8 @@ class RoleControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should handle empty title as invalid")
-    void shouldHandleEmptyTitle() {
+    @DisplayName("Should handle empty Name as invalid")
+    void shouldHandleEmptyName() {
       RoleInputDTO input = createValidInput();
       input.setName("");
 

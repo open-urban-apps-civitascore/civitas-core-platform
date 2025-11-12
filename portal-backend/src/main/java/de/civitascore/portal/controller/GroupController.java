@@ -55,7 +55,7 @@ public class GroupController
         schema = @Schema(type = "string", example = "group-456")),
     @Parameter(
         name = "q",
-        description = "Search in title or description (partial match, case-insensitive).",
+        description = "Search in name or description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "team"))
   })

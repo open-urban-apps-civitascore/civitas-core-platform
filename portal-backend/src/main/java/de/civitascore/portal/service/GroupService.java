@@ -28,11 +28,11 @@ public class GroupService extends BaseTenantAwareService<Group, GroupInputDTO> {
 
   @Override
   protected Group preSave(Group entity) {
-    validateUniqueTitle(entity);
+    validateUniqueName(entity);
     return super.preSave(entity);
   }
 
-  private void validateUniqueTitle(Group entity) {
+  private void validateUniqueName(Group entity) {
     groupRepository
         .findByNameAndTenantId(entity.getName(), entity.getTenantId())
         .ifPresent(
@@ -119,9 +119,9 @@ public class GroupService extends BaseTenantAwareService<Group, GroupInputDTO> {
       String inputJson = objectMapper.writeValueAsString(input);
       JsonNode jsonNode = objectMapper.readTree(inputJson);
 
-      if (jsonNode.has("title") && StringUtils.isBlank(jsonNode.get("title").asText())) {
+      if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-            "title", "Title cannot be null or blank", existingEntity.getId().toString());
+            "name", "Name cannot be null or blank", existingEntity.getId().toString());
       }
     } catch (InvalidInputException e) {
       throw e;

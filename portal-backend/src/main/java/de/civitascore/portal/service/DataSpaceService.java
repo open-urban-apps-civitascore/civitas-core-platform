@@ -74,11 +74,11 @@ public class DataSpaceService extends BaseTenantAwareService<DataSpace, DataSpac
 
   @Override
   protected DataSpace preSave(DataSpace entity) {
-    validateUniqueTitle(entity);
+    validateUniqueName(entity);
     return super.preSave(entity);
   }
 
-  private void validateUniqueTitle(DataSpace entity) {
+  private void validateUniqueName(DataSpace entity) {
     dataSpaceRepository
         .findByNameAndTenantId(entity.getName(), entity.getTenantId())
         .ifPresent(

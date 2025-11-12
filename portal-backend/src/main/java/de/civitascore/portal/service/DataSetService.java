@@ -80,11 +80,11 @@ public class DataSetService extends BaseTenantAwareService<DataSet, DataSetInput
 
   @Override
   protected DataSet preSave(DataSet entity) {
-    validateUniqueTitle(entity);
+    validateUniqueName(entity);
     return super.preSave(entity);
   }
 
-  private void validateUniqueTitle(DataSet entity) {
+  private void validateUniqueName(DataSet entity) {
     dataSetRepository
         .findByNameAndTenantId(entity.getName(), entity.getTenantId())
         .ifPresent(

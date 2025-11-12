@@ -71,11 +71,11 @@ public class RoleService extends BaseTenantAwareService<Role, RoleInputDTO> {
 
   @Override
   protected Role preSave(Role entity) {
-    validateUniqueTitle(entity);
+    validateUniqueName(entity);
     return super.preSave(entity);
   }
 
-  private void validateUniqueTitle(Role entity) {
+  private void validateUniqueName(Role entity) {
     roleRepository
         .findByNameAndTenantId(entity.getName(), entity.getTenantId())
         .ifPresent(
