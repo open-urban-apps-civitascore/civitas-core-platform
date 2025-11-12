@@ -39,6 +39,7 @@
     "edit": "bearbeiten",
     "users": "User Management",
     "groups": "Gruppen",
+    "dataspaces": "Datenräume",
     "tenants": "Mandanten-Management"
   },
   "datasets": {
@@ -167,6 +168,24 @@
       "previousPage": "Zur vorherigen Seite wechseln",
       "nextPage": "Zur nächsten Seite wechseln",
       "lastPage": "Zur letzten Seite wechseln"
+    }
+  },
+  "dataspaces": {
+    "title": "Datenräume",
+    "newDataSpace": "Neuer Datenraum",
+    "createDataSpace": "Datenraum erstellen",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "protected": "Geschützt"
+    },
+    "form": {
+      "inputs": {
+        "name": "Name des Datenraums",
+        "description": "Beschreibung des Datenraums",
+        "protected": "Datenraum schützen",
+        "protectedDescription": "Geschützte Datenräume erfordern erweiterte Berechtigungen für den Zugriff"
+      }
     }
   },
   "permissions": {
