@@ -69,8 +69,8 @@ export const RolesTab = (props: RolesTabProps) => {
         setIsLoading(false)
       }
     }
-
-    fetchData()
+    if (groupIds.length > 0) fetchData()
+    else setIsLoading(false)
   }, [groupIds])
 
   return (
