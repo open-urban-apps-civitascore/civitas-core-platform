@@ -49,13 +49,13 @@ const UsersPage = () => {
     setPaginationParams,
     setSearchParam,
     getApiRequestParamsByUrl,
+    setTotalPages,
     pageIndex,
     pageSize,
     sorting,
     search,
+    totalPages,
   } = useQueryParams()
-
-  const totalPages = Math.ceil(rowCount / pageSize)
 
   useEffect(() => {
     if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
@@ -100,6 +100,7 @@ const UsersPage = () => {
       setIsLoading(false)
 
       const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
+      setTotalPages(Math.ceil(totalCount / pageSize) || 1)
       if (rowCount !== totalCount) {
         setRowCount(totalCount)
       }

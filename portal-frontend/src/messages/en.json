@@ -8,7 +8,8 @@
       "submit": "Save",
       "cancel": "Cancel",
       "delete": "Delete",
-      "add": "Add"
+      "add": "Add",
+      "open": "open"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
@@ -31,6 +32,7 @@
     "documentation": "Documentation",
     "logout": "Log out",
     "datasets": "Datasets",
+    "permissions": "Permissions",
     "roles": "Role Management",
     "create": "create",
     "edit": "edit",
@@ -175,6 +177,16 @@
         "protected": "Protect Data Space",
         "protectedDescription": "Protected Data Spaces require elevated permissions for access"
       }
+    }
+  },
+  "permissions": {
+    "title": "Permissions",
+    "systemPermissions": "System Permissions",
+    "dataPermissions": "Daten Permissions",
+    "governancePermissions": "Governance Permissions",
+    "tableHeaders": {
+      "title": "Name",
+      "category": "Category"
     }
   },
   "roles": {

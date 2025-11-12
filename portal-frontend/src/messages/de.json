@@ -8,7 +8,8 @@
       "submit": "Speichern",
       "cancel": "Abbrechen",
       "delete": "Löschen",
-      "add": "Hinzufügen"
+      "add": "Hinzufügen",
+      "open": "öffnen"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -31,6 +32,7 @@
     "documentation": "Dokumentation",
     "logout": "Abmelden",
     "datasets": "Datensätze",
+    "permissions": "Berechtigungen",
     "roles": "Rollen Management",
     "create": "erstellen",
     "edit": "bearbeiten",
@@ -174,6 +176,16 @@
         "protected": "Datenraum schützen",
         "protectedDescription": "Geschützte Datenräume erfordern erweiterte Berechtigungen für den Zugriff"
       }
+    }
+  },
+  "permissions": {
+    "title": "Berechtigungen",
+    "systemPermissions": "Systemberechtigungen",
+    "dataPermissions": "Datenberechtigungen",
+    "governancePermissions": "Governanceberechtigungen",
+    "tableHeaders": {
+      "title": "Name",
+      "category": "Kategorie"
     }
   },
   "roles": {

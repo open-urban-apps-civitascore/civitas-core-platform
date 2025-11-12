@@ -43,13 +43,13 @@ const GroupsPage = () => {
     setPaginationParams,
     setSearchParam,
     getApiRequestParamsByUrl,
+    setTotalPages,
     pageIndex,
     pageSize,
     sorting,
     search,
+    totalPages,
   } = useQueryParams()
-
-  const totalPages = Math.ceil(rowCount / pageSize)
 
   useEffect(() => {
     if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
@@ -79,6 +79,7 @@ const GroupsPage = () => {
       if (rowCount !== totalCount) {
         setRowCount(totalCount)
       }
+      setTotalPages(Math.ceil(totalCount / pageSize))
     } catch (error) {
       console.error(error)
       setIsLoading(false)

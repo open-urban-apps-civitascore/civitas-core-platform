@@ -5560,6 +5560,96 @@
       "name": "test",
       "description": "test 12355",
       "protected": false
+  "permissions": [
+    {
+      "id": "1",
+      "title": "Permission 1",
+      "category": {"id": "1", "title": "Category 1"},
+      "type": "system"
+    },
+    {
+      "id": "2",
+      "title": "Permission 2",
+      "category": {"id": "2", "title": "Category 2"},
+      "type": "system"
+    },
+    {
+      "id": "3",
+      "title": "Permission 3",
+      "category": {"id": "3", "title": "Category 3"},
+      "type": "system"
+    },
+    {
+      "id": "4",
+      "title": "Permission 4",
+      "category": {"id": "4", "title": "Category 4"},
+      "type": "system"
+    },
+    {
+      "id": "5",
+      "title": "Permission 5",
+      "category": {"id": "5", "title": "Category 5"},
+      "type": "system"
+    },
+    {
+      "id": "6",
+      "title": "Permission 6",
+      "category": {"id": "1", "title": "Category 1"},
+      "type": "data"
+    },
+    {
+      "id": "7",
+      "title": "Permission 7",
+      "category": {"id": "2", "title": "Category 2"},
+      "type": "data"
+    },
+    {
+      "id": "8",
+      "title": "Permission 8",
+      "category": {"id": "3", "title": "Category 3"},
+      "type": "data"
+    },
+    {
+      "id": "9",
+      "title": "Permission 9",
+      "category": {"id": "4", "title": "Category 4"},
+      "type": "data"
+    },
+    {
+      "id": "10",
+      "title": "Permission 10",
+      "category": {"id": "5", "title": "Category 5"},
+      "type": "data"
+    },
+    {
+      "id": "11",
+      "title": "Permission 11",
+      "category": {"id": "1", "title": "Category 1"},
+      "type": "governance"
+    },
+    {
+      "id": "12",
+      "title": "Permission 12",
+      "category": {"id": "2", "title": "Category 2"},
+      "type": "governance"
+    },
+    {
+      "id": "13",
+      "title": "Permission 13",
+      "category": {"id": "3", "title": "Category 3"},
+      "type": "governance"
+    },
+    {
+      "id": "14",
+      "title": "Permission 14",
+      "category": {"id": "4", "title": "Category 4"},
+      "type": "governance"
+    },
+    {
+      "id": "15",
+      "title": "Permission 15",
+      "category": {"id": "5", "title": "Category 5"},
+      "type": "governance"
     }
   ],
   "roles": [
@@ -5568,7 +5658,7 @@
       "name": "SystemAdmin",
       "description": "SystemAdmin",
       "tenant": "ExampleCorp",
-      "type": "System",
+      "type": "system",
       "permissions": ["perm1", "perm2", "perm3", "perm4"],
       "user": ["1", "2"],
       "createdAt": "2024-06-01T12:00:00Z"
@@ -5578,7 +5668,7 @@
       "name": "SystemDev",
       "description": "System Developer",
       "tenant": "ExampleCorp",
-      "type": "System",
+      "type": "system",
       "permissions": ["perm2", "perm3"],
       "user": ["3", "4"],
       "createdAt": "2024-06-01T12:00:00Z"
@@ -5588,7 +5678,7 @@
       "name": "StandardUser",
       "description": "Standard User",
       "tenant": "ExampleCorp",
-      "type": "System",
+      "type": "system",
       "permissions": ["perm3"],
       "user": ["5", "6", "7", "8", "9", "10", "11", "12"],
       "createdAt": "2024-06-01T12:00:00Z"
@@ -5598,7 +5688,7 @@
       "name": "Editor",
       "description": "Content Editor",
       "tenant": "ExampleCorp",
-      "type": "Data",
+      "type": "data",
       "permissions": ["perm4", "perm5", "perm6"],
       "user": ["1", "2"],
       "createdAt": "2024-06-01T12:00:00Z"
@@ -5608,7 +5698,7 @@
       "name": "Leser:in",
       "description": "Read-Only User",
       "tenant": "ExampleCorp",
-      "type": "Data",
+      "type": "data",
       "permissions": ["perm5", "perm6"],
       "user": ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
       "createdAt": "2024-06-01T12:00:00Z"
@@ -5618,7 +5708,7 @@
       "name": "DataOwner",
       "description": "Data Owner",
       "tenant": "ExampleCorp",
-      "type": "Governance",
+      "type": "governance",
       "permissions": ["perm8", "perm9", "perm10"],
       "user": ["1", "2"],
       "createdAt": "2024-06-01T12:00:00Z"
@@ -5627,7 +5717,7 @@
       "id": "7",
       "name": "TestRolle",
       "description": "Das ist eine Testrolle",
-      "type": "Data",
+      "type": "data",
       "tenant": "ExampleCorp",
       "permissions": ["perm1", "perm2"],
       "user": ["1", "2"],
@@ -5637,7 +5727,7 @@
       "id": "8",
       "name": "Test 4",
       "description": "Some more text",
-      "type": "Data",
+      "type": "data",
       "tenant": "ExampleCorp",
       "permissions": ["perm1", "perm2"],
       "user": ["1", "2"],
@@ -5647,14 +5737,14 @@
       "id": "9",
       "name": "Test 5",
       "description": "Das ist eine Testrolle",
-      "type": "Data",
+      "type": "data",
       "tenant": "ExampleCorp",
       "permissions": [],
       "user": [],
       "createdAt": "2024-06-01T12:00:00Z"
     },
     {
-      "type": "Governance",
+      "type": "governance",
       "tenant": "ExampleCorp",
       "user": null,
       "permissions": null,
@@ -5664,7 +5754,7 @@
       "id": "KERWOWP"
     },
     {
-      "type": "System",
+      "type": "system",
       "tenant": "ExampleCorp",
       "user": null,
       "permissions": null,
