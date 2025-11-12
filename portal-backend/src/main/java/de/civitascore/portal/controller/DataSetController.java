@@ -3,11 +3,11 @@ package de.civitascore.portal.controller;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
+import de.civitascore.portal.model.output.assembler.BaseAssembler;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
-import de.civitascore.portal.model.output.assembler.EntityAssembler;
 import de.civitascore.portal.repository.specification.DataSetSpec;
+import de.civitascore.portal.service.BaseTenantAwareService;
 import de.civitascore.portal.service.DataSetService;
-import de.civitascore.portal.service.TenantAwareService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -20,7 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/datasets")
@@ -64,12 +65,12 @@ public class DataSetController
   }
 
   @Override
-  protected TenantAwareService<DataSet, String, DataSetInputDTO> getService() {
+  protected BaseTenantAwareService<DataSet, String, DataSetInputDTO> getService() {
     return dataSetService;
   }
 
   @Override
-  protected EntityAssembler<DataSet, DataSetOutputDTO, String> getAssembler() {
+  protected BaseAssembler<DataSet, DataSetOutputDTO, String> getAssembler() {
     return dataSetAssembler;
   }
 }

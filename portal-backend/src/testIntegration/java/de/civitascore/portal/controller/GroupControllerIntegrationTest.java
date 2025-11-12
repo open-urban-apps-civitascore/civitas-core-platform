@@ -7,6 +7,7 @@ import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,7 +19,7 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("Group Controller Integration Tests")
 class GroupControllerIntegrationTest
-    extends BaseControllerIntegrationTest<GroupInputDTO, GroupOutputDTO, String> {
+    extends BaseControllerIntegrationTest<GroupInputDTO, GroupOutputDTO> {
 
   private final String GROUPS_ENDPOINT = "/groups";
 
@@ -285,21 +286,130 @@ class GroupControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should partially update group with PATCH")
+    @DisplayName("Should partially update group with PATCH - single field")
     void shouldPartiallyUpdateGroupWithPatch() {
       String groupId = createTestEntity();
 
-      GroupInputDTO patchInput = new GroupInputDTO();
-      patchInput.setDescription("Only description updated");
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Only description updated");
 
-      ResponseEntity<GroupOutputDTO> response = performPatch(groupId, patchInput);
+      ResponseEntity<GroupOutputDTO> response = performPatch(groupId, patchMap);
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
-
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDescription())
           .as("Description should be updated")
-          .isEqualTo(patchInput.getDescription());
+          .isEqualTo("Only description updated");
+    }
+
+    @Test
+    @DisplayName("Should update multiple fields with PATCH")
+    void shouldUpdateMultipleFieldsWithPatch() {
+      String groupId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("title", "PatchedGroup");
+      patchMap.put("description", "Patched description");
+
+      ResponseEntity<GroupOutputDTO> response = performPatch(groupId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTitle()).isEqualTo("PatchedGroup");
+      assertThat(response.getBody().getDescription()).isEqualTo("Patched description");
+    }
+
+    @Test
+    @DisplayName("Should set description to null with PATCH")
+    void shouldSetDescriptionToNullWithPatch() {
+      String groupId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", null);
+
+      ResponseEntity<GroupOutputDTO> response = performPatch(groupId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription())
+          .as("Description should be set to null")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("Should leave omitted fields unchanged with PATCH")
+    void shouldLeaveOmittedFieldsUnchangedWithPatch() {
+      String groupId = createTestEntity();
+
+      ResponseEntity<GroupOutputDTO> initialResponse = performGetById(groupId);
+      GroupOutputDTO initialGroup = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "New description");
+
+      ResponseEntity<GroupOutputDTO> response = performPatch(groupId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription()).isEqualTo("New description");
+      assertThat(response.getBody().getTitle())
+          .as("Title should remain unchanged")
+          .isEqualTo(initialGroup.getTitle());
+    }
+
+    @Test
+    @DisplayName("Should set parentGroup to null with PATCH")
+    void shouldSetParentGroupToNullWithPatch() {
+      String parentGroupId = createTestEntity();
+      String childGroupId = createTestEntity();
+
+      // Set parent
+      Map<String, Object> setParentMap = new HashMap<>();
+      setParentMap.put("parentGroupId", parentGroupId);
+      performPatch(childGroupId, setParentMap);
+
+      // Remove parent
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("parentGroupId", null);
+
+      ResponseEntity<GroupOutputDTO> response = performPatch(childGroupId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getParentGroup())
+          .as("ParentGroup should be set to null")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("Should handle empty PATCH (no changes)")
+    void shouldHandleEmptyPatch() {
+      String groupId = createTestEntity();
+
+      ResponseEntity<GroupOutputDTO> initialResponse = performGetById(groupId);
+      GroupOutputDTO initialGroup = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+
+      ResponseEntity<GroupOutputDTO> response = performPatch(groupId, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTitle()).isEqualTo(initialGroup.getTitle());
+      assertThat(response.getBody().getDescription()).isEqualTo(initialGroup.getDescription());
+    }
+
+    @Test
+    @DisplayName("Should be idempotent with PATCH")
+    void shouldBeIdempotentWithPatch() {
+      String groupId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Idempotent test");
+
+      ResponseEntity<GroupOutputDTO> firstResponse = performPatch(groupId, patchMap);
+      ResponseEntity<GroupOutputDTO> secondResponse = performPatch(groupId, patchMap);
+
+      assertThat(firstResponse.getBody()).isNotNull();
+      assertThat(secondResponse.getBody()).isNotNull();
+      assertThat(firstResponse.getBody().getDescription())
+          .isEqualTo(secondResponse.getBody().getDescription());
     }
 
     @Test

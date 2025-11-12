@@ -7,6 +7,7 @@ import de.civitascore.portal.model.input.PermissionInputDTO;
 import de.civitascore.portal.model.output.PermissionOutputDTO;
 import de.civitascore.portal.repository.PermissionRepository;
 import de.civitascore.portal.util.RestPage;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,7 +19,7 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("Permission Controller Integration Tests")
 class PermissionControllerIntegrationTest
-    extends BaseControllerIntegrationTest<PermissionInputDTO, PermissionOutputDTO, String> {
+    extends BaseControllerIntegrationTest<PermissionInputDTO, PermissionOutputDTO> {
 
   private final String PERMISSIONS_ENDPOINT = "/permissions";
 
@@ -61,6 +62,7 @@ class PermissionControllerIntegrationTest
     input.setDescription("Updated description");
     input.setPermissionType(PermissionType.SYSTEM);
     input.setUserModifiable(true);
+    input.setIsDefault(true);
     return input;
   }
 
@@ -280,18 +282,110 @@ class PermissionControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should partially update permission with PATCH")
+    @DisplayName("Should partially update permission with PATCH - single field")
     void shouldPartiallyUpdatePermissionWithPatch() {
       String permissionId = createTestEntity();
 
-      PermissionInputDTO patchInput = new PermissionInputDTO();
-      patchInput.setDescription("Only description updated");
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Only description updated");
 
-      ResponseEntity<PermissionOutputDTO> response = performPatch(permissionId, patchInput);
+      ResponseEntity<PermissionOutputDTO> response = performPatch(permissionId, patchMap);
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription())
+          .as("Description should be updated")
+          .isEqualTo("Only description updated");
+    }
+
+    @Test
+    @DisplayName("Should update multiple fields with PATCH")
+    void shouldUpdateMultipleFieldsWithPatch() {
+      String permissionId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("title", "PatchedPermission");
+      patchMap.put("description", "Patched description");
+
+      ResponseEntity<PermissionOutputDTO> response = performPatch(permissionId, patchMap);
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTitle()).isEqualTo("PatchedPermission");
+      assertThat(response.getBody().getDescription()).isEqualTo("Patched description");
+    }
+
+    @Test
+    @DisplayName("Should set description to null with PATCH")
+    void shouldSetDescriptionToNullWithPatch() {
+      String permissionId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", null);
+
+      ResponseEntity<PermissionOutputDTO> response = performPatch(permissionId, patchMap);
 
       assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription())
+          .as("Description should be set to null")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("Should leave omitted fields unchanged with PATCH")
+    void shouldLeaveOmittedFieldsUnchangedWithPatch() {
+      String permissionId = createTestEntity();
+
+      ResponseEntity<PermissionOutputDTO> initialResponse = performGetById(permissionId);
+      PermissionOutputDTO initialPermission = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "New description");
+
+      ResponseEntity<PermissionOutputDTO> response = performPatch(permissionId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription()).isEqualTo("New description");
+      assertThat(response.getBody().getTitle())
+          .as("Name should remain unchanged")
+          .isEqualTo(initialPermission.getTitle());
+      assertThat(response.getBody().getCreatedAt())
+          .as("Resource should remain unchanged")
+          .isEqualTo(initialPermission.getCreatedAt());
+    }
+
+    @Test
+    @DisplayName("Should handle empty PATCH (no changes)")
+    void shouldHandleEmptyPatch() {
+      String permissionId = createTestEntity();
+
+      ResponseEntity<PermissionOutputDTO> initialResponse = performGetById(permissionId);
+      PermissionOutputDTO initialPermission = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+
+      ResponseEntity<PermissionOutputDTO> response = performPatch(permissionId, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTitle()).isEqualTo(initialPermission.getTitle());
+      assertThat(response.getBody().getDescription()).isEqualTo(initialPermission.getDescription());
+    }
+
+    @Test
+    @DisplayName("Should be idempotent with PATCH")
+    void shouldBeIdempotentWithPatch() {
+      String permissionId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Idempotent test");
+
+      ResponseEntity<PermissionOutputDTO> firstResponse = performPatch(permissionId, patchMap);
+      ResponseEntity<PermissionOutputDTO> secondResponse = performPatch(permissionId, patchMap);
+
+      assertThat(firstResponse.getBody()).isNotNull();
+      assertThat(secondResponse.getBody()).isNotNull();
+      assertThat(firstResponse.getBody().getDescription())
+          .isEqualTo(secondResponse.getBody().getDescription());
     }
 
     @Test

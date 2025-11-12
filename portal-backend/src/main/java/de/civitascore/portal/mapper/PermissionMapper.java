@@ -4,30 +4,33 @@ import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.input.PermissionInputDTO;
 import de.civitascore.portal.model.output.PermissionOutputDTO;
 import de.civitascore.portal.model.output.summary.PermissionSummaryDTO;
-import org.mapstruct.*;
+import org.mapstruct.BeanMapping;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.mapstruct.ReportingPolicy;
 
 @Mapper(
     componentModel = "spring",
-    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+    unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface PermissionMapper
     extends DtoMapper<PermissionInputDTO, PermissionOutputDTO, Permission> {
 
-  @Mapping(target = "id", ignore = true)
   @Mapping(target = "tenantId", ignore = true)
-  @Mapping(target = "createdAt", ignore = true)
-  @Mapping(target = "modifiedAt", ignore = true)
   @Override
   Permission toEntity(PermissionInputDTO input);
 
   @Override
   PermissionOutputDTO toOutput(Permission entity);
 
+  @Override
+  PermissionInputDTO toInput(Permission entity);
+
   PermissionSummaryDTO toSummary(Permission entity);
 
-  @Mapping(target = "id", ignore = true)
-  @Mapping(target = "tenantId", ignore = true)
-  @Mapping(target = "createdAt", ignore = true)
-  @Mapping(target = "modifiedAt", ignore = true)
+  @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Override
   void updateEntity(@MappingTarget Permission entity, PermissionInputDTO input);
 }

@@ -3,25 +3,27 @@ package de.civitascore.portal.mapper;
 import de.civitascore.portal.model.entity.Tenant;
 import de.civitascore.portal.model.input.TenantInputDTO;
 import de.civitascore.portal.model.output.TenantOutputDTO;
-import org.mapstruct.*;
+import org.mapstruct.BeanMapping;
+import org.mapstruct.Mapper;
+import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
 
 @Mapper(
     componentModel = "spring",
-    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+    unmappedTargetPolicy = org.mapstruct.ReportingPolicy.IGNORE)
 public interface TenantMapper extends DtoMapper<TenantInputDTO, TenantOutputDTO, Tenant> {
 
-  @Mapping(target = "id", ignore = true)
-  @Mapping(target = "createdAt", ignore = true)
-  @Mapping(target = "modifiedAt", ignore = true)
   @Override
   Tenant toEntity(TenantInputDTO input);
 
   @Override
   TenantOutputDTO toOutput(Tenant entity);
 
-  @Mapping(target = "id", ignore = true)
-  @Mapping(target = "createdAt", ignore = true)
-  @Mapping(target = "modifiedAt", ignore = true)
+  @Override
+  TenantInputDTO toInput(Tenant entity);
+
+  @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Override
   void updateEntity(@MappingTarget Tenant entity, TenantInputDTO input);
 }

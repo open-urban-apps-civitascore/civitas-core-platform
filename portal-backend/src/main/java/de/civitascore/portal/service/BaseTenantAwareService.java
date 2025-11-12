@@ -2,23 +2,36 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.configuration.TenantContext;
 import de.civitascore.portal.mapper.DtoMapper;
-import de.civitascore.portal.model.entity.base.BaseEntity;
+import de.civitascore.portal.model.entity.base.TenantAwareEntity;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.io.Serializable;
-import java.lang.reflect.Method;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Abstract base service for tenant-aware entities.
+ *
+ * <p>This service provides CRUD operations with automatic tenant ID injection and validation. All
+ * entities managed by this service must extend {@link TenantAwareEntity}.
+ *
+ * @param <E> the entity type extending TenantAwareEntity
+ * @param <ID> the ID type
+ * @param <I> the input DTO type
+ */
+@Slf4j
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public abstract class TenantAwareService<
-    E extends BaseEntity<ID>, ID extends Serializable, I extends BaseInputDTO> {
+public abstract class BaseTenantAwareService<
+        E extends TenantAwareEntity, ID extends Serializable, I extends BaseInputDTO>
+    extends BaseService<E, ID, I> {
 
+  @Override
   @Transactional
   public E create(I input) {
     I preProcessedInput = preProcessCreateInput(input);
@@ -30,6 +43,7 @@ public abstract class TenantAwareService<
     return saved;
   }
 
+  @Override
   @Transactional
   public E update(ID id, I input) {
     E entity = findById(id);
@@ -42,21 +56,24 @@ public abstract class TenantAwareService<
     return saved;
   }
 
+  @Override
   public Page<E> findAll(Specification<E> spec, Pageable pageable) {
     Specification<E> enhancedSpec = preProcessQuery(spec, pageable);
     Page<E> result = getRepository().findAll(enhancedSpec, pageable);
     return postProcessQueryResult(result);
   }
 
+  @Override
   public E findById(ID id) {
-    E entity = preProcessLoad(id);
-    entity =
+    preProcessLoad(id);
+    E entity =
         getRepository()
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id.toString()));
     return postLoad(entity);
   }
 
+  @Override
   @Transactional
   public void deleteById(ID id) {
     if (!getRepository().existsById(id)) {
@@ -71,6 +88,15 @@ public abstract class TenantAwareService<
     return input;
   }
 
+  /**
+   * Called after converting input DTO to entity, before saving.
+   *
+   * <p>This is the default hook to set the tenant ID. Override if you need custom behavior.
+   *
+   * @param entity the entity to process
+   * @param input the input DTO
+   * @return the processed entity
+   */
   protected E postConvertToEntity(E entity, I input) {
     setTenantId(entity);
     return entity;
@@ -108,25 +134,40 @@ public abstract class TenantAwareService<
 
   protected void postDelete(E entity) {}
 
+  @Override
   protected abstract TenantAwareRepository<E, ID> getRepository();
 
   protected abstract DtoMapper<I, ?, E> getMapper();
 
-  protected abstract String getEntityName();
-
+  /**
+   * Gets the current tenant ID from the TenantContext.
+   *
+   * @return the tenant ID
+   * @throws IllegalStateException if no tenant context is available
+   */
   protected String getCurrentTenantId() {
-    String tenantId = TenantContext.getTenantId();
-    if (tenantId == null) throw new IllegalStateException("No tenant context available");
-    return tenantId;
+    return TenantContext.requireTenantId();
   }
 
+  /**
+   * Sets the tenant ID on the entity from the current tenant context.
+   *
+   * <p>This method is type-safe since all entities handled by this service must extend {@link
+   * TenantAwareEntity}.
+   *
+   * @param entity the entity to set the tenant ID on
+   */
   protected void setTenantId(E entity) {
-    String tenantId = getCurrentTenantId();
-    try {
-      Method setTenantId = entity.getClass().getMethod("setTenantId", String.class);
-      setTenantId.invoke(entity, tenantId);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to set tenant ID", e);
+    if (entity.getTenantId() != null) {
+      log.debug(
+          "Entity {} already has tenant ID '{}', not overwriting",
+          entity.getClass().getSimpleName(),
+          entity.getTenantId());
+      return;
     }
+
+    String tenantId = getCurrentTenantId();
+    entity.setTenantId(tenantId);
+    log.trace("Set tenant ID '{}' on entity {}", tenantId, entity.getClass().getSimpleName());
   }
 }

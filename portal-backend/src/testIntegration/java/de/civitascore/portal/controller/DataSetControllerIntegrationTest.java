@@ -7,6 +7,7 @@ import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,7 +19,7 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataSet Controller Integration Tests")
 class DataSetControllerIntegrationTest
-    extends BaseControllerIntegrationTest<DataSetInputDTO, DataSetOutputDTO, String> {
+    extends BaseControllerIntegrationTest<DataSetInputDTO, DataSetOutputDTO> {
 
   private final String DATASETS_ENDPOINT = "/datasets";
 
@@ -288,18 +289,107 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should partially update dataset with PATCH")
+    @DisplayName("Should partially update dataset with PATCH - single field")
     void shouldPartiallyUpdateDataSetWithPatch() {
       String dataSetId = createTestEntity();
 
-      DataSetInputDTO patchInput = new DataSetInputDTO();
-      patchInput.setDescription("Only description updated");
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Only description updated");
 
-      ResponseEntity<DataSetOutputDTO> response = performPatch(dataSetId, patchInput);
+      ResponseEntity<DataSetOutputDTO> response = performPatch(dataSetId, patchMap);
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription())
+          .as("Description should be updated")
+          .isEqualTo("Only description updated");
+    }
+
+    @Test
+    @DisplayName("Should update multiple fields with PATCH")
+    void shouldUpdateMultipleFieldsWithPatch() {
+      String dataSetId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("title", "PatchedDataSet");
+      patchMap.put("description", "Patched description");
+
+      ResponseEntity<DataSetOutputDTO> response = performPatch(dataSetId, patchMap);
 
       assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTitle()).isEqualTo("PatchedDataSet");
+      assertThat(response.getBody().getDescription()).isEqualTo("Patched description");
+    }
+
+    @Test
+    @DisplayName("Should set description to null with PATCH")
+    void shouldSetDescriptionToNullWithPatch() {
+      String dataSetId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", null);
+
+      ResponseEntity<DataSetOutputDTO> response = performPatch(dataSetId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription())
+          .as("Description should be set to null")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("Should leave omitted fields unchanged with PATCH")
+    void shouldLeaveOmittedFieldsUnchangedWithPatch() {
+      String dataSetId = createTestEntity();
+
+      ResponseEntity<DataSetOutputDTO> initialResponse = performGetById(dataSetId);
+      DataSetOutputDTO initialDataSet = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "New description");
+
+      ResponseEntity<DataSetOutputDTO> response = performPatch(dataSetId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription()).isEqualTo("New description");
+      assertThat(response.getBody().getTitle())
+          .as("Title should remain unchanged")
+          .isEqualTo(initialDataSet.getTitle());
+    }
+
+    @Test
+    @DisplayName("Should handle empty PATCH (no changes)")
+    void shouldHandleEmptyPatch() {
+      String dataSetId = createTestEntity();
+
+      ResponseEntity<DataSetOutputDTO> initialResponse = performGetById(dataSetId);
+      DataSetOutputDTO initialDataSet = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+
+      ResponseEntity<DataSetOutputDTO> response = performPatch(dataSetId, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTitle()).isEqualTo(initialDataSet.getTitle());
+      assertThat(response.getBody().getDescription()).isEqualTo(initialDataSet.getDescription());
+    }
+
+    @Test
+    @DisplayName("Should be idempotent with PATCH")
+    void shouldBeIdempotentWithPatch() {
+      String dataSetId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Idempotent test");
+
+      ResponseEntity<DataSetOutputDTO> firstResponse = performPatch(dataSetId, patchMap);
+      ResponseEntity<DataSetOutputDTO> secondResponse = performPatch(dataSetId, patchMap);
+
+      assertThat(firstResponse.getBody()).isNotNull();
+      assertThat(secondResponse.getBody()).isNotNull();
+      assertThat(firstResponse.getBody().getDescription())
+          .isEqualTo(secondResponse.getBody().getDescription());
     }
 
     @Test

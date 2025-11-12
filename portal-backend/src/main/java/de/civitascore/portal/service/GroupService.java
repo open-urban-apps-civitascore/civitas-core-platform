@@ -1,28 +1,32 @@
 package de.civitascore.portal.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.TenantAwareRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class GroupService extends TenantAwareService<Group, String, GroupInputDTO> {
+public class GroupService extends BaseTenantAwareService<Group, String, GroupInputDTO> {
 
   private final GroupRepository groupRepository;
   private final GroupMapper groupMapper;
   private final UserService userService;
   private final RoleService roleService;
+  private final ObjectMapper objectMapper;
 
   @Override
   protected Group preSave(Group entity) {
-    // Validate unique constraint: title + tenant_id
     validateUniqueTitle(entity);
     return super.preSave(entity);
   }
@@ -32,7 +36,6 @@ public class GroupService extends TenantAwareService<Group, String, GroupInputDT
         .findByTitleAndTenantId(entity.getTitle(), entity.getTenantId())
         .ifPresent(
             existing -> {
-              // If it's an update and the existing entity is the same, skip validation
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
                     "Group", "title", entity.getTitle(), "tenant", entity.getTenantId());
@@ -42,17 +45,18 @@ public class GroupService extends TenantAwareService<Group, String, GroupInputDT
 
   @Override
   protected Group postConvertToEntity(Group entity, GroupInputDTO input) {
-    // Set contact user
-    if (Objects.nonNull(input.getContactUserId())) {
+    if (input.getContactUserId() != null) {
       entity.setContactUser(userService.findById(input.getContactUserId()));
+    } else {
+      entity.setContactUser(null);
     }
 
-    // Set parent group
-    if (Objects.nonNull(input.getParentGroupId())) {
+    if (input.getParentGroupId() != null) {
       groupRepository.findById(input.getParentGroupId()).ifPresent(entity::setParentGroup);
+    } else {
+      entity.setParentGroup(null);
     }
 
-    // Set members
     if (Objects.nonNull(input.getMemberIds())) {
       entity.setMembers(new HashSet<>());
       if (!input.getMemberIds().isEmpty()) {
@@ -98,5 +102,23 @@ public class GroupService extends TenantAwareService<Group, String, GroupInputDT
   @Override
   protected String getEntityName() {
     return "Group";
+  }
+
+  @Override
+  protected GroupInputDTO preProcessUpdateInput(GroupInputDTO input, Group existingEntity) {
+    try {
+      String inputJson = objectMapper.writeValueAsString(input);
+      JsonNode jsonNode = objectMapper.readTree(inputJson);
+
+      if (jsonNode.has("title") && StringUtils.isBlank(jsonNode.get("title").asText())) {
+        throw new InvalidInputException(
+            "title", "Title cannot be null or blank", existingEntity.getId().toString());
+      }
+    } catch (InvalidInputException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to process update input", e);
+    }
+    return super.preProcessUpdateInput(input, existingEntity);
   }
 }

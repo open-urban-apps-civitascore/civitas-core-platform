@@ -2,7 +2,19 @@ package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.entity.base.NamedEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.NamedAttributeNode;
+import jakarta.persistence.NamedEntityGraph;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -24,7 +36,7 @@ import lombok.Setter;
 @NamedEntityGraph(
     name = "Role.withPermissions",
     attributeNodes = @NamedAttributeNode("permissions"))
-public class Role extends NamedEntity<String> {
+public class Role extends NamedEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "role_type", nullable = false)

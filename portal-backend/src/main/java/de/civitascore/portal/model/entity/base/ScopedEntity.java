@@ -1,15 +1,18 @@
 package de.civitascore.portal.model.entity.base;
 
 import de.civitascore.portal.model.embedded.ScopeType;
-import jakarta.persistence.*;
-import java.io.Serializable;
+import jakarta.persistence.Column;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.PreUpdate;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
 @MappedSuperclass
-public abstract class ScopedEntity<ID extends Serializable> extends TenantAwareEntity<ID> {
+public abstract class ScopedEntity extends TenantAwareEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "scope_type", nullable = false)

@@ -9,10 +9,9 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Minimal DataSet assembler using your mapper + basic enrichments. */
 @Component
 @RequiredArgsConstructor
-public class DataSetAssembler implements EntityAssembler<DataSet, DataSetOutputDTO, String> {
+public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO, String> {
 
   private final DataSetMapper dataSetMapper;
   private final UserMapper userMapper;
@@ -36,5 +35,11 @@ public class DataSetAssembler implements EntityAssembler<DataSet, DataSetOutputD
     }
 
     return output;
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <I> I toInput(DataSet entity) {
+    return (I) dataSetMapper.toInput(entity);
   }
 }

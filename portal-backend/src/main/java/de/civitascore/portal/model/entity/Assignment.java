@@ -4,7 +4,17 @@ import de.civitascore.portal.model.embedded.AssignmentType;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.base.ScopedEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,7 +33,7 @@ import lombok.Setter;
     })
 @Getter
 @Setter
-public class Assignment extends ScopedEntity<String> {
+public class Assignment extends ScopedEntity {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "group_id", nullable = false)
@@ -63,12 +73,12 @@ public class Assignment extends ScopedEntity<String> {
     if (role.getRoleType() == RoleType.SYSTEM) {
       assignmentType = AssignmentType.BINARY;
       if (getScopeType() != ScopeType.TENANT) {
-        throw new IllegalStateException("SYSTEM roles must use TENANT scope");
+        throw new IllegalStateException(role.getRoleType() + " roles must use TENANT scope");
       }
     } else {
       assignmentType = AssignmentType.TERNARY;
       if (getScopeType() == null) {
-        throw new IllegalStateException("DATA/GOVERNANCE roles require explicit scope");
+        throw new IllegalStateException(role.getRoleType() + " roles require explicit scope");
       }
     }
   }

@@ -8,7 +8,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class RoleOutputDTO extends BaseOutputDTO<String> {
+public class RoleOutputDTO extends BaseOutputDTO {
   private String title;
   private String description;
   private RoleType roleType;

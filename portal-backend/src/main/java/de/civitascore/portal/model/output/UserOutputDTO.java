@@ -7,7 +7,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class UserOutputDTO extends BaseOutputDTO<String> {
+public class UserOutputDTO extends BaseOutputDTO {
   private String firstName;
   private String lastName;
   private String email;

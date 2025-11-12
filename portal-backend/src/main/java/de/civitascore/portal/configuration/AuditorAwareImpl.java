@@ -4,23 +4,26 @@ import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import java.util.Optional;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.lang.NonNull;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
+/**
+ * Provides the current auditor (user) for JPA auditing.
+ *
+ * <p>This implementation retrieves the username from the {@link TenantContext} and falls back to
+ * "system" if no authenticated user is available.
+ */
 @Component
 public class AuditorAwareImpl implements AuditorAware<String> {
 
   @Override
   @NonNull public Optional<String> getCurrentAuditor() {
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    PrincipalUserDetails userDetails = TenantContext.getCurrentUser();
 
-    if (authentication == null || !authentication.isAuthenticated()) {
-      return Optional.of("system");
+    if (userDetails != null) {
+      return Optional.of(userDetails.getUsername());
     }
 
-    PrincipalUserDetails userDetails = (PrincipalUserDetails) authentication.getPrincipal();
-    String username = userDetails.getUsername();
-    return Optional.ofNullable(username);
+    // Fallback for system operations (e.g., scheduled tasks, system initialization)
+    return Optional.of("system");
   }
 }

@@ -8,6 +8,7 @@ import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,7 +20,7 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("Role Controller Integration Tests")
 class RoleControllerIntegrationTest
-    extends BaseControllerIntegrationTest<RoleInputDTO, RoleOutputDTO, String> {
+    extends BaseControllerIntegrationTest<RoleInputDTO, RoleOutputDTO> {
 
   private final String ROLES_ENDPOINT = "/roles";
 
@@ -62,6 +63,7 @@ class RoleControllerIntegrationTest
     input.setDescription("Updated description");
     input.setRoleType(RoleType.GOVERNANCE);
     input.setUserModifiable(true);
+    input.setIsDefault(true);
     return input;
   }
 
@@ -293,18 +295,107 @@ class RoleControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should partially update role with PATCH")
+    @DisplayName("Should partially update role with PATCH - single field")
     void shouldPartiallyUpdateRoleWithPatch() {
       String roleId = createTestEntity();
 
-      RoleInputDTO patchInput = new RoleInputDTO();
-      patchInput.setDescription("Only description updated");
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Only description updated");
 
-      ResponseEntity<RoleOutputDTO> response = performPatch(roleId, patchInput);
+      ResponseEntity<RoleOutputDTO> response = performPatch(roleId, patchMap);
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription())
+          .as("Description should be updated")
+          .isEqualTo("Only description updated");
+    }
+
+    @Test
+    @DisplayName("Should update multiple fields with PATCH")
+    void shouldUpdateMultipleFieldsWithPatch() {
+      String roleId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("title", "PatchedRole");
+      patchMap.put("description", "Patched description");
+
+      ResponseEntity<RoleOutputDTO> response = performPatch(roleId, patchMap);
 
       assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTitle()).isEqualTo("PatchedRole");
+      assertThat(response.getBody().getDescription()).isEqualTo("Patched description");
+    }
+
+    @Test
+    @DisplayName("Should set description to null with PATCH")
+    void shouldSetDescriptionToNullWithPatch() {
+      String roleId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", null);
+
+      ResponseEntity<RoleOutputDTO> response = performPatch(roleId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription())
+          .as("Description should be set to null")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("Should leave omitted fields unchanged with PATCH")
+    void shouldLeaveOmittedFieldsUnchangedWithPatch() {
+      String roleId = createTestEntity();
+
+      ResponseEntity<RoleOutputDTO> initialResponse = performGetById(roleId);
+      RoleOutputDTO initialRole = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "New description");
+
+      ResponseEntity<RoleOutputDTO> response = performPatch(roleId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription()).isEqualTo("New description");
+      assertThat(response.getBody().getTitle())
+          .as("Title should remain unchanged")
+          .isEqualTo(initialRole.getTitle());
+    }
+
+    @Test
+    @DisplayName("Should handle empty PATCH (no changes)")
+    void shouldHandleEmptyPatch() {
+      String roleId = createTestEntity();
+
+      ResponseEntity<RoleOutputDTO> initialResponse = performGetById(roleId);
+      RoleOutputDTO initialRole = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+
+      ResponseEntity<RoleOutputDTO> response = performPatch(roleId, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTitle()).isEqualTo(initialRole.getTitle());
+      assertThat(response.getBody().getDescription()).isEqualTo(initialRole.getDescription());
+    }
+
+    @Test
+    @DisplayName("Should be idempotent with PATCH")
+    void shouldBeIdempotentWithPatch() {
+      String roleId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Idempotent test");
+
+      ResponseEntity<RoleOutputDTO> firstResponse = performPatch(roleId, patchMap);
+      ResponseEntity<RoleOutputDTO> secondResponse = performPatch(roleId, patchMap);
+
+      assertThat(firstResponse.getBody()).isNotNull();
+      assertThat(secondResponse.getBody()).isNotNull();
+      assertThat(firstResponse.getBody().getDescription())
+          .isEqualTo(secondResponse.getBody().getDescription());
     }
 
     @Test

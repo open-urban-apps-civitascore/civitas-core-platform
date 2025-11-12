@@ -6,6 +6,7 @@ import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.model.output.DataSpaceOutputDTO;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.util.RestPage;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,7 +18,7 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("DataSpace Controller Integration Tests")
 class DataSpaceControllerIntegrationTest
-    extends BaseControllerIntegrationTest<DataSpaceInputDTO, DataSpaceOutputDTO, String> {
+    extends BaseControllerIntegrationTest<DataSpaceInputDTO, DataSpaceOutputDTO> {
 
   private final String DATASPACES_ENDPOINT = "/dataspaces";
 
@@ -270,18 +271,130 @@ class DataSpaceControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should partially update dataspace with PATCH")
+    @DisplayName("Should partially update dataspace with PATCH - single field")
     void shouldPartiallyUpdateDataSpaceWithPatch() {
       String dataSpaceId = createTestEntity();
 
-      DataSpaceInputDTO patchInput = new DataSpaceInputDTO();
-      patchInput.setDescription("Only description updated");
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Only description updated");
 
-      ResponseEntity<DataSpaceOutputDTO> response = performPatch(dataSpaceId, patchInput);
+      ResponseEntity<DataSpaceOutputDTO> response = performPatch(dataSpaceId, patchMap);
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription())
+          .as("Description should be updated")
+          .isEqualTo("Only description updated");
+    }
+
+    @Test
+    @DisplayName("Should update multiple fields with PATCH")
+    void shouldUpdateMultipleFieldsWithPatch() {
+      String dataSpaceId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("title", "PatchedDataSpace");
+      patchMap.put("description", "Patched description");
+
+      ResponseEntity<DataSpaceOutputDTO> response = performPatch(dataSpaceId, patchMap);
 
       assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTitle()).isEqualTo("PatchedDataSpace");
+      assertThat(response.getBody().getDescription()).isEqualTo("Patched description");
+    }
+
+    @Test
+    @DisplayName("Should set description to null with PATCH")
+    void shouldSetDescriptionToNullWithPatch() {
+      String dataSpaceId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", null);
+
+      ResponseEntity<DataSpaceOutputDTO> response = performPatch(dataSpaceId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription())
+          .as("Description should be set to null")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("Should leave omitted fields unchanged with PATCH")
+    void shouldLeaveOmittedFieldsUnchangedWithPatch() {
+      String dataSpaceId = createTestEntity();
+
+      ResponseEntity<DataSpaceOutputDTO> initialResponse = performGetById(dataSpaceId);
+      DataSpaceOutputDTO initialDataSpace = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "New description");
+
+      ResponseEntity<DataSpaceOutputDTO> response = performPatch(dataSpaceId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription()).isEqualTo("New description");
+      assertThat(response.getBody().getTitle())
+          .as("Title should remain unchanged")
+          .isEqualTo(initialDataSpace.getTitle());
+    }
+
+    @Test
+    @DisplayName("Should set parentDataSpace to null with PATCH")
+    void shouldSetParentDataSpaceToNullWithPatch() {
+      String parentDataSpaceId = createTestEntity();
+      String childDataSpaceId = createTestEntity();
+
+      // Set parent
+      Map<String, Object> setParentMap = new HashMap<>();
+      setParentMap.put("parentDataSpaceId", parentDataSpaceId);
+      performPatch(childDataSpaceId, setParentMap);
+
+      // Remove parent
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("parentDataSpaceId", null);
+
+      ResponseEntity<DataSpaceOutputDTO> response = performPatch(childDataSpaceId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getParentDataSpace())
+          .as("ParentDataSpace should be set to null")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("Should handle empty PATCH (no changes)")
+    void shouldHandleEmptyPatch() {
+      String dataSpaceId = createTestEntity();
+
+      ResponseEntity<DataSpaceOutputDTO> initialResponse = performGetById(dataSpaceId);
+      DataSpaceOutputDTO initialDataSpace = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+
+      ResponseEntity<DataSpaceOutputDTO> response = performPatch(dataSpaceId, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTitle()).isEqualTo(initialDataSpace.getTitle());
+      assertThat(response.getBody().getDescription()).isEqualTo(initialDataSpace.getDescription());
+    }
+
+    @Test
+    @DisplayName("Should be idempotent with PATCH")
+    void shouldBeIdempotentWithPatch() {
+      String dataSpaceId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Idempotent test");
+
+      ResponseEntity<DataSpaceOutputDTO> firstResponse = performPatch(dataSpaceId, patchMap);
+      ResponseEntity<DataSpaceOutputDTO> secondResponse = performPatch(dataSpaceId, patchMap);
+
+      assertThat(firstResponse.getBody()).isNotNull();
+      assertThat(secondResponse.getBody()).isNotNull();
+      assertThat(firstResponse.getBody().getDescription())
+          .isEqualTo(secondResponse.getBody().getDescription());
     }
 
     @Test

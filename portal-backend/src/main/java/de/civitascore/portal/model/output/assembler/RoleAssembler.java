@@ -8,10 +8,9 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Minimal Role assembler using your mapper + basic enrichments. */
 @Component
 @RequiredArgsConstructor
-public class RoleAssembler implements EntityAssembler<Role, RoleOutputDTO, String> {
+public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, String> {
 
   private final RoleMapper roleMapper;
   private final PermissionMapper permissionMapper;
@@ -20,7 +19,6 @@ public class RoleAssembler implements EntityAssembler<Role, RoleOutputDTO, Strin
   public RoleOutputDTO mapToBaseDto(Role entity) {
     RoleOutputDTO output = roleMapper.toOutput(entity);
 
-    // Map permissions
     if (entity.getPermissions() != null && !entity.getPermissions().isEmpty()) {
       output.setPermissions(
           entity.getPermissions().stream()
@@ -29,5 +27,11 @@ public class RoleAssembler implements EntityAssembler<Role, RoleOutputDTO, Strin
     }
 
     return output;
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <I> I toInput(Role entity) {
+    return (I) roleMapper.toInput(entity);
   }
 }

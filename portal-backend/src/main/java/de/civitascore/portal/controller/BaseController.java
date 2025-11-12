@@ -1,21 +1,24 @@
 package de.civitascore.portal.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.model.entity.base.BaseEntity;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
-import de.civitascore.portal.model.output.assembler.EntityAssembler;
+import de.civitascore.portal.model.output.assembler.BaseAssembler;
 import de.civitascore.portal.repository.specification.base.BaseSpec;
-import de.civitascore.portal.service.TenantAwareService;
+import de.civitascore.portal.service.BaseService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
-import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -23,23 +26,32 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @Validated
 @RequestMapping
-@RequiredArgsConstructor
 @FieldDefaults(level = lombok.AccessLevel.PROTECTED)
 public abstract class BaseController<
     I extends BaseInputDTO,
     O extends BaseOutputDTO,
-    E extends BaseEntity<ID>,
+    E extends BaseEntity,
     S extends BaseSpec<E>,
     ID extends Serializable> {
 
-  abstract TenantAwareService<E, ID, I> getService();
+  abstract BaseService<E, ID, I> getService();
 
-  protected abstract EntityAssembler<E, O, ID> getAssembler();
+  protected abstract BaseAssembler<E, O, ID> getAssembler();
+
+  @Autowired protected ObjectMapper objectMapper;
 
   @Parameters({
     @Parameter(
@@ -109,8 +121,12 @@ public abstract class BaseController<
   }
 
   @PatchMapping("/{id}")
-  public ResponseEntity<O> patch(@PathVariable ID id, @RequestBody I input) {
-    E updated = getService().update(id, input);
+  public ResponseEntity<O> patch(@PathVariable ID id, @RequestBody JsonNode updates)
+      throws IOException {
+    E current = getService().findById(id);
+    I currentDto = getAssembler().toInput(current);
+    I patchedDto = objectMapper.readerForUpdating(currentDto).readValue(updates);
+    E updated = getService().update(id, patchedDto);
     O output = getAssembler().toOutput(updated);
     return ResponseEntity.ok(output);
   }

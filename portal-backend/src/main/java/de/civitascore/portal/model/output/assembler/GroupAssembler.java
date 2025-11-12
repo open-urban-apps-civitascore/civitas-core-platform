@@ -9,10 +9,9 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Minimal Group assembler using your mapper + basic enrichments. */
 @Component
 @RequiredArgsConstructor
-public class GroupAssembler implements EntityAssembler<Group, GroupOutputDTO, String> {
+public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, String> {
 
   private final GroupMapper groupMapper;
   private final UserMapper userMapper;
@@ -45,5 +44,11 @@ public class GroupAssembler implements EntityAssembler<Group, GroupOutputDTO, St
     }
 
     return output;
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <I> I toInput(Group entity) {
+    return (I) groupMapper.toInput(entity);
   }
 }

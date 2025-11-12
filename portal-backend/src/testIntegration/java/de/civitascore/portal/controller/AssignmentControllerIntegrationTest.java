@@ -12,6 +12,7 @@ import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.util.RestPage;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -26,7 +27,7 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("Assignment Controller Integration Tests")
 class AssignmentControllerIntegrationTest
-    extends BaseControllerIntegrationTest<AssignmentInputDTO, AssignmentOutputDTO, String> {
+    extends BaseControllerIntegrationTest<AssignmentInputDTO, AssignmentOutputDTO> {
 
   private final String ASSIGNMENTS_ENDPOINT = "/assignments";
 
@@ -103,7 +104,7 @@ class AssignmentControllerIntegrationTest
             new ParameterizedTypeReference<GroupOutputDTO>() {});
 
     if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId();
+      return response.getBody().getId().toString();
     }
     throw new IllegalStateException("Failed to create test group");
   }
@@ -124,7 +125,7 @@ class AssignmentControllerIntegrationTest
             "/roles", HttpMethod.POST, request, new ParameterizedTypeReference<RoleOutputDTO>() {});
 
     if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId();
+      return response.getBody().getId().toString();
     }
     throw new IllegalStateException("Failed to create test role");
   }
@@ -374,18 +375,129 @@ class AssignmentControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should partially update assignment with PATCH")
+    @DisplayName("Should partially update assignment with PATCH - single field")
     void shouldPartiallyUpdateAssignmentWithPatch() {
       String assignmentId = createTestEntity();
 
-      AssignmentInputDTO patchInput = new AssignmentInputDTO();
-      patchInput.setIsInherited(true);
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("isInherited", true);
 
-      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchInput);
+      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getIsInherited()).as("IsInherited should be updated").isTrue();
+    }
+
+    @Test
+    @DisplayName("Should update multiple fields with PATCH")
+    void shouldUpdateMultipleFieldsWithPatch() {
+      String assignmentId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("isInherited", true);
+      patchMap.put("scopeId", "new-scope-id");
+
+      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
 
       assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getIsInherited()).isTrue();
+      assertThat(response.getBody().getScopeId()).isEqualTo("new-scope-id");
+    }
+
+    @Test
+    @DisplayName("Should set scopeId to null with PATCH")
+    void shouldSetScopeIdToNullWithPatch() {
+      String assignmentId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("scopeId", null);
+
+      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getScopeId()).as("ScopeId should be set to null").isNull();
+    }
+
+    @Test
+    @DisplayName("Should leave omitted fields unchanged with PATCH")
+    void shouldLeaveOmittedFieldsUnchangedWithPatch() {
+      String assignmentId = createTestEntity();
+
+      ResponseEntity<AssignmentOutputDTO> initialResponse = performGetById(assignmentId);
+      AssignmentOutputDTO initialAssignment = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("isInherited", true);
+
+      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getIsInherited()).isTrue();
+      assertThat(response.getBody().getScopeType())
+          .as("ScopeType should remain unchanged")
+          .isEqualTo(initialAssignment.getScopeType());
+      assertThat(response.getBody().getScopeId())
+          .as("ScopeId should remain unchanged")
+          .isEqualTo(initialAssignment.getScopeId());
+    }
+
+    @Test
+    @DisplayName("Should set parentAssignment to null with PATCH")
+    void shouldSetParentAssignmentToNullWithPatch() {
+      String parentAssignmentId = createTestEntity();
+      String childAssignmentId = createTestEntity();
+
+      // Set parent
+      Map<String, Object> setParentMap = new HashMap<>();
+      setParentMap.put("parentAssignmentId", parentAssignmentId);
+      performPatch(childAssignmentId, setParentMap);
+
+      // Remove parent
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("parentAssignmentId", null);
+
+      ResponseEntity<AssignmentOutputDTO> response = performPatch(childAssignmentId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getParentAssignment())
+          .as("ParentAssignment should be set to null")
+          .isNull();
+    }
+
+    @Test
+    @DisplayName("Should handle empty PATCH (no changes)")
+    void shouldHandleEmptyPatch() {
+      String assignmentId = createTestEntity();
+
+      ResponseEntity<AssignmentOutputDTO> initialResponse = performGetById(assignmentId);
+      AssignmentOutputDTO initialAssignment = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+
+      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getScopeType()).isEqualTo(initialAssignment.getScopeType());
+      assertThat(response.getBody().getIsInherited()).isEqualTo(initialAssignment.getIsInherited());
+    }
+
+    @Test
+    @DisplayName("Should be idempotent with PATCH")
+    void shouldBeIdempotentWithPatch() {
+      String assignmentId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("isInherited", true);
+
+      ResponseEntity<AssignmentOutputDTO> firstResponse = performPatch(assignmentId, patchMap);
+      ResponseEntity<AssignmentOutputDTO> secondResponse = performPatch(assignmentId, patchMap);
+
+      assertThat(firstResponse.getBody()).isNotNull();
+      assertThat(secondResponse.getBody()).isNotNull();
+      assertThat(firstResponse.getBody().getIsInherited())
+          .isEqualTo(secondResponse.getBody().getIsInherited());
     }
 
     @Test

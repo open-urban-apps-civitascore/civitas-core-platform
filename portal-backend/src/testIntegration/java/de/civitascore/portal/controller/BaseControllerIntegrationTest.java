@@ -5,14 +5,18 @@ import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
 import de.civitascore.portal.util.RestPage;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 
 /**
  * Base class for controller integration tests providing common test utilities. Subclasses must
@@ -20,15 +24,13 @@ import org.springframework.http.*;
  *
  * @param <I> Input DTO type
  * @param <O> Output DTO type
- * @param <ID> Entity ID type
  */
-public abstract class BaseControllerIntegrationTest<
-        I extends BaseInputDTO, O extends BaseOutputDTO<ID>, ID extends Serializable>
+public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O extends BaseOutputDTO>
     extends BaseKeycloakIntegrationTest {
 
   @Autowired protected ObjectMapper objectMapper;
 
-  protected final List<ID> createdEntityIds = new ArrayList<>();
+  protected final List<String> createdEntityIds = new ArrayList<>();
 
   protected abstract String getEndpointPath();
 
@@ -42,13 +44,13 @@ public abstract class BaseControllerIntegrationTest<
 
   protected abstract ParameterizedTypeReference<RestPage<O>> getPageTypeReference();
 
-  protected abstract ID getIdFromOutput(O output);
+  protected abstract String getIdFromOutput(O output);
 
   @AfterEach
   void cleanupAfterTest() {
     try {
       for (int i = createdEntityIds.size() - 1; i >= 0; i--) {
-        ID id = createdEntityIds.get(i);
+        String id = createdEntityIds.get(i);
         try {
           performDelete(id);
         } catch (Exception e) {
@@ -101,14 +103,14 @@ public abstract class BaseControllerIntegrationTest<
     if (trackForCleanup
         && response.getStatusCode() == HttpStatus.CREATED
         && response.getBody() != null) {
-      ID id = getIdFromOutput(response.getBody());
+      String id = getIdFromOutput(response.getBody()).toString();
       createdEntityIds.add(id);
     }
 
     return response;
   }
 
-  protected ResponseEntity<O> performGetById(ID id) {
+  protected ResponseEntity<O> performGetById(String id) {
     HttpHeaders headers = createAuthHeaders();
     HttpEntity<Void> request = new HttpEntity<>(headers);
     return restTemplate.exchange(
@@ -133,21 +135,30 @@ public abstract class BaseControllerIntegrationTest<
     return restTemplate.exchange(url.toString(), HttpMethod.GET, request, getPageTypeReference());
   }
 
-  protected ResponseEntity<O> performUpdate(ID id, I input) {
+  protected ResponseEntity<O> performUpdate(String id, I input) {
     HttpHeaders headers = createAuthHeaders();
     HttpEntity<I> request = new HttpEntity<>(input, headers);
     return restTemplate.exchange(
         getEndpointPath() + "/" + id, HttpMethod.PUT, request, getOutputTypeReference());
   }
 
-  protected ResponseEntity<O> performPatch(ID id, I input) {
+  protected ResponseEntity<O> performPatch(String id, I input) {
     HttpHeaders headers = createAuthHeaders();
     HttpEntity<I> request = new HttpEntity<>(input, headers);
     return restTemplate.exchange(
         getEndpointPath() + "/" + id, HttpMethod.PATCH, request, getOutputTypeReference());
   }
 
-  protected ResponseEntity<Void> performDelete(ID id) {
+  protected ResponseEntity<O> performPatch(String id, Object patchBody) {
+    HttpHeaders headers = createAuthHeaders();
+    headers.setContentType(MediaType.APPLICATION_JSON);
+    HttpEntity<Object> request = new HttpEntity<>(patchBody, headers);
+
+    return restTemplate.exchange(
+        getEndpointPath() + "/" + id, HttpMethod.PATCH, request, getOutputTypeReference());
+  }
+
+  protected ResponseEntity<Void> performDelete(String id) {
     HttpHeaders headers = createAuthHeaders();
     HttpEntity<Void> request = new HttpEntity<>(headers);
     return restTemplate.exchange(
@@ -159,10 +170,10 @@ public abstract class BaseControllerIntegrationTest<
         getEndpointPath() + path, method, new HttpEntity<>(new HttpHeaders()), String.class);
   }
 
-  protected ID createTestEntity() {
+  protected String createTestEntity() {
     ResponseEntity<O> response = performCreate(createValidInput());
     if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return getIdFromOutput(response.getBody());
+      return getIdFromOutput(response.getBody()).toString();
     }
     throw new IllegalStateException("Failed to create test entity");
   }

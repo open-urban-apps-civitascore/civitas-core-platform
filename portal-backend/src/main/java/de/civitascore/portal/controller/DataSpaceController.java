@@ -3,11 +3,11 @@ package de.civitascore.portal.controller;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.model.output.DataSpaceOutputDTO;
+import de.civitascore.portal.model.output.assembler.BaseAssembler;
 import de.civitascore.portal.model.output.assembler.DataSpaceAssembler;
-import de.civitascore.portal.model.output.assembler.EntityAssembler;
 import de.civitascore.portal.repository.specification.DataSpaceSpec;
+import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.service.DataSpaceService;
-import de.civitascore.portal.service.TenantAwareService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -20,7 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/dataspaces")
@@ -32,6 +33,16 @@ public class DataSpaceController
 
   private final DataSpaceService dataSpaceService;
   private final DataSpaceAssembler dataSpaceAssembler;
+
+  @Override
+  BaseService<DataSpace, String, DataSpaceInputDTO> getService() {
+    return dataSpaceService;
+  }
+
+  @Override
+  protected BaseAssembler<DataSpace, DataSpaceOutputDTO, String> getAssembler() {
+    return dataSpaceAssembler;
+  }
 
   @Parameters({
     @Parameter(
@@ -62,15 +73,5 @@ public class DataSpaceController
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
     return super.getAll(spec, pageable);
-  }
-
-  @Override
-  protected TenantAwareService<DataSpace, String, DataSpaceInputDTO> getService() {
-    return dataSpaceService;
-  }
-
-  @Override
-  protected EntityAssembler<DataSpace, DataSpaceOutputDTO, String> getAssembler() {
-    return dataSpaceAssembler;
   }
 }

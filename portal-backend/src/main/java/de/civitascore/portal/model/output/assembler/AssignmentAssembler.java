@@ -8,11 +8,9 @@ import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Minimal Assignment assembler using your mapper + basic enrichments. */
 @Component
 @RequiredArgsConstructor
-public class AssignmentAssembler
-    implements EntityAssembler<Assignment, AssignmentOutputDTO, String> {
+public class AssignmentAssembler implements BaseAssembler<Assignment, AssignmentOutputDTO, String> {
 
   private final AssignmentMapper assignmentMapper;
   private final GroupMapper groupMapper;
@@ -38,5 +36,11 @@ public class AssignmentAssembler
     }
 
     return output;
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <I> I toInput(Assignment entity) {
+    return (I) assignmentMapper.toInput(entity);
   }
 }

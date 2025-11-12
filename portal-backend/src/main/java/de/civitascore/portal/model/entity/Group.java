@@ -1,7 +1,17 @@
 package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.entity.base.NamedEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -17,11 +27,7 @@ import lombok.Setter;
     indexes = {@Index(name = "idx_group_contact", columnList = "contact_user_id")})
 @Getter
 @Setter
-@NamedEntityGraph(name = "Group.withMembers", attributeNodes = @NamedAttributeNode("members"))
-@NamedEntityGraph(
-    name = "Group.withSystemRoles",
-    attributeNodes = @NamedAttributeNode("systemRoles"))
-public class Group extends NamedEntity<String> {
+public class Group extends NamedEntity {
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(

@@ -1,6 +1,11 @@
 package de.civitascore.portal.model.entity.base;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.MappedSuperclass;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -18,12 +23,12 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public abstract class BaseEntity<ID extends Serializable> implements Serializable {
+public abstract class BaseEntity implements Serializable {
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   @Column(name = "id", nullable = false, updatable = false)
-  protected ID id;
+  protected String id;
 
   @CreatedDate
   @Column(name = "created_at", nullable = false, updatable = false)
@@ -45,7 +50,7 @@ public abstract class BaseEntity<ID extends Serializable> implements Serializabl
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
-    BaseEntity<?> that = (BaseEntity<?>) o;
+    BaseEntity that = (BaseEntity) o;
     return id != null && id.equals(that.id);
   }
 

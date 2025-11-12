@@ -6,7 +6,7 @@ import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.assembler.AssignmentAssembler;
 import de.civitascore.portal.repository.specification.AssignmentSpec;
 import de.civitascore.portal.service.AssignmentService;
-import de.civitascore.portal.service.TenantAwareService;
+import de.civitascore.portal.service.BaseService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -19,7 +19,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/assignments")
@@ -33,7 +34,7 @@ public class AssignmentController
   private final AssignmentAssembler assignmentAssembler;
 
   @Override
-  protected TenantAwareService<Assignment, String, AssignmentInputDTO> getService() {
+  BaseService<Assignment, String, AssignmentInputDTO> getService() {
     return assignmentService;
   }
 

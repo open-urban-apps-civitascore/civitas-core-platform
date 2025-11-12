@@ -6,7 +6,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class PermissionOutputDTO extends BaseOutputDTO<String> {
+public class PermissionOutputDTO extends BaseOutputDTO {
   private String title;
   private String description;
   private PermissionType permissionType;

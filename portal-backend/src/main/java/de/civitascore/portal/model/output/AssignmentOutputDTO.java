@@ -9,7 +9,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class AssignmentOutputDTO extends BaseOutputDTO<String> {
+public class AssignmentOutputDTO extends BaseOutputDTO {
   private GroupSummaryDTO group;
   private RoleSummaryDTO role;
   private ScopeType scopeType;

@@ -7,6 +7,7 @@ import de.civitascore.portal.model.output.UserOutputDTO;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -18,7 +19,7 @@ import org.springframework.http.ResponseEntity;
 
 @DisplayName("User Controller Integration Tests")
 class UserControllerIntegrationTest
-    extends BaseControllerIntegrationTest<UserInputDTO, UserOutputDTO, String> {
+    extends BaseControllerIntegrationTest<UserInputDTO, UserOutputDTO> {
 
   private final String USERS_ENDPOINT = "/users";
 
@@ -184,7 +185,7 @@ class UserControllerIntegrationTest
     void shouldRetrieveUserById() {
       String userId = createTestEntity();
 
-      ResponseEntity<UserOutputDTO> response = performGetById(userId);
+      ResponseEntity<UserOutputDTO> response = performGetById(userId.toString());
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
 
@@ -277,18 +278,167 @@ class UserControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should partially update user with PATCH")
+    @DisplayName("Should partially update user with PATCH - single field")
     void shouldPartiallyUpdateUserWithPatch() {
       String userId = createTestEntity();
 
-      UserInputDTO patchInput = new UserInputDTO();
-      patchInput.setPhone("+49111222333");
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("phone", "+49111222333");
 
-      ResponseEntity<UserOutputDTO> response = performPatch(userId, patchInput);
+      ResponseEntity<UserOutputDTO> response = performPatch(userId, patchMap);
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getPhone())
+          .as("Phone should be updated")
+          .isEqualTo("+49111222333");
+      // Other fields should remain unchanged
+      assertThat(response.getBody().getFirstName())
+          .as("First name should remain unchanged")
+          .isEqualTo("Test");
+    }
+
+    @Test
+    @DisplayName("Should update multiple fields with PATCH")
+    void shouldPartiallyUpdateUserWithPatchMultipleFields() {
+      String userId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("phone", null);
+      patchMap.put("firstName", "TestPatch");
+
+      ResponseEntity<UserOutputDTO> response = performPatch(userId, patchMap);
 
       assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getPhone()).as("Phone should be updated to null").isNull();
+      assertThat(response.getBody().getFirstName())
+          .as("First name should be updated")
+          .isEqualTo("TestPatch");
+      // Other fields should remain unchanged
+      assertThat(response.getBody().getEmail()).as("Email should remain unchanged").isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should set field to null with PATCH")
+    void shouldSetFieldToNullWithPatch() {
+      String userId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("phone", null);
+
+      ResponseEntity<UserOutputDTO> response = performPatch(userId, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getPhone()).as("Phone should be set to null").isNull();
+    }
+
+    @Test
+    @DisplayName("Should leave omitted fields unchanged with PATCH")
+    void shouldLeaveOmittedFieldsUnchangedWithPatch() {
+      String userId = createTestEntity();
+
+      // Get initial state
+      ResponseEntity<UserOutputDTO> initialResponse = performGetById(userId);
+      UserOutputDTO initialUser = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("firstName", "NewFirstName");
+      // lastName, email, phone, active are omitted
+
+      ResponseEntity<UserOutputDTO> response = performPatch(userId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getFirstName())
+          .as("First name should be updated")
+          .isEqualTo("NewFirstName");
+      assertThat(response.getBody().getLastName())
+          .as("Last name should remain unchanged")
+          .isEqualTo(initialUser.getLastName());
+      assertThat(response.getBody().getEmail())
+          .as("Email should remain unchanged")
+          .isEqualTo(initialUser.getEmail());
+      assertThat(response.getBody().getPhone())
+          .as("Phone should remain unchanged")
+          .isEqualTo(initialUser.getPhone());
+      assertThat(response.getBody().getActive())
+          .as("Active should remain unchanged")
+          .isEqualTo(initialUser.getActive());
+    }
+
+    @Test
+    @DisplayName("Should handle empty PATCH (no changes)")
+    void shouldHandleEmptyPatch() {
+      String userId = createTestEntity();
+
+      ResponseEntity<UserOutputDTO> initialResponse = performGetById(userId);
+      UserOutputDTO initialUser = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+
+      ResponseEntity<UserOutputDTO> response = performPatch(userId, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getFirstName()).isEqualTo(initialUser.getFirstName());
+      assertThat(response.getBody().getLastName()).isEqualTo(initialUser.getLastName());
+      assertThat(response.getBody().getEmail()).isEqualTo(initialUser.getEmail());
+      assertThat(response.getBody().getPhone()).isEqualTo(initialUser.getPhone());
+    }
+
+    @Test
+    @DisplayName("Should update boolean field with PATCH")
+    void shouldUpdateBooleanFieldWithPatch() {
+      String userId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("active", false);
+
+      ResponseEntity<UserOutputDTO> response = performPatch(userId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getActive()).as("Active should be updated to false").isFalse();
+    }
+
+    @Test
+    @DisplayName("Should handle PATCH with all fields")
+    void shouldHandlePatchWithAllFields() {
+      String userId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("firstName", "PatchedFirst");
+      patchMap.put("lastName", "PatchedLast");
+      patchMap.put("email", "patched@example.com");
+      patchMap.put("phone", "+49999999999");
+      patchMap.put("active", false);
+
+      ResponseEntity<UserOutputDTO> response = performPatch(userId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getFirstName()).isEqualTo("PatchedFirst");
+      assertThat(response.getBody().getLastName()).isEqualTo("PatchedLast");
+      assertThat(response.getBody().getEmail()).isEqualTo("patched@example.com");
+      assertThat(response.getBody().getPhone()).isEqualTo("+49999999999");
+      assertThat(response.getBody().getActive()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should be idempotent with PATCH")
+    void shouldBeIdempotentWithPatch() {
+      String userId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("firstName", "IdempotentTest");
+
+      // Apply patch twice
+      ResponseEntity<UserOutputDTO> firstResponse = performPatch(userId, patchMap);
+      ResponseEntity<UserOutputDTO> secondResponse = performPatch(userId, patchMap);
+
+      assertThat(firstResponse.getBody()).isNotNull();
+      assertThat(secondResponse.getBody()).isNotNull();
+      assertThat(firstResponse.getBody().getFirstName())
+          .isEqualTo(secondResponse.getBody().getFirstName());
+      assertThat(firstResponse.getBody().getFirstName()).isEqualTo("IdempotentTest");
     }
 
     @Test

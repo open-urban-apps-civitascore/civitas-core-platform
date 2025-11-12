@@ -1,7 +1,13 @@
 package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.entity.base.TenantAwareEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import java.util.HashSet;
@@ -23,8 +29,7 @@ import lombok.Setter;
     })
 @Getter
 @Setter
-@NamedEntityGraph(name = "User.withGroups", attributeNodes = @NamedAttributeNode("groups"))
-public class User extends TenantAwareEntity<String> {
+public class User extends TenantAwareEntity {
 
   @NotBlank @Column(name = "first_name", nullable = false)
   private String firstName;

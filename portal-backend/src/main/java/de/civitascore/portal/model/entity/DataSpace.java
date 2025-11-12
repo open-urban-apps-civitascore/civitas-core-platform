@@ -1,7 +1,17 @@
 package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.entity.base.NamedEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
@@ -17,7 +27,7 @@ import lombok.Setter;
     indexes = {@Index(name = "idx_dataspace_owner", columnList = "owner_user_id")})
 @Getter
 @Setter
-public class DataSpace extends NamedEntity<String> {
+public class DataSpace extends NamedEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owner_user_id")

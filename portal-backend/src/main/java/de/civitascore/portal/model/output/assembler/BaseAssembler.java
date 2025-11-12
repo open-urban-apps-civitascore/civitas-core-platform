@@ -9,8 +9,17 @@ import org.springframework.data.domain.Page;
  * Generic assembler with pre/post hooks for output assembly. Template method: toOutput()
  * orchestrates assembly steps.
  */
-public interface EntityAssembler<
-    E extends BaseEntity<ID>, O extends BaseOutputDTO, ID extends Serializable> {
+public interface BaseAssembler<
+    E extends BaseEntity, O extends BaseOutputDTO, ID extends Serializable> {
+
+  /**
+   * Convert entity back to input DTO for PATCH operations. Must be implemented by concrete
+   * assemblers that need PATCH support.
+   */
+  default <I> I toInput(E entity) {
+    throw new UnsupportedOperationException(
+        "toInput() must be implemented by the concrete assembler for PATCH support");
+  }
 
   /**
    * Template method for entity to output conversion. Subclasses can override hooks but not this

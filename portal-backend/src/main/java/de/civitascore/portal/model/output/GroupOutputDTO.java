@@ -9,7 +9,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class GroupOutputDTO extends BaseOutputDTO<String> {
+public class GroupOutputDTO extends BaseOutputDTO {
   private String title;
   private String description;
   private String tenantId;

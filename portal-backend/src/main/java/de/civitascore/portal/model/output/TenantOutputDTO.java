@@ -5,7 +5,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class TenantOutputDTO extends BaseOutputDTO<String> {
+public class TenantOutputDTO extends BaseOutputDTO {
   private String name;
   private String description;
   private Boolean active;

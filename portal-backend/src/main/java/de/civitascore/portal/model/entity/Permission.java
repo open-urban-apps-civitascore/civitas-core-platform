@@ -2,7 +2,13 @@ package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.PermissionType;
 import de.civitascore.portal.model.entity.base.NamedEntity;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.security.core.GrantedAuthority;
@@ -20,7 +26,7 @@ import org.springframework.security.core.GrantedAuthority;
     })
 @Getter
 @Setter
-public class Permission extends NamedEntity<String> implements GrantedAuthority {
+public class Permission extends NamedEntity implements GrantedAuthority {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "permission_type", nullable = false)

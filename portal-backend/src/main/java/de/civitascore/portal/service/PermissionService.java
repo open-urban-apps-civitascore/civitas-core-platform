@@ -1,20 +1,26 @@
 package de.civitascore.portal.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.PermissionMapper;
 import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.input.PermissionInputDTO;
 import de.civitascore.portal.repository.PermissionRepository;
 import de.civitascore.portal.repository.TenantAwareRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class PermissionService extends TenantAwareService<Permission, String, PermissionInputDTO> {
+public class PermissionService
+    extends BaseTenantAwareService<Permission, String, PermissionInputDTO> {
 
   private final PermissionRepository permissionRepository;
   private final PermissionMapper permissionMapper;
+  private final ObjectMapper objectMapper;
 
   @Override
   protected TenantAwareRepository<Permission, String> getRepository() {
@@ -47,5 +53,32 @@ public class PermissionService extends TenantAwareService<Permission, String, Pe
                     "Permission", "title", entity.getTitle(), "tenant", entity.getTenantId());
               }
             });
+  }
+
+  @Override
+  protected PermissionInputDTO preProcessUpdateInput(
+      PermissionInputDTO input, Permission existingEntity) {
+    try {
+      String inputJson = objectMapper.writeValueAsString(input);
+      JsonNode jsonNode = objectMapper.readTree(inputJson);
+
+      if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
+        throw new InvalidInputException(
+            "name", "Name cannot be null or blank", existingEntity.getId().toString());
+      }
+      if (jsonNode.has("title") && StringUtils.isBlank(jsonNode.get("title").asText())) {
+        throw new InvalidInputException(
+            "title", "Title cannot be null or blank", existingEntity.getId().toString());
+      }
+      if (jsonNode.has("permissionType") && jsonNode.get("permissionType").isNull()) {
+        throw new InvalidInputException(
+            "permissionType", "Permission type cannot be null", existingEntity.getId().toString());
+      }
+    } catch (InvalidInputException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to process update input", e);
+    }
+    return super.preProcessUpdateInput(input, existingEntity);
   }
 }

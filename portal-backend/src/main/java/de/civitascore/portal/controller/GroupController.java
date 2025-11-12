@@ -5,8 +5,8 @@ import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.model.output.assembler.GroupAssembler;
 import de.civitascore.portal.repository.specification.GroupSpec;
+import de.civitascore.portal.service.BaseTenantAwareService;
 import de.civitascore.portal.service.GroupService;
-import de.civitascore.portal.service.TenantAwareService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -74,7 +74,7 @@ public class GroupController
   }
 
   @Override
-  protected TenantAwareService<Group, String, GroupInputDTO> getService() {
+  protected BaseTenantAwareService<Group, String, GroupInputDTO> getService() {
     return groupService;
   }
 

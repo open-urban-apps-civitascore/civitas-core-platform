@@ -8,10 +8,9 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-/** Minimal DataSpace assembler using your mapper + basic enrichments. */
 @Component
 @RequiredArgsConstructor
-public class DataSpaceAssembler implements EntityAssembler<DataSpace, DataSpaceOutputDTO, String> {
+public class DataSpaceAssembler implements BaseAssembler<DataSpace, DataSpaceOutputDTO, String> {
 
   private final DataSpaceMapper dataSpaceMapper;
   private final UserMapper userMapper;
@@ -39,5 +38,11 @@ public class DataSpaceAssembler implements EntityAssembler<DataSpace, DataSpaceO
     }
 
     return output;
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public <I> I toInput(DataSpace entity) {
+    return (I) dataSpaceMapper.toInput(entity);
   }
 }

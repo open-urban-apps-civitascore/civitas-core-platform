@@ -2,7 +2,9 @@ package de.civitascore.portal.repository.specification;
 
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.repository.specification.base.TenantAwareSpec;
-import net.kaczmarzyk.spring.data.jpa.domain.*;
+import net.kaczmarzyk.spring.data.jpa.domain.Equal;
+import net.kaczmarzyk.spring.data.jpa.domain.EqualIgnoreCase;
+import net.kaczmarzyk.spring.data.jpa.domain.LikeIgnoreCase;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Or;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 

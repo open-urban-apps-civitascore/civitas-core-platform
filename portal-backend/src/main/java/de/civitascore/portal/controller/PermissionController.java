@@ -5,8 +5,8 @@ import de.civitascore.portal.model.input.PermissionInputDTO;
 import de.civitascore.portal.model.output.PermissionOutputDTO;
 import de.civitascore.portal.model.output.assembler.PermissionAssembler;
 import de.civitascore.portal.repository.specification.PermissionSpec;
+import de.civitascore.portal.service.BaseTenantAwareService;
 import de.civitascore.portal.service.PermissionService;
-import de.civitascore.portal.service.TenantAwareService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -19,7 +19,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/permissions")
@@ -64,7 +65,7 @@ public class PermissionController
   }
 
   @Override
-  protected TenantAwareService<Permission, String, PermissionInputDTO> getService() {
+  protected BaseTenantAwareService<Permission, String, PermissionInputDTO> getService() {
     return permissionService;
   }
 
