@@ -12,6 +12,7 @@ import { useQueryParams } from '@/hooks/useQueryParams'
 
 import { RolesTab } from './RolesTab'
 import { FormUser, UserForm } from './UserForm'
+import { GroupsTab } from './groups-tab/GroupsTab'
 
 interface UserDetailsProps {
   userData: FormUser | null
@@ -89,10 +90,11 @@ export const UserDetails = (props: UserDetailsProps) => {
       />
       <PageBackground>
         {userData ? (
-          <ContentCard>
+          <>
             {subTabValue === tabValues.roles.value && isEditMode && <RolesTab userId={userData.id} />}
             {subTabValue === tabValues.userData.value && <UserForm userData={userData} isEditMode={isEditMode} />}
-          </ContentCard>
+            {subTabValue === tabValues.userGroups.value && <GroupsTab userId={userData.id} />}
+          </>
         ) : (
           <div>No data</div>
         )}

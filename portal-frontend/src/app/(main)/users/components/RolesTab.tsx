@@ -15,6 +15,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { UserResponse } from '@/types/users'
+import { ContentCard } from '@/components/content-card/ContentCard'
 
 interface Role {
   id: string
@@ -233,7 +234,7 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
   }
 
   return (
-    <div>
+    <ContentCard>
       <RoleCategory
         title={tRoles('systemRoles')}
         category="System"
@@ -261,6 +262,6 @@ export const RolesTab = ({ userId }: RolesTabProps) => {
           {tCommon('actions.submit')}
         </Button>
       </div>
-    </div>
+    </ContentCard>
   )
 }

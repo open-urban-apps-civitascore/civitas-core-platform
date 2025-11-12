@@ -1,5 +1,5 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 
 import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { TableProps } from '@/types/table'
 import { UserGroupsListData } from '@/types/groups'
 import { resolveUpdater } from '@/utils/table'
+import { formatDate } from '@/utils/formatDate'
 
 interface GroupsTableProps extends TableProps<UserGroupsListData> {
   groups: UserGroupsListData[]
@@ -28,6 +29,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     isLoading,
   } = props
   const t = useTranslations('users')
+  const locale = useLocale()
   const columnHelper = createColumnHelper<UserGroupsListData>()
 
   const columns = [
@@ -48,15 +50,23 @@ const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('memberSince', {
       header: t('groupsTab.memberSince'),
-      cell: info => info.getValue(),
+      cell: info => formatDate(info.getValue(), locale),
     }),
     columnHelper.accessor('contact', {
       header: t('groupsTab.contact'),
-      cell: info => info.getValue(),
+      cell: info => info.getValue()?.displayName,
     }),
     columnHelper.accessor('description', {
       header: t('groupsTab.description'),
       cell: info => info.getValue(),
+      meta: {
+        style: {
+          whiteSpace: 'nowrap',
+          maxWidth: '300px',
+          textOverflow: 'ellipsis',
+          overflow: 'hidden',
+        },
+      },
     }),
     columnHelper.accessor('roles', {
       header: t('groupsTab.roles'),
@@ -74,6 +84,12 @@ const GroupsTable = (props: GroupsTableProps) => {
           </>
         )
         return <div className="flex flex-wrap gap-1">{badges}</div>
+      },
+      meta: {
+        style: {
+          width: '22.22%',
+          minWidth: '200px',
+        },
       },
     }),
   ]

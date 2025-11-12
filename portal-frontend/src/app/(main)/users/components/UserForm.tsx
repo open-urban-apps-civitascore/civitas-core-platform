@@ -18,6 +18,7 @@ import { Authority, UserFormData, UserFormSchema, UserResponse } from '@/types/u
 import { mapApiUserData } from '@/utils/users'
 
 import { createUser, updateUser } from '../actions'
+import { ContentCard } from '@/components/content-card/ContentCard'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
@@ -117,64 +118,72 @@ export const UserForm = (props: UserFormProps) => {
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
 
   return (
-    <Form {...form}>
-      <form onSubmit={handleSubmit}>
-        <div className={`grid gap-4 space-y-8 mb-4 max-w-3xl ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
-          <TextField form={form} label={t('info.id')} name="id" placeholder={t('info.id')} disabled />
-          <div className="flex w-full justify-between">
-            <Select
-              id="title-select"
-              label={t('info.title.title')}
-              options={titleOptions}
-              placeholder={t('form.selectTitle')}
+    <ContentCard>
+      <Form {...form}>
+        <form onSubmit={handleSubmit}>
+          <div className={`grid gap-4 space-y-8 mb-4 max-w-3xl ${isMobile ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            <TextField form={form} label={t('info.id')} name="id" placeholder={t('info.id')} disabled />
+            <div className="flex w-full justify-between">
+              <Select
+                id="title-select"
+                label={t('info.title.title')}
+                options={titleOptions}
+                placeholder={t('form.selectTitle')}
+                form={form}
+                name="title"
+                required
+              />
+              <Switch form={form} name="active" label={t('info.active')} />
+            </div>
+            <TextField
               form={form}
-              name="title"
+              label={t('info.firstName')}
+              name="firstName"
+              placeholder={t('info.firstName')}
               required
             />
-            <Switch form={form} name="active" label={t('info.active')} />
+            <TextField
+              form={form}
+              label={t('info.lastName')}
+              name="lastName"
+              placeholder={t('info.lastName')}
+              required
+            />
+            <TextField form={form} label={t('info.email')} name="email" placeholder={t('info.email')} required />
+            <TextField form={form} label={t('info.phone')} name="phone" placeholder={t('info.phone')} />
+            <Select
+              id="authority-select"
+              label={t('info.authority')}
+              options={authorities.map(authority => ({ value: authority.id, label: authority.title }))}
+              placeholder={t('form.selectAuthority')}
+              form={form}
+              name="authority"
+            />
+            <Select
+              id="department-select"
+              label={t('info.department')}
+              options={departmentOptions}
+              placeholder={t('form.selectDepartment')}
+              form={form}
+              name="department"
+            />
+            <TextField form={form} label={t('info.position')} name="position" placeholder={t('info.position')} />
           </div>
-          <TextField
+          <TextArea
+            className="max-w-lg my-12"
             form={form}
-            label={t('info.firstName')}
-            name="firstName"
-            placeholder={t('info.firstName')}
-            required
+            label={t('info.description')}
+            name="positionDescription"
+            placeholder={t('info.description')}
           />
-          <TextField form={form} label={t('info.lastName')} name="lastName" placeholder={t('info.lastName')} required />
-          <TextField form={form} label={t('info.email')} name="email" placeholder={t('info.email')} required />
-          <TextField form={form} label={t('info.phone')} name="phone" placeholder={t('info.phone')} />
-          <Select
-            id="authority-select"
-            label={t('info.authority')}
-            options={authorities.map(authority => ({ value: authority.id, label: authority.title }))}
-            placeholder={t('form.selectAuthority')}
-            form={form}
-            name="authority"
-          />
-          <Select
-            id="department-select"
-            label={t('info.department')}
-            options={departmentOptions}
-            placeholder={t('form.selectDepartment')}
-            form={form}
-            name="department"
-          />
-          <TextField form={form} label={t('info.position')} name="position" placeholder={t('info.position')} />
-        </div>
-        <TextArea
-          className="max-w-lg my-12"
-          form={form}
-          label={t('info.description')}
-          name="positionDescription"
-          placeholder={t('info.description')}
-        />
-        <div className="w-full flex gap-4 justify-end pt-8">
-          <Button type="reset" variant="secondary" onClick={() => goToUsersList()}>
-            {tCommon('actions.cancel')}
-          </Button>
-          <Button type="submit">{tCommon('actions.submit')}</Button>
-        </div>
-      </form>
-    </Form>
+          <div className="w-full flex gap-4 justify-end pt-8">
+            <Button type="reset" variant="secondary" onClick={() => goToUsersList()}>
+              {tCommon('actions.cancel')}
+            </Button>
+            <Button type="submit">{tCommon('actions.submit')}</Button>
+          </div>
+        </form>
+      </Form>
+    </ContentCard>
   )
 }
