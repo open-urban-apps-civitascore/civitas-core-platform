@@ -9,7 +9,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class GroupInputDTO extends BaseInputDTO {
 
-  @NotBlank(message = "Title is required") private String title;
+  @NotBlank(message = "Name is required") private String name;
 
   private String description;
   private String contactUserId;

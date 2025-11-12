@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.PermissionMapper;
 import de.civitascore.portal.model.entity.Permission;
+import de.civitascore.portal.model.entity.Permission_;
 import de.civitascore.portal.model.input.PermissionInputDTO;
 import de.civitascore.portal.repository.PermissionRepository;
 import de.civitascore.portal.repository.TenantAwareRepository;
@@ -34,7 +35,7 @@ public class PermissionService
 
   @Override
   protected String getEntityName() {
-    return "Permission";
+    return Permission.class.getSimpleName();
   }
 
   @Override
@@ -45,12 +46,16 @@ public class PermissionService
 
   private void validateUniqueTitle(Permission entity) {
     permissionRepository
-        .findByTitleAndTenantId(entity.getTitle(), entity.getTenantId())
+        .findByNameAndTenantId(entity.getName(), entity.getTenantId())
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
-                    "Permission", "title", entity.getTitle(), "tenant", entity.getTenantId());
+                    Permission.class.getSimpleName(),
+                    Permission_.NAME,
+                    entity.getName(),
+                    Permission_.TENANT_ID,
+                    entity.getTenantId());
               }
             });
   }

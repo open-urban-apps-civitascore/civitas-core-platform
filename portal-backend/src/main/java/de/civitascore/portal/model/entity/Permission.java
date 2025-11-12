@@ -19,7 +19,7 @@ import org.springframework.security.core.GrantedAuthority;
     uniqueConstraints =
         @UniqueConstraint(
             name = "uk_permission_name_tenant",
-            columnNames = {"title", "tenant_id"}),
+            columnNames = {"name", "tenant_id"}),
     indexes = {
       @Index(name = "idx_permission_type", columnList = "permission_type"),
       @Index(name = "idx_permission_modifiable", columnList = "user_modifiable")
@@ -40,6 +40,6 @@ public class Permission extends NamedEntity implements GrantedAuthority {
 
   @Override
   public String getAuthority() {
-    return getTitle();
+    return getName();
   }
 }

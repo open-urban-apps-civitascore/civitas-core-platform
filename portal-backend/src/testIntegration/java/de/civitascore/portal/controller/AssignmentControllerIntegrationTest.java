@@ -91,7 +91,7 @@ class AssignmentControllerIntegrationTest
 
   private String createTestGroup() {
     GroupInputDTO groupInput = new GroupInputDTO();
-    groupInput.setTitle("Test Group " + System.currentTimeMillis());
+    groupInput.setName("Test Group " + System.currentTimeMillis());
     groupInput.setDescription("Test group for assignment");
 
     HttpHeaders headers = createAuthHeaders();
@@ -112,7 +112,7 @@ class AssignmentControllerIntegrationTest
   private String createTestRole() {
     RoleInputDTO roleInput = new RoleInputDTO();
     roleInput.setName("test_role_" + System.currentTimeMillis());
-    roleInput.setTitle("Test Role " + System.currentTimeMillis());
+    roleInput.setName("Test Role " + System.currentTimeMillis());
     roleInput.setDescription("Test role for assignment");
     roleInput.setRoleType(RoleType.DATA);
     roleInput.setUserModifiable(true);

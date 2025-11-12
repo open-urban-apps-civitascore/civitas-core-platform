@@ -9,9 +9,15 @@ import org.springframework.data.jpa.domain.Specification;
 /**
  * Base specification for common fields present in BaseEntity.
  *
- * <p>Provides filtering by: - id: exact match (supports comma-separated list) - createdAtFrom:
- * created after date - createdAtTo: created before date - modifiedAtFrom: modified after date -
- * modifiedAtTo: modified before date
+ * <p>Provides filtering by:
+ *
+ * <ul>
+ *   <li>id: exact match (supports comma-separated list)
+ *   <li>createdAtFrom: created after date
+ *   <li>createdAtTo: created before date
+ *   <li>modifiedAtFrom: modified after date
+ *   <li>modifiedAtTo: modified before date
+ * </ul>
  *
  * <p>All entity specifications should extend this.
  */

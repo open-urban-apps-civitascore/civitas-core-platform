@@ -39,7 +39,6 @@ class DataSetControllerIntegrationTest
   protected DataSetInputDTO createValidInput() {
     DataSetInputDTO input = new DataSetInputDTO();
     input.setName("test_dataset_" + System.currentTimeMillis());
-    input.setTitle("Test DataSet " + System.currentTimeMillis());
     input.setDescription("A test dataset for integration testing");
     input.setFormat("JSON");
     input.setExternalId("ext-" + System.currentTimeMillis());
@@ -57,7 +56,7 @@ class DataSetControllerIntegrationTest
   protected DataSetInputDTO createUpdateInput() {
     DataSetInputDTO input = new DataSetInputDTO();
     input.setName("updated_dataset");
-    input.setTitle("Updated DataSet");
+    input.setName("Updated DataSet");
     input.setDescription("Updated description");
     input.setFormat("CSV");
     return input;
@@ -97,7 +96,7 @@ class DataSetControllerIntegrationTest
 
       DataSetOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
-      assertThat(output.getTitle()).as("Title should match input").isEqualTo(input.getTitle());
+      assertThat(output.getName()).as("Title should match input").isEqualTo(input.getName());
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo(input.getDescription());
@@ -201,7 +200,7 @@ class DataSetControllerIntegrationTest
 
       DataSetOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(dataSetId);
-      assertThat(output.getTitle()).as("Title should be present").isNotNull();
+      assertThat(output.getName()).as("Title should be present").isNotNull();
     }
 
     @Test
@@ -278,7 +277,7 @@ class DataSetControllerIntegrationTest
 
       DataSetOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should remain the same").isEqualTo(dataSetId);
-      assertThat(output.getTitle()).as("Title should be updated").isEqualTo(updateInput.getTitle());
+      assertThat(output.getName()).as("Title should be updated").isEqualTo(updateInput.getName());
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
@@ -317,7 +316,7 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response = performPatch(dataSetId, patchMap);
 
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTitle()).isEqualTo("PatchedDataSet");
+      assertThat(response.getBody().getName()).isEqualTo("PatchedDataSet");
       assertThat(response.getBody().getDescription()).isEqualTo("Patched description");
     }
 
@@ -352,9 +351,9 @@ class DataSetControllerIntegrationTest
 
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDescription()).isEqualTo("New description");
-      assertThat(response.getBody().getTitle())
+      assertThat(response.getBody().getName())
           .as("Title should remain unchanged")
-          .isEqualTo(initialDataSet.getTitle());
+          .isEqualTo(initialDataSet.getName());
     }
 
     @Test
@@ -371,7 +370,7 @@ class DataSetControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTitle()).isEqualTo(initialDataSet.getTitle());
+      assertThat(response.getBody().getName()).isEqualTo(initialDataSet.getName());
       assertThat(response.getBody().getDescription()).isEqualTo(initialDataSet.getDescription());
     }
 
@@ -513,7 +512,7 @@ class DataSetControllerIntegrationTest
     void shouldHandleSpecialCharactersInName() {
       DataSetInputDTO input = createValidInput();
       input.setName("dataset_with_special_äöü");
-      input.setTitle("DataSet with special chars: äöü ß @#$%");
+      input.setName("DataSet with special chars: äöü ß @#$%");
 
       ResponseEntity<DataSetOutputDTO> response = performCreate(input);
 

@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.entity.Role_;
 import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Objects;
@@ -36,22 +38,31 @@ public class RoleService extends BaseTenantAwareService<Role, String, RoleInputD
 
   @Override
   protected String getEntityName() {
-    return "Role";
+    return Role.class.getSimpleName();
+  }
+
+  /**
+   * Override findById to use EntityGraph for efficient loading of permissions. This fetches the
+   * Role along with all Permissions in a single JOIN query, preventing N+1 query problems.
+   */
+  @Override
+  public Role findById(String id) {
+    preProcessLoad(id);
+    Role entity =
+        roleRepository
+            .findByIdAndTenantIdWithRelations(id, getCurrentTenantId())
+            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+    return postLoad(entity);
   }
 
   @Override
   protected Role postConvertToEntity(Role entity, RoleInputDTO input) {
+    // Use findAllById for efficient batch loading of permissions instead of N+1 queries
     if (Objects.nonNull(input.getPermissionIds())) {
       entity.setPermissions(new HashSet<>());
       if (!input.getPermissionIds().isEmpty()) {
-        input
-            .getPermissionIds()
-            .forEach(
-                permissionId ->
-                    permissionService
-                        .getRepository()
-                        .findById(permissionId)
-                        .ifPresent(entity.getPermissions()::add));
+        entity.setPermissions(
+            new HashSet<>(permissionService.getRepository().findAllById(input.getPermissionIds())));
       }
     }
 
@@ -66,12 +77,16 @@ public class RoleService extends BaseTenantAwareService<Role, String, RoleInputD
 
   private void validateUniqueTitle(Role entity) {
     roleRepository
-        .findByTitleAndTenantId(entity.getTitle(), entity.getTenantId())
+        .findByNameAndTenantId(entity.getName(), entity.getTenantId())
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
-                    "Role", "title", entity.getTitle(), "tenant", entity.getTenantId());
+                    Role.class.getSimpleName(),
+                    Role_.NAME,
+                    entity.getName(),
+                    Role_.TENANT_ID,
+                    entity.getTenantId());
               }
             });
   }
@@ -85,10 +100,6 @@ public class RoleService extends BaseTenantAwareService<Role, String, RoleInputD
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
             "name", "Name cannot be null or blank", existingEntity.getId().toString());
-      }
-      if (jsonNode.has("title") && StringUtils.isBlank(jsonNode.get("title").asText())) {
-        throw new InvalidInputException(
-            "title", "Title cannot be null or blank", existingEntity.getId().toString());
       }
       if (jsonNode.has("roleType") && jsonNode.get("roleType").isNull()) {
         throw new InvalidInputException(

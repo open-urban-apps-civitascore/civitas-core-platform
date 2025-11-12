@@ -26,7 +26,7 @@ import lombok.Setter;
     uniqueConstraints =
         @UniqueConstraint(
             name = "uk_role_name_tenant",
-            columnNames = {"title", "tenant_id"}),
+            columnNames = {"name", "tenant_id"}),
     indexes = {
       @Index(name = "idx_role_type", columnList = "role_type"),
       @Index(name = "idx_role_default", columnList = "is_default")

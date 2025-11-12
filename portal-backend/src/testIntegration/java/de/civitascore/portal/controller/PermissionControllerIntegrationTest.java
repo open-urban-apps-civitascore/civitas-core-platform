@@ -38,8 +38,7 @@ class PermissionControllerIntegrationTest
   @Override
   protected PermissionInputDTO createValidInput() {
     PermissionInputDTO input = new PermissionInputDTO();
-    input.setName("test_permission_" + System.currentTimeMillis());
-    input.setTitle("Test Permission " + System.currentTimeMillis());
+    input.setName("Test Permission " + System.currentTimeMillis());
     input.setDescription("A test permission for integration testing");
     input.setPermissionType(PermissionType.DATA);
     input.setIsDefault(false);
@@ -58,7 +57,7 @@ class PermissionControllerIntegrationTest
   protected PermissionInputDTO createUpdateInput() {
     PermissionInputDTO input = new PermissionInputDTO();
     input.setName("updated_permission");
-    input.setTitle("Updated Permission");
+    input.setName("Updated Permission");
     input.setDescription("Updated description");
     input.setPermissionType(PermissionType.SYSTEM);
     input.setUserModifiable(true);
@@ -100,7 +99,7 @@ class PermissionControllerIntegrationTest
 
       PermissionOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
-      assertThat(output.getTitle()).as("Title should match input").isEqualTo(input.getTitle());
+      assertThat(output.getName()).as("Title should match input").isEqualTo(input.getName());
       assertThat(output.getPermissionType())
           .as("Permission type should match input")
           .isEqualTo(input.getPermissionType());
@@ -137,7 +136,7 @@ class PermissionControllerIntegrationTest
       for (PermissionType type : PermissionType.values()) {
         PermissionInputDTO input = createValidInput();
         input.setName("permission_" + type.name().toLowerCase() + "_" + System.currentTimeMillis());
-        input.setTitle("Permission " + type.name());
+        input.setName("Permission " + type.name());
         input.setPermissionType(type);
 
         ResponseEntity<PermissionOutputDTO> response = performCreate(input);
@@ -152,7 +151,7 @@ class PermissionControllerIntegrationTest
     @DisplayName("Should fail to create duplicate permission with same title in same tenant")
     void shouldFailToCreateDuplicatePermission() {
       PermissionInputDTO input = createValidInput();
-      input.setTitle("Unique Permission Title");
+      input.setName("Unique Permission Title");
 
       // Create first permission
       ResponseEntity<PermissionOutputDTO> firstResponse = performCreate(input);
@@ -197,7 +196,7 @@ class PermissionControllerIntegrationTest
 
       PermissionOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(permissionId);
-      assertThat(output.getTitle()).as("Title should be present").isNotNull();
+      assertThat(output.getName()).as("Title should be present").isNotNull();
     }
 
     @Test
@@ -274,7 +273,7 @@ class PermissionControllerIntegrationTest
 
       PermissionOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should remain the same").isEqualTo(permissionId);
-      assertThat(output.getTitle()).as("Title should be updated").isEqualTo(updateInput.getTitle());
+      assertThat(output.getName()).as("Title should be updated").isEqualTo(updateInput.getName());
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
@@ -310,7 +309,7 @@ class PermissionControllerIntegrationTest
       ResponseEntity<PermissionOutputDTO> response = performPatch(permissionId, patchMap);
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTitle()).isEqualTo("PatchedPermission");
+      assertThat(response.getBody().getName()).isEqualTo("PatchedPermission");
       assertThat(response.getBody().getDescription()).isEqualTo("Patched description");
     }
 
@@ -345,9 +344,9 @@ class PermissionControllerIntegrationTest
 
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDescription()).isEqualTo("New description");
-      assertThat(response.getBody().getTitle())
+      assertThat(response.getBody().getName())
           .as("Name should remain unchanged")
-          .isEqualTo(initialPermission.getTitle());
+          .isEqualTo(initialPermission.getName());
       assertThat(response.getBody().getCreatedAt())
           .as("Resource should remain unchanged")
           .isEqualTo(initialPermission.getCreatedAt());
@@ -367,7 +366,7 @@ class PermissionControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTitle()).isEqualTo(initialPermission.getTitle());
+      assertThat(response.getBody().getName()).isEqualTo(initialPermission.getName());
       assertThat(response.getBody().getDescription()).isEqualTo(initialPermission.getDescription());
     }
 
@@ -512,7 +511,7 @@ class PermissionControllerIntegrationTest
     void shouldHandleSpecialCharactersInName() {
       PermissionInputDTO input = createValidInput();
       input.setName("permission_with_special_chars_äöü");
-      input.setTitle("Permission with special chars: äöü ß @#$%");
+      input.setName("Permission with special chars: äöü ß @#$%");
 
       ResponseEntity<PermissionOutputDTO> response = performCreate(input);
 
@@ -535,7 +534,7 @@ class PermissionControllerIntegrationTest
     @DisplayName("Should handle empty title as invalid")
     void shouldHandleEmptyTitle() {
       PermissionInputDTO input = createValidInput();
-      input.setTitle("");
+      input.setName("");
 
       ResponseEntity<PermissionOutputDTO> response = performCreate(input);
 

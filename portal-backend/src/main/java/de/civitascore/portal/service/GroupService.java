@@ -4,10 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Group_;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Objects;
@@ -33,41 +34,41 @@ public class GroupService extends BaseTenantAwareService<Group, String, GroupInp
 
   private void validateUniqueTitle(Group entity) {
     groupRepository
-        .findByTitleAndTenantId(entity.getTitle(), entity.getTenantId())
+        .findByNameAndTenantId(entity.getName(), entity.getTenantId())
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
-                    "Group", "title", entity.getTitle(), "tenant", entity.getTenantId());
+                    Group.class.getSimpleName(),
+                    Group_.NAME,
+                    entity.getName(),
+                    Group_.TENANT_ID,
+                    entity.getTenantId());
               }
             });
   }
 
   @Override
   protected Group postConvertToEntity(Group entity, GroupInputDTO input) {
+    // Use getReferenceById for ManyToOne relationships to avoid unnecessary SELECT queries
     if (input.getContactUserId() != null) {
-      entity.setContactUser(userService.findById(input.getContactUserId()));
+      entity.setContactUser(userService.getReferenceById(input.getContactUserId()));
     } else {
       entity.setContactUser(null);
     }
 
     if (input.getParentGroupId() != null) {
-      groupRepository.findById(input.getParentGroupId()).ifPresent(entity::setParentGroup);
+      entity.setParentGroup(groupRepository.getReferenceById(input.getParentGroupId()));
     } else {
       entity.setParentGroup(null);
     }
 
+    // For collections, use findAllById for efficient batch loading
     if (Objects.nonNull(input.getMemberIds())) {
       entity.setMembers(new HashSet<>());
       if (!input.getMemberIds().isEmpty()) {
-        input
-            .getMemberIds()
-            .forEach(
-                userId ->
-                    userService
-                        .getRepository()
-                        .findById(userId)
-                        .ifPresent(entity.getMembers()::add));
+        entity.setMembers(
+            new HashSet<>(userService.getRepository().findAllById(input.getMemberIds())));
       }
     }
 
@@ -75,14 +76,8 @@ public class GroupService extends BaseTenantAwareService<Group, String, GroupInp
     if (Objects.nonNull(input.getSystemRoleIds())) {
       entity.setSystemRoles(new HashSet<>());
       if (!input.getSystemRoleIds().isEmpty()) {
-        input
-            .getSystemRoleIds()
-            .forEach(
-                roleId ->
-                    roleService
-                        .getRepository()
-                        .findById(roleId)
-                        .ifPresent(entity.getSystemRoles()::add));
+        entity.setSystemRoles(
+            new HashSet<>(roleService.getRepository().findAllById(input.getSystemRoleIds())));
       }
     }
 
@@ -90,7 +85,7 @@ public class GroupService extends BaseTenantAwareService<Group, String, GroupInp
   }
 
   @Override
-  protected TenantAwareRepository<Group, String> getRepository() {
+  protected GroupRepository getRepository() {
     return groupRepository;
   }
 
@@ -101,7 +96,22 @@ public class GroupService extends BaseTenantAwareService<Group, String, GroupInp
 
   @Override
   protected String getEntityName() {
-    return "Group";
+    return Group.class.getSimpleName();
+  }
+
+  /**
+   * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
+   * Group along with contactUser, parentGroup, members and systemRoles in a single JOIN query,
+   * preventing N+1 query problems.
+   */
+  @Override
+  public Group findById(String id) {
+    preProcessLoad(id);
+    Group entity =
+        groupRepository
+            .findByIdAndTenantIdWithRelations(id, getCurrentTenantId())
+            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+    return postLoad(entity);
   }
 
   @Override

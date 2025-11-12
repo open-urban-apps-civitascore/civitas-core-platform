@@ -11,8 +11,6 @@ import lombok.EqualsAndHashCode;
 public class PermissionInputDTO extends BaseInputDTO {
   @NotBlank(message = "Name is required") private String name;
 
-  @NotBlank(message = "Title is required") private String title;
-
   private String description;
 
   @NotNull(message = "Permission type is required") private PermissionType permissionType;

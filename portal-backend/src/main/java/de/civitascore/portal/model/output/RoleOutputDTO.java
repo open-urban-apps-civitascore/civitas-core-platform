@@ -9,7 +9,7 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class RoleOutputDTO extends BaseOutputDTO {
-  private String title;
+  private String name;
   private String description;
   private RoleType roleType;
   private List<PermissionSummaryDTO> permissions;

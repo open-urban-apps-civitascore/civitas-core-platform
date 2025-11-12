@@ -8,6 +8,7 @@ import de.civitascore.portal.model.input.AssignmentInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -35,32 +36,48 @@ public class AssignmentService
 
   @Override
   protected String getEntityName() {
-    return "Assignment";
+    return Assignment.class.getSimpleName();
   }
 
   @Override
   protected Assignment postConvertToEntity(Assignment entity, AssignmentInputDTO input) {
+
     if (input.getGroupId() != null) {
-      entity.setGroup(groupService.findById(input.getGroupId()));
+      entity.setGroup(groupService.getReferenceById(input.getGroupId()));
     } else {
       entity.setGroup(null);
     }
 
     if (input.getRoleId() != null) {
-      entity.setRole(roleService.findById(input.getRoleId()));
+      entity.setRole(roleService.getReferenceById(input.getRoleId()));
     } else {
       entity.setRole(null);
     }
 
     if (input.getParentAssignmentId() != null) {
-      assignmentRepository
-          .findById(input.getParentAssignmentId())
-          .ifPresent(entity::setParentAssignment);
+      entity.setParentAssignment(
+          assignmentRepository.getReferenceById(input.getParentAssignmentId()));
     } else {
       entity.setParentAssignment(null);
     }
 
     return super.postConvertToEntity(entity, input);
+  }
+
+  /**
+   * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
+   * Assignment along with Group, Role, and ParentAssignment in a single JOIN query, preventing N+1
+   * query problems that would occur with lazy loading. Also ensures tenant isolation by filtering
+   * by tenant ID.
+   */
+  @Override
+  public Assignment findById(String id) {
+    preProcessLoad(id);
+    Assignment entity =
+        assignmentRepository
+            .findByIdAndTenantIdWithRelations(id, getCurrentTenantId())
+            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+    return postLoad(entity);
   }
 
   @Override

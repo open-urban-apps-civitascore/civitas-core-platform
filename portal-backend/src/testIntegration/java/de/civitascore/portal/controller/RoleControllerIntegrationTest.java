@@ -40,7 +40,6 @@ class RoleControllerIntegrationTest
   protected RoleInputDTO createValidInput() {
     RoleInputDTO input = new RoleInputDTO();
     input.setName("test_role_" + System.currentTimeMillis());
-    input.setTitle("Test Role " + System.currentTimeMillis());
     input.setDescription("A test role for integration testing");
     input.setRoleType(RoleType.GOVERNANCE);
     input.setIsDefault(false);
@@ -59,7 +58,7 @@ class RoleControllerIntegrationTest
   protected RoleInputDTO createUpdateInput() {
     RoleInputDTO input = new RoleInputDTO();
     input.setName("updated_role");
-    input.setTitle("Updated Role");
+    input.setName("Updated Role");
     input.setDescription("Updated description");
     input.setRoleType(RoleType.GOVERNANCE);
     input.setUserModifiable(true);
@@ -101,7 +100,7 @@ class RoleControllerIntegrationTest
 
       RoleOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
-      assertThat(output.getTitle()).as("Title should match input").isEqualTo(input.getTitle());
+      assertThat(output.getName()).as("Title should match input").isEqualTo(input.getName());
       assertThat(output.getRoleType())
           .as("Role type should match input")
           .isEqualTo(input.getRoleType());
@@ -138,7 +137,7 @@ class RoleControllerIntegrationTest
       for (RoleType type : RoleType.values()) {
         RoleInputDTO input = createValidInput();
         input.setName("role_" + type.name().toLowerCase() + "_" + System.currentTimeMillis());
-        input.setTitle("Role " + type.name());
+        input.setName("Role " + type.name());
         input.setRoleType(type);
 
         ResponseEntity<RoleOutputDTO> response = performCreate(input);
@@ -165,7 +164,7 @@ class RoleControllerIntegrationTest
     @DisplayName("Should fail to create duplicate role with same title in same tenant")
     void shouldFailToCreateDuplicateRole() {
       RoleInputDTO input = createValidInput();
-      input.setTitle("Unique Role Title");
+      input.setName("Unique Role Title");
 
       // Create first role
       ResponseEntity<RoleOutputDTO> firstResponse = performCreate(input);
@@ -210,7 +209,7 @@ class RoleControllerIntegrationTest
 
       RoleOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(roleId);
-      assertThat(output.getTitle()).as("Title should be present").isNotNull();
+      assertThat(output.getName()).as("Title should be present").isNotNull();
     }
 
     @Test
@@ -287,7 +286,7 @@ class RoleControllerIntegrationTest
 
       RoleOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should remain the same").isEqualTo(roleId);
-      assertThat(output.getTitle()).as("Title should be updated").isEqualTo(updateInput.getTitle());
+      assertThat(output.getName()).as("Title should be updated").isEqualTo(updateInput.getName());
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
@@ -323,7 +322,7 @@ class RoleControllerIntegrationTest
       ResponseEntity<RoleOutputDTO> response = performPatch(roleId, patchMap);
 
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTitle()).isEqualTo("PatchedRole");
+      assertThat(response.getBody().getName()).isEqualTo("PatchedRole");
       assertThat(response.getBody().getDescription()).isEqualTo("Patched description");
     }
 
@@ -358,9 +357,9 @@ class RoleControllerIntegrationTest
 
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDescription()).isEqualTo("New description");
-      assertThat(response.getBody().getTitle())
+      assertThat(response.getBody().getName())
           .as("Title should remain unchanged")
-          .isEqualTo(initialRole.getTitle());
+          .isEqualTo(initialRole.getName());
     }
 
     @Test
@@ -377,7 +376,7 @@ class RoleControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTitle()).isEqualTo(initialRole.getTitle());
+      assertThat(response.getBody().getName()).isEqualTo(initialRole.getName());
       assertThat(response.getBody().getDescription()).isEqualTo(initialRole.getDescription());
     }
 
@@ -536,7 +535,7 @@ class RoleControllerIntegrationTest
     void shouldHandleSpecialCharactersInName() {
       RoleInputDTO input = createValidInput();
       input.setName("role_with_special_chars_äöü");
-      input.setTitle("Role with special chars: äöü ß @#$%");
+      input.setName("Role with special chars: äöü ß @#$%");
 
       ResponseEntity<RoleOutputDTO> response = performCreate(input);
 
@@ -559,7 +558,7 @@ class RoleControllerIntegrationTest
     @DisplayName("Should handle empty title as invalid")
     void shouldHandleEmptyTitle() {
       RoleInputDTO input = createValidInput();
-      input.setTitle("");
+      input.setName("");
 
       ResponseEntity<RoleOutputDTO> response = performCreate(input);
 

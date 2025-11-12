@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.User;
+import de.civitascore.portal.model.entity.User_;
 import de.civitascore.portal.model.input.UserInputDTO;
 import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.repository.UserRepository;
@@ -33,7 +34,7 @@ public class UserService extends BaseTenantAwareService<User, String, UserInputD
 
   @Override
   protected String getEntityName() {
-    return "User";
+    return User.class.getSimpleName();
   }
 
   @Override
@@ -50,7 +51,11 @@ public class UserService extends BaseTenantAwareService<User, String, UserInputD
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
-                    "User", "email", entity.getEmail(), "tenant", entity.getTenantId());
+                    User.class.getSimpleName(),
+                    User_.EMAIL,
+                    entity.getEmail(),
+                    User_.TENANT_ID,
+                    entity.getTenantId());
               }
             });
   }

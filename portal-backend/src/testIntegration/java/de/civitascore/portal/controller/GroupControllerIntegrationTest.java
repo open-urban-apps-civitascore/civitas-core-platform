@@ -38,7 +38,7 @@ class GroupControllerIntegrationTest
   @Override
   protected GroupInputDTO createValidInput() {
     GroupInputDTO input = new GroupInputDTO();
-    input.setTitle("Test Group " + System.currentTimeMillis());
+    input.setName("Test Group " + System.currentTimeMillis());
     input.setDescription("A test group for integration testing");
     return input;
   }
@@ -53,7 +53,7 @@ class GroupControllerIntegrationTest
   @Override
   protected GroupInputDTO createUpdateInput() {
     GroupInputDTO input = new GroupInputDTO();
-    input.setTitle("Updated Group");
+    input.setName("Updated Group");
     input.setDescription("Updated description");
     return input;
   }
@@ -92,7 +92,7 @@ class GroupControllerIntegrationTest
 
       GroupOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
-      assertThat(output.getTitle()).as("Title should match input").isEqualTo(input.getTitle());
+      assertThat(output.getName()).as("Title should match input").isEqualTo(input.getName());
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo(input.getDescription());
@@ -131,7 +131,7 @@ class GroupControllerIntegrationTest
     @DisplayName("Should create group with contact user")
     void shouldCreateGroupWithContactUser() {
       GroupInputDTO input = createValidInput();
-      input.setTitle("Group with Contact");
+      input.setName("Group with Contact");
 
       ResponseEntity<GroupOutputDTO> response = performCreate(input);
 
@@ -143,7 +143,7 @@ class GroupControllerIntegrationTest
     @DisplayName("Should create group with empty members list")
     void shouldCreateGroupWithEmptyMembers() {
       GroupInputDTO input = createValidInput();
-      input.setTitle("Group with Empty Members");
+      input.setName("Group with Empty Members");
       input.setMemberIds(Collections.emptyList());
 
       ResponseEntity<GroupOutputDTO> response = performCreate(input);
@@ -157,7 +157,7 @@ class GroupControllerIntegrationTest
     @DisplayName("Should fail to create duplicate group with same title in same tenant")
     void shouldFailToCreateDuplicateGroup() {
       GroupInputDTO input = createValidInput();
-      input.setTitle("Unique Group Title");
+      input.setName("Unique Group Title");
 
       ResponseEntity<GroupOutputDTO> firstResponse = performCreate(input);
       assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -187,7 +187,7 @@ class GroupControllerIntegrationTest
 
       GroupOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(groupId);
-      assertThat(output.getTitle()).as("Title should be present").isNotNull();
+      assertThat(output.getName()).as("Title should be present").isNotNull();
     }
 
     @Test
@@ -249,7 +249,7 @@ class GroupControllerIntegrationTest
     @DisplayName("Should filter groups by title")
     void shouldFilterGroupsByTitle() {
       GroupInputDTO input = createValidInput();
-      input.setTitle("Searchable Group");
+      input.setName("Searchable Group");
       performCreate(input);
 
       Map<String, String> params = Map.of("title", "Searchable");
@@ -278,7 +278,7 @@ class GroupControllerIntegrationTest
 
       GroupOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should remain the same").isEqualTo(groupId);
-      assertThat(output.getTitle()).as("Title should be updated").isEqualTo(updateInput.getTitle());
+      assertThat(output.getName()).as("Title should be updated").isEqualTo(updateInput.getName());
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
@@ -314,7 +314,7 @@ class GroupControllerIntegrationTest
       ResponseEntity<GroupOutputDTO> response = performPatch(groupId, patchMap);
 
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTitle()).isEqualTo("PatchedGroup");
+      assertThat(response.getBody().getName()).isEqualTo("PatchedGroup");
       assertThat(response.getBody().getDescription()).isEqualTo("Patched description");
     }
 
@@ -349,9 +349,9 @@ class GroupControllerIntegrationTest
 
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDescription()).isEqualTo("New description");
-      assertThat(response.getBody().getTitle())
+      assertThat(response.getBody().getName())
           .as("Title should remain unchanged")
-          .isEqualTo(initialGroup.getTitle());
+          .isEqualTo(initialGroup.getName());
     }
 
     @Test
@@ -391,7 +391,7 @@ class GroupControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTitle()).isEqualTo(initialGroup.getTitle());
+      assertThat(response.getBody().getName()).isEqualTo(initialGroup.getName());
       assertThat(response.getBody().getDescription()).isEqualTo(initialGroup.getDescription());
     }
 
@@ -533,7 +533,7 @@ class GroupControllerIntegrationTest
       String parentId = createTestEntity();
 
       GroupInputDTO childInput = createValidInput();
-      childInput.setTitle("Child Group");
+      childInput.setName("Child Group");
       childInput.setParentGroupId(parentId);
 
       ResponseEntity<GroupOutputDTO> response = performCreate(childInput);
@@ -550,13 +550,13 @@ class GroupControllerIntegrationTest
     @DisplayName("Should handle group hierarchy correctly")
     void shouldHandleGroupHierarchyCorrectly() {
       GroupInputDTO parentInput = createValidInput();
-      parentInput.setTitle("Parent Group");
+      parentInput.setName("Parent Group");
       ResponseEntity<GroupOutputDTO> parentResponse = performCreate(parentInput);
       String parentId = parentResponse.getBody().getId();
       assertThat(parentResponse.getBody()).isNotNull();
 
       GroupInputDTO childInput = createValidInput();
-      childInput.setTitle("Child Group");
+      childInput.setName("Child Group");
       childInput.setParentGroupId(parentId);
       ResponseEntity<GroupOutputDTO> childResponse = performCreate(childInput);
 
@@ -619,12 +619,12 @@ class GroupControllerIntegrationTest
     @DisplayName("Should handle special characters in title")
     void shouldHandleSpecialCharactersInTitle() {
       GroupInputDTO input = createValidInput();
-      input.setTitle("Group with special chars: äöü ß @#$%");
+      input.setName("Group with special chars: äöü ß @#$%");
 
       ResponseEntity<GroupOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody().getTitle());
+      assertThat(response.getBody().getName());
       assertThat(response.getBody()).isNotNull();
     }
 
@@ -643,7 +643,7 @@ class GroupControllerIntegrationTest
     @DisplayName("Should handle empty title as invalid")
     void shouldHandleEmptyTitle() {
       GroupInputDTO input = createValidInput();
-      input.setTitle("");
+      input.setName("");
 
       ResponseEntity<GroupOutputDTO> response = performCreate(input);
 
@@ -656,7 +656,7 @@ class GroupControllerIntegrationTest
     @DisplayName("Should handle whitespace-only title as invalid")
     void shouldHandleWhitespaceOnlyTitle() {
       GroupInputDTO input = createValidInput();
-      input.setTitle("   ");
+      input.setName("   ");
 
       ResponseEntity<GroupOutputDTO> response = performCreate(input);
 

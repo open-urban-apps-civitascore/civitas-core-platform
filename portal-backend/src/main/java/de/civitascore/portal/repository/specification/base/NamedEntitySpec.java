@@ -6,8 +6,13 @@ import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 /**
  * Base specification for entities with title and description (NamedEntity).
  *
- * <p>Provides filtering by: - title: partial match (case-insensitive) - description: partial match
- * (case-insensitive) - q: search in title or description
+ * <p>Provides filtering by:
+ *
+ * <ul>
+ *   <li>title: partial match (case-insensitive)
+ *   <li>description: partial match (case-insensitive)
+ *   <li>q: search in title or description
+ * </ul>
  */
 @Spec(path = "title", params = "title", spec = LikeIgnoreCase.class)
 interface NamedEntityTitleSpec<T> extends TenantAwareSpec<T> {}

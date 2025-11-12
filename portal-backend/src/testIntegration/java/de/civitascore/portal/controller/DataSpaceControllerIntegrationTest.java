@@ -38,7 +38,6 @@ class DataSpaceControllerIntegrationTest
   protected DataSpaceInputDTO createValidInput() {
     DataSpaceInputDTO input = new DataSpaceInputDTO();
     input.setName("test_dataspace_" + System.currentTimeMillis());
-    input.setTitle("Test DataSpace " + System.currentTimeMillis());
     input.setDescription("A test dataspace for integration testing");
     input.setExternalId("ext-" + System.currentTimeMillis());
     return input;
@@ -55,7 +54,7 @@ class DataSpaceControllerIntegrationTest
   protected DataSpaceInputDTO createUpdateInput() {
     DataSpaceInputDTO input = new DataSpaceInputDTO();
     input.setName("updated_dataspace");
-    input.setTitle("Updated DataSpace");
+    input.setName("Updated DataSpace");
     input.setDescription("Updated description");
     return input;
   }
@@ -94,7 +93,7 @@ class DataSpaceControllerIntegrationTest
 
       DataSpaceOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
-      assertThat(output.getTitle()).as("Title should match input").isEqualTo(input.getTitle());
+      assertThat(output.getName()).as("Title should match input").isEqualTo(input.getName());
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo(input.getDescription());
@@ -134,7 +133,7 @@ class DataSpaceControllerIntegrationTest
       // Create child dataspace
       DataSpaceInputDTO childInput = createValidInput();
       childInput.setName("child_dataspace");
-      childInput.setTitle("Child DataSpace");
+      childInput.setName("Child DataSpace");
       childInput.setParentDataSpaceId(parentId);
 
       ResponseEntity<DataSpaceOutputDTO> response = performCreate(childInput);
@@ -186,7 +185,7 @@ class DataSpaceControllerIntegrationTest
 
       DataSpaceOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(dataSpaceId);
-      assertThat(output.getTitle()).as("Title should be present").isNotNull();
+      assertThat(output.getName()).as("Title should be present").isNotNull();
     }
 
     @Test
@@ -263,7 +262,7 @@ class DataSpaceControllerIntegrationTest
 
       DataSpaceOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should remain the same").isEqualTo(dataSpaceId);
-      assertThat(output.getTitle()).as("Title should be updated").isEqualTo(updateInput.getTitle());
+      assertThat(output.getName()).as("Title should be updated").isEqualTo(updateInput.getName());
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
@@ -299,7 +298,7 @@ class DataSpaceControllerIntegrationTest
       ResponseEntity<DataSpaceOutputDTO> response = performPatch(dataSpaceId, patchMap);
 
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTitle()).isEqualTo("PatchedDataSpace");
+      assertThat(response.getBody().getName()).isEqualTo("PatchedDataSpace");
       assertThat(response.getBody().getDescription()).isEqualTo("Patched description");
     }
 
@@ -334,9 +333,9 @@ class DataSpaceControllerIntegrationTest
 
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDescription()).isEqualTo("New description");
-      assertThat(response.getBody().getTitle())
+      assertThat(response.getBody().getName())
           .as("Title should remain unchanged")
-          .isEqualTo(initialDataSpace.getTitle());
+          .isEqualTo(initialDataSpace.getName());
     }
 
     @Test
@@ -376,7 +375,7 @@ class DataSpaceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTitle()).isEqualTo(initialDataSpace.getTitle());
+      assertThat(response.getBody().getName()).isEqualTo(initialDataSpace.getName());
       assertThat(response.getBody().getDescription()).isEqualTo(initialDataSpace.getDescription());
     }
 
@@ -478,7 +477,7 @@ class DataSpaceControllerIntegrationTest
       // Create parent dataspace
       DataSpaceInputDTO parentInput = createValidInput();
       parentInput.setName("parent_dataspace");
-      parentInput.setTitle("Parent DataSpace");
+      parentInput.setName("Parent DataSpace");
       ResponseEntity<DataSpaceOutputDTO> parentResponse = performCreate(parentInput);
       assertThat(parentResponse.getBody()).isNotNull();
       String parentId = parentResponse.getBody().getId();
@@ -486,7 +485,7 @@ class DataSpaceControllerIntegrationTest
       // Create child dataspace
       DataSpaceInputDTO childInput = createValidInput();
       childInput.setName("child_dataspace");
-      childInput.setTitle("Child DataSpace");
+      childInput.setName("Child DataSpace");
       childInput.setParentDataSpaceId(parentId);
       ResponseEntity<DataSpaceOutputDTO> childResponse = performCreate(childInput);
 
@@ -515,7 +514,7 @@ class DataSpaceControllerIntegrationTest
     void shouldHandleSpecialCharactersInName() {
       DataSpaceInputDTO input = createValidInput();
       input.setName("dataspace_with_special_äöü");
-      input.setTitle("DataSpace with special chars: äöü ß @#$%");
+      input.setName("DataSpace with special chars: äöü ß @#$%");
 
       ResponseEntity<DataSpaceOutputDTO> response = performCreate(input);
 

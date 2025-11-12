@@ -2,11 +2,10 @@ package de.civitascore.portal.model.output.summary;
 
 import de.civitascore.portal.model.embedded.PermissionType;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Data
-public class PermissionSummaryDTO {
-  private String id;
-
-  private String title;
+@EqualsAndHashCode(callSuper = true)
+public class PermissionSummaryDTO extends BaseSummaryDTO {
   private PermissionType permissionType;
 }

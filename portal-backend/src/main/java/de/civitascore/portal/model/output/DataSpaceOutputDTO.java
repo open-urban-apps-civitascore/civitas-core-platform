@@ -9,7 +9,7 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataSpaceOutputDTO extends BaseOutputDTO {
-  private String title;
+  private String name;
   private String description;
   private UserSummaryDTO owner;
   private DataSpaceSummaryDTO parentDataSpace;

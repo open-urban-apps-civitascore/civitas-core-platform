@@ -4,10 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSet_;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Objects;
@@ -37,28 +39,39 @@ public class DataSetService extends BaseTenantAwareService<DataSet, String, Data
 
   @Override
   protected String getEntityName() {
-    return "DataSet";
+    return DataSet.class.getSimpleName();
+  }
+
+  /**
+   * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
+   * DataSet along with owner and dataSpaces in a single JOIN query, preventing N+1 query problems
+   * that would occur with lazy loading.
+   */
+  @Override
+  public DataSet findById(String id) {
+    preProcessLoad(id);
+    DataSet entity =
+        dataSetRepository
+            .findByIdAndTenantIdWithRelations(id, getCurrentTenantId())
+            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+    return postLoad(entity);
   }
 
   @Override
   protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
+    // Use getReferenceById for ManyToOne relationships to avoid unnecessary SELECT queries
     if (input.getOwnerUserId() != null) {
-      entity.setOwner(userService.findById(input.getOwnerUserId()));
+      entity.setOwner(userService.getReferenceById(input.getOwnerUserId()));
     } else {
       entity.setOwner(null);
     }
 
+    // Use findAllById for efficient batch loading of dataSpaces instead of N+1 queries
     if (Objects.nonNull(input.getDataSpaceIds())) {
       entity.setDataSpaces(new HashSet<>());
       if (!input.getDataSpaceIds().isEmpty()) {
-        input
-            .getDataSpaceIds()
-            .forEach(
-                dataSpaceId ->
-                    dataSpaceService
-                        .getRepository()
-                        .findById(dataSpaceId)
-                        .ifPresent(entity.getDataSpaces()::add));
+        entity.setDataSpaces(
+            new HashSet<>(dataSpaceService.getRepository().findAllById(input.getDataSpaceIds())));
       }
     }
 
@@ -73,12 +86,16 @@ public class DataSetService extends BaseTenantAwareService<DataSet, String, Data
 
   private void validateUniqueTitle(DataSet entity) {
     dataSetRepository
-        .findByTitleAndTenantId(entity.getTitle(), entity.getTenantId())
+        .findByNameAndTenantId(entity.getName(), entity.getTenantId())
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
-                    "DataSet", "title", entity.getTitle(), "tenant", entity.getTenantId());
+                    DataSet.class.getSimpleName(),
+                    DataSet_.NAME,
+                    entity.getName(),
+                    DataSet_.TENANT_ID,
+                    entity.getTenantId());
               }
             });
   }
@@ -92,10 +109,6 @@ public class DataSetService extends BaseTenantAwareService<DataSet, String, Data
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
             "name", "Name cannot be null or blank", existingEntity.getId().toString());
-      }
-      if (jsonNode.has("title") && StringUtils.isBlank(jsonNode.get("title").asText())) {
-        throw new InvalidInputException(
-            "title", "Title cannot be null or blank", existingEntity.getId().toString());
       }
     } catch (InvalidInputException e) {
       throw e;

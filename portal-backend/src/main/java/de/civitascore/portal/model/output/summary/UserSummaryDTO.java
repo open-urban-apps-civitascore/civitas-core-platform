@@ -1,11 +1,8 @@
 package de.civitascore.portal.model.output.summary;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Data
-public class UserSummaryDTO {
-  private String id;
-  private String firstName;
-  private String lastName;
-  private String email;
-}
+@EqualsAndHashCode(callSuper = true)
+public class UserSummaryDTO extends BaseSummaryDTO {}

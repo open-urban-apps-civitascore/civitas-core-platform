@@ -22,7 +22,7 @@ import lombok.Setter;
     uniqueConstraints =
         @UniqueConstraint(
             name = "uk_dataset_name_tenant",
-            columnNames = {"title", "tenant_id"}),
+            columnNames = {"name", "tenant_id"}),
     indexes = {
       @Index(name = "idx_dataset_owner", columnList = "owner_user_id"),
       @Index(name = "idx_dataset_external_id", columnList = "external_id")

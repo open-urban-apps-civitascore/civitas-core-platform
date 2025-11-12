@@ -12,8 +12,6 @@ import lombok.EqualsAndHashCode;
 public class RoleInputDTO extends BaseInputDTO {
   @NotBlank(message = "Name is required") private String name;
 
-  @NotBlank(message = "Title is required") private String title;
-
   private String description;
 
   @NotNull(message = "Role type is required") private RoleType roleType;

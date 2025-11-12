@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.DtoMapper;
 import de.civitascore.portal.mapper.TenantMapper;
 import de.civitascore.portal.model.entity.Tenant;
+import de.civitascore.portal.model.entity.Tenant_;
 import de.civitascore.portal.model.input.TenantInputDTO;
 import de.civitascore.portal.repository.BaseRepository;
 import de.civitascore.portal.repository.TenantRepository;
@@ -25,7 +26,7 @@ public class TenantService extends BaseService<Tenant, String, TenantInputDTO> {
 
   @Override
   protected String getEntityName() {
-    return "Tenant";
+    return Tenant.class.getSimpleName();
   }
 
   protected DtoMapper<TenantInputDTO, ?, Tenant> getMapper() {
@@ -62,7 +63,8 @@ public class TenantService extends BaseService<Tenant, String, TenantInputDTO> {
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException("Tenant", "name", entity.getName());
+                throw new UniqueConstraintViolationException(
+                    Tenant.class.getSimpleName(), Tenant_.NAME, entity.getName());
               }
             });
   }

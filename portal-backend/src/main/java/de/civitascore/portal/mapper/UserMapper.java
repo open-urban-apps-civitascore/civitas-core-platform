@@ -30,6 +30,9 @@ public interface UserMapper extends DtoMapper<UserInputDTO, UserOutputDTO, User>
   @Override
   UserInputDTO toInput(User entity);
 
+  @Mapping(
+      target = "name",
+      expression = "java(entity.getFirstName() + \" \" + entity.getLastName())")
   UserSummaryDTO toSummary(User entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)

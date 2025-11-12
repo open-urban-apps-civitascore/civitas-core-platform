@@ -23,7 +23,7 @@ import lombok.Setter;
     uniqueConstraints =
         @UniqueConstraint(
             name = "uk_group_name_tenant",
-            columnNames = {"title", "tenant_id"}),
+            columnNames = {"name", "tenant_id"}),
     indexes = {@Index(name = "idx_group_contact", columnList = "contact_user_id")})
 @Getter
 @Setter
