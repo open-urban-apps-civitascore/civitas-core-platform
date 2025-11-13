@@ -56,8 +56,8 @@ export const mapFormUserToApiData = (formData: UserFormData) => {
 
   const userData = {
     ...parsed,
-    authority: parsed.authority
-      ? { id: parsed.authority, department: parsed.department ? { id: parsed.department } : null }
+    authority: !!parsed.authority
+      ? { id: parsed.authority, department: !!parsed.department ? { id: parsed.department } : null }
       : null,
     positionDescription: parsed.positionDescription || null,
     displayName: `${parsed.firstName} ${parsed.lastName}`,

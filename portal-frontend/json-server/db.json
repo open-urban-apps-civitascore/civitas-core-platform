@@ -2801,7 +2801,7 @@
       },
       "groups": ["1", "2", "3", "zQe8zBc"],
       "phone": "+49 75 5576070",
-      "active": [],
+      "active": true,
       "position": "Bauingenieur für Kanalisationsbau",
       "positionDescription": "Bauingenieur für Kanalisationsbau",
       "roles": ["1", "6"],

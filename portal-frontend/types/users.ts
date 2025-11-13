@@ -90,8 +90,8 @@ export const UserFormSchema = z.object({
   email: z.email({
     message: 'common.errors.invalidEmail',
   }),
-  authority: z.string().nullable(),
-  department: z.string().nullable(),
+  authority: z.string(),
+  department: z.string(),
   phone: PhoneSchema,
   active: z.boolean(),
   positionDescription: z
@@ -99,8 +99,7 @@ export const UserFormSchema = z.object({
     .min(10, {
       message: 'common.errors.atLeast10',
     })
-    .or(z.literal(''))
-    .nullable(),
+    .or(z.literal('')),
 })
 
 export type UserFormData = z.infer<typeof UserFormSchema>
