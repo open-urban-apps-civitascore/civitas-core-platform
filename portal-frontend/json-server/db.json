@@ -6009,69 +6009,93 @@
   "permissions": [
     {
       "id": "1",
-      "name": "Naturschutz",
-      "description": "Der DataSpace enthält Grundlagendaten, Klimaanalysen, Planungshinweise und weitere Informationen zum Naturschutz in der Region.",
-      "protected": true
+      "title": "Permission 1",
+      "category": { "id": "1", "title": "Category 1" },
+      "type": "system"
     },
     {
       "id": "2",
-      "name": "Verkehrsplanung",
-      "description": "Daten zur städtischen Verkehrsplanung, Mobilitätskonzepte und Verkehrsanalysen für eine nachhaltige Stadtentwicklung. ",
-      "protected": true
+      "title": "Permission 2",
+      "category": { "id": "2", "title": "Category 2" },
+      "type": "system"
     },
     {
       "id": "3",
-      "name": "Stadtentwicklung",
-      "description": "Planungsdaten und Konzepte für die zukünftige Entwicklung der Stadt, einschließlich Bauprojekte und Flächennutzung.",
-      "protected": true
+      "title": "Permission 3",
+      "category": { "id": "3", "title": "Category 3" },
+      "type": "system"
     },
     {
       "id": "4",
-      "name": "Umweltmonitoring",
-      "description": "Messdaten zur Luftqualität, Lärmbelastung und anderen Umweltparametern zur Überwachung der städtischen Umweltsituation.",
-      "protected": false
+      "title": "Permission 4",
+      "category": { "id": "4", "title": "Category 4" },
+      "type": "system"
     },
     {
       "id": "5",
-      "name": "Bürgerdienste",
-      "description": "Informationen und Daten zur Bereitstellung von Bürgerdiensten und zur Verbesserung der Verwaltungsabläufe.",
-      "protected": true
+      "title": "Permission 5",
+      "category": { "id": "5", "title": "Category 5" },
+      "type": "system"
     },
     {
       "id": "6",
-      "name": "Energiemanagement",
-      "description": "Energieverbrauchsdaten und -analysen für öffentliche Gebäude und Infrastruktur zur Optimierung der Energieeffizienz.",
-      "protected": false
+      "title": "Permission 6",
+      "category": { "id": "1", "title": "Category 1" },
+      "type": "data"
     },
     {
       "id": "7",
-      "name": "Wasserwirtschaft",
-      "description": "Daten zur Wasserversorgung, Abwassermanagement und Hochwasserschutz in der Kommune.",
-      "protected": true
+      "title": "Permission 7",
+      "category": { "id": "2", "title": "Category 2" },
+      "type": "data"
     },
     {
       "id": "8",
-      "name": "Bildungswesen",
-      "description": "Bildungsstatistiken, Schulentwicklungsplanung und Ressourcenverwaltung für städtische Bildungseinrichtungen.",
-      "protected": false
+      "title": "Permission 8",
+      "category": { "id": "3", "title": "Category 3" },
+      "type": "data"
     },
     {
       "id": "9",
-      "name": "Gesundheitsdaten",
-      "description": "Aggregierte Gesundheitsstatistiken und Informationen zur öffentlichen Gesundheitsversorgung.",
-      "protected": true
+      "title": "Permission 9",
+      "category": { "id": "4", "title": "Category 4" },
+      "type": "data"
     },
     {
       "id": "10",
-      "name": "Tourismus",
-      "description": "Tourismuszahlen, Besucherstatistiken und Daten zur touristischen Infrastruktur der Stadt.",
-      "protected": false
+      "title": "Permission 10",
+      "category": { "id": "5", "title": "Category 5" },
+      "type": "data"
     },
     {
-      "id": "1762358504364",
-      "name": "test",
-      "description": "test 12355",
-      "protected": false
+      "id": "11",
+      "title": "Permission 11",
+      "category": { "id": "1", "title": "Category 1" },
+      "type": "governance"
+    },
+    {
+      "id": "12",
+      "title": "Permission 12",
+      "category": { "id": "2", "title": "Category 2" },
+      "type": "governance"
+    },
+    {
+      "id": "13",
+      "title": "Permission 13",
+      "category": { "id": "3", "title": "Category 3" },
+      "type": "governance"
+    },
+    {
+      "id": "14",
+      "title": "Permission 14",
+      "category": { "id": "4", "title": "Category 4" },
+      "type": "governance"
+    },
+    {
+      "id": "15",
+      "title": "Permission 15",
+      "category": { "id": "5", "title": "Category 5" },
+      "type": "governance"
     }
   ],
   "roles": [

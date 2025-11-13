@@ -1,0 +1,6 @@
+{
+  "prettier.configPath": "portal-frontend/.prettierrc",
+  "prettier.ignorePath": "portal-frontend/.prettierignore",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true
+}
