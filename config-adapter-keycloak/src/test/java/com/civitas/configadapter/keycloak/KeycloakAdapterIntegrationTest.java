@@ -7,14 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
-import java.util.UUID;
+import java.util.*;
 
 import org.junit.jupiter.api.*;
 import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.resource.RoleResource;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
@@ -326,6 +323,60 @@ class KeycloakAdapterIntegrationTest {
 
     @Test
     @Order(7)
+    void shouldCreateRoleWithNestedRole() {
+        // Given - create test realm first
+        RealmRepresentation realmRep = new RealmRepresentation();
+        realmRep.setRealm("role-nested-create-realm");
+        realmRep.setEnabled(true);
+        keycloakClient.realms().create(realmRep);
+
+        RoleRepresentation nestedRoleRep = new RoleRepresentation();
+        nestedRoleRep.setName("nestedtestrole");
+
+        keycloakClient.realm("role-nested-create-realm").roles().create(nestedRoleRep);
+
+        RoleRepresentation roleRep = new RoleRepresentation();
+        roleRep.setName("testrole");
+        roleRep.setComposite(true);
+        RoleRepresentation.Composites composites = new RoleRepresentation.Composites();
+        composites.setRealm(Set.of("nestedtestrole"));
+        roleRep.setComposites(composites);
+
+        ConfigEvent event = createConfigEvent(
+                "realms/role-nested-create-realm/roles/testrole",
+                "role",
+                "CREATE",
+                roleRep
+        );
+
+        // When
+        adapter.processConfigEvent(Topics.ROLE_CREATED, event);
+
+        // Then
+        List<RoleRepresentation> roles = keycloakClient.realm("role-nested-create-realm")
+                .roles().list();
+
+        RoleRepresentation addedRole = roles.stream()
+                .filter(role -> role.getName().equals("testrole"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No added roles found"));
+        assertTrue(addedRole.isComposite(), "role 'testrole' is not marked as composite.");
+        RoleResource roleResource = keycloakClient.realm("role-nested-create-realm")
+                .roles()
+                .get("testrole");
+        Set<RoleRepresentation> compositeRoles = roleResource.getRealmRoleComposites();
+        assertEquals(1, compositeRoles.size());
+        boolean roleFound = compositeRoles.stream()
+                .anyMatch(role -> role.getName().equals("nestedtestrole"));
+        assertTrue(roleFound, "No nested roles found");
+
+        // Verify success result
+        assertEquals(1, eventPublisher.getPublishedEvents().size());
+        assertEquals("SUCCESS", eventPublisher.getPublishedEvents().getFirst().getExtension("status"));
+    }
+
+    @Test
+    @Order(8)
     void shouldUpdateRole() {
         // Given - create test realm first
         RealmRepresentation realmRep = new RealmRepresentation();
@@ -368,7 +419,7 @@ class KeycloakAdapterIntegrationTest {
     }
 
     @Test
-    @Order(8)
+    @Order(9)
     void shouldDeleteRole() {
         // Given - create test realm first
         RealmRepresentation realmRep = new RealmRepresentation();
@@ -405,7 +456,7 @@ class KeycloakAdapterIntegrationTest {
     }
 
     @Test
-    @Order(9)
+    @Order(10)
     void shouldPublishErrorResultOnFailure() {
         // Given - try to update non-existent realm
         RealmRepresentation realmRep = new RealmRepresentation();
