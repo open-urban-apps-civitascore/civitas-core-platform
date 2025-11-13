@@ -59,7 +59,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
   const router = useRouter()
-  const [defaultGroupData, setDefaultGroupData] = useState(groupData)
+  const [defaultFormData, setDefaultFormData] = useState(mapGroupToBaseFormData(groupData))
   const [isLoading, setIsLoading] = useState(false)
   const [isContactListOpen, setIsContactListOpen] = useState(false)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
@@ -70,7 +70,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   const form = useForm<GroupBaseFormData>({
     resolver: zodResolver(GroupBaseFormDataSchema),
-    defaultValues: { ...mapGroupToBaseFormData(defaultGroupData) },
+    defaultValues: defaultFormData,
   })
 
   const resetAutocomplete = (contact: Contact | null) => {
@@ -80,7 +80,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   }
 
   useEffect(() => {
-    form.setValue('contact', selectedContact?.id || null)
+    form.setValue('contact', selectedContact?.id || '')
   }, [selectedContact, form])
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           email: contactData.email,
         }
         setSelectedContact(contact)
-        form.reset(mapGroupToBaseFormData(defaultGroupData))
+        form.reset(defaultFormData)
         resetAutocomplete(contact)
       } catch (error) {
         console.error('Error fetching contact data:', error)
@@ -107,18 +107,18 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
       }
     }
 
-    if (defaultGroupData.contact) {
-      getInitialContact(defaultGroupData.contact.id)
+    if (defaultFormData.contact) {
+      getInitialContact(defaultFormData.contact)
     } else {
-      form.reset(mapGroupToBaseFormData(defaultGroupData))
+      form.reset(defaultFormData)
     }
-  }, [defaultGroupData, form])
+  }, [defaultFormData, form])
 
   useEffect(() => {
     if (debouncedInput.trim().length >= MIN_LENGTH) {
       getContacts(debouncedInput)
     } else {
-      form.setValue('contact', null)
+      form.setValue('contact', '')
       setSelectedContact(null)
       setContacts([])
       setContactListItems([])
@@ -156,13 +156,13 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
       const updateGroupData: UpdateGroupData = {
         ...formData,
         contact: selectedContact ? { id: selectedContact.id, displayName: selectedContact.displayName } : null,
-        parent: defaultGroupData.parent,
-        roles: defaultGroupData.roles,
-        subgroups: defaultGroupData.subgroups,
-        users: defaultGroupData.users,
+        parent: groupData.parent,
+        roles: groupData.roles,
+        subgroups: groupData.subgroups,
+        users: groupData.users,
       }
       await updateGroup(updateGroupData)
-      setDefaultGroupData(updateGroupData)
+      setDefaultFormData(formData)
       form.reset({ ...mapGroupToBaseFormData(updateGroupData) })
     } catch (error) {
       console.error('An error occurred while updating the group: ', error)
@@ -284,7 +284,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
         <ActionButtons
           onCancelClick={() => router.push('/groups')}
           confirmButtonType="submit"
-          isConfirmButtonDisabled={!form.formState.isDirty && form.getValues().contact === defaultGroupData.contact?.id}
+          isConfirmButtonDisabled={!form.formState.isDirty && form.getValues().contact === defaultFormData.contact}
         />
       </form>
     </Form>

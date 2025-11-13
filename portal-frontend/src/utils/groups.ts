@@ -14,5 +14,5 @@ export const mapGroupToBaseFormData = (groupData: Group): GroupBaseFormData => (
   id: groupData.id,
   title: groupData.title,
   description: groupData.description || '',
-  contact: groupData.contact?.id || null,
+  contact: groupData.contact?.id || '',
 })

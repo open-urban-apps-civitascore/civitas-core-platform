@@ -25,7 +25,7 @@ export const GroupBaseFormDataSchema = z.object({
     message: 'common.errors.atLeast2',
   }),
   description: z.string(),
-  contact: z.string().nullable(),
+  contact: z.string(),
 })
 
 export type GroupBaseFormData = z.infer<typeof GroupBaseFormDataSchema>
