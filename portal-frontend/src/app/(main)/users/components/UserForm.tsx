@@ -136,8 +136,11 @@ export const UserForm = (props: UserFormProps) => {
     const mappedData: UserResponse = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
-    await createUser(createUserData)
-    router.push('/users')
+    const newUser = await createUser(createUserData)
+    if (!newUser) {
+      throw new Error('An error occurred while creating the user')
+    }
+    router.push(`/users/${newUser.id}`)
   }
 
   const handleUpdateUser = async (formData: UserFormData) => {

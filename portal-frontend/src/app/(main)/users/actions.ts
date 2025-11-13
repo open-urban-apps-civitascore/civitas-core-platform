@@ -1,6 +1,6 @@
 'use server'
 
-import { CreateUserData, UpdateUserData } from '@/types/users'
+import { CreateUserData, UpdateUserData, UserResponse } from '@/types/users'
 
 const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
@@ -20,8 +20,9 @@ export const createUser = async (userData: CreateUserData) => {
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`)
     }
-    const data = await response.json()
+    const data: UserResponse = await response.json()
     console.log('successfully created user:', data)
+    return data
   } catch (error) {
     console.error('An error occurred while creating new user:', error)
   }

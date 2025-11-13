@@ -67,7 +67,8 @@ export type TitleSchemaType = z.infer<typeof TitleSchema>
 
 export const PhoneSchema = z.string().superRefine((value, ctx) => {
   const phoneNumber = parsePhoneNumberFromString(value, 'DE')
-  if (!phoneNumber || !phoneNumber.isValid()) {
+  if (!phoneNumber) return z.NEVER
+  if (!phoneNumber?.isValid()) {
     ctx.addIssue({
       code: 'custom',
       message: 'common.errors.invalidPhone',
