@@ -12,7 +12,7 @@ import lombok.EqualsAndHashCode;
 public class GroupOutputDTO extends BaseOutputDTO {
   private String name;
   private String description;
-  private String tenantId;
+
   private UserSummaryDTO contactUser;
   private GroupSummaryDTO parentGroup;
   private List<GroupSummaryDTO> childGroups;

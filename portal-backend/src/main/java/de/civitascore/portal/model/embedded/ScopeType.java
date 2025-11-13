@@ -1,7 +1,7 @@
 package de.civitascore.portal.model.embedded;
 
 /**
- * Defines the hierarchical scope level for assignments: TENANT → DATASPACE → DATASET.
+ * Defines the hierarchical scope level for assignments: DATASPACE → DATASET.
  *
  * <p>DATASPACE and DATASET scopes require a scope ID to identify the target entity.
  *

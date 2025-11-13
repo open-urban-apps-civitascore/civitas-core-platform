@@ -5,7 +5,7 @@ import de.civitascore.portal.model.input.PermissionInputDTO;
 import de.civitascore.portal.model.output.PermissionOutputDTO;
 import de.civitascore.portal.model.output.assembler.PermissionAssembler;
 import de.civitascore.portal.repository.specification.PermissionSpec;
-import de.civitascore.portal.service.BaseTenantAwareService;
+import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.service.PermissionService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -60,7 +60,7 @@ public class PermissionController
   }
 
   @Override
-  protected BaseTenantAwareService<Permission, PermissionInputDTO> getService() {
+  protected BaseService<Permission, String, PermissionInputDTO> getService() {
     return permissionService;
   }
 

@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSpaceMapper;
 import de.civitascore.portal.model.entity.DataSpace;
-import de.civitascore.portal.model.entity.DataSpace_;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.repository.DataSpaceRepository;
-import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -17,7 +15,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class DataSpaceService extends BaseTenantAwareService<DataSpace, DataSpaceInputDTO> {
+public class DataSpaceService extends BaseService<DataSpace, String, DataSpaceInputDTO> {
 
   private final DataSpaceRepository dataSpaceRepository;
   private final DataSpaceMapper dataSpaceMapper;
@@ -25,7 +23,7 @@ public class DataSpaceService extends BaseTenantAwareService<DataSpace, DataSpac
   private final ObjectMapper objectMapper;
 
   @Override
-  protected TenantAwareRepository<DataSpace, String> getRepository() {
+  protected DataSpaceRepository getRepository() {
     return dataSpaceRepository;
   }
 
@@ -49,7 +47,7 @@ public class DataSpaceService extends BaseTenantAwareService<DataSpace, DataSpac
     preProcessLoad(id);
     DataSpace entity =
         dataSpaceRepository
-            .findByIdAndTenantIdWithRelations(id, getCurrentTenantId())
+            .findByIdWithRelations(id)
             .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
     return postLoad(entity);
   }
@@ -64,7 +62,7 @@ public class DataSpaceService extends BaseTenantAwareService<DataSpace, DataSpac
     }
 
     if (input.getParentDataSpaceId() != null) {
-      entity.setParentDataSpace(dataSpaceRepository.getReferenceById(input.getParentDataSpaceId()));
+      entity.setParentDataSpace(getReferenceById(input.getParentDataSpaceId()));
     } else {
       entity.setParentDataSpace(null);
     }
@@ -80,16 +78,12 @@ public class DataSpaceService extends BaseTenantAwareService<DataSpace, DataSpac
 
   private void validateUniqueName(DataSpace entity) {
     dataSpaceRepository
-        .findByNameAndTenantId(entity.getName(), entity.getTenantId())
+        .findByName(entity.getName())
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
-                    DataSpace.class.getSimpleName(),
-                    DataSpace_.NAME,
-                    entity.getName(),
-                    DataSpace_.TENANT_ID,
-                    entity.getTenantId());
+                    DataSpace.class.getSimpleName(), "name", entity.getName());
               }
             });
   }
@@ -103,9 +97,8 @@ public class DataSpaceService extends BaseTenantAwareService<DataSpace, DataSpac
 
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-            "name", "Name cannot be null or blank", existingEntity.getId().toString());
+            "name", "Name cannot be null or blank", existingEntity.getId());
       }
-
     } catch (InvalidInputException e) {
       throw e;
     } catch (Exception e) {

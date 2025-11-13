@@ -1,5 +1,6 @@
 package de.civitascore.portal.repository.specification.base;
 
+import de.civitascore.portal.model.entity.base.NamedEntity;
 import net.kaczmarzyk.spring.data.jpa.domain.LikeIgnoreCase;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 
@@ -15,18 +16,18 @@ import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
  * </ul>
  */
 @Spec(path = "name", params = "name", spec = LikeIgnoreCase.class)
-interface NamedEntityNameSpec<T> extends TenantAwareSpec<T> {}
+interface NamedEntityNameSpec<T> extends BaseSpec<T> {}
 
 @Spec(path = "description", params = "description", spec = LikeIgnoreCase.class)
-interface NamedEntityDescriptionSpec<T> extends TenantAwareSpec<T> {}
+interface NamedEntityDescriptionSpec<T> extends BaseSpec<T> {}
 
 @Spec(path = "name", params = "q", spec = LikeIgnoreCase.class)
-interface NamedEntityNameSearchSpec<T> extends TenantAwareSpec<T> {}
+interface NamedEntityNameSearchSpec<T> extends BaseSpec<T> {}
 
 @Spec(path = "description", params = "q", spec = LikeIgnoreCase.class)
-interface NamedEntityDescriptionSearchSpec<T> extends TenantAwareSpec<T> {}
+interface NamedEntityDescriptionSearchSpec<T> extends BaseSpec<T> {}
 
-public interface NamedEntitySpec<T>
+public interface NamedEntitySpec<T extends NamedEntity>
     extends NamedEntityNameSpec<T>,
         NamedEntityDescriptionSpec<T>,
         NamedEntityNameSearchSpec<T>,

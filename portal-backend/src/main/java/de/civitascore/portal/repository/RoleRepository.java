@@ -11,15 +11,13 @@ import org.springframework.stereotype.Repository;
 public interface RoleRepository extends NamedEntityRepository<Role, String> {
 
   /**
-   * Find a role by ID and tenant ID with permissions eagerly fetched. This prevents N+1 query
-   * problems when loading roles with their permissions.
+   * Find a role by ID with permissions eagerly fetched. This prevents N+1 query problems when
+   * loading roles with their permissions.
    *
    * @param id the role ID
-   * @param tenantId the tenant ID
    * @return the role with eagerly fetched permissions
    */
   @EntityGraph(attributePaths = {"permissions"})
-  @Query("SELECT r FROM Role r WHERE r.id = :id AND r.tenantId = :tenantId")
-  Optional<Role> findByIdAndTenantIdWithRelations(
-      @Param("id") String id, @Param("tenantId") String tenantId);
+  @Query("SELECT r FROM Role r WHERE r.id = :id")
+  Optional<Role> findByIdWithRelations(@Param("id") String id);
 }

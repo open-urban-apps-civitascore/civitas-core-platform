@@ -14,6 +14,6 @@ public class UserOutputDTO extends BaseOutputDTO {
   private String phone;
   private String externalId;
   private Boolean active;
-  private String tenantId;
+
   private List<GroupSummaryDTO> groups;
 }

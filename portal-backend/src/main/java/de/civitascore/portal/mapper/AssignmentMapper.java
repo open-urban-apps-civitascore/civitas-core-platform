@@ -17,7 +17,6 @@ import org.mapstruct.ReportingPolicy;
 public interface AssignmentMapper
     extends DtoMapper<AssignmentInputDTO, AssignmentOutputDTO, Assignment> {
 
-  @Mapping(target = "tenantId", ignore = true)
   @Mapping(target = "group", ignore = true)
   @Mapping(target = "role", ignore = true)
   @Mapping(target = "assignmentType", ignore = true)

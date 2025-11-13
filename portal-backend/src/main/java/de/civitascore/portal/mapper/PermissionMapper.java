@@ -6,7 +6,6 @@ import de.civitascore.portal.model.output.PermissionOutputDTO;
 import de.civitascore.portal.model.output.summary.PermissionSummaryDTO;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 import org.mapstruct.ReportingPolicy;
@@ -18,7 +17,6 @@ import org.mapstruct.ReportingPolicy;
 public interface PermissionMapper
     extends DtoMapper<PermissionInputDTO, PermissionOutputDTO, Permission> {
 
-  @Mapping(target = "tenantId", ignore = true)
   @Override
   Permission toEntity(PermissionInputDTO input);
 

@@ -18,7 +18,7 @@ import org.mapstruct.ReportingPolicy;
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface DataSpaceMapper
     extends DtoMapper<DataSpaceInputDTO, DataSpaceOutputDTO, DataSpace> {
-  @Mapping(target = "tenantId", ignore = true)
+
   @Mapping(target = "owner", ignore = true)
   @Mapping(target = "dataSets", ignore = true)
   @Mapping(target = "parentDataSpace", ignore = true)

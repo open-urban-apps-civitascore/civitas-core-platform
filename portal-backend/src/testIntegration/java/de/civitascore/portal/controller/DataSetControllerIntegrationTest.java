@@ -101,7 +101,6 @@ class DataSetControllerIntegrationTest
           .as("Description should match input")
           .isEqualTo(input.getDescription());
       assertThat(output.getFormat()).as("Format should match input").isEqualTo(input.getFormat());
-      assertThat(output.getTenantId()).as("Tenant ID should be set").isNotNull();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -478,17 +477,6 @@ class DataSetControllerIntegrationTest
   @Nested
   @DisplayName("Business Logic Tests")
   class BusinessLogicTests {
-
-    @Test
-    @DisplayName("Should maintain tenant isolation")
-    void shouldMaintainTenantIsolation() {
-      String dataSetId = createTestEntity();
-
-      ResponseEntity<DataSetOutputDTO> response = performGetById(dataSetId);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTenantId()).isNotNull();
-    }
 
     @Test
     @DisplayName("Should handle dataset with multiple dataspaces")

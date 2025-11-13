@@ -5,8 +5,8 @@ import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface UserRepository extends TenantAwareRepository<User, String> {
-  Optional<User> findByEmailAndTenantId(String email, String tenantId);
+public interface UserRepository extends BaseRepository<User, String> {
+  Optional<User> findByEmail(String email);
 
-  Optional<User> findByExternalIdAndTenantId(String externalId, String tenantId);
+  Optional<User> findByExternalId(String externalId);
 }

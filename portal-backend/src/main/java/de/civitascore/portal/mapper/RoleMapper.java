@@ -16,7 +16,7 @@ import org.mapstruct.ReportingPolicy;
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface RoleMapper extends DtoMapper<RoleInputDTO, RoleOutputDTO, Role> {
-  @Mapping(target = "tenantId", ignore = true)
+
   @Mapping(target = "permissions", ignore = true)
   @Override
   Role toEntity(RoleInputDTO input);

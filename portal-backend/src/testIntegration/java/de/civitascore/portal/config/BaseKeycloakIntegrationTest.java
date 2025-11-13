@@ -26,7 +26,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Slf4j
 public abstract class BaseKeycloakIntegrationTest {
 
-  // Use static containers to share across tests and ensure stable startup
   protected static final PostgreSQLContainer<?> POSTGRES;
   protected static final KeycloakContainer KEYCLOAK;
 
@@ -41,7 +40,6 @@ public abstract class BaseKeycloakIntegrationTest {
         new KeycloakContainer("quay.io/keycloak/keycloak:26.3.4")
             .withRealmImportFile("keycloak/iot-realm.json");
 
-    // Start them explicitly before Spring Boot config phase
     POSTGRES.start();
     KEYCLOAK.start();
 

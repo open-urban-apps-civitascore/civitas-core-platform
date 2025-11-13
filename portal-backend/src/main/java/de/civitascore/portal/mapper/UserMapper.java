@@ -17,7 +17,6 @@ import org.mapstruct.ReportingPolicy;
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface UserMapper extends DtoMapper<UserInputDTO, UserOutputDTO, User> {
 
-  @Mapping(target = "tenantId", ignore = true)
   @Mapping(target = "groups", ignore = true)
   @Override
   User toEntity(UserInputDTO input);

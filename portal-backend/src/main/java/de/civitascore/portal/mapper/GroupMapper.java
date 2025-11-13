@@ -17,7 +17,6 @@ import org.mapstruct.ReportingPolicy;
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface GroupMapper extends DtoMapper<GroupInputDTO, GroupOutputDTO, Group> {
 
-  @Mapping(target = "tenantId", ignore = true)
   @Mapping(target = "members", ignore = true) // Service resolves
   @Mapping(target = "roles", ignore = true)
   @Mapping(target = "contactUser", ignore = true) // Service resolves from ID

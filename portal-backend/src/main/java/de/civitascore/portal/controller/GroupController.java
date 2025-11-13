@@ -5,7 +5,7 @@ import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.model.output.assembler.GroupAssembler;
 import de.civitascore.portal.repository.specification.GroupSpec;
-import de.civitascore.portal.service.BaseTenantAwareService;
+import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.service.GroupService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -16,8 +16,6 @@ import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -63,13 +61,13 @@ public class GroupController
   public ResponseEntity<Page<GroupOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") GroupSpec spec,
       @ParameterObject
-          @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+          //  @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
     return super.getAll(spec, pageable);
   }
 
   @Override
-  protected BaseTenantAwareService<Group, GroupInputDTO> getService() {
+  protected BaseService<Group, String, GroupInputDTO> getService() {
     return groupService;
   }
 

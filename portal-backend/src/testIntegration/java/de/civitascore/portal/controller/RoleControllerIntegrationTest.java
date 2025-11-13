@@ -100,7 +100,6 @@ class RoleControllerIntegrationTest
       assertThat(output.getRoleType())
           .as("Role type should match input")
           .isEqualTo(input.getRoleType());
-      assertThat(output.getTenantId()).as("Tenant ID should be set").isNotNull();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -251,6 +250,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should retrieve roles with pagination parameters")
     void shouldRetrieveRolesWithPaginationParams() {
+      String id = createTestEntity();
       Map<String, String> params =
           Map.of(
               "page", "0",
@@ -506,17 +506,6 @@ class RoleControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getRoleType()).isEqualTo(RoleType.DATA);
-    }
-
-    @Test
-    @DisplayName("Should maintain tenant isolation")
-    void shouldMaintainTenantIsolation() {
-      String roleId = createTestEntity();
-
-      ResponseEntity<RoleOutputDTO> response = performGetById(roleId);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTenantId()).isNotNull();
     }
   }
 

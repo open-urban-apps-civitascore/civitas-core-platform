@@ -18,8 +18,8 @@ import org.springframework.security.core.GrantedAuthority;
     name = "permissions",
     uniqueConstraints =
         @UniqueConstraint(
-            name = "uk_permission_name_tenant",
-            columnNames = {"name", "tenant_id"}),
+            name = "uk_permission_name",
+            columnNames = {"name"}),
     indexes = {
       @Index(name = "idx_permission_type", columnList = "permission_type"),
     })

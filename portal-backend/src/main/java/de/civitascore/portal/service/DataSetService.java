@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.DataSet_;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -19,7 +17,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class DataSetService extends BaseTenantAwareService<DataSet, DataSetInputDTO> {
+public class DataSetService extends BaseService<DataSet, String, DataSetInputDTO> {
 
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
@@ -28,7 +26,7 @@ public class DataSetService extends BaseTenantAwareService<DataSet, DataSetInput
   private final ObjectMapper objectMapper;
 
   @Override
-  protected TenantAwareRepository<DataSet, String> getRepository() {
+  protected DataSetRepository getRepository() {
     return dataSetRepository;
   }
 
@@ -52,7 +50,7 @@ public class DataSetService extends BaseTenantAwareService<DataSet, DataSetInput
     preProcessLoad(id);
     DataSet entity =
         dataSetRepository
-            .findByIdAndTenantIdWithRelations(id, getCurrentTenantId())
+            .findByIdWithRelations(id)
             .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
     return postLoad(entity);
   }
@@ -86,16 +84,12 @@ public class DataSetService extends BaseTenantAwareService<DataSet, DataSetInput
 
   private void validateUniqueName(DataSet entity) {
     dataSetRepository
-        .findByNameAndTenantId(entity.getName(), entity.getTenantId())
+        .findByName(entity.getName())
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
-                    DataSet.class.getSimpleName(),
-                    DataSet_.NAME,
-                    entity.getName(),
-                    DataSet_.TENANT_ID,
-                    entity.getTenantId());
+                    DataSet.class.getSimpleName(), "name", entity.getName());
               }
             });
   }
@@ -108,7 +102,7 @@ public class DataSetService extends BaseTenantAwareService<DataSet, DataSetInput
 
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-            "name", "Name cannot be null or blank", existingEntity.getId().toString());
+            "name", "Name cannot be null or blank", existingEntity.getId());
       }
     } catch (InvalidInputException e) {
       throw e;

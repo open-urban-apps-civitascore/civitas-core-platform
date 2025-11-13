@@ -5,7 +5,7 @@ import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.model.output.assembler.RoleAssembler;
 import de.civitascore.portal.repository.specification.RoleSpec;
-import de.civitascore.portal.service.BaseTenantAwareService;
+import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.service.RoleService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -59,7 +59,7 @@ public class RoleController
   }
 
   @Override
-  protected BaseTenantAwareService<Role, RoleInputDTO> getService() {
+  protected BaseService<Role, String, RoleInputDTO> getService() {
     return roleService;
   }
 

@@ -152,7 +152,6 @@ class AssignmentControllerIntegrationTest
       assertThat(output.getScopeType())
           .as("Scope type should match input")
           .isEqualTo(input.getScopeType());
-      assertThat(output.getTenantId()).as("Tenant ID should be set").isNotNull();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -605,17 +604,6 @@ class AssignmentControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("Should maintain tenant isolation")
-    void shouldMaintainTenantIsolation() {
-      String assignmentId = createTestEntity();
-
-      ResponseEntity<AssignmentOutputDTO> response = performGetById(assignmentId);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTenantId()).isNotNull();
     }
 
     @Test

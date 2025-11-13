@@ -5,12 +5,16 @@ import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.repository.BaseRepository;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.io.Serializable;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public abstract class BaseService<T, ID extends Serializable, I extends BaseInputDTO> {
 
   protected abstract BaseRepository<T, ID> getRepository();
@@ -161,10 +165,14 @@ public abstract class BaseService<T, ID extends Serializable, I extends BaseInpu
    *
    * @param id the entity ID
    * @return a reference to the entity (lazy proxy)
-   * @throws jakarta.persistence.EntityNotFoundException if entity not found
+   * @throws ResourceNotFoundException if entity not found
    */
+  @Transactional(readOnly = true)
   public T getReferenceById(ID id) {
-    return getRepository().getReferenceByIdOrThrow(id);
+    if (!getRepository().existsById(id)) {
+      throw new ResourceNotFoundException(getEntityName(), id.toString());
+    }
+    return getRepository().getReferenceById(id);
   }
 
   /**

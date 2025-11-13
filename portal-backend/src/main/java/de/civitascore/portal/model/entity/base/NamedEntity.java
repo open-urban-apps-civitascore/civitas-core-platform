@@ -9,7 +9,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @MappedSuperclass
-public abstract class NamedEntity extends TenantAwareEntity {
+public abstract class NamedEntity extends BaseEntity {
 
   @NotBlank @Column(nullable = false)
   private String name;

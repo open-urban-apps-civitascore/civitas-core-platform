@@ -96,7 +96,6 @@ class GroupControllerIntegrationTest
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo(input.getDescription());
-      assertThat(output.getTenantId()).as("Tenant ID should be set").isNotNull();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
 
       assertThat(response.getHeaders().getLocation())

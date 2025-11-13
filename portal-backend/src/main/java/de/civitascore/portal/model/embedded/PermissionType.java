@@ -6,7 +6,7 @@ package de.civitascore.portal.model.embedded;
  * @see de.civitascore.portal.model.entity.Permission
  */
 public enum PermissionType {
-  /** System administration and tenant-wide operations. */
+  /** System administration. */
   SYSTEM,
 
   /** Data access and management operations. */

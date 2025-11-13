@@ -12,7 +12,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @MappedSuperclass
-public abstract class ScopedEntity extends TenantAwareEntity {
+public abstract class ScopedEntity extends BaseEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "scope_type", nullable = false)

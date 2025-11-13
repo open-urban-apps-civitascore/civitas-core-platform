@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.PermissionMapper;
 import de.civitascore.portal.model.entity.Permission;
-import de.civitascore.portal.model.entity.Permission_;
 import de.civitascore.portal.model.input.PermissionInputDTO;
 import de.civitascore.portal.repository.PermissionRepository;
-import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import lombok.RequiredArgsConstructor;
@@ -16,14 +14,14 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class PermissionService extends BaseTenantAwareService<Permission, PermissionInputDTO> {
+public class PermissionService extends BaseService<Permission, String, PermissionInputDTO> {
 
   private final PermissionRepository permissionRepository;
   private final PermissionMapper permissionMapper;
   private final ObjectMapper objectMapper;
 
   @Override
-  protected TenantAwareRepository<Permission, String> getRepository() {
+  protected PermissionRepository getRepository() {
     return permissionRepository;
   }
 
@@ -45,16 +43,12 @@ public class PermissionService extends BaseTenantAwareService<Permission, Permis
 
   private void validateUniqueName(Permission entity) {
     permissionRepository
-        .findByNameAndTenantId(entity.getName(), entity.getTenantId())
+        .findByName(entity.getName())
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
-                    Permission.class.getSimpleName(),
-                    Permission_.NAME,
-                    entity.getName(),
-                    Permission_.TENANT_ID,
-                    entity.getTenantId());
+                    Permission.class.getSimpleName(), "name", entity.getName());
               }
             });
   }
@@ -68,11 +62,11 @@ public class PermissionService extends BaseTenantAwareService<Permission, Permis
 
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-            "name", "Name cannot be null or blank", existingEntity.getId().toString());
+            "name", "Name cannot be null or blank", existingEntity.getId());
       }
       if (jsonNode.has("permissionType") && jsonNode.get("permissionType").isNull()) {
         throw new InvalidInputException(
-            "permissionType", "Permission type cannot be null", existingEntity.getId().toString());
+            "permissionType", "Permission type cannot be null", existingEntity.getId());
       }
     } catch (InvalidInputException e) {
       throw e;

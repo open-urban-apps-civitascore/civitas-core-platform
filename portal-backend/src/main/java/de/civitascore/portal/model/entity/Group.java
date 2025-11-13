@@ -24,8 +24,8 @@ import lombok.Setter;
     name = "groups",
     uniqueConstraints =
         @UniqueConstraint(
-            name = "uk_group_name_tenant",
-            columnNames = {"name", "tenant_id"}),
+            name = "uk_group_name",
+            columnNames = {"name"}),
     indexes = {@Index(name = "idx_group_contact", columnList = "contact_user_id")})
 @Getter
 @Setter

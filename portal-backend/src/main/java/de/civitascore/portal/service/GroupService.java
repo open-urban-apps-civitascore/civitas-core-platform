@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.entity.Group;
-import de.civitascore.portal.model.entity.Group_;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -18,7 +17,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class GroupService extends BaseTenantAwareService<Group, GroupInputDTO> {
+public class GroupService extends BaseService<Group, String, GroupInputDTO> {
 
   private final GroupRepository groupRepository;
   private final GroupMapper groupMapper;
@@ -34,16 +33,12 @@ public class GroupService extends BaseTenantAwareService<Group, GroupInputDTO> {
 
   private void validateUniqueName(Group entity) {
     groupRepository
-        .findByNameAndTenantId(entity.getName(), entity.getTenantId())
+        .findByName(entity.getName())
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
-                    Group.class.getSimpleName(),
-                    Group_.NAME,
-                    entity.getName(),
-                    Group_.TENANT_ID,
-                    entity.getTenantId());
+                    Group.class.getSimpleName(), "name", entity.getName());
               }
             });
   }
@@ -58,7 +53,7 @@ public class GroupService extends BaseTenantAwareService<Group, GroupInputDTO> {
     }
 
     if (input.getParentGroupId() != null) {
-      entity.setParentGroup(groupRepository.getReferenceById(input.getParentGroupId()));
+      entity.setParentGroup(getReferenceById(input.getParentGroupId()));
     } else {
       entity.setParentGroup(null);
     }
@@ -100,15 +95,14 @@ public class GroupService extends BaseTenantAwareService<Group, GroupInputDTO> {
 
   /**
    * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
-   * Group along with contactUser, parentGroup, members and roles in a single JOIN query, preventing
-   * N+1 query problems.
+   * Group along with contactUser, parentGroup, members and roles in a single JOIN query
    */
   @Override
   public Group findById(String id) {
     preProcessLoad(id);
     Group entity =
         groupRepository
-            .findByIdAndTenantIdWithRelations(id, getCurrentTenantId())
+            .findByIdWithRelations(id)
             .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
     return postLoad(entity);
   }
@@ -121,7 +115,7 @@ public class GroupService extends BaseTenantAwareService<Group, GroupInputDTO> {
 
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-            "name", "Name cannot be null or blank", existingEntity.getId().toString());
+            "name", "Name cannot be null or blank", existingEntity.getId());
       }
     } catch (InvalidInputException e) {
       throw e;

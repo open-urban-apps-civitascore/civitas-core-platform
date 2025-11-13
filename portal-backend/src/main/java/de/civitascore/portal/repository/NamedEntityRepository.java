@@ -7,14 +7,13 @@ import org.springframework.data.repository.NoRepositoryBean;
 
 @NoRepositoryBean
 public interface NamedEntityRepository<T extends NamedEntity, ID extends Serializable>
-    extends TenantAwareRepository<T, ID> {
+    extends BaseRepository<T, ID> {
 
   /**
-   * Find an entity by name and tenant ID.
+   * Find an entity by name.
    *
    * @param name the entity name
-   * @param tenantId the tenant ID
    * @return the entity if found
    */
-  Optional<T> findByNameAndTenantId(String name, String tenantId);
+  Optional<T> findByName(String name);
 }

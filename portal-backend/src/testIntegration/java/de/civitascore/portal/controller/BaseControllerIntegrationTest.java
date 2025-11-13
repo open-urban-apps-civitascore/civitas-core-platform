@@ -51,7 +51,6 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
 
   @AfterEach
   void cleanupAfterTest() {
-    // Prefer DB-level isolation (TRUNCATE/reset) configured once for the profile.
     performAdditionalCleanup();
   }
 

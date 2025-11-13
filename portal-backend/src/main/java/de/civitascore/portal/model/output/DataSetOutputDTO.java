@@ -15,5 +15,4 @@ public class DataSetOutputDTO extends BaseOutputDTO {
   private List<DataSpaceSummaryDTO> dataSpaces;
   private String externalId;
   private String format;
-  private String tenantId;
 }

@@ -99,7 +99,6 @@ class PermissionControllerIntegrationTest
       assertThat(output.getPermissionType())
           .as("Permission type should match input")
           .isEqualTo(input.getPermissionType());
-      assertThat(output.getTenantId()).as("Tenant ID should be set").isNotNull();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -482,17 +481,6 @@ class PermissionControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getPermissionType()).isEqualTo(PermissionType.GOVERNANCE);
-    }
-
-    @Test
-    @DisplayName("Should maintain tenant isolation")
-    void shouldMaintainTenantIsolation() {
-      String permissionId = createTestEntity();
-
-      ResponseEntity<PermissionOutputDTO> response = performGetById(permissionId);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTenantId()).isNotNull();
     }
   }
 

@@ -105,7 +105,6 @@ class UserControllerIntegrationTest
           .as("Last name should match input")
           .isEqualTo(input.getLastName());
       assertThat(output.getEmail()).as("Email should match input").isEqualTo(input.getEmail());
-      assertThat(output.getTenantId()).as("Tenant ID should be set").isNotNull();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -556,17 +555,6 @@ class UserControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getExternalId()).isEqualTo("ext-123");
-    }
-
-    @Test
-    @DisplayName("Should maintain tenant isolation")
-    void shouldMaintainTenantIsolation() {
-      String userId = createTestEntity();
-
-      ResponseEntity<UserOutputDTO> response = performGetById(userId);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTenantId()).isNotNull();
     }
   }
 

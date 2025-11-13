@@ -97,7 +97,6 @@ class DataSpaceControllerIntegrationTest
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo(input.getDescription());
-      assertThat(output.getTenantId()).as("Tenant ID should be set").isNotNull();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -492,17 +491,6 @@ class DataSpaceControllerIntegrationTest
 
       assertThat(childResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(childResponse.getBody()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("Should maintain tenant isolation")
-    void shouldMaintainTenantIsolation() {
-      String dataSpaceId = createTestEntity();
-
-      ResponseEntity<DataSpaceOutputDTO> response = performGetById(dataSpaceId);
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTenantId()).isNotNull();
     }
   }
 

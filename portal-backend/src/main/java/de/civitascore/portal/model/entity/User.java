@@ -1,6 +1,6 @@
 package de.civitascore.portal.model.entity;
 
-import de.civitascore.portal.model.entity.base.TenantAwareEntity;
+import de.civitascore.portal.model.entity.base.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -20,8 +20,8 @@ import lombok.Setter;
     name = "users",
     uniqueConstraints =
         @UniqueConstraint(
-            name = "uk_user_email_tenant",
-            columnNames = {"email", "tenant_id"}),
+            name = "uk_user_email",
+            columnNames = {"email"}),
     indexes = {
       @Index(name = "idx_user_email", columnList = "email"),
       @Index(name = "idx_user_active", columnList = "active"),
@@ -29,7 +29,7 @@ import lombok.Setter;
     })
 @Getter
 @Setter
-public class User extends TenantAwareEntity {
+public class User extends BaseEntity {
 
   @NotBlank @Column(name = "first_name", nullable = false)
   private String firstName;

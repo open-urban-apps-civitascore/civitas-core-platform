@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.model.entity.Role;
-import de.civitascore.portal.model.entity.Role_;
 import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.repository.RoleRepository;
-import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -19,7 +17,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class RoleService extends BaseTenantAwareService<Role, RoleInputDTO> {
+public class RoleService extends BaseService<Role, String, RoleInputDTO> {
 
   private final RoleRepository roleRepository;
   private final RoleMapper roleMapper;
@@ -27,7 +25,7 @@ public class RoleService extends BaseTenantAwareService<Role, RoleInputDTO> {
   private final ObjectMapper objectMapper;
 
   @Override
-  protected TenantAwareRepository<Role, String> getRepository() {
+  protected RoleRepository getRepository() {
     return roleRepository;
   }
 
@@ -50,7 +48,7 @@ public class RoleService extends BaseTenantAwareService<Role, RoleInputDTO> {
     preProcessLoad(id);
     Role entity =
         roleRepository
-            .findByIdAndTenantIdWithRelations(id, getCurrentTenantId())
+            .findByIdWithRelations(id)
             .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
     return postLoad(entity);
   }
@@ -77,16 +75,12 @@ public class RoleService extends BaseTenantAwareService<Role, RoleInputDTO> {
 
   private void validateUniqueName(Role entity) {
     roleRepository
-        .findByNameAndTenantId(entity.getName(), entity.getTenantId())
+        .findByName(entity.getName())
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
-                    Role.class.getSimpleName(),
-                    Role_.NAME,
-                    entity.getName(),
-                    Role_.TENANT_ID,
-                    entity.getTenantId());
+                    Role.class.getSimpleName(), "name", entity.getName());
               }
             });
   }
@@ -99,11 +93,11 @@ public class RoleService extends BaseTenantAwareService<Role, RoleInputDTO> {
 
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-            "name", "Name cannot be null or blank", existingEntity.getId().toString());
+            "name", "Name cannot be null or blank", existingEntity.getId());
       }
       if (jsonNode.has("roleType") && jsonNode.get("roleType").isNull()) {
         throw new InvalidInputException(
-            "roleType", "Role type cannot be null", existingEntity.getId().toString());
+            "roleType", "Role type cannot be null", existingEntity.getId());
       }
     } catch (InvalidInputException e) {
       throw e;

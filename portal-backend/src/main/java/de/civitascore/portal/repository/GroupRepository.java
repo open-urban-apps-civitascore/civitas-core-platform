@@ -11,14 +11,12 @@ import org.springframework.stereotype.Repository;
 public interface GroupRepository extends NamedEntityRepository<Group, String> {
 
   /**
-   * Find a group by ID and tenant ID with related entities eagerly fetched.
+   * Find a group by ID with related entities eagerly fetched.
    *
    * @param id the group ID
-   * @param tenantId the tenant ID
    * @return the group with eagerly fetched contactUser and parentGroup
    */
   @EntityGraph(attributePaths = {"contactUser", "parentGroup"})
-  @Query("SELECT g FROM Group g WHERE g.id = :id AND g.tenantId = :tenantId")
-  Optional<Group> findByIdAndTenantIdWithRelations(
-      @Param("id") String id, @Param("tenantId") String tenantId);
+  @Query("SELECT g FROM Group g WHERE g.id = :id")
+  Optional<Group> findByIdWithRelations(@Param("id") String id);
 }

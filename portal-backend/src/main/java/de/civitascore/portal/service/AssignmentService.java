@@ -6,7 +6,6 @@ import de.civitascore.portal.mapper.AssignmentMapper;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.TenantAwareRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class AssignmentService extends BaseTenantAwareService<Assignment, AssignmentInputDTO> {
+public class AssignmentService extends BaseService<Assignment, String, AssignmentInputDTO> {
 
   private final AssignmentRepository assignmentRepository;
   private final AssignmentMapper assignmentMapper;
@@ -24,7 +23,7 @@ public class AssignmentService extends BaseTenantAwareService<Assignment, Assign
   private final ObjectMapper objectMapper;
 
   @Override
-  protected TenantAwareRepository<Assignment, String> getRepository() {
+  protected AssignmentRepository getRepository() {
     return assignmentRepository;
   }
 
@@ -54,9 +53,7 @@ public class AssignmentService extends BaseTenantAwareService<Assignment, Assign
     }
 
     if (input.getParentAssignmentId() != null) {
-      entity.setParentAssignment(
-          assignmentRepository.getReferenceByIdAndTenantIdOrThrow(
-              input.getParentAssignmentId(), getCurrentTenantId()));
+      entity.setParentAssignment(getReferenceById(input.getParentAssignmentId()));
     } else {
       entity.setParentAssignment(null);
     }
@@ -67,15 +64,14 @@ public class AssignmentService extends BaseTenantAwareService<Assignment, Assign
   /**
    * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
    * Assignment along with Group, Role, and ParentAssignment in a single JOIN query, preventing N+1
-   * query problems that would occur with lazy loading. Also ensures tenant isolation by filtering
-   * by tenant ID.
+   * query problems that would occur with lazy loading.
    */
   @Override
   public Assignment findById(String id) {
     preProcessLoad(id);
     Assignment entity =
         assignmentRepository
-            .findByIdAndTenantIdWithRelations(id, getCurrentTenantId())
+            .findByIdWithRelations(id)
             .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
     return postLoad(entity);
   }
@@ -89,15 +85,15 @@ public class AssignmentService extends BaseTenantAwareService<Assignment, Assign
 
       if (jsonNode.has("groupId") && StringUtils.isBlank(jsonNode.get("groupId").asText())) {
         throw new InvalidInputException(
-            "groupId", "Group ID cannot be null or blank", existingEntity.getId().toString());
+            "groupId", "Group ID cannot be null or blank", existingEntity.getId());
       }
       if (jsonNode.has("roleId") && StringUtils.isBlank(jsonNode.get("roleId").asText())) {
         throw new InvalidInputException(
-            "roleId", "Role ID cannot be null or blank", existingEntity.getId().toString());
+            "roleId", "Role ID cannot be null or blank", existingEntity.getId());
       }
       if (jsonNode.has("scopeType") && jsonNode.get("scopeType").isNull()) {
         throw new InvalidInputException(
-            "scopeType", "Scope type cannot be null", existingEntity.getId().toString());
+            "scopeType", "Scope type cannot be null", existingEntity.getId());
       }
     } catch (InvalidInputException e) {
       throw e;

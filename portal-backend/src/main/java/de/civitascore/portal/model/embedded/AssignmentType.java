@@ -10,7 +10,7 @@ package de.civitascore.portal.model.embedded;
  * @see RoleType
  */
 public enum AssignmentType {
-  /** Binary assignment for system roles at tenant level. */
+  /** Binary assignment for system roles. */
   BINARY,
 
   /** Ternary assignment for data/governance roles with specific scope. */

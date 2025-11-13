@@ -22,7 +22,7 @@ import lombok.Setter;
     uniqueConstraints =
         @UniqueConstraint(
             name = "uk_assignment_group_role_scope",
-            columnNames = {"group_id", "role_id", "scope_type", "scope_id", "tenant_id"}),
+            columnNames = {"group_id", "role_id", "scope_type", "scope_id"}),
     indexes = {
       @Index(name = "idx_assignment_group", columnList = "group_id"),
       @Index(name = "idx_assignment_role", columnList = "role_id"),
@@ -49,8 +49,7 @@ public class Assignment extends ScopedEntity {
 
   /**
    * Derives the assignment type based on the role type. Binary assignments: System roles assigned
-   * to user groups (tenant scope) Ternary assignments: Data/Governance roles assigned to
-   * datasets/dataspaces
+   * to user groups Ternary assignments: Data/Governance roles assigned to datasets/dataspaces
    *
    * @return BINARY for system roles, TERNARY for data and governance roles
    */
