@@ -1,4 +1,4 @@
-package com.civitas.configadapter.kafka;
+package com.civitas.event.handler.kafka;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -36,6 +36,7 @@ import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Payload;
+import com.civitas.event.handler.kafka.KafkaEventHandler;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.cloudevents.CloudEvent;

@@ -1,4 +1,4 @@
-package com.civitas.configadapter.kafka;
+package com.civitas.event.handler.kafka;
 
 import java.time.Duration;
 import java.util.ArrayList;
