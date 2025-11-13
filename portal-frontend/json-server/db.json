@@ -5560,95 +5560,97 @@
       "name": "test",
       "description": "test 12355",
       "protected": false
+    }
+  ],
   "permissions": [
     {
       "id": "1",
       "title": "Permission 1",
-      "category": {"id": "1", "title": "Category 1"},
+      "category": { "id": "1", "title": "Category 1" },
       "type": "system"
     },
     {
       "id": "2",
       "title": "Permission 2",
-      "category": {"id": "2", "title": "Category 2"},
+      "category": { "id": "2", "title": "Category 2" },
       "type": "system"
     },
     {
       "id": "3",
       "title": "Permission 3",
-      "category": {"id": "3", "title": "Category 3"},
+      "category": { "id": "3", "title": "Category 3" },
       "type": "system"
     },
     {
       "id": "4",
       "title": "Permission 4",
-      "category": {"id": "4", "title": "Category 4"},
+      "category": { "id": "4", "title": "Category 4" },
       "type": "system"
     },
     {
       "id": "5",
       "title": "Permission 5",
-      "category": {"id": "5", "title": "Category 5"},
+      "category": { "id": "5", "title": "Category 5" },
       "type": "system"
     },
     {
       "id": "6",
       "title": "Permission 6",
-      "category": {"id": "1", "title": "Category 1"},
+      "category": { "id": "1", "title": "Category 1" },
       "type": "data"
     },
     {
       "id": "7",
       "title": "Permission 7",
-      "category": {"id": "2", "title": "Category 2"},
+      "category": { "id": "2", "title": "Category 2" },
       "type": "data"
     },
     {
       "id": "8",
       "title": "Permission 8",
-      "category": {"id": "3", "title": "Category 3"},
+      "category": { "id": "3", "title": "Category 3" },
       "type": "data"
     },
     {
       "id": "9",
       "title": "Permission 9",
-      "category": {"id": "4", "title": "Category 4"},
+      "category": { "id": "4", "title": "Category 4" },
       "type": "data"
     },
     {
       "id": "10",
       "title": "Permission 10",
-      "category": {"id": "5", "title": "Category 5"},
+      "category": { "id": "5", "title": "Category 5" },
       "type": "data"
     },
     {
       "id": "11",
       "title": "Permission 11",
-      "category": {"id": "1", "title": "Category 1"},
+      "category": { "id": "1", "title": "Category 1" },
       "type": "governance"
     },
     {
       "id": "12",
       "title": "Permission 12",
-      "category": {"id": "2", "title": "Category 2"},
+      "category": { "id": "2", "title": "Category 2" },
       "type": "governance"
     },
     {
       "id": "13",
       "title": "Permission 13",
-      "category": {"id": "3", "title": "Category 3"},
+      "category": { "id": "3", "title": "Category 3" },
       "type": "governance"
     },
     {
       "id": "14",
       "title": "Permission 14",
-      "category": {"id": "4", "title": "Category 4"},
+      "category": { "id": "4", "title": "Category 4" },
       "type": "governance"
     },
     {
       "id": "15",
       "title": "Permission 15",
-      "category": {"id": "5", "title": "Category 5"},
+      "category": { "id": "5", "title": "Category 5" },
       "type": "governance"
     }
   ],
