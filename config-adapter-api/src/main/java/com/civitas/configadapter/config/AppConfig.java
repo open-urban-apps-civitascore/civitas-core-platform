@@ -6,16 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 
-public class AppConfig {
-
-    private final Properties properties;
-
-    public AppConfig(Properties properties) {
-		this.properties = properties;
-    }
+public record AppConfig(Properties properties) {
 
     public AppConfig(String configFile) {
-        this.properties = new Properties();
+        this(new Properties());
         try (InputStream input = getClass().getClassLoader().getResourceAsStream(configFile)) {
             if (input == null) {
                 throw new RuntimeException("Unable to find " + configFile);
@@ -60,9 +54,5 @@ public class AppConfig {
 
     public String getProperty(String key, String defaultValue) {
         return properties.getProperty(key, defaultValue);
-    }
-
-    public Properties getProperties() {
-        return properties;
     }
 }
