@@ -3,8 +3,9 @@ import { Check } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
-import { FormField, FormMessage } from '@/components/ui/form'
+import { FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Select as ShadcnSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
 export type SelectOption = {
@@ -44,6 +45,7 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
   } = props
 
   const t = useTranslations('common')
+  const isMobile = useIsMobile()
 
   return (
     <FormField
@@ -52,17 +54,23 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
       rules={{ required: required ? t('errors.required') : false }}
       render={({ field }) => {
         return (
-          <div className={className}>
-            <label htmlFor={id} className="text-sm font-medium text-gray-700 dark:text-gray-200">
+          <FormItem
+            className={cn(isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]', className)}
+          >
+            <FormLabel htmlFor={id} className="text-sm font-medium text-gray-700 dark:text-gray-200">
               {label}
               {required && <span className="text-red-500 ml-1">*</span>}
-            </label>
+            </FormLabel>
 
-            <ShadcnSelect value={field.value.id} onValueChange={onChange ?? field.onChange}>
+            <ShadcnSelect value={field.value} onValueChange={onChange ?? field.onChange}>
               <SelectTrigger
                 id={id}
                 aria-label={label}
-                className={cn('w-full', selectTriggerProps?.className)}
+                className={cn(
+                  'w-full disabled:opacity-100 disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0 disabled:pointer-events-none',
+                  selectTriggerProps?.className,
+                )}
+                style={{ height: disabled ? '20px' : '' }}
                 disabled={disabled}
               >
                 <SelectValue placeholder={placeholder} />
@@ -81,7 +89,7 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
               </SelectContent>
             </ShadcnSelect>
             <FormMessage />
-          </div>
+          </FormItem>
         )
       }}
     />

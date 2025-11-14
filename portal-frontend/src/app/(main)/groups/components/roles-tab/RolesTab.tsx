@@ -9,17 +9,10 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { Group, GroupTabProps } from '@/types/groups'
-import { RoleType } from '@/types/roles'
+import { BaseRole, ROLE_TYPES } from '@/types/roles'
 
 import { updateGroup } from '../../actions'
 import { RoleCategory } from './RoleCategory'
-
-interface Role {
-  id: string
-  name: string
-  description: string
-  type: RoleType
-}
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
@@ -27,11 +20,11 @@ export const RolesTab = (props: GroupTabProps) => {
   const { groupData } = props
   const t = useTranslations('groups')
   const tRoles = useTranslations('roles')
-  const originalRoles = groupData.roles
+  const [originalRoles, setOriginalRoles] = useState(groupData.roles)
   const router = useRouter()
   const [group, setGroup] = useState<Group>(groupData)
 
-  const [allRoles, setAllRoles] = useState<Role[]>([])
+  const [allRoles, setAllRoles] = useState<BaseRole[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   const hasChanges = useMemo(
@@ -75,7 +68,7 @@ export const RolesTab = (props: GroupTabProps) => {
     try {
       setIsLoading(true)
       await updateGroup(group)
-      router.refresh()
+      setOriginalRoles(group.roles)
     } catch (error) {
       console.error('An error occurred while updating the group: ', error)
     } finally {
@@ -103,7 +96,7 @@ export const RolesTab = (props: GroupTabProps) => {
         </DetailsFieldContainer>
         <RoleCategory
           title={tRoles('systemRoles')}
-          category="system"
+          category={ROLE_TYPES.SYSTEM}
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
@@ -112,7 +105,7 @@ export const RolesTab = (props: GroupTabProps) => {
 
         <RoleCategory
           title={tRoles('dataRoles')}
-          category="data"
+          category={ROLE_TYPES.DATA}
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
@@ -121,7 +114,7 @@ export const RolesTab = (props: GroupTabProps) => {
 
         <RoleCategory
           title={tRoles('governanceRoles')}
-          category="governance"
+          category={ROLE_TYPES.GOVERNANCE}
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
@@ -130,10 +123,9 @@ export const RolesTab = (props: GroupTabProps) => {
         />
       </ContentCard>
       <ActionButtons
-        onCancelClick={() => setGroup({ ...group, roles: originalRoles })}
+        onCancelClick={() => router.push('/groups')}
         confirmButtonType="button"
         isConfirmButtonDisabled={!hasChanges}
-        isCancelButtonDisabled={!hasChanges}
         onConfirmClick={handleUpdateGroup}
       />
     </div>

@@ -1,14 +1,13 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { useLocale, useTranslations } from 'next-intl'
 
-import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Badge } from '@/components/ui/badge'
-import { TableProps } from '@/types/table'
 import { UserGroupsListData } from '@/types/groups'
-import { resolveUpdater } from '@/utils/table'
+import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
+import { resolveUpdater } from '@/utils/table'
 
 interface GroupsTableProps extends TableProps<UserGroupsListData> {
   groups: UserGroupsListData[]

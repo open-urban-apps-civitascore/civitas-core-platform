@@ -4,48 +4,37 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
+import { UserResponse } from '@/types/users'
 
-import { RolesTab } from './RolesTab'
-import { FormUser, UserForm } from './UserForm'
 import { GroupsTab } from './groups-tab/GroupsTab'
+import { RolesTab } from './roles-tab/RolesTab'
+import { UserForm } from './UserForm'
 
 interface UserDetailsProps {
-  userData: FormUser | null
+  title: string
+  userData: UserResponse | null
   isEditMode?: boolean
 }
 
 export const UserDetails = (props: UserDetailsProps) => {
-  const { userData, isEditMode = false } = props
+  const { title, userData, isEditMode = false } = props
   const t = useTranslations('users')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
-  const getTitle = () => {
-    if (!isEditMode) {
-      return t('newUser')
-    } else if (isEditMode && userData) {
-      return userData.displayName
-    } else {
-      return t('notFound')
-    }
-  }
 
-  const tabValues: Record<'userData' | 'roles' | 'userGroups' | 'dataSpaces' | 'account', Tab> = {
+  const tabValues: Record<'userData' | 'roles' | 'groups' | 'dataSpaces' | 'account', Tab> = {
     userData: {
       label: t('detailsTabs.userData'),
       value: 'userDetails',
       isActive: true,
     },
-    roles: {
-      label: t('detailsTabs.roles'),
-      value: 'roles',
-      isActive: isEditMode,
-    },
-    userGroups: {
-      label: t('detailsTabs.userGroups'),
+    groups: {
+      label: t('detailsTabs.groups'),
       value: 'userGroups',
       isActive: isEditMode,
     },
@@ -54,19 +43,18 @@ export const UserDetails = (props: UserDetailsProps) => {
       value: 'dataspaces',
       isActive: isEditMode,
     },
+    roles: {
+      label: t('detailsTabs.roles'),
+      value: 'roles',
+      isActive: isEditMode,
+    },
     account: {
       label: t('detailsTabs.account'),
       value: 'account',
       isActive: isEditMode,
     },
   }
-  const tabs: Tab[] = [
-    tabValues.userData,
-    tabValues.roles,
-    tabValues.userGroups,
-    tabValues.dataSpaces,
-    tabValues.account,
-  ]
+  const tabs: Tab[] = [tabValues.userData, tabValues.groups, tabValues.dataSpaces, tabValues.roles, tabValues.account]
 
   const defaultTab = tabValues.userData.value
 
@@ -82,23 +70,33 @@ export const UserDetails = (props: UserDetailsProps) => {
     setSubTabValueParam(newTab)
   }
 
+  let Content = <LoadingSpinner className="h-full" />
+  if (!userData) {
+    Content = <ContentCard>No data</ContentCard>
+  } else if (!isBlockedTab) {
+    switch (subTabValue) {
+      case tabValues.userData.value:
+        Content = <UserForm userData={userData} isEditMode={isEditMode} />
+        break
+      case tabValues.groups.value:
+        Content = <GroupsTab userId={userData.id} />
+        break
+      case tabValues.roles.value:
+        Content = <RolesTab groupIds={userData.groups} />
+        break
+      default:
+        Content = <ContentCard>No data</ContentCard>
+        break
+    }
+  }
+
   return (
-    <PageContainer headerType="withSubTabs">
+    <PageContainer headerType="withSubTabs" className="overflow-hidden">
       <PageHeader
-        title={getTitle()}
+        title={title}
         subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: newTab => handleSelectTab(newTab) }}
       />
-      <PageBackground>
-        {userData ? (
-          <>
-            {subTabValue === tabValues.roles.value && isEditMode && <RolesTab userId={userData.id} />}
-            {subTabValue === tabValues.userData.value && <UserForm userData={userData} isEditMode={isEditMode} />}
-            {subTabValue === tabValues.userGroups.value && <GroupsTab userId={userData.id} />}
-          </>
-        ) : (
-          <div>No data</div>
-        )}
-      </PageBackground>
+      <PageBackground>{userData ? Content : <div>No data</div>}</PageBackground>
     </PageContainer>
   )
 }

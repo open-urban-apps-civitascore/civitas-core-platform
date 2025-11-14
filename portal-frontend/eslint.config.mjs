@@ -105,7 +105,7 @@ const eslintConfig = [
           format: ['camelCase'],
           leadingUnderscore: 'allow',
           custom: {
-            regex: '^(is|has|should|can)[A-Z].*$',
+            regex: '^(is|are|has|should|can)[A-Z].*$',
             match: true,
           },
           filter: {
@@ -119,7 +119,7 @@ const eslintConfig = [
           types: ['boolean'],
           format: ['camelCase'],
           custom: {
-            regex: '^(is|has|should|can)[A-Z].*$',
+            regex: '^(is|are|has|should|can)[A-Z].*$',
             match: true,
           },
           filter: {
@@ -175,8 +175,33 @@ const eslintConfig = [
       'react/boolean-prop-naming': [
         'warn',
         {
-          rule: '^(is|has|should|can)[A-Z]([A-Za-z0-9]?)',
+          rule: '^(is|are|has|should|can)[A-Z]([A-Za-z0-9]?)',
           validateNested: true,
+        },
+      ],
+
+      // ===================================================
+      // SECURITY - AR-2 COMPLIANCE
+      // ===================================================
+
+      // Prevent legacy client technologies (Flash, ActiveX, Java Applets)
+      'react/forbid-elements': [
+        'error',
+        {
+          forbid: [
+            {
+              element: 'object',
+              message: 'Legacy <object> tag is forbidden (AR-2 compliance). Use modern alternatives.',
+            },
+            {
+              element: 'embed',
+              message: 'Legacy <embed> tag is forbidden (AR-2 compliance). Use modern alternatives.',
+            },
+            {
+              element: 'applet',
+              message: 'Legacy <applet> tag is forbidden (AR-2 compliance). Java applets are deprecated.',
+            },
+          ],
         },
       ],
 

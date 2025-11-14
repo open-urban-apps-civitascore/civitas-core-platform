@@ -1,15 +1,12 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { z } from 'zod'
 
-export type Category = {
-  id: string
-  title: string
-}
+import { Item } from './common'
 
-export type UserGroup = Category
+export type UserGroup = Item
 
-export type Authority = Category & {
-  departments: Category[]
+export type Authority = Item & {
+  departments: Item[]
 }
 
 export type UserAuthority = {
@@ -28,10 +25,8 @@ export type UserResponse = {
   phone: string
   title: TitleSchemaType
   authority: UserAuthority | null
-  group: string | null
+  groups: string[]
   active: boolean
-  roles: string[]
-  position: string | null
   positionDescription: string | null
 }
 
@@ -43,7 +38,6 @@ export type ListUser = {
   displayName: string
   authority: string
   department: string
-  roles: string[]
   email: string
   isActive: boolean
 }
@@ -73,7 +67,8 @@ export type TitleSchemaType = z.infer<typeof TitleSchema>
 
 export const PhoneSchema = z.string().superRefine((value, ctx) => {
   const phoneNumber = parsePhoneNumberFromString(value, 'DE')
-  if (!phoneNumber || !phoneNumber.isValid()) {
+  if (!phoneNumber) return z.NEVER
+  if (!phoneNumber?.isValid()) {
     ctx.addIssue({
       code: 'custom',
       message: 'common.errors.invalidPhone',
@@ -84,25 +79,27 @@ export const PhoneSchema = z.string().superRefine((value, ctx) => {
 
 export const UserFormSchema = z.object({
   id: z.string(),
+  title: TitleSchema,
   firstName: z.string().min(2, {
     message: 'common.errors.atLeast2',
   }),
 
-  title: TitleSchema,
   lastName: z.string().min(2, {
     message: 'common.errors.atLeast2',
   }),
   email: z.email({
     message: 'common.errors.invalidEmail',
   }),
-  authority: z.string().nullable(),
-  department: z.string().nullable(),
-  group: z.string().nullable(),
+  authority: z.string(),
+  department: z.string(),
   phone: PhoneSchema,
   active: z.boolean(),
-  position: z.string().min(2).or(z.literal('')).nullable(),
-  positionDescription: z.string().min(10).or(z.literal('')).nullable(),
-  roles: z.array(z.string()),
+  positionDescription: z
+    .string()
+    .min(10, {
+      message: 'common.errors.atLeast10',
+    })
+    .or(z.literal('')),
 })
 
 export type UserFormData = z.infer<typeof UserFormSchema>

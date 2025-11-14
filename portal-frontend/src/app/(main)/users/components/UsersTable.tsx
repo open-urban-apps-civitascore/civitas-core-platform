@@ -4,7 +4,6 @@ import { useTranslations } from 'next-intl'
 import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { Badge } from '@/components/ui/badge'
 import { TableProps } from '@/types/table'
 import { ListUser } from '@/types/users'
 import { resolveUpdater } from '@/utils/table'
@@ -41,41 +40,34 @@ const UsersTable = (props: UsersTableProps) => {
       cell: info => info.getValue(),
       meta: {
         style: {
-          width: '22.22%',
+          width: '27%',
           minWidth: '200px',
+          color: 'var(--foreground)',
+          fontWeight: '500',
         },
       },
     }),
     columnHelper.accessor('authority', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('info.authority')} />,
+      header: t('info.authority'),
       cell: info => info.getValue(),
-    }),
-    columnHelper.accessor('department', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('info.department')} />,
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor('roles', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('info.role')} />,
-      cell: info => {
-        const roles = info.getValue()
-        if (!roles || roles.length === 0) return '-'
-        return (
-          <div className="flex flex-wrap gap-1">
-            {roles.map(role => (
-              <Badge key={role} variant="secondary">
-                {role}
-              </Badge>
-            ))}
-          </div>
-        )
+      meta: {
+        style: {
+          width: '18%',
+          color: 'var(--foreground)',
+          fontWeight: '500',
+        },
       },
     }),
+    columnHelper.accessor('department', {
+      header: t('info.department'),
+      cell: info => info.getValue(),
+    }),
     columnHelper.accessor('email', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('info.email')} />,
+      header: t('info.email'),
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('isActive', {
-      header: t('info.active'),
+      header: t('info.status.title'),
       cell: info => <StatusLabel isChecked={info.getValue()} />,
     }),
   ]

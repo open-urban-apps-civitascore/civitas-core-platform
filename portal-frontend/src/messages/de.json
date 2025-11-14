@@ -9,6 +9,7 @@
       "cancel": "Abbrechen",
       "delete": "Löschen",
       "add": "Hinzufügen",
+      "edit": "Bearbeiten",
       "open": "öffnen"
     },
     "errors": {
@@ -16,7 +17,9 @@
       "invalidEmail": "Ungültige E-Mail Adresse",
       "required": "Dieses Feld ist erforderlich",
       "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
-      "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein."
+      "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
+      "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
+      "notFound": "Keine {items} gefunden"
     }
   },
   "languages": {
@@ -38,6 +41,7 @@
     "edit": "bearbeiten",
     "users": "User Management",
     "groups": "Gruppen",
+    "dataspaces": "Datenräume",
     "tenants": "Mandanten-Management"
   },
   "datasets": {
@@ -64,11 +68,20 @@
   },
   "users": {
     "title": "Übersicht: User",
-    "newUser": "Neuer User",
+    "newUser": "User erstellen",
     "createUser": "User erstellen",
     "searchUsers": "Filtern...",
     "notFound": "User nicht gefunden",
+    "detailsTabs": {
+      "userData": "Benutzerdaten",
+      "roles": "Rollen",
+      "groups": "Gruppen",
+      "dataspaces": "Datenräume und -sätze",
+      "account": "Account"
+    },
     "info": {
+      "header": "User Informationen",
+      "subheader": "Persönliche Angaben und allgemeine Informationen.",
       "id": "ID",
       "displayName": "Anzeigename",
       "title": { "title": "Anrede", "male": "Herr", "female": "Frau" },
@@ -80,16 +93,13 @@
       "phone": "Telefonnummer",
       "email": "E-Mail",
       "group": "Gruppe",
-      "active": "Aktiv",
       "position": "Position",
-      "description": "Tätigkeitsbeschreibung"
-    },
-    "detailsTabs": {
-      "userData": "Benutzerdaten",
-      "roles": "Rollen",
-      "userGroups": "Usergruppen",
-      "dataspaces": "Datenräume und -sätze",
-      "account": "Account"
+      "description": "Tätigkeitsbeschreibung",
+      "status": {
+        "title": "Status",
+        "active": "Aktiv",
+        "inactive": "Inaktiv"
+      }
     },
     "form": {
       "selectTitle": "Titel wählen...",
@@ -97,11 +107,14 @@
       "selectDepartment": "Abteilung wählen...",
       "selectGroup": "Gruppe wählen..."
     },
-    "rolesTab": {
-      "userNotFound": "Benutzer nicht gefunden",
-      "addRoleDialog": {
-        "title": "Rolle hinzufügen - {category}",
-        "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen."
+    "roles": {
+      "title": "Übersicht: Rollen",
+      "rolesTables": {
+        "role": "Rolle",
+        "inherited": "Vererbt",
+        "group": "Gruppe",
+        "assignment": "Zuordnung",
+        "noRolesAssigned": "Keine {roleType} zugewiesen"
       }
     },
     "groupsTab": {
@@ -120,6 +133,7 @@
     "createGroup": "Gruppe erstellen",
     "search": "Filtern...",
     "notFound": "Gruppe nicht gefunden",
+    "createHint": "Bitte die Basisinformationen ausfüllen, um Rollen, User und Untergruppen zu aktivieren.",
     "list": {
       "id": "ID",
       "title": "Name",
@@ -137,7 +151,7 @@
       "baseInfo": "Basisinformationen",
       "name": "Name der Gruppe",
       "description": "Beschreibung der Gruppe",
-      "contact": "Ansprechpartner"
+      "contact": { "label": "Ansprechpartner", "placeholder": "Nach Name oder Email suchen" }
     },
     "roles": {
       "groupInfo": "Gruppe Informationen",
@@ -166,6 +180,24 @@
       "previousPage": "Zur vorherigen Seite wechseln",
       "nextPage": "Zur nächsten Seite wechseln",
       "lastPage": "Zur letzten Seite wechseln"
+    }
+  },
+  "dataspaces": {
+    "title": "Datenräume",
+    "newDataSpace": "Neuer Datenraum",
+    "createDataSpace": "Datenraum erstellen",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "protected": "Geschützt"
+    },
+    "form": {
+      "inputs": {
+        "name": "Name des Datenraums",
+        "description": "Beschreibung des Datenraums",
+        "protected": "Datenraum schützen",
+        "protectedDescription": "Geschützte Datenräume erfordern erweiterte Berechtigungen für den Zugriff"
+      }
     }
   },
   "permissions": {

@@ -1,11 +1,13 @@
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
-import { TableContainer } from '@/components/table-container/TableContainer'
-import { Group, UserGroupsListData } from '@/types/groups'
 import { PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
+
+import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { TableContainer } from '@/components/table-container/TableContainer'
+import { Group, UserGroupsListData } from '@/types/groups'
+import { RoleResponse } from '@/types/roles'
+
 import GroupsTable from './GroupsTable'
-import { Role, RoleResponse } from '@/types/roles'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 

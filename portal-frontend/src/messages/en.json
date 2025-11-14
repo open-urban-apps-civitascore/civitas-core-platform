@@ -9,6 +9,7 @@
       "cancel": "Cancel",
       "delete": "Delete",
       "add": "Add",
+      "edit": "Edit",
       "open": "open"
     },
     "errors": {
@@ -16,7 +17,9 @@
       "invalidEmail": "Invalid E-mail address",
       "required": "This field is required",
       "atLeast2": "The input must be at least 2 characters.",
-      "atLeast10": "The input must be at least 10 characters."
+      "atLeast10": "The input must be at least 10 characters.",
+      "minChar": "The input has to be at least {amount} characters.",
+      "notFound": "No {items} found"
     }
   },
   "languages": {
@@ -38,6 +41,7 @@
     "edit": "edit",
     "users": "User Management",
     "groups": "Groups",
+    "dataspaces": "Data Spaces",
     "tenants": "Tenant Management"
   },
   "datasets": {
@@ -64,12 +68,14 @@
   },
   "users": {
     "title": "Overview: Users",
-    "newUser": "New User",
+    "newUser": "Create User",
     "createUser": "Create User",
     "searchUsers": "Filter...",
     "notFound": "User not found",
 
     "info": {
+      "header": "User Information",
+      "subheader": "Personal details and general information.",
       "id": "ID",
       "displayName": "Display Name",
       "title": { "title": "Title", "male": "Mr", "female": "Ms" },
@@ -81,15 +87,19 @@
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
-      "active": "Active",
       "position": "Position",
-      "description": "Activity Description"
+      "description": "Activity Description",
+      "status": {
+        "title": "Status",
+        "active": "Active",
+        "inactive": "Inactive"
+      }
     },
     "detailsTabs": {
       "userData": "User Data",
       "roles": "Roles",
-      "userGroups": "User Groups",
-      "dataspaces": "Datenspaces and Datasets",
+      "groups": "Groups",
+      "dataspaces": "Data Spaces and Datasets",
       "account": "Account"
     },
     "form": {
@@ -98,11 +108,14 @@
       "selectDepartment": "Select department...",
       "selectGroup": "Select group..."
     },
-    "rolesTab": {
-      "userNotFound": "User not found",
-      "addRoleDialog": {
-        "title": "Add Role - {category}",
-        "description": "Select a role to add to the user from the available {category} roles."
+    "roles": {
+      "title": "Overview: Roles",
+      "noRolesAssigned": "No {roleType} assigned",
+      "rolesTables": {
+        "role": "Role",
+        "inherited": "Inherited",
+        "group": "Group",
+        "assignment": "Assignment"
       }
     },
     "groupsTab": {
@@ -121,6 +134,7 @@
     "createGroup": "Create Group",
     "search": "Filter...",
     "notFound": "Group not found",
+    "createHint": "Please fill in the base information for activating roles, users and user groups.",
     "list": {
       "id": "ID",
       "title": "Name",
@@ -138,7 +152,7 @@
       "baseInfo": "Base Information",
       "name": "Name of the Group",
       "description": "Group Description",
-      "contact": "Contact"
+      "contact": { "label": "Contact", "placeholder": "Search by name or email" }
     },
     "roles": {
       "groupInfo": "Group Information",
@@ -167,6 +181,24 @@
       "previousPage": "Go to previous page",
       "nextPage": "Go to next page",
       "lastPage": "Go to last page"
+    }
+  },
+  "dataspaces": {
+    "title": "Data Spaces",
+    "newDataSpace": "New Data Space",
+    "createDataSpace": "Create Data Space",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Description",
+      "protected": "Protected"
+    },
+    "form": {
+      "inputs": {
+        "name": "Data Space Name",
+        "description": "Data Space Description",
+        "protected": "Protect Data Space",
+        "protectedDescription": "Protected Data Spaces require elevated permissions for access"
+      }
     }
   },
   "permissions": {

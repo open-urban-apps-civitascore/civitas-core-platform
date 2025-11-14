@@ -10,8 +10,9 @@ const defaultGroup: Group = {
   description: '',
   roles: [],
   users: [],
-  contact: { id: '', displayName: '' },
+  contact: null,
   parent: null,
+  dataspace: null,
   subgroups: [],
 }
 

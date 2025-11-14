@@ -13,8 +13,8 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { Role } from '@/types/roles'
-import { Authority, Category, ListUser, UserResponse } from '@/types/users'
+import { Item } from '@/types/common'
+import { Authority, ListUser, UserResponse } from '@/types/users'
 import { isPageIndexHigherThanTotalPages } from '@/utils/table'
 import { mapListUsers } from '@/utils/users'
 
@@ -22,8 +22,8 @@ import UsersTable from './components/UsersTable'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-export type UserAuthority = Category & {
-  department: Category
+export type UserAuthority = Item & {
+  department: Item
 }
 
 export const getSortParam = (sorting: SortingState) => {
@@ -69,14 +69,11 @@ const UsersPage = () => {
 
     try {
       setIsLoading(true)
-      const [usersResponse, authoritiesResponse, rolesResponse] = await Promise.all([
+      const [usersResponse, authoritiesResponse] = await Promise.all([
         fetch(`${URL}/users?${params.toString()}`, {
           cache: 'no-store',
         }),
         fetch(`${URL}/authorities`, {
-          cache: 'no-store',
-        }),
-        fetch(`${URL}/roles`, {
           cache: 'no-store',
         }),
       ])
@@ -84,18 +81,12 @@ const UsersPage = () => {
         throw new Error('An error occurred while loading form data')
       }
 
-      const [usersData, authoritiesData, rolesData]: [UserResponse[], Authority[], Role[]] = await Promise.all([
+      const [usersData, authoritiesData]: [UserResponse[], Authority[]] = await Promise.all([
         usersResponse.json(),
         authoritiesResponse.json(),
-        rolesResponse.json(),
       ])
 
-      const rolesMap: Record<string, string> = {}
-      rolesData.forEach((role: Role) => {
-        rolesMap[role.id] = role.name
-      })
-
-      const users = mapListUsers(usersData, authoritiesData, rolesMap)
+      const users = mapListUsers(usersData, authoritiesData)
       setListUsers(users)
       setIsLoading(false)
 
