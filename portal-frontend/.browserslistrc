@@ -1,27 +1,19 @@
 # Browserslist config for AR-2 compliance
-
-# Excludes legacy browsers that might support outdated plugin technologies
-
-# See: https://github.com/browserslist/browserslist
-
 # Modern browsers only - no IE support
 
 > 0.5%
-> last 2 versions
-> not dead
+last 2 versions
+not dead
 
-# Explicitly exclude Internet Explorer and other legacy browsers
-
-not ie 11
-not ie_mob 11
-not opera_mini all
-not android 4.4.3-4.4.4
-not chrome < 64
-not edge < 79
-not firefox < 67
-not safari < 12
+# Explicitly exclude Internet Explorer and legacy browsers
+not IE 11
+not op_mini all
+not Android 4.4.3-4.4.4
+not Chrome < 64
+not Edge < 79
+not Firefox < 67
+not Safari < 12
 
 # Support for ES modules (modern JavaScript)
-
 supports es6-module
 supports es6-module-dynamic-import
