@@ -9,7 +9,7 @@ const generateNonce = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-export default auth((req: NextRequest) => {
+export default auth((_: NextRequest) => {
   const response = NextResponse.next()
 
   // Generate unique nonces for each request
