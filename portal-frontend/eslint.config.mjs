@@ -105,7 +105,7 @@ const eslintConfig = [
           format: ['camelCase'],
           leadingUnderscore: 'allow',
           custom: {
-            regex: '^(is|has|should|can)[A-Z].*$',
+            regex: '^(is|are|has|should|can)[A-Z].*$',
             match: true,
           },
           filter: {
@@ -119,7 +119,7 @@ const eslintConfig = [
           types: ['boolean'],
           format: ['camelCase'],
           custom: {
-            regex: '^(is|has|should|can)[A-Z].*$',
+            regex: '^(is|are|has|should|can)[A-Z].*$',
             match: true,
           },
           filter: {
@@ -175,7 +175,7 @@ const eslintConfig = [
       'react/boolean-prop-naming': [
         'warn',
         {
-          rule: '^(is|has|should|can)[A-Z]([A-Za-z0-9]?)',
+          rule: '^(is|are|has|should|can)[A-Z]([A-Za-z0-9]?)',
           validateNested: true,
         },
       ],

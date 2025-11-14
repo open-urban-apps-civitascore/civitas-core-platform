@@ -9,6 +9,7 @@
       "cancel": "Cancel",
       "delete": "Delete",
       "add": "Add",
+      "edit": "Edit",
       "open": "open"
     },
     "errors": {
@@ -65,12 +66,14 @@
   },
   "users": {
     "title": "Overview: Users",
-    "newUser": "New User",
+    "newUser": "Create User",
     "createUser": "Create User",
     "searchUsers": "Filter...",
     "notFound": "User not found",
 
     "info": {
+      "header": "User Information",
+      "subheader": "Personal details and general information.",
       "id": "ID",
       "displayName": "Display Name",
       "title": { "title": "Title", "male": "Mr", "female": "Ms" },
@@ -82,14 +85,18 @@
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
-      "active": "Active",
       "position": "Position",
-      "description": "Activity Description"
+      "description": "Activity Description",
+      "status": {
+        "title": "Status",
+        "active": "Active",
+        "inactive": "Inactive"
+      }
     },
     "detailsTabs": {
       "userData": "User Data",
       "roles": "Roles",
-      "userGroups": "User Groups",
+      "groups": "Groups",
       "dataspaces": "Data Spaces and Datasets",
       "account": "Account"
     },
@@ -99,11 +106,14 @@
       "selectDepartment": "Select department...",
       "selectGroup": "Select group..."
     },
-    "rolesTab": {
-      "userNotFound": "User not found",
-      "addRoleDialog": {
-        "title": "Add Role - {category}",
-        "description": "Select a role to add to the user from the available {category} roles."
+    "roles": {
+      "title": "Overview: Roles",
+      "noRolesAssigned": "No {roleType} assigned",
+      "rolesTables": {
+        "role": "Role",
+        "inherited": "Inherited",
+        "group": "Group",
+        "assignment": "Assignment"
       }
     }
   },
