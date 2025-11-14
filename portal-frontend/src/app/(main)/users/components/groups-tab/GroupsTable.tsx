@@ -32,6 +32,7 @@ const GroupsTable = (props: GroupsTableProps) => {
   const locale = useLocale()
   const columnHelper = createColumnHelper<UserGroupsListData>()
 
+  console.log(groups)
   const columns = [
     columnHelper.accessor('id', {
       header: 'id',
@@ -120,7 +121,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     },
     state: { pagination: { pageIndex, pageSize }, sorting, rowSelection },
     manualPagination: true,
-    manualSorting: true,
+    // manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onPaginationChange: updater => {

@@ -1,5 +1,6 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
+import { useEffect } from 'react'
 
 import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
@@ -28,6 +29,10 @@ const UsersTable = (props: UsersTableProps) => {
   } = props
   const t = useTranslations('users')
   const columnHelper = createColumnHelper<ListUser>()
+
+  useEffect(() => {
+    console.log(sorting)
+  }, [sorting])
 
   const columns = [
     columnHelper.accessor('id', {

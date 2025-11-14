@@ -40,7 +40,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
   const [filteredGroups, setFilteredGroups] = useState(groups)
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
-  const [sorting, setSorting] = useState<SortingState>([])
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'title', desc: false }])
   const rowCount = groups.length
   const totalPages = Math.ceil(rowCount / pageSize) || 1
 
