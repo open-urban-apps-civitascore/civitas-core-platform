@@ -22,15 +22,13 @@ export interface GroupTabProps {
   onCancel?: () => void
 }
 
-export const GroupBaseInfoSchema = z.object({
+export const GroupBaseFormDataSchema = z.object({
   id: z.string(),
   title: z.string().min(2, {
     message: 'common.errors.atLeast2',
   }),
-  description: z.string().min(10, {
-    message: 'common.errors.atLeast10',
-  }),
+  description: z.string(),
   contact: z.string(),
 })
 
-export type GroupBaseInfo = z.infer<typeof GroupBaseInfoSchema>
+export type GroupBaseFormData = z.infer<typeof GroupBaseFormDataSchema>

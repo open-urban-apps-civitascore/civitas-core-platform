@@ -17,7 +17,9 @@
       "invalidEmail": "Invalid E-mail address",
       "required": "This field is required",
       "atLeast2": "The input must be at least 2 characters.",
-      "atLeast10": "The input must be at least 10 characters."
+      "atLeast10": "The input must be at least 10 characters.",
+      "minChar": "The input has to be at least {amount} characters.",
+      "notFound": "No {items} found"
     }
   },
   "languages": {
@@ -123,6 +125,7 @@
     "createGroup": "Create Group",
     "search": "Filter...",
     "notFound": "Group not found",
+    "createHint": "Please fill in the base information for activating roles, users and user groups.",
     "list": {
       "id": "ID",
       "title": "Name",
@@ -140,7 +143,7 @@
       "baseInfo": "Base Information",
       "name": "Name of the Group",
       "description": "Group Description",
-      "contact": "Contact"
+      "contact": { "label": "Contact", "placeholder": "Search by name or email" }
     },
     "roles": {
       "groupInfo": "Group Information",

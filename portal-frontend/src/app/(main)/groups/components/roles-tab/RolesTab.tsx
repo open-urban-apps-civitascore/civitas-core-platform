@@ -20,7 +20,7 @@ export const RolesTab = (props: GroupTabProps) => {
   const { groupData } = props
   const t = useTranslations('groups')
   const tRoles = useTranslations('roles')
-  const originalRoles = groupData.roles
+  const [originalRoles, setOriginalRoles] = useState(groupData.roles)
   const router = useRouter()
   const [group, setGroup] = useState<Group>(groupData)
 
@@ -68,7 +68,7 @@ export const RolesTab = (props: GroupTabProps) => {
     try {
       setIsLoading(true)
       await updateGroup(group)
-      router.refresh()
+      setOriginalRoles(group.roles)
     } catch (error) {
       console.error('An error occurred while updating the group: ', error)
     } finally {
@@ -123,10 +123,9 @@ export const RolesTab = (props: GroupTabProps) => {
         />
       </ContentCard>
       <ActionButtons
-        onCancelClick={() => setGroup({ ...group, roles: originalRoles })}
+        onCancelClick={() => router.push('/groups')}
         confirmButtonType="button"
         isConfirmButtonDisabled={!hasChanges}
-        isCancelButtonDisabled={!hasChanges}
         onConfirmClick={handleUpdateGroup}
       />
     </div>

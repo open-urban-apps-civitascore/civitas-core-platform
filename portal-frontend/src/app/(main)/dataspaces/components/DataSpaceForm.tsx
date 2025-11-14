@@ -30,7 +30,7 @@ export const DataSpaceForm = (props: DataSpaceFormProps) => {
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <div className="flex flex-col flex-grow justify-between h-[calc(100vh-200px)] mt-4">
           <ContentCard>
-            <div className="w-1/2">
+            <div>
               <TextField
                 form={form}
                 name="name"

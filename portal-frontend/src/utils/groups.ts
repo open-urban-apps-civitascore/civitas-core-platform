@@ -1,4 +1,4 @@
-import { Group } from '@/types/groups'
+import { Group, GroupBaseFormData } from '@/types/groups'
 
 export const mapGroupDetailsData = (groupResponse: Group | null): Group | null =>
   groupResponse
@@ -9,3 +9,10 @@ export const mapGroupDetailsData = (groupResponse: Group | null): Group | null =
         subgroups: groupResponse.subgroups.flatMap(subgroup => mapGroupDetailsData(subgroup) ?? []),
       }
     : null
+
+export const mapGroupToBaseFormData = (groupData: Group): GroupBaseFormData => ({
+  id: groupData.id,
+  title: groupData.title,
+  description: groupData.description || '',
+  contact: groupData.contact?.id || '',
+})
