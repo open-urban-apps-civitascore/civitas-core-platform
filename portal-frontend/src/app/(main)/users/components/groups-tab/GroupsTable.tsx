@@ -3,6 +3,7 @@ import { useLocale, useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { BasicTooltip } from '@/components/tooltip/Tooltip'
 import { Badge } from '@/components/ui/badge'
 import { UserGroupsListData } from '@/types/groups'
 import { TableProps } from '@/types/table'
@@ -72,6 +73,16 @@ const GroupsTable = (props: GroupsTableProps) => {
       cell: info => {
         const roles = info.getValue()
         if (!roles || roles.length === 0) return '-'
+        const tooltipContent = (
+          <div className="flex flex-wrap gap-2">
+            {' '}
+            {roles.slice(2, roles.length).map(role => (
+              <Badge key={role} variant="secondary">
+                {role}
+              </Badge>
+            ))}
+          </div>
+        )
         const badges = (
           <>
             {roles.slice(0, 2).map(role => (
@@ -79,7 +90,11 @@ const GroupsTable = (props: GroupsTableProps) => {
                 {role}
               </Badge>
             ))}
-            {roles.length > 2 && <Badge variant="outline">+{roles.length - 2}</Badge>}
+            {roles.length > 2 && (
+              <BasicTooltip tooltipContent={tooltipContent}>
+                <Badge variant="outline">+{roles.length - 2}</Badge>
+              </BasicTooltip>
+            )}
           </>
         )
         return <div className="flex flex-wrap gap-1">{badges}</div>
@@ -122,6 +137,7 @@ const GroupsTable = (props: GroupsTableProps) => {
       totalPages={totalPages}
       onRowClick={onRowClick}
       isLoading={isLoading}
+      hasCard={false}
     />
   )
 }

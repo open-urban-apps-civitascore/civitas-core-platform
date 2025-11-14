@@ -27,6 +27,7 @@ export interface DataTableProps<T> extends ComponentProps<'table'> {
   pageIndex: number
   totalPages: number
   isLoading?: boolean
+  hasCard?: boolean
   isRowClickable?: (row: Row<T>) => boolean
   onRowClick?: (row: Row<T>) => void
 }
@@ -47,6 +48,7 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
     pageIndex,
     totalPages,
     isLoading,
+    hasCard = true,
     onRowClick,
     isRowClickable = () => true,
     ...tableProps
@@ -57,7 +59,9 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
   return (
     <div className="@container h-full w-full">
       <div className="h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]">
-        <ScrollArea className="h-[calc(100%-var(--pagination-height))] w-full bg-white rounded-md border-1">
+        <ScrollArea
+          className={cn('h-[calc(100%-var(--pagination-height))] w-full bg-white', hasCard && 'rounded-md border-1')}
+        >
           <ShadCnTable aria-labelledby="subheading" tableContainerProps={{ className: '' }} {...tableProps}>
             <TableHeader>
               {table.getHeaderGroups().map(group => (

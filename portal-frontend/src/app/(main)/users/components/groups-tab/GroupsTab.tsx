@@ -2,8 +2,11 @@ import { PaginationState, SortingState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { ContentCard } from '@/components/content-card/ContentCard'
+import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
+import { Button } from '@/components/ui/button'
 import { Group, UserGroupsListData } from '@/types/groups'
 import { RoleResponse } from '@/types/roles'
 
@@ -11,8 +14,6 @@ import GroupsTable from './GroupsTable'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-const mapRolesData = (roles: RoleResponse[]): { id: string; title: string }[] =>
-  roles.map(role => ({ id: role.id, title: role.name }))
 interface GroupsTabProps {
   userId: string
 }
@@ -29,8 +30,6 @@ const transformGroupsToListData = (groups: Group[], roles: RoleResponse[], userI
     memberSince: group.users.find(user => user.id === userId)?.assignedAt || '',
     contact: group.contact,
   }))
-
-type UserRole = { id: string; title: string }
 
 export const GroupsTab = (props: GroupsTabProps) => {
   const { userId } = props
@@ -95,11 +94,13 @@ export const GroupsTab = (props: GroupsTabProps) => {
     setPageIndex(newPagination.pageIndex)
     setPageSize(newPagination.pageSize)
   }
+
+  const CustomElement = <Button>{t('groupsTab.addGroup')}</Button>
   return (
-    <div className="h-full">
-      <h2>{t('groupsTab.title')}</h2>
-      <SearchHeader searchString={searchString} onChangeSearchString={setSearchString} />
-      <TableContainer>
+    <ContentCard className="h-full">
+      <SubHeader title={t('groupsTab.title')} customElement={CustomElement} />
+      <SearchHeader searchString={searchString} onChangeSearchString={setSearchString} className="my-2" />
+      <TableContainer className="[--search-height:calc(--spacing(30))]">
         <GroupsTable
           groups={filteredGroups}
           rowCount={rowCount}
@@ -112,6 +113,6 @@ export const GroupsTab = (props: GroupsTabProps) => {
           isLoading={isLoading}
         />
       </TableContainer>
-    </div>
+    </ContentCard>
   )
 }
