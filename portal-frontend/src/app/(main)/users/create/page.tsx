@@ -1,8 +1,26 @@
-import { UserDetails } from '../components/UserDetails'
-import { defaultFormUser } from '../formDefaults'
+import { getTranslations } from 'next-intl/server'
 
-const page = () => {
-  return <UserDetails userData={defaultFormUser} />
+import { TitleSchemaType, UserResponse } from '@/types/users'
+
+import { UserDetails } from '../components/UserDetails'
+
+export const defaultFormUser: UserResponse = {
+  id: '',
+  displayName: '',
+  firstName: '',
+  lastName: '',
+  title: 'male' as TitleSchemaType,
+  email: '',
+  active: false,
+  authority: null,
+  groups: [],
+  phone: '',
+  positionDescription: '',
 }
 
-export default page
+const CreateUserPage = async () => {
+  const t = await getTranslations('users')
+  return <UserDetails userData={defaultFormUser} title={t('newUser')} />
+}
+
+export default CreateUserPage
