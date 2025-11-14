@@ -181,6 +181,31 @@ const eslintConfig = [
       ],
 
       // ===================================================
+      // SECURITY - AR-2 COMPLIANCE
+      // ===================================================
+
+      // Prevent legacy client technologies (Flash, ActiveX, Java Applets)
+      'react/forbid-elements': [
+        'error',
+        {
+          forbid: [
+            {
+              element: 'object',
+              message: 'Legacy <object> tag is forbidden (AR-2 compliance). Use modern alternatives.',
+            },
+            {
+              element: 'embed',
+              message: 'Legacy <embed> tag is forbidden (AR-2 compliance). Use modern alternatives.',
+            },
+            {
+              element: 'applet',
+              message: 'Legacy <applet> tag is forbidden (AR-2 compliance). Java applets are deprecated.',
+            },
+          ],
+        },
+      ],
+
+      // ===================================================
       // CODE STYLE
       // ===================================================
 
