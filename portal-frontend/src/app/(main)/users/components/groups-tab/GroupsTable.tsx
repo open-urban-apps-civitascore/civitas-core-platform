@@ -55,11 +55,11 @@ const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('contact', {
       header: t('groupsTab.contact'),
-      cell: info => info.getValue()?.displayName,
+      cell: info => info.getValue()?.displayName || '-',
     }),
     columnHelper.accessor('description', {
       header: t('groupsTab.description'),
-      cell: info => info.getValue(),
+      cell: info => info.getValue() || '-',
       meta: {
         style: {
           whiteSpace: 'nowrap',
@@ -121,7 +121,6 @@ const GroupsTable = (props: GroupsTableProps) => {
     },
     state: { pagination: { pageIndex, pageSize }, sorting, rowSelection },
     manualPagination: true,
-    // manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     onPaginationChange: updater => {
