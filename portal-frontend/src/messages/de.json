@@ -48,6 +48,7 @@
     "title": "Datensätze",
     "subtitle": "Alle verfügbaren Datensätze unserer Organisation",
     "searchDatasets": "Datensätze durchsuchen",
+    "newDataset": "Neuer Datensatz",
     "tableHeaders": {
       "name": "Name",
       "dataSpace": "Datenraum",
@@ -64,7 +65,23 @@
         "closed": "geschlossen"
       }
     },
-    "newDataset": "Neuer Datensatz"
+    "create": {
+      "title": "Übersicht: Dataset erstellen",
+      "info": {
+        "dataspace": "Datenraum",
+        "name": "Name",
+        "description": "Beschreibung",
+        "tags": "Tags"
+      },
+      "progress": {
+        "metadata": "Metadaten",
+        "groups": "Gruppen- & Rollenzuweisung",
+        "configuration": "Datenkonfiguration",
+        "distribution": "Distribution / Applikationen / APIs",
+        "permissions": "Nutzerdatenberechtigungen",
+        "publication": "Freigabe"
+      }
+    }
   },
   "users": {
     "title": "Übersicht: User",

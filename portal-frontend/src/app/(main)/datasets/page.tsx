@@ -14,6 +14,7 @@ import { useQueryParams } from '@/hooks/useQueryParams'
 import { isPageIndexHigherThanTotalPages } from '@/utils/table'
 
 import DatasetsTable from './components/DatasetsTable'
+import { useRouter } from 'next/navigation'
 
 export type Status = 'open' | 'closed' | null
 export type Creator = { id: string; firstName: string; lastName: string }
@@ -81,6 +82,7 @@ export const mapDatasets = (datasets: DatasetResponse[]): Dataset[] =>
 
 const DatasetsPage = () => {
   const t = useTranslations('datasets')
+  const router = useRouter()
   const [datasets, setDatasets] = useState<Dataset[]>([])
   const [rowCount, setRowCount] = useState(0)
 
@@ -127,7 +129,7 @@ const DatasetsPage = () => {
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
 
   const CustomElement = (
-    <Button>
+    <Button onClick={() => router.push('datasets/create')}>
       <Plus />
       {t('newDataset')}
     </Button>
