@@ -1,13 +1,5 @@
 import { z } from 'zod'
 
-export type DatasetCreationProgress = {
-  metadata: boolean
-  groups: boolean
-  dataConfiguration: boolean
-  distribution: boolean
-  permissions: boolean
-  publication: boolean
-}
 
 export const DatasetFormSchema = z.object({
   id: z.string(),
@@ -20,7 +12,3 @@ export const DatasetFormSchema = z.object({
 })
 
 export type DatasetFormData = z.infer<typeof DatasetFormSchema>
-
-export type DatasetOverviewData = DatasetFormData & {
-  creationProgress: DatasetCreationProgress
-}

@@ -5,6 +5,8 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { Select, SelectOption } from '@/components/form/fields/Select'
 import { TextField } from '@/components/form/fields/TextField'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
+import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -13,28 +15,29 @@ import { Form, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-import { DatasetFormData, DatasetFormSchema, DatasetOverviewData } from '@/types/datasets'
+import { DatasetFormData, DatasetFormSchema } from '@/types/datasets'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
-import { KeyboardEvent } from 'react'
+import { KeyboardEvent, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { createDataset } from '../actions'
 
 interface DatasetOverviewProps {
-  dataset: DatasetOverviewData
+  dataset: DatasetFormData
   dataspaces: SelectOption[]
   isEditMode: boolean
 }
 export const DatasetOverview = (props: DatasetOverviewProps) => {
   const { dataset, dataspaces, isEditMode } = props
-  const { creationProgress, ...datasetInfo } = dataset
   const t = useTranslations('datasets')
   const isMobile = useIsMobile()
   const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<DatasetFormData>({
     resolver: zodResolver(DatasetFormSchema),
-    defaultValues: datasetInfo,
+    defaultValues: dataset,
   })
 
   const tagsWatch = form.watch('tags')
@@ -47,9 +50,22 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     }
   }
 
-  const createDataset = () => {}
-  const updateDataset = () => {}
-  const handleSubmit = () => (isEditMode ? updateDataset() : createDataset())
+  const handleCreateDataset = async (formData: DatasetFormData) => {
+    setIsLoading(true)
+    const response = await createDataset(formData)
+
+    router.push(`/datasets/${response.id}`)
+  }
+  const handleUpdateDataset = () => {}
+  const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateDataset) : form.handleSubmit(handleCreateDataset)
+
+  if (!dataset) {
+    return <NoDataPage title="No Data" />
+  }
+
+  if (isLoading) {
+    return <LoadingSpinner title="Loading..." />
+  }
 
   return (
     <PageContainer headerType="withSubTabs" className="overflow-hidden">
@@ -76,6 +92,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
                     label={t('create.info.name')}
                     name="title"
                     placeholder={t('create.info.name')}
+                    required
                   />
                 </DetailsFieldContainer>
                 <DetailsFieldContainer>
@@ -103,7 +120,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
               <ActionButtons
                 confirmButtonType="submit"
                 isConfirmButtonDisabled={!form.formState.isDirty}
-                onCancelClick={() => router.push('datasets')}
+                onCancelClick={() => router.push('/datasets')}
                 hasCard={false}
               />
             </form>
