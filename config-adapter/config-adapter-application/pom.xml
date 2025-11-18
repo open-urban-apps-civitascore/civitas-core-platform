@@ -25,7 +25,7 @@
 
         <dependency>
             <groupId>com.civitas</groupId>
-            <artifactId>config-adapter-kafka</artifactId>
+            <artifactId>event-handler-kafka</artifactId>
             <version>${project.version}</version>
         </dependency>
 

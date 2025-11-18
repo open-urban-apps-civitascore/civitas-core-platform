@@ -8,51 +8,51 @@ import java.util.Properties;
 
 public record AppConfig(Properties properties) {
 
-    public AppConfig(String configFile) {
-        this(new Properties());
-        try (InputStream input = getClass().getClassLoader().getResourceAsStream(configFile)) {
-            if (input == null) {
-                throw new RuntimeException("Unable to find " + configFile);
-            }
-            properties.load(input);
-        } catch (IOException ex) {
-            throw new RuntimeException("Failed to load configuration", ex);
+  public AppConfig(String configFile) {
+    this(new Properties());
+    try (InputStream input = getClass().getClassLoader().getResourceAsStream(configFile)) {
+      if (input == null) {
+        throw new RuntimeException("Unable to find " + configFile);
+      }
+      properties.load(input);
+    } catch (IOException ex) {
+      throw new RuntimeException("Failed to load configuration", ex);
+    }
+  }
+
+  public List<String> getAdapterClasses() {
+    List<String> adapterClasses = new ArrayList<>();
+    String adaptersProperty = properties.getProperty("adapters");
+
+    if (adaptersProperty != null && !adaptersProperty.trim().isEmpty()) {
+      String[] adapters = adaptersProperty.split(",");
+      for (String adapter : adapters) {
+        String trimmed = adapter.trim();
+        if (!trimmed.isEmpty()) {
+          adapterClasses.add(trimmed);
         }
+      }
     }
+    return adapterClasses;
+  }
 
-    public List<String> getAdapterClasses() {
-        List<String> adapterClasses = new ArrayList<>();
-        String adaptersProperty = properties.getProperty("adapters");
+  public String getEventHandlerClass() {
+    return properties.getProperty("eventhandler.class");
+  }
 
-        if (adaptersProperty != null && !adaptersProperty.trim().isEmpty()) {
-            String[] adapters = adaptersProperty.split(",");
-            for (String adapter : adapters) {
-                String trimmed = adapter.trim();
-                if (!trimmed.isEmpty()) {
-                    adapterClasses.add(trimmed);
-                }
-            }
-        }
-        return adapterClasses;
-    }
+  public String getEventConsumerClass() {
+    return properties.getProperty("eventconsumer.class");
+  }
 
-    public String getEventHandlerClass() {
-        return properties.getProperty("eventhandler.class");
-    }
+  public String getEventPublisherClass() {
+    return properties.getProperty("eventpublisher.class");
+  }
 
-    public String getEventConsumerClass() {
-        return properties.getProperty("eventconsumer.class");
-    }
+  public String getProperty(String key) {
+    return properties.getProperty(key);
+  }
 
-    public String getEventPublisherClass() {
-        return properties.getProperty("eventpublisher.class");
-    }
-
-    public String getProperty(String key) {
-        return properties.getProperty(key);
-    }
-
-    public String getProperty(String key, String defaultValue) {
-        return properties.getProperty(key, defaultValue);
-    }
+  public String getProperty(String key, String defaultValue) {
+    return properties.getProperty(key, defaultValue);
+  }
 }

@@ -18,44 +18,56 @@ lint-config-adapter:
     key:
       prefix: config-adapter-maven
       files:
-        - portal-config-adapter/pom.xml
+        - config-adapter/pom.xml
     paths:
       - .m2/repository
   script:
-    - cd portal-config-adapter
+    - cd config-adapter
     - mvn spotless:check
 
 test-config-adapter:
   extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-21
   stage: test
   needs: []
+  services:
+    - name: docker:27-dind
+      alias: docker
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+    DOCKER_DRIVER: overlay2
+    TESTCONTAINERS_HOST_OVERRIDE: docker
   cache:
     key:
       prefix: config-adapter-maven
       files:
-        - portal-config-adapter/pom.xml
+        - config-adapter/pom.xml
     paths:
       - .m2/repository
   script:
-    - cd portal-config-adapter
-    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report
-    # To print coverage, picked up by coverage regex
-    - cat target/site/jacoco/index.html| grep -o '<tfoot>.*</tfoot>'
+    - cd config-adapter
+    - mvn $MAVEN_CLI_OPTS clean test
+    # Aggregate coverage from all modules
+    - |
+      for module in */target/site/jacoco/index.html; do
+        if [ -f "$module" ]; then
+          cat "$module" | grep -o '<tfoot>.*</tfoot>'
+        fi
+      done
   coverage: '/Total.*?([0-9]{1,3})%/'
   artifacts:
     when: always
     expire_in: 1 month
     paths:
-      - portal-config-adapter/target/surefire-reports/
-      - portal-config-adapter/target/site/jacoco/
+      - config-adapter/*/target/surefire-reports/
+      - config-adapter/*/target/site/jacoco/
     reports:
-      junit: portal-config-adapter/target/surefire-reports/TEST-*.xml
+      junit: config-adapter/*/target/surefire-reports/TEST-*.xml
       coverage_report:
         coverage_format: jacoco
-        path: portal-config-adapter/target/site/jacoco/jacoco.xml
+        path: config-adapter/*/target/site/jacoco/jacoco.xml
 
 build-config-adapter:
   extends: .only-config-adapter-changes

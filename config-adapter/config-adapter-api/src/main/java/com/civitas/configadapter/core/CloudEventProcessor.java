@@ -8,41 +8,42 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Internal helper class that processes CloudEvents and delegates to ConfigAdapter.
- * Handles deserialization of CloudEvent data into ConfigEvent.
+ * Internal helper class that processes CloudEvents and delegates to ConfigAdapter. Handles
+ * deserialization of CloudEvent data into ConfigEvent.
  */
 public class CloudEventProcessor {
 
-    private static final Logger logger = LoggerFactory.getLogger(CloudEventProcessor.class);
+  private static final Logger logger = LoggerFactory.getLogger(CloudEventProcessor.class);
 
-    private final ConfigAdapter configAdapter;
-    private final ObjectMapper objectMapper;
+  private final ConfigAdapter configAdapter;
+  private final ObjectMapper objectMapper;
 
-    public CloudEventProcessor(ConfigAdapter configAdapter) {
-        this.configAdapter = configAdapter;
-        this.objectMapper = new ObjectMapper();
+  public CloudEventProcessor(ConfigAdapter configAdapter) {
+    this.configAdapter = configAdapter;
+    this.objectMapper = new ObjectMapper();
+  }
+
+  public void handleEvent(String topic, CloudEvent cloudEvent) {
+    try {
+      logger.info(
+          "Received CloudEvent - ID: {}, Type: {}, Source: {}",
+          cloudEvent.getId(),
+          cloudEvent.getType(),
+          cloudEvent.getSource());
+
+      if (cloudEvent.getData() == null) {
+        logger.warn("CloudEvent has no data, skipping: {}", cloudEvent.getId());
+        return;
+      }
+
+      String jsonData = new String(cloudEvent.getData().toBytes());
+      logger.debug("CloudEvent data: {}", jsonData);
+
+      ConfigEvent configEvent = objectMapper.readValue(jsonData, ConfigEvent.class);
+      configAdapter.processConfigEvent(topic, configEvent);
+
+    } catch (Exception e) {
+      logger.error("Error processing CloudEvent: {}", cloudEvent.getId(), e);
     }
-
-    public void handleEvent(String topic, CloudEvent cloudEvent) {
-        try {
-            logger.info("Received CloudEvent - ID: {}, Type: {}, Source: {}",
-                cloudEvent.getId(),
-                cloudEvent.getType(),
-                cloudEvent.getSource());
-
-            if (cloudEvent.getData() == null) {
-                logger.warn("CloudEvent has no data, skipping: {}", cloudEvent.getId());
-                return;
-            }
-
-            String jsonData = new String(cloudEvent.getData().toBytes());
-            logger.debug("CloudEvent data: {}", jsonData);
-
-            ConfigEvent configEvent = objectMapper.readValue(jsonData, ConfigEvent.class);
-            configAdapter.processConfigEvent(topic, configEvent);
-
-        } catch (Exception e) {
-            logger.error("Error processing CloudEvent: {}", cloudEvent.getId(), e);
-        }
-    }
+  }
 }
