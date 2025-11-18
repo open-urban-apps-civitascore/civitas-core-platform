@@ -89,7 +89,7 @@ build-config-adapter:
   artifacts:
     when: on_success
     paths:
-      - config-adapter/target/*.jar
+      - config-adapter/config-adapter-application/target/*.jar
     expire_in: 1 month
 
 deploy-config-adapter:
