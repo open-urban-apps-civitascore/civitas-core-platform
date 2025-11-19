@@ -42,9 +42,8 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
     this.processor = new CloudEventProcessor(adapter);
 
     Properties props = new Properties();
-    props.put(
-        ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
-        config.getProperty(KAFKA_BOOTSTRAP_SERVERS, "localhost:9092"));
+    String kafkaServerUrl = config.getProperty(KAFKA_BOOTSTRAP_SERVERS, "localhost:9092");
+    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServerUrl);
     props.put(
         ConsumerConfig.GROUP_ID_CONFIG, config.getProperty(KAFKA_GROUP_ID, "config-adapter-group"));
     props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
@@ -61,9 +60,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
     // Initialize producer for publishing events
     Properties producerProps = new Properties();
-    producerProps.put(
-        ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
-        config.getProperty(KAFKA_BOOTSTRAP_SERVERS, "localhost:9092"));
+    producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServerUrl);
     producerProps.put(
         ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
         org.apache.kafka.common.serialization.StringSerializer.class.getName());
@@ -80,7 +77,8 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
     adapter.setEventPublisher(this);
 
     logger.info(
-        "Kafka event consumer initialized for adapter {} with {} topic(s): {}",
+        "Kafka {} event consumer initialized for adapter {} with {} topic(s): {}",
+        kafkaServerUrl,
         adapter.getClass().getSimpleName(),
         topicList.size(),
         topicList);
