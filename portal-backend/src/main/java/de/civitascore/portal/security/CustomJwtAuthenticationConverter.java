@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 public class CustomJwtAuthenticationConverter
     implements Converter<Jwt, AbstractAuthenticationToken> {
 
+  private static final String CLAIM_SUB = "sub";
   private static final String CLAIM_PREFERRED_USERNAME = "preferred_username";
   private static final String CLAIM_EMAIL = "email";
   private static final String CLAIM_TENANT_ID = "tenantId";
@@ -30,6 +31,7 @@ public class CustomJwtAuthenticationConverter
 
   @Override
   public AbstractAuthenticationToken convert(Jwt jwt) {
+    String userId = jwt.getClaimAsString(CLAIM_SUB);
     String username = jwt.getClaimAsString(CLAIM_PREFERRED_USERNAME);
     String email = jwt.getClaimAsString(CLAIM_EMAIL);
     String tenant = extractTenantId(jwt);
@@ -40,6 +42,7 @@ public class CustomJwtAuthenticationConverter
 
     PrincipalUserDetails dto =
         PrincipalUserDetails.builder()
+            .userId(userId)
             .username(username)
             .email(email)
             .tenantId(tenant)

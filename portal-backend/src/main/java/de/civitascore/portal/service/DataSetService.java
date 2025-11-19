@@ -58,9 +58,8 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
 
   @Override
   protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
-    // Use getReferenceById for ManyToOne relationships to avoid unnecessary SELECT queries
     if (input.getOwnerUserId() != null) {
-      entity.setOwner(userService.getReferenceById(input.getOwnerUserId()));
+      entity.setOwner(userService.findById(input.getOwnerUserId()));
     } else {
       entity.setOwner(null);
     }

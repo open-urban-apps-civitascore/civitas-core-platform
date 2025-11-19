@@ -34,7 +34,19 @@
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
         <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
         <tomcat.version>11.0.14</tomcat.version>
+        <commons-compress.version>1.27.1</commons-compress.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Override transitive dependency to fix CVE -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>${commons-compress.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Web, Data, Validation -->

@@ -42,19 +42,19 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   protected Assignment postConvertToEntity(Assignment entity, AssignmentInputDTO input) {
 
     if (input.getGroupId() != null) {
-      entity.setGroup(groupService.getReferenceById(input.getGroupId()));
+      entity.setGroup(groupService.findById(input.getGroupId()));
     } else {
       entity.setGroup(null);
     }
 
     if (input.getRoleId() != null) {
-      entity.setRole(roleService.getReferenceById(input.getRoleId()));
+      entity.setRole(roleService.findById(input.getRoleId()));
     } else {
       entity.setRole(null);
     }
 
     if (input.getParentAssignmentId() != null) {
-      entity.setParentAssignment(getReferenceById(input.getParentAssignmentId()));
+      entity.setParentAssignment(findById(input.getParentAssignmentId()));
     } else {
       entity.setParentAssignment(null);
     }

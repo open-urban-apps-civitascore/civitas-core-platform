@@ -170,9 +170,6 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
    */
   @Transactional(readOnly = true)
   public T getReferenceById(UUID id) {
-    if (!getRepository().existsById(id)) {
-      throw new ResourceNotFoundException(getEntityName(), id);
-    }
     return getRepository().getReferenceById(id);
   }
 

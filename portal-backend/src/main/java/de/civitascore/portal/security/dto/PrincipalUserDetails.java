@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 @Setter
 @Data
 public class PrincipalUserDetails implements UserDetails {
+  private final String userId;
   private final String username;
   private final String email;
   private final String tenantId;

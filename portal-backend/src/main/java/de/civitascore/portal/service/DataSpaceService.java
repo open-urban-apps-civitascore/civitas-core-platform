@@ -57,13 +57,13 @@ public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> 
   protected DataSpace postConvertToEntity(DataSpace entity, DataSpaceInputDTO input) {
     // Use getReferenceById for ManyToOne relationships to avoid unnecessary SELECT queries
     if (input.getOwnerUserId() != null) {
-      entity.setOwner(userService.getReferenceById(input.getOwnerUserId()));
+      entity.setOwner(userService.findById(input.getOwnerUserId()));
     } else {
       entity.setOwner(null);
     }
 
     if (input.getParentDataSpaceId() != null) {
-      entity.setParentDataSpace(getReferenceById(input.getParentDataSpaceId()));
+      entity.setParentDataSpace(findById(input.getParentDataSpaceId()));
     } else {
       entity.setParentDataSpace(null);
     }

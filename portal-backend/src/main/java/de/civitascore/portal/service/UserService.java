@@ -8,6 +8,7 @@ import de.civitascore.portal.model.input.UserInputDTO;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -78,5 +79,9 @@ public class UserService extends BaseService<User, UserInputDTO> {
       throw new RuntimeException("Failed to process update input", e);
     }
     return super.preProcessUpdateInput(input, existingEntity);
+  }
+
+  public Optional<User> findByEmail(String email) {
+    return userRepository.findByEmail(email);
   }
 }

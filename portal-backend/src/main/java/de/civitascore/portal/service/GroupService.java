@@ -48,13 +48,13 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
   protected Group postConvertToEntity(Group entity, GroupInputDTO input) {
     // Use getReferenceById for ManyToOne relationships to avoid unnecessary SELECT queries
     if (input.getContactUserId() != null) {
-      entity.setContactUser(userService.getReferenceById(input.getContactUserId()));
+      entity.setContactUser(userService.findById(input.getContactUserId()));
     } else {
       entity.setContactUser(null);
     }
 
     if (input.getParentGroupId() != null) {
-      entity.setParentGroup(getReferenceById(input.getParentGroupId()));
+      entity.setParentGroup(findById(input.getParentGroupId()));
     } else {
       entity.setParentGroup(null);
     }
