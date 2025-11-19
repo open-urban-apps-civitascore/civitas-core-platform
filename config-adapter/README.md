@@ -438,6 +438,153 @@ Reference implementations for learning and creating your own adapters.
 
 ## Configuration
 
+### Environment Variable Support
+
+All properties can be overridden by environment variables. This is essential for containerized deployments (Docker, Kubernetes).
+
+**Conversion Rules:**
+- Convert property key to **UPPERCASE**
+- Replace dots (`.`) with underscores (`_`)
+- Replace dashes (`-`) with underscores (`_`)
+
+**Resolution Order:**
+1. Environment variable
+2. Properties file value
+3. Default value
+
+**Property to Environment Variable Mapping:**
+
+| Property | Environment Variable |
+|----------|---------------------|
+| `healthcheck.port` | `HEALTHCHECK_PORT` |
+| `kafka.bootstrap.servers` | `KAFKA_BOOTSTRAP_SERVERS` |
+| `kafka.group.id` | `KAFKA_GROUP_ID` |
+| `keycloak.url` | `KEYCLOAK_URL` |
+| `keycloak.realm` | `KEYCLOAK_REALM` |
+| `keycloak.username` | `KEYCLOAK_USERNAME` |
+| `keycloak.password` | `KEYCLOAK_PASSWORD` |
+| `keycloak.client.id` | `KEYCLOAK_CLIENT_ID` |
+| `adapters` | `ADAPTERS` |
+| `eventhandler.class` | `EVENTHANDLER_CLASS` |
+
+### Health Check Endpoints
+
+The application provides HTTP health check endpoints for external monitoring:
+
+**Endpoints:**
+
+| Endpoint | Description | Success | Failure |
+|----------|-------------|---------|---------|
+| `/health` | Detailed health status | 200 | 503 |
+| `/health/ready` | Kubernetes readiness probe | 200 | 503 |
+| `/health/live` | Kubernetes liveness probe | 200 | - |
+
+**Response Examples:**
+
+```json
+// GET /health (healthy)
+{
+  "status": "UP",
+  "consumers": 2,
+  "details": {
+    "ready": true
+  }
+}
+
+// GET /health/ready
+{"status": "UP"}
+
+// GET /health/live
+{"status": "UP"}
+```
+
+**Configuration:**
+```properties
+# Health check port (default: 8080)
+healthcheck.port=8080
+```
+
+### Docker Compose Example
+
+```yaml
+version: '3.8'
+services:
+  config-adapter:
+    image: config-adapter:latest
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_GROUP_ID: config-adapter-prod
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: production
+      KEYCLOAK_USERNAME: admin
+      KEYCLOAK_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KEYCLOAK_CLIENT_ID: admin-cli
+      HEALTHCHECK_PORT: "8080"
+      ADAPTERS: com.civitas.configadapter.keycloak.KeycloakAdapter
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      - kafka
+      - keycloak
+```
+
+### Kubernetes Deployment Example
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-adapter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: config-adapter
+  template:
+    metadata:
+      labels:
+        app: config-adapter
+    spec:
+      containers:
+      - name: config-adapter
+        image: config-adapter:latest
+        ports:
+        - name: health
+          containerPort: 8080
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka:9092"
+        - name: KEYCLOAK_URL
+          value: "http://keycloak:8080"
+        - name: KEYCLOAK_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: keycloak-secrets
+              key: admin-password
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: health
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+```
+
 ### Kafka Configuration
 
 ```properties

@@ -22,7 +22,7 @@ public record AppConfig(Properties properties) {
 
   public List<String> getAdapterClasses() {
     List<String> adapterClasses = new ArrayList<>();
-    String adaptersProperty = properties.getProperty("adapters");
+    String adaptersProperty = getProperty("adapters");
 
     if (adaptersProperty != null && !adaptersProperty.trim().isEmpty()) {
       String[] adapters = adaptersProperty.split(",");
@@ -37,19 +37,19 @@ public record AppConfig(Properties properties) {
   }
 
   public String getEventHandlerClass() {
-    return properties.getProperty("eventhandler.class");
+    return getProperty("eventhandler.class");
   }
 
   public String getEventConsumerClass() {
-    return properties.getProperty("eventconsumer.class");
+    return getProperty("eventconsumer.class");
   }
 
   public String getEventPublisherClass() {
-    return properties.getProperty("eventpublisher.class");
+    return getProperty("eventpublisher.class");
   }
 
   public int getHealthCheckPort() {
-    String portProperty = properties.getProperty("healthcheck.port", "8080");
+    String portProperty = getProperty("healthcheck.port", "8080");
     try {
       return Integer.parseInt(portProperty);
     } catch (NumberFormatException e) {
@@ -58,11 +58,77 @@ public record AppConfig(Properties properties) {
     }
   }
 
+  /**
+   * Gets a property value with environment variable override support.
+   *
+   * <p>Resolution order:
+   *
+   * <ol>
+   *   <li>Environment variable (property key converted to uppercase with dots/dashes replaced by
+   *       underscores)
+   *   <li>Properties file value
+   * </ol>
+   *
+   * <p>Example: Property "kafka.bootstrap.servers" can be overridden by environment variable
+   * "KAFKA_BOOTSTRAP_SERVERS"
+   *
+   * @param key the property key
+   * @return the property value, or null if not found
+   */
   public String getProperty(String key) {
-    return properties.getProperty(key);
+    return getProperty(key, null);
   }
 
+  /**
+   * Gets a property value with environment variable override support and default fallback.
+   *
+   * <p>Resolution order:
+   *
+   * <ol>
+   *   <li>Environment variable (property key converted to uppercase with dots/dashes replaced by
+   *       underscores)
+   *   <li>Properties file value
+   *   <li>Default value
+   * </ol>
+   *
+   * @param key the property key
+   * @param defaultValue the default value if not found
+   * @return the property value, or defaultValue if not found
+   */
   public String getProperty(String key, String defaultValue) {
+    String envKey = toEnvironmentVariableName(key);
+    String envValue = System.getenv(envKey);
+
+    if (envValue != null && !envValue.isEmpty()) {
+      return envValue;
+    }
+
     return properties.getProperty(key, defaultValue);
+  }
+
+  /**
+   * Converts a property key to an environment variable name.
+   *
+   * <p>Conversion rules:
+   *
+   * <ul>
+   *   <li>Convert to uppercase
+   *   <li>Replace dots (.) with underscores (_)
+   *   <li>Replace dashes (-) with underscores (_)
+   * </ul>
+   *
+   * <p>Examples:
+   *
+   * <ul>
+   *   <li>"kafka.bootstrap.servers" → "KAFKA_BOOTSTRAP_SERVERS"
+   *   <li>"healthcheck.port" → "HEALTHCHECK_PORT"
+   *   <li>"keycloak.client.id" → "KEYCLOAK_CLIENT_ID"
+   * </ul>
+   *
+   * @param propertyKey the property key
+   * @return the environment variable name
+   */
+  private String toEnvironmentVariableName(String propertyKey) {
+    return propertyKey.toUpperCase().replace('.', '_').replace('-', '_');
   }
 }
