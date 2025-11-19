@@ -15,9 +15,13 @@ RUN addgroup -g 1001 -S civitas && \
     chown -R civitas:civitas /civitas
 USER civitas
 
-ENV PORT=8091
+ENV PORT=8089
 EXPOSE $PORT
 ENV NODE_ENV=production
+
+# Health check with correct endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8089/health/ready || exit 1
 
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
 
