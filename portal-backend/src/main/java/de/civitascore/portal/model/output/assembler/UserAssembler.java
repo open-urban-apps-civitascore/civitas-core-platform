@@ -3,12 +3,13 @@ package de.civitascore.portal.model.output.assembler;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.output.UserOutputDTO;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class UserAssembler implements BaseAssembler<User, UserOutputDTO, String> {
+public class UserAssembler implements BaseAssembler<User, UserOutputDTO, UUID> {
 
   private final UserMapper userMapper;
 

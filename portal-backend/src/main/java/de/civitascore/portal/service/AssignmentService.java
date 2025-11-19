@@ -8,13 +8,14 @@ import de.civitascore.portal.model.input.AssignmentInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class AssignmentService extends BaseService<Assignment, String, AssignmentInputDTO> {
+public class AssignmentService extends BaseService<Assignment, AssignmentInputDTO> {
 
   private final AssignmentRepository assignmentRepository;
   private final AssignmentMapper assignmentMapper;
@@ -67,7 +68,7 @@ public class AssignmentService extends BaseService<Assignment, String, Assignmen
    * query problems that would occur with lazy loading.
    */
   @Override
-  public Assignment findById(String id) {
+  public Assignment findById(UUID id) {
     preProcessLoad(id);
     Assignment entity =
         assignmentRepository
@@ -85,15 +86,15 @@ public class AssignmentService extends BaseService<Assignment, String, Assignmen
 
       if (jsonNode.has("groupId") && StringUtils.isBlank(jsonNode.get("groupId").asText())) {
         throw new InvalidInputException(
-            "groupId", "Group ID cannot be null or blank", existingEntity.getId());
+            "groupId", existingEntity.getId(), "Group ID cannot be null or blank");
       }
       if (jsonNode.has("roleId") && StringUtils.isBlank(jsonNode.get("roleId").asText())) {
         throw new InvalidInputException(
-            "roleId", "Role ID cannot be null or blank", existingEntity.getId());
+            "roleId", existingEntity.getId(), "Role ID cannot be null or blank");
       }
       if (jsonNode.has("scopeType") && jsonNode.get("scopeType").isNull()) {
         throw new InvalidInputException(
-            "scopeType", "Scope type cannot be null", existingEntity.getId());
+            "scopeType", existingEntity.getId(), "Scope type cannot be null");
       }
     } catch (InvalidInputException e) {
       throw e;

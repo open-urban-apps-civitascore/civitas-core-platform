@@ -9,6 +9,7 @@ import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -73,7 +74,7 @@ class DataSetControllerIntegrationTest
   }
 
   @Override
-  protected String getIdFromOutput(DataSetOutputDTO output) {
+  protected UUID getIdFromOutput(DataSetOutputDTO output) {
     return output.getId();
   }
 
@@ -189,7 +190,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should retrieve dataset by ID successfully")
     void shouldRetrieveDataSetById() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       ResponseEntity<DataSetOutputDTO> response = performGetById(dataSetId);
 
@@ -205,7 +206,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should return 404 for non-existent dataset")
     void shouldReturn404ForNonExistentDataSet() {
-      ResponseEntity<DataSetOutputDTO> response = performGetById("non-existent-id");
+      ResponseEntity<DataSetOutputDTO> response = performGetById(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -215,7 +216,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should fail to retrieve dataset without authentication")
     void shouldFailToRetrieveDataSetWithoutAuth() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + dataSetId, org.springframework.http.HttpMethod.GET);
@@ -265,7 +266,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should update dataset successfully with PUT")
     void shouldUpdateDataSetWithPut() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       DataSetInputDTO updateInput = createUpdateInput();
       ResponseEntity<DataSetOutputDTO> response = performUpdate(dataSetId, updateInput);
@@ -289,7 +290,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should partially update dataset with PATCH - single field")
     void shouldPartiallyUpdateDataSetWithPatch() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", "Only description updated");
@@ -306,7 +307,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should update multiple fields with PATCH")
     void shouldUpdateMultipleFieldsWithPatch() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("name", "PatchedDataSet");
@@ -322,7 +323,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should set description to null with PATCH")
     void shouldSetDescriptionToNullWithPatch() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", null);
@@ -338,7 +339,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should leave omitted fields unchanged with PATCH")
     void shouldLeaveOmittedFieldsUnchangedWithPatch() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       ResponseEntity<DataSetOutputDTO> initialResponse = performGetById(dataSetId);
       DataSetOutputDTO initialDataSet = initialResponse.getBody();
@@ -358,7 +359,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should handle empty PATCH (no changes)")
     void shouldHandleEmptyPatch() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       ResponseEntity<DataSetOutputDTO> initialResponse = performGetById(dataSetId);
       DataSetOutputDTO initialDataSet = initialResponse.getBody();
@@ -376,7 +377,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should be idempotent with PATCH")
     void shouldBeIdempotentWithPatch() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", "Idempotent test");
@@ -395,7 +396,7 @@ class DataSetControllerIntegrationTest
     void shouldFailToUpdateNonExistentDataSet() {
       DataSetInputDTO updateInput = createUpdateInput();
 
-      ResponseEntity<DataSetOutputDTO> response = performUpdate("non-existent-id", updateInput);
+      ResponseEntity<DataSetOutputDTO> response = performUpdate(UUID.randomUUID(), updateInput);
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -405,7 +406,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should fail to update dataset without authentication")
     void shouldFailToUpdateDataSetWithoutAuth() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + dataSetId, org.springframework.http.HttpMethod.PUT);
@@ -418,7 +419,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should update dataset URL")
     void shouldUpdateDataSetUrl() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       DataSetInputDTO updateInput = createUpdateInput();
 
@@ -436,7 +437,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should delete dataset successfully")
     void shouldDeleteDataSetSuccessfully() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       ResponseEntity<Void> response = performDelete(dataSetId);
 
@@ -453,7 +454,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete non-existent dataset")
     void shouldFailToDeleteNonExistentDataSet() {
-      ResponseEntity<Void> response = performDelete("non-existent-id");
+      ResponseEntity<Void> response = performDelete(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -463,7 +464,7 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete dataset without authentication")
     void shouldFailToDeleteDataSetWithoutAuth() {
-      String dataSetId = createTestEntity();
+      UUID dataSetId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + dataSetId, org.springframework.http.HttpMethod.DELETE);

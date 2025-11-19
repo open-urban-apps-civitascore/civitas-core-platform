@@ -2,6 +2,7 @@ package de.civitascore.portal.model.output;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import lombok.Data;
 
 /**
@@ -11,7 +12,7 @@ import lombok.Data;
 @Data
 public abstract class BaseOutputDTO implements Serializable {
 
-  protected String id;
+  protected UUID id;
   protected LocalDateTime createdAt;
   protected LocalDateTime modifiedAt;
 }

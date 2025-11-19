@@ -14,7 +14,7 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity(proxyTargetClass = true)
 @EnableJpaAuditing(auditorAwareRef = "auditorAwareImpl")
 public class SecurityConfig {
 

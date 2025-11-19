@@ -11,13 +11,14 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class RoleService extends BaseService<Role, String, RoleInputDTO> {
+public class RoleService extends BaseService<Role, RoleInputDTO> {
 
   private final RoleRepository roleRepository;
   private final RoleMapper roleMapper;
@@ -44,7 +45,7 @@ public class RoleService extends BaseService<Role, String, RoleInputDTO> {
    * Role along with all Permissions in a single JOIN query, preventing N+1 query problems.
    */
   @Override
-  public Role findById(String id) {
+  public Role findById(UUID id) {
     preProcessLoad(id);
     Role entity =
         roleRepository
@@ -93,11 +94,11 @@ public class RoleService extends BaseService<Role, String, RoleInputDTO> {
 
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-            "name", "Name cannot be null or blank", existingEntity.getId());
+            "name", existingEntity.getId(), "Name cannot be null or blank");
       }
       if (jsonNode.has("roleType") && jsonNode.get("roleType").isNull()) {
         throw new InvalidInputException(
-            "roleType", "Role type cannot be null", existingEntity.getId());
+            "roleType", existingEntity.getId(), "Role type cannot be null");
       }
     } catch (InvalidInputException e) {
       throw e;

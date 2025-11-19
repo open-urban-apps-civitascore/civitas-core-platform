@@ -9,6 +9,7 @@ import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -75,7 +76,7 @@ class UserControllerIntegrationTest
   }
 
   @Override
-  protected String getIdFromOutput(UserOutputDTO output) {
+  protected UUID getIdFromOutput(UserOutputDTO output) {
     return output.getId();
   }
 
@@ -182,9 +183,9 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should retrieve user by ID successfully")
     void shouldRetrieveUserById() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
-      ResponseEntity<UserOutputDTO> response = performGetById(userId.toString());
+      ResponseEntity<UserOutputDTO> response = performGetById(userId);
 
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
 
@@ -198,7 +199,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should return 404 for non-existent user")
     void shouldReturn404ForNonExistentUser() {
-      ResponseEntity<UserOutputDTO> response = performGetById("non-existent-id");
+      ResponseEntity<UserOutputDTO> response = performGetById(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -208,7 +209,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should fail to retrieve user without authentication")
     void shouldFailToRetrieveUserWithoutAuth() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + userId, org.springframework.http.HttpMethod.GET);
@@ -258,7 +259,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should update user successfully with PUT")
     void shouldUpdateUserWithPut() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       UserInputDTO updateInput = createUpdateInput();
       ResponseEntity<UserOutputDTO> response = performUpdate(userId, updateInput);
@@ -279,7 +280,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should partially update user with PATCH - single field")
     void shouldPartiallyUpdateUserWithPatch() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("phone", "+49111222333");
@@ -300,7 +301,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should update multiple fields with PATCH")
     void shouldPartiallyUpdateUserWithPatchMultipleFields() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("phone", null);
@@ -320,7 +321,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should set field to null with PATCH")
     void shouldSetFieldToNullWithPatch() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("phone", null);
@@ -335,7 +336,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should leave omitted fields unchanged with PATCH")
     void shouldLeaveOmittedFieldsUnchangedWithPatch() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       // Get initial state
       ResponseEntity<UserOutputDTO> initialResponse = performGetById(userId);
@@ -368,7 +369,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should handle empty PATCH (no changes)")
     void shouldHandleEmptyPatch() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       ResponseEntity<UserOutputDTO> initialResponse = performGetById(userId);
       UserOutputDTO initialUser = initialResponse.getBody();
@@ -388,7 +389,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should update boolean field with PATCH")
     void shouldUpdateBooleanFieldWithPatch() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("active", false);
@@ -402,7 +403,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should handle PATCH with all fields")
     void shouldHandlePatchWithAllFields() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("firstName", "PatchedFirst");
@@ -424,7 +425,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should be idempotent with PATCH")
     void shouldBeIdempotentWithPatch() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("firstName", "IdempotentTest");
@@ -445,7 +446,7 @@ class UserControllerIntegrationTest
     void shouldFailToUpdateNonExistentUser() {
       UserInputDTO updateInput = createUpdateInput();
 
-      ResponseEntity<UserOutputDTO> response = performUpdate("non-existent-id", updateInput);
+      ResponseEntity<UserOutputDTO> response = performUpdate(UUID.randomUUID(), updateInput);
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -455,7 +456,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should fail to update user without authentication")
     void shouldFailToUpdateUserWithoutAuth() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + userId, org.springframework.http.HttpMethod.PUT);
@@ -468,7 +469,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should fail to update user with invalid email")
     void shouldFailToUpdateUserWithInvalidEmail() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
       UserInputDTO invalidInput = createUpdateInput();
       invalidInput.setEmail("not-an-email");
 
@@ -487,7 +488,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should delete user successfully")
     void shouldDeleteUserSuccessfully() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       ResponseEntity<Void> response = performDelete(userId);
 
@@ -504,7 +505,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete non-existent user")
     void shouldFailToDeleteNonExistentUser() {
-      ResponseEntity<Void> response = performDelete("non-existent-id");
+      ResponseEntity<Void> response = performDelete(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -514,7 +515,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete user without authentication")
     void shouldFailToDeleteUserWithoutAuth() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + userId, org.springframework.http.HttpMethod.DELETE);
@@ -532,7 +533,7 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should deactivate user")
     void shouldDeactivateUser() {
-      String userId = createTestEntity();
+      UUID userId = createTestEntity();
 
       UserInputDTO updateInput = createUpdateInput();
       updateInput.setActive(false);

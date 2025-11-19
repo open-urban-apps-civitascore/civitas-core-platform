@@ -9,6 +9,7 @@ import de.civitascore.portal.repository.PermissionRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -72,7 +73,7 @@ class PermissionControllerIntegrationTest
   }
 
   @Override
-  protected String getIdFromOutput(PermissionOutputDTO output) {
+  protected UUID getIdFromOutput(PermissionOutputDTO output) {
     return output.getId();
   }
 
@@ -181,7 +182,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should retrieve permission by ID successfully")
     void shouldRetrievePermissionById() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       ResponseEntity<PermissionOutputDTO> response = performGetById(permissionId);
 
@@ -197,7 +198,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should return 404 for non-existent permission")
     void shouldReturn404ForNonExistentPermission() {
-      ResponseEntity<PermissionOutputDTO> response = performGetById("non-existent-id");
+      ResponseEntity<PermissionOutputDTO> response = performGetById(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -207,7 +208,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should fail to retrieve permission without authentication")
     void shouldFailToRetrievePermissionWithoutAuth() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + permissionId, org.springframework.http.HttpMethod.GET);
@@ -257,7 +258,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should update permission successfully with PUT")
     void shouldUpdatePermissionWithPut() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       PermissionInputDTO updateInput = createUpdateInput();
       ResponseEntity<PermissionOutputDTO> response = performUpdate(permissionId, updateInput);
@@ -278,7 +279,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should partially update permission with PATCH - single field")
     void shouldPartiallyUpdatePermissionWithPatch() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", "Only description updated");
@@ -295,7 +296,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should update multiple fields with PATCH")
     void shouldUpdateMultipleFieldsWithPatch() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("name", "PatchedPermission");
@@ -311,7 +312,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should set description to null with PATCH")
     void shouldSetDescriptionToNullWithPatch() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", null);
@@ -327,7 +328,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should leave omitted fields unchanged with PATCH")
     void shouldLeaveOmittedFieldsUnchangedWithPatch() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       ResponseEntity<PermissionOutputDTO> initialResponse = performGetById(permissionId);
       PermissionOutputDTO initialPermission = initialResponse.getBody();
@@ -350,7 +351,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should handle empty PATCH (no changes)")
     void shouldHandleEmptyPatch() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       ResponseEntity<PermissionOutputDTO> initialResponse = performGetById(permissionId);
       PermissionOutputDTO initialPermission = initialResponse.getBody();
@@ -368,7 +369,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should be idempotent with PATCH")
     void shouldBeIdempotentWithPatch() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", "Idempotent test");
@@ -387,7 +388,7 @@ class PermissionControllerIntegrationTest
     void shouldFailToUpdateNonExistentPermission() {
       PermissionInputDTO updateInput = createUpdateInput();
 
-      ResponseEntity<PermissionOutputDTO> response = performUpdate("non-existent-id", updateInput);
+      ResponseEntity<PermissionOutputDTO> response = performUpdate(UUID.randomUUID(), updateInput);
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -397,7 +398,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should fail to update permission without authentication")
     void shouldFailToUpdatePermissionWithoutAuth() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + permissionId, org.springframework.http.HttpMethod.PUT);
@@ -415,7 +416,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should delete permission successfully")
     void shouldDeletePermissionSuccessfully() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       ResponseEntity<Void> response = performDelete(permissionId);
 
@@ -432,7 +433,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete non-existent permission")
     void shouldFailToDeleteNonExistentPermission() {
-      ResponseEntity<Void> response = performDelete("non-existent-id");
+      ResponseEntity<Void> response = performDelete(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -442,7 +443,7 @@ class PermissionControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete permission without authentication")
     void shouldFailToDeletePermissionWithoutAuth() {
-      String permissionId = createTestEntity();
+      UUID permissionId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + permissionId, org.springframework.http.HttpMethod.DELETE);

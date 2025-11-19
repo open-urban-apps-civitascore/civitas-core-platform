@@ -1,5 +1,6 @@
 package de.civitascore.portal.util;
 
+import java.util.UUID;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -9,9 +10,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 public class InvalidInputException extends RuntimeException {
 
   private final String resourceType;
-  private final String resourceId;
+  private final UUID resourceId;
 
-  public InvalidInputException(String resourceType, String resourceId, String message) {
+  public InvalidInputException(String resourceType, UUID resourceId, String message) {
     super(message);
     this.resourceType = resourceType;
     this.resourceId = resourceId;

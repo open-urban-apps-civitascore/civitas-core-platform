@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class PermissionService extends BaseService<Permission, String, PermissionInputDTO> {
+public class PermissionService extends BaseService<Permission, PermissionInputDTO> {
 
   private final PermissionRepository permissionRepository;
   private final PermissionMapper permissionMapper;
@@ -62,11 +62,11 @@ public class PermissionService extends BaseService<Permission, String, Permissio
 
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-            "name", "Name cannot be null or blank", existingEntity.getId());
+            "name", existingEntity.getId(), "Name cannot be null or blank");
       }
       if (jsonNode.has("permissionType") && jsonNode.get("permissionType").isNull()) {
         throw new InvalidInputException(
-            "permissionType", "Permission type cannot be null", existingEntity.getId());
+            "permissionType", existingEntity.getId(), "Permission type cannot be null");
       }
     } catch (InvalidInputException e) {
       throw e;

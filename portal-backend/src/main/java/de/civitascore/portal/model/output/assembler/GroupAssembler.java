@@ -5,13 +5,14 @@ import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.output.GroupOutputDTO;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, String> {
+public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID> {
 
   private final GroupMapper groupMapper;
   private final UserMapper userMapper;

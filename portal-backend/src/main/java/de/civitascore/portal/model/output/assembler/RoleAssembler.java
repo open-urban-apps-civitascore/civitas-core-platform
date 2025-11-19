@@ -4,13 +4,14 @@ import de.civitascore.portal.mapper.PermissionMapper;
 import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.output.RoleOutputDTO;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, String> {
+public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
 
   private final RoleMapper roleMapper;
   private final PermissionMapper permissionMapper;

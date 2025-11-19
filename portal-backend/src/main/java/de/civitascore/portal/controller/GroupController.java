@@ -5,7 +5,6 @@ import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.model.output.assembler.GroupAssembler;
 import de.civitascore.portal.repository.specification.GroupSpec;
-import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.service.GroupService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -16,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "Groups", description = "Group management API")
 public class GroupController
-    extends BaseController<GroupInputDTO, GroupOutputDTO, Group, GroupSpec, String> {
+    extends BaseController<GroupInputDTO, GroupOutputDTO, Group, GroupSpec> {
 
   private final GroupService groupService;
   private final GroupAssembler groupAssembler;
@@ -61,13 +62,13 @@ public class GroupController
   public ResponseEntity<Page<GroupOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") GroupSpec spec,
       @ParameterObject
-          //  @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+          @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
     return super.getAll(spec, pageable);
   }
 
   @Override
-  protected BaseService<Group, String, GroupInputDTO> getService() {
+  protected GroupService getService() {
     return groupService;
   }
 

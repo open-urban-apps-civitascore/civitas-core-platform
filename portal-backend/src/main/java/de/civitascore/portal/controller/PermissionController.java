@@ -5,7 +5,6 @@ import de.civitascore.portal.model.input.PermissionInputDTO;
 import de.civitascore.portal.model.output.PermissionOutputDTO;
 import de.civitascore.portal.model.output.assembler.PermissionAssembler;
 import de.civitascore.portal.repository.specification.PermissionSpec;
-import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.service.PermissionService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -27,8 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "Permissions", description = "Permission management endpoints")
 public class PermissionController
-    extends BaseController<
-        PermissionInputDTO, PermissionOutputDTO, Permission, PermissionSpec, String> {
+    extends BaseController<PermissionInputDTO, PermissionOutputDTO, Permission, PermissionSpec> {
 
   private final PermissionService permissionService;
   private final PermissionAssembler permissionAssembler;
@@ -60,7 +58,7 @@ public class PermissionController
   }
 
   @Override
-  protected BaseService<Permission, String, PermissionInputDTO> getService() {
+  protected PermissionService getService() {
     return permissionService;
   }
 

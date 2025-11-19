@@ -11,13 +11,14 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class GroupService extends BaseService<Group, String, GroupInputDTO> {
+public class GroupService extends BaseService<Group, GroupInputDTO> {
 
   private final GroupRepository groupRepository;
   private final GroupMapper groupMapper;
@@ -98,7 +99,7 @@ public class GroupService extends BaseService<Group, String, GroupInputDTO> {
    * Group along with contactUser, parentGroup, members and roles in a single JOIN query
    */
   @Override
-  public Group findById(String id) {
+  public Group findById(UUID id) {
     preProcessLoad(id);
     Group entity =
         groupRepository
@@ -115,7 +116,7 @@ public class GroupService extends BaseService<Group, String, GroupInputDTO> {
 
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-            "name", "Name cannot be null or blank", existingEntity.getId());
+            "name", existingEntity.getId(), "Name cannot be null or blank");
       }
     } catch (InvalidInputException e) {
       throw e;

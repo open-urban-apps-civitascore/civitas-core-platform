@@ -4,13 +4,14 @@ import de.civitascore.portal.mapper.DataSpaceMapper;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.output.DataSpaceOutputDTO;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class DataSpaceAssembler implements BaseAssembler<DataSpace, DataSpaceOutputDTO, String> {
+public class DataSpaceAssembler implements BaseAssembler<DataSpace, DataSpaceOutputDTO, UUID> {
 
   private final DataSpaceMapper dataSpaceMapper;
   private final UserMapper userMapper;

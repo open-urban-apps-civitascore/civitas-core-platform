@@ -7,7 +7,6 @@ import de.civitascore.portal.model.output.UserOutputDTO;
 import de.civitascore.portal.model.output.assembler.UserAssembler;
 import de.civitascore.portal.repository.specification.UserSpec;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
-import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -35,8 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Users", description = "User management endpoints")
-public class UserController
-    extends BaseController<UserInputDTO, UserOutputDTO, User, UserSpec, String> {
+public class UserController extends BaseController<UserInputDTO, UserOutputDTO, User, UserSpec> {
   private final UserService userService;
   private final UserAssembler userAssembler;
 
@@ -100,7 +98,7 @@ public class UserController
   }
 
   @Override
-  protected BaseService<User, String, UserInputDTO> getService() {
+  protected UserService getService() {
     return userService;
   }
 

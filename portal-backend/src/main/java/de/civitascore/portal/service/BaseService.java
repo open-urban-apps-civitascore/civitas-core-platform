@@ -5,6 +5,7 @@ import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.repository.BaseRepository;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.io.Serializable;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -15,9 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public abstract class BaseService<T, ID extends Serializable, I extends BaseInputDTO> {
+public abstract class BaseService<T, I extends BaseInputDTO> {
 
-  protected abstract BaseRepository<T, ID> getRepository();
+  protected abstract BaseRepository<T, UUID> getRepository();
 
   /**
    * Get the mapper for converting between DTOs and entities.
@@ -69,7 +70,7 @@ public abstract class BaseService<T, ID extends Serializable, I extends BaseInpu
    * @return the updated entity
    */
   @Transactional
-  public T update(ID id, I input) {
+  public T update(UUID id, I input) {
     T entity = findById(id);
     I preProcessedInput = preProcessUpdateInput(input, entity);
     getMapper().updateEntity(entity, preProcessedInput);
@@ -114,10 +115,10 @@ public abstract class BaseService<T, ID extends Serializable, I extends BaseInpu
    * @return the entity
    * @throws ResourceNotFoundException if entity not found
    */
-  public T findById(ID id) {
+  public T findById(UUID id) {
     T entity = preProcessLoad(id);
     if (entity == null) {
-      throw new ResourceNotFoundException(getEntityName(), id.toString());
+      throw new ResourceNotFoundException(getEntityName(), id);
     }
     return postLoad(entity);
   }
@@ -141,16 +142,16 @@ public abstract class BaseService<T, ID extends Serializable, I extends BaseInpu
    * @throws ResourceNotFoundException if entity not found
    */
   @Transactional
-  public void deleteById(ID id) {
+  public void deleteById(UUID id) {
     if (!getRepository().existsById(id)) {
-      throw new ResourceNotFoundException(getEntityName(), id.toString());
+      throw new ResourceNotFoundException(getEntityName(), id);
     }
     T entity = preProcessDelete(id);
     getRepository().deleteById(id);
     postDelete(entity);
   }
 
-  public boolean existsById(ID id) {
+  public boolean existsById(UUID id) {
     return getRepository().existsById(id);
   }
 
@@ -168,9 +169,9 @@ public abstract class BaseService<T, ID extends Serializable, I extends BaseInpu
    * @throws ResourceNotFoundException if entity not found
    */
   @Transactional(readOnly = true)
-  public T getReferenceById(ID id) {
+  public T getReferenceById(UUID id) {
     if (!getRepository().existsById(id)) {
-      throw new ResourceNotFoundException(getEntityName(), id.toString());
+      throw new ResourceNotFoundException(getEntityName(), id);
     }
     return getRepository().getReferenceById(id);
   }
@@ -260,7 +261,7 @@ public abstract class BaseService<T, ID extends Serializable, I extends BaseInpu
    * @param id the entity ID
    * @return the loaded entity or null if not found
    */
-  protected T preProcessLoad(ID id) {
+  protected T preProcessLoad(UUID id) {
     return getRepository().findById(id).orElse(null);
   }
 
@@ -280,7 +281,7 @@ public abstract class BaseService<T, ID extends Serializable, I extends BaseInpu
    * @param id the entity ID
    * @return the entity to be deleted or null
    */
-  protected T preProcessDelete(ID id) {
+  protected T preProcessDelete(UUID id) {
     return getRepository().findById(id).orElse(null);
   }
 

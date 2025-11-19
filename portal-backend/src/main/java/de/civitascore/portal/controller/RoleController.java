@@ -5,7 +5,6 @@ import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.model.output.assembler.RoleAssembler;
 import de.civitascore.portal.repository.specification.RoleSpec;
-import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.service.RoleService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -26,8 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/roles")
 @RequiredArgsConstructor
 @Tag(name = "Roles", description = "Role management endpoints")
-public class RoleController
-    extends BaseController<RoleInputDTO, RoleOutputDTO, Role, RoleSpec, String> {
+public class RoleController extends BaseController<RoleInputDTO, RoleOutputDTO, Role, RoleSpec> {
 
   private final RoleService roleService;
   private final RoleAssembler roleAssembler;
@@ -59,7 +57,7 @@ public class RoleController
   }
 
   @Override
-  protected BaseService<Role, String, RoleInputDTO> getService() {
+  protected RoleService getService() {
     return roleService;
   }
 

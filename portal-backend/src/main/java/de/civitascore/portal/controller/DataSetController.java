@@ -3,10 +3,8 @@ package de.civitascore.portal.controller;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
-import de.civitascore.portal.model.output.assembler.BaseAssembler;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
 import de.civitascore.portal.repository.specification.DataSetSpec;
-import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.service.DataSetService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -28,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "DataSets", description = "Dataset management endpoints")
 public class DataSetController
-    extends BaseController<DataSetInputDTO, DataSetOutputDTO, DataSet, DataSetSpec, String> {
+    extends BaseController<DataSetInputDTO, DataSetOutputDTO, DataSet, DataSetSpec> {
 
   private final DataSetService dataSetService;
   private final DataSetAssembler dataSetAssembler;
@@ -60,12 +58,12 @@ public class DataSetController
   }
 
   @Override
-  protected BaseService<DataSet, String, DataSetInputDTO> getService() {
+  protected DataSetService getService() {
     return dataSetService;
   }
 
   @Override
-  protected BaseAssembler<DataSet, DataSetOutputDTO, String> getAssembler() {
+  protected DataSetAssembler getAssembler() {
     return dataSetAssembler;
   }
 }

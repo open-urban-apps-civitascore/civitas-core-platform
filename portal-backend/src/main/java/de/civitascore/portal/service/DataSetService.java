@@ -11,13 +11,14 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class DataSetService extends BaseService<DataSet, String, DataSetInputDTO> {
+public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
 
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
@@ -46,7 +47,7 @@ public class DataSetService extends BaseService<DataSet, String, DataSetInputDTO
    * that would occur with lazy loading.
    */
   @Override
-  public DataSet findById(String id) {
+  public DataSet findById(UUID id) {
     preProcessLoad(id);
     DataSet entity =
         dataSetRepository
@@ -102,7 +103,7 @@ public class DataSetService extends BaseService<DataSet, String, DataSetInputDTO
 
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-            "name", "Name cannot be null or blank", existingEntity.getId());
+            "name", existingEntity.getId(), "Name cannot be null or blank");
       }
     } catch (InvalidInputException e) {
       throw e;

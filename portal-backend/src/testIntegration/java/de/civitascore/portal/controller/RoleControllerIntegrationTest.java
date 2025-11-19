@@ -10,6 +10,7 @@ import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -73,7 +74,7 @@ class RoleControllerIntegrationTest
   }
 
   @Override
-  protected String getIdFromOutput(RoleOutputDTO output) {
+  protected UUID getIdFromOutput(RoleOutputDTO output) {
     return output.getId();
   }
 
@@ -194,7 +195,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should retrieve role by ID successfully")
     void shouldRetrieveRoleById() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       ResponseEntity<RoleOutputDTO> response = performGetById(roleId);
 
@@ -210,7 +211,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should return 404 for non-existent role")
     void shouldReturn404ForNonExistentRole() {
-      ResponseEntity<RoleOutputDTO> response = performGetById("non-existent-id");
+      ResponseEntity<RoleOutputDTO> response = performGetById(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -220,7 +221,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should fail to retrieve role without authentication")
     void shouldFailToRetrieveRoleWithoutAuth() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + roleId, org.springframework.http.HttpMethod.GET);
@@ -250,7 +251,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should retrieve roles with pagination parameters")
     void shouldRetrieveRolesWithPaginationParams() {
-      String id = createTestEntity();
+      UUID id = createTestEntity();
       Map<String, String> params =
           Map.of(
               "page", "0",
@@ -271,7 +272,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should update role successfully with PUT")
     void shouldUpdateRoleWithPut() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       RoleInputDTO updateInput = createUpdateInput();
       ResponseEntity<RoleOutputDTO> response = performUpdate(roleId, updateInput);
@@ -292,7 +293,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should partially update role with PATCH - single field")
     void shouldPartiallyUpdateRoleWithPatch() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", "Only description updated");
@@ -309,7 +310,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should update multiple fields with PATCH")
     void shouldUpdateMultipleFieldsWithPatch() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("name", "PatchedRole");
@@ -325,7 +326,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should set description to null with PATCH")
     void shouldSetDescriptionToNullWithPatch() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", null);
@@ -341,7 +342,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should leave omitted fields unchanged with PATCH")
     void shouldLeaveOmittedFieldsUnchangedWithPatch() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       ResponseEntity<RoleOutputDTO> initialResponse = performGetById(roleId);
       RoleOutputDTO initialRole = initialResponse.getBody();
@@ -361,7 +362,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should handle empty PATCH (no changes)")
     void shouldHandleEmptyPatch() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       ResponseEntity<RoleOutputDTO> initialResponse = performGetById(roleId);
       RoleOutputDTO initialRole = initialResponse.getBody();
@@ -379,7 +380,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should be idempotent with PATCH")
     void shouldBeIdempotentWithPatch() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", "Idempotent test");
@@ -398,7 +399,7 @@ class RoleControllerIntegrationTest
     void shouldFailToUpdateNonExistentRole() {
       RoleInputDTO updateInput = createUpdateInput();
 
-      ResponseEntity<RoleOutputDTO> response = performUpdate("non-existent-id", updateInput);
+      ResponseEntity<RoleOutputDTO> response = performUpdate(UUID.randomUUID(), updateInput);
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -408,7 +409,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should fail to update role without authentication")
     void shouldFailToUpdateRoleWithoutAuth() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + roleId, org.springframework.http.HttpMethod.PUT);
@@ -421,7 +422,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should update role permissions")
     void shouldUpdateRolePermissions() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       RoleInputDTO updateInput = createUpdateInput();
       updateInput.setPermissionIds(Collections.emptyList());
@@ -440,7 +441,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should delete role successfully")
     void shouldDeleteRoleSuccessfully() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       ResponseEntity<Void> response = performDelete(roleId);
 
@@ -457,7 +458,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete non-existent role")
     void shouldFailToDeleteNonExistentRole() {
-      ResponseEntity<Void> response = performDelete("non-existent-id");
+      ResponseEntity<Void> response = performDelete(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -467,7 +468,7 @@ class RoleControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete role without authentication")
     void shouldFailToDeleteRoleWithoutAuth() {
-      String roleId = createTestEntity();
+      UUID roleId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + roleId, org.springframework.http.HttpMethod.DELETE);

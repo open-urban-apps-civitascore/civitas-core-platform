@@ -1,21 +1,21 @@
 package de.civitascore.portal.model.input;
 
 import de.civitascore.portal.model.embedded.ScopeType;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class AssignmentInputDTO extends BaseInputDTO {
-  @NotBlank(message = "Group ID is required") private String groupId;
+  @NotNull(message = "Group ID is required") private UUID groupId;
 
-  @NotBlank(message = "Role ID is required") private String roleId;
+  @NotNull(message = "Role ID is required") private UUID roleId;
 
   @NotNull(message = "Scope type is required") private ScopeType scopeType;
 
   private String scopeId;
   private Boolean isInherited;
-  private String parentAssignmentId;
+  private UUID parentAssignmentId;
 }

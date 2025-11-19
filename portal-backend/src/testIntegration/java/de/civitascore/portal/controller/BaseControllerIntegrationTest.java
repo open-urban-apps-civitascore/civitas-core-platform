@@ -7,6 +7,7 @@ import de.civitascore.portal.model.output.BaseOutputDTO;
 import de.civitascore.portal.util.RestPage;
 import java.net.URI;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +45,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
 
   protected abstract ParameterizedTypeReference<RestPage<O>> getPageTypeReference();
 
-  protected abstract String getIdFromOutput(O output);
+  protected abstract UUID getIdFromOutput(O output);
 
   // Optional hook for domain-specific cleanup (files, stubs, etc.)
   protected void performAdditionalCleanup() {}
@@ -96,7 +97,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
         getEndpointPath(), HttpMethod.POST, createAuthHeaders(), input, getOutputTypeReference());
   }
 
-  protected ResponseEntity<O> performGetById(String id) {
+  protected ResponseEntity<O> performGetById(UUID id) {
     String url = getEndpointPath() + "/" + id;
     return exchange(url, HttpMethod.GET, createAuthHeaders(), null, getOutputTypeReference());
   }
@@ -111,19 +112,19 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
     return restTemplate.exchange(uri, HttpMethod.GET, request, getPageTypeReference());
   }
 
-  protected ResponseEntity<O> performUpdate(String id, I input) {
+  protected ResponseEntity<O> performUpdate(UUID id, I input) {
     String url = getEndpointPath() + "/" + id;
     return exchange(url, HttpMethod.PUT, createAuthHeaders(), input, getOutputTypeReference());
   }
 
-  protected ResponseEntity<O> performPatch(String id, Object patchBody) {
+  protected ResponseEntity<O> performPatch(UUID id, Object patchBody) {
     String url = getEndpointPath() + "/" + id;
     HttpHeaders headers = createAuthHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
     return exchange(url, HttpMethod.PATCH, headers, patchBody, getOutputTypeReference());
   }
 
-  protected ResponseEntity<Void> performDelete(String id) {
+  protected ResponseEntity<Void> performDelete(UUID id) {
     String url = getEndpointPath() + "/" + id;
     HttpEntity<Void> request = new HttpEntity<>(createAuthHeaders());
     return restTemplate.exchange(url, HttpMethod.DELETE, request, Void.class);
@@ -133,7 +134,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
     return restTemplate.exchange(getEndpointPath() + path, method, HttpEntity.EMPTY, String.class);
   }
 
-  protected String createTestEntity() {
+  protected UUID createTestEntity() {
     ResponseEntity<O> response = performCreate(createValidInput());
     if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
       return getIdFromOutput(response.getBody());

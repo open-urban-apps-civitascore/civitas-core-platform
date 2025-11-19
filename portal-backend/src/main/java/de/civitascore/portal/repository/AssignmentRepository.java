@@ -2,13 +2,14 @@ package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.entity.Assignment;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface AssignmentRepository extends BaseRepository<Assignment, String> {
+public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
 
   /**
    * Find an assignment by ID with all related entities eagerly fetched in a single JOIN query. This
@@ -20,5 +21,5 @@ public interface AssignmentRepository extends BaseRepository<Assignment, String>
    */
   @EntityGraph(attributePaths = {"group", "role", "parentAssignment"})
   @Query("SELECT a FROM Assignment a WHERE a.id = :id")
-  Optional<Assignment> findByIdWithRelations(@Param("id") String id);
+  Optional<Assignment> findByIdWithRelations(@Param("id") UUID id);
 }

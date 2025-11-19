@@ -8,6 +8,7 @@ import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -70,7 +71,7 @@ class DataSpaceControllerIntegrationTest
   }
 
   @Override
-  protected String getIdFromOutput(DataSpaceOutputDTO output) {
+  protected UUID getIdFromOutput(DataSpaceOutputDTO output) {
     return output.getId();
   }
 
@@ -127,7 +128,7 @@ class DataSpaceControllerIntegrationTest
     @DisplayName("Should create dataspace with parent dataspace")
     void shouldCreateDataSpaceWithParent() {
       // Create parent dataspace
-      String parentId = createTestEntity();
+      UUID parentId = createTestEntity();
 
       // Create child dataspace
       DataSpaceInputDTO childInput = createValidInput();
@@ -175,7 +176,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should retrieve dataspace by ID successfully")
     void shouldRetrieveDataSpaceById() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       ResponseEntity<DataSpaceOutputDTO> response = performGetById(dataSpaceId);
 
@@ -191,7 +192,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should return 404 for non-existent dataspace")
     void shouldReturn404ForNonExistentDataSpace() {
-      ResponseEntity<DataSpaceOutputDTO> response = performGetById("non-existent-id");
+      ResponseEntity<DataSpaceOutputDTO> response = performGetById(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -201,7 +202,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should fail to retrieve dataspace without authentication")
     void shouldFailToRetrieveDataSpaceWithoutAuth() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + dataSpaceId, org.springframework.http.HttpMethod.GET);
@@ -251,7 +252,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should update dataspace successfully with PUT")
     void shouldUpdateDataSpaceWithPut() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       DataSpaceInputDTO updateInput = createUpdateInput();
       ResponseEntity<DataSpaceOutputDTO> response = performUpdate(dataSpaceId, updateInput);
@@ -272,7 +273,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should partially update dataspace with PATCH - single field")
     void shouldPartiallyUpdateDataSpaceWithPatch() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", "Only description updated");
@@ -289,7 +290,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should update multiple fields with PATCH")
     void shouldUpdateMultipleFieldsWithPatch() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("name", "PatchedDataSpace");
@@ -305,7 +306,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should set description to null with PATCH")
     void shouldSetDescriptionToNullWithPatch() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", null);
@@ -321,7 +322,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should leave omitted fields unchanged with PATCH")
     void shouldLeaveOmittedFieldsUnchangedWithPatch() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       ResponseEntity<DataSpaceOutputDTO> initialResponse = performGetById(dataSpaceId);
       DataSpaceOutputDTO initialDataSpace = initialResponse.getBody();
@@ -341,8 +342,8 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should set parentDataSpace to null with PATCH")
     void shouldSetParentDataSpaceToNullWithPatch() {
-      String parentDataSpaceId = createTestEntity();
-      String childDataSpaceId = createTestEntity();
+      UUID parentDataSpaceId = createTestEntity();
+      UUID childDataSpaceId = createTestEntity();
 
       // Set parent
       Map<String, Object> setParentMap = new HashMap<>();
@@ -364,7 +365,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should handle empty PATCH (no changes)")
     void shouldHandleEmptyPatch() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       ResponseEntity<DataSpaceOutputDTO> initialResponse = performGetById(dataSpaceId);
       DataSpaceOutputDTO initialDataSpace = initialResponse.getBody();
@@ -382,7 +383,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should be idempotent with PATCH")
     void shouldBeIdempotentWithPatch() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", "Idempotent test");
@@ -401,7 +402,7 @@ class DataSpaceControllerIntegrationTest
     void shouldFailToUpdateNonExistentDataSpace() {
       DataSpaceInputDTO updateInput = createUpdateInput();
 
-      ResponseEntity<DataSpaceOutputDTO> response = performUpdate("non-existent-id", updateInput);
+      ResponseEntity<DataSpaceOutputDTO> response = performUpdate(UUID.randomUUID(), updateInput);
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -411,7 +412,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should fail to update dataspace without authentication")
     void shouldFailToUpdateDataSpaceWithoutAuth() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + dataSpaceId, org.springframework.http.HttpMethod.PUT);
@@ -429,7 +430,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should delete dataspace successfully")
     void shouldDeleteDataSpaceSuccessfully() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       ResponseEntity<Void> response = performDelete(dataSpaceId);
 
@@ -446,7 +447,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete non-existent dataspace")
     void shouldFailToDeleteNonExistentDataSpace() {
-      ResponseEntity<Void> response = performDelete("non-existent-id");
+      ResponseEntity<Void> response = performDelete(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -456,7 +457,7 @@ class DataSpaceControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete dataspace without authentication")
     void shouldFailToDeleteDataSpaceWithoutAuth() {
-      String dataSpaceId = createTestEntity();
+      UUID dataSpaceId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + dataSpaceId, org.springframework.http.HttpMethod.DELETE);
@@ -480,7 +481,7 @@ class DataSpaceControllerIntegrationTest
       parentInput.setName("Parent DataSpace");
       ResponseEntity<DataSpaceOutputDTO> parentResponse = performCreate(parentInput);
       assertThat(parentResponse.getBody()).isNotNull();
-      String parentId = parentResponse.getBody().getId();
+      UUID parentId = parentResponse.getBody().getId();
 
       // Create child dataspace
       DataSpaceInputDTO childInput = createValidInput();

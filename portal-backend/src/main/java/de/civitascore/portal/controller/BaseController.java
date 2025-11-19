@@ -14,8 +14,8 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import java.io.IOException;
-import java.io.Serializable;
 import java.net.URI;
+import java.util.UUID;
 import lombok.experimental.FieldDefaults;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,15 +41,11 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @RequestMapping
 @FieldDefaults(level = lombok.AccessLevel.PROTECTED)
 public abstract class BaseController<
-    I extends BaseInputDTO,
-    O extends BaseOutputDTO,
-    E extends BaseEntity,
-    S extends BaseSpec<E>,
-    ID extends Serializable> {
+    I extends BaseInputDTO, O extends BaseOutputDTO, E extends BaseEntity, S extends BaseSpec<E>> {
 
-  abstract BaseService<E, ID, I> getService();
+  abstract BaseService<E, I> getService();
 
-  protected abstract BaseAssembler<E, O, ID> getAssembler();
+  protected abstract BaseAssembler<E, O, UUID> getAssembler();
 
   @Autowired protected ObjectMapper objectMapper;
 
@@ -93,7 +89,7 @@ public abstract class BaseController<
   }
 
   @GetMapping("/{id}")
-  public ResponseEntity<O> getById(@PathVariable ID id) {
+  public ResponseEntity<O> getById(@PathVariable UUID id) {
     E entity = getService().findById(id);
     O output = getAssembler().toOutput(entity);
     return ResponseEntity.ok(output);
@@ -104,7 +100,7 @@ public abstract class BaseController<
   public ResponseEntity<O> create(@Valid @RequestBody I input) {
     E created = getService().create(input);
     O output = getAssembler().toOutput(created);
-    ID createdId = getAssembler().getIdFromOutput(output);
+    UUID createdId = getAssembler().getIdFromOutput(output);
     URI location =
         ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{id}")
@@ -114,14 +110,14 @@ public abstract class BaseController<
   }
 
   @PutMapping("/{id}")
-  public ResponseEntity<O> update(@PathVariable ID id, @Valid @RequestBody I input) {
+  public ResponseEntity<O> update(@PathVariable UUID id, @Valid @RequestBody I input) {
     E updated = getService().update(id, input);
     O output = getAssembler().toOutput(updated);
     return ResponseEntity.ok(output);
   }
 
   @PatchMapping("/{id}")
-  public ResponseEntity<O> patch(@PathVariable ID id, @RequestBody JsonNode updates)
+  public ResponseEntity<O> patch(@PathVariable UUID id, @RequestBody JsonNode updates)
       throws IOException {
     E current = getService().findById(id);
     I currentDto = getAssembler().toInput(current);
@@ -133,7 +129,7 @@ public abstract class BaseController<
 
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void delete(@PathVariable ID id) {
+  public void delete(@PathVariable UUID id) {
     getService().deleteById(id);
   }
 }

@@ -4,6 +4,7 @@ import de.civitascore.portal.model.embedded.RoleType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
+import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -16,5 +17,5 @@ public class RoleInputDTO extends BaseInputDTO {
 
   @NotNull(message = "Role type is required") private RoleType roleType;
 
-  private List<String> permissionIds;
+  private List<UUID> permissionIds;
 }

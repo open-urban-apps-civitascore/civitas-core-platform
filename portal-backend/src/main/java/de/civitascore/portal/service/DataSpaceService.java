@@ -9,13 +9,14 @@ import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class DataSpaceService extends BaseService<DataSpace, String, DataSpaceInputDTO> {
+public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> {
 
   private final DataSpaceRepository dataSpaceRepository;
   private final DataSpaceMapper dataSpaceMapper;
@@ -43,7 +44,7 @@ public class DataSpaceService extends BaseService<DataSpace, String, DataSpaceIn
    * problems that would occur with lazy loading.
    */
   @Override
-  public DataSpace findById(String id) {
+  public DataSpace findById(UUID id) {
     preProcessLoad(id);
     DataSpace entity =
         dataSpaceRepository
@@ -97,7 +98,7 @@ public class DataSpaceService extends BaseService<DataSpace, String, DataSpaceIn
 
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-            "name", "Name cannot be null or blank", existingEntity.getId());
+            "name", existingEntity.getId(), "Name cannot be null or blank");
       }
     } catch (InvalidInputException e) {
       throw e;

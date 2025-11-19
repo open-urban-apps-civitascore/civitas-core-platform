@@ -5,12 +5,13 @@ import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class AssignmentAssembler implements BaseAssembler<Assignment, AssignmentOutputDTO, String> {
+public class AssignmentAssembler implements BaseAssembler<Assignment, AssignmentOutputDTO, UUID> {
 
   private final AssignmentMapper assignmentMapper;
   private final GroupMapper groupMapper;

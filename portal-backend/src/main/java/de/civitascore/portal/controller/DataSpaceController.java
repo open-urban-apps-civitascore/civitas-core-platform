@@ -3,10 +3,8 @@ package de.civitascore.portal.controller;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.model.output.DataSpaceOutputDTO;
-import de.civitascore.portal.model.output.assembler.BaseAssembler;
 import de.civitascore.portal.model.output.assembler.DataSpaceAssembler;
 import de.civitascore.portal.repository.specification.DataSpaceSpec;
-import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.service.DataSpaceService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -28,19 +26,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "DataSpaces", description = "DataSpace management endpoints")
 public class DataSpaceController
-    extends BaseController<
-        DataSpaceInputDTO, DataSpaceOutputDTO, DataSpace, DataSpaceSpec, String> {
+    extends BaseController<DataSpaceInputDTO, DataSpaceOutputDTO, DataSpace, DataSpaceSpec> {
 
   private final DataSpaceService dataSpaceService;
   private final DataSpaceAssembler dataSpaceAssembler;
 
   @Override
-  BaseService<DataSpace, String, DataSpaceInputDTO> getService() {
+  DataSpaceService getService() {
     return dataSpaceService;
   }
 
   @Override
-  protected BaseAssembler<DataSpace, DataSpaceOutputDTO, String> getAssembler() {
+  protected DataSpaceAssembler getAssembler() {
     return dataSpaceAssembler;
   }
 

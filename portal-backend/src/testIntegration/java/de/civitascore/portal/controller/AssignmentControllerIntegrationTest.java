@@ -14,6 +14,7 @@ import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -45,8 +46,8 @@ class AssignmentControllerIntegrationTest
 
   @Override
   protected AssignmentInputDTO createValidInput() {
-    String groupId = createTestGroup();
-    String roleId = createTestRole();
+    UUID groupId = createTestGroup();
+    UUID roleId = createTestRole();
 
     AssignmentInputDTO input = new AssignmentInputDTO();
     input.setGroupId(groupId);
@@ -63,8 +64,8 @@ class AssignmentControllerIntegrationTest
 
   @Override
   protected AssignmentInputDTO createUpdateInput() {
-    String groupId = createTestGroup();
-    String roleId = createTestRole();
+    UUID groupId = createTestGroup();
+    UUID roleId = createTestRole();
 
     AssignmentInputDTO input = new AssignmentInputDTO();
     input.setGroupId(groupId);
@@ -85,11 +86,11 @@ class AssignmentControllerIntegrationTest
   }
 
   @Override
-  protected String getIdFromOutput(AssignmentOutputDTO output) {
+  protected UUID getIdFromOutput(AssignmentOutputDTO output) {
     return output.getId();
   }
 
-  private String createTestGroup() {
+  private UUID createTestGroup() {
     GroupInputDTO groupInput = new GroupInputDTO();
     groupInput.setName("Test Group " + System.currentTimeMillis());
     groupInput.setDescription("Test group for assignment");
@@ -104,12 +105,12 @@ class AssignmentControllerIntegrationTest
             new ParameterizedTypeReference<GroupOutputDTO>() {});
 
     if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId().toString();
+      return response.getBody().getId();
     }
     throw new IllegalStateException("Failed to create test group");
   }
 
-  private String createTestRole() {
+  private UUID createTestRole() {
     RoleInputDTO roleInput = new RoleInputDTO();
     roleInput.setName("test_role_" + System.currentTimeMillis());
     roleInput.setName("Test Role " + System.currentTimeMillis());
@@ -123,7 +124,7 @@ class AssignmentControllerIntegrationTest
             "/roles", HttpMethod.POST, request, new ParameterizedTypeReference<RoleOutputDTO>() {});
 
     if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId().toString();
+      return response.getBody().getId();
     }
     throw new IllegalStateException("Failed to create test role");
   }
@@ -182,8 +183,8 @@ class AssignmentControllerIntegrationTest
     @DisplayName("Should create assignment with different scope types")
     void shouldCreateAssignmentWithDifferentScopeTypes() {
       for (ScopeType scopeType : ScopeType.values()) {
-        String groupId = createTestGroup();
-        String roleId = createTestRole();
+        UUID groupId = createTestGroup();
+        UUID roleId = createTestRole();
 
         AssignmentInputDTO input = new AssignmentInputDTO();
         input.setGroupId(groupId);
@@ -245,7 +246,7 @@ class AssignmentControllerIntegrationTest
     @DisplayName("Should fail to create assignment with non-existent group")
     void shouldFailToCreateAssignmentWithNonExistentGroup() {
       AssignmentInputDTO input = new AssignmentInputDTO();
-      input.setGroupId("non-existent-group");
+      input.setGroupId(UUID.randomUUID());
       input.setRoleId(createTestRole());
       input.setScopeType(ScopeType.TENANT);
       input.setIsInherited(false);
@@ -262,7 +263,7 @@ class AssignmentControllerIntegrationTest
     void shouldFailToCreateAssignmentWithNonExistentRole() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(createTestGroup());
-      input.setRoleId("non-existent-role");
+      input.setRoleId(UUID.randomUUID());
       input.setScopeType(ScopeType.TENANT);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
@@ -280,7 +281,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should retrieve assignment by ID successfully")
     void shouldRetrieveAssignmentById() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       ResponseEntity<AssignmentOutputDTO> response = performGetById(assignmentId);
 
@@ -297,7 +298,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should return 404 for non-existent assignment")
     void shouldReturn404ForNonExistentAssignment() {
-      ResponseEntity<AssignmentOutputDTO> response = performGetById("non-existent-id");
+      ResponseEntity<AssignmentOutputDTO> response = performGetById(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -307,7 +308,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should fail to retrieve assignment without authentication")
     void shouldFailToRetrieveAssignmentWithoutAuth() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + assignmentId, org.springframework.http.HttpMethod.GET);
@@ -357,7 +358,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should update assignment successfully with PUT")
     void shouldUpdateAssignmentWithPut() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       AssignmentInputDTO updateInput = createUpdateInput();
       ResponseEntity<AssignmentOutputDTO> response = performUpdate(assignmentId, updateInput);
@@ -377,7 +378,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should partially update assignment with PATCH - single field")
     void shouldPartiallyUpdateAssignmentWithPatch() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("isInherited", true);
@@ -392,7 +393,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should update multiple fields with PATCH")
     void shouldUpdateMultipleFieldsWithPatch() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("isInherited", true);
@@ -408,7 +409,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should set scopeId to null with PATCH")
     void shouldSetScopeIdToNullWithPatch() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("scopeId", null);
@@ -422,7 +423,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should leave omitted fields unchanged with PATCH")
     void shouldLeaveOmittedFieldsUnchangedWithPatch() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       ResponseEntity<AssignmentOutputDTO> initialResponse = performGetById(assignmentId);
       AssignmentOutputDTO initialAssignment = initialResponse.getBody();
@@ -445,8 +446,8 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should set parentAssignment to null with PATCH")
     void shouldSetParentAssignmentToNullWithPatch() {
-      String parentAssignmentId = createTestEntity();
-      String childAssignmentId = createTestEntity();
+      UUID parentAssignmentId = createTestEntity();
+      UUID childAssignmentId = createTestEntity();
 
       // Set parent
       Map<String, Object> setParentMap = new HashMap<>();
@@ -468,7 +469,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should handle empty PATCH (no changes)")
     void shouldHandleEmptyPatch() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       ResponseEntity<AssignmentOutputDTO> initialResponse = performGetById(assignmentId);
       AssignmentOutputDTO initialAssignment = initialResponse.getBody();
@@ -486,7 +487,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should be idempotent with PATCH")
     void shouldBeIdempotentWithPatch() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("isInherited", true);
@@ -505,7 +506,7 @@ class AssignmentControllerIntegrationTest
     void shouldFailToUpdateNonExistentAssignment() {
       AssignmentInputDTO updateInput = createUpdateInput();
 
-      ResponseEntity<AssignmentOutputDTO> response = performUpdate("non-existent-id", updateInput);
+      ResponseEntity<AssignmentOutputDTO> response = performUpdate(UUID.randomUUID(), updateInput);
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -515,7 +516,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should fail to update assignment without authentication")
     void shouldFailToUpdateAssignmentWithoutAuth() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + assignmentId, org.springframework.http.HttpMethod.PUT);
@@ -528,7 +529,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should update assignment scope")
     void shouldUpdateAssignmentScope() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       AssignmentInputDTO updateInput = createUpdateInput();
       updateInput.setScopeType(ScopeType.DATASET);
@@ -550,7 +551,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should delete assignment successfully")
     void shouldDeleteAssignmentSuccessfully() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       ResponseEntity<Void> response = performDelete(assignmentId);
 
@@ -567,7 +568,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete non-existent assignment")
     void shouldFailToDeleteNonExistentAssignment() {
-      ResponseEntity<Void> response = performDelete("non-existent-id");
+      ResponseEntity<Void> response = performDelete(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -577,7 +578,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete assignment without authentication")
     void shouldFailToDeleteAssignmentWithoutAuth() {
-      String assignmentId = createTestEntity();
+      UUID assignmentId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + assignmentId, org.springframework.http.HttpMethod.DELETE);
@@ -595,7 +596,7 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should handle assignment with parent assignment")
     void shouldHandleAssignmentWithParent() {
-      String parentId = createTestEntity();
+      UUID parentId = createTestEntity();
 
       AssignmentInputDTO childInput = createValidInput();
       childInput.setParentAssignmentId(parentId);
@@ -641,9 +642,9 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should handle multiple assignments for same group")
     void shouldHandleMultipleAssignmentsForSameGroup() {
-      String groupId = createTestGroup();
-      String role1Id = createTestRole();
-      String role2Id = createTestRole();
+      UUID groupId = createTestGroup();
+      UUID role1Id = createTestRole();
+      UUID role2Id = createTestRole();
 
       AssignmentInputDTO input1 = new AssignmentInputDTO();
       input1.setGroupId(groupId);

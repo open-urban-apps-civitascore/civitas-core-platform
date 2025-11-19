@@ -6,7 +6,6 @@ import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.assembler.AssignmentAssembler;
 import de.civitascore.portal.repository.specification.AssignmentSpec;
 import de.civitascore.portal.service.AssignmentService;
-import de.civitascore.portal.service.BaseService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -27,14 +26,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "Assignments", description = "Role assignment management endpoints")
 public class AssignmentController
-    extends BaseController<
-        AssignmentInputDTO, AssignmentOutputDTO, Assignment, AssignmentSpec, String> {
+    extends BaseController<AssignmentInputDTO, AssignmentOutputDTO, Assignment, AssignmentSpec> {
 
   private final AssignmentService assignmentService;
   private final AssignmentAssembler assignmentAssembler;
 
   @Override
-  BaseService<Assignment, String, AssignmentInputDTO> getService() {
+  AssignmentService getService() {
     return assignmentService;
   }
 

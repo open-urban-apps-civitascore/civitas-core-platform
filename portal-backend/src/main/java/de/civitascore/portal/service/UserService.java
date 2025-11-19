@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class UserService extends BaseService<User, String, UserInputDTO> {
+public class UserService extends BaseService<User, UserInputDTO> {
 
   private final UserRepository userRepository;
   private final UserMapper userMapper;
@@ -62,15 +62,15 @@ public class UserService extends BaseService<User, String, UserInputDTO> {
 
       if (jsonNode.has("firstName") && StringUtils.isBlank(jsonNode.get("firstName").asText())) {
         throw new InvalidInputException(
-            "firstName", "First name cannot be null or blank", existingEntity.getId());
+            "firstName", existingEntity.getId(), "First name cannot be null or blank");
       }
       if (jsonNode.has("lastName") && StringUtils.isBlank(jsonNode.get("lastName").asText())) {
         throw new InvalidInputException(
-            "lastName", "Last name cannot be null or blank", existingEntity.getId());
+            "lastName", existingEntity.getId(), "Last name cannot be null or blank");
       }
       if (jsonNode.has("email") && StringUtils.isBlank(jsonNode.get("email").asText())) {
         throw new InvalidInputException(
-            "email", "Email cannot be null or blank", existingEntity.getId());
+            "email", existingEntity.getId(), "Email cannot be null or blank");
       }
     } catch (InvalidInputException e) {
       throw e;

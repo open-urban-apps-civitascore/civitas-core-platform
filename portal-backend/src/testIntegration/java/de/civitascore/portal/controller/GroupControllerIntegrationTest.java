@@ -9,6 +9,7 @@ import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -69,7 +70,7 @@ class GroupControllerIntegrationTest
   }
 
   @Override
-  protected String getIdFromOutput(GroupOutputDTO output) {
+  protected UUID getIdFromOutput(GroupOutputDTO output) {
     return output.getId();
   }
 
@@ -176,7 +177,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should retrieve group by ID successfully")
     void shouldRetrieveGroupById() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       ResponseEntity<GroupOutputDTO> response = performGetById(groupId);
 
@@ -192,8 +193,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should return 404 for non-existent group")
     void shouldReturn404ForNonExistentGroup() {
-      ResponseEntity<GroupOutputDTO> response = performGetById("non-existent-id");
-
+      ResponseEntity<GroupOutputDTO> response = performGetById(UUID.randomUUID());
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
           .isEqualTo(HttpStatus.NOT_FOUND);
@@ -202,7 +202,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should fail to retrieve group without authentication")
     void shouldFailToRetrieveGroupWithoutAuth() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + groupId, org.springframework.http.HttpMethod.GET);
@@ -266,7 +266,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should update group successfully with PUT")
     void shouldUpdateGroupWithPut() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       GroupInputDTO updateInput = createUpdateInput();
       ResponseEntity<GroupOutputDTO> response = performUpdate(groupId, updateInput);
@@ -287,7 +287,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should partially update group with PATCH - single field")
     void shouldPartiallyUpdateGroupWithPatch() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", "Only description updated");
@@ -304,7 +304,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should update multiple fields with PATCH")
     void shouldUpdateMultipleFieldsWithPatch() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("name", "PatchedGroup");
@@ -320,7 +320,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should set description to null with PATCH")
     void shouldSetDescriptionToNullWithPatch() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", null);
@@ -336,7 +336,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should leave omitted fields unchanged with PATCH")
     void shouldLeaveOmittedFieldsUnchangedWithPatch() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       ResponseEntity<GroupOutputDTO> initialResponse = performGetById(groupId);
       GroupOutputDTO initialGroup = initialResponse.getBody();
@@ -356,8 +356,8 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should set parentGroup to null with PATCH")
     void shouldSetParentGroupToNullWithPatch() {
-      String parentGroupId = createTestEntity();
-      String childGroupId = createTestEntity();
+      UUID parentGroupId = createTestEntity();
+      UUID childGroupId = createTestEntity();
 
       // Set parent
       Map<String, Object> setParentMap = new HashMap<>();
@@ -379,7 +379,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should handle empty PATCH (no changes)")
     void shouldHandleEmptyPatch() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       ResponseEntity<GroupOutputDTO> initialResponse = performGetById(groupId);
       GroupOutputDTO initialGroup = initialResponse.getBody();
@@ -397,7 +397,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should be idempotent with PATCH")
     void shouldBeIdempotentWithPatch() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("description", "Idempotent test");
@@ -416,7 +416,7 @@ class GroupControllerIntegrationTest
     void shouldFailToUpdateNonExistentGroup() {
       GroupInputDTO updateInput = createUpdateInput();
 
-      ResponseEntity<GroupOutputDTO> response = performUpdate("non-existent-id", updateInput);
+      ResponseEntity<GroupOutputDTO> response = performUpdate(UUID.randomUUID(), updateInput);
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -426,7 +426,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should fail to update group without authentication")
     void shouldFailToUpdateGroupWithoutAuth() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + groupId, org.springframework.http.HttpMethod.PUT);
@@ -439,7 +439,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should fail to update group with invalid data")
     void shouldFailToUpdateGroupWithInvalidData() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
       GroupInputDTO invalidInput = createInvalidInput();
 
       ResponseEntity<GroupOutputDTO> response = performUpdate(groupId, invalidInput);
@@ -452,7 +452,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should update group and clear members")
     void shouldUpdateGroupAndClearMembers() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       GroupInputDTO updateInput = createUpdateInput();
       updateInput.setMemberIds(Collections.emptyList());
@@ -472,7 +472,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should delete group successfully")
     void shouldDeleteGroupSuccessfully() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       ResponseEntity<Void> response = performDelete(groupId);
 
@@ -489,7 +489,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete non-existent group")
     void shouldFailToDeleteNonExistentGroup() {
-      ResponseEntity<Void> response = performDelete("non-existent-id");
+      ResponseEntity<Void> response = performDelete(UUID.randomUUID());
 
       assertThat(response.getStatusCode())
           .as("Should return NOT_FOUND status")
@@ -499,7 +499,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete group without authentication")
     void shouldFailToDeleteGroupWithoutAuth() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       ResponseEntity<String> response =
           performRequestWithoutAuth("/" + groupId, org.springframework.http.HttpMethod.DELETE);
@@ -512,7 +512,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should not allow deleting same group twice")
     void shouldNotAllowDeletingSameGroupTwice() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       ResponseEntity<Void> firstResponse = performDelete(groupId);
       assertThat(firstResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
@@ -529,7 +529,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should create group with parent group relationship")
     void shouldCreateGroupWithParentGroup() {
-      String parentId = createTestEntity();
+      UUID parentId = createTestEntity();
 
       GroupInputDTO childInput = createValidInput();
       childInput.setName("Child Group");
@@ -542,7 +542,7 @@ class GroupControllerIntegrationTest
       assertThat(response.getBody().getParentGroup()).as("Parent group should be set").isNotNull();
       assertThat(response.getBody().getParentGroup().getId())
           .as("Parent group ID should match")
-          .isEqualTo(parentId);
+          .isEqualTo(parentId.toString());
     }
 
     @Test
@@ -551,7 +551,7 @@ class GroupControllerIntegrationTest
       GroupInputDTO parentInput = createValidInput();
       parentInput.setName("Parent Group");
       ResponseEntity<GroupOutputDTO> parentResponse = performCreate(parentInput);
-      String parentId = parentResponse.getBody().getId();
+      UUID parentId = parentResponse.getBody().getId();
       assertThat(parentResponse.getBody()).isNotNull();
 
       GroupInputDTO childInput = createValidInput();
@@ -567,7 +567,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should update group members list")
     void shouldUpdateGroupMembersList() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       GroupInputDTO updateInput = createUpdateInput();
       ResponseEntity<GroupOutputDTO> response = performUpdate(groupId, updateInput);
@@ -578,7 +578,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should maintain tenant isolation")
     void shouldMaintainTenantIsolation() {
-      String group1Id = createTestEntity();
+      UUID group1Id = createTestEntity();
 
       ResponseEntity<GroupOutputDTO> response = performGetById(group1Id);
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -587,7 +587,7 @@ class GroupControllerIntegrationTest
     @Test
     @DisplayName("Should preserve timestamps on update")
     void shouldPreserveTimestampsOnUpdate() {
-      String groupId = createTestEntity();
+      UUID groupId = createTestEntity();
 
       ResponseEntity<GroupOutputDTO> originalResponse = performGetById(groupId);
       GroupOutputDTO original = originalResponse.getBody();
