@@ -23,10 +23,15 @@ public class Application {
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> logger.info("Shutdown signal received")));
 
-    try {
+    try (HealthCheckServer healthCheckServer =
+        new HealthCheckServer(appConfig.getHealthCheckPort(), consumers)) {
+      healthCheckServer.start();
+
       for (EventConsumer consumer : consumers) {
         consumer.start();
       }
+
+      healthCheckServer.markReady();
 
       logger.info(
           "Civitas Config Adapter is running with {} consumer(s). Press Ctrl+C to stop.",
@@ -42,6 +47,7 @@ public class Application {
       System.exit(1);
     } finally {
       logger.info("Shutting down {} consumer(s)", consumers.size());
+
       for (EventConsumer consumer : consumers) {
         try {
           consumer.close();

@@ -48,6 +48,16 @@ public record AppConfig(Properties properties) {
     return properties.getProperty("eventpublisher.class");
   }
 
+  public int getHealthCheckPort() {
+    String portProperty = properties.getProperty("healthcheck.port", "8080");
+    try {
+      return Integer.parseInt(portProperty);
+    } catch (NumberFormatException e) {
+      throw new RuntimeException(
+          "Invalid healthcheck.port value: " + portProperty + ". Must be a valid integer.", e);
+    }
+  }
+
   public String getProperty(String key) {
     return properties.getProperty(key);
   }
