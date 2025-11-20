@@ -65,15 +65,18 @@
         "closed": "closed"
       }
     },
-    "create": {
+    "overview": {
       "title": "Overview: Create Dataset",
       "info": {
+        "title": "Base Information",
         "dataspace": "Data Space",
         "name": "Name",
         "description": "Description",
-        "tags": "Tags"
+        "tags": "Tags",
+        "typeTag": "Type tag..."
       },
-            "progress": {
+      "completion": {
+        "title": "Creation Progress",
         "metadata": "Metadata",
         "groups": "Group & Role Assignment",
         "configuration": "Data Configuration",

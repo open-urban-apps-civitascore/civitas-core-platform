@@ -1,10 +1,10 @@
 'use server'
 
-import { DatasetFormData, DatasetOverviewData } from '@/types/datasets'
+import { DatasetResponse } from '@/types/datasets'
 
 const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
-export const createDataset = async (datasetData: DatasetOverviewData) => {
+export const createDataset = async (datasetData: DatasetResponse) => {
   console.log('creating dataset')
   try {
     const response = await fetch(`${URL}/datasets`, {
@@ -19,7 +19,7 @@ export const createDataset = async (datasetData: DatasetOverviewData) => {
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`)
     }
-    const data: DatasetOverviewData = await response.json()
+    const data: DatasetResponse = await response.json()
     console.log('successfully created dataset:', data)
     return data
   } catch (error) {
@@ -28,7 +28,7 @@ export const createDataset = async (datasetData: DatasetOverviewData) => {
   }
 }
 
-export const updateDataset = async (updateDatasetData: DatasetFormData) => {
+export const updateDataset = async (updateDatasetData: Partial<DatasetResponse>) => {
   try {
     const response = await fetch(`${URL}/datasets/${updateDatasetData.id}`, {
       method: 'PATCH',
@@ -47,5 +47,6 @@ export const updateDataset = async (updateDatasetData: DatasetFormData) => {
     console.log('successfully updated dataset:', data)
   } catch (error) {
     console.error('An error occurred while updating the dataset:', error)
+    throw new Error(`An error occurred while updating dataset:, ${error}`)
   }
 }

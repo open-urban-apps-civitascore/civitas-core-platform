@@ -65,15 +65,18 @@
         "closed": "geschlossen"
       }
     },
-    "create": {
+    "overview": {
       "title": "Übersicht: Dataset erstellen",
       "info": {
+        "title": "Basisinformationen",
         "dataspace": "Datenraum",
         "name": "Name",
         "description": "Beschreibung",
-        "tags": "Tags"
+        "tags": "Tags",
+        "typeTag": "Tag eingeben..."
       },
-      "progress": {
+      "completion": {
+        "title": "Erstellungsfortschritt",
         "metadata": "Metadaten",
         "groups": "Gruppen- & Rollenzuweisung",
         "configuration": "Datenkonfiguration",

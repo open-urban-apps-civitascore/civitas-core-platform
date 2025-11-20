@@ -1,29 +1,22 @@
-import { DatasetOverviewData } from '@/types/datasets'
+import { DatasetFormData } from '@/types/datasets'
 import { DataSpace } from '@/types/dataspaces'
+
 import { DatasetOverview } from '../components/DatasetOverview'
 
 const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
-export const defaultDataset: DatasetOverviewData = {
+export const defaultDataset: DatasetFormData = {
   id: '',
   dataspace: '',
-  title: '',
+  name: '',
   description: '',
   tags: [],
-  creationProgress: {
-    metadata: false,
-    groups: false,
-    dataConfiguration: false,
-    distribution: false,
-    permissions: false,
-    publication: false,
-  },
 }
 
 const CreateDatasetPage = async () => {
   const getDataspaces = async () => {
     try {
-      const dataspacesResponse = await fetch(`${URL}/datasets`, {
+      const dataspacesResponse = await fetch(`${URL}/dataspaces`, {
         cache: 'no-store',
       })
       if (!dataspacesResponse) {
