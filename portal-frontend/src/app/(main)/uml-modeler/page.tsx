@@ -13,7 +13,7 @@ const UmlModelerPage = () => {
         </div>
         <div className="flex gap-2">
           {/* Placeholder for toolbar buttons - will be implemented in future phases */}
-          <div className="text-xs text-muted-foreground">Phase 1: Foundation Complete ✓</div>
+          <div className="text-xs text-muted-foreground">Phase 1: Foundation ✓ | Phase 2: Visual UML Nodes ✓</div>
         </div>
       </div>
 

@@ -61,6 +61,7 @@ export const useUMLDiagramCore = (initialDiagram?: UMLDiagram): UseUMLDiagramCor
 
   // Node operations
   const addNode = useCallback((context: NodeCreationContext) => {
+    console.log('Adding node with context:', context)
     const newNode = createUMLNode(context.elementType, context.position, context.name)
     dispatch({ type: 'ADD_NODE', payload: newNode })
   }, [])

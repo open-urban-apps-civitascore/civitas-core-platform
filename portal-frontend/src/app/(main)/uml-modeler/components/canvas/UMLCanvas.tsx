@@ -12,17 +12,18 @@ import {
 } from '@xyflow/react'
 import { useCallback, useMemo } from 'react'
 
-import { useUMLDiagramCore } from '../../hooks/useUMLDiagramCore'
+import { useUMLDiagram } from '../../hooks/UMLDiagramContext'
+import { nodeTypes as umlNodeTypes } from '../nodes/nodeTypes'
 
 interface UMLCanvasProps {
   className?: string
 }
 
 export const UMLCanvas: React.FC<UMLCanvasProps> = ({ className = '' }) => {
-  const { diagram, dispatch, addEdge, validateConnection } = useUMLDiagramCore()
+  const { diagram, dispatch, addEdge, validateConnection } = useUMLDiagram()
 
-  // Node types registry (empty for now, will be populated in Phase 2)
-  const nodeTypes = useMemo(() => ({}), [])
+  // Node types registry - UML node components
+  const nodeTypes = useMemo(() => umlNodeTypes, [])
 
   // Edge types registry (empty for now, will be populated in Phase 3)
   const edgeTypes = useMemo(() => ({}), [])
