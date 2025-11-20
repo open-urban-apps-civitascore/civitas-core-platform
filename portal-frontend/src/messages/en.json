@@ -42,7 +42,8 @@
     "users": "User Management",
     "groups": "Groups",
     "dataspaces": "Data Spaces",
-    "tenants": "Tenant Management"
+    "tenants": "Tenant Management",
+    "uml-modeler": "UML Modeler"
   },
   "datasets": {
     "title": "Datasets",

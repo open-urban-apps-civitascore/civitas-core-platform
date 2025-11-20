@@ -84,6 +84,11 @@ export const appSidebarNavItems = [
     url: '#',
     icon: BookOpen,
   },
+  {
+    title: 'uml-modeler',
+    url: '/uml-modeler',
+    icon: SquareTerminal,
+  },
 ]
 
 export const expampleOrganizations = [
