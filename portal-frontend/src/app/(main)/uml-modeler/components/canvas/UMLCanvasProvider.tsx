@@ -2,7 +2,8 @@
 
 import { ReactFlowProvider } from '@xyflow/react'
 
-import { TestNodes } from '../TestNodes'
+import { TestEdges } from '../TestEdges'
+// import { TestNodes } from '../TestNodes'
 import { UMLDiagramProvider } from '../UMLDiagramProvider'
 import { UMLCanvas } from './UMLCanvas'
 
@@ -14,8 +15,9 @@ export const UMLCanvasProvider: React.FC<UMLCanvasProviderProps> = ({ className 
   return (
     <UMLDiagramProvider>
       <ReactFlowProvider>
+        <TestEdges />
         <UMLCanvas className={className} />
-        <TestNodes />
+        {/* <TestNodes /> */}
       </ReactFlowProvider>
     </UMLDiagramProvider>
   )

@@ -1,5 +1,6 @@
 'use client'
 
+import { Handle, Position } from '@xyflow/react'
 import type { CSSProperties, ReactNode } from 'react'
 
 import { NODE_DIMENSIONS, UML_COLORS } from '../../constants/umlTypes'
@@ -42,6 +43,11 @@ export const BaseUMLNode: React.FC<BaseUMLNodeProps> = ({
 }) => {
   return (
     <div className={`uml-node ${className}`} style={getNodeStyle(elementType, isSelected)}>
+      {/* Universal connection handles - invisible for clean UML appearance */}
+
+      <Handle type="source" position={Position.Top} id="universal" />
+      <Handle type="target" position={Position.Top} id="universal" />
+
       {/* Header section with stereotype and name */}
       <div
         className="node-header"

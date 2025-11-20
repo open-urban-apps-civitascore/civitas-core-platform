@@ -13,6 +13,8 @@ import {
 import { useCallback, useMemo } from 'react'
 
 import { useUMLDiagram } from '../../hooks/UMLDiagramContext'
+import { edgeTypes as umlEdgeTypes } from '../edges/edgeTypes'
+import { UMLMarkers } from '../edges/UMLMarkers'
 import { nodeTypes as umlNodeTypes } from '../nodes/nodeTypes'
 
 interface UMLCanvasProps {
@@ -25,8 +27,8 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({ className = '' }) => {
   // Node types registry - UML node components
   const nodeTypes = useMemo(() => umlNodeTypes, [])
 
-  // Edge types registry (empty for now, will be populated in Phase 3)
-  const edgeTypes = useMemo(() => ({}), [])
+  // Edge types registry - UML edge components
+  const edgeTypes = useMemo(() => umlEdgeTypes, [])
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -53,6 +55,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({ className = '' }) => {
 
   return (
     <div className={`h-full w-full ${className}`}>
+      <UMLMarkers />
       <ReactFlow
         nodes={diagram.nodes}
         edges={diagram.edges}

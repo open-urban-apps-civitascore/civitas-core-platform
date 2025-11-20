@@ -215,7 +215,62 @@ export const validateConnection = (diagram: UMLDiagram, connection: Connection):
   // Check for duplicate connections
   const existingConnection = diagram.edges.find(edge => edge.source === source && edge.target === target)
 
-  return !existingConnection
+  if (existingConnection) {
+    return false
+  }
+
+  // UML-specific validation rules
+  const sourceType = sourceNode.data.element.type
+  const targetType = targetNode.data.element.type
+
+  // For now, allow all connections (basic implementation)
+  // Future enhancement: Add relationship-specific validation
+  // Example: inheritance only class → class/abstractClass
+  // realization only class → interface
+
+  return true
+}
+
+// Enhanced validation for specific relationship types
+export const validateRelationshipConnection = (
+  diagram: UMLDiagram,
+  connection: Connection,
+  relationshipType: string,
+): boolean => {
+  if (!validateConnection(diagram, connection)) {
+    return false
+  }
+
+  const sourceNode = findNodeById(diagram, connection.source!)
+  const targetNode = findNodeById(diagram, connection.target!)
+
+  if (!sourceNode || !targetNode) {
+    return false
+  }
+
+  const sourceType = sourceNode.data.element.type
+  const targetType = targetNode.data.element.type
+
+  // Relationship-specific validation rules
+  switch (relationshipType) {
+    case 'inheritance':
+      // Inheritance: class → class/abstractClass only
+      return sourceType === 'class' && (targetType === 'class' || targetType === 'abstractClass')
+
+    case 'realization':
+      // Realization: class → interface only
+      return sourceType === 'class' && targetType === 'interface'
+
+    case 'association':
+    case 'aggregation':
+    case 'composition':
+    case 'dependency':
+      // These relationships are more flexible
+      return true
+
+    default:
+      return true
+  }
 }
 
 // Diagram serialization
