@@ -1,39 +1,44 @@
 package com.civitas.configadapter.config;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.Properties;
+import org.apache.commons.configuration2.CompositeConfiguration;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.EnvironmentConfiguration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.builder.fluent.Configurations;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 
-public record AppConfig(Properties properties) {
+public record AppConfig(Configuration configuration) {
 
   public AppConfig(String configFile) {
-    this(new Properties());
-    try (InputStream input = getClass().getClassLoader().getResourceAsStream(configFile)) {
-      if (input == null) {
-        throw new RuntimeException("Unable to find " + configFile);
-      }
-      properties.load(input);
-    } catch (IOException ex) {
-      throw new RuntimeException("Failed to load configuration", ex);
+    this(buildConfiguration(configFile));
+  }
+
+  private static Configuration buildConfiguration(String configFile) {
+    try {
+      CompositeConfiguration compositeConfig = new CompositeConfiguration();
+      EnvironmentConfiguration envConfig = new EnvironmentConfiguration();
+      compositeConfig.addConfiguration(envConfig);
+
+      Configurations configs = new Configurations();
+      PropertiesConfiguration propsConfig =
+          configs.properties(AppConfig.class.getClassLoader().getResource(configFile));
+      compositeConfig.addConfiguration(propsConfig);
+
+      return compositeConfig;
+    } catch (ConfigurationException | NullPointerException ex) {
+      throw new RuntimeException("Failed to load configuration from " + configFile, ex);
     }
   }
 
   public List<String> getAdapterClasses() {
-    List<String> adapterClasses = new ArrayList<>();
     String adaptersProperty = getProperty("adapters");
-
     if (adaptersProperty != null && !adaptersProperty.trim().isEmpty()) {
-      String[] adapters = adaptersProperty.split(",");
-      for (String adapter : adapters) {
-        String trimmed = adapter.trim();
-        if (!trimmed.isEmpty()) {
-          adapterClasses.add(trimmed);
-        }
-      }
+      return Arrays.stream(adaptersProperty.split(",")).map(String::trim).toList();
     }
-    return adapterClasses;
+    return Collections.emptyList();
   }
 
   public String getEventHandlerClass() {
@@ -97,13 +102,14 @@ public record AppConfig(Properties properties) {
    */
   public String getProperty(String key, String defaultValue) {
     String envKey = toEnvironmentVariableName(key);
-    String envValue = System.getenv(envKey);
+    String value = configuration.getString(envKey);
 
-    if (envValue != null && !envValue.isEmpty()) {
-      return envValue;
+    if (value != null && !value.isEmpty()) {
+      return value;
     }
 
-    return properties.getProperty(key, defaultValue);
+    value = configuration.getString(key);
+    return value != null ? value : defaultValue;
   }
 
   /**
@@ -128,7 +134,7 @@ public record AppConfig(Properties properties) {
    * @param propertyKey the property key
    * @return the environment variable name
    */
-  private String toEnvironmentVariableName(String propertyKey) {
+  private static String toEnvironmentVariableName(String propertyKey) {
     return propertyKey.toUpperCase().replace('.', '_').replace('-', '_');
   }
 }

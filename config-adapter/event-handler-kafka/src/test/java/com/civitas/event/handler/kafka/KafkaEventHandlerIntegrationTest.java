@@ -26,6 +26,7 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -61,11 +62,11 @@ class KafkaEventHandlerIntegrationTest {
     objectMapper = new ObjectMapper();
 
     // Create test configuration
-    Properties props = new Properties();
-    props.setProperty("kafka.bootstrap.servers", kafka.getBootstrapServers());
-    props.setProperty("kafka.group.id", "test-group-" + UUID.randomUUID());
-    props.setProperty("kafka.auto.offset.reset", "earliest");
-    config = new AppConfig(props);
+    Map<String, Object> props = new HashMap<>();
+    props.put("kafka.bootstrap.servers", kafka.getBootstrapServers());
+    props.put("kafka.group.id", "test-group-" + UUID.randomUUID());
+    props.put("kafka.auto.offset.reset", "earliest");
+    config = new AppConfig(new MapConfiguration(props));
 
     // Create test adapter
     testAdapter = new TestAdapter();

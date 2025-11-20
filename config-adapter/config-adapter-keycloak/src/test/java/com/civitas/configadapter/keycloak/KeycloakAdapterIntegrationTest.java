@@ -16,6 +16,7 @@ import com.civitas.configadapter.model.Topics;
 import io.cloudevents.CloudEvent;
 import java.time.OffsetDateTime;
 import java.util.*;
+import org.apache.commons.configuration2.MapConfiguration;
 import org.junit.jupiter.api.*;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RoleResource;
@@ -58,13 +59,13 @@ class KeycloakAdapterIntegrationTest {
     waitForKeycloakReady(keycloakUrl);
 
     // Create configuration
-    Properties props = new Properties();
-    props.setProperty("keycloak.url", keycloakUrl);
-    props.setProperty("keycloak.realm", "master");
-    props.setProperty("keycloak.username", "admin");
-    props.setProperty("keycloak.password", "admin");
-    props.setProperty("keycloak.client.id", "admin-cli");
-    props.setProperty(
+    Map<String, Object> props = new HashMap<>();
+    props.put("keycloak.url", keycloakUrl);
+    props.put("keycloak.realm", "master");
+    props.put("keycloak.username", "admin");
+    props.put("keycloak.password", "admin");
+    props.put("keycloak.client.id", "admin-cli");
+    props.put(
         "keycloak.topics",
         String.join(
             ",",
@@ -81,7 +82,7 @@ class KeycloakAdapterIntegrationTest {
             Topics.CLIENT_CREATED,
             Topics.CLIENT_UPDATED,
             Topics.CLIENT_DELETED));
-    AppConfig config = new AppConfig(props);
+    AppConfig config = new AppConfig(new MapConfiguration(props));
 
     // Create adapter
     adapter = new KeycloakAdapter(config);

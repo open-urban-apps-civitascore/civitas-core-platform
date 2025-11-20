@@ -20,9 +20,12 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -85,16 +88,16 @@ class EndToEndIntegrationTest {
     waitForKeycloakReady(keycloakUrl);
 
     // Create configuration
-    Properties props = new Properties();
-    props.setProperty("kafka.bootstrap.servers", kafka.getBootstrapServers());
-    props.setProperty("kafka.group.id", "e2e-test-group-" + UUID.randomUUID());
-    props.setProperty("kafka.auto.offset.reset", "earliest");
-    props.setProperty("keycloak.url", keycloakUrl);
-    props.setProperty("keycloak.realm", "master");
-    props.setProperty("keycloak.username", "admin");
-    props.setProperty("keycloak.password", "admin");
-    props.setProperty("keycloak.client.id", "admin-cli");
-    props.setProperty(
+    Map<String, Object> props = new HashMap<>();
+    props.put("kafka.bootstrap.servers", kafka.getBootstrapServers());
+    props.put("kafka.group.id", "e2e-test-group-" + UUID.randomUUID());
+    props.put("kafka.auto.offset.reset", "earliest");
+    props.put("keycloak.url", keycloakUrl);
+    props.put("keycloak.realm", "master");
+    props.put("keycloak.username", "admin");
+    props.put("keycloak.password", "admin");
+    props.put("keycloak.client.id", "admin-cli");
+    props.put(
         "keycloak.topics",
         String.join(
             ",",
@@ -111,7 +114,7 @@ class EndToEndIntegrationTest {
             Topics.CLIENT_CREATED,
             Topics.CLIENT_UPDATED,
             Topics.CLIENT_DELETED));
-    AppConfig config = new AppConfig(props);
+    AppConfig config = new AppConfig(new MapConfiguration(props));
 
     // Create adapter
     adapter = new KeycloakAdapter(config);

@@ -3,74 +3,62 @@ package com.civitas.configadapter.config;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import java.util.Properties;
+import java.util.Collections;
+import java.util.Map;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.MapConfiguration;
 import org.junit.jupiter.api.Test;
 
 class AppConfigTest {
 
   @Test
   void shouldReturnPropertyFromPropertiesFile() {
-    Properties props = new Properties();
-    props.setProperty("test.key", "test-value");
-
-    AppConfig config = new AppConfig(props);
+    AppConfig config = createAppConfig("test.key", "test-value");
 
     assertEquals("test-value", config.getProperty("test.key"));
   }
 
   @Test
   void shouldReturnDefaultValueWhenPropertyNotFound() {
-    Properties props = new Properties();
-
-    AppConfig config = new AppConfig(props);
+    Map<String, Object> props = Collections.emptyMap();
+    AppConfig config = new AppConfig(new MapConfiguration(props));
 
     assertEquals("default", config.getProperty("missing.key", "default"));
   }
 
   @Test
   void shouldReturnNullWhenPropertyNotFoundAndNoDefault() {
-    Properties props = new Properties();
-
-    AppConfig config = new AppConfig(props);
+    Map<String, Object> props = Collections.emptyMap();
+    AppConfig config = new AppConfig(new MapConfiguration(props));
 
     assertNull(config.getProperty("missing.key"));
   }
 
   @Test
   void shouldConvertPropertyKeyToEnvironmentVariableName() {
-    Properties props = new Properties();
-    props.setProperty("kafka.bootstrap.servers", "localhost:9092");
-
-    AppConfig config = new AppConfig(props);
+    AppConfig config = createAppConfig("kafka.bootstrap.servers", "localhost:9092");
 
     assertEquals("localhost:9092", config.getProperty("kafka.bootstrap.servers"));
   }
 
   @Test
   void shouldGetHealthCheckPortFromProperties() {
-    Properties props = new Properties();
-    props.setProperty("healthcheck.port", "9090");
-
-    AppConfig config = new AppConfig(props);
+    AppConfig config = createAppConfig("healthcheck.port", "9090");
 
     assertEquals(9090, config.getHealthCheckPort());
   }
 
   @Test
   void shouldGetDefaultHealthCheckPort() {
-    Properties props = new Properties();
-
-    AppConfig config = new AppConfig(props);
+    Map<String, Object> props = Collections.emptyMap();
+    AppConfig config = new AppConfig(new MapConfiguration(props));
 
     assertEquals(8080, config.getHealthCheckPort());
   }
 
   @Test
   void shouldGetAdapterClasses() {
-    Properties props = new Properties();
-    props.setProperty("adapters", "com.example.Adapter1,com.example.Adapter2");
-
-    AppConfig config = new AppConfig(props);
+    AppConfig config = createAppConfig("adapters", "com.example.Adapter1,com.example.Adapter2");
 
     assertEquals(2, config.getAdapterClasses().size());
     assertEquals("com.example.Adapter1", config.getAdapterClasses().get(0));
@@ -79,20 +67,14 @@ class AppConfigTest {
 
   @Test
   void shouldHandleEmptyAdaptersProperty() {
-    Properties props = new Properties();
-    props.setProperty("adapters", "");
-
-    AppConfig config = new AppConfig(props);
+    AppConfig config = createAppConfig("adapters", "");
 
     assertEquals(0, config.getAdapterClasses().size());
   }
 
   @Test
   void shouldTrimAdapterClassNames() {
-    Properties props = new Properties();
-    props.setProperty("adapters", " com.example.Adapter1 , com.example.Adapter2 ");
-
-    AppConfig config = new AppConfig(props);
+    AppConfig config = createAppConfig("adapters", " com.example.Adapter1 , com.example.Adapter2 ");
 
     assertEquals(2, config.getAdapterClasses().size());
     assertEquals("com.example.Adapter1", config.getAdapterClasses().get(0));
@@ -101,31 +83,28 @@ class AppConfigTest {
 
   @Test
   void shouldGetEventHandlerClass() {
-    Properties props = new Properties();
-    props.setProperty("eventhandler.class", "com.example.EventHandler");
-
-    AppConfig config = new AppConfig(props);
+    AppConfig config = createAppConfig("eventhandler.class", "com.example.EventHandler");
 
     assertEquals("com.example.EventHandler", config.getEventHandlerClass());
   }
 
   @Test
   void shouldGetEventConsumerClass() {
-    Properties props = new Properties();
-    props.setProperty("eventconsumer.class", "com.example.EventConsumer");
-
-    AppConfig config = new AppConfig(props);
+    AppConfig config = createAppConfig("eventconsumer.class", "com.example.EventConsumer");
 
     assertEquals("com.example.EventConsumer", config.getEventConsumerClass());
   }
 
   @Test
   void shouldGetEventPublisherClass() {
-    Properties props = new Properties();
-    props.setProperty("eventpublisher.class", "com.example.EventPublisher");
-
-    AppConfig config = new AppConfig(props);
+    AppConfig config = createAppConfig("eventpublisher.class", "com.example.EventPublisher");
 
     assertEquals("com.example.EventPublisher", config.getEventPublisherClass());
+  }
+
+  private AppConfig createAppConfig(String key, String value) {
+    Map<String, Object> props = Collections.singletonMap(key, value);
+    Configuration config = new MapConfiguration(props);
+    return new AppConfig(config);
   }
 }
