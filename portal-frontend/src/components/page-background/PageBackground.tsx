@@ -6,7 +6,10 @@ export const PageBackground = (props: HTMLAttributes<HTMLDivElement>) => {
   const { children, className } = props
   return (
     <div
-      className={cn('min-h-0 bg-muted p-[calc(var(--layout-padding))] h-[calc(100%-var(--title-height))]', className)}
+      className={cn(
+        'min-h-0 bg-muted p-[calc(var(--layout-padding))] h-[calc(100%-var(--title-height))] overflow-auto',
+        className,
+      )}
     >
       {children}
     </div>

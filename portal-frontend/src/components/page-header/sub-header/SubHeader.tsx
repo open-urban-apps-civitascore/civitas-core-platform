@@ -13,8 +13,8 @@ export const SubHeader = (props: SubHeaderProps) => {
   return (
     <div className={cn('flex justify-between', className)}>
       <div>
-        <h2>{title}</h2>
-        <p className="text-sm text-muted-foreground pt-1">{subtitle}</p>
+        <h2 className="text-xl">{title}</h2>
+        {subtitle && <p className="text-sm text-muted-foreground pt-1">{subtitle}</p>}
       </div>
       {customElement}
     </div>

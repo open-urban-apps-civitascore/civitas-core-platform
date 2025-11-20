@@ -116,6 +116,15 @@
         "assignment": "Zuordnung",
         "noRolesAssigned": "Keine {roleType} zugewiesen"
       }
+    },
+    "groupsTab": {
+      "title": "Gruppenmitgliedschaft",
+      "addGroup": "Gruppe hinzufügen",
+      "name": "Name",
+      "memberSince": "Mitglied seit",
+      "contact": "Ansprechpartner",
+      "description": "Beschreibung",
+      "roles": "Rollen"
     }
   },
   "groups": {

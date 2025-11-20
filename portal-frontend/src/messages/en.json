@@ -117,6 +117,15 @@
         "group": "Group",
         "assignment": "Assignment"
       }
+    },
+    "groupsTab": {
+      "title": "Group Membership",
+      "addGroup": "Add Group",
+      "name": "Name",
+      "memberSince": "Member since",
+      "contact": "Contact",
+      "description": "Description",
+      "roles": "Roles"
     }
   },
   "groups": {
