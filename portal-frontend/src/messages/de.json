@@ -24,7 +24,8 @@
   },
   "languages": {
     "german": "Deutsch",
-    "english": "Englisch"
+    "english": "Englisch",
+    "selectLanguagePlaceholder": "Sprache wählen"
   },
   "sidebar": {
     "home": "Home",
@@ -225,21 +226,42 @@
       "user": "User",
       "createdAt": "erstellt"
     },
-    "form": {
-      "title": { "createRole": "Rolle erstellen" },
-      "inputs": {
-        "name": "Name der Rolle",
-        "description": "Beschreibung der Rolle"
-      },
-      "formErrors": {
-        "name": {
-          "minLength": "Name muss mindestens 2 Zeichen lang sein.",
-          "maxLength": "Name darf höchstens 30 Zeichen lang sein."
+    "tabLabels": {
+      "basicInformation": "Informationen",
+      "permissions": "Berechtigungen",
+      "groupAssignment": "Mitgliedschaft"
+    },
+    "baseInfoTab": {
+      "heading": "Basisinformationen",
+      "form": {
+        "inputs": {
+          "name": "Name der Rolle",
+          "description": "Beschreibung der Rolle"
         },
-        "description": {
-          "maxLength": "Beschreibung darf höchstens 100 Zeichen lang sein."
+        "placeholders": {
+          "name": "Name der Rolle",
+          "description": "Beschreibung der Rolle"
+        },
+        "formErrors": {
+          "name": {
+            "minLength": "Name muss mindestens 2 Zeichen lang sein.",
+            "maxLength": "Name darf höchstens 30 Zeichen lang sein."
+          },
+          "description": {
+            "maxLength": "Beschreibung darf höchstens 100 Zeichen lang sein."
+          }
         }
       }
+    },
+    "permissionsTab": {
+      "heading": "Berechtigungen",
+      "selectedPersmissions": "{count} ausgewählt",
+      "roleTemplate": {
+        "placeholder": "Rolle als Vorlage auswählen"
+      }
+    },
+    "groupAssignmentTab": {
+      "heading": "Mitgliedschaften"
     }
   }
 }

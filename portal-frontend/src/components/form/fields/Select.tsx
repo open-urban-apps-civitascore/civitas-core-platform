@@ -7,11 +7,7 @@ import { FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/for
 import { Select as ShadcnSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-
-export type SelectOption = {
-  value: string
-  label: string
-}
+import { SelectOption } from '@/types/common'
 
 export interface AccessibleSelectProps<T extends FieldValues> {
   id: string
