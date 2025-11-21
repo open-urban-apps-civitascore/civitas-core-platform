@@ -20,7 +20,7 @@ export const defaultFormUser: UserResponse = {
 
 const CreateUserPage = async () => {
   const t = await getTranslations('users')
-  return <UserDetails userData={defaultFormUser} title={t('newUser')} />
+  return <UserDetails testId="createUserPage" userData={defaultFormUser} title={t('newUser')} />
 }
 
 export default CreateUserPage

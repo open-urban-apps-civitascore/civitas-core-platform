@@ -16,6 +16,7 @@ export const PageHeader = (props: PageHeaderProps) => {
   return (
     <div
       id="heading"
+      data-testid="pageHeader"
       className={cn(
         'flex flex-col gap-[var(--layout-padding)] h-[var(--title-height)] py-[var(--layout-padding)] border-b-1',
         className,
@@ -23,7 +24,13 @@ export const PageHeader = (props: PageHeaderProps) => {
       style={style}
     >
       {tabs && (
-        <TabsSection tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} isHeading={!title} />
+        <TabsSection
+          testId="primaryTabs"
+          tabs={tabs.tabs}
+          onClick={tabs.onClick}
+          selectedTab={tabs.selectedTab}
+          isHeading={!title}
+        />
       )}
       <div
         id="heading"
@@ -37,6 +44,7 @@ export const PageHeader = (props: PageHeaderProps) => {
       </div>
       {subTabs && (
         <TabsSection
+          testId="secondaryTabs"
           tabs={subTabs.tabs}
           selectedTab={subTabs.selectedTab}
           onClick={subTabs.onClick}

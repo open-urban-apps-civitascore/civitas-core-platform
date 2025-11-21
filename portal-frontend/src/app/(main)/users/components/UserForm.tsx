@@ -154,7 +154,7 @@ export const UserForm = (props: UserFormProps) => {
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
 
   const EditButton = (
-    <Button variant="outline" type="button" onClick={() => setIsReadOnly(false)}>
+    <Button data-testid="editButton" variant="outline" type="button" onClick={() => setIsReadOnly(false)}>
       <SquarePen />
       {tCommon('actions.edit')}
     </Button>
@@ -162,7 +162,7 @@ export const UserForm = (props: UserFormProps) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} data-testid="userDetailsForm">
         <ContentCard>
           <DetailsFieldContainer className="pt-0 pb-4 text-xl">
             <SubHeader
@@ -184,6 +184,7 @@ export const UserForm = (props: UserFormProps) => {
           <DetailsFieldContainer>
             <Select
               id="title-select"
+              
               label={t('info.title.title')}
               options={titleOptions}
               placeholder={t('form.selectTitle')}

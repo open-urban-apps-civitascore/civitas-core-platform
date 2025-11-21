@@ -20,10 +20,11 @@ interface UserDetailsProps {
   title: string
   userData: UserResponse | null
   isEditMode?: boolean
+  testId?: string
 }
 
 export const UserDetails = (props: UserDetailsProps) => {
-  const { title, userData, isEditMode = false } = props
+  const { title, userData, isEditMode = false, testId } = props
   const t = useTranslations('users')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
 
@@ -91,7 +92,7 @@ export const UserDetails = (props: UserDetailsProps) => {
   }
 
   return (
-    <PageContainer headerType="withSubTabs" className="overflow-hidden">
+    <PageContainer headerType="withSubTabs" className="overflow-hidden" testId={testId}>
       <PageHeader
         title={title}
         subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: newTab => handleSelectTab(newTab) }}

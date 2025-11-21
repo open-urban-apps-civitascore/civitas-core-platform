@@ -115,7 +115,7 @@ const UsersPage = () => {
   }
 
   const CustomElement = (
-    <Button onClick={() => router.push('/users/create')}>
+    <Button data-testid="addUserButton" onClick={() => router.push('/users/create')}>
       <Plus />
       {t('newUser')}
     </Button>
