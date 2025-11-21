@@ -94,6 +94,7 @@ export const diagramReducer = (state: UMLDiagram, action: DiagramAction): UMLDia
           edge.id === id
             ? {
                 ...edge,
+                type: updates.type || edge.type, // Update edge type for ReactFlow
                 data: {
                   ...edge.data,
                   relationship: { ...edge.data.relationship, ...updates },

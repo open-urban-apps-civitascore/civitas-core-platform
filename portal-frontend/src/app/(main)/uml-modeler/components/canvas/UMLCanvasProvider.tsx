@@ -17,6 +17,7 @@ export const UMLCanvasProvider: React.FC<UMLCanvasProviderProps> = ({ className 
       <ReactFlowProvider>
         <TestEdges />
         <UMLCanvas className={className} />
+
         {/* <TestNodes /> */}
       </ReactFlowProvider>
     </UMLDiagramProvider>
