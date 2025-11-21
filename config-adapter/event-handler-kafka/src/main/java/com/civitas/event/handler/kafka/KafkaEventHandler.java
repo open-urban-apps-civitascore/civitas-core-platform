@@ -5,13 +5,17 @@ import com.civitas.configadapter.config.AppConfig;
 import com.civitas.configadapter.core.CloudEventProcessor;
 import com.civitas.configadapter.messaging.EventConsumer;
 import com.civitas.configadapter.messaging.EventPublisher;
+import com.civitas.configadapter.model.ConfigResultEvent;
 import io.cloudevents.CloudEvent;
+import io.cloudevents.core.builder.CloudEventBuilder;
 import io.cloudevents.kafka.CloudEventDeserializer;
 import io.cloudevents.kafka.CloudEventSerializer;
+import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -129,28 +133,74 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   }
 
   @Override
-  public void publish(String topic, CloudEvent event) {
+  public void publish(String topic, ConfigResultEvent resultEvent) {
+    CloudEvent cloudEvent = convertToCloudEvent(resultEvent);
     try {
-      ProducerRecord<String, CloudEvent> record = new ProducerRecord<>(topic, event.getId(), event);
+      ProducerRecord<String, CloudEvent> record =
+          new ProducerRecord<>(topic, cloudEvent.getId(), cloudEvent);
 
       kafkaProducer.send(
           record,
           (metadata, exception) -> {
             if (exception != null) {
               logger.error(
-                  "Failed to publish event {} to topic {}", event.getId(), topic, exception);
+                  "Failed to publish result event {} to topic {}",
+                  cloudEvent.getId(),
+                  topic,
+                  exception);
             } else {
               logger.debug(
-                  "Published event {} to topic {} partition {} offset {}",
-                  event.getId(),
+                  "Published result event {} to topic {} partition {} offset {}",
+                  cloudEvent.getId(),
                   metadata.topic(),
                   metadata.partition(),
                   metadata.offset());
             }
           });
     } catch (Exception e) {
-      logger.error("Error publishing event {} to topic {}", event.getId(), topic, e);
+      logger.error("Error publishing result event {} to topic {}", cloudEvent.getId(), topic, e);
     }
+  }
+
+  /**
+   * Converts a ConfigResultEvent to a CloudEvent for transmission over Kafka.
+   *
+   * @param resultEvent the configuration result event
+   * @return a CloudEvent representation
+   */
+  private CloudEvent convertToCloudEvent(ConfigResultEvent resultEvent) {
+    CloudEventBuilder builder =
+        CloudEventBuilder.v1()
+            .withId(UUID.randomUUID().toString())
+            .withSource(URI.create(resultEvent.source()))
+            .withType("core.civitas.idm.processing.result")
+            .withTime(resultEvent.timestamp())
+            .withData("application/json", "{}".getBytes())
+            .withExtension("correlationid", resultEvent.correlationId())
+            .withExtension("originalmessageid", resultEvent.originalMessageId())
+            .withExtension("status", resultEvent.status().name())
+            .withExtension("operation", resultEvent.operation())
+            .withExtension("targetresource", resultEvent.targetResource());
+
+    if (resultEvent.message() != null) {
+      builder.withExtension("message", resultEvent.message());
+    }
+
+    if (resultEvent.status() == ConfigResultEvent.Status.SUCCESS
+        && resultEvent.resourceId() != null) {
+      builder.withExtension("resourceid", resultEvent.resourceId());
+    }
+
+    if (resultEvent.status() == ConfigResultEvent.Status.FAILURE
+        && resultEvent.errorCode() != null) {
+      builder.withExtension("errorcode", resultEvent.errorCode());
+    }
+
+    if (resultEvent.status() == ConfigResultEvent.Status.FAILURE && resultEvent.message() != null) {
+      builder.withExtension("errormessage", resultEvent.message());
+    }
+
+    return builder.build();
   }
 
   @Override

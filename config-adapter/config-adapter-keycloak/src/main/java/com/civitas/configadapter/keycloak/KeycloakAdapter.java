@@ -3,17 +3,13 @@ package com.civitas.configadapter.keycloak;
 import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.config.AppConfig;
 import com.civitas.configadapter.model.ConfigEvent;
+import com.civitas.configadapter.model.ConfigResultEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.cloudevents.CloudEvent;
-import io.cloudevents.core.builder.CloudEventBuilder;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
-import java.net.URI;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
@@ -504,23 +500,15 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
 
     try {
-      // Include minimal data body - Kafka treats NULL values as tombstones
-      // which causes the deserializer to return NULL
-      CloudEvent resultEvent =
-          CloudEventBuilder.v1()
-              .withId(UUID.randomUUID().toString())
-              .withSource(URI.create("civitas.config-adapter.keycloak"))
-              .withType("core.civitas.idm.processing.result")
-              .withTime(OffsetDateTime.now())
-              .withData("application/json", "{}".getBytes())
-              .withExtension("correlationid", originalEvent.metadata().correlationId())
-              .withExtension("originalmessageid", originalEvent.metadata().messageId())
-              .withExtension("status", "SUCCESS")
-              .withExtension("message", message)
-              .withExtension("resourceid", resourceId)
-              .withExtension("operation", originalEvent.payload().operation())
-              .withExtension("targetresource", originalEvent.payload().targetResource())
-              .build();
+      ConfigResultEvent resultEvent =
+          ConfigResultEvent.success(
+              originalEvent.metadata().correlationId(),
+              originalEvent.metadata().messageId(),
+              message,
+              resourceId,
+              originalEvent.payload().operation(),
+              originalEvent.payload().targetResource(),
+              "civitas.config-adapter.keycloak");
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
@@ -537,23 +525,15 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
 
     try {
-      // Include minimal data body - Kafka treats NULL values as tombstones
-      // which causes the deserializer to return NULL
-      CloudEvent resultEvent =
-          CloudEventBuilder.v1()
-              .withId(UUID.randomUUID().toString())
-              .withSource(URI.create("civitas.config-adapter.keycloak"))
-              .withType("core.civitas.idm.processing.result")
-              .withTime(OffsetDateTime.now())
-              .withData("application/json", "{}".getBytes())
-              .withExtension("correlationid", originalEvent.metadata().correlationId())
-              .withExtension("originalmessageid", originalEvent.metadata().messageId())
-              .withExtension("status", "FAILURE")
-              .withExtension("errorcode", errorCode)
-              .withExtension("errormessage", errorMessage)
-              .withExtension("operation", originalEvent.payload().operation())
-              .withExtension("targetresource", originalEvent.payload().targetResource())
-              .build();
+      ConfigResultEvent resultEvent =
+          ConfigResultEvent.failure(
+              originalEvent.metadata().correlationId(),
+              originalEvent.metadata().messageId(),
+              errorCode,
+              errorMessage,
+              originalEvent.payload().operation(),
+              originalEvent.payload().targetResource(),
+              "civitas.config-adapter.keycloak");
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published FAILURE result to topic: {}", originalEvent.metadata().resultTopic());

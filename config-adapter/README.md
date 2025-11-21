@@ -34,9 +34,11 @@ Core interfaces and models that define the adapter contract.
 **Key Components:**
 - `ConfigAdapter` - Interface for backend service adapters
 - `EventConsumer` - Interface for message consumers
-- `EventPublisher` - Interface for publishing result events
+- `EventPublisher` - Interface for publishing result events (uses ConfigResultEvent)
 - `CloudEventProcessor` - Internal helper for CloudEvent deserialization
-- `ConfigEvent` - Event data model with metadata and payload
+- `ConfigEvent` - Input event data model with metadata and payload
+- `ConfigResultEvent` - Output result event model with status, correlation, and error details
+- `AppConfig` - Configuration management using Apache Commons Configuration2
 
 **Usage:** Depend on this module to create new adapters or consumers.
 
@@ -53,7 +55,7 @@ Generic application runner that uses reflection to load adapters and consumers.
 
 **Key Components:**
 - `Application` - Main entry point that reads configuration and wires components
-- `AppConfig` - Base configuration class with properties loading
+- `AppConfig` - Configuration management using Apache Commons Configuration2 with environment variable support
 
 **Features:**
 - Supports single or multiple adapters configuration
@@ -225,7 +227,33 @@ public class MyServiceAdapter implements ConfigAdapter {
 
 	@Override
 	public void setEventPublisher(EventPublisher publisher) {
-	    // Store publisher to send result events
+	    this.eventPublisher = publisher;
+	}
+
+	private void publishResult(ConfigEvent original, boolean success, String message) {
+	    if (eventPublisher == null || original.metadata().resultTopic() == null) {
+	        return;
+	    }
+
+	    ConfigResultEvent result = success
+	        ? ConfigResultEvent.success(
+	              original.metadata().correlationId(),
+	              original.metadata().messageId(),
+	              message,
+	              resourceId,
+	              original.payload().operation(),
+	              original.payload().targetResource(),
+	              "my.adapter.source")
+	        : ConfigResultEvent.failure(
+	              original.metadata().correlationId(),
+	              original.metadata().messageId(),
+	              errorCode,
+	              message,
+	              original.payload().operation(),
+	              original.payload().targetResource(),
+	              "my.adapter.source");
+
+	    eventPublisher.publish(original.metadata().resultTopic(), result);
 	}
 
     @Override
@@ -372,15 +400,18 @@ All available topic constants are defined in `com.civitas.configadapter.model.To
 Pure interfaces with minimal dependencies:
 - CloudEvents API
 - Jackson (for data binding)
+- Apache Commons Configuration2 (for configuration management)
 - SLF4J (for logging)
 
 Contains:
 - `ConfigAdapter` interface with `getSubscribedTopics()` and `setEventPublisher()` methods
 - `EventConsumer` interface for message consumers
-- `EventPublisher` interface for result publishing
-- `ConfigEvent` record with metadata and payload structure
+- `EventPublisher` interface for publishing `ConfigResultEvent`
+- `ConfigEvent` record with metadata and payload structure (input events)
+- `ConfigResultEvent` record for adapter processing results (output events)
 - `Topics` class with centralized topic constants
 - `CloudEventProcessor` internal helper for deserialization
+- `AppConfig` configuration management with Apache Commons Configuration2
 
 No implementation-specific dependencies.
 
@@ -394,6 +425,7 @@ Kafka-specific implementation:
 Contains:
 - `KafkaEventHandler` with constructor accepting `(AppConfig, ConfigAdapter)`
 - Implements both EventConsumer and EventPublisher interfaces
+- Converts `ConfigResultEvent` to CloudEvent for Kafka transmission
 - Subscribes to multiple Kafka topics at broker level
 - Uses virtual threads for efficient concurrent consumption
 
@@ -404,7 +436,7 @@ No backend service dependencies.
 Generic application runner:
 - Depends on: `config-adapter-api`
 - Uses reflection to load configured adapters and consumers
-- `AppConfig` class for property management (part of API module)
+- `AppConfig` class using Apache Commons Configuration2 for property management (part of API module)
 
 Contains:
 - `Application` main class with simplified architecture
@@ -440,17 +472,17 @@ Reference implementations for learning and creating your own adapters.
 
 ### Environment Variable Support
 
-All properties can be overridden by environment variables. This is essential for containerized deployments (Docker, Kubernetes).
+Configuration is powered by **Apache Commons Configuration2**, providing robust support for environment variables and multiple configuration sources. All properties can be overridden by environment variables - essential for containerized deployments (Docker, Kubernetes).
 
 **Conversion Rules:**
 - Convert property key to **UPPERCASE**
 - Replace dots (`.`) with underscores (`_`)
 - Replace dashes (`-`) with underscores (`_`)
 
-**Resolution Order:**
-1. Environment variable
-2. Properties file value
-3. Default value
+**Resolution Order (highest priority first):**
+1. Environment variable (e.g., `KAFKA_BOOTSTRAP_SERVERS`)
+2. Properties file value (e.g., `kafka.bootstrap.servers` in application.properties)
+3. Default value (if specified in code)
 
 **Property to Environment Variable Mapping:**
 
@@ -671,9 +703,11 @@ civitas-config-adapter/
 │       │   └── CloudEventProcessor.java
 │       └── model/
 │           ├── ConfigEvent.java
+│           ├── ConfigResultEvent.java
 │           ├── Metadata.java
 │           ├── Payload.java
-│           └── Config.java
+│           ├── Config.java
+│           └── Topics.java
 ├── event-handler-kafka/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/event/handler/kafka/

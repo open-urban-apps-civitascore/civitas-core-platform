@@ -10,10 +10,10 @@ import com.civitas.configadapter.config.AppConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
+import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Payload;
 import com.civitas.configadapter.model.Topics;
-import io.cloudevents.CloudEvent;
 import java.time.OffsetDateTime;
 import java.util.*;
 import org.apache.commons.configuration2.MapConfiguration;
@@ -128,9 +128,9 @@ class KeycloakAdapterIntegrationTest {
 
     // Verify success result was published
     assertEquals(1, eventPublisher.getPublishedEvents().size());
-    CloudEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals("SUCCESS", resultEvent.getExtension("status"));
-    assertEquals("test-realm", resultEvent.getExtension("resourceid"));
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+    assertEquals("test-realm", resultEvent.resourceId());
   }
 
   @Test
@@ -158,7 +158,8 @@ class KeycloakAdapterIntegrationTest {
 
     // Verify success result
     assertEquals(1, eventPublisher.getPublishedEvents().size());
-    assertEquals("SUCCESS", eventPublisher.getPublishedEvents().getFirst().getExtension("status"));
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
   }
 
   @Test
@@ -207,7 +208,8 @@ class KeycloakAdapterIntegrationTest {
 
     // Verify success result
     assertEquals(1, eventPublisher.getPublishedEvents().size());
-    assertEquals("SUCCESS", eventPublisher.getPublishedEvents().getFirst().getExtension("status"));
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
   }
 
   @Test
@@ -241,7 +243,8 @@ class KeycloakAdapterIntegrationTest {
 
     // Verify success result
     assertEquals(1, eventPublisher.getPublishedEvents().size());
-    assertEquals("SUCCESS", eventPublisher.getPublishedEvents().getFirst().getExtension("status"));
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
   }
 
   @Test
@@ -265,7 +268,8 @@ class KeycloakAdapterIntegrationTest {
 
     // Verify success result
     assertEquals(1, eventPublisher.getPublishedEvents().size());
-    assertEquals("SUCCESS", eventPublisher.getPublishedEvents().getFirst().getExtension("status"));
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
   }
 
   @Test
@@ -294,7 +298,8 @@ class KeycloakAdapterIntegrationTest {
 
     // Verify success result
     assertEquals(1, eventPublisher.getPublishedEvents().size());
-    assertEquals("SUCCESS", eventPublisher.getPublishedEvents().getFirst().getExtension("status"));
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
   }
 
   @Test
@@ -345,7 +350,8 @@ class KeycloakAdapterIntegrationTest {
 
     // Verify success result
     assertEquals(1, eventPublisher.getPublishedEvents().size());
-    assertEquals("SUCCESS", eventPublisher.getPublishedEvents().getFirst().getExtension("status"));
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
   }
 
   @Test
@@ -385,7 +391,8 @@ class KeycloakAdapterIntegrationTest {
 
     // Verify success result
     assertEquals(1, eventPublisher.getPublishedEvents().size());
-    assertEquals("SUCCESS", eventPublisher.getPublishedEvents().getFirst().getExtension("status"));
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
   }
 
   @Test
@@ -419,7 +426,8 @@ class KeycloakAdapterIntegrationTest {
 
     // Verify success result
     assertEquals(1, eventPublisher.getPublishedEvents().size());
-    assertEquals("SUCCESS", eventPublisher.getPublishedEvents().getFirst().getExtension("status"));
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
   }
 
   @Test
@@ -436,10 +444,10 @@ class KeycloakAdapterIntegrationTest {
 
     // Then - verify error result was published
     assertEquals(1, eventPublisher.getPublishedEvents().size());
-    CloudEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals("FAILURE", resultEvent.getExtension("status"));
-    assertNotNull(resultEvent.getExtension("errorcode"));
-    assertNotNull(resultEvent.getExtension("errormessage"));
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.FAILURE, resultEvent.status());
+    assertNotNull(resultEvent.errorCode());
+    assertNotNull(resultEvent.message());
   }
 
   @Test
@@ -459,9 +467,9 @@ class KeycloakAdapterIntegrationTest {
 
     // Then - verify correlation ID is preserved in result
     assertEquals(1, eventPublisher.getPublishedEvents().size());
-    CloudEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals(correlationId, resultEvent.getExtension("correlationid"));
-    assertEquals(event.metadata().messageId(), resultEvent.getExtension("originalmessageid"));
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(correlationId, resultEvent.correlationId());
+    assertEquals(event.metadata().messageId(), resultEvent.originalMessageId());
   }
 
   // Helper methods
@@ -512,15 +520,15 @@ class KeycloakAdapterIntegrationTest {
 
   /** Test event publisher that captures published events */
   static class TestEventPublisher implements EventPublisher {
-    private final List<CloudEvent> publishedEvents =
+    private final List<ConfigResultEvent> publishedEvents =
         Collections.synchronizedList(new ArrayList<>());
 
     @Override
-    public void publish(String topic, CloudEvent event) {
+    public void publish(String topic, ConfigResultEvent event) {
       publishedEvents.add(event);
     }
 
-    public List<CloudEvent> getPublishedEvents() {
+    public List<ConfigResultEvent> getPublishedEvents() {
       return new ArrayList<>(publishedEvents);
     }
 

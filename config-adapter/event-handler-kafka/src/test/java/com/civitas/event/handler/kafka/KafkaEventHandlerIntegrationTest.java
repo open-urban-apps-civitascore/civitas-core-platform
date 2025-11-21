@@ -9,6 +9,7 @@ import com.civitas.configadapter.config.AppConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
+import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Payload;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -135,19 +136,21 @@ class KafkaEventHandlerIntegrationTest {
     String topic = "user.created-publish";
     testAdapter.setSubscribedTopics(List.of(topic));
     CountDownLatch publishLatch = new CountDownLatch(1);
-    List<CloudEvent> publishedEvents = Collections.synchronizedList(new ArrayList<>());
+    List<ConfigResultEvent> publishedEvents = Collections.synchronizedList(new ArrayList<>());
 
     testAdapter.setProcessCallback(
         (t, event) -> {
           // Adapter publishes result event
           if (testAdapter.eventPublisher != null) {
-            CloudEvent resultEvent =
-                CloudEventBuilder.v1()
-                    .withId(UUID.randomUUID().toString())
-                    .withSource(URI.create("test.adapter"))
-                    .withType("test.result")
-                    .withExtension("status", "SUCCESS")
-                    .build();
+            ConfigResultEvent resultEvent =
+                ConfigResultEvent.success(
+                    event.metadata().correlationId(),
+                    event.metadata().messageId(),
+                    "Test success",
+                    null,
+                    event.payload().operation(),
+                    event.payload().targetResource(),
+                    "test.adapter");
             testAdapter.eventPublisher.publish(event.metadata().resultTopic(), resultEvent);
             publishedEvents.add(resultEvent);
             publishLatch.countDown();
@@ -171,7 +174,7 @@ class KafkaEventHandlerIntegrationTest {
     assertTrue(
         publishLatch.await(10, TimeUnit.SECONDS), "Result should be published within 10 seconds");
     assertEquals(1, publishedEvents.size());
-    assertEquals("SUCCESS", publishedEvents.get(0).getExtension("status"));
+    assertEquals(ConfigResultEvent.Status.SUCCESS, publishedEvents.get(0).status());
   }
 
   @Test
