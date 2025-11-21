@@ -24,7 +24,6 @@ export const DEFAULT_TAB = ROLE_TYPES.SYSTEM
 const RolesPage = () => {
   const t = useTranslations('roles')
   const router = useRouter()
-
   const [listRoles, setListRoles] = useState<RoleResponse[] | []>([])
   const [isLoading, setIsLoading] = useState(true)
   const [rowCount, setRowCount] = useState(0)

@@ -7,3 +7,9 @@ export type Permission = {
   category: Item
   type: (typeof ROLE_TYPES)[keyof typeof ROLE_TYPES]
 }
+
+export type PermissionItem = {
+  name: Permission['title']
+  value: Permission['id']
+  category: Item
+}

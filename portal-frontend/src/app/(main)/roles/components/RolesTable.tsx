@@ -27,9 +27,7 @@ export const RolesTable = (props: RolesTableProps) => {
     onPaginationChange,
     onSortingChange,
   } = props
-
   const t = useTranslations('roles')
-
   const locale = useLocale()
 
   const columnHelper = createColumnHelper<RoleResponse>()
