@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from 'react'
 
+import { createEmptyDiagram } from '../services/diagramService'
 import type { UseUMLDiagramCoreReturn } from './useUMLDiagramCore'
 
 // Context for sharing UML diagram state between components
@@ -12,7 +13,40 @@ export const useUMLDiagram = (): UseUMLDiagramCoreReturn => {
   const context = useContext(UMLDiagramContext)
 
   if (!context) {
-    throw new Error('useUMLDiagram must be used within a UMLDiagramProvider')
+    // Provide a fallback context for shared components when no provider exists
+    // This allows components like ElementPalette to function without being inside a specific session
+    const emptyDiagram = createEmptyDiagram()
+    return {
+      diagram: emptyDiagram,
+      stats: {
+        nodeCount: 0,
+        edgeCount: 0,
+        elementTypes: {},
+        relationshipTypes: {},
+      },
+      isDirty: false,
+      activeRelationshipType: 'association',
+      dispatch: () => {},
+      addNode: () => {},
+      updateNode: () => {},
+      deleteNodes: () => {},
+      selectNode: () => {},
+      addEdge: () => {},
+      updateEdge: () => {},
+      deleteEdges: () => {},
+      selectEdge: () => {},
+      setActiveRelationshipType: () => {},
+      clearSelection: () => {},
+      selectAll: () => {},
+      getSelectedNodes: () => [],
+      getSelectedEdges: () => [],
+      deleteSelected: () => {},
+      loadDiagram: () => {},
+      resetDiagram: () => {},
+      markClean: () => {},
+      markDirty: () => {},
+      validateConnection: () => false,
+    }
   }
 
   return context
