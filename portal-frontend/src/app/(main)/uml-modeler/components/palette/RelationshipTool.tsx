@@ -1,5 +1,6 @@
 'use client'
 
+import { ArrowRight, ArrowUpRight, Diamond, Gem, MoveRight, MoveUpRight } from 'lucide-react'
 import { useCallback } from 'react'
 
 import { useUMLDiagram } from '../../hooks/UMLDiagramContext'
@@ -11,6 +12,16 @@ interface RelationshipToolProps {
   description: string
   icon: string
 }
+
+// Icon mapping for relationship elements
+const ICON_MAP = {
+  arrowUpRight: ArrowUpRight,
+  moveUpRight: MoveUpRight,
+  arrowRight: ArrowRight,
+  gem: Gem,
+  diamond: Diamond,
+  moveRight: MoveRight,
+} as const
 
 export const RelationshipTool: React.FC<RelationshipToolProps> = ({ relationshipType, label, description, icon }) => {
   const { activeRelationshipType, setActiveRelationshipType } = useUMLDiagram()
@@ -35,7 +46,10 @@ export const RelationshipTool: React.FC<RelationshipToolProps> = ({ relationship
     >
       {/* Icon */}
       <div className="flex-shrink-0 w-8 h-8 rounded border flex items-center justify-center text-sm bg-gray-50 border-gray-300">
-        {icon}
+        {(() => {
+          const IconComponent = ICON_MAP[icon as keyof typeof ICON_MAP]
+          return IconComponent ? <IconComponent size={16} /> : <span>{icon}</span>
+        })()}
       </div>
 
       {/* Label and Description */}

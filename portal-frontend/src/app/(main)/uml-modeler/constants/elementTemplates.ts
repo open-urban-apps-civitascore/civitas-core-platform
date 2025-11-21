@@ -203,35 +203,3 @@ export const SAMPLE_DIAGRAMS = {
     ],
   },
 }
-
-// Palette items for drag & drop
-export const PALETTE_ITEMS = [
-  {
-    id: 'class',
-    type: 'class' as UMLElementType,
-    label: 'Class',
-    description: 'UML Class with attributes and operations',
-    icon: '📁',
-  },
-  {
-    id: 'interface',
-    type: 'interface' as UMLElementType,
-    label: 'Interface',
-    description: 'UML Interface with operations only',
-    icon: '🔌',
-  },
-  {
-    id: 'abstractClass',
-    type: 'abstractClass' as UMLElementType,
-    label: 'Abstract Class',
-    description: 'UML Abstract Class with abstract operations',
-    icon: '📂',
-  },
-  {
-    id: 'enumeration',
-    type: 'enumeration' as UMLElementType,
-    label: 'Enumeration',
-    description: 'UML Enumeration with literal values',
-    icon: '📝',
-  },
-]

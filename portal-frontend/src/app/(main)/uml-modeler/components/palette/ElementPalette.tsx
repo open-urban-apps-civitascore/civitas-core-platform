@@ -3,7 +3,7 @@
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 
-import { PALETTE_ITEMS } from '../../constants/elementTemplates'
+import { ELEMENT_PALETTE_ITEMS, RELATIONSHIP_PALETTE_ITEMS } from '../../constants/paletteItems'
 import { PaletteCategory } from './PaletteCategory'
 import { PaletteItem } from './PaletteItem'
 import { RelationshipTool } from './RelationshipTool'
@@ -11,52 +11,6 @@ import { RelationshipTool } from './RelationshipTool'
 interface ElementPaletteProps {
   className?: string
 }
-
-// Relationship palette items
-const RELATIONSHIP_ITEMS = [
-  {
-    id: 'inheritance',
-    type: 'inheritance' as const,
-    label: 'Inheritance',
-    description: 'Hollow triangle arrow (extends/inherits)',
-    icon: '⬆️',
-  },
-  {
-    id: 'realization',
-    type: 'realization' as const,
-    label: 'Realization',
-    description: 'Dashed hollow triangle (implements interface)',
-    icon: '⤴️',
-  },
-  {
-    id: 'association',
-    type: 'association' as const,
-    label: 'Association',
-    description: 'Solid line with arrow (uses/knows about)',
-    icon: '→',
-  },
-  {
-    id: 'aggregation',
-    type: 'aggregation' as const,
-    label: 'Aggregation',
-    description: 'Hollow diamond (has-a, weak ownership)',
-    icon: '◇→',
-  },
-  {
-    id: 'composition',
-    type: 'composition' as const,
-    label: 'Composition',
-    description: 'Filled diamond (strong ownership)',
-    icon: '♦→',
-  },
-  {
-    id: 'dependency',
-    type: 'dependency' as const,
-    label: 'Dependency',
-    description: 'Dashed arrow (temporary relationship)',
-    icon: '⇢',
-  },
-]
 
 export const ElementPalette: React.FC<ElementPaletteProps> = ({ className = '' }) => {
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -94,7 +48,7 @@ export const ElementPalette: React.FC<ElementPaletteProps> = ({ className = '' }
         onToggle={() => setAreClassesExpanded(!areClassesExpanded)}
       >
         <div className="space-y-1 p-2">
-          {PALETTE_ITEMS.map(item => (
+          {ELEMENT_PALETTE_ITEMS.map(item => (
             <PaletteItem
               key={item.id}
               elementType={item.type}
@@ -113,7 +67,7 @@ export const ElementPalette: React.FC<ElementPaletteProps> = ({ className = '' }
         onToggle={() => setAreRelationshipsExpanded(!areRelationshipsExpanded)}
       >
         <div className="space-y-1 p-2">
-          {RELATIONSHIP_ITEMS.map(item => (
+          {RELATIONSHIP_PALETTE_ITEMS.map(item => (
             <RelationshipTool
               key={item.id}
               relationshipType={item.type}

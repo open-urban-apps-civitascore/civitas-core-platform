@@ -1,5 +1,6 @@
 'use client'
 
+import { Box, BoxSelect, List, PuzzleIcon } from 'lucide-react'
 import { useCallback } from 'react'
 
 import { UML_COLORS } from '../../constants/umlTypes'
@@ -11,6 +12,14 @@ interface PaletteItemProps {
   description: string
   icon: string
 }
+
+// Icon mapping for class elements
+const ICON_MAP = {
+  box: Box,
+  puzzle: PuzzleIcon,
+  boxSelect: BoxSelect,
+  list: List,
+} as const
 
 export const PaletteItem: React.FC<PaletteItemProps> = ({ elementType, label, description, icon }) => {
   const onDragStart = useCallback((event: React.DragEvent, nodeType: UMLElementType) => {
@@ -36,7 +45,10 @@ export const PaletteItem: React.FC<PaletteItemProps> = ({ elementType, label, de
           color: colors.text,
         }}
       >
-        {icon}
+        {(() => {
+          const IconComponent = ICON_MAP[icon as keyof typeof ICON_MAP]
+          return IconComponent ? <IconComponent size={16} /> : <span>{icon}</span>
+        })()}
       </div>
 
       {/* Label and Description */}
