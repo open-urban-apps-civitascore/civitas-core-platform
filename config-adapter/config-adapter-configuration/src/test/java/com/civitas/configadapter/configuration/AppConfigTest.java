@@ -112,6 +112,27 @@ class AppConfigTest {
     assertEquals("com.example.EventPublisher", config.getEventPublisherClass());
   }
 
+  @Test
+  void shouldThrowExceptionWhenHealthCheckPortIsInvalid() {
+    AppConfig config = createAppConfig("healthcheck.port", "invalid-port");
+
+    RuntimeException exception =
+        org.junit.jupiter.api.Assertions.assertThrows(
+            RuntimeException.class, () -> config.getHealthCheckPort());
+
+    org.junit.jupiter.api.Assertions.assertTrue(
+        exception.getMessage().contains("Invalid healthcheck.port value"));
+    org.junit.jupiter.api.Assertions.assertTrue(exception.getMessage().contains("invalid-port"));
+  }
+
+  @Test
+  void shouldReturnEmptyListWhenAdaptersPropertyIsNull() {
+    Map<String, Object> props = Collections.emptyMap();
+    AppConfig config = new AppConfig(new MapConfiguration(props));
+
+    assertEquals(0, config.getAdapterClasses().size());
+  }
+
   private AppConfig createAppConfig(String key, String value) {
     Map<String, Object> props = Collections.singletonMap(key, value);
     Configuration config = new MapConfiguration(props);

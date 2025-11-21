@@ -211,6 +211,18 @@
 							<include>src/main/java/**/*.java</include>
 							<include>src/test/java/**/*.java</include>
 						</includes>
+						<licenseHeader>
+							<content>/**
+ * Copyright (c) 2012 - $YEAR Data In Motion and others. All rights reserved.
+ *
+ * &lt;p&gt;This program and the accompanying materials are made available under the terms of the Eclipse
+ * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * &lt;p&gt;SPDX-License-Identifier: EPL-2.0
+ *
+ * &lt;p&gt;Contributors: Data In Motion - initial API and implementation
+ */</content>
+						</licenseHeader>
 						<googleJavaFormat />
 						<removeUnusedImports />
 						<importOrder />
