@@ -1,6 +1,6 @@
 package com.civitas.configadapter.adapter;
 
-import com.civitas.configadapter.config.AppConfig;
+import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.Topics;
 import java.util.ArrayList;
@@ -16,7 +16,7 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(AbstractConfigAdapter.class);
 
-  protected final AppConfig config;
+  protected final AdapterConfig config;
   protected EventPublisher eventPublisher;
   private final List<String> subscribedTopics;
   private final String adapterName;
@@ -31,9 +31,9 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
    * @throws IllegalArgumentException if config or adapterName is null/empty, or if invalid topics
    *     are configured
    */
-  protected AbstractConfigAdapter(AppConfig config, String adapterName) {
+  protected AbstractConfigAdapter(AdapterConfig config, String adapterName) {
     if (config == null) {
-      throw new IllegalArgumentException("AppConfig cannot be null");
+      throw new IllegalArgumentException("AdapterConfig cannot be null");
     }
     if (adapterName == null || adapterName.trim().isEmpty()) {
       throw new IllegalArgumentException("Adapter name cannot be null or empty");
@@ -134,9 +134,9 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
   /**
    * Gets the application configuration.
    *
-   * @return the AppConfig instance
+   * @return the AdapterConfig instance
    */
-  protected AppConfig getConfig() {
+  protected AdapterConfig getConfig() {
     return config;
   }
 }

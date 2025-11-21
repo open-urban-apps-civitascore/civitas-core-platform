@@ -1,7 +1,7 @@
 package com.civitas.configadapter.keycloak;
 
 import com.civitas.configadapter.adapter.AbstractConfigAdapter;
-import com.civitas.configadapter.config.AppConfig;
+import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,7 +35,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   private final Keycloak keycloakClient;
   private final ObjectMapper objectMapper;
 
-  public KeycloakAdapter(AppConfig config) {
+  public KeycloakAdapter(AdapterConfig config) {
     super(config, ADAPTER_NAME);
     this.keycloakClient =
         KeycloakBuilder.builder()

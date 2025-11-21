@@ -1,7 +1,7 @@
 package com.civitas.event.handler.kafka;
 
 import com.civitas.configadapter.adapter.ConfigAdapter;
-import com.civitas.configadapter.config.AppConfig;
+import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.core.CloudEventProcessor;
 import com.civitas.configadapter.messaging.EventConsumer;
 import io.cloudevents.CloudEvent;
@@ -35,7 +35,7 @@ public class KafkaEventConsumer implements EventConsumer {
   private final AtomicBoolean running = new AtomicBoolean(false);
   private Thread consumerThread;
 
-  public KafkaEventConsumer(AppConfig config, ConfigAdapter adapter) {
+  public KafkaEventConsumer(AdapterConfig config, ConfigAdapter adapter) {
     this.adapter = adapter;
     this.processor = new CloudEventProcessor(adapter);
 

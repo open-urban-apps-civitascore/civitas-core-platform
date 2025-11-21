@@ -1,4 +1,14 @@
-package com.civitas.configadapter.config;
+/**
+ * Copyright (c) 2012 - 2025 Data In Motion and others. All rights reserved.
+ *
+ * <p>This program and the accompanying materials are made available under the terms of the Eclipse
+ * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * <p>SPDX-License-Identifier: EPL-2.0
+ *
+ * <p>Contributors: Data In Motion - initial API and implementation
+ */
+package com.civitas.configadapter.configuration;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -10,7 +20,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 
-public record AppConfig(Configuration configuration) {
+public record AppConfig(Configuration configuration) implements AdapterConfig {
 
   public AppConfig(String configFile) {
     this(buildConfiguration(configFile));

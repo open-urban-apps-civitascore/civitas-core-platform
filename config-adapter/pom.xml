@@ -14,6 +14,7 @@
 
 	<modules>
 		<module>config-adapter-api</module>
+		<module>config-adapter-configuration</module>
 		<module>event-handler-kafka</module>
 		<module>config-adapter-application</module>
 		<module>config-adapter-keycloak</module>

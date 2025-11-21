@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.civitas.configadapter.adapter.ConfigAdapter;
-import com.civitas.configadapter.config.AppConfig;
+import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;

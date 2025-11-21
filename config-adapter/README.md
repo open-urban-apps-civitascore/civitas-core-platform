@@ -4,45 +4,83 @@ Modular configuration adapter framework that consumes CloudEvents and applies co
 
 ## Architecture
 
-The project is split into four independent modules for maximum reusability:
+The project follows the Dependency Inversion Principle with interface-based configuration:
 
 ```
-┌─────────────────────┐
-│ config-adapter-api  │  Core interfaces and models
-└──────────┬──────────┘
+┌─────────────────────────────┐
+│   config-adapter-api        │  Core interfaces (AdapterConfig, ConfigAdapter, etc.)
+│   - AdapterConfig interface │  - No implementation dependencies
+│   - ConfigAdapter           │  - Defines configuration contract
+│   - ConfigEvent/ResultEvent │
+└──────────┬──────────────────┘
+           │
+           │ (implements AdapterConfig)
+           │
+┌──────────▼──────────────────┐
+│ config-adapter-configuration│  Configuration implementation
+│   - AppConfig (impl AdapterConfig) │  - Apache Commons Configuration2
+└──────────┬──────────────────┘  - Environment variable support
+           │
+           │ (compile dependency only in application & tests)
            │
     ┌──────┴──────────┬──────────────────┐
-    │                 │                  │              
-┌───▼────────────┐  ┌─▼──────────────┐ ┌─▼────────────┐ 
-│ event-handler- │  │ event-handler- │ │config-adapter│ 
-│ kafka          │  │ other-broker   │ │ application  │ 
-└────────────────┘  └────────────────┘ └──────┬───────┘ 
+    │                 │                  │
+┌───▼────────────┐  ┌─▼──────────────┐ ┌─▼────────────┐
+│ event-handler- │  │ event-handler- │ │config-adapter│
+│ kafka          │  │ other-broker   │ │ application  │
+└────────────────┘  └────────────────┘ └──────┬───────┘
                                               │
                     ┌─────────────────────────┴─────────────────┐
                     │                                           │
          ┌──────────▼────────────────┐             ┌────────────▼──────────┐
          │ config-adapter-keycloak   │             │ Other implementations │
-         │ Keycloak                  │             │                       │
+         │ (uses AdapterConfig interface)   │      │ (uses AdapterConfig interface)│
          └───────────────────────────┘             └───────────────────────┘
 ```
+
+**Design Benefits:**
+- API module has no implementation dependencies
+- Adapters depend only on `AdapterConfig` interface, not `AppConfig` implementation
+- Implementation details isolated to application module
+- Easy to provide alternative AdapterConfig implementations
 
 ## Modules
 
 ### 1. config-adapter-api
-Core interfaces and models that define the adapter contract.
+Core interfaces and models that define the adapter contract. **No implementation dependencies.**
 
 **Key Components:**
+- `AdapterConfig` - **Interface** for configuration access (no dependencies on implementation)
 - `ConfigAdapter` - Interface for backend service adapters
+- `AbstractConfigAdapter` - Base class using `AdapterConfig` interface (not `AppConfig` implementation)
 - `EventConsumer` - Interface for message consumers
 - `EventPublisher` - Interface for publishing result events (uses ConfigResultEvent)
 - `CloudEventProcessor` - Internal helper for CloudEvent deserialization
 - `ConfigEvent` - Input event data model with metadata and payload
 - `ConfigResultEvent` - Output result event model with status, correlation, and error details
-- `AppConfig` - Configuration management using Apache Commons Configuration2
+- `Config` - Data model for configuration values within events (path and value)
 
-**Usage:** Depend on this module to create new adapters or consumers.
+**Dependency Principle:**
+- Uses `AdapterConfig` interface, not `AppConfig` implementation
+- Allows any configuration implementation to be used
+- API remains stable even if configuration implementation changes
 
-### 2. event-handler-kafka
+**Usage:** Depend on this module to create new adapters or consumers. Adapters work with `AdapterConfig` interface only.
+
+### 2. config-adapter-configuration
+Configuration implementation module using Apache Commons Configuration2.
+
+**Key Components:**
+- `AppConfig` - Implementation of `AdapterConfig` interface with Apache Commons Configuration2
+- Environment variable override support
+- Properties file support with layered configuration
+
+**Usage:**
+- Application module depends on this at compile time to instantiate `AppConfig`
+- Adapter modules only need this for tests (test scope dependency)
+- Adapters use `AdapterConfig` interface at runtime, not this implementation
+
+### 3. event-handler-kafka
 Kafka-specific message consumer / publisher implementation.
 
 **Key Components:**
@@ -50,12 +88,12 @@ Kafka-specific message consumer / publisher implementation.
 
 **Usage:** Use this module to consume events from Apache Kafka.
 
-### 3. config-adapter-application
+### 4. config-adapter-application
 Generic application runner that uses reflection to load adapters and consumers.
 
 **Key Components:**
 - `Application` - Main entry point that reads configuration and wires components
-- `AppConfig` - Configuration management using Apache Commons Configuration2 with environment variable support
+- Instantiates `AppConfig` (the only module that needs the concrete implementation)
 
 **Features:**
 - Supports single or multiple adapters configuration
@@ -65,9 +103,14 @@ Generic application runner that uses reflection to load adapters and consumers.
 - Simplified architecture with cleaner lifecycle management
 - Automatic resource cleanup on shutdown
 
+**Dependency Note:**
+- Only module with compile-time dependency on `config-adapter-configuration`
+- Instantiates `AppConfig` and passes it as `AdapterConfig` interface to adapters
+- Demonstrates Dependency Inversion Principle in practice
+
 **Usage:** Configure adapters via application.properties using comma-separated list.
 
-### 4. config-adapter-keycloak
+### 5. config-adapter-keycloak
 Production implementation of Keycloak adapter.
 
 **Key Components:**
@@ -75,7 +118,7 @@ Production implementation of Keycloak adapter.
 
 **Usage:** Production-ready adapter that integrates with Keycloak for user, realm, and client management.
 
-### 5. config-adapter-examples
+### 6. config-adapter-examples
 Example adapter implementations for reference and testing.
 
 **Key Components:**
@@ -400,7 +443,6 @@ All available topic constants are defined in `com.civitas.configadapter.model.To
 Pure interfaces with minimal dependencies:
 - CloudEvents API
 - Jackson (for data binding)
-- Apache Commons Configuration2 (for configuration management)
 - SLF4J (for logging)
 
 Contains:
@@ -411,9 +453,21 @@ Contains:
 - `ConfigResultEvent` record for adapter processing results (output events)
 - `Topics` class with centralized topic constants
 - `CloudEventProcessor` internal helper for deserialization
-- `AppConfig` configuration management with Apache Commons Configuration2
 
-No implementation-specific dependencies.
+Depends on `config-adapter-configuration` for `AppConfig` used by `AbstractConfigAdapter`.
+
+### config-adapter-configuration
+
+Configuration management module:
+- Apache Commons Configuration2
+- Commons BeanUtils
+
+Contains:
+- `AppConfig` class with environment variable override support
+- Layered configuration (environment variables over properties files)
+- Property key to environment variable name conversion
+
+No dependencies on other config-adapter modules - pure configuration infrastructure.
 
 ### event-handler-kafka
 
@@ -434,9 +488,9 @@ No backend service dependencies.
 ### config-adapter-application
 
 Generic application runner:
-- Depends on: `config-adapter-api`
+- Depends on: `config-adapter-api`, `config-adapter-configuration`
 - Uses reflection to load configured adapters and consumers
-- `AppConfig` class using Apache Commons Configuration2 for property management (part of API module)
+- Uses `AppConfig` from configuration module for property management
 
 Contains:
 - `Application` main class with simplified architecture
@@ -693,9 +747,10 @@ civitas-config-adapter/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/configadapter/
 │       ├── adapter/
-│       │   └── ConfigAdapter.java
-│       ├── config/
-│       │   └── AppConfig.java
+│       │   ├── ConfigAdapter.java
+│       │   └── AbstractConfigAdapter.java
+│       ├── configuration/
+│       │   └── AdapterConfig.java             # Interface for configuration
 │       ├── messaging/
 │       │   ├── EventConsumer.java
 │       │   └── EventPublisher.java
@@ -706,8 +761,12 @@ civitas-config-adapter/
 │           ├── ConfigResultEvent.java
 │           ├── Metadata.java
 │           ├── Payload.java
-│           ├── Config.java
+│           ├── Config.java                    # Event config data model
 │           └── Topics.java
+├── config-adapter-configuration/
+│   ├── pom.xml
+│   └── src/main/java/com/civitas/configadapter/configuration/
+│       └── AppConfig.java                     # Implementation of AdapterConfig
 ├── event-handler-kafka/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/event/handler/kafka/
@@ -729,7 +788,9 @@ civitas-config-adapter/
 ### Dependencies Between Modules
 
 ```
-config-adapter-api (contains Topics constants, ConfigAdapter interface, EventConsumer interface)
+config-adapter-configuration (AppConfig, environment variable support)
+    ↑
+config-adapter-api (interfaces, models, depends on configuration)
     ↑
     ├── event-handler-kafka (KafkaEventHandler accepts ConfigAdapter in constructor)
     ├── config-adapter-keycloak (KeycloakAdapter for production)

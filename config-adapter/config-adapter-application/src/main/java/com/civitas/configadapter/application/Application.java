@@ -1,7 +1,7 @@
 package com.civitas.configadapter.application;
 
 import com.civitas.configadapter.adapter.ConfigAdapter;
-import com.civitas.configadapter.config.AppConfig;
+import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.messaging.EventConsumer;
 import com.civitas.configadapter.messaging.EventPublisher;
 import java.lang.reflect.InvocationTargetException;

@@ -3,7 +3,7 @@ package com.civitas.configadapter.application;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.civitas.configadapter.config.AppConfig;
+import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.keycloak.KeycloakAdapter;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;

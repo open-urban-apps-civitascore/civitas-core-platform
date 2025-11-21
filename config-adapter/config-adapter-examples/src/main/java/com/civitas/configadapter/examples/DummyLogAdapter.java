@@ -1,7 +1,7 @@
 package com.civitas.configadapter.examples;
 
 import com.civitas.configadapter.adapter.AbstractConfigAdapter;
-import com.civitas.configadapter.config.AppConfig;
+import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import org.slf4j.Logger;
@@ -18,7 +18,7 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
 
   private static final String ADAPTER_NAME = "dummylog";
 
-  public DummyLogAdapter(AppConfig config) {
+  public DummyLogAdapter(AdapterConfig config) {
     super(config, ADAPTER_NAME);
     logger.info("DummyLogAdapter '{}' initialized - will log all received events", getName());
     logger.info("Subscribed to {} topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
