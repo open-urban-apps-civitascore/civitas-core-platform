@@ -3,7 +3,7 @@
 import { ArrowRight, ArrowUpRight, Diamond, Gem, MoveRight, MoveUpRight } from 'lucide-react'
 import { useCallback } from 'react'
 
-import { useUMLDiagram } from '../../hooks/UMLDiagramContext'
+import { useActiveDiagram } from '../../hooks/useActiveDiagram'
 import type { UMLRelationshipType } from '../../types/uml'
 
 interface RelationshipToolProps {
@@ -24,7 +24,7 @@ const ICON_MAP = {
 } as const
 
 export const RelationshipTool: React.FC<RelationshipToolProps> = ({ relationshipType, label, description, icon }) => {
-  const { activeRelationshipType, setActiveRelationshipType } = useUMLDiagram()
+  const { activeRelationshipType, setActiveRelationshipType } = useActiveDiagram()
 
   const isActive = activeRelationshipType === relationshipType
 

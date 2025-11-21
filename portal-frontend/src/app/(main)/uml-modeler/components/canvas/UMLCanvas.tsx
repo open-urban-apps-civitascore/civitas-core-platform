@@ -13,7 +13,7 @@ import {
 } from '@xyflow/react'
 import { useCallback, useMemo } from 'react'
 
-import { useUMLDiagram } from '../../hooks/UMLDiagramContext'
+import { useActiveDiagram } from '../../hooks/useActiveDiagram'
 import type { UMLElementType } from '../../types/uml'
 import { edgeTypes as umlEdgeTypes } from '../edges/edgeTypes'
 import { UMLMarkers } from '../edges/UMLMarkers'
@@ -24,7 +24,7 @@ interface UMLCanvasProps {
 }
 
 export const UMLCanvas: React.FC<UMLCanvasProps> = ({ className = '' }) => {
-  const { diagram, dispatch, addEdge, validateConnection, addNode } = useUMLDiagram()
+  const { diagram, dispatch, addEdge, validateConnection, addNode } = useActiveDiagram()
   const { screenToFlowPosition } = useReactFlow()
 
   // Node types registry - UML node components
@@ -85,6 +85,14 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({ className = '' }) => {
     },
     [screenToFlowPosition, addNode],
   )
+
+  if (!diagram) {
+    return (
+      <div className={`h-full w-full flex items-center justify-center ${className}`}>
+        <p className="text-gray-500">No diagram available</p>
+      </div>
+    )
+  }
 
   return (
     <div className={`h-full w-full ${className}`}>

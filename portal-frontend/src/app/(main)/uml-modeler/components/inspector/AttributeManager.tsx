@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useCallback } from 'react'
 
 import { UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
-import { useUMLDiagram } from '../../hooks/UMLDiagramContext'
+import { useActiveDiagram } from '../../hooks/useActiveDiagram'
 import type { UMLAttribute, UMLElement, UMLPrimitiveType, Visibility } from '../../types/uml'
 
 interface AttributeManagerProps {
@@ -13,7 +13,7 @@ interface AttributeManagerProps {
 }
 
 export const AttributeManager: React.FC<AttributeManagerProps> = ({ nodeId, element }) => {
-  const { updateNode } = useUMLDiagram()
+  const { updateNode } = useActiveDiagram()
 
   const addAttribute = useCallback(() => {
     if ('attributes' in element) {

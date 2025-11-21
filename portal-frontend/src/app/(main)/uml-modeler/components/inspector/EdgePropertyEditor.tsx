@@ -3,7 +3,7 @@
 import { ChangeEvent, useCallback } from 'react'
 
 import { MULTIPLICITY_VALUES } from '../../constants/umlTypes'
-import { useUMLDiagram } from '../../hooks/UMLDiagramContext'
+import { useActiveDiagram } from '../../hooks/useActiveDiagram'
 import type { UMLEdge } from '../../types/diagram'
 import type { UMLRelationshipType } from '../../types/uml'
 
@@ -12,7 +12,7 @@ interface EdgePropertyEditorProps {
 }
 
 export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) => {
-  const { updateEdge } = useUMLDiagram()
+  const { updateEdge } = useActiveDiagram()
 
   const relationship = edge.data.relationship
 

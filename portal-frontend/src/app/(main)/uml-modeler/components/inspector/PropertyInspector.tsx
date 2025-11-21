@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight, Settings } from 'lucide-react'
 import { useState } from 'react'
 
-import { useUMLDiagram } from '../../hooks/UMLDiagramContext'
+import { useActiveDiagram } from '../../hooks/useActiveDiagram'
 import { EdgePropertyEditor } from './EdgePropertyEditor'
 import { NodePropertyEditor } from './NodePropertyEditor'
 
@@ -12,12 +12,10 @@ interface PropertyInspectorProps {
 }
 
 export const PropertyInspector: React.FC<PropertyInspectorProps> = ({ className = '' }) => {
-  const { diagram } = useUMLDiagram()
+  const { selectedNode, selectedEdge } = useActiveDiagram()
   const [isCollapsed, setIsCollapsed] = useState(false)
 
   // Get the currently selected element
-  const selectedNode = diagram.nodes.find(node => node.selected)
-  const selectedEdge = diagram.edges.find(edge => edge.selected)
   const selectedElement = selectedNode || selectedEdge
 
   if (isCollapsed) {

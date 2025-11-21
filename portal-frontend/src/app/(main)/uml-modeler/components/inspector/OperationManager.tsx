@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useState } from 'react'
 
 import { UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
-import { useUMLDiagram } from '../../hooks/UMLDiagramContext'
+import { useActiveDiagram } from '../../hooks/useActiveDiagram'
 import type { UMLElement, UMLOperation, UMLParameter, UMLPrimitiveType, Visibility } from '../../types/uml'
 
 interface OperationManagerProps {
@@ -13,7 +13,7 @@ interface OperationManagerProps {
 }
 
 export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, element }) => {
-  const { updateNode } = useUMLDiagram()
+  const { updateNode } = useActiveDiagram()
   const [expandedOperations, setExpandedOperations] = useState<Set<string>>(new Set())
 
   const addOperation = useCallback(() => {

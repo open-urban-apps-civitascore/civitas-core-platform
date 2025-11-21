@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { ChangeEvent, useCallback, useState } from 'react'
 
 import { UML_STEREOTYPES } from '../../constants/umlTypes'
-import { useUMLDiagram } from '../../hooks/UMLDiagramContext'
+import { useActiveDiagram } from '../../hooks/useActiveDiagram'
 import type { UMLNode } from '../../types/diagram'
 import { hasAttributes, hasOperations } from '../../types/uml'
 import { AttributeManager } from './AttributeManager'
@@ -15,7 +15,7 @@ interface NodePropertyEditorProps {
 }
 
 export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) => {
-  const { updateNode } = useUMLDiagram()
+  const { updateNode } = useActiveDiagram()
   const [activeSection, setActiveSection] = useState<'basic' | 'attributes' | 'operations' | 'literals'>('basic')
 
   const element = node.data.element
