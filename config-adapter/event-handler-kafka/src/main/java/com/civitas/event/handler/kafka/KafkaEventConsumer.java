@@ -12,7 +12,6 @@ package com.civitas.event.handler.kafka;
 
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AdapterConfig;
-import com.civitas.configadapter.core.CloudEventProcessor;
 import com.civitas.configadapter.messaging.EventConsumer;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.kafka.CloudEventDeserializer;

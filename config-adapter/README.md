@@ -55,10 +55,10 @@ Core interfaces and models that define the adapter contract. **No implementation
 - `AbstractConfigAdapter` - Base class using `AdapterConfig` interface (not `AppConfig` implementation)
 - `EventConsumer` - Interface for message consumers
 - `EventPublisher` - Interface for publishing result events (uses ConfigResultEvent)
-- `CloudEventProcessor` - Internal helper for CloudEvent deserialization
 - `ConfigEvent` - Input event data model with metadata and payload
 - `ConfigResultEvent` - Output result event model with status, correlation, and error details
 - `Config` - Data model for configuration values within events (path and value)
+- `Topics` - Constants for all valid Kafka topic names
 
 **Dependency Principle:**
 - Uses `AdapterConfig` interface, not `AppConfig` implementation
@@ -85,8 +85,11 @@ Kafka-specific message consumer / publisher implementation.
 
 **Key Components:**
 - `KafkaEventHandler` - Consumes CloudEvents from Kafka and implements EventPublisher
+- `KafkaEventConsumer` - Kafka consumer that polls for CloudEvents and processes them
+- `KafkaEventPublisher` - Kafka producer for publishing ConfigResultEvents
+- `CloudEventProcessor` - Internal helper that deserializes CloudEvents and delegates to ConfigAdapter
 
-**Usage:** Use this module to consume events from Apache Kafka.
+**Usage:** Use this module to consume events from Apache Kafka and publish results.
 
 ### 4. config-adapter-application
 Generic application runner that uses reflection to load adapters and consumers.
@@ -754,8 +757,6 @@ civitas-config-adapter/
 │       ├── messaging/
 │       │   ├── EventConsumer.java
 │       │   └── EventPublisher.java
-│       ├── core/
-│       │   └── CloudEventProcessor.java
 │       └── model/
 │           ├── ConfigEvent.java
 │           ├── ConfigResultEvent.java
@@ -770,7 +771,10 @@ civitas-config-adapter/
 ├── event-handler-kafka/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/event/handler/kafka/
-│       └── KafkaEventHandler.java
+│       ├── CloudEventProcessor.java           # CloudEvent deserializer
+│       ├── KafkaEventConsumer.java
+│       ├── KafkaEventHandler.java
+│       └── KafkaEventPublisher.java
 ├── config-adapter-application/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/configadapter/application/

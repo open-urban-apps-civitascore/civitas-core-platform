@@ -8,7 +8,7 @@
  *
  * <p>Contributors: Data In Motion - initial API and implementation
  */
-package com.civitas.configadapter.core;
+package com.civitas.event.handler.kafka;
 
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.model.ConfigEvent;
