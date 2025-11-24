@@ -78,7 +78,7 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
                 <SelectValue placeholder={placeholder} />
               </SelectTrigger>
               <SelectContent data-testid={`${name}SelectContent`}>
-                <SelectItem value="none" disabled={required}>
+                <SelectItem data-testid={`${name}SelectItemPlaceholder`} value="none" disabled={required}>
                   {placeholder}
                 </SelectItem>
 

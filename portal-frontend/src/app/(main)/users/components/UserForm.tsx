@@ -147,7 +147,7 @@ export const UserForm = (props: UserFormProps) => {
     const updateUserData = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
     await updateUser(updateUserData)
     setDefaultUserData(updateUserData)
-    form.reset(mapUserToFormData(defaultUserData))
+    router.refresh()
     setIsReadOnly(true)
   }
 
@@ -184,7 +184,6 @@ export const UserForm = (props: UserFormProps) => {
           <DetailsFieldContainer>
             <Select
               id="title-select"
-              
               label={t('info.title.title')}
               options={titleOptions}
               placeholder={t('form.selectTitle')}
@@ -267,7 +266,7 @@ export const UserForm = (props: UserFormProps) => {
           </DetailsFieldContainer>
           <DetailsFieldContainer className="border-b-0 flex items-center">
             <Switch form={form} name="active" label={t('info.status.title')} isReadOnly={isReadOnly} />
-            <span className={cn('ml-3 text-sm', isReadOnly && 'text-muted-foreground')}>
+            <span data-testid="activeStatus" className={cn('ml-3 text-sm', isReadOnly && 'text-muted-foreground')}>
               {watchStatus ? t('info.status.active') : t('info.status.inactive')}
             </span>
           </DetailsFieldContainer>

@@ -1,5 +1,7 @@
-import { UserResponse } from '@/types/users'
 import { request } from '@playwright/test'
+
+import { UserResponse } from '@/types/users'
+
 import { getMockUserData } from './helpers/userFactory'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`

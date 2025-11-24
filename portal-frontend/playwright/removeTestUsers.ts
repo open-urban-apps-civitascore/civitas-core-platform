@@ -1,5 +1,6 @@
 // global-teardown.ts
 import { request } from '@playwright/test'
+
 import { E2E_MOCK_EMAIL, E2E_MOCK_FIRSTNAME, E2E_MOCK_LASTNAME } from '../playwright.config'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`

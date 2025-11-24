@@ -1,6 +1,6 @@
-import { UUID } from 'crypto'
+import { UserResponse } from '@/types/users'
+
 import { E2E_MOCK_FIRSTNAME, E2E_MOCK_LASTNAME } from '../../playwright.config'
-import { UserFormData, UserResponse } from '@/types/users'
 
 export const getMockUserData = (overrides: Partial<UserResponse> = {}): UserResponse => {
   const id = crypto.randomUUID()

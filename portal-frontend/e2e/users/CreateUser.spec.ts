@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test'
 
-import { getMockUserData } from '../playwright/helpers/userFactory'
-import { removeTestUsers } from '../playwright/removeTestUsers'
-import { pickSelectOption } from './utils/formUtils'
 import { Authority } from '@/types/users'
+
+import { getMockUserData } from '../../playwright/helpers/userFactory'
+import { pickSelectOption } from '../utils/formUtils'
 
 const MOCK_USER_1 = getMockUserData()
 
@@ -22,7 +22,6 @@ const MOCK_AUTHORITIES = [
 
 test.describe('Create User Flow', async () => {
   test.beforeEach(async ({ page }) => {
-    await removeTestUsers()
     await page.route('http://localhost:3001/authorities', async route => {
       const json: Authority[] = MOCK_AUTHORITIES
       await route.fulfill({ json })
@@ -31,6 +30,7 @@ test.describe('Create User Flow', async () => {
   })
 
   test('renders the page elements', async ({ page }) => {
+    const formFieldsCount = 10
     await page.getByTestId('userDetailsForm').waitFor({ state: 'visible' })
 
     const pageHeader = page.getByTestId('pageHeader')
@@ -48,14 +48,14 @@ test.describe('Create User Flow', async () => {
     await expect(page.getByTestId('confirmButton')).toBeVisible()
     await expect(page.getByTestId('editButton')).not.toBeVisible()
     const fields = page.locator('[data-test-element="formField"]')
-    await expect(fields).toHaveCount(10)
+    await expect(fields).toHaveCount(formFieldsCount)
     // verify disabled state of form fields
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < formFieldsCount; i++) {
       const field = fields.nth(i)
       if (i === 0) {
         await expect(field).toBeDisabled()
       } else {
-        await expect(field).not.toBeDisabled()
+        await expect(field).toBeEnabled()
       }
     }
   })
@@ -76,10 +76,12 @@ test.describe('Create User Flow', async () => {
 
     // verify redirect zu new users details page
     await expect(page).toHaveURL(/\/users\/.+/)
-    await expect(page.getByTestId('editUserPage')).toBeVisible()
+    await expect(page.getByTestId('userDetailsPage')).toBeVisible()
     await expect(page.getByTestId('pageHeader')).toContainText(MOCK_USER_1.displayName)
 
     // verify new created user appears in users list
+    await page.waitForLoadState('networkidle')
+    await page.waitForTimeout(50)
     await page.goto('/users')
     await page.getByTestId('searchArea').locator('input').fill(MOCK_USER_1.firstName)
     const rows = page.getByRole('row')

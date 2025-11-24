@@ -1,8 +1,9 @@
 import { expect, test } from '@playwright/test'
 
 import { UserResponse } from '@/types/users'
-import { createTestUser } from '../playwright/createTestUser'
-import { removeTestUser } from '../playwright/removeTestUser'
+
+import { createTestUser } from '../../playwright/createTestUser'
+import { removeTestUser } from '../../playwright/removeTestUser'
 
 test.describe('User List', async () => {
   let user: UserResponse
