@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Building2, Database, LucideProps, SquareMenu, SquareTerminal, User } from 'lucide-react'
+import { BookOpen, Bot, Building2, LucideProps, SquareMenu, SquareTerminal, User } from 'lucide-react'
 import { ForwardRefExoticComponent, ReactNode, RefAttributes } from 'react'
 
 export interface NavItems {
