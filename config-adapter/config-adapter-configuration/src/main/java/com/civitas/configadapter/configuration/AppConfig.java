@@ -10,6 +10,7 @@
  */
 package com.civitas.configadapter.configuration;
 
+import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -33,8 +34,11 @@ public record AppConfig(Configuration configuration) implements AdapterConfig {
       compositeConfig.addConfiguration(envConfig);
 
       Configurations configs = new Configurations();
-      PropertiesConfiguration propsConfig =
-          configs.properties(AppConfig.class.getClassLoader().getResource(configFile));
+      URL configFileResource = AppConfig.class.getClassLoader().getResource(configFile);
+      if (configFileResource == null) {
+        throw new RuntimeException("Unable to find " + configFile);
+      }
+      PropertiesConfiguration propsConfig = configs.properties(configFileResource);
       compositeConfig.addConfiguration(propsConfig);
 
       return compositeConfig;
@@ -43,7 +47,7 @@ public record AppConfig(Configuration configuration) implements AdapterConfig {
     }
   }
 
-  public List<String> getAdapterClasses() {
+  public List<String> getAdapterNames() {
     String adaptersProperty = getProperty("adapters");
     if (adaptersProperty != null && !adaptersProperty.trim().isEmpty()) {
       return Arrays.stream(adaptersProperty.split(",")).map(String::trim).toList();

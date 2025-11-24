@@ -10,13 +10,21 @@
  */
 package com.civitas.configadapter.application;
 
+import static java.util.Objects.requireNonNull;
+
+import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.adapter.ConfigAdapter;
+import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.messaging.EventConsumer;
 import com.civitas.configadapter.messaging.EventPublisher;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.ServiceLoader;
+import java.util.ServiceLoader.Provider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,11 +35,25 @@ public class Application {
   public static void main(String[] args) {
     logger.info("Starting Civitas Config Adapter...");
 
-    AppConfig appConfig = new AppConfig("application.properties");
-
-    List<EventConsumer> consumers = createConsumers(appConfig);
-
     Runtime.getRuntime().addShutdownHook(new Thread(() -> logger.info("Shutdown signal received")));
+    Application application = new Application();
+    application.run();
+    logger.info("Application shutdown complete");
+  }
+
+  private final AppConfig appConfig;
+  private final List<EventConsumer> consumers;
+
+  public Application(String configFileName) {
+    appConfig = new AppConfig(requireNonNull(configFileName));
+    consumers = createConsumers(appConfig);
+  }
+
+  public Application() {
+    this("application.properties");
+  }
+
+  protected void run() {
 
     try (HealthCheckServer healthCheckServer =
         new HealthCheckServer(appConfig.getHealthCheckPort(), consumers)) {
@@ -66,14 +88,12 @@ public class Application {
         }
       }
     }
-
-    logger.info("Application shutdown complete");
   }
 
-  private static List<EventConsumer> createConsumers(AppConfig config) {
-    List<String> adapterClasses = config.getAdapterClasses();
+  private List<EventConsumer> createConsumers(AppConfig config) {
+    List<String> adapterNames = config.getAdapterNames();
 
-    if (adapterClasses.isEmpty()) {
+    if (adapterNames.isEmpty()) {
       throw new RuntimeException(
           "No adapters configured. Please specify 'adapters' or 'adapter.class' property");
     }
@@ -103,19 +123,19 @@ public class Application {
           eventPublisherClass != null ? eventPublisherClass : "none");
     }
 
-    logger.info("Creating {} adapter(s)", adapterClasses.size());
+    logger.info("Creating {} adapter(s)", adapterNames.size());
 
     List<EventConsumer> consumers = new ArrayList<>();
 
-    for (String adapterClass : adapterClasses) {
+    for (String adapterName : adapterNames) {
       try {
-        logger.info("Loading adapter: {}", adapterClass);
+        logger.info("Loading adapter: {}", adapterName);
 
-        ConfigAdapter adapter = createAdapter(config, adapterClass);
+        ConfigAdapter adapter = createAdapter(config, adapterName);
         List<String> topics = adapter.getSubscribedTopics();
 
         if (topics.isEmpty()) {
-          logger.warn("Adapter {} has no subscribed topics, skipping", adapterClass);
+          logger.warn("Adapter {} has no subscribed topics, skipping", adapterName);
           continue;
         }
 
@@ -146,11 +166,11 @@ public class Application {
 
         consumers.add(consumer);
 
-        logger.info("Successfully created consumer for adapter: {}", adapterClass);
+        logger.info("Successfully created consumer for adapter: {}", adapterName);
 
       } catch (Exception e) {
-        logger.error("Failed to create consumer for adapter: {}", adapterClass, e);
-        throw new RuntimeException("Failed to create consumer for adapter: " + adapterClass, e);
+        logger.error("Failed to create consumer for adapter: {}", adapterName, e);
+        throw new RuntimeException("Failed to create consumer for adapter: " + adapterName, e);
       }
     }
 
@@ -161,7 +181,7 @@ public class Application {
     return consumers;
   }
 
-  private static EventConsumer createConsumer(
+  private EventConsumer createConsumer(
       AppConfig config, String consumerClass, ConfigAdapter adapter)
       throws ClassNotFoundException,
           InstantiationException,
@@ -178,11 +198,11 @@ public class Application {
 
     return (EventConsumer)
         consumerClazz
-            .getConstructor(AppConfig.class, ConfigAdapter.class)
+            .getConstructor(AdapterConfig.class, ConfigAdapter.class)
             .newInstance(config, adapter);
   }
 
-  private static EventPublisher createPublisher(AppConfig config, String publisherClass)
+  private EventPublisher createPublisher(AppConfig config, String publisherClass)
       throws ClassNotFoundException,
           InstantiationException,
           IllegalAccessException,
@@ -199,20 +219,23 @@ public class Application {
     return (EventPublisher) publisherClazz.getConstructor(AppConfig.class).newInstance(config);
   }
 
-  private static ConfigAdapter createAdapter(AppConfig config, String adapterClass)
-      throws ClassNotFoundException,
-          InstantiationException,
-          IllegalAccessException,
-          InvocationTargetException,
-          NoSuchMethodException {
-    Class<?> adapterClazz = Class.forName(adapterClass);
-
-    // Verify that the class implements ConfigAdapter interface
-    if (!ConfigAdapter.class.isAssignableFrom(adapterClazz)) {
-      throw new IllegalArgumentException(
-          String.format("Class %s does not implement ConfigAdapter interface", adapterClass));
+  private ConfigAdapter createAdapter(AppConfig config, String adapterName) {
+    ServiceLoader<ConfigAdapter> configAdapterLoader = ServiceLoader.load(ConfigAdapter.class);
+    Optional<ConfigAdapter> configAdapterOpt =
+        configAdapterLoader.stream()
+            .filter(p -> Objects.equals(adapterName, p.get().getName()))
+            .map(Provider::get)
+            .findFirst();
+    if (configAdapterOpt.isPresent()) {
+      ConfigAdapter configAdapter = configAdapterOpt.get();
+      if (configAdapter instanceof AbstractConfigAdapter aca) {
+        aca.initialize(config);
+        return configAdapter;
+      } else {
+        throw new IllegalStateException(
+            String.format("Class %s does not implement AbstractConfigAdapter class", adapterName));
+      }
     }
-
-    return (ConfigAdapter) adapterClazz.getConstructor(AppConfig.class).newInstance(config);
+    return null;
   }
 }

@@ -12,6 +12,8 @@ package com.civitas.configadapter.configuration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
 import java.util.Map;
@@ -70,25 +72,25 @@ class AppConfigTest {
   void shouldGetAdapterClasses() {
     AppConfig config = createAppConfig("adapters", "com.example.Adapter1,com.example.Adapter2");
 
-    assertEquals(2, config.getAdapterClasses().size());
-    assertEquals("com.example.Adapter1", config.getAdapterClasses().get(0));
-    assertEquals("com.example.Adapter2", config.getAdapterClasses().get(1));
+    assertEquals(2, config.getAdapterNames().size());
+    assertEquals("com.example.Adapter1", config.getAdapterNames().get(0));
+    assertEquals("com.example.Adapter2", config.getAdapterNames().get(1));
   }
 
   @Test
   void shouldHandleEmptyAdaptersProperty() {
     AppConfig config = createAppConfig("adapters", "");
 
-    assertEquals(0, config.getAdapterClasses().size());
+    assertEquals(0, config.getAdapterNames().size());
   }
 
   @Test
   void shouldTrimAdapterClassNames() {
     AppConfig config = createAppConfig("adapters", " com.example.Adapter1 , com.example.Adapter2 ");
 
-    assertEquals(2, config.getAdapterClasses().size());
-    assertEquals("com.example.Adapter1", config.getAdapterClasses().get(0));
-    assertEquals("com.example.Adapter2", config.getAdapterClasses().get(1));
+    assertEquals(2, config.getAdapterNames().size());
+    assertEquals("com.example.Adapter1", config.getAdapterNames().get(0));
+    assertEquals("com.example.Adapter2", config.getAdapterNames().get(1));
   }
 
   @Test
@@ -116,13 +118,9 @@ class AppConfigTest {
   void shouldThrowExceptionWhenHealthCheckPortIsInvalid() {
     AppConfig config = createAppConfig("healthcheck.port", "invalid-port");
 
-    RuntimeException exception =
-        org.junit.jupiter.api.Assertions.assertThrows(
-            RuntimeException.class, () -> config.getHealthCheckPort());
-
-    org.junit.jupiter.api.Assertions.assertTrue(
-        exception.getMessage().contains("Invalid healthcheck.port value"));
-    org.junit.jupiter.api.Assertions.assertTrue(exception.getMessage().contains("invalid-port"));
+    RuntimeException exception = assertThrows(RuntimeException.class, config::getHealthCheckPort);
+    assertTrue(exception.getMessage().contains("Invalid healthcheck.port value"));
+    assertTrue(exception.getMessage().contains("invalid-port"));
   }
 
   @Test
@@ -130,7 +128,7 @@ class AppConfigTest {
     Map<String, Object> props = Collections.emptyMap();
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
-    assertEquals(0, config.getAdapterClasses().size());
+    assertEquals(0, config.getAdapterNames().size());
   }
 
   private AppConfig createAppConfig(String key, String value) {

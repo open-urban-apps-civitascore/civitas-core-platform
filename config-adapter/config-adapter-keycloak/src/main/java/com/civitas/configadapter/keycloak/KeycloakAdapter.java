@@ -40,13 +40,22 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(KeycloakAdapter.class);
 
-  private static final String ADAPTER_NAME = "keycloak";
+  public static final String ADAPTER_NAME = "keycloak";
 
-  private final Keycloak keycloakClient;
   private final ObjectMapper objectMapper;
+  private Keycloak keycloakClient;
 
-  public KeycloakAdapter(AdapterConfig config) {
-    super(config, ADAPTER_NAME);
+  public KeycloakAdapter() {
+    this.objectMapper = new ObjectMapper();
+  }
+
+  /*
+   * (non-Javadoc)
+   * @see com.civitas.configadapter.adapter.AbstractConfigAdapter#initialize(com.civitas.configadapter.config.AppConfig)
+   */
+  @Override
+  public void initialize(AdapterConfig config) {
+    super.initialize(config);
     this.keycloakClient =
         KeycloakBuilder.builder()
             .serverUrl(getAdapterProperty("url", "http://localhost:8080"))
@@ -55,7 +64,6 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
             .password(getAdapterProperty("password", "admin"))
             .clientId(getAdapterProperty("client.id", "admin-cli"))
             .build();
-    this.objectMapper = new ObjectMapper();
 
     logger.info(
         "Keycloak adapter '{}' initialized for: {}",
@@ -63,6 +71,15 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         getAdapterProperty("url", "http://localhost:8080"));
     logger.info(
         "Subscribed to {} Kafka topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
+  }
+
+  /*
+   * (non-Javadoc)
+   * @see com.civitas.configadapter.adapter.ConfigAdapter#getName()
+   */
+  @Override
+  public String getName() {
+    return ADAPTER_NAME;
   }
 
   @Override
@@ -293,7 +310,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   // ============== USER OPERATIONS ==============
   /*
-       * {
+  * {
     "metadata": {
       "messageId": "uuid-v4-of-this-message",
       "timestamp": "2025-09-30T15:31:50Z",
@@ -318,7 +335,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-       */
+  */
 
   private void createUser(String realm, ConfigEvent event) {
     try {

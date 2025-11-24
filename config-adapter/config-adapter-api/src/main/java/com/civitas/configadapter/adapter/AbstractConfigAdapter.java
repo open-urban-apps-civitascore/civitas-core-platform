@@ -14,6 +14,8 @@ import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.Topics;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,37 +28,22 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(AbstractConfigAdapter.class);
 
-  protected final AdapterConfig config;
+  protected AdapterConfig config;
   protected EventPublisher eventPublisher;
-  private final List<String> subscribedTopics;
-  private final String adapterName;
+  private String adapterName;
+  private final List<String> subscribedTopics = new LinkedList<>();
 
-  /**
-   * Constructor that injects required dependencies. Automatically parses and validates topics from
-   * configuration using the adapter's name as prefix. Topics are read from the configuration key:
-   * "{adapterName}.topics"
-   *
-   * @param config The application configuration containing adapter-specific settings
-   * @param adapterName The name of the adapter (used as prefix for configuration properties)
-   * @throws IllegalArgumentException if config or adapterName is null/empty, or if invalid topics
-   *     are configured
-   */
-  protected AbstractConfigAdapter(AdapterConfig config, String adapterName) {
+  public void initialize(AdapterConfig config) {
     if (config == null) {
       throw new IllegalArgumentException("AdapterConfig cannot be null");
     }
+    this.adapterName = getName();
     if (adapterName == null || adapterName.trim().isEmpty()) {
       throw new IllegalArgumentException("Adapter name cannot be null or empty");
     }
     this.config = config;
-    this.adapterName = adapterName;
     String topicsConfigKey = adapterName + ".topics";
-    this.subscribedTopics = parseAndValidateTopics(topicsConfigKey);
-  }
-
-  @Override
-  public String getName() {
-    return adapterName;
+    this.subscribedTopics.addAll(parseAndValidateTopics(topicsConfigKey));
   }
 
   /**
@@ -123,7 +110,7 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
 
   @Override
   public List<String> getSubscribedTopics() {
-    return subscribedTopics;
+    return Collections.unmodifiableList(subscribedTopics);
   }
 
   @Override

@@ -26,12 +26,28 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(DummyLogAdapter.class);
 
-  private static final String ADAPTER_NAME = "dummylog";
+  public static final String ADAPTER_NAME = "dummylog";
 
-  public DummyLogAdapter(AdapterConfig config) {
-    super(config, ADAPTER_NAME);
+  public DummyLogAdapter() {}
+
+  /*
+   * (non-Javadoc)
+   * @see com.civitas.configadapter.adapter.AbstractConfigAdapter#initialize(com.civitas.configadapter.config.AppConfig)
+   */
+  @Override
+  public void initialize(AdapterConfig config) {
+    super.initialize(config);
     logger.info("DummyLogAdapter '{}' initialized - will log all received events", getName());
     logger.info("Subscribed to {} topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
+  }
+
+  /*
+   * (non-Javadoc)
+   * @see com.civitas.configadapter.adapter.ConfigAdapter#getName()
+   */
+  @Override
+  public String getName() {
+    return ADAPTER_NAME;
   }
 
   @Override

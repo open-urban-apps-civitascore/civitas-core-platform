@@ -95,7 +95,8 @@ class KeycloakAdapterIntegrationTest {
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
     // Create adapter
-    adapter = new KeycloakAdapter(config);
+    adapter = new KeycloakAdapter();
+    adapter.initialize(config);
 
     // Create test event publisher
     eventPublisher = new TestEventPublisher();

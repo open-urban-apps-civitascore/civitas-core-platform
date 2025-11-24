@@ -50,7 +50,7 @@ public interface AdapterConfig {
    *
    * @return list of fully qualified adapter class names
    */
-  List<String> getAdapterClasses();
+  List<String> getAdapterNames();
 
   /**
    * Gets the event handler class name.

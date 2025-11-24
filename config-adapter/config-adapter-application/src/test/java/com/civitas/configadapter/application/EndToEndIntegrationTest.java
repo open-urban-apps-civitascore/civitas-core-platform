@@ -127,7 +127,8 @@ class EndToEndIntegrationTest {
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
     // Create adapter
-    adapter = new KeycloakAdapter(config);
+    adapter = new KeycloakAdapter();
+    adapter.initialize(config);
 
     // Create consumer with adapter
     consumer = new KafkaEventHandler(config, adapter);

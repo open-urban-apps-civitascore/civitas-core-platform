@@ -28,8 +28,11 @@ import org.junit.jupiter.api.Test;
 class AbstractConfigAdapterTest {
 
   private static class TestAdapter extends AbstractConfigAdapter {
-    public TestAdapter(AdapterConfig config, String adapterName) {
-      super(config, adapterName);
+    private String adapterName;
+
+    private TestAdapter(AdapterConfig config, String adapterName) {
+      this.adapterName = adapterName;
+      initialize(config);
     }
 
     @Override
@@ -40,6 +43,11 @@ class AbstractConfigAdapterTest {
     @Override
     public void close() {
       // Test implementation
+    }
+
+    @Override
+    public String getName() {
+      return adapterName;
     }
   }
 
