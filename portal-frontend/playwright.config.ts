@@ -15,10 +15,15 @@ if (
   !process.env.E2E_PASSWORD ||
   !process.env.E2E_EMAIL ||
   !process.env.E2E_FIRSTNAME ||
-  !process.env.E2E_LASTNAME
+  !process.env.E2E_LASTNAME ||
+  !process.env.E2E_MOCK_FIRSTNAME ||
+  !process.env.E2E_MOCK_LASTNAME ||
+  !process.env.E2E_MOCK_EMAIL ||
+  !process.env.JSON_SERVER_HOST ||
+  !process.env.JSON_SERVER_PORT
 ) {
   throw new Error(
-    'E2E_USERNAME, E2E_PASSWORD, E2E_EMAIL, E2E_FIRSTNAME and E2E_LASTNAME environment variables are required',
+    'E2E_USERNAME, E2E_PASSWORD, E2E_EMAIL, E2E_FIRSTNAME, E2E_LASTNAME, E2E_MOCK_FIRSTNAME, E2E_MOCK_LASTNAME, E2E_MOCK_EMAIL, JSON_SERVER_HOST and JSON_SERVER_PORT environment variables are required',
   )
 }
 
@@ -27,6 +32,11 @@ export const TEST_PASSWORD = process.env.E2E_PASSWORD
 export const TEST_EMAIL = process.env.E2E_EMAIL
 export const TEST_FIRSTNAME = process.env.E2E_FIRSTNAME
 export const TEST_LASTNAME = process.env.E2E_LASTNAME
+export const E2E_MOCK_FIRSTNAME = process.env.E2E_MOCK_FIRSTNAME
+export const E2E_MOCK_LASTNAME = process.env.E2E_MOCK_LASTNAME
+export const E2E_MOCK_EMAIL = process.env.E2E_MOCK_EMAIL
+export const JSON_SERVER_HOST = process.env.JSON_SERVER_HOST
+export const JSON_SERVER_PORT = process.env.JSON_SERVER_PORT
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -51,6 +61,8 @@ export default defineConfig({
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
   },
+  globalSetup: './playwright/globalTeardown.ts',
+  globalTeardown: './playwright/globalTeardown.ts',
 
   /* Configure projects for major browsers */
   projects: [

@@ -66,6 +66,7 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
               <SelectTrigger
                 id={id}
                 data-testid={`${name}SelectTrigger`}
+                data-test-element="formField"
                 aria-label={label}
                 className={cn(
                   'w-full disabled:opacity-100 disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0 disabled:pointer-events-none',

@@ -122,7 +122,7 @@ const UsersPage = () => {
   )
 
   return (
-    <PageContainer headerType="onlyTitle">
+    <PageContainer headerType="onlyTitle" testId="usersPage">
       <PageHeader title={t('title')} />
       <PageBackground>
         <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />
