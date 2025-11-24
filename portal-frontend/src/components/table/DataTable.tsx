@@ -34,12 +34,12 @@ export interface DataTableProps<T> extends ComponentProps<'table'> {
 }
 
 const LoadingSkeleton = () => (
-  <>
+  <div data-testid="loadingSkeleton">
     <Skeleton className="h-10 w-full mb-2.5 mt-2" />
     <Skeleton className="h-10 w-full mb-2.5" />
     <Skeleton className="h-10 w-full mb-2.5" />
     <Skeleton className="h-10 w-full" />
-  </>
+  </div>
 )
 
 export const DataTable = <T,>(props: DataTableProps<T>) => {

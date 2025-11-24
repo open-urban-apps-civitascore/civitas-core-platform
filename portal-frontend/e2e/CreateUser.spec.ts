@@ -1,18 +1,9 @@
 import { expect, test } from '@playwright/test'
 
-import { Authority } from '@/types/users'
-import { pickSelectOption } from './utils/formUtils'
-import {
-  E2E_MOCK_EMAIL,
-  E2E_MOCK_FIRSTNAME,
-  E2E_MOCK_LASTNAME,
-  TEST_EMAIL,
-  TEST_FIRSTNAME,
-  TEST_LASTNAME,
-} from '../playwright.config'
-import { removeTestUsers } from '../playwright/removeTestUsers'
 import { getMockUserData } from '../playwright/helpers/userFactory'
-import { createTestUser } from '../playwright/createTestUser'
+import { removeTestUsers } from '../playwright/removeTestUsers'
+import { pickSelectOption } from './utils/formUtils'
+import { Authority } from '@/types/users'
 
 const MOCK_USER_1 = getMockUserData()
 
@@ -29,9 +20,13 @@ const MOCK_AUTHORITIES = [
   },
 ]
 
-test.describe('Create User Page', async () => {
+test.describe('Create User Flow', async () => {
   test.beforeEach(async ({ page }) => {
     await removeTestUsers()
+    await page.route('http://localhost:3001/authorities', async route => {
+      const json: Authority[] = MOCK_AUTHORITIES
+      await route.fulfill({ json })
+    })
     await page.goto('/users/create')
   })
 
@@ -66,8 +61,6 @@ test.describe('Create User Page', async () => {
   })
 
   test('creates new user', async ({ page }) => {
-    await page.getByTestId('addUserButton').click()
-
     // fill in form data
     await pickSelectOption(page, 'title', 1)
     await page.getByTestId('firstNameTextField').fill(MOCK_USER_1.firstName)

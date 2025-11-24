@@ -1,54 +1,40 @@
 import { expect, test } from '@playwright/test'
 
-import { Authority } from '@/types/users'
-import { pickSelectOption } from './utils/formUtils'
-import {
-  E2E_MOCK_EMAIL,
-  E2E_MOCK_FIRSTNAME,
-  E2E_MOCK_LASTNAME,
-  TEST_EMAIL,
-  TEST_FIRSTNAME,
-  TEST_LASTNAME,
-} from '../playwright.config'
-import { removeTestUsers } from '../playwright/removeTestUsers'
-import { getMockUserData } from '../playwright/helpers/userFactory'
+import { UserResponse } from '@/types/users'
 import { createTestUser } from '../playwright/createTestUser'
+import { removeTestUser } from '../playwright/removeTestUser'
 
-const MOCK_USER_1 = getMockUserData()
+test.describe('User List', async () => {
+  let user: UserResponse
 
-const MOCK_AUTHORITIES = [
-  {
-    id: '1',
-    title: 'authority1',
-    departments: [
-      {
-        id: '1',
-        title: 'department1',
-      },
-    ],
-  },
-]
-
-test.describe('User List Page', async () => {
   test.beforeEach(async ({ page }) => {
-    await removeTestUsers()
+    user = await createTestUser()
     await page.goto('/users')
   })
 
+  test.afterEach(async () => {
+    await removeTestUser(user.id)
+  })
+
   test('renders the page elements', async ({ page }) => {
+    await page.getByTestId('loadingSkeleton').waitFor({ state: 'hidden' })
+
     const pageHeader = page.getByTestId('pageHeader')
     await expect(pageHeader).toBeVisible()
     await expect(pageHeader).toContainText('Overview: Users')
-
     await expect(page.getByTestId('addUserButton')).toBeVisible()
 
     await expect(page.getByTestId('usersTable')).toBeVisible()
 
     const searchArea = page.getByTestId('searchArea')
     await expect(searchArea).toBeVisible()
-    searchArea.locator('input').fill(E2E_MOCK_FIRSTNAME)
+    searchArea.locator('input').fill(user.firstName)
 
     const rows = page.getByRole('row')
+    await expect(rows).toHaveCount(2)
+    await expect(rows.nth(1)).toContainText(user.displayName)
+
+    searchArea.locator('input').fill(crypto.randomUUID())
     await expect(rows).toHaveCount(2)
     await expect(rows.nth(1)).toContainText('No results found.')
   })
@@ -60,39 +46,13 @@ test.describe('User List Page', async () => {
     await expect(createUserPage).toBeVisible()
   })
 
-  test('creates new user', async ({ page }) => {
-    await page.getByTestId('addUserButton').click()
+  test('navigates to user details page', async ({ page }) => {
+    await page.getByTestId('loadingSkeleton').waitFor({ state: 'hidden' })
+    await page.getByTestId('searchArea').locator('input').fill(user.firstName)
 
-    // FILL IN FORM DATA
-    await pickSelectOption(page, 'title', 1)
-    await page.getByTestId('firstNameTextField').fill(MOCK_USER_1.firstName)
-    await page.getByTestId('lastNameTextField').fill(MOCK_USER_1.lastName)
-    await page.getByTestId('emailTextField').fill(MOCK_USER_1.email)
-    await page.getByTestId('phoneTextField').fill(MOCK_USER_1.phone)
-    await pickSelectOption(page, 'authority')
-    await pickSelectOption(page, 'department')
-    await page.getByTestId('positionDescriptionTextArea').fill(MOCK_USER_1.positionDescription || '')
-    await page.getByTestId('activeSwitch').click()
-
-    await page.getByTestId('confirmButton').click()
-
-    // verify redirect zu new users details page
-    await expect(page).toHaveURL(/\/users\/.+/)
-    await expect(page.getByTestId('editUserPage')).toBeVisible()
-    await expect(page.getByTestId('pageHeader')).toContainText(MOCK_USER_1.displayName)
-
-    // verify new created user appears in users list
-    await page.goto('/users')
-    await page.getByTestId('searchArea').locator('input').fill(MOCK_USER_1.firstName)
-    const rows = page.getByRole('row')
-    await expect(rows).toHaveCount(2)
-    await expect(rows.filter({ hasText: MOCK_USER_1.displayName })).toBeVisible()
-  })
-
-  test('edits existing user', async ({ page }) => {
-    const newUser = await createTestUser()
-    const rows = page.getByRole('row')
-
-    await rows.filter({ hasText: newUser.displayName }).click()
+    const userRow = page.getByRole('row').filter({ hasText: user.displayName })
+    await userRow.click()
+    await expect(page.getByTestId('userDetailsPage')).toBeVisible()
+    await expect(page.getByTestId('pageHeader')).toContainText(user.displayName)
   })
 })
