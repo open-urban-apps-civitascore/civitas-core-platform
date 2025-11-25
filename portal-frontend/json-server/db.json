@@ -2989,8 +2989,8 @@
   "users": [
     {
       "id": "1",
-      "firstName": "Sophia",
       "title": "female",
+      "firstName": "Sophia",
       "lastName": "Fischer",
       "email": "sophie.fischer@test.com",
       "authority": {
@@ -2999,21 +2999,16 @@
           "id": "1"
         }
       },
+      "department": "1",
+      "phone": "+49 75 5576070",
+      "active": true,
+      "positionDescription": "Bauingenieur für Kanalisationsbau ",
+      "displayName": "Sophia Fischer",
       "groups": [
         "1",
         "2",
-        "3",
         "zQe8zBc"
-      ],
-      "phone": "+49 75 5576070",
-      "active": true,
-      "position": "Bauingenieur für Kanalisationsbau",
-      "positionDescription": "Bauingenieur für Kanalisationsbau",
-      "roles": [
-        "1",
-        "6"
-      ],
-      "displayName": "Sophia Fischer"
+      ]
     },
     {
       "id": "2",
@@ -5650,8 +5645,12 @@
       "parent": null,
       "roles": [
         "1",
+        "2",
         "4",
-        "6"
+        "6",
+        "8",
+        "9",
+        "KERWOWP"
       ],
       "dataspace": {
         "id": "1",
@@ -6439,7 +6438,7 @@
       "title": "Permission 1",
       "category": {
         "id": "1",
-        "title": "Category 1"
+        "title": "Category System 1"
       },
       "type": "system"
     },
@@ -6448,7 +6447,7 @@
       "title": "Permission 2",
       "category": {
         "id": "2",
-        "title": "Category 2"
+        "title": "Category System 2"
       },
       "type": "system"
     },
@@ -6457,7 +6456,7 @@
       "title": "Permission 3",
       "category": {
         "id": "3",
-        "title": "Category 3"
+        "title": "Category System 3"
       },
       "type": "system"
     },
@@ -6466,7 +6465,7 @@
       "title": "Permission 4",
       "category": {
         "id": "4",
-        "title": "Category 4"
+        "title": "Category System 4"
       },
       "type": "system"
     },
@@ -6475,7 +6474,7 @@
       "title": "Permission 5",
       "category": {
         "id": "5",
-        "title": "Category 5"
+        "title": "Category System 5"
       },
       "type": "system"
     },
@@ -6483,8 +6482,8 @@
       "id": "6",
       "title": "Permission 6",
       "category": {
-        "id": "1",
-        "title": "Category 1"
+        "id": "6",
+        "title": "Category Data 1"
       },
       "type": "data"
     },
@@ -6492,8 +6491,8 @@
       "id": "7",
       "title": "Permission 7",
       "category": {
-        "id": "2",
-        "title": "Category 2"
+        "id": "7",
+        "title": "Category Data 2"
       },
       "type": "data"
     },
@@ -6501,8 +6500,8 @@
       "id": "8",
       "title": "Permission 8",
       "category": {
-        "id": "3",
-        "title": "Category 3"
+        "id": "8",
+        "title": "Category Data 3"
       },
       "type": "data"
     },
@@ -6510,8 +6509,8 @@
       "id": "9",
       "title": "Permission 9",
       "category": {
-        "id": "4",
-        "title": "Category 4"
+        "id": "9",
+        "title": "Category Data 4"
       },
       "type": "data"
     },
@@ -6519,8 +6518,8 @@
       "id": "10",
       "title": "Permission 10",
       "category": {
-        "id": "5",
-        "title": "Category 5"
+        "id": "10",
+        "title": "Category Data 5"
       },
       "type": "data"
     },
@@ -6528,8 +6527,8 @@
       "id": "11",
       "title": "Permission 11",
       "category": {
-        "id": "1",
-        "title": "Category 1"
+        "id": "11",
+        "title": "Category Governance 1"
       },
       "type": "governance"
     },
@@ -6537,8 +6536,8 @@
       "id": "12",
       "title": "Permission 12",
       "category": {
-        "id": "2",
-        "title": "Category 2"
+        "id": "12",
+        "title": "Category Governance 2"
       },
       "type": "governance"
     },
@@ -6546,8 +6545,8 @@
       "id": "13",
       "title": "Permission 13",
       "category": {
-        "id": "3",
-        "title": "Category 3"
+        "id": "13",
+        "title": "Category Governance 3"
       },
       "type": "governance"
     },
@@ -6555,8 +6554,8 @@
       "id": "14",
       "title": "Permission 14",
       "category": {
-        "id": "4",
-        "title": "Category 4"
+        "id": "14",
+        "title": "Category Governance 4"
       },
       "type": "governance"
     },
@@ -6564,8 +6563,215 @@
       "id": "15",
       "title": "Permission 15",
       "category": {
+        "id": "15",
+        "title": "Category Governance 5"
+      },
+      "type": "governance"
+    },
+    {
+      "id": "16",
+      "title": "Permission 16",
+      "category": {
+        "id": "1",
+        "title": "Category System 1"
+      },
+      "type": "system"
+    },
+    {
+      "id": "17",
+      "title": "Permission 17",
+      "category": {
+        "id": "2",
+        "title": "Category System 2"
+      },
+      "type": "system"
+    },
+    {
+      "id": "18",
+      "title": "Permission 18",
+      "category": {
+        "id": "3",
+        "title": "Category System 3"
+      },
+      "type": "system"
+    },
+    {
+      "id": "19",
+      "title": "Permission 19",
+      "category": {
+        "id": "4",
+        "title": "Category System 4"
+      },
+      "type": "system"
+    },
+    {
+      "id": "20",
+      "title": "Permission 20",
+      "category": {
         "id": "5",
-        "title": "Category 5"
+        "title": "Category System 5"
+      },
+      "type": "system"
+    },
+    {
+      "id": "21",
+      "title": "Permission 21",
+      "category": {
+        "id": "6",
+        "title": "Category Data 1"
+      },
+      "type": "data"
+    },
+    {
+      "id": "22",
+      "title": "Permission 22",
+      "category": {
+        "id": "7",
+        "title": "Category Data 2"
+      },
+      "type": "data"
+    },
+    {
+      "id": "23",
+      "title": "Permission 23",
+      "category": {
+        "id": "8",
+        "title": "Category Data 3"
+      },
+      "type": "data"
+    },
+    {
+      "id": "24",
+      "title": "Permission 24",
+      "category": {
+        "id": "9",
+        "title": "Category Data 4"
+      },
+      "type": "data"
+    },
+    {
+      "id": "25",
+      "title": "Permission 25",
+      "category": {
+        "id": "10",
+        "title": "Category Data 5"
+      },
+      "type": "data"
+    },
+    {
+      "id": "26",
+      "title": "Permission 26",
+      "category": {
+        "id": "11",
+        "title": "Category Governance 1"
+      },
+      "type": "governance"
+    },
+    {
+      "id": "27",
+      "title": "Permission 27",
+      "category": {
+        "id": "12",
+        "title": "Category Governance 2"
+      },
+      "type": "governance"
+    },
+    {
+      "id": "28",
+      "title": "Permission 28",
+      "category": {
+        "id": "13",
+        "title": "Category Governance 3"
+      },
+      "type": "governance"
+    },
+    {
+      "id": "29",
+      "title": "Permission 29",
+      "category": {
+        "id": "14",
+        "title": "Category Governance 4"
+      },
+      "type": "governance"
+    },
+    {
+      "id": "30",
+      "title": "Permission 30",
+      "category": {
+        "id": "15",
+        "title": "Category Governance 5"
+      },
+      "type": "governance"
+    },
+    {
+      "id": "31",
+      "title": "Permission 31",
+      "category": {
+        "id": "1",
+        "title": "Category System 1"
+      },
+      "type": "system"
+    },
+    {
+      "id": "32",
+      "title": "Permission 32",
+      "category": {
+        "id": "2",
+        "title": "Category System 2"
+      },
+      "type": "system"
+    },
+    {
+      "id": "33",
+      "title": "Permission 33",
+      "category": {
+        "id": "3",
+        "title": "Category System 3"
+      },
+      "type": "system"
+    },
+    {
+      "id": "34",
+      "title": "Permission 34",
+      "category": {
+        "id": "4",
+        "title": "Category Data 4"
+      },
+      "type": "data"
+    },
+    {
+      "id": "35",
+      "title": "Permission 35",
+      "category": {
+        "id": "5",
+        "title": "Category Data 5"
+      },
+      "type": "data"
+    },
+    {
+      "id": "36",
+      "title": "Permission 36",
+      "category": {
+        "id": "11",
+        "title": "Category Governance 1"
+      },
+      "type": "governance"
+    },
+    {
+      "id": "37",
+      "title": "Permission 37",
+      "category": {
+        "id": "12",
+        "title": "Category Governance 2"
+      },
+      "type": "governance"
+    },
+    {
+      "id": "38",
+      "title": "Permission 38",
+      "category": {
+        "id": "13",
+        "title": "Category Governance 3"
       },
       "type": "governance"
     }
@@ -6578,10 +6784,19 @@
       "tenant": "ExampleCorp",
       "type": "system",
       "permissions": [
-        "perm1",
-        "perm2",
-        "perm3",
-        "perm4"
+        "3",
+        "1",
+        "16",
+        "31",
+        "2",
+        "17",
+        "32",
+        "18",
+        "33",
+        "4",
+        "19",
+        "5",
+        "20"
       ],
       "user": [
         "1",
@@ -6596,8 +6811,17 @@
       "tenant": "ExampleCorp",
       "type": "system",
       "permissions": [
-        "perm2",
-        "perm3"
+        "1",
+        "2",
+        "3",
+        "16",
+        "17",
+        "18",
+        "31",
+        "32",
+        "33",
+        "4",
+        "19"
       ],
       "user": [
         "3",
@@ -6612,7 +6836,12 @@
       "tenant": "ExampleCorp",
       "type": "system",
       "permissions": [
-        "perm3"
+        "1",
+        "2",
+        "16",
+        "17",
+        "31",
+        "32"
       ],
       "user": [
         "5",
@@ -6632,11 +6861,7 @@
       "description": "Content Editor",
       "tenant": "ExampleCorp",
       "type": "data",
-      "permissions": [
-        "perm4",
-        "perm5",
-        "perm6"
-      ],
+      "permissions": [],
       "user": [
         "1",
         "2"
@@ -6649,10 +6874,7 @@
       "description": "Read-Only User",
       "tenant": "ExampleCorp",
       "type": "data",
-      "permissions": [
-        "perm5",
-        "perm6"
-      ],
+      "permissions": [],
       "user": [
         "3",
         "4",
@@ -6673,11 +6895,7 @@
       "description": "Data Owner",
       "tenant": "ExampleCorp",
       "type": "governance",
-      "permissions": [
-        "perm8",
-        "perm9",
-        "perm10"
-      ],
+      "permissions": [],
       "user": [
         "1",
         "2"
@@ -6690,10 +6908,7 @@
       "description": "Das ist eine Testrolle",
       "type": "data",
       "tenant": "ExampleCorp",
-      "permissions": [
-        "perm1",
-        "perm2"
-      ],
+      "permissions": [],
       "user": [
         "1",
         "2"
@@ -6706,10 +6921,7 @@
       "description": "Some more text",
       "type": "data",
       "tenant": "ExampleCorp",
-      "permissions": [
-        "perm1",
-        "perm2"
-      ],
+      "permissions": [],
       "user": [
         "1",
         "2"
@@ -6730,7 +6942,7 @@
       "type": "governance",
       "tenant": "ExampleCorp",
       "user": null,
-      "permissions": null,
+      "permissions": [],
       "createdAt": "2025-09-29T15:15:58.072Z",
       "name": "Global Data Assignment",
       "description": "Beschreibungstext",
@@ -6740,7 +6952,12 @@
       "type": "system",
       "tenant": "ExampleCorp",
       "user": null,
-      "permissions": null,
+      "permissions": [
+        "2",
+        "16",
+        "31",
+        "1"
+      ],
       "createdAt": "2025-10-02T14:18:37.769Z",
       "name": "Testrolle",
       "description": "test",

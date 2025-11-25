@@ -4,6 +4,7 @@ import de.civitascore.portal.controller.exception.SecurityExceptionHandler;
 import de.civitascore.portal.security.CustomJwtAuthenticationConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -13,7 +14,8 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity(proxyTargetClass = true)
+@EnableJpaAuditing(auditorAwareRef = "auditorAwareImpl")
 public class SecurityConfig {
 
   private final CustomJwtAuthenticationConverter customJwtConverter;

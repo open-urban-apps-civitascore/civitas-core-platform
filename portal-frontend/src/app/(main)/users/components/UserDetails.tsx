@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { UserResponse } from '@/types/users'
 
+import { GroupsTab } from './groups-tab/GroupsTab'
 import { RolesTab } from './roles-tab/RolesTab'
 import { UserForm } from './UserForm'
 
@@ -77,6 +78,9 @@ export const UserDetails = (props: UserDetailsProps) => {
       case tabValues.userData.value:
         Content = <UserForm userData={userData} isEditMode={isEditMode} />
         break
+      case tabValues.groups.value:
+        Content = <GroupsTab userId={userData.id} />
+        break
       case tabValues.roles.value:
         Content = <RolesTab groupIds={userData.groups} />
         break
@@ -92,7 +96,7 @@ export const UserDetails = (props: UserDetailsProps) => {
         title={title}
         subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: newTab => handleSelectTab(newTab) }}
       />
-      <PageBackground className="overflow-y-auto">{Content}</PageBackground>
+      <PageBackground>{userData ? Content : <div>No data</div>}</PageBackground>
     </PageContainer>
   )
 }

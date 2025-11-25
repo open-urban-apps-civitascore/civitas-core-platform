@@ -1,0 +1,12 @@
+keycloak:
+  auth-server-url: http://localhost:8080/auth
+  realm: test-realm
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: ${keycloak.auth-server-url}/realms/${keycloak.realm}/protocol/openid-connect/certs
+          issuer-uri: ${keycloak.auth-server-url}/realms/${keycloak.realm}
+

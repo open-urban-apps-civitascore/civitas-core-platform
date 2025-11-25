@@ -5,16 +5,19 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 public class CustomJwtAuthenticationConverter
     implements Converter<Jwt, AbstractAuthenticationToken> {
 
+  private static final String CLAIM_SUB = "sub";
   private static final String CLAIM_PREFERRED_USERNAME = "preferred_username";
   private static final String CLAIM_EMAIL = "email";
   private static final String CLAIM_TENANT_ID = "tenantId";
@@ -28,6 +31,7 @@ public class CustomJwtAuthenticationConverter
 
   @Override
   public AbstractAuthenticationToken convert(Jwt jwt) {
+    String userId = jwt.getClaimAsString(CLAIM_SUB);
     String username = jwt.getClaimAsString(CLAIM_PREFERRED_USERNAME);
     String email = jwt.getClaimAsString(CLAIM_EMAIL);
     String tenant = extractTenantId(jwt);
@@ -38,6 +42,7 @@ public class CustomJwtAuthenticationConverter
 
     PrincipalUserDetails dto =
         PrincipalUserDetails.builder()
+            .userId(userId)
             .username(username)
             .email(email)
             .tenantId(tenant)
@@ -50,11 +55,14 @@ public class CustomJwtAuthenticationConverter
   }
 
   private String extractTenantId(Jwt jwt) {
-    String tenantId = jwt.getClaimAsString(CLAIM_TENANT_ID);
-    if (tenantId != null) {
-      return tenantId;
+    // Try to get tenantId as a String claim first
+    Object tenantIdClaim = jwt.getClaim(CLAIM_TENANT_ID);
+
+    if (tenantIdClaim instanceof String) {
+      return (String) tenantIdClaim;
     }
 
+    // Fallback: extract from issuer
     if (jwt.getIssuer() != null) {
       String iss = jwt.getIssuer().toString();
       int idx = iss.indexOf(ISSUER_REALMS_MARKER);

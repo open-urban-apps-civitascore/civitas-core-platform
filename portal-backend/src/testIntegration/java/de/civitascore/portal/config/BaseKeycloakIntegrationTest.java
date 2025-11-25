@@ -4,6 +4,8 @@ import dasniko.testcontainers.keycloak.KeycloakContainer;
 import de.civitascore.portal.PortalBackendApplication;
 import de.civitascore.portal.util.KeycloakTokenHelper;
 import de.civitascore.portal.util.TestContainerConfiguration;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -13,7 +15,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @SpringBootTest(
@@ -22,61 +23,66 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @ActiveProfiles("test-integration")
 @Testcontainers
 @Import(TestContainerConfiguration.class)
+@Slf4j
 public abstract class BaseKeycloakIntegrationTest {
 
-  @Container static PostgreSQLContainer<?> postgres;
-
-  @Container static KeycloakContainer keycloak;
-
-  @Autowired protected TestRestTemplate restTemplate;
-
-  protected KeycloakTokenHelper tokenHelper;
+  protected static final PostgreSQLContainer<?> POSTGRES;
+  protected static final KeycloakContainer KEYCLOAK;
 
   static {
-    // Initialize containers from beans
-    postgres =
+    POSTGRES =
         new PostgreSQLContainer<>("postgres:15")
             .withDatabaseName("iot_schema")
             .withUsername("iot")
             .withPassword("iot");
 
-    keycloak =
+    KEYCLOAK =
         new KeycloakContainer("quay.io/keycloak/keycloak:26.3.4")
             .withRealmImportFile("keycloak/iot-realm.json");
 
-    postgres.start();
-    keycloak.start();
+    POSTGRES.start();
+    KEYCLOAK.start();
+
+    log.info("Test Containers Started");
+    log.debug("PostgreSQL URL: " + POSTGRES.getJdbcUrl());
+    log.debug("Keycloak URL: " + KEYCLOAK.getAuthServerUrl());
   }
+
+  @Autowired protected TestRestTemplate restTemplate;
+
+  protected KeycloakTokenHelper tokenHelper;
 
   @DynamicPropertySource
   static void configureProperties(DynamicPropertyRegistry registry) {
-    // Configure DataSource properties
-    registry.add("spring.datasource.url", postgres::getJdbcUrl);
-    registry.add("spring.datasource.username", postgres::getUsername);
-    registry.add("spring.datasource.password", postgres::getPassword);
+    // Register container properties after they're started
+    registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+    registry.add("spring.datasource.username", POSTGRES::getUsername);
+    registry.add("spring.datasource.password", POSTGRES::getPassword);
     registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    String authServerUrl = keycloak.getAuthServerUrl();
+
+    String authServerUrl = KEYCLOAK.getAuthServerUrl();
     String issuerUri = authServerUrl + "/realms/iot";
     String jwkSetUri = issuerUri + "/protocol/openid-connect/certs";
 
-    System.out.println("Keycloak Auth Server URL: " + authServerUrl);
-    System.out.println("JWT Issuer URI: " + issuerUri);
-    System.out.println("JWK Set URI: " + jwkSetUri);
-
-    // Configure Keycloak JWT properties with ACTUAL container URLs
     registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", () -> issuerUri);
     registry.add("spring.security.oauth2.resourceserver.jwt.jwk-set-uri", () -> jwkSetUri);
-
-    // Configure Keycloak properties
   }
 
   @BeforeEach
   void setUp() {
-    tokenHelper = new KeycloakTokenHelper(keycloak);
-    System.out.println(
-        " PostgreSQL running: " + postgres.isRunning() + " at " + postgres.getJdbcUrl());
-    System.out.println(
-        " Keycloak running: " + keycloak.isRunning() + " at " + keycloak.getAuthServerUrl());
+    if (!POSTGRES.isRunning() || !KEYCLOAK.isRunning()) {
+      throw new IllegalStateException("Test containers stopped unexpectedly!");
+    }
+
+    tokenHelper = new KeycloakTokenHelper(KEYCLOAK);
+
+    log.info("PostgreSQL running at " + POSTGRES.getJdbcUrl());
+    log.info("Keycloak running at " + KEYCLOAK.getAuthServerUrl());
+  }
+
+  @AfterAll
+  static void tearDown() {
+    log.info("Test Containers will be stopped automatically by Testcontainers");
   }
 
   protected String getValidAccessToken() {
