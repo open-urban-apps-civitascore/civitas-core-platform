@@ -3,6 +3,7 @@
     "type-to-search": "Zum Suchen tippen",
     "search": "Durchsuchen",
     "noResults": "Es gibt leider keine Ergebnisse.",
+    "noData": "Keine Daten",
     "loading": "Lädt...",
     "actions": {
       "submit": "Speichern",
@@ -35,6 +36,7 @@
     "documentation": "Dokumentation",
     "logout": "Abmelden",
     "ourData": "Unsere Daten",
+    "datasets": "Unsere Daten",
     "permissions": "Berechtigungen",
     "roles": "Rollen Management",
     "create": "erstellen",

@@ -67,7 +67,7 @@ export const DatasetCompletionStatus = (props: DatasetCompletionStatusProps) => 
   return (
     <div className={cn(isMobile && 'mt-6')}>
       <DetailsFieldContainer>
-        <SubHeader title={t('overview.completion.title')} titleClassName={cn(disabled && 'text-muted-foreground')} />
+        <SubHeader title={t('overview.completion.title')} />
       </DetailsFieldContainer>
       <DetailsFieldContainer>
         <CompletionStep step={completionSteps.metadata} datasetId={datasetId} disabled={disabled} className="mb-4" />

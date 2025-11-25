@@ -36,6 +36,7 @@ interface DatasetOverviewProps {
 export const DatasetOverview = (props: DatasetOverviewProps) => {
   const { dataset, dataspaces, isEditMode } = props
   const t = useTranslations('datasets')
+  const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -102,6 +103,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     try {
       await updateDataset(updateDatasetData)
       form.reset(formData)
+      router.refresh()
     } catch {
       console.error('An error occurred while updating dataset')
     } finally {
@@ -111,7 +113,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateDataset) : form.handleSubmit(handleCreateDataset)
 
   if (!dataset) {
-    return <NoDataPage title="No Data" />
+    return <NoDataPage title={tCommon('noData')} />
   }
 
   if (isLoading) {

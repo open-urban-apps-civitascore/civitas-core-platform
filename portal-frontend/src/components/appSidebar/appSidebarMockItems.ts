@@ -1,12 +1,12 @@
 import { BookOpen, Bot, Building2, LucideProps, SquareMenu, SquareTerminal, User } from 'lucide-react'
 import { ForwardRefExoticComponent, ReactNode, RefAttributes } from 'react'
 
-export interface NavItems {
+export interface NavItem {
   title: string
   url: string
   icon?: ReactNode | ForwardRefExoticComponent<Omit<LucideProps, 'ref'> & RefAttributes<SVGSVGElement>>
   isActive?: boolean
-  items?: NavItems[]
+  items?: NavItem[]
 }
 
 export const appSidebarNavItems = [

@@ -3,6 +3,7 @@
     "type-to-search": "Type to search",
     "search": "Search",
     "noResults": "No results found.",
+    "noData": "No Data",
     "loading": "Loading...",
     "actions": {
       "submit": "Save",
@@ -35,6 +36,7 @@
     "documentation": "Documentation",
     "logout": "Log out",
     "ourData": "Our Data",
+    "datasets": "Our Data",
     "permissions": "Permissions",
     "roles": "Role Management",
     "create": "create",
