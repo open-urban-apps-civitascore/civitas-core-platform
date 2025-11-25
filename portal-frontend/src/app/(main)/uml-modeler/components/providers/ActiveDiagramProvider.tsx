@@ -15,7 +15,7 @@ import {
 } from '../../services/diagramService'
 import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge } from '../../types/diagram'
 import type { UseMultiSessionReturn } from '../../types/session'
-import type { UMLRelationshipType } from '../../types/uml'
+import type { UMLElement, UMLRelationship, UMLRelationshipType } from '../../types/uml'
 
 interface ActiveDiagramProviderComponentProps {
   children: ReactNode
@@ -76,7 +76,7 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   )
 
   const updateNode = useCallback(
-    (nodeId: string, updates: any) => {
+    (nodeId: string, updates: Partial<UMLElement>) => {
       dispatch({ type: 'UPDATE_NODE', payload: { id: nodeId, updates } })
     },
     [dispatch],
@@ -133,7 +133,7 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
   )
 
   const updateEdge = useCallback(
-    (edgeId: string, updates: any) => {
+    (edgeId: string, updates: Partial<UMLRelationship>) => {
       dispatch({ type: 'UPDATE_EDGE', payload: { id: edgeId, updates } })
     },
     [dispatch],

@@ -1,13 +1,15 @@
-// useActiveDiagram.tsx
+'use client'
+
 import type { Connection } from '@xyflow/react'
 import { createContext, useContext } from 'react'
 
-import type { getDiagramStats } from '../services/diagramService'
+import { createEmptyDiagram, getDiagramStats } from '../services/diagramService'
 import type { DiagramAction, NodeCreationContext, UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
+import type { UMLElement, UMLRelationship } from '../types/uml'
 
 interface ActiveDiagramContextValue {
   // Current active diagram
-  diagram: UMLDiagram | null
+  diagram: UMLDiagram
   stats: ReturnType<typeof getDiagramStats>
   isDirty: boolean
   activeRelationshipType: string
@@ -21,13 +23,13 @@ interface ActiveDiagramContextValue {
 
   // Node operations
   addNode: (context: NodeCreationContext) => void
-  updateNode: (nodeId: string, updates: any) => void
+  updateNode: (nodeId: string, updates: Partial<UMLElement>) => void
   deleteNodes: (nodeIds: string[]) => void
   selectNode: (nodeId: string, isMultiSelect?: boolean) => void
 
   // Edge operations
   addEdge: (connection: Connection) => void
-  updateEdge: (edgeId: string, updates: any) => void
+  updateEdge: (edgeId: string, updates: Partial<UMLRelationship>) => void
   deleteEdges: (edgeIds: string[]) => void
   selectEdge: (edgeId: string, isMultiSelect?: boolean) => void
 
@@ -50,11 +52,40 @@ interface ActiveDiagramContextValue {
 
 const ActiveDiagramContext = createContext<ActiveDiagramContextValue | null>(null)
 
-export const useActiveDiagram = () => {
+export const useActiveDiagram = (): ActiveDiagramContextValue => {
   const context = useContext(ActiveDiagramContext)
+
   if (!context) {
-    throw new Error('useActiveDiagram must be used within ActiveDiagramProvider')
+    // Provide a fallback context for shared components when no provider exists
+    // This allows components like ElementPalette to function without being inside a specific session
+    const emptyDiagram = createEmptyDiagram()
+    return {
+      diagram: emptyDiagram,
+      stats: getDiagramStats(emptyDiagram),
+      isDirty: false,
+      activeRelationshipType: 'association',
+      selectedNode: undefined,
+      selectedEdge: undefined,
+      dispatch: () => {},
+      addNode: () => {},
+      updateNode: () => {},
+      deleteNodes: () => {},
+      selectNode: () => {},
+      addEdge: () => {},
+      updateEdge: () => {},
+      deleteEdges: () => {},
+      selectEdge: () => {},
+      setActiveRelationshipType: () => {},
+      clearSelection: () => {},
+      selectAll: () => {},
+      getSelectedNodes: () => [],
+      getSelectedEdges: () => [],
+      deleteSelected: () => {},
+      validateConnection: () => false,
+      activeSessionId: null,
+    }
   }
+
   return context
 }
 
