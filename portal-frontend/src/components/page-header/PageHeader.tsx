@@ -2,17 +2,18 @@ import { HTMLAttributes } from 'react'
 
 import { cn } from '@/lib/utils'
 
+import { Badge } from '../ui/badge'
 import { TabSectionProps, TabsSection } from './components/TabsSections'
 
 export type PageHeaderProps = Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & {
   title?: string
   tabs?: TabSectionProps
   subTabs?: TabSectionProps
+  badgeTitle?: string
 }
 
 export const PageHeader = (props: PageHeaderProps) => {
-  const { title, className, style, tabs, subTabs } = props
-
+  const { title, className, style, tabs, subTabs, badgeTitle } = props
   return (
     <div
       id="heading"
@@ -30,9 +31,12 @@ export const PageHeader = (props: PageHeaderProps) => {
         className={`flex-1 flex ${title ? 'justify-between' : 'justify-end'} items-center px-[var(--layout-padding)]`}
       >
         {title && (
-          <h1 id="page-heading" className=" bg-transparent text-3xl font-bold text-center m-0">
-            {title}
-          </h1>
+          <div className="flex flex-row items-center gap-4">
+            <h1 id="page-heading" className=" bg-transparent text-3xl font-bold text-center m-0">
+              {title}
+            </h1>
+            {badgeTitle && <Badge variant="outline">{badgeTitle}</Badge>}
+          </div>
         )}
       </div>
       {subTabs && (

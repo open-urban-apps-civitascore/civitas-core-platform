@@ -10,7 +10,7 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Item } from '@/types/common'
 import { Permission, PermissionItem } from '@/types/permissions'
-import { ROLE_TYPES, RoleResponse } from '@/types/roles'
+import { ROLE_ORIGINS, ROLE_TYPES, RoleResponse } from '@/types/roles'
 
 import { CategoryList } from './CategoryList'
 import { RoleTemplateSelect } from './RoleTemplateSelect'
@@ -23,6 +23,7 @@ type PermissionsTabProps = {
   roleType: string
   hasPermissionsTabBeenSaved: boolean
   setHasPermissionsTabBeenSaved: (value: boolean) => void
+  isDefaultRole: boolean
 }
 
 const mapPermissions = (permissionsInput: Permission[]): PermissionItem[] => {
@@ -40,9 +41,11 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     roleType,
     hasPermissionsTabBeenSaved,
     setHasPermissionsTabBeenSaved,
+    isDefaultRole,
   } = props
   const router = useRouter()
   const t = useTranslations('common')
+  const tRoles = useTranslations('roles')
   const { getApiRequestParams, tabValue } = useQueryParams()
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [allPermissionsResponse, setAllPermissionsResponse] = useState<Permission[]>([])
@@ -53,7 +56,9 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
 
   const getRoles = useCallback(async () => {
     try {
-      const rolesResponse = await fetch(`${URL}/roles?type=${tabValue}`, { cache: 'no-store' })
+      const rolesResponse = await fetch(`${URL}/roles?type=${tabValue}&roleOrigin=${ROLE_ORIGINS.DEFAULT}`, {
+        cache: 'no-store',
+      })
 
       if (!rolesResponse.ok) {
         throw new Error('An error occurred while loading roles data')
@@ -165,7 +170,10 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
       <SearchHeader
         searchString={searchInput}
         onChangeSearchString={setSearchInput}
-        customElement={<RoleTemplateSelect allRoles={allRoles} setRoleTemplate={setRoleTemplate} />}
+        customElement={
+          isDefaultRole ? null : <RoleTemplateSelect allRoles={allRoles} setRoleTemplate={setRoleTemplate} />
+        }
+        placeholder={tRoles('permissionsTab.searchPermissions')}
       />
 
       {permissions.length === 0 ? (
@@ -178,19 +186,20 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
                 permissionList={permissions.filter(permission => permission.category.id === category.id)}
                 checkedItems={checkedPermissionItems}
                 setCheckedItems={setCheckedPermissionItems}
+                isDefaultRole={isDefaultRole}
               />
             </div>
           ))}
 
-          <ActionButtons
-            confirmButtonType="button"
-            onConfirmClick={() => {
-              updatePermissions(checkedPermissionItems.map(item => item.value))
-            }}
-            onCancelClick={() => router.push(`/roles?_tab=${roleType || ROLE_TYPES.SYSTEM}`)}
-            isConfirmButtonDisabled={isLoading || !arePermissionsTouched || hasPermissionsTabBeenSaved}
-            isCancelButtonDisabled={isLoading}
-          />
+          {!isDefaultRole && (
+            <ActionButtons
+              confirmButtonType="button"
+              onConfirmClick={() => updatePermissions(checkedPermissionItems.map(item => item.value))}
+              onCancelClick={() => router.push(`/roles?_tab=${roleType || ROLE_TYPES.SYSTEM}`)}
+              isConfirmButtonDisabled={isLoading || !arePermissionsTouched || hasPermissionsTabBeenSaved}
+              isCancelButtonDisabled={isLoading}
+            />
+          )}
         </>
       )}
     </div>

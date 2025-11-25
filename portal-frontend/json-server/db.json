@@ -6780,7 +6780,7 @@
     {
       "id": "1",
       "name": "SystemAdmin",
-      "description": "SystemAdmin",
+      "description": "Diese Rolle ist für etwas spezifisches da",
       "tenant": "ExampleCorp",
       "type": "system",
       "permissions": [
@@ -6802,46 +6802,53 @@
         "1",
         "2"
       ],
-      "createdAt": "2024-06-01T12:00:00Z"
+      "groups": [
+        "1",
+        "4"
+      ],
+      "createdAt": "2024-06-01T12:00:00Z",
+      "lastUpdated": "2024-06-01T12:00:00Z",
+      "updatedBy": null,
+      "roleOrigin": "default"
     },
     {
       "id": "2",
-      "name": "SystemDev",
-      "description": "System Developer",
+      "name": "SystemDev ",
+      "description": "Diese Rolle ist für etwas spezifisches da",
       "tenant": "ExampleCorp",
       "type": "system",
       "permissions": [
         "1",
         "2",
         "3",
-        "16",
-        "17",
-        "18",
-        "31",
-        "32",
-        "33",
-        "4",
-        "19"
+        "6",
+        "8",
+        "11",
+        "13",
+        "7",
+        "12"
       ],
       "user": [
         "3",
         "4"
       ],
-      "createdAt": "2024-06-01T12:00:00Z"
+      "createdAt": "2024-06-01T12:00:00Z",
+      "groups": [
+        "1",
+        "2"
+      ],
+      "lastUpdated": "2024-06-01T12:00:00Z",
+      "updatedBy": null,
+      "roleOrigin": "default"
     },
     {
       "id": "3",
       "name": "StandardUser",
-      "description": "Standard User",
+      "description": "Diese Rolle ist für etwas spezifisches da",
       "tenant": "ExampleCorp",
       "type": "system",
       "permissions": [
-        "1",
-        "2",
-        "16",
-        "17",
-        "31",
-        "32"
+        "perm3"
       ],
       "user": [
         "5",
@@ -6853,12 +6860,18 @@
         "11",
         "12"
       ],
-      "createdAt": "2024-06-01T12:00:00Z"
+      "createdAt": "2024-06-01T12:00:00Z",
+      "groups": [
+        "3"
+      ],
+      "lastUpdated": "2024-06-01T12:00:00Z",
+      "updatedBy": null,
+      "roleOrigin": "default"
     },
     {
       "id": "4",
       "name": "Editor",
-      "description": "Content Editor",
+      "description": "Diese Rolle ist für etwas spezifisches da",
       "tenant": "ExampleCorp",
       "type": "data",
       "permissions": [],
@@ -6866,12 +6879,18 @@
         "1",
         "2"
       ],
-      "createdAt": "2024-06-01T12:00:00Z"
+      "createdAt": "2024-06-01T12:00:00Z",
+      "groups": [
+        "1"
+      ],
+      "lastUpdated": "2024-06-01T12:00:00Z",
+      "updatedBy": null,
+      "roleOrigin": "default"
     },
     {
       "id": "5",
       "name": "Leser:in",
-      "description": "Read-Only User",
+      "description": "Diese Rolle ist für etwas spezifisches da",
       "tenant": "ExampleCorp",
       "type": "data",
       "permissions": [],
@@ -6887,12 +6906,19 @@
         "11",
         "12"
       ],
-      "createdAt": "2024-06-01T12:00:00Z"
+      "createdAt": "2024-06-01T12:00:00Z",
+      "groups": [
+        "1",
+        "4"
+      ],
+      "lastUpdated": "2024-06-01T12:00:00Z",
+      "updatedBy": null,
+      "roleOrigin": "default"
     },
     {
       "id": "6",
       "name": "DataOwner",
-      "description": "Data Owner",
+      "description": "Diese Rolle ist für etwas spezifisches da",
       "tenant": "ExampleCorp",
       "type": "governance",
       "permissions": [],
@@ -6900,7 +6926,16 @@
         "1",
         "2"
       ],
-      "createdAt": "2024-06-01T12:00:00Z"
+      "createdAt": "2024-06-01T12:00:00Z",
+      "groups": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
+      "lastUpdated": "2024-06-01T12:00:00Z",
+      "updatedBy": null,
+      "roleOrigin": "default"
     },
     {
       "id": "7",
@@ -6913,7 +6948,15 @@
         "1",
         "2"
       ],
-      "createdAt": "2024-06-01T12:00:00Z"
+      "createdAt": "2024-06-01T12:00:00Z",
+      "groups": [
+        "1",
+        "2",
+        "6"
+      ],
+      "lastUpdated": "2024-06-01T12:00:00Z",
+      "updatedBy": null,
+      "roleOrigin": "custom"
     },
     {
       "id": "8",
@@ -6926,7 +6969,15 @@
         "1",
         "2"
       ],
-      "createdAt": "2024-06-01T12:00:00Z"
+      "createdAt": "2024-06-01T12:00:00Z",
+      "groups": [
+        "1",
+        "4",
+        "3"
+      ],
+      "lastUpdated": "2024-06-01T12:00:00Z",
+      "updatedBy": null,
+      "roleOrigin": "custom"
     },
     {
       "id": "9",
@@ -6936,7 +6987,11 @@
       "tenant": "ExampleCorp",
       "permissions": [],
       "user": [],
-      "createdAt": "2024-06-01T12:00:00Z"
+      "createdAt": "2024-06-01T12:00:00Z",
+      "groups": [],
+      "lastUpdated": "2024-06-01T12:00:00Z",
+      "updatedBy": null,
+      "roleOrigin": "custom"
     },
     {
       "type": "governance",
@@ -6946,22 +7001,65 @@
       "createdAt": "2025-09-29T15:15:58.072Z",
       "name": "Global Data Assignment",
       "description": "Beschreibungstext",
-      "id": "KERWOWP"
+      "id": "KERWOWP",
+      "groups": [
+        "1",
+        "4"
+      ],
+      "lastUpdated": "2024-06-01T12:00:00Z",
+      "updatedBy": null,
+      "roleOrigin": "custom"
     },
     {
       "type": "system",
       "tenant": "ExampleCorp",
       "user": null,
       "permissions": [
-        "2",
+        "1",
         "16",
         "31",
-        "1"
+        "2",
+        "17",
+        "32"
       ],
       "createdAt": "2025-10-02T14:18:37.769Z",
       "name": "Testrolle",
-      "description": "test",
-      "id": "b81evni"
+      "description": "Diese Rolle ist für etwas spezifisches da.",
+      "id": "b81evni",
+      "groups": [
+        "1"
+      ],
+      "lastUpdated": "2024-06-01T12:00:00Z",
+      "updatedBy": null,
+      "roleOrigin": "custom"
+    },
+    {
+      "type": "system",
+      "tenant": "ExampleCorp",
+      "user": null,
+      "permissions": [
+        "1",
+        "16",
+        "31"
+      ],
+      "createdAt": "2025-11-21T13:52:15.279Z",
+      "groups": null,
+      "name": "Test1",
+      "description": "Diese Rolle kann irgendwas super Tolles.",
+      "roleOrigin": "custom",
+      "id": "t2mjcMn"
+    },
+    {
+      "type": "governance",
+      "tenant": "ExampleCorp",
+      "user": null,
+      "permissions": [],
+      "createdAt": "2025-11-21T13:53:36.594Z",
+      "groups": null,
+      "name": "Test Governance",
+      "description": "Das hier ist eine Governancerolle",
+      "roleOrigin": "custom",
+      "id": "_8UNR6J"
     }
   ]
 }

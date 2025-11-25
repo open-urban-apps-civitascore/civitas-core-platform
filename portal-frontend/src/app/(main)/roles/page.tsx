@@ -59,7 +59,6 @@ const RolesPage = () => {
   }, [totalPages, pageIndex, pageSize])
 
   const [selectedRoleType, setSelectedRoleType] = useState<string>(tabValue || DEFAULT_TAB)
-  const [selectedSubTab, setSelectedSubTab] = useState<string>(tabValue || 'roles')
 
   const getRoles = useCallback(async () => {
     const params = getApiRequestParamsByUrl()
@@ -94,9 +93,9 @@ const RolesPage = () => {
   }
 
   return (
-    <PageContainer headerType="withBothTabsRows">
+    <PageContainer headerType="withPrimaryTabs">
       <PageHeader
-        title={tabs.find(tab => tab.value === selectedRoleType)?.label}
+        title={`${t('overView')} ${tabs.find(tab => tab.value === selectedRoleType)?.label}`}
         tabs={{
           tabs,
           onClick: type => {
@@ -104,14 +103,6 @@ const RolesPage = () => {
             setTabValueParam(type)
           },
           selectedTab: selectedRoleType,
-        }}
-        subTabs={{
-          tabs: [
-            { value: 'roles', label: t('roles') },
-            { value: 'roleSets', label: t('roleSets') },
-          ],
-          selectedTab: selectedSubTab,
-          onClick: newTab => setSelectedSubTab(newTab),
         }}
       />
       <PageBackground>
