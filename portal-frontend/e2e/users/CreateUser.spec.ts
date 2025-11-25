@@ -74,16 +74,16 @@ test.describe('Create User Flow', async () => {
 
     await page.getByTestId('confirmButton').click()
 
-    // verify redirect zu new users details page
+    // verify redirect to new created user's details page
     await expect(page).toHaveURL(/\/users\/.+/)
     await expect(page.getByTestId('userDetailsPage')).toBeVisible()
     await expect(page.getByTestId('pageHeader')).toContainText(MOCK_USER_1.displayName)
 
     // verify new created user appears in users list
+    await page.getByTestId('sidebarMenuItem-users').click()
     await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(50)
-    await page.goto('/users')
     await page.getByTestId('searchArea').locator('input').fill(MOCK_USER_1.firstName)
+
     const rows = page.getByRole('row')
     await expect(rows).toHaveCount(2)
     await expect(rows.filter({ hasText: MOCK_USER_1.displayName })).toBeVisible()
