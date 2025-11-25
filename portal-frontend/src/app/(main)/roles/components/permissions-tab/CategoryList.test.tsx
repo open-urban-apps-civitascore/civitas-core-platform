@@ -23,7 +23,12 @@ describe('CategoryList', () => {
 
   it('renders the component with correct permissions', () => {
     render(
-      <CategoryList permissionList={permissionList} checkedItems={checkedItems} setCheckedItems={setCheckedItems} />,
+      <CategoryList
+        permissionList={permissionList}
+        checkedItems={checkedItems}
+        setCheckedItems={setCheckedItems}
+        isDefaultRole={false}
+      />,
     )
 
     expect(screen.getByText('General')).toBeInTheDocument()
@@ -39,7 +44,12 @@ describe('CategoryList', () => {
 
   it('toggles the selection of a single item', () => {
     render(
-      <CategoryList permissionList={permissionList} checkedItems={checkedItems} setCheckedItems={setCheckedItems} />,
+      <CategoryList
+        permissionList={permissionList}
+        checkedItems={checkedItems}
+        setCheckedItems={setCheckedItems}
+        isDefaultRole={false}
+      />,
     )
 
     const writeCheckbox = screen.getAllByRole('checkbox')[2]
@@ -53,12 +63,33 @@ describe('CategoryList', () => {
 
   it('toggles the selection of all items', () => {
     render(
-      <CategoryList permissionList={permissionList} checkedItems={checkedItems} setCheckedItems={setCheckedItems} />,
+      <CategoryList
+        permissionList={permissionList}
+        checkedItems={checkedItems}
+        setCheckedItems={setCheckedItems}
+        isDefaultRole={false}
+      />,
     )
 
     const headerCheckbox = screen.getAllByRole('checkbox')[0]
     fireEvent.click(headerCheckbox)
 
     expect(setCheckedItems).toHaveBeenCalledWith(permissionList)
+  })
+
+  it('renders disabled checkboxes when isDefaultRole is true', () => {
+    render(
+      <CategoryList
+        permissionList={permissionList}
+        checkedItems={checkedItems}
+        setCheckedItems={setCheckedItems}
+        isDefaultRole={true}
+      />,
+    )
+
+    const checkboxes = screen.getAllByRole('checkbox')
+    checkboxes.forEach(checkbox => {
+      expect(checkbox).toBeDisabled()
+    })
   })
 })

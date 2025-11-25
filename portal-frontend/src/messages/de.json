@@ -37,7 +37,7 @@
     "logout": "Abmelden",
     "datasets": "Datensätze",
     "permissions": "Berechtigungen",
-    "roles": "Rollen Management",
+    "roles": "Rollen",
     "create": "erstellen",
     "edit": "bearbeiten",
     "users": "User Management",
@@ -213,8 +213,9 @@
   },
   "roles": {
     "title": "Rollen",
-    "newRole": "Neue Rolle",
-    "systemRoles": "Systemrollen",
+    "newRole": "Rolle erstellen",
+    "overView": "Übersicht:",
+    "systemRoles": " Systemrollen",
     "dataRoles": "Datenrollen",
     "governanceRoles": "Governancerollen",
     "roles": "Einzelrollen",
@@ -222,10 +223,15 @@
     "tableHeaders": {
       "name": "Name",
       "description": "Beschreibung",
-      "permissions": "Berechtigungen",
       "user": "User",
-      "createdAt": "erstellt"
+      "groups": "Gruppen",
+      "lastUpdated": "letztes Update",
+      "updatedBy": "Geändert von",
+      "roleOrigin": "Typ"
     },
+    "defaultRole": "Standard",
+    "customRole": "Eigene",
+    "searchRoles": "Rollen durchsuchen",
     "tabLabels": {
       "basicInformation": "Informationen",
       "permissions": "Berechtigungen",
@@ -236,7 +242,8 @@
       "form": {
         "inputs": {
           "name": "Name der Rolle",
-          "description": "Beschreibung der Rolle"
+          "description": "Beschreibung der Rolle",
+          "roleOrigin": "Typ"
         },
         "placeholders": {
           "name": "Name der Rolle",
@@ -251,10 +258,17 @@
             "maxLength": "Beschreibung darf höchstens 100 Zeichen lang sein."
           }
         }
+      },
+      "securityArea": {
+        "heading": "Sicherheitsbereich",
+        "description": "Rolle löschen",
+        "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
+        "deleteButton": "Rolle löschen"
       }
     },
     "permissionsTab": {
       "heading": "Berechtigungen",
+      "searchPermissions": "Berechtigung suchen...",
       "selectedPersmissions": "{count} ausgewählt",
       "roleTemplate": {
         "placeholder": "Rolle als Vorlage auswählen"

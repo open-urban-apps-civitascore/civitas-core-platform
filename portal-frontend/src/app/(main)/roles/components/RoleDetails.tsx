@@ -12,7 +12,15 @@ import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
-import { FormRole, RoleInput, RoleResponse, roleSchema, RoleType, RoleUpdate } from '../../../../../types/roles'
+import {
+  FormRole,
+  ROLE_ORIGINS,
+  RoleInput,
+  RoleResponse,
+  roleSchema,
+  RoleType,
+  RoleUpdate,
+} from '../../../../../types/roles'
 import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
@@ -29,7 +37,7 @@ export const RoleDetails = (props: Props): JSX.Element => {
   const { roleId, isEditMode = false } = props
   const tRoles = useTranslations('roles')
   const router = useRouter()
-  const { setSubTabValueParam, subTabValue, tabValue, setTabValueParam } = useQueryParams()
+  const { setSubTabValueParam, subTabValue, tabValue } = useQueryParams()
   const [selectedRole, setSelectedRole] = useState<RoleResponse | undefined>(undefined)
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [hasPermissionsTabBeenSaved, setHasPermissionsTabBeenSaved] = useState<boolean>(false)
@@ -118,10 +126,10 @@ export const RoleDetails = (props: Props): JSX.Element => {
         throw new Error(`HTTP error! Status: ${response.status}`)
       }
 
-      form.reset()
+      const data = await response.json()
+      console.log('Erfolgreich erstellt:', data)
 
-      setTabValueParam(tabValue || DEFAULT_TAB)
-      router.push(`/roles?_tab=${tabValue || DEFAULT_TAB}`)
+      router.push(`/roles/${data.id}?_tab=${tabValue}`)
     } catch (error) {
       console.error('Fehler:', error)
     }
@@ -131,11 +139,32 @@ export const RoleDetails = (props: Props): JSX.Element => {
     postRole({
       type: (tabValue as RoleType) || (DEFAULT_TAB as RoleType),
       tenant: 'ExampleCorp', // Placeholder tenant
-      user: null, // null until user assignment is implemented
+      users: [],
       permissions: [],
       createdAt: new Date().toISOString(), // Placeholder createdAt, later set by backend
+      groups: [],
       ...values,
     })
+  }
+
+  const deleteRole = async (roleId: RoleResponse['id']) => {
+    try {
+      const response = await fetch(`${URL}/roles/${roleId}`, {
+        method: 'DELETE',
+        headers: {
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`)
+      }
+
+      router.push('/roles')
+    } catch (error) {
+      console.error('Error deleting role:', error)
+    }
   }
 
   const onSubmit = (values: FormRole): void => {
@@ -172,6 +201,7 @@ export const RoleDetails = (props: Props): JSX.Element => {
 
   const subTabs: Tab[] = [subTabValues.basicInformation, subTabValues.permissions, subTabValues.groupAssignment]
   const defaultSubTab = subTabValues.basicInformation.value
+  const isDefaultRole = selectedRole?.roleOrigin === ROLE_ORIGINS.DEFAULT
 
   useEffect(() => {
     if (!subTabValue) {
@@ -179,10 +209,14 @@ export const RoleDetails = (props: Props): JSX.Element => {
     }
   }, [subTabValue, setSubTabValueParam, defaultSubTab])
 
+  const roleType = selectedRole?.type || tabValue
+  const badgeTitle = roleType ? tRoles(`${roleType}Roles`).slice(0, -1) : undefined
+
   return (
     <PageContainer headerType="withSubTabs">
       <PageHeader
         title={roleId ? selectedRole?.name : tRoles('newRole')}
+        badgeTitle={badgeTitle}
         subTabs={{
           tabs: subTabs,
           selectedTab: subTabValue || defaultSubTab,
@@ -192,7 +226,15 @@ export const RoleDetails = (props: Props): JSX.Element => {
 
       <PageBackground className="overflow-auto">
         {subTabValue === subTabValues.basicInformation.value && (
-          <BaseInfoTab form={form} onSubmit={onSubmit} isLoading={isLoading} roleType={tabValue} />
+          <BaseInfoTab
+            form={form}
+            onSubmit={onSubmit}
+            isLoading={isLoading}
+            roleType={tabValue}
+            isDefaultRole={isDefaultRole}
+            isEditMode={isEditMode}
+            deleteRole={() => roleId && deleteRole(roleId)}
+          />
         )}
 
         {subTabValue === subTabValues.permissions.value && (
@@ -202,6 +244,7 @@ export const RoleDetails = (props: Props): JSX.Element => {
             roleType={tabValue}
             hasPermissionsTabBeenSaved={hasPermissionsTabBeenSaved}
             setHasPermissionsTabBeenSaved={setHasPermissionsTabBeenSaved}
+            isDefaultRole={isDefaultRole}
           />
         )}
 

@@ -18,7 +18,7 @@ export const TabsSection = (props: TabSectionProps) => {
   const { tabs, onClick, selectedTab, isSubTabsSection = false, isHeading = false, className } = props
 
   const tabsStyles = (tab: Tab) =>
-    `p-3 pt-0 border-b-2 border-transparent rounded-none hover:bg-white hover:border-foreground underline-offset-10 decoration-1 ${selectedTab === tab.value ? ' border-foreground' : 'text-slate-400'}`
+    `p-3 pt-0 border-b-2 border-transparent rounded-none hover:bg-white hover:border-primary underline-offset-10 decoration-1 ${selectedTab === tab.value ? ' border-primary' : 'text-slate-400'}`
   const subTabsStyles = (tab: Tab) =>
     `rounded-sm no-underline px-2 py-1 h-7 hover:bg-white ${selectedTab === tab.value && 'bg-white shadow-sm'}`
   const Tag = isHeading ? 'h1' : 'div'

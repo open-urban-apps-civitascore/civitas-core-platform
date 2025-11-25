@@ -9,10 +9,11 @@ type CategoryListProps = {
   permissionList: PermissionItem[]
   checkedItems: PermissionItem[]
   setCheckedItems: (items: PermissionItem[]) => void
+  isDefaultRole: boolean
 }
 
 export const CategoryList = (props: CategoryListProps) => {
-  const { permissionList, checkedItems, setCheckedItems } = props
+  const { permissionList, checkedItems, setCheckedItems, isDefaultRole } = props
   const tRoles = useTranslations('roles')
 
   const checkedItemsByCategory = useMemo(() => {
@@ -73,6 +74,7 @@ export const CategoryList = (props: CategoryListProps) => {
                 onClick={() => {
                   onToggleAllItems()
                 }}
+                disabled={isDefaultRole}
               />
             </div>
             <h2 className="text-xl">{permissionList[0]?.category.title}</h2>
@@ -93,6 +95,7 @@ export const CategoryList = (props: CategoryListProps) => {
             className="w-[16px] h-[16px]"
             onClick={() => onChangeCheckbox(inputItem)}
             checked={checkedItems.some(item => item.value === inputItem.value)}
+            disabled={isDefaultRole}
           />
         </div>
         <span>{inputItem.name}</span>
