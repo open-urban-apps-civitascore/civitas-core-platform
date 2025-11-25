@@ -27,6 +27,16 @@
 - **Goal**: Multiple concurrent diagram sessions with tab-based interface
 - **Output**: Professional multi-tab UML modeler with session management and toolbar
 
+### Phase 5.5: Architecture Refactoring ✅ DONE
+
+- **Goal**: Fix state synchronization issues between tabs and property inspector
+- **Output**: Simplified single-provider architecture with centralized state management
+- **Key Changes**:
+  - Replaced dual-provider pattern (`UMLDiagramProvider` + `UMLDiagramContext`) with single `ActiveDiagramProvider`
+  - Introduced `useActiveDiagram()` hook as the single interface for all components
+  - Fixed tab switching and property inspector synchronization issues
+- **Reference**: See `UML-MODELER-ARCHITECTURE.md` for detailed architecture documentation
+
 ### Phase 6: Future Features
 
 - **Tasks**: XMI export/import, API integration, performance optimization
@@ -59,21 +69,19 @@ UMLEdge extends Edge<UMLEdgeData, UMLRelationshipType>
 DiagramAction, NodeCreationContext, EdgeCreationContext
 ```
 
-### State Management (Ready to Use)
+### State Management (Post-Refactoring)
 
-#### Core Hook (`hooks/useUMLDiagramCore.ts`)
-
-```typescript
-// Use this for non-ReactFlow components
-const { diagram, addNode, updateNode, deleteNodes, addEdge, selectNode, dispatch } = useUMLDiagramCore()
-```
-
-#### ReactFlow Hook (`hooks/useUMLDiagram.ts`)
+#### Main Hook (`hooks/useActiveDiagram.ts`)
 
 ```typescript
-// Use this inside ReactFlow provider only
-const { ...coreFeatures, autoLayout, fitView } = useUMLDiagram()
+// Use this hook for ALL components - provides access to active diagram state
+import { useActiveDiagram } from '../hooks/useActiveDiagram'
+
+const { diagram, selectedNode, selectedEdge, addNode, updateNode, deleteNodes, addEdge, selectNode, dispatch } =
+  useActiveDiagram()
 ```
+
+**Note**: The old `useUMLDiagramCore` and `useUMLDiagram` hooks have been deprecated. All components now use the single `useActiveDiagram()` hook.
 
 #### Service Functions (`services/diagramService.ts`)
 
@@ -112,30 +120,52 @@ getNextElementName('class') // → "NeueKlasse", "NeueKlasse2"
 
 ## Phase 2 State ✅ DONE
 
-### Shared State Management (CRITICAL - Use This)
+### Shared State Management (Post-Refactoring)
 
-#### Main Hook (`hooks/UMLDiagramContext.tsx`)
-
-```typescript
-// ALL components must use this hook (not useUMLDiagramCore directly)
-import { useUMLDiagram } from '../hooks/UMLDiagramContext'
-
-const { diagram, addNode, updateNode, deleteNodes, selectNode } = useUMLDiagram()
-```
-
-#### Provider Setup (`components/UMLDiagramProvider.tsx`)
+#### Main Hook (`hooks/useActiveDiagram.ts`)
 
 ```typescript
-// Wrap your UML components with this provider
-<UMLDiagramProvider>
-  <ReactFlowProvider>
-    <UMLCanvas />
-    <YourComponent />
-  </ReactFlowProvider>
-</UMLDiagramProvider>
+// ALL components now use this single hook for diagram state access
+import { useActiveDiagram } from '../hooks/useActiveDiagram'
+
+const {
+  diagram,
+  selectedNode,
+  selectedEdge,
+  addNode,
+  updateNode,
+  deleteNodes,
+  selectNode,
+  activeRelationshipType,
+  setActiveRelationshipType,
+} = useActiveDiagram()
 ```
 
-**⚠️ IMPORTANT**: Components using `useUMLDiagramCore()` directly get separate state instances. Always use `useUMLDiagram()` for shared state.
+#### Provider Setup (`components/providers/ActiveDiagramProvider.tsx`)
+
+```typescript
+// The provider is now set up at the MultiSessionLayout level
+// Individual components DO NOT need to wrap themselves
+// Provider hierarchy:
+<MultiSessionLayout>
+  <ActiveDiagramProviderComponent>
+    {/* All child components automatically have access to context */}
+    <ElementPalette />
+    <TabContent>
+      <ReactFlowProvider>
+        <UMLCanvas />
+      </ReactFlowProvider>
+    </TabContent>
+    <PropertyInspector />
+  </ActiveDiagramProviderComponent>
+</MultiSessionLayout>
+```
+
+**✅ KEY IMPROVEMENTS**:
+
+- Single provider at the top level eliminates state synchronization issues
+- All components share the same diagram state automatically
+- No need for manual provider wrapping in individual components
 
 ### Visual Components (Ready to Use)
 
@@ -174,7 +204,7 @@ export const YourNode = ({ data, selected }) => (
 
 #### Add New UML Components
 
-1. **Use shared state**: `const { diagram, addEdge } = useUMLDiagram()`
+1. **Use shared state**: `const { diagram, addEdge } = useActiveDiagram()`
 2. **Reuse styling**: `UML_COLORS.yourType`, `NODE_DIMENSIONS`
 3. **Follow patterns**: See existing node components for structure
 4. **Register in nodeTypes**: Add to `components/nodes/nodeTypes.ts`
@@ -267,7 +297,7 @@ validateRelationshipConnection(diagram, connection, type) // Type-specific
 
 #### Add New Edge Features
 
-1. **Use shared state**: `const { diagram, addEdge, updateEdge } = useUMLDiagram()`
+1. **Use shared state**: `const { diagram, addEdge, updateEdge } = useActiveDiagram()`
 2. **Reuse base pattern**: Extend `BaseUMLEdge` for new edge types
 3. **Add to registry**: Register in `components/edges/edgeTypes.ts`
 4. **Follow UML standards**: Use existing `RELATIONSHIP_STYLES`
@@ -291,7 +321,7 @@ Professional UML Class Diagram modeler in Next.js/React with ReactFlow. **Phases
 
 ## Current Status ✅ Phases 1 & 2 Complete
 
-- **Phase 1**: Complete TypeScript architecture, state management with `useUMLDiagram()` shared context
+- **Phase 1**: Complete TypeScript architecture, state management with `useActiveDiagram()` shared context
 - **Phase 2**: 4 UML node components (Class, Interface, AbstractClass, Enum) rendering on canvas
 - **Phase 3**: 6 UML relationship types with professional markers (inheritance, realization, association, aggregation, composition, dependency)
 - **Working Canvas**: Professional UML nodes with proper styling, drag & drop, selection, and relationship creation
@@ -344,7 +374,7 @@ import { UMLModelerLayout } from '../components/layout/UMLModelerLayout'
 
 ```typescript
 // Simplified relationship type management
-const { activeRelationshipType, setActiveRelationshipType } = useUMLDiagram()
+const { activeRelationshipType, setActiveRelationshipType } = useActiveDiagram()
 
 // Usage in relationship tools
 const isActive = activeRelationshipType === relationshipType
@@ -371,7 +401,7 @@ setActiveRelationshipType(relationshipType) // Sets type for next connection
 - Literals: Manage enumeration values (for enum types)
 
 // Usage pattern
-const { updateNode } = useUMLDiagram()
+const { updateNode } = useActiveDiagram()
 updateNode(nodeId, { name: newName, stereotype: newStereotype })
 ```
 
@@ -386,7 +416,7 @@ updateNode(nodeId, { name: newName, stereotype: newStereotype })
 - Name: Optional relationship name
 
 // Usage pattern
-const { updateEdge } = useUMLDiagram()
+const { updateEdge } = useActiveDiagram()
 updateEdge(edgeId, { type: newType, sourceMultiplicity: '1...*' })
 ```
 
@@ -410,7 +440,7 @@ updateNode(nodeId, {
 
 ```typescript
 // All property changes flow through shared context
-const { updateNode, updateEdge } = useUMLDiagram()
+const { updateNode, updateEdge } = useActiveDiagram()
 
 // Real-time updates across all components
 updateNode(nodeId, changes) // Updates node data
@@ -436,7 +466,7 @@ import { UML_PRIMITIVE_TYPES, MULTIPLICITY_VALUES } from '../constants/umlTypes'
 
 ```typescript
 // Follows established Phase 1-3 patterns
-1. **Shared State**: All components use useUMLDiagram() hook
+1. **Shared State**: All components use useActiveDiagram() hook
 2. **Type Safety**: Strict TypeScript with established UML types
 3. **Styling**: Consistent with UML_COLORS and design system
 4. **ReactFlow Integration**: Proper node/edge data flow
@@ -656,7 +686,7 @@ import { MultiSessionLayout } from '../components/layout/MultiSessionLayout'
 // Multi-session → Individual session → Shared components
 1. **Session Creation**: useMultiSessionManager creates new DiagramSession
 2. **Session Switching**: Active session changes, TabContent re-renders
-3. **Diagram Changes**: Changes update session.diagram via useUMLDiagram()
+3. **Diagram Changes**: Changes update session.diagram via useActiveDiagram()
 4. **Dirty State**: Session marked dirty, tab shows unsaved indicator (•)
 5. **Save/Clean**: Session marked clean, indicator disappears
 ```
@@ -727,12 +757,78 @@ const UmlModelerPage = () => (
 
 ---
 
+## Migration Notes (Phase 5.5)
+
+### Deprecated Patterns
+
+The following patterns are deprecated after the Phase 5.5 refactoring:
+
+#### Old Hook Pattern
+
+```typescript
+// ❌ DEPRECATED - Don't use these anymore
+import { useUMLDiagram } from '../hooks/UMLDiagramContext'
+import { useUMLDiagramCore } from '../hooks/useUMLDiagramCore'
+```
+
+#### New Hook Pattern
+
+```typescript
+// ✅ USE THIS - Single hook for all components
+import { useActiveDiagram } from '../hooks/useActiveDiagram'
+```
+
+### Before/After Examples
+
+#### Component State Access
+
+```typescript
+// ❌ Before (Dual-provider pattern)
+const MyComponent = () => {
+  const { diagram, updateNode } = useUMLDiagram()
+  // Component might not get updates from other tabs
+}
+
+// ✅ After (Single-provider pattern)
+const MyComponent = () => {
+  const { diagram, updateNode } = useActiveDiagram()
+  // Always synced with active session
+}
+```
+
+#### Provider Setup
+
+```typescript
+// ❌ Before (Manual provider wrapping)
+<UMLDiagramProvider>
+  <ReactFlowProvider>
+    <YourComponents />
+  </ReactFlowProvider>
+</UMLDiagramProvider>
+
+// ✅ After (Automatic at top level)
+<MultiSessionLayout>
+  {/* ActiveDiagramProvider is already set up */}
+  {/* All components have access automatically */}
+</MultiSessionLayout>
+```
+
+### Key Benefits of New Architecture
+
+1. **No More State Sync Issues**: Property inspector always shows correct values
+2. **Reliable Tab Switching**: State properly preserved and restored
+3. **Simplified Component Code**: No need to manage providers manually
+4. **Better Performance**: Reduced re-renders with centralized state
+
+---
+
 ## Summary: Current Capabilities
 
-### ✅ **Fully Implemented (Phases 1-5)**
+### ✅ **Fully Implemented (Phases 1-5.5)**
 
 - **Complete Type System**: TypeScript UML element definitions with Redux-style action patterns
-- **State Management**: Shared context with useUMLDiagram() hook and multi-session management
+- **State Management**: Shared context with useActiveDiagram() hook and multi-session management
+- **Single-Provider Architecture**: Centralized state management with ActiveDiagramProvider
 - **4 UML Node Types**: Class, Interface, AbstractClass, Enumeration
 - **6 UML Relationships**: All major relationship types with professional markers
 - **Element Palette**: Drag-and-drop element creation
