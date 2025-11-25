@@ -42,7 +42,7 @@ public record AppConfig(Configuration configuration) implements AdapterConfig {
       compositeConfig.addConfiguration(propsConfig);
 
       return compositeConfig;
-    } catch (ConfigurationException | NullPointerException ex) {
+    } catch (ConfigurationException ex) {
       throw new RuntimeException("Failed to load configuration from " + configFile, ex);
     }
   }
