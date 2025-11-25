@@ -77,6 +77,3 @@ export const RELATIONSHIP_PALETTE_ITEMS = [
     icon: 'moveRight',
   },
 ]
-
-// Legacy export for backward compatibility (can be removed later)
-export const PALETTE_ITEMS = ELEMENT_PALETTE_ITEMS

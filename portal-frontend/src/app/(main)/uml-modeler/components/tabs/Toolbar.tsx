@@ -1,6 +1,6 @@
 'use client'
 
-import { FileDown, Save } from 'lucide-react'
+import { FileDown, FileUp, Save } from 'lucide-react'
 import { useCallback } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -35,6 +35,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onSave, onExport, hasUnsavedCh
           <span className="ml-1 text-xs">Save</span>
         </Button>
 
+        <Button variant="ghost" size="sm" onClick={handleExportData} className="h-8 px-2" title="Export diagram data">
+          <FileUp className="h-4 w-4" />
+          <span className="ml-1 text-xs">Imprt</span>
+        </Button>
         <Button variant="ghost" size="sm" onClick={handleExportData} className="h-8 px-2" title="Export diagram data">
           <FileDown className="h-4 w-4" />
           <span className="ml-1 text-xs">Export</span>
