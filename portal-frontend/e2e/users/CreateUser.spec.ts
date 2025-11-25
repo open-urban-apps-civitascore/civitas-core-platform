@@ -73,7 +73,7 @@ test.describe('Create User Flow', async () => {
     await page.getByTestId('activeSwitch').click()
 
     await page.getByTestId('confirmButton').click()
-     await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('networkidle')
 
     // verify redirect to new created user's details page
     await expect(page.getByTestId('userDetailsPage')).toBeVisible()

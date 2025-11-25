@@ -100,7 +100,7 @@ test.describe('Edit User Page', async () => {
     await page.getByTestId('activeSwitch').click()
 
     await page.getByTestId('confirmButton').click()
-     await page.waitForLoadState('networkidle')
+    await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('userDetailsPage')).toBeVisible()
     await expect(page.getByTestId('pageHeader')).toContainText(
