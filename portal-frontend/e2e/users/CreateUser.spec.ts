@@ -88,4 +88,9 @@ test.describe('Create User Flow', async () => {
     await expect(rows).toHaveCount(2)
     await expect(rows.filter({ hasText: MOCK_USER_1.displayName })).toBeVisible()
   })
+
+  test('cancel user creation navigates to users list', async ({ page }) => {
+    await page.getByTestId('cancelButton').click()
+    await expect(page.getByTestId('usersPage')).toBeVisible()
+  })
 })

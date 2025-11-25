@@ -89,9 +89,9 @@ test.describe('Edit User Page', async () => {
   })
 
   test('edits user details', async ({ page }) => {
-    // fill in form data
     await page.getByTestId('editButton').click()
 
+    // fill in form data
     await pickSelectOption(page, 'title', 1)
     await page.getByTestId('firstNameTextField').fill(`edited ${MOCK_USER_1.firstName}`)
     await page.getByTestId('lastNameTextField').fill(`edited ${MOCK_USER_1.lastName}`)
@@ -108,5 +108,11 @@ test.describe('Edit User Page', async () => {
 
     await expect(page.getByTestId('departmentSelectTrigger')).toContainText('Select department...')
     await expect(page.getByTestId('activeStatus')).toContainText('Inactive')
+  })
+
+  test('cancel user editing navigates to users list', async ({ page }) => {
+    await page.getByTestId('editButton').click()
+    await page.getByTestId('cancelButton').click()
+    await expect(page.getByTestId('usersPage')).toBeVisible()
   })
 })
