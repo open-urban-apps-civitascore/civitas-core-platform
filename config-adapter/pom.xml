@@ -26,15 +26,15 @@
 		<maven.compiler.target>21</maven.compiler.target>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-		<kafka.version>3.6.1</kafka.version>
-		<keycloak.version>23.0.3</keycloak.version>
+		<kafka.version>4.1.1</kafka.version>
+		<keycloak.version>26.0.7</keycloak.version>
 		<cloudevents.version>3.0.0</cloudevents.version>
 		<slf4j.version>2.0.9</slf4j.version>
 		<jackson.version>2.16.1</jackson.version>
 		<commons.configuration2.version>2.11.0</commons.configuration2.version>
 		<junit.version>5.10.1</junit.version>
 		<mockito.version>5.8.0</mockito.version>
-		<testcontainers.version>1.19.3</testcontainers.version>
+		<testcontainers.version>1.21.3</testcontainers.version>
 		<jacoco.version>0.8.11</jacoco.version>
 		<spotless.version>2.46.1</spotless.version>
 	</properties>
@@ -88,7 +88,7 @@
 			<dependency>
 				<groupId>commons-beanutils</groupId>
 				<artifactId>commons-beanutils</artifactId>
-				<version>1.9.4</version>
+				<version>1.11.0</version>
 			</dependency>
 
 			<!-- Logging -->
