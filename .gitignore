@@ -5,3 +5,5 @@ gl-dependency-scanning.json
 **/.settings
 **/.project
 **/.classpath
+
+/.idea/
