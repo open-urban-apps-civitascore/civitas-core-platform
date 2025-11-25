@@ -221,13 +221,9 @@ export const validateConnection = (diagram: UMLDiagram, connection: Connection):
   }
 
   // UML-specific validation rules
-  const sourceType = sourceNode.data.element.type
-  const targetType = targetNode.data.element.type
-
-  // For now, allow all connections (basic implementation)
-  // Future enhancement: Add relationship-specific validation
-  // Example: inheritance only class → class/abstractClass
-  // realization only class → interface
+  // const sourceType = sourceNode.data.element.type
+  // const targetType = targetNode.data.element.type
+  // TODO: relationship-specific validation like inheritance, realization, etc. ...
 
   return true
 }
