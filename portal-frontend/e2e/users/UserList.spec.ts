@@ -43,12 +43,12 @@ test.describe('User List', async () => {
   test('navigates to create user page', async ({ page }) => {
     const addUserButton = page.getByTestId('addUserButton')
     await addUserButton.click()
+    await page.waitForLoadState('networkidle')
     const createUserPage = page.getByTestId('createUserPage')
     await expect(createUserPage).toBeVisible()
   })
 
   test('navigates to user details page', async ({ page }) => {
-    await page.getByTestId('loadingSkeleton').waitFor({ state: 'hidden' })
     await page.getByTestId('searchArea').locator('input').fill(user.firstName)
 
     const userRow = page.getByRole('row').filter({ hasText: user.displayName })

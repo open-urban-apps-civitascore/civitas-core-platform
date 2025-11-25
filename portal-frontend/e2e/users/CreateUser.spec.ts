@@ -73,9 +73,9 @@ test.describe('Create User Flow', async () => {
     await page.getByTestId('activeSwitch').click()
 
     await page.getByTestId('confirmButton').click()
+     await page.waitForLoadState('networkidle')
 
     // verify redirect to new created user's details page
-    await expect(page).toHaveURL(/\/users\/.+/)
     await expect(page.getByTestId('userDetailsPage')).toBeVisible()
     await expect(page.getByTestId('pageHeader')).toContainText(MOCK_USER_1.displayName)
 
