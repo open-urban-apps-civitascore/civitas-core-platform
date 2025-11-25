@@ -10,7 +10,7 @@ interface TabContentProps {
   isActive: boolean
 }
 
-export const TabContent: React.FC<TabContentProps> = ({ session, isActive }) => {
+export const TabContent: React.FC<TabContentProps> = ({ isActive }) => {
   if (!isActive) {
     return null // Don't render inactive tabs to improve performance
   }
