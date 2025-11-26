@@ -18,6 +18,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.configuration.AppConfig;
+import com.civitas.configadapter.messaging.EventPublisher;
+import com.civitas.configadapter.model.Config;
+import com.civitas.configadapter.model.ConfigEvent;
+import com.civitas.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.Metadata;
+import com.civitas.configadapter.model.Payload;
+import com.civitas.configadapter.model.Topics;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-
 import org.apache.commons.configuration2.MapConfiguration;
 import org.awaitility.core.ThrowingRunnable;
 import org.junit.jupiter.api.AfterEach;
@@ -45,15 +52,6 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
-
-import com.civitas.configadapter.configuration.AppConfig;
-import com.civitas.configadapter.messaging.EventPublisher;
-import com.civitas.configadapter.model.Config;
-import com.civitas.configadapter.model.ConfigEvent;
-import com.civitas.configadapter.model.ConfigResultEvent;
-import com.civitas.configadapter.model.Metadata;
-import com.civitas.configadapter.model.Payload;
-import com.civitas.configadapter.model.Topics;
 
 /**
  * Integration test for KeycloakAdapter using Testcontainers. Tests actual Keycloak operations:
@@ -509,9 +507,12 @@ class KeycloakAdapterIntegrationTest {
             testClient.serverInfo().getInfo();
           }
         };
-    await().atMost(30, SECONDS).pollInterval(1, SECONDS).ignoreExceptions().untilAsserted(assertion);
+    await()
+        .atMost(30, SECONDS)
+        .pollInterval(1, SECONDS)
+        .ignoreExceptions()
+        .untilAsserted(assertion);
   }
-
 
   private ConfigEvent createConfigEvent(
       String targetResource, String targetComponent, String operation, Object value) {
