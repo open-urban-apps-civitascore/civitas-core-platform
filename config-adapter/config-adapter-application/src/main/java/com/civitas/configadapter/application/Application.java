@@ -15,14 +15,6 @@ import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static java.util.Objects.requireNonNull;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AdapterConfig;
@@ -30,6 +22,12 @@ import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.messaging.EventConsumer;
 import com.civitas.configadapter.messaging.EventPublisher;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Application {
 
@@ -183,7 +181,8 @@ public class Application {
 
   private EventConsumer createConsumer(
       ApplicationConfig config, String consumerName, ConfigAdapter adapter) {
-    Optional<EventConsumer> consumerOpt = getInstanceByFilter(EventConsumer.class, ec -> Objects.equals(consumerName, ec.getName()));
+    Optional<EventConsumer> consumerOpt =
+        getInstanceByFilter(EventConsumer.class, ec -> Objects.equals(consumerName, ec.getName()));
     if (consumerOpt.isPresent()) {
       EventConsumer consumer = consumerOpt.get();
       consumer.initialize(config, adapter);
@@ -194,7 +193,8 @@ public class Application {
 
   private EventPublisher createPublisher(
       ApplicationConfig config, String publisherName, ConfigAdapter adapter) {
-    Optional<EventPublisher> publisherOpt = getInstanceByFilter(
+    Optional<EventPublisher> publisherOpt =
+        getInstanceByFilter(
             EventPublisher.class, ep -> Objects.equals(publisherName, ep.getName()));
     if (publisherOpt.isPresent()) {
       EventPublisher ep = publisherOpt.get();
@@ -205,7 +205,8 @@ public class Application {
   }
 
   private ConfigAdapter createAdapter(AdapterConfig config, String adapterName) {
-    Optional<ConfigAdapter> configAdapterOpt = getInstanceByFilter(ConfigAdapter.class, ca -> Objects.equals(adapterName, ca.getName()));
+    Optional<ConfigAdapter> configAdapterOpt =
+        getInstanceByFilter(ConfigAdapter.class, ca -> Objects.equals(adapterName, ca.getName()));
     if (configAdapterOpt.isPresent()) {
       ConfigAdapter configAdapter = configAdapterOpt.get();
       if (configAdapter instanceof AbstractConfigAdapter aca) {
@@ -218,5 +219,4 @@ public class Application {
     }
     return null;
   }
-
 }
