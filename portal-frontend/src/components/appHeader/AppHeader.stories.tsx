@@ -18,11 +18,14 @@ const meta = {
   },
   args: {},
   decorators: [
-    Story => (
-      <SidebarProvider>
-        <Story />
-      </SidebarProvider>
-    ),
+    story => {
+      const Story = story
+      return (
+        <SidebarProvider>
+          <Story />
+        </SidebarProvider>
+      )
+    },
   ],
 } satisfies Meta<typeof AppHeader>
 

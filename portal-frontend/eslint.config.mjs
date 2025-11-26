@@ -33,6 +33,7 @@ const eslintConfig = [
       'coverage',
       'playwright/.auth/**',
       'playwright-report',
+      'storybook-static',
     ],
   },
   ...compat.config({

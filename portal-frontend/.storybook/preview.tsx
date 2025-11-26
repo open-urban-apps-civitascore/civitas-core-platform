@@ -1,12 +1,13 @@
 import '../src/app/globals.css'
 
-import type { Preview } from '@storybook/nextjs-vite'
+import type { Decorator, Preview } from '@storybook/nextjs-vite'
 import { NextIntlClientProvider } from 'next-intl'
 
 import defaultMessages from '../src/messages/en.json'
 
-export const decorators = [
-  Story => {
+export const decorators: Decorator[] = [
+  story => {
+    const Story = story
     return (
       <NextIntlClientProvider locale="en" messages={defaultMessages}>
         <Story />
