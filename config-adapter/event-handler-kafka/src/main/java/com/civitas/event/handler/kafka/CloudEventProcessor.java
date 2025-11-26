@@ -33,7 +33,7 @@ public class CloudEventProcessor {
     this.objectMapper = new ObjectMapper();
   }
 
-  public void handleEvent(String topic, CloudEvent cloudEvent) {
+  public void handleEvent(String topic, CloudEvent cloudEvent) throws Exception {
     try {
       logger.info(
           "Received CloudEvent - ID: {}, Type: {}, Source: {}",
@@ -54,6 +54,7 @@ public class CloudEventProcessor {
 
     } catch (Exception e) {
       logger.error("Error processing CloudEvent: {}", cloudEvent.getId(), e);
+      throw e;
     }
   }
 }

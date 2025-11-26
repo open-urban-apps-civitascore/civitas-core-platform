@@ -10,6 +10,7 @@
  */
 package com.civitas.event.handler.kafka;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -30,7 +31,7 @@ import org.junit.jupiter.api.Test;
 class CloudEventProcessorTest {
 
   @Test
-  void handleEventShouldProcessValidCloudEvent() {
+  void handleEventShouldProcessValidCloudEvent() throws Exception {
     ConfigAdapter mockAdapter = mock(ConfigAdapter.class);
     CloudEventProcessor processor = new CloudEventProcessor(mockAdapter);
 
@@ -70,7 +71,7 @@ class CloudEventProcessorTest {
   }
 
   @Test
-  void handleEventShouldSkipCloudEventWithNullData() {
+  void handleEventShouldSkipCloudEventWithNullData() throws Exception {
     ConfigAdapter mockAdapter = mock(ConfigAdapter.class);
     CloudEventProcessor processor = new CloudEventProcessor(mockAdapter);
 
@@ -87,7 +88,7 @@ class CloudEventProcessorTest {
   }
 
   @Test
-  void handleEventShouldHandleInvalidJson() {
+  void handleEventShouldThrowExceptionForInvalidJson() {
     ConfigAdapter mockAdapter = mock(ConfigAdapter.class);
     CloudEventProcessor processor = new CloudEventProcessor(mockAdapter);
 
@@ -101,13 +102,13 @@ class CloudEventProcessorTest {
             .withData("application/json", invalidJson.getBytes())
             .build();
 
-    processor.handleEvent("test.topic", cloudEvent);
+    assertThrows(Exception.class, () -> processor.handleEvent("test.topic", cloudEvent));
 
     verify(mockAdapter, never()).processConfigEvent(anyString(), any(ConfigEvent.class));
   }
 
   @Test
-  void handleEventShouldHandleEmptyData() {
+  void handleEventShouldThrowExceptionForEmptyData() {
     ConfigAdapter mockAdapter = mock(ConfigAdapter.class);
     CloudEventProcessor processor = new CloudEventProcessor(mockAdapter);
 
@@ -119,13 +120,13 @@ class CloudEventProcessorTest {
             .withData("application/json", "".getBytes())
             .build();
 
-    processor.handleEvent("test.topic", cloudEvent);
+    assertThrows(Exception.class, () -> processor.handleEvent("test.topic", cloudEvent));
 
     verify(mockAdapter, never()).processConfigEvent(anyString(), any(ConfigEvent.class));
   }
 
   @Test
-  void handleEventShouldHandleDataDeserializationException() {
+  void handleEventShouldThrowExceptionForDataDeserializationError() {
     ConfigAdapter mockAdapter = mock(ConfigAdapter.class);
     CloudEventProcessor processor = new CloudEventProcessor(mockAdapter);
 
@@ -138,13 +139,13 @@ class CloudEventProcessorTest {
     when(mockCloudEvent.getSource()).thenReturn(URI.create("/test"));
     when(mockCloudEvent.getData()).thenReturn(mockData);
 
-    processor.handleEvent("test.topic", mockCloudEvent);
+    assertThrows(Exception.class, () -> processor.handleEvent("test.topic", mockCloudEvent));
 
     verify(mockAdapter, never()).processConfigEvent(anyString(), any(ConfigEvent.class));
   }
 
   @Test
-  void handleEventShouldHandleProcessingException() {
+  void handleEventShouldThrowExceptionForProcessingError() {
     ConfigAdapter mockAdapter = mock(ConfigAdapter.class);
     CloudEventProcessor processor = new CloudEventProcessor(mockAdapter);
 
@@ -182,7 +183,7 @@ class CloudEventProcessorTest {
         .when(mockAdapter)
         .processConfigEvent(anyString(), any(ConfigEvent.class));
 
-    processor.handleEvent("test.topic", cloudEvent);
+    assertThrows(Exception.class, () -> processor.handleEvent("test.topic", cloudEvent));
 
     verify(mockAdapter).processConfigEvent(eq("test.topic"), any(ConfigEvent.class));
   }
