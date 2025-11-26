@@ -259,13 +259,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
           objectMapper.convertValue(configValue, ClientRepresentation.class);
 
       RealmResource realmResource = keycloakClient.realm(realm);
-      Response response = realmResource.clients().create(clientRep);
 
-      if (response.getStatus() != 201) {
-        throw new Exception("Client creation failed: " + response.getStatus());
+      try (Response response = realmResource.clients().create(clientRep)) {
+        validateResponse("Client creation", 201, response);
       }
-
-      response.close();
 
       logger.info("Created client: {} in realm: {}", clientRep.getClientId(), realm);
       publishSuccessResult(event, "Client created successfully", clientRep.getClientId());
@@ -349,14 +346,12 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       userRep.setClientRoles(null);
 
       RealmResource realmResource = keycloakClient.realm(realm);
-      Response response = realmResource.users().create(userRep);
 
-      if (response.getStatus() != 201) {
-        throw new Exception("User creation failed: " + response.getStatus());
+      String userId;
+      try (Response response = realmResource.users().create(userRep)) {
+        validateResponse("User creation", 201, response);
+        userId = CreatedResponseUtil.getCreatedId(response);
       }
-
-      String userId = CreatedResponseUtil.getCreatedId(response);
-      response.close();
 
       AssignRealmRolesToUser(rolesToAssignNames, realmResource, userId);
       AssignClientRolesToUser(clientRolesMap, realmResource, userId);
@@ -516,6 +511,15 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     } catch (Exception e) {
       logger.error("Failed to delete role: {} from realm: {}", roleId, realm, e);
       publishErrorResult(event, "ROLE_DELETE_FAILED", e.getMessage());
+    }
+  }
+
+  private void validateResponse(String operationDescription, int expectedStatus, Response response)
+      throws Exception {
+    if (response.getStatus() != expectedStatus) {
+      String errorBody = response.readEntity(String.class);
+      throw new Exception(
+          operationDescription + " failed with status " + response.getStatus() + ": " + errorBody);
     }
   }
 
