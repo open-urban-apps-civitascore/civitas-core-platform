@@ -16,7 +16,7 @@ export const PageHeader = (props: PageHeaderProps) => {
   const { title, className, style, tabs, subTabs, badgeTitle } = props
   return (
     <div
-      id="heading"
+      id="pageHeader"
       className={cn(
         'flex flex-col gap-[var(--layout-padding)] h-[var(--title-height)] py-[var(--layout-padding)] border-b-1',
         className,
@@ -24,10 +24,16 @@ export const PageHeader = (props: PageHeaderProps) => {
       style={style}
     >
       {tabs && (
-        <TabsSection tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} isHeading={!title} />
+        <TabsSection
+          testId="primaryTabs"
+          tabs={tabs.tabs}
+          onClick={tabs.onClick}
+          selectedTab={tabs.selectedTab}
+          isHeading={!title}
+        />
       )}
       <div
-        id="heading"
+        id="pageHeaderTitle"
         className={`flex-1 flex ${title ? 'justify-between' : 'justify-end'} items-center px-[var(--layout-padding)]`}
       >
         {title && (
@@ -41,6 +47,7 @@ export const PageHeader = (props: PageHeaderProps) => {
       </div>
       {subTabs && (
         <TabsSection
+          testId="subTabs"
           tabs={subTabs.tabs}
           selectedTab={subTabs.selectedTab}
           onClick={subTabs.onClick}
