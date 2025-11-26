@@ -25,7 +25,8 @@
   },
   "languages": {
     "german": "German",
-    "english": "English"
+    "english": "English",
+    "selectLanguagePlaceholder": "Select language"
   },
   "sidebar": {
     "home": "Home",
@@ -139,6 +140,15 @@
         "group": "Group",
         "assignment": "Assignment"
       }
+    },
+    "groupsTab": {
+      "title": "Group Membership",
+      "addGroup": "Add Group",
+      "name": "Name",
+      "memberSince": "Member since",
+      "contact": "Contact",
+      "description": "Description",
+      "roles": "Roles"
     }
   },
   "groups": {
@@ -226,7 +236,8 @@
   },
   "roles": {
     "title": "Roles",
-    "newRole": "New Role",
+    "newRole": "Create Role",
+    "overView": "Overview:",
     "systemRoles": "System Roles",
     "dataRoles": "Data Roles",
     "governanceRoles": "Governance Roles",
@@ -235,25 +246,58 @@
     "tableHeaders": {
       "name": "Name",
       "description": "Description",
-      "permissions": "Permissions",
       "user": "User",
-      "createdAt": "created"
+      "groups": "Groups",
+      "lastUpdated": "Last Updated",
+      "updatedBy": "Updated By",
+      "roleOrigin": "Type"
     },
-    "form": {
-      "title": { "createRole": "Create Role" },
-      "inputs": {
-        "name": "Name of the Role",
-        "description": "Role Description"
-      },
-      "formErrors": {
-        "name": {
-          "minLength": "Name must be at least 2 characters.",
-          "maxLength": "Name must be at most 30 characters."
+    "defaultRole": "Default",
+    "customRole": "Custom",
+    "tabLabels": {
+      "basicInformation": "Basic Information",
+      "permissions": "Permissions",
+      "groupAssignment": "Group Assignments"
+    },
+    "baseInfoTab": {
+      "heading": "Basic Information",
+      "form": {
+        "inputs": {
+          "name": "Name of the Role",
+          "description": "Role Description",
+          "roleOrigin": "Type"
         },
-        "description": {
-          "maxLength": "Description must be at most 100 characters."
+        "placeholders": {
+          "name": "Name of the Role",
+          "description": "Role Description"
+        },
+        "formErrors": {
+          "name": {
+            "minLength": "Name must be at least 2 characters.",
+            "maxLength": "Name must be at most 30 characters."
+          },
+          "description": {
+            "maxLength": "Description must be at most 100 characters."
+          }
         }
+      },
+      "securityArea": {
+        "heading": "Sicherheitsbereich",
+        "description": "Rolle löschen",
+        "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
+        "deleteButton": "Rolle löschen"
       }
+    },
+    "permissionsTab": {
+      "heading": "Permissions",
+      "searchPermissions": "Search permission...",
+      "selectedPersmissions": "{count} selected",
+      "roleTemplate": {
+        "placeholder": "Select Role as template"
+      }
+    },
+    "groupAssignmentTab": {
+      "heading": "Group Assignments"
     }
   }
 }

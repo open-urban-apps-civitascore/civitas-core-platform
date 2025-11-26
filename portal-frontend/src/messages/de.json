@@ -25,7 +25,8 @@
   },
   "languages": {
     "german": "Deutsch",
-    "english": "Englisch"
+    "english": "Englisch",
+    "selectLanguagePlaceholder": "Sprache wählen"
   },
   "sidebar": {
     "home": "Home",
@@ -38,7 +39,7 @@
     "ourData": "Unsere Daten",
     "datasets": "Unsere Daten",
     "permissions": "Berechtigungen",
-    "roles": "Rollen Management",
+    "roles": "Rollen",
     "create": "erstellen",
     "edit": "bearbeiten",
     "users": "User Management",
@@ -138,6 +139,15 @@
         "assignment": "Zuordnung",
         "noRolesAssigned": "Keine {roleType} zugewiesen"
       }
+    },
+    "groupsTab": {
+      "title": "Gruppenmitgliedschaft",
+      "addGroup": "Gruppe hinzufügen",
+      "name": "Name",
+      "memberSince": "Mitglied seit",
+      "contact": "Ansprechpartner",
+      "description": "Beschreibung",
+      "roles": "Rollen"
     }
   },
   "groups": {
@@ -225,8 +235,9 @@
   },
   "roles": {
     "title": "Rollen",
-    "newRole": "Neue Rolle",
-    "systemRoles": "Systemrollen",
+    "newRole": "Rolle erstellen",
+    "overView": "Übersicht:",
+    "systemRoles": " Systemrollen",
     "dataRoles": "Datenrollen",
     "governanceRoles": "Governancerollen",
     "roles": "Einzelrollen",
@@ -234,25 +245,59 @@
     "tableHeaders": {
       "name": "Name",
       "description": "Beschreibung",
-      "permissions": "Berechtigungen",
       "user": "User",
-      "createdAt": "erstellt"
+      "groups": "Gruppen",
+      "lastUpdated": "letztes Update",
+      "updatedBy": "Geändert von",
+      "roleOrigin": "Typ"
     },
-    "form": {
-      "title": { "createRole": "Rolle erstellen" },
-      "inputs": {
-        "name": "Name der Rolle",
-        "description": "Beschreibung der Rolle"
-      },
-      "formErrors": {
-        "name": {
-          "minLength": "Name muss mindestens 2 Zeichen lang sein.",
-          "maxLength": "Name darf höchstens 30 Zeichen lang sein."
+    "defaultRole": "Standard",
+    "customRole": "Eigene",
+    "searchRoles": "Rollen durchsuchen",
+    "tabLabels": {
+      "basicInformation": "Informationen",
+      "permissions": "Berechtigungen",
+      "groupAssignment": "Mitgliedschaft"
+    },
+    "baseInfoTab": {
+      "heading": "Basisinformationen",
+      "form": {
+        "inputs": {
+          "name": "Name der Rolle",
+          "description": "Beschreibung der Rolle",
+          "roleOrigin": "Typ"
         },
-        "description": {
-          "maxLength": "Beschreibung darf höchstens 100 Zeichen lang sein."
+        "placeholders": {
+          "name": "Name der Rolle",
+          "description": "Beschreibung der Rolle"
+        },
+        "formErrors": {
+          "name": {
+            "minLength": "Name muss mindestens 2 Zeichen lang sein.",
+            "maxLength": "Name darf höchstens 30 Zeichen lang sein."
+          },
+          "description": {
+            "maxLength": "Beschreibung darf höchstens 100 Zeichen lang sein."
+          }
         }
+      },
+      "securityArea": {
+        "heading": "Sicherheitsbereich",
+        "description": "Rolle löschen",
+        "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
+        "deleteButton": "Rolle löschen"
       }
+    },
+    "permissionsTab": {
+      "heading": "Berechtigungen",
+      "searchPermissions": "Berechtigung suchen...",
+      "selectedPersmissions": "{count} ausgewählt",
+      "roleTemplate": {
+        "placeholder": "Rolle als Vorlage auswählen"
+      }
+    },
+    "groupAssignmentTab": {
+      "heading": "Mitgliedschaften"
     }
   }
 }

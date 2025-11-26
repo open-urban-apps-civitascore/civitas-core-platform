@@ -7,7 +7,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import de.civitascore.portal.model.output.PrincipalUserOutput;
+import de.civitascore.portal.model.output.assembler.UserAssembler;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
+import de.civitascore.portal.service.UserService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(
@@ -28,6 +31,9 @@ import org.springframework.test.web.servlet.MockMvc;
 class UserControllerTest {
 
   @Autowired private MockMvc mockMvc;
+
+  @MockitoBean private UserService userService;
+  @MockitoBean private UserAssembler userAssembler;
 
   @Test
   @DisplayName("Authenticated user should get current user profile with roles")

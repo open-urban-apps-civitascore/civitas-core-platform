@@ -24,7 +24,6 @@ export const DEFAULT_TAB = ROLE_TYPES.SYSTEM
 const RolesPage = () => {
   const t = useTranslations('roles')
   const router = useRouter()
-
   const [listRoles, setListRoles] = useState<RoleResponse[] | []>([])
   const [isLoading, setIsLoading] = useState(true)
   const [rowCount, setRowCount] = useState(0)
@@ -60,7 +59,6 @@ const RolesPage = () => {
   }, [totalPages, pageIndex, pageSize])
 
   const [selectedRoleType, setSelectedRoleType] = useState<string>(tabValue || DEFAULT_TAB)
-  const [selectedSubTab, setSelectedSubTab] = useState<string>(tabValue || 'roles')
 
   const getRoles = useCallback(async () => {
     const params = getApiRequestParamsByUrl()
@@ -95,9 +93,9 @@ const RolesPage = () => {
   }
 
   return (
-    <PageContainer headerType="withBothTabsRows">
+    <PageContainer headerType="withPrimaryTabs">
       <PageHeader
-        title={tabs.find(tab => tab.value === selectedRoleType)?.label}
+        title={`${t('overView')} ${tabs.find(tab => tab.value === selectedRoleType)?.label}`}
         tabs={{
           tabs,
           onClick: type => {
@@ -105,14 +103,6 @@ const RolesPage = () => {
             setTabValueParam(type)
           },
           selectedTab: selectedRoleType,
-        }}
-        subTabs={{
-          tabs: [
-            { value: 'roles', label: t('roles') },
-            { value: 'roleSets', label: t('roleSets') },
-          ],
-          selectedTab: selectedSubTab,
-          onClick: newTab => setSelectedSubTab(newTab),
         }}
       />
       <PageBackground>

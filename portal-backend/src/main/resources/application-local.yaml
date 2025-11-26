@@ -8,11 +8,6 @@ app:
   url: http://localhost:8089
 
 spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/portal_backend
-    username: admin
-    password: admin
-
   jpa:
     hibernate:
       ddl-auto: validate
@@ -20,5 +15,5 @@ spring:
       hibernate.format_sql: true
 
 keycloak:
-  realm: "civitas-core"
+  realm: "iot"
   auth-server-url: http://localhost:8080

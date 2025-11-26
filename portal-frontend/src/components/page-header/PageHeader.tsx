@@ -3,18 +3,19 @@ import { HTMLAttributes } from 'react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
+import { Badge } from '../ui/badge'
 import { TabSectionProps, TabsSection } from './components/TabsSections'
 
 export type PageHeaderProps = Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & {
   title?: string
   tabs?: TabSectionProps
   subTabs?: TabSectionProps
+  badgeTitle?: string
 }
 
 export const PageHeader = (props: PageHeaderProps) => {
-  const { title, className, style, tabs, subTabs } = props
+  const { title, className, style, tabs, subTabs, badgeTitle } = props
   const isMobile = useIsMobile()
-
   return (
     <div
       id="heading"
@@ -32,6 +33,7 @@ export const PageHeader = (props: PageHeaderProps) => {
         className={`flex-1 flex w-full min-w-0 ${title ? 'justify-between' : 'justify-end'} items-center px-[var(--layout-padding)]`}
       >
         {title && (
+          <div className="flex flex-row items-center gap-4">
           <h1
             id="page-heading"
             className={cn(
@@ -41,6 +43,8 @@ export const PageHeader = (props: PageHeaderProps) => {
           >
             {title}
           </h1>
+            {badgeTitle && <Badge variant="outline">{badgeTitle}</Badge>}
+          </div>
         )}
       </div>
       {subTabs && (

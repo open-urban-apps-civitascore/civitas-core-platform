@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useLocale, useTranslations } from 'next-intl'
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { BasicSelect } from '@/components/basicSelect/BasicSelect'
 import { LOCALES } from '@/i18n/locales'
 
 export const LanguageSelect = () => {
@@ -15,18 +15,18 @@ export const LanguageSelect = () => {
     router.refresh() // Reload with new locale
   }
 
+  const options = LOCALES.map(language => ({
+    value: language.key,
+    label: tLang(language.name),
+  }))
+
   return (
-    <Select onValueChange={handleLanguageChange} defaultValue={initialLocale}>
-      <SelectTrigger className="w-[140px]">
-        <SelectValue placeholder="Select Language" />
-      </SelectTrigger>
-      <SelectContent>
-        {LOCALES.map(language => (
-          <SelectItem key={language.key} value={language.key}>
-            {tLang(language.name)}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <BasicSelect
+      onValueChange={handleLanguageChange}
+      options={options}
+      placeholder={tLang('selectLanguagePlaceholder')}
+      triggerClassName="w-[140px]"
+      defaultValue={initialLocale}
+    />
   )
 }
