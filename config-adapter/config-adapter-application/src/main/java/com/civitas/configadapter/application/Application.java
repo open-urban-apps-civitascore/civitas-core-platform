@@ -29,6 +29,39 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Main application runner for the Civitas Config Adapter framework.
+ *
+ * <p>This class orchestrates the startup and lifecycle of config adapters and their associated
+ * event consumers/publishers. It uses {@link java.util.ServiceLoader} to discover and instantiate
+ * components by name.
+ *
+ * <h2>Configuration Modes</h2>
+ *
+ * <p>The application supports two configuration modes:
+ *
+ * <ul>
+ *   <li><b>Combined handler</b>: Use {@code eventhandler.name} to specify a single component that
+ *       handles both consuming and publishing (e.g., KafkaEventHandler)
+ *   <li><b>Separate consumer/publisher</b>: Use {@code eventconsumer.name} and optionally {@code
+ *       eventpublisher.name} to configure independent components
+ * </ul>
+ *
+ * <h2>Component Discovery</h2>
+ *
+ * <p>Components are discovered via ServiceLoader and matched by name:
+ *
+ * <ul>
+ *   <li>Adapters: Registered under {@link ConfigAdapter}, matched by {@code adapters} config
+ *   <li>Consumers: Registered under {@link EventConsumer}, matched by {@code eventconsumer.name}
+ *   <li>Publishers: Registered under {@link EventPublisher}, matched by {@code eventpublisher.name}
+ * </ul>
+ *
+ * @see ApplicationConfig
+ * @see ConfigAdapter
+ * @see EventConsumer
+ * @see EventPublisher
+ */
 public class Application {
 
   private static final Logger logger = LoggerFactory.getLogger(Application.class);
@@ -45,15 +78,35 @@ public class Application {
   private final AppConfig appConfig;
   private final List<EventConsumer> consumers;
 
+  /**
+   * Creates a new Application instance with the specified configuration file.
+   *
+   * @param configFileName the name of the properties file to load from the classpath, must not be
+   *     null
+   * @throws NullPointerException if configFileName is null
+   * @throws RuntimeException if configuration is invalid or required components cannot be created
+   */
   public Application(String configFileName) {
     appConfig = new AppConfig(requireNonNull(configFileName));
     consumers = createConsumers(appConfig);
   }
 
+  /**
+   * Creates a new Application instance using the default configuration file
+   * "application.properties".
+   *
+   * @throws RuntimeException if configuration is invalid or required components cannot be created
+   */
   public Application() {
     this("application.properties");
   }
 
+  /**
+   * Runs the application, starting all consumers and the health check server.
+   *
+   * <p>This method blocks until the application is interrupted (e.g., via Ctrl+C). On shutdown, it
+   * gracefully closes all consumers and releases resources.
+   */
   protected void run() {
 
     try (HealthCheckServer healthCheckServer =
@@ -146,21 +199,25 @@ public class Application {
             topics.size(),
             topics);
 
-        EventConsumer consumer;
-        consumer = createConsumer(config, eventConsumerName, adapter);
-        // Separate consumer and publisher
+        // Create optional publisher first if configured
         EventPublisher publisher = null;
         if (nonNull(eventPublisherName)) {
           publisher = createPublisher(config, eventPublisherName, adapter);
-          adapter.setEventPublisher(publisher);
+          if (nonNull(publisher)) {
+            adapter.setEventPublisher(publisher);
+          } else {
+            logger.warn(
+                "Event publisher '{}' not found via ServiceLoader, continuing without publisher",
+                eventPublisherName);
+          }
         }
 
-        // Inject publisher into adapter
-        if (publisher != null) {
-          adapter.setEventPublisher(publisher);
+        // Create mandatory consumer
+        EventConsumer consumer = createConsumer(config, eventConsumerName, adapter);
+        if (isNull(consumer)) {
+          throw new RuntimeException(
+              "Event consumer '" + eventConsumerName + "' not found via ServiceLoader");
         }
-
-        consumer = createConsumer(config, eventConsumerName, adapter);
 
         consumers.add(consumer);
 
