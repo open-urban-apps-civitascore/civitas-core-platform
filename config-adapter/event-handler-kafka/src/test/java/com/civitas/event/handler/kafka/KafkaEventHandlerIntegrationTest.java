@@ -119,9 +119,6 @@ class KafkaEventHandlerIntegrationTest {
     handler = new KafkaEventHandler(config, testAdapter);
     handler.start();
 
-    // Wait a bit for handler to be ready
-    Thread.sleep(1000);
-
     // Create and send test event
     ConfigEvent configEvent = createTestConfigEvent("test-user-123");
     CloudEvent cloudEvent = createCloudEvent(configEvent);
@@ -170,7 +167,6 @@ class KafkaEventHandlerIntegrationTest {
     // Create handler
     handler = new KafkaEventHandler(config, testAdapter);
     handler.start();
-    Thread.sleep(1000);
 
     // Create test event with result topic
     ConfigEvent configEvent = createTestConfigEvent("test-user-456");
@@ -197,7 +193,6 @@ class KafkaEventHandlerIntegrationTest {
 
     handler = new KafkaEventHandler(config, testAdapter);
     handler.start();
-    Thread.sleep(1000);
 
     // When - send events to different topics
     for (String topic : List.of("user.created", "user.updated", "user.deleted")) {
@@ -221,7 +216,6 @@ class KafkaEventHandlerIntegrationTest {
     testAdapter.setProcessCallback((t, event) -> latch.countDown());
     handler = new KafkaEventHandler(config, testAdapter);
     handler.start();
-    Thread.sleep(1000);
 
     // Create CloudEvent with no data
     CloudEvent cloudEvent =

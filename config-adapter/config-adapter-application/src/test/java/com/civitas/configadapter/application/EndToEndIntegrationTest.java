@@ -10,22 +10,11 @@
  */
 package com.civitas.configadapter.application;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.civitas.configadapter.configuration.AppConfig;
-import com.civitas.configadapter.keycloak.KeycloakAdapter;
-import com.civitas.configadapter.model.Config;
-import com.civitas.configadapter.model.ConfigEvent;
-import com.civitas.configadapter.model.Metadata;
-import com.civitas.configadapter.model.Payload;
-import com.civitas.configadapter.model.Topics;
-import com.civitas.event.handler.kafka.KafkaEventHandler;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.cloudevents.CloudEvent;
-import io.cloudevents.core.builder.CloudEventBuilder;
-import io.cloudevents.kafka.CloudEventDeserializer;
-import io.cloudevents.kafka.CloudEventSerializer;
 import java.net.URI;
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -35,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -45,6 +35,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.awaitility.core.ThrowingRunnable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
@@ -59,6 +50,21 @@ import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+
+import com.civitas.configadapter.configuration.AppConfig;
+import com.civitas.configadapter.keycloak.KeycloakAdapter;
+import com.civitas.configadapter.model.Config;
+import com.civitas.configadapter.model.ConfigEvent;
+import com.civitas.configadapter.model.Metadata;
+import com.civitas.configadapter.model.Payload;
+import com.civitas.configadapter.model.Topics;
+import com.civitas.event.handler.kafka.KafkaEventHandler;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.cloudevents.CloudEvent;
+import io.cloudevents.core.builder.CloudEventBuilder;
+import io.cloudevents.kafka.CloudEventDeserializer;
+import io.cloudevents.kafka.CloudEventSerializer;
 
 /**
  * End-to-end integration test that tests the complete flow: Kafka Producer -> Kafka ->
@@ -161,9 +167,6 @@ class EndToEndIntegrationTest {
 
     // Create Keycloak client for verification
     keycloakClient = Keycloak.getInstance(keycloakUrl, "master", "admin", "admin", "admin-cli");
-
-    // Give consumer time to start and topics to be created
-    Thread.sleep(3000);
   }
 
   @AfterEach
@@ -377,20 +380,15 @@ class EndToEndIntegrationTest {
 
   // Helper methods
 
-  private void waitForKeycloakReady(String keycloakUrl) throws InterruptedException {
-    int maxAttempts = 30;
-    for (int i = 0; i < maxAttempts; i++) {
-      try {
-        Keycloak testClient =
-            Keycloak.getInstance(keycloakUrl, "master", "admin", "admin", "admin-cli");
-        testClient.serverInfo().getInfo();
-        testClient.close();
-        return;
-      } catch (Exception e) {
-        Thread.sleep(1000);
-      }
-    }
-    throw new RuntimeException("Keycloak did not start in time");
+  private void waitForKeycloakReady(String keycloakUrl) {
+    ThrowingRunnable assertion =
+        () -> {
+          try (Keycloak testClient =
+              Keycloak.getInstance(keycloakUrl, "master", "admin", "admin", "admin-cli")) {
+            testClient.serverInfo().getInfo();
+          }
+        };
+    await().atMost(30, SECONDS).pollInterval(1, SECONDS).ignoreExceptions().untilAsserted(assertion);
   }
 
   private ConfigEvent createConfigEvent(

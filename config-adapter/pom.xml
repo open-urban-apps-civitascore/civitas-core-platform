@@ -35,6 +35,7 @@
 		<junit.version>5.10.1</junit.version>
 		<mockito.version>5.8.0</mockito.version>
 		<testcontainers.version>1.21.3</testcontainers.version>
+		<awaitility.version>4.2.2</awaitility.version>
 		<jacoco.version>0.8.11</jacoco.version>
 		<spotless.version>2.46.1</spotless.version>
 		<commons.beanutils.version>1.11.0</commons.beanutils.version>
@@ -157,6 +158,12 @@
 				<groupId>org.testcontainers</groupId>
 				<artifactId>junit-jupiter</artifactId>
 				<version>${testcontainers.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.awaitility</groupId>
+				<artifactId>awaitility</artifactId>
+				<version>${awaitility.version}</version>
 				<scope>test</scope>
 			</dependency>
 		</dependencies>
