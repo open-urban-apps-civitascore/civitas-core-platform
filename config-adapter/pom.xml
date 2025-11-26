@@ -37,6 +37,10 @@
 		<testcontainers.version>1.21.3</testcontainers.version>
 		<jacoco.version>0.8.11</jacoco.version>
 		<spotless.version>2.46.1</spotless.version>
+		<commons.beanutils.version>1.11.0</commons.beanutils.version>
+		<commons.io.version>2.21.0</commons.io.version>
+		<commons.lang.version>3.20.0</commons.lang.version>
+		<commons.compress.version>1.28.0</commons.compress.version>
 	</properties>
 
 	<dependencyManagement>
@@ -79,7 +83,7 @@
 				<version>${jackson.version}</version>
 			</dependency>
 
-			<!-- Apache Commons Configuration2 -->
+			<!-- Apache Commons -->
 			<dependency>
 				<groupId>org.apache.commons</groupId>
 				<artifactId>commons-configuration2</artifactId>
@@ -88,7 +92,22 @@
 			<dependency>
 				<groupId>commons-beanutils</groupId>
 				<artifactId>commons-beanutils</artifactId>
-				<version>1.11.0</version>
+				<version>${commons.beanutils.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>commons-io</groupId>
+				<artifactId>commons-io</artifactId>
+				<version>${commons.io.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.commons</groupId>
+				<artifactId>commons-lang3</artifactId>
+				<version>${commons.lang.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.apache.commons</groupId>
+				<artifactId>commons-compress</artifactId>
+				<version>${commons.compress.version}</version>
 			</dependency>
 
 			<!-- Logging -->
