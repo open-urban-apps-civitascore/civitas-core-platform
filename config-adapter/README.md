@@ -19,7 +19,7 @@ The project follows the Dependency Inversion Principle with interface-based conf
            │
 ┌──────────▼─────────────────────────────┐
 │       config-adapter-configuration     │  Configuration implementation
-│   - AppConfig (impl ApplicationConfig) │  - Apache Commons Configuration2
+│  - AppConfig (impl ApplicationConfig)  │  - Apache Commons Configuration2
 └──────────┬─────────────────────────────┘  - Environment variable support
            │
            │ (compile dependency only in application & tests)
@@ -90,8 +90,6 @@ Kafka-specific message consumer / publisher implementation.
 
 **Key Components:**
 - `KafkaEventHandler` - Consumes CloudEvents from Kafka and implements EventPublisher
-- `KafkaEventConsumer` - Kafka consumer that polls for CloudEvents and processes them
-- `KafkaEventPublisher` - Kafka producer for publishing ConfigResultEvents
 - `CloudEventProcessor` - Internal helper that deserializes CloudEvents and delegates to ConfigAdapter. Throws exceptions on processing failures to allow caller-defined error handling.
 
 **Usage:** Use this module to consume events from Apache Kafka and publish results.
@@ -816,9 +814,7 @@ civitas-config-adapter/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/event/handler/kafka/
 │       ├── CloudEventProcessor.java           # CloudEvent deserializer
-│       ├── KafkaEventConsumer.java
-│       ├── KafkaEventHandler.java
-│       └── KafkaEventPublisher.java
+│       └── KafkaEventHandler.java
 ├── config-adapter-application/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/configadapter/application/
@@ -879,4 +875,4 @@ Both adapters can run simultaneously, each with their own Kafka handler subscrib
 
 ## License
 
-MIT
+European Union Public License License (EU-PL) 1.2
