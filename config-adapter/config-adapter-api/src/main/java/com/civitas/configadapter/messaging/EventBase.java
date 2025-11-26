@@ -15,16 +15,24 @@ import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.ApplicationConfig;
 
 /**
- * Interface for event base components that process messages from message brokers (Kafka, RabbitMQ,
- * etc.) and delegate to ConfigAdapter implementations.
+ * Base interface for event-handling components ({@link EventConsumer} and {@link EventPublisher})
+ * that interact with message brokers (Kafka, RabbitMQ, etc.) and work with ConfigAdapter
+ * implementations.
+ *
+ * <p>This interface provides the common initialization contract for event components that need
+ * access to application configuration and a ConfigAdapter instance.
  */
 public interface EventBase extends ConfigBase {
 
   /**
-   * Initializes the event consumer.
+   * Initializes this event component with configuration and adapter.
    *
-   * @param config the {@link ApplicationConfig} must not be <code>null</code>
-   * @param adapter the {@link ConfigAdapter} must not be <code>null</code>
+   * <p>This method must be called before the component can be used. Implementations should use the
+   * provided configuration to set up connections to message brokers and associate with the given
+   * adapter.
+   *
+   * @param config the application configuration providing connection settings, must not be null
+   * @param adapter the ConfigAdapter this component will work with, must not be null
    */
   void initialize(ApplicationConfig config, ConfigAdapter adapter);
 }

@@ -97,7 +97,7 @@ Kafka-specific message consumer / publisher implementation.
 **Usage:** Use this module to consume events from Apache Kafka and publish results.
 
 ### 4. config-adapter-application
-Generic application runner that uses reflection to load adapters and consumers.
+Generic application runner that uses ServiceLoader to discover and load adapters and consumers by name.
 
 **Key Components:**
 - `Application` - Main entry point that reads configuration and wires components
@@ -156,10 +156,10 @@ The framework supports configuring multiple adapters to run independently. Each 
 
 ### Configuration Options
 
-**Multiple Adapters (comma-separated)**
+**Multiple Adapters (comma-separated short names)**
 ```properties
-adapters=com.civitas.configadapter.keycloak.KeycloakAdapter,com.civitas.configadapter.examples.DummyLogAdapter
-eventhandler.class=com.civitas.event.handler.kafka.KafkaEventHandler
+adapters=keycloak,dummylog
+eventhandler.name=kafka
 ```
 
 ### How It Works
@@ -174,11 +174,15 @@ eventhandler.class=com.civitas.event.handler.kafka.KafkaEventHandler
 ### Example Configuration
 
 ```properties
-# Multiple adapters - each will get its own handler
-adapters=com.civitas.configadapter.keycloak.KeycloakAdapter,com.civitas.configadapter.examples.DummyLogAdapter
+# Multiple adapters - each will get its own consumer (short names matched via ServiceLoader)
+adapters=keycloak,dummylog
 
-# Kafka event handler class
-eventhandler.class=com.civitas.event.handler.kafka.KafkaEventHandler
+# Event handler name (implements both EventConsumer and EventPublisher)
+eventhandler.name=kafka
+
+# OR use separate consumer/publisher (publisher is optional):
+# eventconsumer.name=kafka
+# eventpublisher.name=kafka
 
 # Kafka settings
 kafka.bootstrap.servers=localhost:9092
@@ -191,25 +195,26 @@ keycloak.username=admin
 keycloak.password=admin
 keycloak.client.id=admin-cli
 
-# DummyLogAdapter needs no additional configuration
-# It subscribes to: user.created, user.updated, user.deleted
-# And simply logs all received events
+# DummyLogAdapter topic configuration
+dummylog.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.user.deleted
 ```
 
 ### Topic Subscription Example
 
 ```java
-public class MyAdapter implements ConfigAdapter {
+public class MyAdapter extends AbstractConfigAdapter {
 
-    private static final List<String> SUBSCRIBED_TOPICS = List.of(
-            Topics.USER_CREATED,
-            Topics.USER_UPDATED,
-            Topics.USER_DELETED
-    );
+    private static final String ADAPTER_NAME = "myadapter";
+
+    @Override
+    public String getName() {
+        return ADAPTER_NAME;  // Used for ServiceLoader discovery
+    }
 
     @Override
     public List<String> getSubscribedTopics() {
-        return SUBSCRIBED_TOPICS;
+        // Read topics from configuration (e.g., myadapter.topics property)
+        return getTopicsFromConfig(ADAPTER_NAME + ".topics");
     }
 
     @Override
@@ -220,6 +225,11 @@ public class MyAdapter implements ConfigAdapter {
     @Override
     public void setEventPublisher(EventPublisher publisher) {
         // Store publisher to send result events
+    }
+
+    @Override
+    public void close() {
+        // Cleanup resources
     }
 }
 ```
@@ -239,32 +249,26 @@ public class MyAdapter implements ConfigAdapter {
 ### 2. Implement ConfigAdapter
 
 ```java
-import com.civitas.configadapter.adapter.ConfigAdapter;
-import com.civitas.configadapter.config.AppConfig;
+import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.model.ConfigEvent;
-import com.civitas.configadapter.model.Topics;
+import com.civitas.configadapter.messaging.EventPublisher;
 
 import java.util.List;
 
-public class MyServiceAdapter implements ConfigAdapter {
+public class MyServiceAdapter extends AbstractConfigAdapter {
 
-    private static final List<String> SUBSCRIBED_TOPICS = List.of(
-        Topics.USER_CREATED,
-        Topics.USER_UPDATED,
-        Topics.USER_DELETED
-        // Add other topics you need
-    );
+    private static final String ADAPTER_NAME = "myservice";
+    private EventPublisher eventPublisher;
 
-    private final AppConfig config;
-
-    public MyServiceAdapter(AppConfig config) {
-        this.config = config;
-        // Initialize your service client
+    @Override
+    public String getName() {
+        return ADAPTER_NAME;  // Must match the name in adapters= config
     }
 
     @Override
     public List<String> getSubscribedTopics() {
-        return SUBSCRIBED_TOPICS;
+        // Read topics from config (e.g., myservice.topics=core.civitas.idm.user.created,...)
+        return getTopicsFromConfig(ADAPTER_NAME + ".topics");
     }
 
     @Override
@@ -277,36 +281,36 @@ public class MyServiceAdapter implements ConfigAdapter {
         }
     }
 
-	@Override
-	public void setEventPublisher(EventPublisher publisher) {
-	    this.eventPublisher = publisher;
-	}
+    @Override
+    public void setEventPublisher(EventPublisher publisher) {
+        this.eventPublisher = publisher;
+    }
 
-	private void publishResult(ConfigEvent original, boolean success, String message) {
-	    if (eventPublisher == null || original.metadata().resultTopic() == null) {
-	        return;
-	    }
+    private void publishResult(ConfigEvent original, boolean success, String message) {
+        if (eventPublisher == null || original.metadata().resultTopic() == null) {
+            return;
+        }
 
-	    ConfigResultEvent result = success
-	        ? ConfigResultEvent.success(
-	              original.metadata().correlationId(),
-	              original.metadata().messageId(),
-	              message,
-	              resourceId,
-	              original.payload().operation(),
-	              original.payload().targetResource(),
-	              "my.adapter.source")
-	        : ConfigResultEvent.failure(
-	              original.metadata().correlationId(),
-	              original.metadata().messageId(),
-	              errorCode,
-	              message,
-	              original.payload().operation(),
-	              original.payload().targetResource(),
-	              "my.adapter.source");
+        ConfigResultEvent result = success
+            ? ConfigResultEvent.success(
+                  original.metadata().correlationId(),
+                  original.metadata().messageId(),
+                  message,
+                  resourceId,
+                  original.payload().operation(),
+                  original.payload().targetResource(),
+                  "my.adapter.source")
+            : ConfigResultEvent.failure(
+                  original.metadata().correlationId(),
+                  original.metadata().messageId(),
+                  errorCode,
+                  message,
+                  original.payload().operation(),
+                  original.payload().targetResource(),
+                  "my.adapter.source");
 
-	    eventPublisher.publish(original.metadata().resultTopic(), result);
-	}
+        eventPublisher.publish(original.metadata().resultTopic(), result);
+    }
 
     @Override
     public void close() {
@@ -315,58 +319,72 @@ public class MyServiceAdapter implements ConfigAdapter {
 }
 ```
 
-### 3. Configure application.properties
+### 3. Register via ServiceLoader
+
+Create file `src/main/resources/META-INF/services/com.civitas.configadapter.adapter.ConfigAdapter`:
+```
+com.mycompany.MyServiceAdapter
+```
+
+### 4. Configure application.properties
 
 ```properties
-# Application Configuration
-adapters=com.mycompany.MyServiceAdapter
-eventhandler.class=com.civitas.event.handler.kafka.KafkaEventHandler
+# Application Configuration (short names matched via ServiceLoader)
+adapters=myservice
+eventhandler.name=kafka
 
 # Kafka Configuration
 kafka.bootstrap.servers=localhost:9092
 kafka.group.id=config-adapter-group
 
 # Your Service Configuration
+myservice.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated
 myservice.url=http://localhost:8080
 myservice.api.key=your-api-key
 ```
 
-The generic `Application` class from `config-adapter-application` will automatically:
-1. Load your adapter using reflection
-2. Inject the adapter into a new `KafkaEventHandler` instance
-3. The consumer calls `getSubscribedTopics()` to subscribe to the adapter's topics
-4. Start the consumer which manages both its own lifecycle and the adapter's lifecycle
+The `Application` class from `config-adapter-application` will automatically:
+1. Discover your adapter via ServiceLoader by matching the name "myservice"
+2. Call `initialize()` to inject configuration
+3. Create an EventConsumer (also discovered via ServiceLoader by name "kafka")
+4. Subscribe to topics returned by `getSubscribedTopics()`
+5. Start the consumer and manage the complete lifecycle
 
-## Creating a New Message Handler
+## Creating a New Event Consumer
 
-### 1. Implement EventHandler
+### 1. Implement EventConsumer
 
 ```java
 import com.civitas.configadapter.adapter.ConfigAdapter;
-import com.civitas.configadapter.config.AppConfig;
-import com.civitas.configadapter.core.CloudEventProcessor;
+import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.messaging.EventConsumer;
+import com.civitas.event.handler.kafka.CloudEventProcessor;
 
 public class RabbitMQEventConsumer implements EventConsumer {
 
-    private final ConfigAdapter adapter;
-    private final CloudEventProcessor processor;
-    private final AppConfig config;
+    private static final String CONSUMER_NAME = "rabbitmq";
+    private ConfigAdapter adapter;
+    private CloudEventProcessor processor;
+    private ApplicationConfig config;
 
-    public RabbitMQEventConsumer(AppConfig config, ConfigAdapter adapter) {
+    @Override
+    public String getName() {
+        return CONSUMER_NAME;  // Used for ServiceLoader discovery
+    }
+
+    @Override
+    public void initialize(ApplicationConfig config, ConfigAdapter adapter) {
         this.config = config;
         this.adapter = adapter;
         this.processor = new CloudEventProcessor(adapter);
-
         // Initialize RabbitMQ connection and subscribe to adapter.getSubscribedTopics()
     }
 
     @Override
     public void start() {
-        // Start consuming messages from subscribed topics
+        // Start consuming messages from subscribed topics (non-blocking)
         // Call processor.handleEvent(topic, cloudEvent) for each message
         // Note: processor.handleEvent() throws exceptions - handle them appropriately
-        // (e.g., log and continue, retry, send to dead letter queue)
     }
 
     @Override
@@ -382,20 +400,27 @@ public class RabbitMQEventConsumer implements EventConsumer {
 }
 ```
 
-### 2. Configure in application.properties
+### 2. Register via ServiceLoader
+
+Create file `src/main/resources/META-INF/services/com.civitas.configadapter.messaging.EventConsumer`:
+```
+com.mycompany.RabbitMQEventConsumer
+```
+
+### 3. Configure in application.properties
 
 ```properties
-# Use your custom consumer
-eventhandler.class=com.mycompany.RabbitMQEventConsumer
+# Use your custom consumer (matched by name via ServiceLoader)
+eventconsumer.name=rabbitmq
 
-# Each adapter will get its own RabbitMQEventConsumer instance
-adapters=com.civitas.configadapter.keycloak.KeycloakAdapter
+# Adapters to run
+adapters=keycloak
 ```
 
 The Application class will automatically:
-1. Instantiate each adapter
-2. Inject the adapter into a new consumer instance (via constructor)
-3. The consumer manages both its own lifecycle and the adapter's lifecycle
+1. Discover your consumer via ServiceLoader by matching the name "rabbitmq"
+2. Call `initialize()` with config and adapter
+3. Call `start()` to begin consuming messages
 
 ## CloudEvent Format
 
@@ -504,7 +529,7 @@ No backend service dependencies.
 
 Generic application runner:
 - Depends on: `config-adapter-api`, `config-adapter-configuration`
-- Uses reflection to load configured adapters and consumers
+- Uses ServiceLoader to discover and load adapters and consumers by name
 - Uses `AppConfig` from configuration module for property management
 
 Contains:
@@ -566,7 +591,9 @@ Configuration is powered by **Apache Commons Configuration2**, providing robust 
 | `keycloak.password` | `KEYCLOAK_PASSWORD` |
 | `keycloak.client.id` | `KEYCLOAK_CLIENT_ID` |
 | `adapters` | `ADAPTERS` |
-| `eventhandler.class` | `EVENTHANDLER_CLASS` |
+| `eventhandler.name` | `EVENTHANDLER_NAME` |
+| `eventconsumer.name` | `EVENTCONSUMER_NAME` |
+| `eventpublisher.name` | `EVENTPUBLISHER_NAME` |
 
 ### Health Check Endpoints
 
@@ -623,7 +650,8 @@ services:
       KEYCLOAK_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KEYCLOAK_CLIENT_ID: admin-cli
       HEALTHCHECK_PORT: "8080"
-      ADAPTERS: com.civitas.configadapter.keycloak.KeycloakAdapter
+      ADAPTERS: keycloak
+      EVENTHANDLER_NAME: kafka
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
       interval: 10s
@@ -698,9 +726,9 @@ Note: Individual topics are not configured in properties. Each adapter declares 
 ### Example: Single Adapter Configuration
 
 ```properties
-# Application settings
-adapters=com.civitas.configadapter.keycloak.KeycloakAdapter
-eventhandler.class=com.civitas.event.handler.kafka.KafkaEventHandler
+# Application settings (short names matched via ServiceLoader)
+adapters=keycloak
+eventhandler.name=kafka
 
 # Kafka settings
 kafka.bootstrap.servers=localhost:9092
@@ -712,14 +740,15 @@ keycloak.realm=master
 keycloak.username=admin
 keycloak.password=admin
 keycloak.client.id=admin-cli
+keycloak.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.realm.created
 ```
 
 ### Example: Multiple Adapters Configuration
 
 ```properties
-# Run both KeycloakAdapter and DummyLogAdapter
-adapters=com.civitas.configadapter.keycloak.KeycloakAdapter,com.civitas.configadapter.examples.DummyLogAdapter
-eventhandler.class=com.civitas.event.handler.kafka.KafkaEventHandler
+# Run both KeycloakAdapter and DummyLogAdapter (short names)
+adapters=keycloak,dummylog
+eventhandler.name=kafka
 
 # Kafka settings
 kafka.bootstrap.servers=localhost:9092
@@ -731,8 +760,10 @@ keycloak.realm=master
 keycloak.username=admin
 keycloak.password=admin
 keycloak.client.id=admin-cli
+keycloak.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated
 
-# DummyLogAdapter needs no additional configuration
+# DummyLogAdapter topic configuration
+dummylog.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.user.deleted
 ```
 
 ## Testing
