@@ -24,13 +24,7 @@ export const PageHeader = (props: PageHeaderProps) => {
       style={style}
     >
       {tabs && (
-        <TabsSection
-          testId="primaryTabs"
-          tabs={tabs.tabs}
-          onClick={tabs.onClick}
-          selectedTab={tabs.selectedTab}
-          isHeading={!title}
-        />
+        <TabsSection testId="primaryTabs" tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} />
       )}
       <div
         id="pageHeaderTitle"
