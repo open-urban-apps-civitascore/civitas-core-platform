@@ -106,22 +106,24 @@ public class KafkaEventConsumer implements EventConsumer {
         boolean batchSuccess = true;
         for (var record : records) {
           try {
-              processor.handleEvent(record.topic(), record.value());
+            processor.handleEvent(record.topic(), record.value());
           } catch (Exception e) {
-              logger.error("Critical error processing event ID {}. Stopping consumer to prevent data loss.",
-                      record.value().getId(), e);
-              batchSuccess = false;
-              running.set(false);
-              break;
+            logger.error(
+                "Critical error processing event ID {}. Stopping consumer to prevent data loss.",
+                record.value().getId(),
+                e);
+            batchSuccess = false;
+            running.set(false);
+            break;
           }
         }
 
         if (batchSuccess && running.get()) {
           try {
-              kafkaConsumer.commitSync();
+            kafkaConsumer.commitSync();
           } catch (Exception commitException) {
-              logger.error("Failed to commit offsets", commitException);
-              running.set(false);
+            logger.error("Failed to commit offsets", commitException);
+            running.set(false);
           }
         }
       } catch (Exception e) {
