@@ -22,6 +22,7 @@ import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
+import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;
@@ -48,9 +49,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /**
@@ -61,8 +62,9 @@ import org.testcontainers.utility.DockerImageName;
 class KafkaEventHandlerIntegrationTest {
 
   @Container
-  static KafkaContainer kafka =
-      new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.3")).withReuse(false);
+  static ConfluentKafkaContainer kafka =
+      new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.3"))
+          .withReuse(false);
 
   private KafkaEventHandler handler;
   private TestAdapter testAdapter;
@@ -135,7 +137,7 @@ class KafkaEventHandlerIntegrationTest {
     assertEquals(1, testAdapter.getProcessedEvents().size());
 
     ConfigEvent receivedEvent = testAdapter.getProcessedEvents().getFirst();
-    assertEquals("CREATE", receivedEvent.payload().operation());
+    assertEquals(Operation.CREATE, receivedEvent.payload().operation());
     assertEquals("user", receivedEvent.payload().targetComponent());
     assertEquals("users/test-user-123", receivedEvent.payload().targetResource());
   }
@@ -303,7 +305,7 @@ class KafkaEventHandlerIntegrationTest {
 
     Config config = new Config("users/" + userId, userData);
 
-    Payload payload = new Payload("user", "users/" + userId, "CREATE", config);
+    Payload payload = new Payload("user", "users/" + userId, Operation.CREATE, config);
 
     return new ConfigEvent(metadata, payload);
   }

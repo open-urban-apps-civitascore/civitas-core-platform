@@ -14,6 +14,7 @@ import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.Operation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
@@ -84,7 +85,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   @Override
   public void processConfigEvent(String topic, ConfigEvent event) {
-    String operation = event.payload().operation();
+    Operation operation = event.payload().operation();
     String targetResource = event.payload().targetResource();
     String targetComponent = event.payload().targetComponent();
 
@@ -99,10 +100,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       // Parse the target resource to determine resource type and identifiers
       ResourceInfo resourceInfo = parseTargetResource(targetResource);
 
-      switch (operation.toUpperCase()) {
-        case "CREATE" -> handleCreate(resourceInfo, event);
-        case "UPDATE" -> handleUpdate(resourceInfo, event);
-        case "DELETE" -> handleDelete(resourceInfo, event);
+      switch (operation) {
+        case CREATE -> handleCreate(resourceInfo, event);
+        case UPDATE -> handleUpdate(resourceInfo, event);
+        case DELETE -> handleDelete(resourceInfo, event);
         default -> {
           logger.warn("Unknown operation: {}", operation);
           publishErrorResult(event, "UNSUPPORTED_OPERATION", "Unknown operation: " + operation);
