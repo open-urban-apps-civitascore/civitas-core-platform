@@ -18,6 +18,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.Executors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +32,7 @@ public class HealthCheckServer implements AutoCloseable {
   public HealthCheckServer(int port, List<?> consumers) throws IOException {
     this.healthStatus = new HealthStatus(consumers);
     this.server = HttpServer.create(new InetSocketAddress(port), 0);
+    this.server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
     this.server.createContext("/health", new HealthHandler());
     this.server.createContext("/health/ready", new ReadinessHandler());
     this.server.createContext("/health/live", new LivenessHandler());
