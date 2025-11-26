@@ -17,7 +17,6 @@ USER civitas
 
 ENV PORT=8089
 EXPOSE $PORT
-ENV NODE_ENV=production
 
 # Health check with correct endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
