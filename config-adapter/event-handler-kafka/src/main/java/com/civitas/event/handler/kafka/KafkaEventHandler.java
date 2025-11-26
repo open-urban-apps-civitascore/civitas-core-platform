@@ -49,6 +49,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   private final CloudEventProcessor processor;
   private final AtomicBoolean running = new AtomicBoolean(false);
   private Thread consumerThread;
+  private boolean ready;
 
   public KafkaEventHandler(ApplicationConfig config, ConfigAdapter adapter) {
     this.adapter = adapter;
@@ -63,13 +64,26 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
     props.put(
         ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, CloudEventDeserializer.class.getName());
     props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-    props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
-    props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000");
+    props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
     this.kafkaConsumer = new KafkaConsumer<>(props);
 
     List<String> topicList = new ArrayList<>(adapter.getSubscribedTopics());
     kafkaConsumer.subscribe(topicList);
+
+    kafkaConsumer.subscribe(topicList, new org.apache.kafka.clients.consumer.ConsumerRebalanceListener() {
+      @Override
+      public void onPartitionsRevoked(java.util.Collection<org.apache.kafka.common.TopicPartition> partitions) {
+          ready = false;
+          logger.info("Partitions revoked - Consumer not ready");
+      }
+
+      @Override
+      public void onPartitionsAssigned(java.util.Collection<org.apache.kafka.common.TopicPartition> partitions) {
+          ready = true;
+          logger.info("Partitions assigned: {} - Consumer ready", partitions);
+      }
+    });
 
     // Initialize producer for publishing events
     Properties producerProps = new Properties();
@@ -97,6 +111,10 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
         topicList);
   }
 
+  public boolean isReady() {
+    return ready;
+  }
+
   @Override
   public void start() {
     if (running.compareAndSet(false, true)) {
@@ -107,30 +125,54 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
   private void consume() {
     logger.info("Starting consumption loop");
-    while (running.get()) {
-      try {
-        ConsumerRecords<String, CloudEvent> records = kafkaConsumer.poll(Duration.ofMillis(1000));
+    try {
+        while (running.get()) {
+            try {
+                ConsumerRecords<String, CloudEvent> records = kafkaConsumer.poll(Duration.ofMillis(1000));
 
-        records.forEach(
-            record -> {
-              try {
-                processor.handleEvent(record.topic(), record.value());
-              } catch (Exception e) {
-                logger.error("Error handling CloudEvent: {}", record.value().getId(), e);
-              }
-            });
-      } catch (Exception e) {
-        logger.error("Error consuming messages", e);
-        if (!running.get()) {
-          break;
+                if (records.isEmpty()) {
+                    continue;
+                }
+
+                boolean batchSuccess = true;
+                for (var record : records) {
+                    try {
+                        processor.handleEvent(record.topic(), record.value());
+                    } catch (Exception e) {
+                        logger.error("Critical error processing event ID {}. Stopping consumer to prevent data loss.",
+                                record.value().getId(), e);
+                        batchSuccess = false;
+                        running.set(false);
+                        break;
+                    }
+                }
+
+                if (batchSuccess && running.get()) {
+                    try {
+                        kafkaConsumer.commitSync();
+                    } catch (Exception commitException) {
+                        logger.error("Failed to commit offsets", commitException);
+                        running.set(false);
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Error consuming messages", e);
+                if (!running.get()) {
+                    break;
+                }
+            }
         }
-      }
+    } catch (Exception e) {
+        logger.error("Consumer loop died unexpectedly", e);
+    } finally {
+        ready = false;
+        logger.info("Consumption loop ended");
     }
-    logger.info("Consumption loop ended");
   }
 
   public void stop() {
     logger.info("Stopping Kafka event consumer");
+    ready = false;
     running.set(false);
     if (consumerThread != null) {
       try {

@@ -58,8 +58,7 @@ public class KafkaEventConsumer implements EventConsumer {
     props.put(
         ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, CloudEventDeserializer.class.getName());
     props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-    props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "true");
-    props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000");
+    props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
 
     this.kafkaConsumer = new KafkaConsumer<>(props);
 
@@ -87,14 +86,31 @@ public class KafkaEventConsumer implements EventConsumer {
       try {
         ConsumerRecords<String, CloudEvent> records = kafkaConsumer.poll(Duration.ofMillis(1000));
 
-        records.forEach(
-            record -> {
-              try {
-                processor.handleEvent(record.topic(), record.value());
-              } catch (Exception e) {
-                logger.error("Error handling CloudEvent: {}", record.value().getId(), e);
-              }
-            });
+        if (records.isEmpty()) {
+          continue;
+        }
+
+        boolean batchSuccess = true;
+        for (var record : records) {
+          try {
+              processor.handleEvent(record.topic(), record.value());
+          } catch (Exception e) {
+              logger.error("Critical error processing event ID {}. Stopping consumer to prevent data loss.",
+                      record.value().getId(), e);
+              batchSuccess = false;
+              running.set(false);
+              break;
+          }
+        }
+
+        if (batchSuccess && running.get()) {
+          try {
+              kafkaConsumer.commitSync();
+          } catch (Exception commitException) {
+              logger.error("Failed to commit offsets", commitException);
+              running.set(false);
+          }
+        }
       } catch (Exception e) {
         logger.error("Error consuming messages", e);
         if (!running.get()) {

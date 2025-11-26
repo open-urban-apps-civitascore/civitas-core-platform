@@ -10,6 +10,7 @@
  */
 package com.civitas.event.handler.kafka;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,6 +38,8 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -131,7 +134,7 @@ class KafkaEventHandlerIntegrationTest {
     assertTrue(latch.await(10, TimeUnit.SECONDS), "Event should be processed within 10 seconds");
     assertEquals(1, testAdapter.getProcessedEvents().size());
 
-    ConfigEvent receivedEvent = testAdapter.getProcessedEvents().get(0);
+    ConfigEvent receivedEvent = testAdapter.getProcessedEvents().getFirst();
     assertEquals("CREATE", receivedEvent.payload().operation());
     assertEquals("user", receivedEvent.payload().targetComponent());
     assertEquals("users/test-user-123", receivedEvent.payload().targetResource());
@@ -180,7 +183,7 @@ class KafkaEventHandlerIntegrationTest {
     assertTrue(
         publishLatch.await(10, TimeUnit.SECONDS), "Result should be published within 10 seconds");
     assertEquals(1, publishedEvents.size());
-    assertEquals(ConfigResultEvent.Status.SUCCESS, publishedEvents.get(0).status());
+    assertEquals(ConfigResultEvent.Status.SUCCESS, publishedEvents.getFirst().status());
   }
 
   @Test
@@ -234,6 +237,46 @@ class KafkaEventHandlerIntegrationTest {
     assertEquals(0, testAdapter.getProcessedEvents().size());
   }
 
+  @Test
+  void shouldNotLoseMessage_WhenProcessingFails() throws Exception {
+    String topic = "user.resilience-test";
+    testAdapter.setSubscribedTopics(List.of(topic));
+    testAdapter.setShouldFailOnce(true);
+
+    CountDownLatch successLatch = new CountDownLatch(1);
+    testAdapter.setProcessCallback((t, e) -> successLatch.countDown());
+
+    handler = new KafkaEventHandler(config, testAdapter);
+    handler.start();
+    await().atMost(30, TimeUnit.SECONDS)
+            .pollInterval(100, TimeUnit.MILLISECONDS)
+            .until(() -> handler.isReady());
+
+    ConfigEvent configEvent = createTestConfigEvent("resilience-user");
+    CloudEvent cloudEvent = createCloudEvent(configEvent);
+    testProducer.send(new ProducerRecord<>(topic, "key", cloudEvent)).get();
+    testProducer.flush();
+
+    await().atMost(5, TimeUnit.SECONDS).until(() -> testAdapter.getAttemptCount() >= 1);
+
+    assertEquals(1, testAdapter.getAttemptCount(), "Should be tried once.");
+    assertEquals(0, testAdapter.getProcessedEvents().size(), "Should not be processed.");
+
+    handler.close();
+    handler = new KafkaEventHandler(config, testAdapter);
+    handler.start();
+
+    await().atMost(30, TimeUnit.SECONDS)
+            .pollInterval(100, TimeUnit.MILLISECONDS)
+            .until(() -> handler.isReady());
+
+    boolean success = successLatch.await(10, TimeUnit.SECONDS);
+    assertTrue(success, "Event should be processed successfully");
+
+    assertEquals(2, testAdapter.getAttemptCount(), "Should be tried two times.");
+    assertEquals(1, testAdapter.getProcessedEvents().size(), "Should be processed now.");
+  }
+
   // Helper methods
 
   private ConfigEvent createTestConfigEvent(String userId) {
@@ -273,6 +316,17 @@ class KafkaEventHandlerIntegrationTest {
   /** Test adapter implementation */
   static class TestAdapter implements ConfigAdapter {
     private List<String> subscribedTopics = null;
+      private final AtomicInteger attemptCount = new AtomicInteger(0);
+      private boolean shouldFailOnce = false;
+
+      public void setShouldFailOnce(boolean shouldFail) {
+          this.shouldFailOnce = shouldFail;
+          this.attemptCount.set(0);
+      }
+
+      public int getAttemptCount() {
+          return attemptCount.get();
+      }
     private final List<ConfigEvent> processedEvents =
         Collections.synchronizedList(new ArrayList<>());
     private ProcessCallback processCallback;
@@ -294,10 +348,16 @@ class KafkaEventHandlerIntegrationTest {
 
     @Override
     public void processConfigEvent(String topic, ConfigEvent event) {
-      processedEvents.add(event);
-      if (processCallback != null) {
-        processCallback.onProcess(topic, event);
-      }
+        int currentAttempt = attemptCount.incrementAndGet();
+
+        if (shouldFailOnce && currentAttempt == 1) {
+            throw new RuntimeException("Simulated DB Crash at first try!");
+        }
+
+        processedEvents.add(event);
+        if (processCallback != null) {
+            processCallback.onProcess(topic, event);
+        }
     }
 
     @Override
