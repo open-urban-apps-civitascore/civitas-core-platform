@@ -72,7 +72,7 @@ class KafkaEventHandlerIntegrationTest {
 
   @BeforeEach
   void setUp() {
-    objectMapper = new ObjectMapper();
+    objectMapper = ObjectMapperFactory.createObjectMapper();
 
     // Create test configuration
     Map<String, Object> props = new HashMap<>();
@@ -290,7 +290,7 @@ class KafkaEventHandlerIntegrationTest {
     Metadata metadata =
         new Metadata(
             UUID.randomUUID().toString(),
-            OffsetDateTime.now().toString(),
+            OffsetDateTime.now(),
             "test.source",
             UUID.randomUUID().toString(),
             "1.0",

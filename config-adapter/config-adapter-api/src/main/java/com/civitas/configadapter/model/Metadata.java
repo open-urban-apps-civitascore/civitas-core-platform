@@ -12,12 +12,13 @@ package com.civitas.configadapter.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.OffsetDateTime;
 
 /** Represents the "metadata" object. */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record Metadata(
     @JsonProperty("messageId") String messageId,
-    @JsonProperty("timestamp") String timestamp,
+    @JsonProperty("timestamp") OffsetDateTime timestamp,
     @JsonProperty("source") String source,
     @JsonProperty("correlationId") String correlationId,
     @JsonProperty("configVersion") String configVersion,

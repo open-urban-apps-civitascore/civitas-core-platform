@@ -531,7 +531,7 @@ class KeycloakAdapterIntegrationTest {
     Metadata metadata =
         new Metadata(
             UUID.randomUUID().toString(),
-            OffsetDateTime.now().toString(),
+            OffsetDateTime.now(),
             "test.source",
             correlationId,
             "1.0",

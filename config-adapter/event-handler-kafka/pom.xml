@@ -43,7 +43,12 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
 
-        <!-- Testing -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+
+		<!-- Testing -->
         <dependency>
             <groupId>com.civitas</groupId>
             <artifactId>config-adapter-configuration</artifactId>

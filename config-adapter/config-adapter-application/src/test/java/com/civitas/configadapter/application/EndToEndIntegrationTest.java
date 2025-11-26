@@ -23,6 +23,7 @@ import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Payload;
 import com.civitas.configadapter.model.Topics;
 import com.civitas.event.handler.kafka.KafkaEventHandler;
+import com.civitas.event.handler.kafka.ObjectMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
@@ -96,7 +97,7 @@ class EndToEndIntegrationTest {
 
   @BeforeEach
   void setUp() throws InterruptedException {
-    objectMapper = new ObjectMapper();
+    objectMapper = ObjectMapperFactory.createObjectMapper();
 
     String keycloakUrl = "http://" + keycloak.getHost() + ":" + keycloak.getMappedPort(8080);
 
@@ -420,12 +421,7 @@ class EndToEndIntegrationTest {
       String messageId) {
     Metadata metadata =
         new Metadata(
-            messageId,
-            OffsetDateTime.now().toString(),
-            "e2e.test",
-            correlationId,
-            "1.0",
-            "result.topic");
+            messageId, OffsetDateTime.now(), "e2e.test", correlationId, "1.0", "result.topic");
 
     Config config = new Config(targetResource, value);
 
