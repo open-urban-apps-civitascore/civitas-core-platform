@@ -29,25 +29,25 @@ public interface ApplicationConfig extends AdapterConfig {
   List<String> getAdapterNames();
 
   /**
-   * Gets the event handler class name.
+   * Gets the event handler name.
    *
-   * @return fully qualified event handler class name
+   * @return fully qualified event handler name
    */
-  String getEventHandlerClass();
+  String getEventHandlerName();
 
   /**
-   * Gets the event consumer class name.
+   * Gets the event consumer name.
    *
-   * @return fully qualified event consumer class name
+   * @return fully qualified event consumer name
    */
-  String getEventConsumerClass();
+  String getEventConsumerName();
 
   /**
-   * Gets the event publisher class name.
+   * Gets the event publisher name.
    *
-   * @return fully qualified event publisher class name
+   * @return fully qualified event publisher name
    */
-  String getEventPublisherClass();
+  String getEventPublisherName();
 
   /**
    * Gets the health check server port.

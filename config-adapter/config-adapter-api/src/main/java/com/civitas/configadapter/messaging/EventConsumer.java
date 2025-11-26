@@ -27,7 +27,7 @@ package com.civitas.configadapter.messaging;
  *
  * <p>Example implementations: KafkaEventHandler, RabbitMQEventConsumer
  */
-public interface EventConsumer extends AutoCloseable {
+public interface EventConsumer extends EventBase {
 
   /**
    * Starts the event consumer to begin processing messages.
@@ -63,22 +63,4 @@ public interface EventConsumer extends AutoCloseable {
    * </ul>
    */
   void start();
-
-  /**
-   * Closes the event consumer and releases all resources.
-   *
-   * <p>Implementations should:
-   *
-   * <ul>
-   *   <li>Stop the consumption loop gracefully
-   *   <li>Close connections to the message broker
-   *   <li>Close the injected ConfigAdapter by calling adapter.close()
-   *   <li>Wait for in-flight messages to complete (if appropriate)
-   *   <li>Release any other resources (threads, executors, etc.)
-   * </ul>
-   *
-   * <p>Default implementation does nothing. Override this method to perform cleanup.
-   */
-  @Override
-  default void close() {}
 }

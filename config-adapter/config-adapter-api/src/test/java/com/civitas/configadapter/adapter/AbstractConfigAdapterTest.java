@@ -172,6 +172,7 @@ class AbstractConfigAdapterTest {
     TestAdapter adapter = new TestAdapter(mockConfig, "my-adapter");
 
     assertEquals("my-adapter", adapter.getName());
+    adapter.close();
   }
 
   @Test
@@ -183,6 +184,7 @@ class AbstractConfigAdapterTest {
     TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
 
     assertEquals("http://localhost:8080", adapter.getAdapterProperty("url"));
+    adapter.close();
   }
 
   @Test
@@ -194,6 +196,7 @@ class AbstractConfigAdapterTest {
     TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
 
     assertEquals("http://localhost:8080", adapter.getAdapterProperty("url", "default"));
+    adapter.close();
   }
 
   @Test
@@ -209,6 +212,7 @@ class AbstractConfigAdapterTest {
     adapter.setEventPublisher(mockPublisher);
 
     assertEquals(mockPublisher, adapter.getEventPublisher());
+    adapter.close();
   }
 
   @Test
@@ -219,6 +223,7 @@ class AbstractConfigAdapterTest {
     TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
 
     assertEquals(mockConfig, adapter.getConfig());
+    adapter.close();
   }
 
   @Test
@@ -231,5 +236,6 @@ class AbstractConfigAdapterTest {
 
     assertNotNull(topics);
     assertThrows(UnsupportedOperationException.class, () -> topics.add("new-topic"));
+    adapter.close();
   }
 }

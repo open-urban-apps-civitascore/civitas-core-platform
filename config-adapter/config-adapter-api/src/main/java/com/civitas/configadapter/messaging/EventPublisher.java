@@ -16,7 +16,7 @@ import com.civitas.configadapter.model.ConfigResultEvent;
  * Interface for publishing events from adapters. Adapters can use this to send result events, error
  * notifications, or status updates.
  */
-public interface EventPublisher {
+public interface EventPublisher extends EventBase {
 
   /**
    * Publish a configuration result event to a specific topic. The implementation is responsible for

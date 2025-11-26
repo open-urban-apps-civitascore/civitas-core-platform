@@ -34,7 +34,7 @@
 		<commons.configuration2.version>2.11.0</commons.configuration2.version>
 		<junit.version>5.10.1</junit.version>
 		<mockito.version>5.8.0</mockito.version>
-		<testcontainers.version>1.21.3</testcontainers.version>
+		<testcontainers.version>2.0.2</testcontainers.version>
 		<awaitility.version>4.2.2</awaitility.version>
 		<jacoco.version>0.8.11</jacoco.version>
 		<spotless.version>2.46.1</spotless.version>
@@ -150,13 +150,13 @@
 			</dependency>
 			<dependency>
 				<groupId>org.testcontainers</groupId>
-				<artifactId>kafka</artifactId>
+				<artifactId>testcontainers-kafka</artifactId>
 				<version>${testcontainers.version}</version>
 				<scope>test</scope>
 			</dependency>
 			<dependency>
 				<groupId>org.testcontainers</groupId>
-				<artifactId>junit-jupiter</artifactId>
+				<artifactId>testcontainers-junit-jupiter</artifactId>
 				<version>${testcontainers.version}</version>
 				<scope>test</scope>
 			</dependency>
