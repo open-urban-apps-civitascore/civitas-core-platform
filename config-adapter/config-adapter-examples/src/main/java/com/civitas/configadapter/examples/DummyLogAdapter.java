@@ -57,7 +57,8 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
     logger.info("ResourceType: 	{}", event.payload().targetComponent());
     logger.info("TargetResource:{}", event.payload().targetResource());
     logger.info("MessageId:   	{}", event.metadata().messageId());
-    logger.info("Data:         	{}", event.payload().config());
+    // keep in mind config could contain sensitive data (e.g. password) not for production 
+    logger.info("Data:         	{}", event.payload().config()); 
     logger.info("ResultTopic:  	{}", event.metadata().resultTopic());
     logger.info("===============================================================");
 
