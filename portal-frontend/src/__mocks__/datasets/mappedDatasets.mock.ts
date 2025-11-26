@@ -1,12 +1,12 @@
-import { Dataset } from '@/app/(main)/datasets/page'
+import { DatasetTableData } from '@/types/datasets'
 
-export const mappedDatasets: Dataset[] = [
+export const mappedDatasets: DatasetTableData[] = [
   {
     id: '1',
-    name: 'Bebauungspläne der Stadt Musterstadt (XPlanung)',
-    dataSpace: 'Verkehr',
+    name: 'Test Dataset 1',
+    dataspace: 'Dataspace 1',
     department: 'Stadtentwicklung',
-    creator: ['Maximilian Müller'],
+    creator: ['Test User1'],
     lastUpdated: '2023-09-10T08:00:00Z',
     status: null,
     releaseProcess: null,
@@ -14,16 +14,16 @@ export const mappedDatasets: Dataset[] = [
   },
   {
     id: '2',
-    name: 'Spielplätze',
-    dataSpace: 'Umwelt',
+    name: 'Test Dataset 2',
+    dataspace: '',
     department: 'Verkehrsplanung',
-    creator: ['Sophie Schneider'],
+    creator: ['Test User2'],
     lastUpdated: '2023-01-01T08:00:00Z',
     status: 'open',
     releaseProcess: null,
     distribution: {
       format: 'DOCX',
-      name: 'Superset',
+      title: 'Superset',
       url: 'https://superset.de',
     },
   },

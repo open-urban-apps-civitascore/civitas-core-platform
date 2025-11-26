@@ -3,6 +3,7 @@
     "type-to-search": "Type to search",
     "search": "Search",
     "noResults": "No results found.",
+    "noData": "No Data",
     "loading": "Loading...",
     "actions": {
       "submit": "Save",
@@ -35,7 +36,8 @@
     "all-datasets": "All Datasets",
     "documentation": "Documentation",
     "logout": "Log out",
-    "datasets": "Datasets",
+    "ourData": "Our Data",
+    "datasets": "Our Data",
     "permissions": "Permissions",
     "roles": "Role Management",
     "create": "create",
@@ -49,6 +51,7 @@
     "title": "Datasets",
     "subtitle": "All available datasets of our organization",
     "searchDatasets": "Search Datasets",
+    "newDataset": "New Dataset",
     "tableHeaders": {
       "name": "Name",
       "dataSpace": "Data Space",
@@ -65,7 +68,26 @@
         "closed": "closed"
       }
     },
-    "newDataset": "New Dataset"
+    "overview": {
+      "title": "Overview: Create Dataset",
+      "info": {
+        "title": "Base Information",
+        "dataspace": "Data Space",
+        "name": "Name",
+        "description": "Description",
+        "tags": "Tags",
+        "typeTag": "Type tag..."
+      },
+      "completion": {
+        "title": "Creation Progress",
+        "metadata": "Metadata",
+        "groups": "Group & Role Assignment",
+        "configuration": "Data Configuration",
+        "distribution": "Distributions / Applications / APIs",
+        "permissions": "User Data Permissions",
+        "publication": "Publication"
+      }
+    }
   },
   "users": {
     "title": "Overview: Users",

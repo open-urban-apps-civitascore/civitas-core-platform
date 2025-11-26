@@ -3,6 +3,7 @@
     {
       "id": "1",
       "name": "Bebauungspläne der Stadt Musterstadt (XPlanung)",
+      "description": "",
       "creator": [
         {
           "id": "1",
@@ -13,6 +14,7 @@
       "issued": "2023-09-10T08:00:00Z",
       "lastUpdated": "2023-09-10T08:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -29,6 +31,7 @@
     {
       "id": "2",
       "name": "Spielplätze",
+      "description": "",
       "creator": [
         {
           "id": "2",
@@ -39,6 +42,7 @@
       "issued": "2023-01-01T08:00:00Z",
       "lastUpdated": "2023-01-01T08:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "2",
         "format": "DOCX",
@@ -60,6 +64,7 @@
     {
       "id": "3",
       "name": "Spielplätze",
+      "description": "",
       "creator": [
         {
           "id": "3",
@@ -70,6 +75,7 @@
       "issued": "2023-02-15T08:00:00Z",
       "lastUpdated": "2023-02-15T08:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "3",
         "format": "GML",
@@ -91,6 +97,7 @@
     {
       "id": "4",
       "name": "Versorgungsleitungen – Trinkwasser",
+      "description": "",
       "creator": [
         {
           "id": "4",
@@ -101,6 +108,7 @@
       "issued": "2023-03-30T08:00:00Z",
       "lastUpdated": "2023-03-30T08:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "4",
         "format": "PDF",
@@ -122,6 +130,7 @@
     {
       "id": "5",
       "name": "Gewerberegister – öffentlich einsehbare Betriebe",
+      "description": "",
       "creator": [
         {
           "id": "5",
@@ -132,6 +141,7 @@
       "issued": "2023-04-12T08:00:00Z",
       "lastUpdated": "2023-04-12T08:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -148,6 +158,7 @@
     {
       "id": "6",
       "name": "Lärmkartierung – Hauptverkehrsstraßen (Tag/Nacht)",
+      "description": "",
       "creator": [
         {
           "id": "6",
@@ -158,6 +169,7 @@
       "issued": "2023-05-05T08:00:00Z",
       "lastUpdated": "2023-05-05T08:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "6",
         "format": "GeoJSON",
@@ -179,6 +191,7 @@
     {
       "id": "7",
       "name": "Echtzeit-Positionen Busse und Straßenbahnen",
+      "description": "",
       "creator": [
         {
           "id": "7",
@@ -189,6 +202,7 @@
       "issued": "2023-06-20T08:00:00Z",
       "lastUpdated": "2023-06-20T08:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -205,6 +219,7 @@
     {
       "id": "8",
       "name": "Bevölkerungsstatistik – Altersgruppen nach Stadtteilen",
+      "description": "",
       "creator": [
         {
           "id": "8",
@@ -215,6 +230,7 @@
       "issued": "2023-07-10T08:00:00Z",
       "lastUpdated": "2023-07-10T08:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "8",
         "format": "zip",
@@ -236,6 +252,7 @@
     {
       "id": "9",
       "name": "Tourismuszahlen Besucherzähler",
+      "description": "",
       "creator": [
         {
           "id": "9",
@@ -244,8 +261,9 @@
         }
       ],
       "issued": "2023-01-05T00:00:00Z",
-      "lastUpdated": "2023-01-09T00:00:00Z",
+      "lastUpdated": "2025-11-20T15:11:29.431Z",
       "status": "closed",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -257,11 +275,16 @@
       "department": {
         "id": "1",
         "name": "Stadtentwicklung"
+      },
+      "dataspace": {
+        "id": "3",
+        "title": "Stadtentwicklung"
       }
     },
     {
       "id": "10",
       "name": "Unfallstatistik Sensorerfassung",
+      "description": "",
       "creator": [
         {
           "id": "10",
@@ -272,6 +295,7 @@
       "issued": "2023-09-04T00:00:00Z",
       "lastUpdated": "2023-09-26T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "10",
         "format": "JSON",
@@ -293,6 +317,7 @@
     {
       "id": "11",
       "name": "Lärmpegel an Hauptverkehrsstraßen",
+      "description": "",
       "creator": [
         {
           "id": "11",
@@ -303,6 +328,7 @@
       "issued": "2023-07-01T00:00:00Z",
       "lastUpdated": "2023-07-08T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -319,6 +345,7 @@
     {
       "id": "12",
       "name": "Krankenhaus Bettenauslastung",
+      "description": "",
       "creator": [
         {
           "id": "12",
@@ -329,6 +356,7 @@
       "issued": "2023-06-12T00:00:00Z",
       "lastUpdated": "2023-06-26T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "12",
         "format": "XML",
@@ -350,6 +378,7 @@
     {
       "id": "13",
       "name": "Lärmkartierung Bahnhöfe",
+      "description": "",
       "creator": [
         {
           "id": "13",
@@ -360,6 +389,7 @@
       "issued": "2023-10-16T00:00:00Z",
       "lastUpdated": "2023-10-29T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "13",
         "format": "XML",
@@ -381,6 +411,7 @@
     {
       "id": "14",
       "name": "Krankenhaus Bettenauslastung",
+      "description": "",
       "creator": [
         {
           "id": "14",
@@ -391,6 +422,7 @@
       "issued": "2023-02-26T00:00:00Z",
       "lastUpdated": "2023-03-11T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -407,6 +439,7 @@
     {
       "id": "15",
       "name": "Echtzeitdaten – Busse",
+      "description": "",
       "creator": [
         {
           "id": "15",
@@ -417,6 +450,7 @@
       "issued": "2023-03-26T00:00:00Z",
       "lastUpdated": "2023-03-29T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "15",
         "format": "PDF",
@@ -438,6 +472,7 @@
     {
       "id": "16",
       "name": "Rettungsdienste – Einsatzzeiten",
+      "description": "",
       "creator": [
         {
           "id": "16",
@@ -448,6 +483,7 @@
       "issued": "2023-04-26T00:00:00Z",
       "lastUpdated": "2023-05-10T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -464,6 +500,7 @@
     {
       "id": "17",
       "name": "Wasserqualität – Flüsse",
+      "description": "",
       "creator": [
         {
           "id": "17",
@@ -474,6 +511,7 @@
       "issued": "2023-10-20T00:00:00Z",
       "lastUpdated": "2023-10-28T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "17",
         "format": "PDF",
@@ -495,6 +533,7 @@
     {
       "id": "18",
       "name": "Straßenbeleuchtung – Defektmeldungen",
+      "description": "",
       "creator": [
         {
           "id": "18",
@@ -505,6 +544,7 @@
       "issued": "2023-01-19T00:00:00Z",
       "lastUpdated": "2023-01-30T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "18",
         "format": "ZIP",
@@ -526,6 +566,7 @@
     {
       "id": "19",
       "name": "Luftqualität – NO2-Messungen",
+      "description": "",
       "creator": [
         {
           "id": "19",
@@ -536,6 +577,7 @@
       "issued": "2023-09-19T00:00:00Z",
       "lastUpdated": "2023-10-13T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "19",
         "format": "GeoJSON",
@@ -557,6 +599,7 @@
     {
       "id": "20",
       "name": "Wasserqualität – Flüsse",
+      "description": "",
       "creator": [
         {
           "id": "20",
@@ -567,6 +610,7 @@
       "issued": "2023-04-05T00:00:00Z",
       "lastUpdated": "2023-04-08T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "20",
         "format": "CSV",
@@ -588,6 +632,7 @@
     {
       "id": "21",
       "name": "Defibrillator Nutzungshäufigkeit",
+      "description": "",
       "creator": [
         {
           "id": "21",
@@ -598,6 +643,7 @@
       "issued": "2023-10-08T00:00:00Z",
       "lastUpdated": "2023-10-10T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "21",
         "format": "XML",
@@ -619,6 +665,7 @@
     {
       "id": "22",
       "name": "Krankenhaus Bettenauslastung",
+      "description": "",
       "creator": [
         {
           "id": "22",
@@ -629,6 +676,7 @@
       "issued": "2023-07-01T00:00:00Z",
       "lastUpdated": "2023-07-10T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "22",
         "format": "GeoJSON",
@@ -650,6 +698,7 @@
     {
       "id": "23",
       "name": "Echtzeitdaten – Busse",
+      "description": "",
       "creator": [
         {
           "id": "23",
@@ -660,6 +709,7 @@
       "issued": "2023-05-23T00:00:00Z",
       "lastUpdated": "2023-05-28T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "23",
         "format": "JSON",
@@ -681,6 +731,7 @@
     {
       "id": "24",
       "name": "Rettungsdienste – Einsatzzeiten",
+      "description": "",
       "creator": [
         {
           "id": "24",
@@ -691,6 +742,7 @@
       "issued": "2023-06-03T00:00:00Z",
       "lastUpdated": "2023-06-30T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "24",
         "format": "PDF",
@@ -712,6 +764,7 @@
     {
       "id": "25",
       "name": "Echtzeitdaten – Straßenbahnen",
+      "description": "",
       "creator": [
         {
           "id": "25",
@@ -722,6 +775,7 @@
       "issued": "2023-08-27T00:00:00Z",
       "lastUpdated": "2023-09-20T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "25",
         "format": "XLSX",
@@ -743,6 +797,7 @@
     {
       "id": "26",
       "name": "Unfallstatistik Sensorerfassung",
+      "description": "",
       "creator": [
         {
           "id": "26",
@@ -753,6 +808,7 @@
       "issued": "2023-07-23T00:00:00Z",
       "lastUpdated": "2023-08-16T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "26",
         "format": "CSV",
@@ -774,6 +830,7 @@
     {
       "id": "27",
       "name": "Wasserqualität – Flüsse",
+      "description": "",
       "creator": [
         {
           "id": "27",
@@ -784,6 +841,7 @@
       "issued": "2023-02-12T00:00:00Z",
       "lastUpdated": "2023-03-12T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "27",
         "format": "XLSX",
@@ -805,6 +863,7 @@
     {
       "id": "28",
       "name": "Krankenhaus Bettenauslastung",
+      "description": "",
       "creator": [
         {
           "id": "28",
@@ -815,6 +874,7 @@
       "issued": "2023-05-01T00:00:00Z",
       "lastUpdated": "2023-05-30T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -831,6 +891,7 @@
     {
       "id": "29",
       "name": "Echtzeitdaten – Straßenbahnen",
+      "description": "",
       "creator": [
         {
           "id": "29",
@@ -841,6 +902,7 @@
       "issued": "2023-08-13T00:00:00Z",
       "lastUpdated": "2023-08-18T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -857,6 +919,7 @@
     {
       "id": "30",
       "name": "Straßenbeleuchtung – Defektmeldungen",
+      "description": "",
       "creator": [
         {
           "id": "30",
@@ -867,6 +930,7 @@
       "issued": "2023-01-13T00:00:00Z",
       "lastUpdated": "2023-02-08T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "30",
         "format": "XLSX",
@@ -888,6 +952,7 @@
     {
       "id": "31",
       "name": "Luftqualität – Feinstaub PM10",
+      "description": "",
       "creator": [
         {
           "id": "31",
@@ -898,6 +963,7 @@
       "issued": "2023-07-18T00:00:00Z",
       "lastUpdated": "2023-08-17T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "31",
         "format": "JSON",
@@ -919,6 +985,7 @@
     {
       "id": "32",
       "name": "Parkplatzauslastung Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "32",
@@ -929,6 +996,7 @@
       "issued": "2023-05-07T00:00:00Z",
       "lastUpdated": "2023-05-27T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "32",
         "format": "XML",
@@ -950,6 +1018,7 @@
     {
       "id": "33",
       "name": "Straßenbeleuchtung – Defektmeldungen",
+      "description": "",
       "creator": [
         {
           "id": "33",
@@ -958,8 +1027,12 @@
         }
       ],
       "issued": "2023-04-11T00:00:00Z",
-      "lastUpdated": "2023-05-04T00:00:00Z",
+      "lastUpdated": "2025-11-20T19:58:56.644Z",
       "status": null,
+      "tags": [
+        "Licht",
+        "Nacht"
+      ],
       "distribution": {
         "id": "33",
         "format": "PDF",
@@ -976,11 +1049,16 @@
       "department": {
         "id": "4",
         "name": "Bauaufsicht"
+      },
+      "dataspace": {
+        "id": "3",
+        "title": "Stadtentwicklung"
       }
     },
     {
       "id": "34",
       "name": "Niederschlagsmengen Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "34",
@@ -991,6 +1069,7 @@
       "issued": "2023-04-14T00:00:00Z",
       "lastUpdated": "2023-04-23T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "34",
         "format": "XML",
@@ -1012,6 +1091,7 @@
     {
       "id": "35",
       "name": "Echtzeitdaten – Straßenbahnen",
+      "description": "",
       "creator": [
         {
           "id": "35",
@@ -1022,6 +1102,7 @@
       "issued": "2023-06-14T00:00:00Z",
       "lastUpdated": "2023-07-10T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "35",
         "format": "PDF",
@@ -1043,6 +1124,7 @@
     {
       "id": "36",
       "name": "Fahrgastzahlen U-Bahn",
+      "description": "",
       "creator": [
         {
           "id": "36",
@@ -1053,6 +1135,7 @@
       "issued": "2023-01-15T00:00:00Z",
       "lastUpdated": "2023-02-13T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "36",
         "format": "PDF",
@@ -1074,6 +1157,7 @@
     {
       "id": "37",
       "name": "Luftqualität – Feinstaub PM10",
+      "description": "",
       "creator": [
         {
           "id": "37",
@@ -1082,8 +1166,9 @@
         }
       ],
       "issued": "2023-07-13T00:00:00Z",
-      "lastUpdated": "2023-07-19T00:00:00Z",
+      "lastUpdated": "2025-11-20T15:46:49.282Z",
       "status": "closed",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -1095,11 +1180,16 @@
       "department": {
         "id": "3",
         "name": "Umweltschutz"
+      },
+      "dataspace": {
+        "id": "9",
+        "title": "Gesundheitsdaten"
       }
     },
     {
       "id": "38",
       "name": "Luftqualität – Ozonwerte",
+      "description": "",
       "creator": [
         {
           "id": "38",
@@ -1110,6 +1200,7 @@
       "issued": "2023-03-13T00:00:00Z",
       "lastUpdated": "2023-03-28T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "38",
         "format": "PDF",
@@ -1131,6 +1222,7 @@
     {
       "id": "39",
       "name": "Luftfeuchtigkeit Innenstadt",
+      "description": "",
       "creator": [
         {
           "id": "39",
@@ -1141,6 +1233,7 @@
       "issued": "2023-06-05T00:00:00Z",
       "lastUpdated": "2023-06-11T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "39",
         "format": "CSV",
@@ -1162,6 +1255,7 @@
     {
       "id": "40",
       "name": "Unfallstatistik Sensorerfassung",
+      "description": "",
       "creator": [
         {
           "id": "40",
@@ -1172,6 +1266,7 @@
       "issued": "2023-01-22T00:00:00Z",
       "lastUpdated": "2023-02-03T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -1188,6 +1283,7 @@
     {
       "id": "41",
       "name": "Fahrgastzahlen U-Bahn",
+      "description": "",
       "creator": [
         {
           "id": "41",
@@ -1198,6 +1294,7 @@
       "issued": "2023-05-18T00:00:00Z",
       "lastUpdated": "2023-05-25T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "41",
         "format": "PDF",
@@ -1219,6 +1316,7 @@
     {
       "id": "42",
       "name": "Luftqualität – NO2-Messungen",
+      "description": "",
       "creator": [
         {
           "id": "42",
@@ -1229,6 +1327,7 @@
       "issued": "2023-04-10T00:00:00Z",
       "lastUpdated": "2023-05-07T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "42",
         "format": "XML",
@@ -1250,6 +1349,7 @@
     {
       "id": "43",
       "name": "Echtzeitdaten – Busse",
+      "description": "",
       "creator": [
         {
           "id": "43",
@@ -1260,6 +1360,7 @@
       "issued": "2023-09-01T00:00:00Z",
       "lastUpdated": "2023-09-12T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "43",
         "format": "XLSX",
@@ -1281,6 +1382,7 @@
     {
       "id": "44",
       "name": "Luftqualität – Ozonwerte",
+      "description": "",
       "creator": [
         {
           "id": "44",
@@ -1291,6 +1393,7 @@
       "issued": "2023-04-25T00:00:00Z",
       "lastUpdated": "2023-04-26T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "44",
         "format": "JSON",
@@ -1312,6 +1415,7 @@
     {
       "id": "45",
       "name": "Rettungsdienste – Einsatzzeiten",
+      "description": "",
       "creator": [
         {
           "id": "45",
@@ -1322,6 +1426,7 @@
       "issued": "2023-01-30T00:00:00Z",
       "lastUpdated": "2023-02-27T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -1338,6 +1443,7 @@
     {
       "id": "46",
       "name": "Radweg-Nutzungssensoren",
+      "description": "",
       "creator": [
         {
           "id": "46",
@@ -1348,6 +1454,7 @@
       "issued": "2023-04-14T00:00:00Z",
       "lastUpdated": "2023-05-06T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "46",
         "format": "GeoJSON",
@@ -1369,6 +1476,7 @@
     {
       "id": "47",
       "name": "Notfallmeldungen – Brandmelder",
+      "description": "",
       "creator": [
         {
           "id": "47",
@@ -1379,6 +1487,7 @@
       "issued": "2023-09-14T00:00:00Z",
       "lastUpdated": "2023-10-11T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "47",
         "format": "XLSX",
@@ -1400,6 +1509,7 @@
     {
       "id": "48",
       "name": "Lärmkartierung Bahnhöfe",
+      "description": "",
       "creator": [
         {
           "id": "48",
@@ -1410,6 +1520,7 @@
       "issued": "2023-07-14T00:00:00Z",
       "lastUpdated": "2023-08-05T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "48",
         "format": "ZIP",
@@ -1431,6 +1542,7 @@
     {
       "id": "49",
       "name": "Luftfeuchtigkeit Innenstadt",
+      "description": "",
       "creator": [
         {
           "id": "49",
@@ -1441,6 +1553,7 @@
       "issued": "2023-09-11T00:00:00Z",
       "lastUpdated": "2023-09-27T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "49",
         "format": "XLSX",
@@ -1462,6 +1575,7 @@
     {
       "id": "50",
       "name": "Energieverbrauch – öffentl. Gebäude",
+      "description": "",
       "creator": [
         {
           "id": "50",
@@ -1472,6 +1586,7 @@
       "issued": "2023-09-06T00:00:00Z",
       "lastUpdated": "2023-10-04T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "50",
         "format": "XML",
@@ -1493,6 +1608,7 @@
     {
       "id": "51",
       "name": "Echtzeitdaten – Busse",
+      "description": "",
       "creator": [
         {
           "id": "51",
@@ -1503,6 +1619,7 @@
       "issued": "2023-09-03T00:00:00Z",
       "lastUpdated": "2023-09-17T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "51",
         "format": "CSV",
@@ -1524,6 +1641,7 @@
     {
       "id": "52",
       "name": "Parkplatzauslastung Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "52",
@@ -1534,6 +1652,7 @@
       "issued": "2023-02-23T00:00:00Z",
       "lastUpdated": "2023-02-24T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "52",
         "format": "XLSX",
@@ -1555,6 +1674,7 @@
     {
       "id": "53",
       "name": "Grundwasserpegel Monitoring",
+      "description": "",
       "creator": [
         {
           "id": "53",
@@ -1565,6 +1685,7 @@
       "issued": "2023-03-02T00:00:00Z",
       "lastUpdated": "2023-03-24T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "53",
         "format": "GeoJSON",
@@ -1586,6 +1707,7 @@
     {
       "id": "54",
       "name": "Müllbehälter Füllstände",
+      "description": "",
       "creator": [
         {
           "id": "54",
@@ -1596,6 +1718,7 @@
       "issued": "2023-10-21T00:00:00Z",
       "lastUpdated": "2023-11-11T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -1612,6 +1735,7 @@
     {
       "id": "55",
       "name": "Verkehrsdichte an Kreuzungen",
+      "description": "",
       "creator": [
         {
           "id": "55",
@@ -1622,6 +1746,7 @@
       "issued": "2023-04-16T00:00:00Z",
       "lastUpdated": "2023-04-19T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "55",
         "format": "XML",
@@ -1643,6 +1768,7 @@
     {
       "id": "56",
       "name": "Echtzeitdaten – Busse",
+      "description": "",
       "creator": [
         {
           "id": "56",
@@ -1653,6 +1779,7 @@
       "issued": "2023-09-23T00:00:00Z",
       "lastUpdated": "2023-09-29T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "56",
         "format": "PDF",
@@ -1674,6 +1801,7 @@
     {
       "id": "57",
       "name": "Unfallstatistik Sensorerfassung",
+      "description": "",
       "creator": [
         {
           "id": "57",
@@ -1684,6 +1812,7 @@
       "issued": "2023-08-11T00:00:00Z",
       "lastUpdated": "2023-08-29T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "57",
         "format": "JSON",
@@ -1705,6 +1834,7 @@
     {
       "id": "58",
       "name": "Verkehrsdichte an Kreuzungen",
+      "description": "",
       "creator": [
         {
           "id": "58",
@@ -1715,6 +1845,7 @@
       "issued": "2023-07-02T00:00:00Z",
       "lastUpdated": "2023-07-15T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -1731,6 +1862,7 @@
     {
       "id": "59",
       "name": "Bevölkerungsbewegungen – anonyme Zählung",
+      "description": "",
       "creator": [
         {
           "id": "59",
@@ -1741,6 +1873,7 @@
       "issued": "2023-05-13T00:00:00Z",
       "lastUpdated": "2023-05-19T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -1757,6 +1890,7 @@
     {
       "id": "60",
       "name": "Niederschlagsmengen Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "60",
@@ -1767,6 +1901,7 @@
       "issued": "2023-05-24T00:00:00Z",
       "lastUpdated": "2023-06-16T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "60",
         "format": "PDF",
@@ -1788,6 +1923,7 @@
     {
       "id": "61",
       "name": "Lärmkartierung Bahnhöfe",
+      "description": "",
       "creator": [
         {
           "id": "61",
@@ -1798,6 +1934,7 @@
       "issued": "2023-03-14T00:00:00Z",
       "lastUpdated": "2023-04-07T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "61",
         "format": "PDF",
@@ -1819,6 +1956,7 @@
     {
       "id": "62",
       "name": "Niederschlagsmengen Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "62",
@@ -1829,6 +1967,7 @@
       "issued": "2023-02-18T00:00:00Z",
       "lastUpdated": "2023-03-03T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "62",
         "format": "JSON",
@@ -1850,6 +1989,7 @@
     {
       "id": "63",
       "name": "Defibrillator Nutzungshäufigkeit",
+      "description": "",
       "creator": [
         {
           "id": "63",
@@ -1860,6 +2000,7 @@
       "issued": "2023-06-08T00:00:00Z",
       "lastUpdated": "2023-06-14T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "63",
         "format": "GeoJSON",
@@ -1881,6 +2022,7 @@
     {
       "id": "64",
       "name": "Lärmpegel an Hauptverkehrsstraßen",
+      "description": "",
       "creator": [
         {
           "id": "64",
@@ -1891,6 +2033,7 @@
       "issued": "2023-10-24T00:00:00Z",
       "lastUpdated": "2023-11-07T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -1907,6 +2050,7 @@
     {
       "id": "65",
       "name": "Luftqualität – Ozonwerte",
+      "description": "",
       "creator": [
         {
           "id": "65",
@@ -1917,6 +2061,7 @@
       "issued": "2023-01-18T00:00:00Z",
       "lastUpdated": "2023-02-06T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "65",
         "format": "JSON",
@@ -1938,6 +2083,7 @@
     {
       "id": "66",
       "name": "Niederschlagsmengen Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "66",
@@ -1948,6 +2094,7 @@
       "issued": "2023-04-15T00:00:00Z",
       "lastUpdated": "2023-04-29T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -1964,6 +2111,7 @@
     {
       "id": "67",
       "name": "E-Ladestationen – Belegung",
+      "description": "",
       "creator": [
         {
           "id": "67",
@@ -1974,6 +2122,7 @@
       "issued": "2023-10-16T00:00:00Z",
       "lastUpdated": "2023-11-04T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "67",
         "format": "CSV",
@@ -1995,6 +2144,7 @@
     {
       "id": "68",
       "name": "Radweg-Nutzungssensoren",
+      "description": "",
       "creator": [
         {
           "id": "68",
@@ -2005,6 +2155,7 @@
       "issued": "2023-09-26T00:00:00Z",
       "lastUpdated": "2023-09-26T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -2021,6 +2172,7 @@
     {
       "id": "69",
       "name": "Unfallstatistik Sensorerfassung",
+      "description": "",
       "creator": [
         {
           "id": "69",
@@ -2031,6 +2183,7 @@
       "issued": "2023-04-30T00:00:00Z",
       "lastUpdated": "2023-05-19T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "69",
         "format": "JSON",
@@ -2052,6 +2205,7 @@
     {
       "id": "70",
       "name": "Temperatur an Wetterstationen",
+      "description": "",
       "creator": [
         {
           "id": "70",
@@ -2062,6 +2216,7 @@
       "issued": "2023-07-11T00:00:00Z",
       "lastUpdated": "2023-08-09T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -2078,6 +2233,7 @@
     {
       "id": "71",
       "name": "Windgeschwindigkeit Stadtgebiet",
+      "description": "",
       "creator": [
         {
           "id": "71",
@@ -2088,6 +2244,7 @@
       "issued": "2023-09-14T00:00:00Z",
       "lastUpdated": "2023-10-14T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "71",
         "format": "JSON",
@@ -2109,6 +2266,7 @@
     {
       "id": "72",
       "name": "Niederschlagsmengen Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "72",
@@ -2119,6 +2277,7 @@
       "issued": "2023-09-18T00:00:00Z",
       "lastUpdated": "2023-10-17T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "72",
         "format": "ZIP",
@@ -2140,6 +2299,7 @@
     {
       "id": "73",
       "name": "Energieverbrauch – öffentl. Gebäude",
+      "description": "",
       "creator": [
         {
           "id": "73",
@@ -2150,6 +2310,7 @@
       "issued": "2023-03-06T00:00:00Z",
       "lastUpdated": "2023-03-28T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "73",
         "format": "PDF",
@@ -2171,6 +2332,7 @@
     {
       "id": "74",
       "name": "Luftfeuchtigkeit Innenstadt",
+      "description": "",
       "creator": [
         {
           "id": "74",
@@ -2181,6 +2343,7 @@
       "issued": "2023-03-13T00:00:00Z",
       "lastUpdated": "2023-04-01T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "74",
         "format": "PDF",
@@ -2202,6 +2365,7 @@
     {
       "id": "75",
       "name": "Tourismuszahlen Besucherzähler",
+      "description": "",
       "creator": [
         {
           "id": "75",
@@ -2212,6 +2376,7 @@
       "issued": "2023-09-08T00:00:00Z",
       "lastUpdated": "2023-09-17T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "75",
         "format": "XLSX",
@@ -2233,6 +2398,7 @@
     {
       "id": "76",
       "name": "Niederschlagsmengen Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "76",
@@ -2243,6 +2409,7 @@
       "issued": "2023-02-25T00:00:00Z",
       "lastUpdated": "2023-03-12T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "76",
         "format": "GeoJSON",
@@ -2264,6 +2431,7 @@
     {
       "id": "77",
       "name": "Windgeschwindigkeit Stadtgebiet",
+      "description": "",
       "creator": [
         {
           "id": "77",
@@ -2274,6 +2442,7 @@
       "issued": "2023-04-26T00:00:00Z",
       "lastUpdated": "2023-04-30T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "77",
         "format": "ZIP",
@@ -2295,6 +2464,7 @@
     {
       "id": "78",
       "name": "Lärmkartierung Bahnhöfe",
+      "description": "",
       "creator": [
         {
           "id": "78",
@@ -2305,6 +2475,7 @@
       "issued": "2023-10-27T00:00:00Z",
       "lastUpdated": "2023-11-16T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "78",
         "format": "GeoJSON",
@@ -2326,6 +2497,7 @@
     {
       "id": "79",
       "name": "Parkplatzauslastung Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "79",
@@ -2336,6 +2508,7 @@
       "issued": "2023-03-10T00:00:00Z",
       "lastUpdated": "2023-04-09T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -2352,6 +2525,7 @@
     {
       "id": "80",
       "name": "Lärmpegel an Hauptverkehrsstraßen",
+      "description": "",
       "creator": [
         {
           "id": "80",
@@ -2362,6 +2536,7 @@
       "issued": "2023-08-09T00:00:00Z",
       "lastUpdated": "2023-08-14T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "80",
         "format": "CSV",
@@ -2383,6 +2558,7 @@
     {
       "id": "81",
       "name": "Luftqualität – Ozonwerte",
+      "description": "",
       "creator": [
         {
           "id": "81",
@@ -2393,6 +2569,7 @@
       "issued": "2023-08-04T00:00:00Z",
       "lastUpdated": "2023-08-18T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "81",
         "format": "PDF",
@@ -2414,6 +2591,7 @@
     {
       "id": "82",
       "name": "Lärmkartierung Bahnhöfe",
+      "description": "",
       "creator": [
         {
           "id": "82",
@@ -2424,6 +2602,7 @@
       "issued": "2023-09-17T00:00:00Z",
       "lastUpdated": "2023-09-25T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "82",
         "format": "ZIP",
@@ -2445,6 +2624,7 @@
     {
       "id": "83",
       "name": "Straßenbeleuchtung – Defektmeldungen",
+      "description": "",
       "creator": [
         {
           "id": "83",
@@ -2455,6 +2635,7 @@
       "issued": "2023-08-15T00:00:00Z",
       "lastUpdated": "2023-08-24T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "83",
         "format": "CSV",
@@ -2476,6 +2657,7 @@
     {
       "id": "84",
       "name": "Temperatur an Wetterstationen",
+      "description": "",
       "creator": [
         {
           "id": "84",
@@ -2486,6 +2668,7 @@
       "issued": "2023-08-09T00:00:00Z",
       "lastUpdated": "2023-08-31T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "84",
         "format": "XML",
@@ -2507,6 +2690,7 @@
     {
       "id": "85",
       "name": "Luftqualität – NO2-Messungen",
+      "description": "",
       "creator": [
         {
           "id": "85",
@@ -2517,6 +2701,7 @@
       "issued": "2023-02-21T00:00:00Z",
       "lastUpdated": "2023-03-19T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "85",
         "format": "ZIP",
@@ -2538,6 +2723,7 @@
     {
       "id": "86",
       "name": "Bevölkerungsbewegungen – anonyme Zählung",
+      "description": "",
       "creator": [
         {
           "id": "86",
@@ -2548,6 +2734,7 @@
       "issued": "2023-02-19T00:00:00Z",
       "lastUpdated": "2023-02-24T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -2564,6 +2751,7 @@
     {
       "id": "87",
       "name": "Verkehrsdichte an Kreuzungen",
+      "description": "",
       "creator": [
         {
           "id": "87",
@@ -2574,6 +2762,7 @@
       "issued": "2023-06-29T00:00:00Z",
       "lastUpdated": "2023-07-20T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "87",
         "format": "XLSX",
@@ -2595,6 +2784,7 @@
     {
       "id": "88",
       "name": "Straßenbeleuchtung – Defektmeldungen",
+      "description": "",
       "creator": [
         {
           "id": "88",
@@ -2605,6 +2795,7 @@
       "issued": "2023-08-21T00:00:00Z",
       "lastUpdated": "2023-09-05T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "88",
         "format": "JSON",
@@ -2626,6 +2817,7 @@
     {
       "id": "89",
       "name": "Defibrillator Nutzungshäufigkeit",
+      "description": "",
       "creator": [
         {
           "id": "89",
@@ -2636,6 +2828,7 @@
       "issued": "2023-07-15T00:00:00Z",
       "lastUpdated": "2023-08-14T00:00:00Z",
       "status": "open",
+      "tags": [],
       "distribution": {
         "id": "89",
         "format": "JSON",
@@ -2657,6 +2850,7 @@
     {
       "id": "90",
       "name": "Rettungsdienste – Einsatzzeiten",
+      "description": "",
       "creator": [
         {
           "id": "90",
@@ -2667,6 +2861,7 @@
       "issued": "2023-02-25T00:00:00Z",
       "lastUpdated": "2023-03-23T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -2683,6 +2878,7 @@
     {
       "id": "91",
       "name": "Grundwasserpegel Monitoring",
+      "description": "",
       "creator": [
         {
           "id": "91",
@@ -2693,6 +2889,7 @@
       "issued": "2023-06-01T00:00:00Z",
       "lastUpdated": "2023-06-21T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "91",
         "format": "CSV",
@@ -2714,6 +2911,7 @@
     {
       "id": "92",
       "name": "Luftqualität – NO2-Messungen",
+      "description": "",
       "creator": [
         {
           "id": "92",
@@ -2724,6 +2922,7 @@
       "issued": "2023-02-15T00:00:00Z",
       "lastUpdated": "2023-03-13T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": null,
       "catalog": [
         "1"
@@ -2740,6 +2939,7 @@
     {
       "id": "93",
       "name": "Tourismuszahlen Besucherzähler",
+      "description": "",
       "creator": [
         {
           "id": "93",
@@ -2750,6 +2950,7 @@
       "issued": "2023-02-04T00:00:00Z",
       "lastUpdated": "2023-02-08T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "93",
         "format": "XLSX",
@@ -2771,6 +2972,7 @@
     {
       "id": "94",
       "name": "Rettungsdienste – Einsatzzeiten",
+      "description": "",
       "creator": [
         {
           "id": "94",
@@ -2781,6 +2983,7 @@
       "issued": "2023-06-15T00:00:00Z",
       "lastUpdated": "2023-06-19T00:00:00Z",
       "status": null,
+      "tags": [],
       "distribution": {
         "id": "94",
         "format": "JSON",
@@ -2802,6 +3005,7 @@
     {
       "id": "95",
       "name": "Parkplatzauslastung Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "95",
@@ -2812,6 +3016,7 @@
       "issued": "2023-01-27T00:00:00Z",
       "lastUpdated": "2023-02-06T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "95",
         "format": "XLSX",
@@ -2833,6 +3038,7 @@
     {
       "id": "96",
       "name": "Parkplatzauslastung Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "96",
@@ -2843,6 +3049,7 @@
       "issued": "2023-05-26T00:00:00Z",
       "lastUpdated": "2023-05-28T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "96",
         "format": "XLSX",
@@ -2852,7 +3059,7 @@
       "catalog": [
         "1"
       ],
-      "series": {
+      "dataspace": {
         "id": "1",
         "name": "Verkehr"
       },
@@ -2864,6 +3071,7 @@
     {
       "id": "97",
       "name": "Energieverbrauch – Straßenbeleuchtung",
+      "description": "",
       "creator": [
         {
           "id": "97",
@@ -2874,6 +3082,7 @@
       "issued": "2023-05-04T00:00:00Z",
       "lastUpdated": "2023-05-14T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "97",
         "format": "PDF",
@@ -2895,6 +3104,7 @@
     {
       "id": "98",
       "name": "Tourismuszahlen Besucherzähler",
+      "description": "",
       "creator": [
         {
           "id": "98",
@@ -2905,6 +3115,7 @@
       "issued": "2023-08-31T00:00:00Z",
       "lastUpdated": "2023-09-07T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "98",
         "format": "CSV",
@@ -2926,6 +3137,7 @@
     {
       "id": "99",
       "name": "Müllbehälter Füllstände",
+      "description": "",
       "creator": [
         {
           "id": "99",
@@ -2936,6 +3148,7 @@
       "issued": "2023-07-28T00:00:00Z",
       "lastUpdated": "2023-08-06T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "99",
         "format": "PDF",
@@ -2957,6 +3170,7 @@
     {
       "id": "100",
       "name": "Niederschlagsmengen Sensoren",
+      "description": "",
       "creator": [
         {
           "id": "100",
@@ -2967,6 +3181,7 @@
       "issued": "2023-02-15T00:00:00Z",
       "lastUpdated": "2023-02-16T00:00:00Z",
       "status": "closed",
+      "tags": [],
       "distribution": {
         "id": "100",
         "format": "ZIP",

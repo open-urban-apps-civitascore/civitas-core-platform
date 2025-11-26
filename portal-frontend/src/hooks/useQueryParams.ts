@@ -31,7 +31,7 @@ export const useQueryParams = () => {
   const tabValue = useMemo(() => searchParams.get(QUERY_PARAMS.tabValue) ?? '', [searchParams])
   const subTabValue = useMemo(() => searchParams.get(QUERY_PARAMS.subTabValue) ?? '', [searchParams])
 
-  const [totalPages, setTotalPages] = useState(1)
+  const [totalPages, setTotalPages] = useState(0)
 
   useEffect(() => {
     if (totalPages && totalPages > 0 && pageIndex + 1 > totalPages) {
