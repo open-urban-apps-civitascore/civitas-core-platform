@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it } from 'vitest'
 
 import messages from '@/messages/de.json'
+
 import { PageHeader } from './PageHeader'
 
 const onTabClickMock = vi.fn()
