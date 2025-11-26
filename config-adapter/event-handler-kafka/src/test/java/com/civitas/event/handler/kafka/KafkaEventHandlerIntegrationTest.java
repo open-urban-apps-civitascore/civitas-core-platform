@@ -250,7 +250,8 @@ class KafkaEventHandlerIntegrationTest {
     CountDownLatch successLatch = new CountDownLatch(1);
     testAdapter.setProcessCallback((t, e) -> successLatch.countDown());
 
-    handler = new KafkaEventHandler(config, testAdapter);
+    handler = new KafkaEventHandler();
+    handler.initialize(config, testAdapter);
     handler.start();
     await().atMost(30, TimeUnit.SECONDS)
             .pollInterval(100, TimeUnit.MILLISECONDS)
@@ -267,7 +268,8 @@ class KafkaEventHandlerIntegrationTest {
     assertEquals(0, testAdapter.getProcessedEvents().size(), "Should not be processed.");
 
     handler.close();
-    handler = new KafkaEventHandler(config, testAdapter);
+    handler = new KafkaEventHandler();
+    handler.initialize(config, testAdapter);
     handler.start();
 
     await().atMost(30, TimeUnit.SECONDS)
