@@ -79,19 +79,23 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
     List<String> topicList = new ArrayList<>(adapter.getSubscribedTopics());
     kafkaConsumer.subscribe(topicList);
 
-    kafkaConsumer.subscribe(topicList, new org.apache.kafka.clients.consumer.ConsumerRebalanceListener() {
-      @Override
-      public void onPartitionsRevoked(java.util.Collection<org.apache.kafka.common.TopicPartition> partitions) {
-          ready = false;
-          logger.info("Partitions revoked - Consumer not ready");
-      }
+    kafkaConsumer.subscribe(
+        topicList,
+        new org.apache.kafka.clients.consumer.ConsumerRebalanceListener() {
+          @Override
+          public void onPartitionsRevoked(
+              java.util.Collection<org.apache.kafka.common.TopicPartition> partitions) {
+            ready = false;
+            logger.info("Partitions revoked - Consumer not ready");
+          }
 
-      @Override
-      public void onPartitionsAssigned(java.util.Collection<org.apache.kafka.common.TopicPartition> partitions) {
-          ready = true;
-          logger.info("Partitions assigned: {} - Consumer ready", partitions);
-      }
-    });
+          @Override
+          public void onPartitionsAssigned(
+              java.util.Collection<org.apache.kafka.common.TopicPartition> partitions) {
+            ready = true;
+            logger.info("Partitions assigned: {} - Consumer ready", partitions);
+          }
+        });
 
     // Initialize producer for publishing events
     Properties producerProps = new Properties();
@@ -143,47 +147,49 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   private void consume() {
     logger.info("Starting consumption loop");
     try {
-        while (running.get()) {
+      while (running.get()) {
+        try {
+          ConsumerRecords<String, CloudEvent> records = kafkaConsumer.poll(Duration.ofMillis(1000));
+
+          if (records.isEmpty()) {
+            continue;
+          }
+
+          boolean batchSuccess = true;
+          for (var record : records) {
             try {
-                ConsumerRecords<String, CloudEvent> records = kafkaConsumer.poll(Duration.ofMillis(1000));
-
-                if (records.isEmpty()) {
-                    continue;
-                }
-
-                boolean batchSuccess = true;
-                for (var record : records) {
-                    try {
-                        processor.handleEvent(record.topic(), record.value());
-                    } catch (Exception e) {
-                        logger.error("Critical error processing event ID {}. Stopping consumer to prevent data loss.",
-                                record.value().getId(), e);
-                        batchSuccess = false;
-                        running.set(false);
-                        break;
-                    }
-                }
-
-                if (batchSuccess && running.get()) {
-                    try {
-                        kafkaConsumer.commitSync();
-                    } catch (Exception commitException) {
-                        logger.error("Failed to commit offsets", commitException);
-                        running.set(false);
-                    }
-                }
+              processor.handleEvent(record.topic(), record.value());
             } catch (Exception e) {
-                logger.error("Error consuming messages", e);
-                if (!running.get()) {
-                    break;
-                }
+              logger.error(
+                  "Critical error processing event ID {}. Stopping consumer to prevent data loss.",
+                  record.value().getId(),
+                  e);
+              batchSuccess = false;
+              running.set(false);
+              break;
             }
+          }
+
+          if (batchSuccess && running.get()) {
+            try {
+              kafkaConsumer.commitSync();
+            } catch (Exception commitException) {
+              logger.error("Failed to commit offsets", commitException);
+              running.set(false);
+            }
+          }
+        } catch (Exception e) {
+          logger.error("Error consuming messages", e);
+          if (!running.get()) {
+            break;
+          }
         }
+      }
     } catch (Exception e) {
-        logger.error("Consumer loop died unexpectedly", e);
+      logger.error("Consumer loop died unexpectedly", e);
     } finally {
-        ready = false;
-        logger.info("Consumption loop ended");
+      ready = false;
+      logger.info("Consumption loop ended");
     }
   }
 
