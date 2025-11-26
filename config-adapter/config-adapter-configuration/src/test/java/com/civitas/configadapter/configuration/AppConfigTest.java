@@ -48,7 +48,7 @@ class AppConfigTest {
 
   @Test
   void shouldConvertPropertyKeyToEnvironmentVariableName() {
-    AppConfig config = createAppConfig("kafka.bootstrap.servers", "localhost:9092");
+    AppConfig config = createAppConfig("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
 
     assertEquals("localhost:9092", config.getProperty("kafka.bootstrap.servers"));
   }
