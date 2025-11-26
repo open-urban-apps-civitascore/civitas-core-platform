@@ -41,7 +41,11 @@ export const PageHeader = (props: PageHeaderProps) => {
             <h1 id="page-heading" className=" bg-transparent text-3xl font-bold text-center m-0">
               {title}
             </h1>
-            {badgeTitle && <Badge variant="outline">{badgeTitle}</Badge>}
+            {badgeTitle && (
+              <Badge data-testid="pageHeaderBadge" variant="outline">
+                {badgeTitle}
+              </Badge>
+            )}
           </div>
         )}
       </div>
