@@ -34,15 +34,15 @@ export const PageHeader = (props: PageHeaderProps) => {
       >
         {title && (
           <div className="flex flex-row items-center gap-4">
-          <h1
-            id="page-heading"
-            className={cn(
-              'block bg-transparent text-3xl font-bold text-center m-0 truncate max-w-full min-w-0',
-              isMobile && 'text-2xl',
-            )}
-          >
-            {title}
-          </h1>
+            <h1
+              id="page-heading"
+              className={cn(
+                'block bg-transparent text-3xl font-bold text-center m-0 truncate max-w-full min-w-0',
+                isMobile && 'text-2xl',
+              )}
+            >
+              {title}
+            </h1>
             {badgeTitle && <Badge variant="outline">{badgeTitle}</Badge>}
           </div>
         )}
