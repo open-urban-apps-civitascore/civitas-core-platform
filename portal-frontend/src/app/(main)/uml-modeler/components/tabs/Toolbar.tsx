@@ -1,6 +1,6 @@
 'use client'
 
-import { FileDown, FileUp, Save } from 'lucide-react'
+import { Save } from 'lucide-react'
 import { useCallback } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -11,14 +11,14 @@ interface ToolbarProps {
   hasUnsavedChanges?: boolean
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ onSave, onExport, hasUnsavedChanges = false }) => {
+export const Toolbar: React.FC<ToolbarProps> = ({ onSave, hasUnsavedChanges = false }) => {
   const handleSave = useCallback(() => {
     onSave?.()
   }, [onSave])
 
-  const handleExportData = useCallback(() => {
-    onExport?.()
-  }, [onExport])
+  // const handleExportData = useCallback(() => {
+  //   onExport?.()
+  // }, [onExport])
 
   return (
     <div className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
@@ -35,14 +35,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onSave, onExport, hasUnsavedCh
           <span className="ml-1 text-xs">Save</span>
         </Button>
 
-        <Button variant="ghost" size="sm" onClick={handleExportData} className="h-8 px-2" title="Export diagram data">
+        {/* <Button variant="ghost" size="sm" onClick={handleExportData} className="h-8 px-2" title="Import diagram data">
           <FileUp className="h-4 w-4" />
-          <span className="ml-1 text-xs">Imprt</span>
+          <span className="ml-1 text-xs">Import</span>
         </Button>
         <Button variant="ghost" size="sm" onClick={handleExportData} className="h-8 px-2" title="Export diagram data">
           <FileDown className="h-4 w-4" />
           <span className="ml-1 text-xs">Export</span>
-        </Button>
+        </Button> */}
       </div>
 
       {/* Spacer */}
