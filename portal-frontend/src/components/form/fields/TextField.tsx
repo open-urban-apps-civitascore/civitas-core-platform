@@ -46,7 +46,7 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
                 disabled={disabled}
               />
             </FormControl>
-            <FormMessage className="mt-2" />
+            <FormMessage data-testid={`${name}FormMessage`} className="mt-2" />
           </div>
         </FormItem>
       )}

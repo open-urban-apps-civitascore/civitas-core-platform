@@ -88,6 +88,32 @@ test.describe('Edit User Page', async () => {
     }
   })
 
+  test('save button gets enabled after changing form values', async ({ page }) => {
+    await page.getByTestId('editButton').click()
+    await expect(page.getByTestId('confirmButton')).toBeDisabled()
+    await page.getByTestId('firstNameTextField').fill(MOCK_USER_1.firstName)
+    await expect(page.getByTestId('confirmButton')).toBeEnabled()
+  })
+
+  test('form validation highlights incorrectly filled in fields and shows error messages', async ({ page }) => {
+    await page.getByTestId('editButton').click()
+    await page.getByTestId('firstNameTextField').fill('')
+    await page.getByTestId('confirmButton').click()
+
+    await expect(page.getByTestId('firstNameTextField')).toHaveAttribute('aria-invalid', 'true')
+    await expect(page.getByTestId('firstNameFormMessage')).toBeVisible()
+
+    await page.getByTestId('firstNameTextField').fill('Test Name')
+    await expect(page.getByTestId('firstNameTextField')).toHaveAttribute('aria-invalid', 'false')
+    await expect(page.getByTestId('firstNameFormMessage')).toBeHidden()
+  })
+
+  test('cancel user editing navigates to users list', async ({ page }) => {
+    await page.getByTestId('editButton').click()
+    await page.getByTestId('cancelButton').click()
+    await expect(page.getByTestId('usersPage')).toBeVisible()
+  })
+
   test('edits user details', async ({ page }) => {
     await page.getByTestId('editButton').click()
 
@@ -102,18 +128,24 @@ test.describe('Edit User Page', async () => {
     await page.getByTestId('confirmButton').click()
     await page.waitForLoadState('networkidle')
 
+    // Verify if edited fields show correct content
     await expect(page.getByTestId('userDetailsPage')).toBeVisible()
+    // names fields have to be checked like this since the name is too long for the field
+    const firstName = (await page.getByTestId('firstNameTextField').textContent())?.trim() ?? ''
+    expect(`edited ${MOCK_USER_1.firstName}`).toContain(firstName)
+    const lastName = (await page.getByTestId('lastNameTextField').textContent())?.trim() ?? ''
+    expect(`edited ${MOCK_USER_1.lastName}`).toContain(lastName)
     await expect(page.getByTestId('pageHeader')).toContainText(
       `edited ${MOCK_USER_1.firstName} edited ${MOCK_USER_1.lastName}`,
     )
-
     await expect(page.getByTestId('departmentSelectTrigger')).toContainText('Select department...')
     await expect(page.getByTestId('activeStatus')).toContainText('Inactive')
-  })
 
-  test('cancel user editing navigates to users list', async ({ page }) => {
-    await page.getByTestId('editButton').click()
-    await page.getByTestId('cancelButton').click()
-    await expect(page.getByTestId('usersPage')).toBeVisible()
+    // verify if page gets set back to readonly view
+    await expect(page.getByTestId('editButton')).toBeVisible()
+    const fields = page.locator('[data-test-element="formField"]')
+    for (const field of await fields.all()) {
+      await expect(field).toBeDisabled()
+    }
   })
 })

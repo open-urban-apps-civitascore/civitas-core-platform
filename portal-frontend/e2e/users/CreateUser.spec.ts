@@ -60,9 +60,39 @@ test.describe('Create User Flow', async () => {
     }
   })
 
+  test('cancel user creation navigates to users list', async ({ page }) => {
+    await page.getByTestId('cancelButton').click()
+    await expect(page.getByTestId('usersPage')).toBeVisible()
+  })
+
+  test('save button gets enabled after changing form values', async ({ page }) => {
+    await expect(page.getByTestId('confirmButton')).toBeDisabled()
+    await page.getByTestId('firstNameTextField').fill(MOCK_USER_1.firstName)
+    await expect(page.getByTestId('confirmButton')).toBeEnabled()
+  })
+
+  test('form validation highlights incorrectly filled in fields and shows error messages', async ({ page }) => {
+    await pickSelectOption(page, 'title', 1)
+    await page.getByTestId('confirmButton').click()
+    await expect(page.getByTestId('firstNameTextField')).toHaveAttribute('aria-invalid', 'true')
+    await expect(page.getByTestId('lastNameTextField')).toHaveAttribute('aria-invalid', 'true')
+    await expect(page.getByTestId('emailTextField')).toHaveAttribute('aria-invalid', 'true')
+    await expect(page.getByTestId('firstNameFormMessage')).toBeVisible()
+    await expect(page.getByTestId('lastNameFormMessage')).toBeVisible()
+    await expect(page.getByTestId('emailFormMessage')).toBeVisible()
+
+    await page.getByTestId('firstNameTextField').fill('Test Name')
+    await expect(page.getByTestId('firstNameTextField')).toHaveAttribute('aria-invalid', 'false')
+    await expect(page.getByTestId('firstNameFormMessage')).toBeHidden()
+  })
+
   test('creates new user', async ({ page }) => {
     // fill in form data
+    await expect(page.getByTestId('confirmButton')).toBeDisabled()
+
     await pickSelectOption(page, 'title', 1)
+    await expect(page.getByTestId('confirmButton')).toBeEnabled()
+
     await page.getByTestId('firstNameTextField').fill(MOCK_USER_1.firstName)
     await page.getByTestId('lastNameTextField').fill(MOCK_USER_1.lastName)
     await page.getByTestId('emailTextField').fill(MOCK_USER_1.email)
@@ -75,9 +105,14 @@ test.describe('Create User Flow', async () => {
     await page.getByTestId('confirmButton').click()
     await page.waitForLoadState('networkidle')
 
-    // verify redirect to new created user's details page
+    // verify redirect to new created user's details page in readonly view
     await expect(page.getByTestId('userDetailsPage')).toBeVisible()
     await expect(page.getByTestId('pageHeader')).toContainText(MOCK_USER_1.displayName)
+    await expect(page.getByTestId('editButton')).toBeVisible()
+    const fields = page.locator('[data-test-element="formField"]')
+    for (const field of await fields.all()) {
+      await expect(field).toBeDisabled()
+    }
 
     // verify new created user appears in users list
     await page.getByTestId('sidebarMenuItem-users').click()
@@ -87,10 +122,5 @@ test.describe('Create User Flow', async () => {
     const rows = page.getByRole('row')
     await expect(rows).toHaveCount(2)
     await expect(rows.filter({ hasText: MOCK_USER_1.displayName })).toBeVisible()
-  })
-
-  test('cancel user creation navigates to users list', async ({ page }) => {
-    await page.getByTestId('cancelButton').click()
-    await expect(page.getByTestId('usersPage')).toBeVisible()
   })
 })
