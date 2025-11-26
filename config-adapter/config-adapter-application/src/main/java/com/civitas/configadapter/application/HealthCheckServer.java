@@ -53,6 +53,10 @@ public class HealthCheckServer implements AutoCloseable {
     this.healthStatus.markReady();
   }
 
+  int getPort() {
+    return server.getAddress().getPort();
+  }
+
   private class HealthHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {

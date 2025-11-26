@@ -17,15 +17,14 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.Arrays;
 import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class HealthCheckServerTest {
 
   private HttpClient httpClient;
-  private static final int TEST_PORT = 9090;
 
   @BeforeEach
   void setUp() {
@@ -34,18 +33,9 @@ class HealthCheckServerTest {
 
   @Test
   void shouldReturnLivenessProbe() throws Exception {
-    List<Object> mockConsumers = Arrays.asList(new Object(), new Object());
-
-    try (HealthCheckServer testServer = new HealthCheckServer(TEST_PORT, mockConsumers)) {
+    try (HealthCheckServer testServer = new HealthCheckServer(0, createMockConsumers(2))) {
       testServer.start();
-      HttpRequest request =
-          HttpRequest.newBuilder()
-              .uri(URI.create("http://localhost:" + TEST_PORT + "/health/live"))
-              .GET()
-              .build();
-
-      HttpResponse<String> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = sendGetRequest(testServer.getPort(), "/health/live");
 
       assertEquals(200, response.statusCode());
       assertTrue(response.body().contains("\"status\":\"UP\""));
@@ -54,18 +44,9 @@ class HealthCheckServerTest {
 
   @Test
   void shouldReturnReadinessProbeNotReady() throws Exception {
-    List<Object> mockConsumers = Arrays.asList(new Object(), new Object());
-
-    try (HealthCheckServer testServer = new HealthCheckServer(TEST_PORT, mockConsumers)) {
+    try (HealthCheckServer testServer = new HealthCheckServer(0, createMockConsumers(2))) {
       testServer.start();
-      HttpRequest request =
-          HttpRequest.newBuilder()
-              .uri(URI.create("http://localhost:" + TEST_PORT + "/health/ready"))
-              .GET()
-              .build();
-
-      HttpResponse<String> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = sendGetRequest(testServer.getPort(), "/health/ready");
 
       assertEquals(503, response.statusCode());
       assertTrue(response.body().contains("\"status\":\"DOWN\""));
@@ -74,20 +55,10 @@ class HealthCheckServerTest {
 
   @Test
   void shouldReturnReadinessProbeReady() throws Exception {
-    List<Object> mockConsumers = Arrays.asList(new Object());
-
-    try (HealthCheckServer testServer = new HealthCheckServer(9091, mockConsumers)) {
+    try (HealthCheckServer testServer = new HealthCheckServer(0, createMockConsumers(1))) {
       testServer.start();
       testServer.markReady();
-
-      HttpRequest request =
-          HttpRequest.newBuilder()
-              .uri(URI.create("http://localhost:9091/health/ready"))
-              .GET()
-              .build();
-
-      HttpResponse<String> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = sendGetRequest(testServer.getPort(), "/health/ready");
 
       assertEquals(200, response.statusCode());
       assertTrue(response.body().contains("\"status\":\"UP\""));
@@ -96,17 +67,10 @@ class HealthCheckServerTest {
 
   @Test
   void shouldReturnHealthEndpointWithDetails() throws Exception {
-    List<Object> mockConsumers = Arrays.asList(new Object(), new Object());
-
-    try (HealthCheckServer testServer = new HealthCheckServer(9092, mockConsumers)) {
+    try (HealthCheckServer testServer = new HealthCheckServer(0, createMockConsumers(2))) {
       testServer.start();
       testServer.markReady();
-
-      HttpRequest request =
-          HttpRequest.newBuilder().uri(URI.create("http://localhost:9092/health")).GET().build();
-
-      HttpResponse<String> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = sendGetRequest(testServer.getPort(), "/health");
 
       assertEquals(200, response.statusCode());
       assertTrue(response.body().contains("\"status\":\"UP\""));
@@ -117,21 +81,32 @@ class HealthCheckServerTest {
 
   @Test
   void shouldReturn405ForNonGetRequests() throws Exception {
-    List<Object> mockConsumers = Arrays.asList(new Object(), new Object());
-
-    try (HealthCheckServer testServer = new HealthCheckServer(TEST_PORT, mockConsumers)) {
+    try (HealthCheckServer testServer = new HealthCheckServer(0, createMockConsumers(2))) {
       testServer.start();
-      HttpRequest request =
-          HttpRequest.newBuilder()
-              .uri(URI.create("http://localhost:" + TEST_PORT + "/health"))
-              .POST(HttpRequest.BodyPublishers.ofString(""))
-              .build();
-
-      HttpResponse<String> response =
-          httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+      HttpResponse<String> response = sendPostRequest(testServer.getPort(), "/health", "");
 
       assertEquals(405, response.statusCode());
       assertEquals("Method Not Allowed", response.body());
     }
+  }
+
+  private HttpResponse<String> sendGetRequest(int port, String path) throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder().uri(URI.create("http://localhost:" + port + path)).GET().build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> sendPostRequest(int port, String path, String body)
+      throws Exception {
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create("http://localhost:" + port + path))
+            .POST(HttpRequest.BodyPublishers.ofString(body))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  }
+
+  private List<Object> createMockConsumers(int count) {
+    return IntStream.range(0, count).mapToObj(i -> new Object()).toList();
   }
 }
