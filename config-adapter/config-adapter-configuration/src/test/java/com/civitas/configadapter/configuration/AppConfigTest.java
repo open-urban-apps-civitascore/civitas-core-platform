@@ -95,23 +95,23 @@ class AppConfigTest {
 
   @Test
   void shouldGetEventHandlerClass() {
-    AppConfig config = createAppConfig("eventhandler.class", "com.example.EventHandler");
+    AppConfig config = createAppConfig("eventhandler.name", "com.example.EventHandler");
 
-    assertEquals("com.example.EventHandler", config.getEventHandlerClass());
+    assertEquals("com.example.EventHandler", config.getEventHandlerName());
   }
 
   @Test
-  void shouldGetEventConsumerClass() {
-    AppConfig config = createAppConfig("eventconsumer.class", "com.example.EventConsumer");
+  void shouldGetEventConsumerName() {
+    AppConfig config = createAppConfig("eventconsumer.name", "com.example.EventConsumer");
 
-    assertEquals("com.example.EventConsumer", config.getEventConsumerClass());
+    assertEquals("com.example.EventConsumer", config.getEventConsumerName());
   }
 
   @Test
-  void shouldGetEventPublisherClass() {
-    AppConfig config = createAppConfig("eventpublisher.class", "com.example.EventPublisher");
+  void shouldGetEventPublisherName() {
+    AppConfig config = createAppConfig("eventpublisher.name", "com.example.EventPublisher");
 
-    assertEquals("com.example.EventPublisher", config.getEventPublisherClass());
+    assertEquals("com.example.EventPublisher", config.getEventPublisherName());
   }
 
   @Test

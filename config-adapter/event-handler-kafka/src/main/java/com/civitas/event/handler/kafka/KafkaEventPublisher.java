@@ -10,6 +10,9 @@
  */
 package com.civitas.event.handler.kafka;
 
+import static java.util.Objects.nonNull;
+
+import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.ConfigResultEvent;
@@ -30,15 +33,20 @@ import org.slf4j.LoggerFactory;
  * as CloudEvents. This class can be used independently when separate consumer and publisher are
  * configured.
  */
-public class KafkaEventPublisher implements EventPublisher, AutoCloseable {
+public class KafkaEventPublisher implements EventPublisher {
+
+  public static final String PUBLISHER_NAME = "kafka";
 
   private static final Logger logger = LoggerFactory.getLogger(KafkaEventPublisher.class);
 
   private static final String KAFKA_BOOTSTRAP_SERVERS = "kafka.bootstrap.servers";
 
-  private final KafkaProducer<String, CloudEvent> kafkaProducer;
+  private KafkaProducer<String, CloudEvent> kafkaProducer;
 
-  public KafkaEventPublisher(ApplicationConfig config) {
+  public KafkaEventPublisher() {}
+
+  @Override
+  public void initialize(ApplicationConfig config, ConfigAdapter adapter) {
     Properties producerProps = new Properties();
     producerProps.put(
         ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -53,6 +61,9 @@ public class KafkaEventPublisher implements EventPublisher, AutoCloseable {
 
     this.kafkaProducer = new KafkaProducer<>(producerProps);
 
+    if (nonNull(adapter)) {
+      adapter.setEventPublisher(this);
+    }
     logger.info(
         "Kafka event publisher initialized with bootstrap servers: {}",
         config.getProperty(KAFKA_BOOTSTRAP_SERVERS, "localhost:9092"));
@@ -86,6 +97,15 @@ public class KafkaEventPublisher implements EventPublisher, AutoCloseable {
     } catch (Exception e) {
       logger.error("Error publishing result event {} to topic {}", cloudEvent.getId(), topic, e);
     }
+  }
+
+  /*
+   * (non-Javadoc)
+   * @see com.civitas.configadapter.messaging.EventPublisher#getName()
+   */
+  @Override
+  public String getName() {
+    return PUBLISHER_NAME;
   }
 
   /**

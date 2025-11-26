@@ -33,18 +33,22 @@ import org.slf4j.LoggerFactory;
  */
 public class KafkaEventConsumer implements EventConsumer {
 
+  public static final String CONSUMER_NAME = "kafka";
   private static final Logger logger = LoggerFactory.getLogger(KafkaEventConsumer.class);
 
   private static final String KAFKA_GROUP_ID = "kafka.group.id";
   private static final String KAFKA_BOOTSTRAP_SERVERS = "kafka.bootstrap.servers";
 
-  private final KafkaConsumer<String, CloudEvent> kafkaConsumer;
-  private final ConfigAdapter adapter;
-  private final CloudEventProcessor processor;
+  private KafkaConsumer<String, CloudEvent> kafkaConsumer;
+  private ConfigAdapter adapter;
+  private CloudEventProcessor processor;
   private final AtomicBoolean running = new AtomicBoolean(false);
   private Thread consumerThread;
 
-  public KafkaEventConsumer(ApplicationConfig config, ConfigAdapter adapter) {
+  public KafkaEventConsumer() {}
+
+  @Override
+  public void initialize(ApplicationConfig config, ConfigAdapter adapter) {
     this.adapter = adapter;
     this.processor = new CloudEventProcessor(adapter);
 
@@ -70,6 +74,15 @@ public class KafkaEventConsumer implements EventConsumer {
         adapter.getClass().getSimpleName(),
         topicList.size(),
         topicList);
+  }
+
+  /*
+   * (non-Javadoc)
+   * @see com.civitas.configadapter.messaging.EventConsumer#getName()
+   */
+  @Override
+  public String getName() {
+    return CONSUMER_NAME;
   }
 
   @Override

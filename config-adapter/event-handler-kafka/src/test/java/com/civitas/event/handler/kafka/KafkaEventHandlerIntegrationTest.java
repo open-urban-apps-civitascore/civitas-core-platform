@@ -119,7 +119,8 @@ class KafkaEventHandlerIntegrationTest {
     testAdapter.setProcessCallback((t, event) -> latch.countDown());
 
     // Create handler with test adapter
-    handler = new KafkaEventHandler(config, testAdapter);
+    handler = new KafkaEventHandler();
+    handler.initialize(config, testAdapter);
     handler.start();
 
     // Create and send test event
@@ -168,7 +169,8 @@ class KafkaEventHandlerIntegrationTest {
         });
 
     // Create handler
-    handler = new KafkaEventHandler(config, testAdapter);
+    handler = new KafkaEventHandler();
+    handler.initialize(config, testAdapter);
     handler.start();
 
     // Create test event with result topic
@@ -194,7 +196,8 @@ class KafkaEventHandlerIntegrationTest {
 
     testAdapter.setProcessCallback((topic, event) -> latch.countDown());
 
-    handler = new KafkaEventHandler(config, testAdapter);
+    handler = new KafkaEventHandler();
+    handler.initialize(config, testAdapter);
     handler.start();
 
     // When - send events to different topics
@@ -217,7 +220,8 @@ class KafkaEventHandlerIntegrationTest {
     testAdapter.setSubscribedTopics(List.of(topic));
     CountDownLatch latch = new CountDownLatch(1);
     testAdapter.setProcessCallback((t, event) -> latch.countDown());
-    handler = new KafkaEventHandler(config, testAdapter);
+    handler = new KafkaEventHandler();
+    handler.initialize(config, testAdapter);
     handler.start();
 
     // Create CloudEvent with no data

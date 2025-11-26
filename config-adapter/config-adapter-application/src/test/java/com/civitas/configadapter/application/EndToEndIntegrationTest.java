@@ -71,11 +71,13 @@ import org.testcontainers.utility.DockerImageName;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class EndToEndIntegrationTest {
 
+  @SuppressWarnings("resource")
   @Container
   static ConfluentKafkaContainer kafka =
       new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.3"))
           .withReuse(false);
 
+  @SuppressWarnings("resource")
   @Container
   static GenericContainer<?> keycloak =
       new GenericContainer<>(DockerImageName.parse("quay.io/keycloak/keycloak:23.0"))
@@ -135,7 +137,8 @@ class EndToEndIntegrationTest {
     adapter.initialize(config);
 
     // Create consumer with adapter
-    consumer = new KafkaEventHandler(config, adapter);
+    consumer = new KafkaEventHandler();
+    consumer.initialize(config, adapter);
     consumer.start();
 
     // Create Kafka producer for sending test events

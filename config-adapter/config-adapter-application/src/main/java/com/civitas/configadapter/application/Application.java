@@ -10,6 +10,9 @@
  */
 package com.civitas.configadapter.application;
 
+import static com.civitas.configadapter.util.ServiceLoaderUtils.getInstanceByFilter;
+import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 import static java.util.Objects.requireNonNull;
 
 import com.civitas.configadapter.adapter.AbstractConfigAdapter;
@@ -19,13 +22,10 @@ import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.messaging.EventConsumer;
 import com.civitas.configadapter.messaging.EventPublisher;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.ServiceLoader;
-import java.util.ServiceLoader.Provider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,28 +100,28 @@ public class Application {
     }
 
     // Determine configuration mode: combined or separate consumer/publisher
-    String eventHandlerClass = config.getEventHandlerClass();
-    String eventConsumerClass = config.getEventConsumerClass();
-    String eventPublisherClass = config.getEventPublisherClass();
+    String eventHandlerName = config.getEventHandlerName();
+    String eventConsumerName = config.getEventConsumerName();
+    String eventPublisherName = config.getEventPublisherName();
 
-    if (eventHandlerClass != null && (eventConsumerClass != null || eventPublisherClass != null)) {
+    if (nonNull(eventHandlerName) && (nonNull(eventConsumerName) || nonNull(eventPublisherName))) {
       throw new RuntimeException(
-          "Configuration error: Cannot specify both 'eventhandler.class' and separate 'eventconsumer.class' or 'eventpublisher.class'");
+          "Configuration error: Cannot specify both 'eventhandler.name' and separate 'eventconsumer.name' or 'eventpublisher.name'");
     }
 
-    boolean useCombinedHandler = eventHandlerClass != null;
-
-    if (useCombinedHandler) {
-      logger.info("Using combined event handler: {}", eventHandlerClass);
+    if (nonNull(eventHandlerName)) {
+      logger.info("Using combined event handler: {}", eventHandlerName);
+      eventConsumerName = eventHandlerName;
+      eventPublisherName = eventHandlerName;
     } else {
-      if (eventConsumerClass == null) {
+      if (isNull(eventConsumerName)) {
         throw new RuntimeException(
-            "No event consumer configured. Please specify 'eventhandler.class' or 'eventconsumer.class'");
+            "No event consumer configured. Please specify 'eventhandler.name' or 'eventconsumer.name'");
       }
       logger.info(
           "Using separate consumer: {} and publisher: {}",
-          eventConsumerClass,
-          eventPublisherClass != null ? eventPublisherClass : "none");
+          eventConsumerName,
+          eventPublisherName != null ? eventPublisherName : "none");
     }
 
     logger.info("Creating {} adapter(s)", adapterNames.size());
@@ -147,23 +147,20 @@ public class Application {
             topics);
 
         EventConsumer consumer;
-        if (useCombinedHandler) {
-          // Combined handler: single class implements both EventConsumer and EventPublisher
-          consumer = createConsumer(config, eventHandlerClass, adapter);
-        } else {
-          // Separate consumer and publisher
-          EventPublisher publisher = null;
-          if (eventPublisherClass != null) {
-            publisher = createPublisher(config, eventPublisherClass);
-          }
-
-          // Inject publisher into adapter
-          if (publisher != null) {
-            adapter.setEventPublisher(publisher);
-          }
-
-          consumer = createConsumer(config, eventConsumerClass, adapter);
+        consumer = createConsumer(config, eventConsumerName, adapter);
+        // Separate consumer and publisher
+        EventPublisher publisher = null;
+        if (nonNull(eventPublisherName)) {
+          publisher = createPublisher(config, eventPublisherName, adapter);
+          adapter.setEventPublisher(publisher);
         }
+
+        // Inject publisher into adapter
+        if (publisher != null) {
+          adapter.setEventPublisher(publisher);
+        }
+
+        consumer = createConsumer(config, eventConsumerName, adapter);
 
         consumers.add(consumer);
 
@@ -183,51 +180,33 @@ public class Application {
   }
 
   private EventConsumer createConsumer(
-      ApplicationConfig config, String consumerClass, ConfigAdapter adapter)
-      throws ClassNotFoundException,
-          InstantiationException,
-          IllegalAccessException,
-          InvocationTargetException,
-          NoSuchMethodException {
-    Class<?> consumerClazz = Class.forName(consumerClass);
-
-    // Verify that the class implements EventConsumer interface
-    if (!EventConsumer.class.isAssignableFrom(consumerClazz)) {
-      throw new IllegalArgumentException(
-          String.format("Class %s does not implement EventConsumer interface", consumerClass));
+      ApplicationConfig config, String consumerName, ConfigAdapter adapter) {
+    Optional<EventConsumer> consumerOpt =
+        getInstanceByFilter(EventConsumer.class, ec -> Objects.equals(consumerName, ec.getName()));
+    if (consumerOpt.isPresent()) {
+      EventConsumer consumer = consumerOpt.get();
+      consumer.initialize(config, adapter);
+      return consumer;
     }
-
-    return (EventConsumer)
-        consumerClazz
-            .getConstructor(ApplicationConfig.class, ConfigAdapter.class)
-            .newInstance(config, adapter);
+    return null;
   }
 
-  private EventPublisher createPublisher(ApplicationConfig config, String publisherClass)
-      throws ClassNotFoundException,
-          InstantiationException,
-          IllegalAccessException,
-          InvocationTargetException,
-          NoSuchMethodException {
-    Class<?> publisherClazz = Class.forName(publisherClass);
-
-    // Verify that the class implements EventPublisher interface
-    if (!EventPublisher.class.isAssignableFrom(publisherClazz)) {
-      throw new IllegalArgumentException(
-          String.format("Class %s does not implement EventPublisher interface", publisherClass));
+  private EventPublisher createPublisher(
+      ApplicationConfig config, String publisherName, ConfigAdapter adapter) {
+    Optional<EventPublisher> publisherOpt =
+        getInstanceByFilter(
+            EventPublisher.class, ep -> Objects.equals(publisherName, ep.getName()));
+    if (publisherOpt.isPresent()) {
+      EventPublisher ep = publisherOpt.get();
+      ep.initialize(config, adapter);
+      return ep;
     }
-
-    return (EventPublisher)
-        publisherClazz.getConstructor(ApplicationConfig.class).newInstance(config);
+    return null;
   }
 
   private ConfigAdapter createAdapter(AdapterConfig config, String adapterName) {
-    ServiceLoader<ConfigAdapter> configAdapterLoader = ServiceLoader.load(ConfigAdapter.class);
     Optional<ConfigAdapter> configAdapterOpt =
-        configAdapterLoader.stream()
-            .filter(p -> Objects.equals(adapterName, p.get().getName()))
-            .map(Provider::get)
-            .findFirst();
+        getInstanceByFilter(ConfigAdapter.class, ca -> Objects.equals(adapterName, ca.getName()));
     if (configAdapterOpt.isPresent()) {
       ConfigAdapter configAdapter = configAdapterOpt.get();
       if (configAdapter instanceof AbstractConfigAdapter aca) {

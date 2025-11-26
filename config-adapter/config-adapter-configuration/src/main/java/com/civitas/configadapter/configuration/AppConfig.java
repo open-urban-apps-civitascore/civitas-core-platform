@@ -55,16 +55,16 @@ public record AppConfig(Configuration configuration) implements ApplicationConfi
     return Collections.emptyList();
   }
 
-  public String getEventHandlerClass() {
-    return getProperty("eventhandler.class");
+  public String getEventHandlerName() {
+    return getProperty("eventhandler.name");
   }
 
-  public String getEventConsumerClass() {
-    return getProperty("eventconsumer.class");
+  public String getEventConsumerName() {
+    return getProperty("eventconsumer.name");
   }
 
-  public String getEventPublisherClass() {
-    return getProperty("eventpublisher.class");
+  public String getEventPublisherName() {
+    return getProperty("eventpublisher.name");
   }
 
   public int getHealthCheckPort() {

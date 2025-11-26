@@ -38,20 +38,28 @@ import org.slf4j.LoggerFactory;
 
 public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
+  public static final String HANDLER_NAME = "kafka";
   private static final Logger logger = LoggerFactory.getLogger(KafkaEventHandler.class);
 
   private static final String KAFKA_GROUP_ID = "kafka.group.id";
   private static final String KAFKA_BOOTSTRAP_SERVERS = "kafka.bootstrap.servers";
 
-  private final KafkaConsumer<String, CloudEvent> kafkaConsumer;
-  private final KafkaProducer<String, CloudEvent> kafkaProducer;
-  private final ConfigAdapter adapter;
-  private final CloudEventProcessor processor;
+  private KafkaConsumer<String, CloudEvent> kafkaConsumer;
+  private KafkaProducer<String, CloudEvent> kafkaProducer;
+  private ConfigAdapter adapter;
+  private CloudEventProcessor processor;
   private final AtomicBoolean running = new AtomicBoolean(false);
   private Thread consumerThread;
   private boolean ready;
 
-  public KafkaEventHandler(ApplicationConfig config, ConfigAdapter adapter) {
+  public KafkaEventHandler() {}
+
+  /*
+   * (non-Javadoc)
+   * @see com.civitas.configadapter.messaging.EventConsumer#initialize(com.civitas.configadapter.configuration.ApplicationConfig, com.civitas.configadapter.adapter.ConfigAdapter)
+   */
+  @Override
+  public void initialize(ApplicationConfig config, ConfigAdapter adapter) {
     this.adapter = adapter;
     this.processor = new CloudEventProcessor(adapter);
 
@@ -113,6 +121,15 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
   public boolean isReady() {
     return ready;
+  }
+
+  /*
+   * (non-Javadoc)
+   * @see com.civitas.configadapter.messaging.EventConsumer#getName()
+   */
+  @Override
+  public String getName() {
+    return HANDLER_NAME;
   }
 
   @Override

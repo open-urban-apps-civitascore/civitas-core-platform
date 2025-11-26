@@ -18,7 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
+import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
@@ -556,8 +558,24 @@ class KeycloakAdapterIntegrationTest {
       return new ArrayList<>(publishedEvents);
     }
 
+    /*
+     * (non-Javadoc)
+     * @see com.civitas.configadapter.messaging.EventPublisher#getName()
+     */
+    @Override
+    public String getName() {
+      return "test";
+    }
+
     public void clear() {
       publishedEvents.clear();
     }
+
+    /*
+     * (non-Javadoc)
+     * @see com.civitas.configadapter.messaging.EventBase#initialize(com.civitas.configadapter.configuration.ApplicationConfig, com.civitas.configadapter.adapter.ConfigAdapter)
+     */
+    @Override
+    public void initialize(ApplicationConfig config, ConfigAdapter adapter) {}
   }
 }
