@@ -10,8 +10,6 @@
  */
 package com.civitas.configadapter.configuration;
 
-import java.util.List;
-
 /**
  * Configuration interface for config adapters. Provides access to configuration properties with
  * support for environment variable overrides and default values.
@@ -44,40 +42,4 @@ public interface AdapterConfig {
    * @return the property value, or defaultValue if not found
    */
   String getProperty(String key, String defaultValue);
-
-  /**
-   * Gets the list of adapter class names to instantiate.
-   *
-   * @return list of fully qualified adapter class names
-   */
-  List<String> getAdapterNames();
-
-  /**
-   * Gets the event handler class name.
-   *
-   * @return fully qualified event handler class name
-   */
-  String getEventHandlerClass();
-
-  /**
-   * Gets the event consumer class name.
-   *
-   * @return fully qualified event consumer class name
-   */
-  String getEventConsumerClass();
-
-  /**
-   * Gets the event publisher class name.
-   *
-   * @return fully qualified event publisher class name
-   */
-  String getEventPublisherClass();
-
-  /**
-   * Gets the health check server port.
-   *
-   * @return the port number for the health check server
-   * @throws RuntimeException if the port value is not a valid integer
-   */
-  int getHealthCheckPort();
 }

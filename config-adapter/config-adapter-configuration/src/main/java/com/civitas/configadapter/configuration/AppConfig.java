@@ -21,7 +21,7 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.builder.fluent.Configurations;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 
-public record AppConfig(Configuration configuration) implements AdapterConfig {
+public record AppConfig(Configuration configuration) implements ApplicationConfig {
 
   public AppConfig(String configFile) {
     this(buildConfiguration(configFile));

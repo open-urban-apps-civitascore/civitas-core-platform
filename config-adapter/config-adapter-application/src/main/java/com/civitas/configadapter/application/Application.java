@@ -16,6 +16,7 @@ import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.configuration.AppConfig;
+import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.messaging.EventConsumer;
 import com.civitas.configadapter.messaging.EventPublisher;
 import java.lang.reflect.InvocationTargetException;
@@ -182,7 +183,7 @@ public class Application {
   }
 
   private EventConsumer createConsumer(
-      AppConfig config, String consumerClass, ConfigAdapter adapter)
+      ApplicationConfig config, String consumerClass, ConfigAdapter adapter)
       throws ClassNotFoundException,
           InstantiationException,
           IllegalAccessException,
@@ -198,11 +199,11 @@ public class Application {
 
     return (EventConsumer)
         consumerClazz
-            .getConstructor(AdapterConfig.class, ConfigAdapter.class)
+            .getConstructor(ApplicationConfig.class, ConfigAdapter.class)
             .newInstance(config, adapter);
   }
 
-  private EventPublisher createPublisher(AppConfig config, String publisherClass)
+  private EventPublisher createPublisher(ApplicationConfig config, String publisherClass)
       throws ClassNotFoundException,
           InstantiationException,
           IllegalAccessException,
@@ -216,10 +217,11 @@ public class Application {
           String.format("Class %s does not implement EventPublisher interface", publisherClass));
     }
 
-    return (EventPublisher) publisherClazz.getConstructor(AppConfig.class).newInstance(config);
+    return (EventPublisher)
+        publisherClazz.getConstructor(ApplicationConfig.class).newInstance(config);
   }
 
-  private ConfigAdapter createAdapter(AppConfig config, String adapterName) {
+  private ConfigAdapter createAdapter(AdapterConfig config, String adapterName) {
     ServiceLoader<ConfigAdapter> configAdapterLoader = ServiceLoader.load(ConfigAdapter.class);
     Optional<ConfigAdapter> configAdapterOpt =
         configAdapterLoader.stream()

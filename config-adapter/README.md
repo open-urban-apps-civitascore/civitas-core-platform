@@ -7,19 +7,20 @@ Modular configuration adapter framework that consumes CloudEvents and applies co
 The project follows the Dependency Inversion Principle with interface-based configuration:
 
 ```
-┌─────────────────────────────┐
-│   config-adapter-api        │  Core interfaces (AdapterConfig, ConfigAdapter, etc.)
-│   - AdapterConfig interface │  - No implementation dependencies
-│   - ConfigAdapter           │  - Defines configuration contract
-│   - ConfigEvent/ResultEvent │
-└──────────┬──────────────────┘
+┌─────────────────────────────────────┐
+│   config-adapter-api                │  Core interfaces
+│   - AdapterConfig interface         │  - Property access (for adapters)
+│   - ApplicationConfig interface     │  - Extends AdapterConfig
+│   - ConfigAdapter                   │  - Adds app-level config
+│   - ConfigEvent/ResultEvent         │  - No implementation dependencies
+└──────────┬──────────────────────────┘
            │
-           │ (implements AdapterConfig)
+           │ (implements ApplicationConfig)
            │
-┌──────────▼──────────────────┐
-│ config-adapter-configuration│  Configuration implementation
-│   - AppConfig (impl AdapterConfig) │  - Apache Commons Configuration2
-└──────────┬──────────────────┘  - Environment variable support
+┌──────────▼─────────────────────────────┐
+│       config-adapter-configuration     │  Configuration implementation
+│   - AppConfig (impl ApplicationConfig) │  - Apache Commons Configuration2
+└──────────┬─────────────────────────────┘  - Environment variable support
            │
            │ (compile dependency only in application & tests)
            │
@@ -30,12 +31,12 @@ The project follows the Dependency Inversion Principle with interface-based conf
 │ kafka          │  │ other-broker   │ │ application  │
 └────────────────┘  └────────────────┘ └──────┬───────┘
                                               │
-                    ┌─────────────────────────┴─────────────────┐
-                    │                                           │
-         ┌──────────▼────────────────┐             ┌────────────▼──────────┐
-         │ config-adapter-keycloak   │             │ Other implementations │
-         │ (uses AdapterConfig interface)   │      │ (uses AdapterConfig interface)│
-         └───────────────────────────┘             └───────────────────────┘
+                    ┌─────────────────────────┴───────────────────┐
+                    │                                             │
+         ┌──────────▼─────────────────────┐      ┌────────────────▼───────────────┐
+         │ config-adapter-keycloak        │      │      Other implementations     │
+         │ (uses AdapterConfig interface) │      │ (uses AdapterConfig interface) │
+         └────────────────────────────────┘      └────────────────────────────────┘
 ```
 
 **Design Benefits:**
@@ -50,7 +51,8 @@ The project follows the Dependency Inversion Principle with interface-based conf
 Core interfaces and models that define the adapter contract. **No implementation dependencies.**
 
 **Key Components:**
-- `AdapterConfig` - **Interface** for configuration access (no dependencies on implementation)
+- `AdapterConfig` - **Interface** for adapter-level configuration (property access only)
+- `ApplicationConfig` - **Interface** extending AdapterConfig with application-level config (adapter names, event handlers, health check port)
 - `ConfigAdapter` - Interface for backend service adapters
 - `AbstractConfigAdapter` - Base class using `AdapterConfig` interface (not `AppConfig` implementation)
 - `EventConsumer` - Interface for message consumers
@@ -61,24 +63,27 @@ Core interfaces and models that define the adapter contract. **No implementation
 - `Topics` - Constants for all valid Kafka topic names
 
 **Dependency Principle:**
-- Uses `AdapterConfig` interface, not `AppConfig` implementation
+- Adapters use `AdapterConfig` interface for property access
+- Application layer uses `ApplicationConfig` interface for app-level configuration
 - Allows any configuration implementation to be used
 - API remains stable even if configuration implementation changes
 
-**Usage:** Depend on this module to create new adapters or consumers. Adapters work with `AdapterConfig` interface only.
+**Usage:** Depend on this module to create new adapters or consumers. Adapters work with `AdapterConfig` interface for properties. Application code uses `ApplicationConfig` for app-level configuration.
 
 ### 2. config-adapter-configuration
 Configuration implementation module using Apache Commons Configuration2.
 
 **Key Components:**
-- `AppConfig` - Implementation of `AdapterConfig` interface with Apache Commons Configuration2
+- `AppConfig` - Implementation of `ApplicationConfig` interface with Apache Commons Configuration2
 - Environment variable override support
 - Properties file support with layered configuration
+- Implements both adapter-level (property access) and application-level configuration (adapter names, event handlers, health check)
 
 **Usage:**
 - Application module depends on this at compile time to instantiate `AppConfig`
 - Adapter modules only need this for tests (test scope dependency)
-- Adapters use `AdapterConfig` interface at runtime, not this implementation
+- Adapters use `AdapterConfig` interface at runtime for property access
+- Application code uses `ApplicationConfig` interface for app-level configuration
 
 ### 3. event-handler-kafka
 Kafka-specific message consumer / publisher implementation.
@@ -87,7 +92,7 @@ Kafka-specific message consumer / publisher implementation.
 - `KafkaEventHandler` - Consumes CloudEvents from Kafka and implements EventPublisher
 - `KafkaEventConsumer` - Kafka consumer that polls for CloudEvents and processes them
 - `KafkaEventPublisher` - Kafka producer for publishing ConfigResultEvents
-- `CloudEventProcessor` - Internal helper that deserializes CloudEvents and delegates to ConfigAdapter
+- `CloudEventProcessor` - Internal helper that deserializes CloudEvents and delegates to ConfigAdapter. Throws exceptions on processing failures to allow caller-defined error handling.
 
 **Usage:** Use this module to consume events from Apache Kafka and publish results.
 
@@ -108,8 +113,9 @@ Generic application runner that uses reflection to load adapters and consumers.
 
 **Dependency Note:**
 - Only module with compile-time dependency on `config-adapter-configuration`
-- Instantiates `AppConfig` and passes it as `AdapterConfig` interface to adapters
-- Demonstrates Dependency Inversion Principle in practice
+- Instantiates `AppConfig` and uses it via `ApplicationConfig` interface for application setup
+- Passes `AppConfig` as `AdapterConfig` interface to adapters (adapters only see property access methods)
+- Demonstrates Dependency Inversion Principle and Interface Segregation Principle in practice
 
 **Usage:** Configure adapters via application.properties using comma-separated list.
 
@@ -359,6 +365,8 @@ public class RabbitMQEventConsumer implements EventConsumer {
     public void start() {
         // Start consuming messages from subscribed topics
         // Call processor.handleEvent(topic, cloudEvent) for each message
+        // Note: processor.handleEvent() throws exceptions - handle them appropriately
+        // (e.g., log and continue, retry, send to dead letter queue)
     }
 
     @Override
@@ -449,15 +457,17 @@ Pure interfaces with minimal dependencies:
 - SLF4J (for logging)
 
 Contains:
+- `AdapterConfig` interface for adapter-level configuration (property access)
+- `ApplicationConfig` interface extending AdapterConfig with application-level configuration
 - `ConfigAdapter` interface with `getSubscribedTopics()` and `setEventPublisher()` methods
 - `EventConsumer` interface for message consumers
 - `EventPublisher` interface for publishing `ConfigResultEvent`
 - `ConfigEvent` record with metadata and payload structure (input events)
 - `ConfigResultEvent` record for adapter processing results (output events)
 - `Topics` class with centralized topic constants
-- `CloudEventProcessor` internal helper for deserialization
+- `CloudEventProcessor` internal helper for deserialization (throws exceptions on failure)
 
-Depends on `config-adapter-configuration` for `AppConfig` used by `AbstractConfigAdapter`.
+No dependencies on implementation modules - pure interfaces only.
 
 ### config-adapter-configuration
 
@@ -466,9 +476,11 @@ Configuration management module:
 - Commons BeanUtils
 
 Contains:
-- `AppConfig` class with environment variable override support
+- `AppConfig` class implementing `ApplicationConfig` interface
+- Environment variable override support
 - Layered configuration (environment variables over properties files)
 - Property key to environment variable name conversion
+- Provides both adapter-level and application-level configuration
 
 No dependencies on other config-adapter modules - pure configuration infrastructure.
 
@@ -753,7 +765,8 @@ civitas-config-adapter/
 │       │   ├── ConfigAdapter.java
 │       │   └── AbstractConfigAdapter.java
 │       ├── configuration/
-│       │   └── AdapterConfig.java             # Interface for configuration
+│       │   ├── AdapterConfig.java             # Interface for adapter configuration
+│       │   └── ApplicationConfig.java         # Interface for application configuration
 │       ├── messaging/
 │       │   ├── EventConsumer.java
 │       │   └── EventPublisher.java
@@ -767,7 +780,7 @@ civitas-config-adapter/
 ├── config-adapter-configuration/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/configadapter/configuration/
-│       └── AppConfig.java                     # Implementation of AdapterConfig
+│       └── AppConfig.java                     # Implementation of ApplicationConfig
 ├── event-handler-kafka/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/event/handler/kafka/

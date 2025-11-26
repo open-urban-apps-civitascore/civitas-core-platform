@@ -10,7 +10,7 @@
  */
 package com.civitas.event.handler.kafka;
 
-import com.civitas.configadapter.configuration.AdapterConfig;
+import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import io.cloudevents.CloudEvent;
@@ -38,7 +38,7 @@ public class KafkaEventPublisher implements EventPublisher, AutoCloseable {
 
   private final KafkaProducer<String, CloudEvent> kafkaProducer;
 
-  public KafkaEventPublisher(AdapterConfig config) {
+  public KafkaEventPublisher(ApplicationConfig config) {
     Properties producerProps = new Properties();
     producerProps.put(
         ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,
