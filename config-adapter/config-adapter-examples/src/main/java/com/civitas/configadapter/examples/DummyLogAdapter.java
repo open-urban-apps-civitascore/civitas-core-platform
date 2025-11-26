@@ -64,7 +64,7 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
 
     // Publish a result event if resultTopic is specified
     String resultTopic = event.metadata().resultTopic();
-    if (getEventPublisher() != null && topic != null && !resultTopic.isEmpty()) {
+    if (getEventPublisher() != null && topic != null && resultTopic != null && !resultTopic.isEmpty()) {
       try {
         ConfigResultEvent resultEvent =
             ConfigResultEvent.success(
