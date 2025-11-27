@@ -1,3 +1,7 @@
 gitleaks.sarif
 eslint-report.json
 gl-dependency-scanning.json
+**/target
+**/.settings
+**/.project
+**/.classpath

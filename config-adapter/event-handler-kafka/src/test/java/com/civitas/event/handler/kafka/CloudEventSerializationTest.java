@@ -1,0 +1,208 @@
+/**
+ * Copyright (c) 2012 - 2025 Data In Motion and others. All rights reserved.
+ *
+ * <p>This program and the accompanying materials are made available under the terms of the Eclipse
+ * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * <p>SPDX-License-Identifier: EPL-2.0
+ *
+ * <p>Contributors: Data In Motion - initial API and implementation
+ */
+package com.civitas.event.handler.kafka;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+import io.cloudevents.CloudEvent;
+import io.cloudevents.core.builder.CloudEventBuilder;
+import io.cloudevents.kafka.CloudEventDeserializer;
+import io.cloudevents.kafka.CloudEventSerializer;
+import java.net.URI;
+import java.time.OffsetDateTime;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Tests to understand CloudEventSerializer and CloudEventDeserializer behavior. This helps debug
+ * why EndToEndIntegrationTest receives NULL events.
+ */
+class CloudEventSerializationTest {
+
+  private CloudEventSerializer serializer;
+  private CloudEventDeserializer deserializer;
+
+  @BeforeEach
+  void setUp() {
+    serializer = new CloudEventSerializer();
+    deserializer = new CloudEventDeserializer();
+
+    // Configure with empty maps (no special configuration)
+    Map<String, Object> config = new HashMap<>();
+    serializer.configure(config, false);
+    deserializer.configure(config, false);
+  }
+
+  @Test
+  void testSerializeDeserializeCloudEventWithoutData() {
+    // Create CloudEvent without data - just like KeycloakAdapter does
+    CloudEvent originalEvent =
+        CloudEventBuilder.v1()
+            .withId(UUID.randomUUID().toString())
+            .withSource(URI.create("test.source"))
+            .withType("test.type")
+            .withTime(OffsetDateTime.now())
+            .withExtension("correlationid", "test-correlation-123")
+            .withExtension("status", "SUCCESS")
+            .withExtension("message", "Test message")
+            .build();
+
+    System.out.println("Original CloudEvent:");
+    System.out.println("  ID: " + originalEvent.getId());
+    System.out.println("  Source: " + originalEvent.getSource());
+    System.out.println("  Type: " + originalEvent.getType());
+    System.out.println("  Data: " + originalEvent.getData());
+    System.out.println("  DataContentType: " + originalEvent.getDataContentType());
+    System.out.println("  Extensions: " + originalEvent.getExtensionNames());
+
+    // Serialize
+    Headers headers = new RecordHeaders();
+    byte[] serializedValue = serializer.serialize("test-topic", headers, originalEvent);
+
+    System.out.println("\nAfter serialization:");
+    System.out.println(
+        "  Serialized value length: "
+            + (serializedValue == null ? "NULL" : serializedValue.length));
+    System.out.println(
+        "  Serialized value: " + (serializedValue == null ? "NULL" : new String(serializedValue)));
+    System.out.println("  Headers count: " + headers.toArray().length);
+    headers.forEach(
+        header -> {
+          System.out.println("    " + header.key() + ": " + new String(header.value()));
+        });
+
+    // Deserialize
+    CloudEvent deserializedEvent = deserializer.deserialize("test-topic", headers, serializedValue);
+
+    System.out.println("\nDeserialized CloudEvent:");
+    if (deserializedEvent == null) {
+      System.out.println("  NULL!");
+    } else {
+      System.out.println("  ID: " + deserializedEvent.getId());
+      System.out.println("  Source: " + deserializedEvent.getSource());
+      System.out.println("  Type: " + deserializedEvent.getType());
+      System.out.println("  Extensions: " + deserializedEvent.getExtensionNames());
+      System.out.println("  correlationid: " + deserializedEvent.getExtension("correlationid"));
+      System.out.println("  status: " + deserializedEvent.getExtension("status"));
+    }
+
+    // Assertions
+    assertNotNull(deserializedEvent, "Deserialized event should not be null");
+    assertEquals(originalEvent.getId(), deserializedEvent.getId());
+    assertEquals(originalEvent.getSource(), deserializedEvent.getSource());
+    assertEquals(originalEvent.getType(), deserializedEvent.getType());
+    assertEquals("test-correlation-123", deserializedEvent.getExtension("correlationid"));
+    assertEquals("SUCCESS", deserializedEvent.getExtension("status"));
+  }
+
+  @Test
+  void testSerializeDeserializeCloudEventWithEmptyJsonData() {
+    // Create CloudEvent with minimal empty JSON data
+    CloudEvent originalEvent =
+        CloudEventBuilder.v1()
+            .withId(UUID.randomUUID().toString())
+            .withSource(URI.create("test.source"))
+            .withType("test.type")
+            .withTime(OffsetDateTime.now())
+            .withData("application/json", "{}".getBytes())
+            .withExtension("correlationid", "test-correlation-456")
+            .withExtension("status", "SUCCESS")
+            .build();
+
+    System.out.println("\nOriginal CloudEvent with data:");
+    System.out.println("  ID: " + originalEvent.getId());
+    System.out.println("  Data: " + new String(originalEvent.getData().toBytes()));
+    System.out.println("  DataContentType: " + originalEvent.getDataContentType());
+
+    // Serialize
+    Headers headers = new RecordHeaders();
+    byte[] serializedValue = serializer.serialize("test-topic", headers, originalEvent);
+
+    System.out.println("\nAfter serialization:");
+    System.out.println(
+        "  Serialized value length: "
+            + (serializedValue == null ? "NULL" : serializedValue.length));
+    System.out.println(
+        "  Serialized value: " + (serializedValue == null ? "NULL" : new String(serializedValue)));
+    System.out.println("  Headers count: " + headers.toArray().length);
+    headers.forEach(
+        header -> {
+          System.out.println("    " + header.key() + ": " + new String(header.value()));
+        });
+
+    // Deserialize
+    CloudEvent deserializedEvent = deserializer.deserialize("test-topic", headers, serializedValue);
+
+    System.out.println("\nDeserialized CloudEvent:");
+    if (deserializedEvent == null) {
+      System.out.println("  NULL!");
+    } else {
+      System.out.println("  ID: " + deserializedEvent.getId());
+      System.out.println(
+          "  Data: "
+              + (deserializedEvent.getData() == null
+                  ? "NULL"
+                  : new String(deserializedEvent.getData().toBytes())));
+      System.out.println("  correlationid: " + deserializedEvent.getExtension("correlationid"));
+    }
+
+    // Assertions
+    assertNotNull(deserializedEvent, "Deserialized event should not be null");
+    assertEquals(originalEvent.getId(), deserializedEvent.getId());
+    assertNotNull(deserializedEvent.getData());
+    assertEquals("test-correlation-456", deserializedEvent.getExtension("correlationid"));
+  }
+
+  @Test
+  void testSerializeDeserializeCloudEventWithJsonData() {
+    // Create CloudEvent with actual JSON data
+    String jsonData = "{\"key\":\"value\",\"number\":42}";
+    CloudEvent originalEvent =
+        CloudEventBuilder.v1()
+            .withId(UUID.randomUUID().toString())
+            .withSource(URI.create("test.source"))
+            .withType("test.type")
+            .withTime(OffsetDateTime.now())
+            .withData("application/json", jsonData.getBytes())
+            .withExtension("correlationid", "test-correlation-789")
+            .build();
+
+    System.out.println("\nOriginal CloudEvent with JSON data:");
+    System.out.println("  ID: " + originalEvent.getId());
+    System.out.println("  Data: " + new String(originalEvent.getData().toBytes()));
+
+    // Serialize
+    Headers headers = new RecordHeaders();
+    byte[] serializedValue = serializer.serialize("test-topic", headers, originalEvent);
+
+    System.out.println("\nAfter serialization:");
+    System.out.println("  Serialized value: " + new String(serializedValue));
+    System.out.println("  Headers:");
+    headers.forEach(
+        header -> {
+          System.out.println("    " + header.key() + ": " + new String(header.value()));
+        });
+
+    // Deserialize
+    CloudEvent deserializedEvent = deserializer.deserialize("test-topic", headers, serializedValue);
+
+    // Assertions
+    assertNotNull(deserializedEvent);
+    assertEquals(originalEvent.getId(), deserializedEvent.getId());
+    assertNotNull(deserializedEvent.getData());
+    assertEquals(jsonData, new String(deserializedEvent.getData().toBytes()));
+  }
+}
