@@ -95,7 +95,6 @@ const UsersTable = (props: UsersTableProps) => {
 
   return (
     <DataTable
-      testId="usersTable"
       table={table}
       pageIndex={pageIndex}
       pageSize={pageSize}

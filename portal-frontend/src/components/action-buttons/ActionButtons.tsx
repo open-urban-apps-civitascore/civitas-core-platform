@@ -39,17 +39,10 @@ export const ActionButtons = (props: ActionButtonsProps) => {
 
   const Buttons = (
     <>
-      <Button
-        data-testid="cancelButton"
-        type="reset"
-        variant="secondary"
-        onClick={onCancelClick}
-        disabled={isCancelButtonDisabled}
-      >
+      <Button type="reset" variant="secondary" onClick={onCancelClick} disabled={isCancelButtonDisabled}>
         {t('actions.cancel')}
       </Button>
       <Button
-        data-testid="confirmButton"
         type={confirmButtonType}
         onClick={confirmButtonType === 'button' ? props.onConfirmClick : undefined}
         disabled={isConfirmButtonDisabled}

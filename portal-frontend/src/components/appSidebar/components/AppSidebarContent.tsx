@@ -50,10 +50,7 @@ export const AppSidebarContent = async () => {
                     <CollapsibleContent>
                       <SidebarMenuSub>
                         {item.items?.map(subItem => (
-                          <SidebarMenuSubItem
-                            key={getMenuItemTitle(subItem)}
-                            data-testid={`sidebarMenuItem-${subItem.title}`}
-                          >
+                          <SidebarMenuSubItem key={getMenuItemTitle(subItem)}>
                             <SidebarMenuSubButton asChild>
                               <a href={subItem.url}>
                                 <span>{getMenuItemTitle(subItem)}</span>
