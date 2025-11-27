@@ -12,10 +12,11 @@ export interface TabSectionProps {
   isSubTabsSection?: boolean
   className?: string
   isHeading?: boolean
+  testId?: string
 }
 
 export const TabsSection = (props: TabSectionProps) => {
-  const { tabs, onClick, selectedTab, isSubTabsSection = false, isHeading = false, className } = props
+  const { tabs, onClick, selectedTab, isSubTabsSection = false, isHeading = false, className, testId } = props
 
   const tabsStyles = (tab: Tab) =>
     `p-3 pt-0 border-b-2 border-transparent rounded-none hover:bg-white hover:border-primary underline-offset-10 decoration-1 ${selectedTab === tab.value ? ' border-primary' : 'text-slate-400'}`
@@ -25,6 +26,7 @@ export const TabsSection = (props: TabSectionProps) => {
 
   return (
     <div
+      data-testid={testId}
       className={cn(
         `px-[calc(var(--layout-padding))] max-w-full self-start ${!isSubTabsSection && '-mb-1 -mt-2 border-b-1 w-full'}`,
       )}

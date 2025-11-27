@@ -5,11 +5,13 @@ import { cn } from '@/lib/utils'
 
 interface StatusLabelProps extends HTMLAttributes<HTMLDivElement> {
   isChecked: boolean
+  testId?: string
 }
 export const StatusLabel = (props: StatusLabelProps) => {
-  const { isChecked, className } = props
+  const { isChecked, testId, className } = props
   return (
     <div
+      data-testid={testId}
       className={cn(
         `flex justify-center items-center w-9 h-9 bg-status-label rounded-md ${isChecked ? 'bg-status-label' : 'bg-secondary'}`,
         className,

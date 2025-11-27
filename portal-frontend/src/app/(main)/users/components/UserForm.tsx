@@ -147,14 +147,14 @@ export const UserForm = (props: UserFormProps) => {
     const updateUserData = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
     await updateUser(updateUserData)
     setDefaultUserData(updateUserData)
-    form.reset(mapUserToFormData(defaultUserData))
+    router.refresh()
     setIsReadOnly(true)
   }
 
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
 
   const EditButton = (
-    <Button variant="outline" type="button" onClick={() => setIsReadOnly(false)}>
+    <Button data-testid="editButton" variant="outline" type="button" onClick={() => setIsReadOnly(false)}>
       <SquarePen />
       {tCommon('actions.edit')}
     </Button>
@@ -162,7 +162,7 @@ export const UserForm = (props: UserFormProps) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} data-testid="userDetailsForm">
         <ContentCard>
           <DetailsFieldContainer className="pt-0 pb-4 text-xl">
             <SubHeader
@@ -266,7 +266,7 @@ export const UserForm = (props: UserFormProps) => {
           </DetailsFieldContainer>
           <DetailsFieldContainer className="border-b-0 flex items-center">
             <Switch form={form} name="active" label={t('info.status.title')} isReadOnly={isReadOnly} />
-            <span className={cn('ml-3 text-sm', isReadOnly && 'text-muted-foreground')}>
+            <span data-testid="activeStatus" className={cn('ml-3 text-sm', isReadOnly && 'text-muted-foreground')}>
               {watchStatus ? t('info.status.active') : t('info.status.inactive')}
             </span>
           </DetailsFieldContainer>

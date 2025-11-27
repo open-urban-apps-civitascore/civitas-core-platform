@@ -28,9 +28,15 @@ export const Switch = <T extends FieldValues>(props: SwitchProps<T>) => {
           <FormLabel>{label}</FormLabel>
           <FormControl>
             {isReadOnly ? (
-              <StatusLabel className="ml-3" isChecked={field.value} />
+              <StatusLabel testId={`${name}StatusLabel`} className="ml-3" isChecked={field.value} />
             ) : (
-              <ShadcnSwitch checked={field.value} onCheckedChange={field.onChange} className="hover:cursor-pointer" />
+              <ShadcnSwitch
+                data-testid={`${name}Switch`}
+                data-test-element="formField"
+                checked={field.value}
+                onCheckedChange={field.onChange}
+                className="hover:cursor-pointer"
+              />
             )}
           </FormControl>
         </FormItem>
