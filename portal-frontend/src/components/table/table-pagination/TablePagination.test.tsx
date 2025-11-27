@@ -3,8 +3,8 @@ import { render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it } from 'vitest'
 
-import { Dataset } from '@/app/(main)/datasets/page'
 import messages from '@/messages/de.json'
+import { DatasetTableData } from '@/types/datasets'
 
 import TablePagination from './TablePagination'
 
@@ -15,7 +15,7 @@ const dummyTable = {
   nextPage: () => {},
   getCanPreviousPage: () => true,
   getCanNextPage: () => true,
-} as unknown as Table<Dataset>
+} as unknown as Table<DatasetTableData>
 
 describe('TablePagination', () => {
   beforeEach(() => {
