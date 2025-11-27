@@ -139,8 +139,7 @@
         "role": "Role",
         "inherited": "Inherited",
         "group": "Group",
-        "assignment": "Assignment",
-        "noRolesAssigned": "No {roleType} assigned"
+        "assignment": "Assignment"
       }
     },
     "groupsTab": {

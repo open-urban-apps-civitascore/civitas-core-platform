@@ -115,14 +115,14 @@ const UsersPage = () => {
   }
 
   const CustomElement = (
-    <Button data-testid="addUserButton" onClick={() => router.push('/users/create')}>
+    <Button onClick={() => router.push('/users/create')}>
       <Plus />
       {t('newUser')}
     </Button>
   )
 
   return (
-    <PageContainer headerType="onlyTitle" testId="usersPage">
+    <PageContainer headerType="onlyTitle">
       <PageHeader title={t('title')} />
       <PageBackground>
         <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />

@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
@@ -19,11 +20,10 @@ interface UserDetailsProps {
   title: string
   userData: UserResponse | null
   isEditMode?: boolean
-  testId?: string
 }
 
 export const UserDetails = (props: UserDetailsProps) => {
-  const { title, userData, isEditMode = false, testId } = props
+  const { title, userData, isEditMode = false } = props
   const t = useTranslations('users')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
 
@@ -70,11 +70,12 @@ export const UserDetails = (props: UserDetailsProps) => {
     setSubTabValueParam(newTab)
   }
 
-  let Content = <ContentCard>No data</ContentCard>
-  if (userData) {
+  let Content = <LoadingSpinner className="h-full" />
+  if (!userData) {
+    Content = <ContentCard>No data</ContentCard>
+  } else if (!isBlockedTab) {
     switch (subTabValue) {
       case tabValues.userData.value:
-      case '':
         Content = <UserForm userData={userData} isEditMode={isEditMode} />
         break
       case tabValues.groups.value:
@@ -90,10 +91,10 @@ export const UserDetails = (props: UserDetailsProps) => {
   }
 
   return (
-    <PageContainer headerType="withSubTabs" className="overflow-hidden" testId={testId}>
+    <PageContainer headerType="withSubTabs" className="overflow-hidden">
       <PageHeader
         title={title}
-        subTabs={{ tabs: tabs, selectedTab: subTabValue || defaultTab, onClick: newTab => handleSelectTab(newTab) }}
+        subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: newTab => handleSelectTab(newTab) }}
       />
       <PageBackground>{userData ? Content : <div>No data</div>}</PageBackground>
     </PageContainer>
