@@ -95,19 +95,19 @@ class KeycloakAdapterIntegrationTest {
         "keycloak.topics",
         String.join(
             ",",
-            Topics.USER_CREATED,
-            Topics.USER_UPDATED,
-            Topics.USER_DELETED,
-            Topics.USER_LOCKED,
-            Topics.USER_UNLOCKED,
-            Topics.USER_PASSWORD_CHANGED,
-            Topics.USER_PASSWORD_RESET,
-            Topics.REALM_CREATED,
-            Topics.REALM_UPDATED,
-            Topics.REALM_DELETED,
-            Topics.CLIENT_CREATED,
-            Topics.CLIENT_UPDATED,
-            Topics.CLIENT_DELETED));
+            Topics.USER_CREATED.toString(),
+            Topics.USER_UPDATED.toString(),
+            Topics.USER_DELETED.toString(),
+            Topics.USER_LOCKED.toString(),
+            Topics.USER_UNLOCKED.toString(),
+            Topics.USER_PASSWORD_CHANGED.toString(),
+            Topics.USER_PASSWORD_RESET.toString(),
+            Topics.REALM_CREATED.toString(),
+            Topics.REALM_UPDATED.toString(),
+            Topics.REALM_DELETED.toString(),
+            Topics.CLIENT_CREATED.toString(),
+            Topics.CLIENT_UPDATED.toString(),
+            Topics.CLIENT_DELETED.toString()));
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
     // Create adapter
@@ -144,7 +144,7 @@ class KeycloakAdapterIntegrationTest {
     ConfigEvent event = createConfigEvent("realms/test-realm", "realm", "CREATE", realmRep);
 
     // When
-    adapter.processConfigEvent(Topics.REALM_CREATED, event);
+    adapter.processConfigEvent(Topics.REALM_CREATED.toString(), event);
 
     // Then
     RealmRepresentation createdRealm = keycloakClient.realm("test-realm").toRepresentation();
@@ -176,7 +176,7 @@ class KeycloakAdapterIntegrationTest {
     ConfigEvent event = createConfigEvent("realms/update-realm", "realm", "UPDATE", realmRep);
 
     // When
-    adapter.processConfigEvent(Topics.REALM_UPDATED, event);
+    adapter.processConfigEvent(Topics.REALM_UPDATED.toString(), event);
 
     // Then
     RealmRepresentation updatedRealm = keycloakClient.realm("update-realm").toRepresentation();
@@ -217,7 +217,7 @@ class KeycloakAdapterIntegrationTest {
         createConfigEvent("realms/user-realm/users/testuser", "user", "CREATE", userRep);
 
     // When
-    adapter.processConfigEvent(Topics.USER_CREATED, event);
+    adapter.processConfigEvent(Topics.USER_CREATED.toString(), event);
 
     // Then
     List<UserRepresentation> users = keycloakClient.realm("user-realm").users().search("testuser");
@@ -258,7 +258,7 @@ class KeycloakAdapterIntegrationTest {
         createConfigEvent("realms/client-realm/clients/test-client", "client", "CREATE", clientRep);
 
     // When
-    adapter.processConfigEvent(Topics.CLIENT_CREATED, event);
+    adapter.processConfigEvent(Topics.CLIENT_CREATED.toString(), event);
 
     // Then
     List<ClientRepresentation> clients =
@@ -286,7 +286,7 @@ class KeycloakAdapterIntegrationTest {
     ConfigEvent event = createConfigEvent("realms/delete-realm", "realm", "DELETE", null);
 
     // When
-    adapter.processConfigEvent(Topics.REALM_DELETED, event);
+    adapter.processConfigEvent(Topics.REALM_DELETED.toString(), event);
 
     // Then - verify realm is deleted
     assertThrows(
@@ -315,7 +315,7 @@ class KeycloakAdapterIntegrationTest {
         createConfigEvent("realms/role-create-realm/roles/testrole", "role", "CREATE", roleRep);
 
     // When
-    adapter.processConfigEvent(Topics.ROLE_CREATED, event);
+    adapter.processConfigEvent(Topics.ROLE_CREATED.toString(), event);
 
     // Then
     List<RoleRepresentation> roles = keycloakClient.realm("role-create-realm").roles().list();
@@ -355,7 +355,7 @@ class KeycloakAdapterIntegrationTest {
             "realms/role-nested-create-realm/roles/testrole", "role", "CREATE", roleRep);
 
     // When
-    adapter.processConfigEvent(Topics.ROLE_CREATED, event);
+    adapter.processConfigEvent(Topics.ROLE_CREATED.toString(), event);
 
     // Then
     List<RoleRepresentation> roles =
@@ -402,7 +402,7 @@ class KeycloakAdapterIntegrationTest {
         createConfigEvent("realms/role-update-realm/roles/testrole", "role", "UPDATE", roleRep);
 
     // When
-    adapter.processConfigEvent(Topics.ROLE_UPDATED, event);
+    adapter.processConfigEvent(Topics.ROLE_UPDATED.toString(), event);
 
     // Then
     List<RoleRepresentation> roles = keycloakClient.realm("role-update-realm").roles().list();
@@ -442,7 +442,7 @@ class KeycloakAdapterIntegrationTest {
         createConfigEvent("realms/role-delete-realm/roles/testrole", "role", "DELETE", roleRep);
 
     // When
-    adapter.processConfigEvent(Topics.ROLE_DELETED, event);
+    adapter.processConfigEvent(Topics.ROLE_DELETED.toString(), event);
 
     // Then
     List<RoleRepresentation> roles = keycloakClient.realm("role-delete-realm").roles().list();
@@ -467,7 +467,7 @@ class KeycloakAdapterIntegrationTest {
     ConfigEvent event = createConfigEvent("realms/non-existent-realm", "realm", "UPDATE", realmRep);
 
     // When
-    adapter.processConfigEvent(Topics.REALM_UPDATED, event);
+    adapter.processConfigEvent(Topics.REALM_UPDATED.toString(), event);
 
     // Then - verify error result was published
     assertEquals(1, eventPublisher.getPublishedEvents().size());
@@ -490,7 +490,7 @@ class KeycloakAdapterIntegrationTest {
             "realms/correlation-realm", "realm", "CREATE", realmRep, correlationId);
 
     // When
-    adapter.processConfigEvent(Topics.REALM_CREATED, event);
+    adapter.processConfigEvent(Topics.REALM_CREATED.toString(), event);
 
     // Then - verify correlation ID is preserved in result
     assertEquals(1, eventPublisher.getPublishedEvents().size());

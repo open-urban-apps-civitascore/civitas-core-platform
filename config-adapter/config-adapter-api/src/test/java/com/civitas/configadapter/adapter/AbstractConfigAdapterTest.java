@@ -127,13 +127,13 @@ class AbstractConfigAdapterTest {
   @Test
   void constructorShouldCreateAdapterWithValidSingleTopic() {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
-    when(mockConfig.getProperty("test-adapter.topics")).thenReturn(Topics.USER_CREATED);
+    when(mockConfig.getProperty("test-adapter.topics")).thenReturn(Topics.USER_CREATED.toString());
 
     TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
 
     assertNotNull(adapter);
     assertEquals(1, adapter.getSubscribedTopics().size());
-    assertEquals(Topics.USER_CREATED, adapter.getSubscribedTopics().get(0));
+    assertEquals(Topics.USER_CREATED.toString(), adapter.getSubscribedTopics().getFirst());
   }
 
   @Test
@@ -146,8 +146,8 @@ class AbstractConfigAdapterTest {
 
     assertNotNull(adapter);
     assertEquals(2, adapter.getSubscribedTopics().size());
-    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_CREATED));
-    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_UPDATED));
+    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_CREATED.toString()));
+    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_UPDATED.toString()));
   }
 
   @Test
@@ -160,8 +160,8 @@ class AbstractConfigAdapterTest {
 
     assertNotNull(adapter);
     assertEquals(2, adapter.getSubscribedTopics().size());
-    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_CREATED));
-    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_UPDATED));
+    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_CREATED.toString()));
+    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_UPDATED.toString()));
   }
 
   @Test
@@ -229,7 +229,7 @@ class AbstractConfigAdapterTest {
   @Test
   void getSubscribedTopicsShouldReturnImmutableList() {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
-    when(mockConfig.getProperty("test-adapter.topics")).thenReturn(Topics.USER_CREATED);
+    when(mockConfig.getProperty("test-adapter.topics")).thenReturn(Topics.USER_CREATED.toString());
 
     TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
     List<String> topics = adapter.getSubscribedTopics();

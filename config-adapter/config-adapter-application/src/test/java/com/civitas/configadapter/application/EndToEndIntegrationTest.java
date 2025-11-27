@@ -117,19 +117,19 @@ class EndToEndIntegrationTest {
         "keycloak.topics",
         String.join(
             ",",
-            Topics.USER_CREATED,
-            Topics.USER_UPDATED,
-            Topics.USER_DELETED,
-            Topics.USER_LOCKED,
-            Topics.USER_UNLOCKED,
-            Topics.USER_PASSWORD_CHANGED,
-            Topics.USER_PASSWORD_RESET,
-            Topics.REALM_CREATED,
-            Topics.REALM_UPDATED,
-            Topics.REALM_DELETED,
-            Topics.CLIENT_CREATED,
-            Topics.CLIENT_UPDATED,
-            Topics.CLIENT_DELETED));
+            Topics.USER_CREATED.toString(),
+            Topics.USER_UPDATED.toString(),
+            Topics.USER_DELETED.toString(),
+            Topics.USER_LOCKED.toString(),
+            Topics.USER_UNLOCKED.toString(),
+            Topics.USER_PASSWORD_CHANGED.toString(),
+            Topics.USER_PASSWORD_RESET.toString(),
+            Topics.REALM_CREATED.toString(),
+            Topics.REALM_UPDATED.toString(),
+            Topics.REALM_DELETED.toString(),
+            Topics.CLIENT_CREATED.toString(),
+            Topics.CLIENT_UPDATED.toString(),
+            Topics.CLIENT_DELETED.toString()));
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
     // Create adapter
@@ -220,10 +220,10 @@ class EndToEndIntegrationTest {
     ConfigEvent configEvent =
         createConfigEvent("realms/e2e-test-realm", "realm", "CREATE", realmRep, "correlation123");
 
-    CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_CREATED);
+    CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_CREATED.toString());
 
     // When - send event to Kafka
-    producer.send(new ProducerRecord<>(Topics.REALM_CREATED, "key", cloudEvent)).get();
+    producer.send(new ProducerRecord<>(Topics.REALM_CREATED.toString(), "key", cloudEvent)).get();
     producer.flush();
 
     // Then - wait for result event
@@ -260,10 +260,10 @@ class EndToEndIntegrationTest {
         createConfigEvent(
             "realms/user-e2e-realm/users/e2euser", "user", "CREATE", userRep, "correlationuser123");
 
-    CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.USER_CREATED);
+    CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.USER_CREATED.toString());
 
     // When - send event to Kafka
-    producer.send(new ProducerRecord<>(Topics.USER_CREATED, "key", cloudEvent)).get();
+    producer.send(new ProducerRecord<>(Topics.USER_CREATED.toString(), "key", cloudEvent)).get();
     producer.flush();
 
     // Then - wait for result event
@@ -290,10 +290,10 @@ class EndToEndIntegrationTest {
         createConfigEvent(
             "realms/non-existent-realm", "realm", "UPDATE", realmRep, "correlationerror123");
 
-    CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_UPDATED);
+    CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_UPDATED.toString());
 
     // When - send event to Kafka
-    producer.send(new ProducerRecord<>(Topics.REALM_UPDATED, "key", cloudEvent)).get();
+    producer.send(new ProducerRecord<>(Topics.REALM_UPDATED.toString(), "key", cloudEvent)).get();
     producer.flush();
 
     // Then - wait for error result event
@@ -319,10 +319,10 @@ class EndToEndIntegrationTest {
         createConfigEventWithMessageId(
             "realms/correlation-test-realm", "realm", "CREATE", realmRep, correlationId, messageId);
 
-    CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_CREATED);
+    CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_CREATED.toString());
 
     // When
-    producer.send(new ProducerRecord<>(Topics.REALM_CREATED, "key", cloudEvent)).get();
+    producer.send(new ProducerRecord<>(Topics.REALM_CREATED.toString(), "key", cloudEvent)).get();
     producer.flush();
 
     // Then
@@ -345,7 +345,7 @@ class EndToEndIntegrationTest {
     realmRep.setEnabled(true);
 
     sendEventAndWaitForResult(
-        Topics.REALM_CREATED,
+        Topics.REALM_CREATED.toString(),
         createConfigEvent("realms/seq-test-realm", "realm", "CREATE", realmRep, "seq-1"));
 
     // 2. Create user
@@ -355,7 +355,7 @@ class EndToEndIntegrationTest {
     userRep.setEnabled(true);
 
     sendEventAndWaitForResult(
-        Topics.USER_CREATED,
+        Topics.USER_CREATED.toString(),
         createConfigEvent(
             "realms/seq-test-realm/users/sequser", "user", "CREATE", userRep, "seq-2"));
 
@@ -366,7 +366,7 @@ class EndToEndIntegrationTest {
     String userId = users.get(0).getId();
 
     sendEventAndWaitForResult(
-        Topics.USER_UPDATED,
+        Topics.USER_UPDATED.toString(),
         createConfigEvent(
             "realms/seq-test-realm/users/" + userId, "user", "UPDATE", userRep, "seq-3"));
 
