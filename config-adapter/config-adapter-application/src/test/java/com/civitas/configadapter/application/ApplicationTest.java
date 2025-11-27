@@ -152,4 +152,84 @@ class ApplicationTest {
         },
         "Application should throw NullPointerException when configuration file name is null");
   }
+
+  @Test
+  @DisplayName("Should successfully create application with separate consumer and publisher")
+  void testSeparateConsumerAndPublisherConfiguration() {
+    // Given a configuration with separate eventconsumer.name and eventpublisher.name
+    // When creating the application
+    assertDoesNotThrow(
+        () -> {
+          new Application("application-separate-consumer-publisher.properties");
+        },
+        "Application should initialize successfully with separate consumer and publisher configuration");
+  }
+
+  @Test
+  @DisplayName("Should fail when both eventhandler.name and eventconsumer.name are specified")
+  void testFailureWithConflictingHandlerConfiguration() {
+    // Given a configuration with both eventhandler.name AND eventconsumer.name specified
+    // When creating the application
+    RuntimeException exception =
+        assertThrows(
+            RuntimeException.class,
+            () -> {
+              new Application("application-conflicting-handler-config.properties");
+            },
+            "Application should throw RuntimeException when both eventhandler.name and eventconsumer.name are specified");
+
+    // Then the exception should indicate the configuration conflict
+    String message = exception.getMessage();
+    assertTrue(
+        message.contains("Cannot specify both"),
+        "Exception message should mention configuration conflict, but was: " + message);
+  }
+
+  @Test
+  @DisplayName("Should fail when event consumer name does not exist")
+  void testFailureWithNonExistentEventConsumer() {
+    // Given a configuration with a non-existent event consumer name 'rabbitmq'
+    // When creating the application
+    RuntimeException exception =
+        assertThrows(
+            RuntimeException.class,
+            () -> {
+              new Application("application-nonexistent-consumer.properties");
+            },
+            "Application should throw RuntimeException when event consumer 'rabbitmq' does not exist");
+
+    // Then the exception or its cause should indicate the failure
+    // The inner exception is wrapped by the catch block in createConsumers
+    Throwable cause = exception.getCause();
+    String causeMessage = cause != null ? cause.getMessage() : "";
+    assertTrue(
+        causeMessage.contains("Event consumer 'rabbitmq' not found"),
+        "Exception cause should mention event consumer not found, but was: " + causeMessage);
+  }
+
+  @Test
+  @DisplayName(
+      "Should succeed with warning when event publisher name does not exist (publisher is optional)")
+  void testSuccessWithNonExistentEventPublisher() {
+    // Given a configuration with a non-existent event publisher name 'rabbitmq'
+    // Publisher is optional, so the application should still initialize successfully
+    // When creating the application
+    assertDoesNotThrow(
+        () -> {
+          new Application("application-nonexistent-publisher.properties");
+        },
+        "Application should initialize successfully even when publisher is not found (publisher is optional)");
+  }
+
+  @Test
+  @DisplayName("Should successfully create application with consumer only (no publisher)")
+  void testConsumerOnlyConfiguration() {
+    // Given a configuration with only eventconsumer.name (no eventpublisher.name)
+    // When creating the application
+    assertDoesNotThrow(
+        () -> {
+          new Application("application-consumer-only.properties");
+        },
+        "Application should initialize successfully with consumer-only configuration");
+  }
 }

@@ -18,5 +18,5 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public record Payload(
     @JsonProperty("targetComponent") String targetComponent,
     @JsonProperty("targetResource") String targetResource,
-    @JsonProperty("operation") String operation,
+    @JsonProperty("operation") Operation operation,
     @JsonProperty("config") Config config) {}

@@ -25,13 +25,15 @@ import java.util.function.Predicate;
 public class ServiceLoaderUtils {
 
   /**
-   * Returns an {@link Optional} instance out of the {@link ServiceLoader} that matches the provided
-   * predicate
+   * Returns an {@link Optional} instance from the {@link ServiceLoader} that matches the provided
+   * predicate. Uses the thread context class loader to discover service implementations.
    *
    * @param <T> the type of the service loader interface
-   * @param serviceClass the class of this type
-   * @param filter the predicate to match the right instance
-   * @return the optional containing the instance or an empty {@link Optional}
+   * @param serviceClass the class of the service interface, must not be null
+   * @param filter the predicate to match the desired instance, must not be null
+   * @return an {@link Optional} containing the first matching instance, or an empty {@link
+   *     Optional} if no service matches the filter
+   * @throws NullPointerException if serviceClass or filter is null
    */
   public static <T> Optional<T> getInstanceByFilter(Class<T> serviceClass, Predicate<T> filter) {
     Objects.requireNonNull(serviceClass);

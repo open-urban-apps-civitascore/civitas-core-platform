@@ -26,6 +26,7 @@ import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
+import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
 import com.civitas.configadapter.model.Topics;
 import java.time.OffsetDateTime;
@@ -141,7 +142,7 @@ class KeycloakAdapterIntegrationTest {
     realmRep.setEnabled(true);
     realmRep.setDisplayName("Test Realm");
 
-    ConfigEvent event = createConfigEvent("realms/test-realm", "realm", "CREATE", realmRep);
+    ConfigEvent event = createConfigEvent("realms/test-realm", "realm", Operation.CREATE, realmRep);
 
     // When
     adapter.processConfigEvent(Topics.REALM_CREATED.toString(), event);
@@ -173,7 +174,8 @@ class KeycloakAdapterIntegrationTest {
     realmRep.setDisplayName("Updated Realm");
     realmRep.setEnabled(false);
 
-    ConfigEvent event = createConfigEvent("realms/update-realm", "realm", "UPDATE", realmRep);
+    ConfigEvent event =
+        createConfigEvent("realms/update-realm", "realm", Operation.UPDATE, realmRep);
 
     // When
     adapter.processConfigEvent(Topics.REALM_UPDATED.toString(), event);
@@ -214,7 +216,7 @@ class KeycloakAdapterIntegrationTest {
     userRep.setRealmRoles(roles);
 
     ConfigEvent event =
-        createConfigEvent("realms/user-realm/users/testuser", "user", "CREATE", userRep);
+        createConfigEvent("realms/user-realm/users/testuser", "user", Operation.CREATE, userRep);
 
     // When
     adapter.processConfigEvent(Topics.USER_CREATED.toString(), event);
@@ -255,7 +257,8 @@ class KeycloakAdapterIntegrationTest {
     clientRep.setDirectAccessGrantsEnabled(true);
 
     ConfigEvent event =
-        createConfigEvent("realms/client-realm/clients/test-client", "client", "CREATE", clientRep);
+        createConfigEvent(
+            "realms/client-realm/clients/test-client", "client", Operation.CREATE, clientRep);
 
     // When
     adapter.processConfigEvent(Topics.CLIENT_CREATED.toString(), event);
@@ -283,7 +286,7 @@ class KeycloakAdapterIntegrationTest {
     realmRep.setEnabled(true);
     keycloakClient.realms().create(realmRep);
 
-    ConfigEvent event = createConfigEvent("realms/delete-realm", "realm", "DELETE", null);
+    ConfigEvent event = createConfigEvent("realms/delete-realm", "realm", Operation.DELETE, null);
 
     // When
     adapter.processConfigEvent(Topics.REALM_DELETED.toString(), event);
@@ -312,7 +315,8 @@ class KeycloakAdapterIntegrationTest {
     roleRep.setName("testrole");
 
     ConfigEvent event =
-        createConfigEvent("realms/role-create-realm/roles/testrole", "role", "CREATE", roleRep);
+        createConfigEvent(
+            "realms/role-create-realm/roles/testrole", "role", Operation.CREATE, roleRep);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_CREATED.toString(), event);
@@ -352,7 +356,7 @@ class KeycloakAdapterIntegrationTest {
 
     ConfigEvent event =
         createConfigEvent(
-            "realms/role-nested-create-realm/roles/testrole", "role", "CREATE", roleRep);
+            "realms/role-nested-create-realm/roles/testrole", "role", Operation.CREATE, roleRep);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_CREATED.toString(), event);
@@ -399,7 +403,8 @@ class KeycloakAdapterIntegrationTest {
     roleRep.setName("testrole");
     roleRep.setDescription("new description");
     ConfigEvent event =
-        createConfigEvent("realms/role-update-realm/roles/testrole", "role", "UPDATE", roleRep);
+        createConfigEvent(
+            "realms/role-update-realm/roles/testrole", "role", Operation.UPDATE, roleRep);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_UPDATED.toString(), event);
@@ -439,7 +444,8 @@ class KeycloakAdapterIntegrationTest {
     RoleRepresentation roleRep = new RoleRepresentation();
     roleRep.setName("testrole");
     ConfigEvent event =
-        createConfigEvent("realms/role-delete-realm/roles/testrole", "role", "DELETE", roleRep);
+        createConfigEvent(
+            "realms/role-delete-realm/roles/testrole", "role", Operation.DELETE, roleRep);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_DELETED.toString(), event);
@@ -464,7 +470,8 @@ class KeycloakAdapterIntegrationTest {
     RealmRepresentation realmRep = new RealmRepresentation();
     realmRep.setRealm("non-existent-realm");
 
-    ConfigEvent event = createConfigEvent("realms/non-existent-realm", "realm", "UPDATE", realmRep);
+    ConfigEvent event =
+        createConfigEvent("realms/non-existent-realm", "realm", Operation.UPDATE, realmRep);
 
     // When
     adapter.processConfigEvent(Topics.REALM_UPDATED.toString(), event);
@@ -487,7 +494,7 @@ class KeycloakAdapterIntegrationTest {
 
     ConfigEvent event =
         createConfigEventWithCorrelation(
-            "realms/correlation-realm", "realm", "CREATE", realmRep, correlationId);
+            "realms/correlation-realm", "realm", Operation.CREATE, realmRep, correlationId);
 
     // When
     adapter.processConfigEvent(Topics.REALM_CREATED.toString(), event);
@@ -517,7 +524,7 @@ class KeycloakAdapterIntegrationTest {
   }
 
   private ConfigEvent createConfigEvent(
-      String targetResource, String targetComponent, String operation, Object value) {
+      String targetResource, String targetComponent, Operation operation, Object value) {
     return createConfigEventWithCorrelation(
         targetResource, targetComponent, operation, value, UUID.randomUUID().toString());
   }
@@ -525,13 +532,13 @@ class KeycloakAdapterIntegrationTest {
   private ConfigEvent createConfigEventWithCorrelation(
       String targetResource,
       String targetComponent,
-      String operation,
+      Operation operation,
       Object value,
       String correlationId) {
     Metadata metadata =
         new Metadata(
             UUID.randomUUID().toString(),
-            OffsetDateTime.now().toString(),
+            OffsetDateTime.now(),
             "test.source",
             correlationId,
             "1.0",

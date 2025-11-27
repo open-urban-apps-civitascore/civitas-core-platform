@@ -22,30 +22,33 @@ import java.util.List;
 public interface ApplicationConfig extends AdapterConfig {
 
   /**
-   * Gets the list of adapter class names to instantiate.
+   * Gets the list of adapter names to instantiate. These names are used to look up adapters via
+   * ServiceLoader by matching against {@link com.civitas.configadapter.ConfigBase#getName()}.
    *
-   * @return list of fully qualified adapter class names
+   * @return list of adapter names (e.g., "keycloak", "dummylog")
    */
   List<String> getAdapterNames();
 
   /**
-   * Gets the event handler name.
+   * Gets the combined event handler name. When specified, this handler is used for both consuming
+   * and publishing events. Cannot be used together with separate consumer/publisher names.
    *
-   * @return fully qualified event handler name
+   * @return the event handler name, or null if using separate consumer/publisher
    */
   String getEventHandlerName();
 
   /**
-   * Gets the event consumer name.
+   * Gets the event consumer name. Used when configuring separate consumer and publisher components.
    *
-   * @return fully qualified event consumer name
+   * @return the event consumer name, or null if using combined handler
    */
   String getEventConsumerName();
 
   /**
-   * Gets the event publisher name.
+   * Gets the event publisher name. Used when configuring separate consumer and publisher
+   * components. The publisher is optional - adapters can function without one.
    *
-   * @return fully qualified event publisher name
+   * @return the event publisher name, or null if not configured or using combined handler
    */
   String getEventPublisherName();
 

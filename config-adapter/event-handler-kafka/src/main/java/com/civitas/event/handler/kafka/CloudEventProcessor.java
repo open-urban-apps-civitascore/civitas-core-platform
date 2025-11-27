@@ -30,7 +30,7 @@ public class CloudEventProcessor {
 
   public CloudEventProcessor(ConfigAdapter configAdapter) {
     this.configAdapter = configAdapter;
-    this.objectMapper = new ObjectMapper();
+    this.objectMapper = ObjectMapperFactory.createObjectMapper();
   }
 
   public void handleEvent(String topic, CloudEvent cloudEvent) throws Exception {

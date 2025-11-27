@@ -253,7 +253,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
             .withExtension("correlationid", resultEvent.correlationId())
             .withExtension("originalmessageid", resultEvent.originalMessageId())
             .withExtension("status", resultEvent.status().name())
-            .withExtension("operation", resultEvent.operation())
+            .withExtension("operation", resultEvent.operation().name())
             .withExtension("targetresource", resultEvent.targetResource());
 
     if (resultEvent.message() != null) {

@@ -25,7 +25,7 @@ public record ConfigResultEvent(
     @JsonProperty("status") Status status,
     @JsonProperty("message") String message,
     @JsonProperty("resourceId") String resourceId,
-    @JsonProperty("operation") String operation,
+    @JsonProperty("operation") Operation operation,
     @JsonProperty("targetResource") String targetResource,
     @JsonProperty("errorCode") String errorCode,
     @JsonProperty("timestamp") OffsetDateTime timestamp,
@@ -54,7 +54,7 @@ public record ConfigResultEvent(
       String originalMessageId,
       String message,
       String resourceId,
-      String operation,
+      Operation operation,
       String targetResource,
       String source) {
     return new ConfigResultEvent(
@@ -87,7 +87,7 @@ public record ConfigResultEvent(
       String originalMessageId,
       String errorCode,
       String errorMessage,
-      String operation,
+      Operation operation,
       String targetResource,
       String source) {
     return new ConfigResultEvent(
