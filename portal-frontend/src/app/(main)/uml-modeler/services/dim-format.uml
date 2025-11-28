@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<uml:Model xmi:version="20131001" xmlns:xmi="http://www.omg.org/spec/XMI/20131001" xmlns:uml="http://www.eclipse.org/uml2/5.0.0/UML" xmi:id="_DEdKUMw_EfCxIPHXbt47BA" name="Test" URI="ccc.civitas.model">
+  <packagedElement xmi:type="uml:Package" xmi:id="_M_xj8Mw_EfCxIPHXbt47BA" name="config" URI="ccc.civitas.configuration">
+    <packagedElement xmi:type="uml:Class" xmi:id="_SgQJ8Mw_EfCxIPHXbt47BA" name="Configuration">
+      <ownedAttribute xmi:id="_VAi8cMw_EfCxIPHXbt47BA" name="pid" isID="true"/>
+      <ownedAttribute xmi:id="_aEvPEMw_EfCxIPHXbt47BA" name="name"/>
+    </packagedElement>
+  </packagedElement>
+</uml:Model>
