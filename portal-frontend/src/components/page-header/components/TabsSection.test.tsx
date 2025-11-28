@@ -15,6 +15,7 @@ const tabsMock = [
 
 describe('TabsSection', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
         <TabsSection tabs={tabsMock} onClick={onTabClickMock} selectedTab={tabsMock[0].value} />
