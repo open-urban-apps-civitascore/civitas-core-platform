@@ -1,7 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { X } from 'lucide-react'
+import { SquarePen, X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { KeyboardEvent, useMemo, useState } from 'react'
@@ -41,6 +41,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const isMobile = useIsMobile()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
+  const [isReadOnly, setIsReadOnly] = useState(isEditMode)
   const searchParams = useSearchParams()
 
   const form = useForm<DatasetFormData>({
@@ -113,6 +114,13 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   }
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateDataset) : form.handleSubmit(handleCreateDataset)
 
+  const EditButton = (
+    <Button variant="outline" type="button" onClick={() => setIsReadOnly(false)}>
+      <SquarePen />
+      {tCommon('actions.edit')}
+    </Button>
+  )
+
   if (!dataset) {
     return <NoDataPage title={tCommon('noData')} />
   }
@@ -122,19 +130,23 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   }
 
   return (
-    <PageContainer headerType="onlyTitle" className="overflow-hidden">
-      <PageHeader title={isEditMode ? dataset.name : t('overview.title')} />
+    <PageContainer headerType={isEditMode ? 'onlyTitle' : 'withSubTabsOrSubtitle'} className="overflow-hidden">
+      <PageHeader
+        title={isEditMode ? dataset.name : t('overview.title')}
+        subtitle={isEditMode ? undefined : t('overview.subtitle')}
+      />
       <PageBackground className="overflow-y-auto">
-        <ContentCard
-          className={cn('h-full grid grid-cols-2 gap-x-[5vw] px-10 overflow-auto', isMobile && 'grid-cols-1')}
-        >
+        <ContentCard className={cn('h-full overflow-auto')}>
           <Form {...form}>
-            <form onSubmit={handleSubmit} className="h-full flex flex-col justify-between">
+            <form
+              onSubmit={handleSubmit}
+              className={cn('flex flex-col gap-6', !isEditMode && 'h-full justify-between')}
+            >
               <div>
-                <DetailsFieldContainer>
-                  <SubHeader title={t('overview.info.title')} />
+                <DetailsFieldContainer className="max-w-250">
+                  <SubHeader title={t('overview.info.title')} customElement={isEditMode && EditButton} />
                 </DetailsFieldContainer>
-                <DetailsFieldContainer>
+                <DetailsFieldContainer className="max-w-250">
                   <Select
                     id="dataspaceSelect"
                     form={form}
@@ -144,7 +156,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
                     options={dataspaces}
                   />
                 </DetailsFieldContainer>
-                <DetailsFieldContainer>
+                <DetailsFieldContainer className="max-w-250">
                   <TextField
                     id="datasetTitle"
                     form={form}
@@ -154,7 +166,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
                     required
                   />
                 </DetailsFieldContainer>
-                <DetailsFieldContainer>
+                <DetailsFieldContainer className="max-w-250">
                   <TextField
                     id="datasetDescription"
                     form={form}
@@ -165,7 +177,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
                 </DetailsFieldContainer>
                 <DetailsFieldContainer
                   className={cn(
-                    'flex items-center',
+                    'flex items-center max-w-250',
                     isMobile ? 'grid gap-4 border-b-0' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]',
                   )}
                 >
@@ -207,12 +219,14 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
                   </div>
                 </DetailsFieldContainer>
               </div>
-              <ActionButtons
-                confirmButtonType="submit"
-                isConfirmButtonDisabled={!form.formState.isDirty && !haveTagsChanged}
-                onCancelClick={() => router.push(`/datasets?${searchParams.toString()}`)}
-                hasCard={false}
-              />
+              {!isReadOnly && (
+                <ActionButtons
+                  confirmButtonType="submit"
+                  isConfirmButtonDisabled={!form.formState.isDirty && !haveTagsChanged}
+                  onCancelClick={() => router.push(`/datasets?${searchParams.toString()}`)}
+                  hasCard={false}
+                />
+              )}
             </form>
           </Form>
           {isEditMode && <DatasetCompletionStatus datasetId={dataset.id} disabled={!isEditMode} />}

@@ -213,7 +213,7 @@ export const RoleDetails = (props: Props): JSX.Element => {
   const badgeTitle = roleType ? tRoles(`${roleType}Roles`).slice(0, -1) : undefined
 
   return (
-    <PageContainer headerType="withSubTabs">
+    <PageContainer headerType="withSubTabsOrSubtitle">
       <PageHeader
         title={roleId ? selectedRole?.name : tRoles('newRole')}
         badgeTitle={badgeTitle}

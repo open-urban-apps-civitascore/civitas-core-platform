@@ -70,7 +70,8 @@
       }
     },
     "overview": {
-      "title": "Overview: Create Dataset",
+      "title": "Create: New Dataset",
+      "subtitle": "Enter the base information.",
       "info": {
         "title": "Base Information",
         "dataspace": "Data Space",

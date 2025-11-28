@@ -70,7 +70,8 @@
       }
     },
     "overview": {
-      "title": "Übersicht: Dataset erstellen",
+      "title": "Erstellen: Neuer Datensatz",
+      "subtitle": "Gib die Basisinformationen ein.",
       "info": {
         "title": "Basisinformationen",
         "dataspace": "Datenraum",

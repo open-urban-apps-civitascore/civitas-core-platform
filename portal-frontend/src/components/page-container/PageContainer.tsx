@@ -3,7 +3,7 @@ import { CSSProperties, HTMLAttributes } from 'react'
 import { cn } from '@/lib/utils'
 
 interface PageContainerProps extends HTMLAttributes<HTMLDivElement> {
-  headerType: 'onlyTitle' | 'withPrimaryTabs' | 'withSubTabs' | 'withBothTabsRows'
+  headerType: 'onlyTitle' | 'withPrimaryTabs' | 'withSubTabsOrSubtitle' | 'withBothTabsRows'
 }
 export const PageContainer = (props: PageContainerProps) => {
   const { headerType, children, className } = props
@@ -14,7 +14,7 @@ export const PageContainer = (props: PageContainerProps) => {
       case 'onlyTitle':
         return tabsAndTitleHeight + 2 * layoutPadding
       case 'withPrimaryTabs':
-      case 'withSubTabs':
+      case 'withSubTabsOrSubtitle':
         return 2 * tabsAndTitleHeight + 3 * layoutPadding
       case 'withBothTabsRows':
         return 3 * tabsAndTitleHeight + 4 * layoutPadding
