@@ -3,6 +3,7 @@
     "type-to-search": "Zum Suchen tippen",
     "search": "Durchsuchen",
     "noResults": "Es gibt leider keine Ergebnisse.",
+    "noData": "Keine Daten",
     "loading": "Lädt...",
     "actions": {
       "submit": "Speichern",
@@ -35,7 +36,8 @@
     "all-datasets": "Alle Datensätze",
     "documentation": "Dokumentation",
     "logout": "Abmelden",
-    "datasets": "Datensätze",
+    "ourData": "Unsere Daten",
+    "datasets": "Unsere Daten",
     "permissions": "Berechtigungen",
     "roles": "Rollen",
     "create": "erstellen",
@@ -43,12 +45,14 @@
     "users": "User Management",
     "groups": "Gruppen",
     "dataspaces": "Datenräume",
-    "tenants": "Mandanten-Management"
+    "tenants": "Mandanten-Management",
+    "uml-modeler": "UML Modeler"
   },
   "datasets": {
     "title": "Datensätze",
     "subtitle": "Alle verfügbaren Datensätze unserer Organisation",
     "searchDatasets": "Datensätze durchsuchen",
+    "newDataset": "Neuer Datensatz",
     "tableHeaders": {
       "name": "Name",
       "dataSpace": "Datenraum",
@@ -65,7 +69,26 @@
         "closed": "geschlossen"
       }
     },
-    "newDataset": "Neuer Datensatz"
+    "overview": {
+      "title": "Übersicht: Dataset erstellen",
+      "info": {
+        "title": "Basisinformationen",
+        "dataspace": "Datenraum",
+        "name": "Name",
+        "description": "Beschreibung",
+        "tags": "Tags",
+        "typeTag": "Tag eingeben..."
+      },
+      "completion": {
+        "title": "Erstellungsfortschritt",
+        "metadata": "Metadaten",
+        "groups": "Gruppen- & Rollenzuweisung",
+        "configuration": "Datenkonfiguration",
+        "distribution": "Distribution / Applikationen / APIs",
+        "permissions": "Nutzerdatenberechtigungen",
+        "publication": "Freigabe"
+      }
+    }
   },
   "users": {
     "title": "Übersicht: User",

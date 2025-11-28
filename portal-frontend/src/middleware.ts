@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 
 import { auth } from '../auth'
 
@@ -9,7 +9,11 @@ const generateNonce = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-export default auth((_: NextRequest) => {
+export default auth(req => {
+  const { nextUrl } = req
+  if (nextUrl.pathname !== '/login' && !req.auth?.user) {
+    return NextResponse.redirect(new URL('/login', req.url))
+  }
   const response = NextResponse.next()
 
   // Generate unique nonces for each request
