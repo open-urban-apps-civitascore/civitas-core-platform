@@ -1,6 +1,8 @@
 import { request } from '@playwright/test'
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+import { JSON_SERVER_HOST, JSON_SERVER_PORT } from '../playwright.config'
+
+const URL = `${JSON_SERVER_HOST}:${JSON_SERVER_PORT}`
 
 export const removeTestUser = async (userId: string) => {
   console.log('deleting test user: ', userId)

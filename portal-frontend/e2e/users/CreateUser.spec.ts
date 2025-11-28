@@ -2,8 +2,11 @@ import { expect, test } from '@playwright/test'
 
 import { Authority } from '@/types/users'
 
+import { JSON_SERVER_HOST, JSON_SERVER_PORT } from '../../playwright.config'
 import { getMockUserData } from '../../playwright/helpers/userFactory'
 import { pickSelectOption } from '../utils/formUtils'
+
+const URL = `${JSON_SERVER_HOST}:${JSON_SERVER_PORT}`
 
 const MOCK_USER_1 = getMockUserData()
 
@@ -22,7 +25,7 @@ const MOCK_AUTHORITIES = [
 
 test.describe('Create User Flow', async () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('http://localhost:3001/authorities', async route => {
+    await page.route(`${URL}/authorities`, async route => {
       const json: Authority[] = MOCK_AUTHORITIES
       await route.fulfill({ json })
     })

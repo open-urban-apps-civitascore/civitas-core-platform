@@ -2,12 +2,12 @@ import { expect, test } from '@playwright/test'
 
 import { Authority, UserResponse } from '@/types/users'
 
+import { JSON_SERVER_HOST, JSON_SERVER_PORT } from '../../playwright.config'
 import { createTestUser } from '../../playwright/createTestUser'
-import { getMockUserData } from '../../playwright/helpers/userFactory'
 import { removeTestUser } from '../../playwright/removeTestUser'
 import { pickSelectOption } from '../utils/formUtils'
 
-const MOCK_USER_1 = getMockUserData()
+const URL = `${JSON_SERVER_HOST}:${JSON_SERVER_PORT}`
 
 const MOCK_AUTHORITIES = [
   {
@@ -26,7 +26,7 @@ test.describe('Edit User Page', async () => {
   let user: UserResponse
   test.beforeEach(async ({ page }) => {
     user = await createTestUser()
-    await page.route('http://localhost:3001/authorities', async route => {
+    await page.route(`${URL}/authorities`, async route => {
       const json: Authority[] = MOCK_AUTHORITIES
       await route.fulfill({ json })
     })
@@ -91,7 +91,7 @@ test.describe('Edit User Page', async () => {
   test('save button gets enabled after changing form values', async ({ page }) => {
     await page.getByTestId('editButton').click()
     await expect(page.getByTestId('confirmButton')).toBeDisabled()
-    await page.getByTestId('firstNameTextField').fill(MOCK_USER_1.firstName)
+    await page.getByTestId('firstNameTextField').fill('Test first name')
     await expect(page.getByTestId('confirmButton')).toBeEnabled()
   })
 
@@ -119,25 +119,23 @@ test.describe('Edit User Page', async () => {
 
     // fill in form data
     await pickSelectOption(page, 'title', 1)
-    await page.getByTestId('firstNameTextField').fill(`edited ${MOCK_USER_1.firstName}`)
-    await page.getByTestId('lastNameTextField').fill(`edited ${MOCK_USER_1.lastName}`)
+    await page.getByTestId('firstNameTextField').fill(`edited ${user.firstName}`)
+    await page.getByTestId('lastNameTextField').fill(`edited ${user.lastName}`)
     await pickSelectOption(page, 'department', 'Placeholder')
     await page.getByTestId('positionDescriptionTextArea').fill('edited description')
     await page.getByTestId('activeSwitch').click()
 
     await page.getByTestId('confirmButton').click()
     await page.waitForLoadState('networkidle')
+    await page.getByTestId('editButton').waitFor({ state: 'visible' })
 
     // Verify if edited fields show correct content
-    await expect(page.getByTestId('userDetailsPage')).toBeVisible()
     // names fields have to be checked like this since the name is too long for the field
     const firstName = (await page.getByTestId('firstNameTextField').textContent())?.trim() ?? ''
-    expect(`edited ${MOCK_USER_1.firstName}`).toContain(firstName)
+    expect(`edited ${user.firstName}`).toContain(firstName)
     const lastName = (await page.getByTestId('lastNameTextField').textContent())?.trim() ?? ''
-    expect(`edited ${MOCK_USER_1.lastName}`).toContain(lastName)
-    await expect(page.getByTestId('pageHeader')).toContainText(
-      `edited ${MOCK_USER_1.firstName} edited ${MOCK_USER_1.lastName}`,
-    )
+    expect(`edited ${user.lastName}`).toContain(lastName)
+    await expect(page.getByTestId('pageHeader')).toContainText(`edited ${user.firstName} edited ${user.lastName}`)
     await expect(page.getByTestId('departmentSelectTrigger')).toContainText('Select department...')
     await expect(page.getByTestId('activeStatus')).toContainText('Inactive')
 
