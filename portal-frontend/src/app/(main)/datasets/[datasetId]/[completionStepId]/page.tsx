@@ -10,13 +10,13 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Button } from '@/components/ui/button'
 
-const CompletionStep = () => {
+const CompletionStepPage = () => {
   const t = useTranslations('datasets')
   const { datasetId, completionStepId } = useParams()
   const searchParams = useSearchParams()
   return (
     <PageContainer headerType="onlyTitle">
-      <PageHeader title={t(`overview.completion.${completionStepId}`) || ''} />
+      <PageHeader title={t(`overview.completion.${completionStepId}.title`) || ''} />
       <PageBackground>
         <ContentCard>
           <Button asChild>
@@ -28,4 +28,4 @@ const CompletionStep = () => {
   )
 }
 
-export default CompletionStep
+export default CompletionStepPage

@@ -82,12 +82,13 @@
       },
       "completion": {
         "title": "Erstellungsfortschritt",
-        "metadata": "Metadaten",
-        "groups": "Gruppen- & Rollenzuweisung",
-        "configuration": "Datenkonfiguration",
-        "distribution": "Distribution / Applikationen / APIs",
-        "permissions": "Nutzerdatenberechtigungen",
-        "publication": "Freigabe"
+        "metadata": { "title": "Metadaten", "button1": "Metadaten eintragen", "requirementsMet": "Mindestanforderungen erfüllt" },
+        "accessPermissions": { "title": "Zugriffsberechtigungen", "button1": "Rollen und Usergruppen hinzufügen", "userGroups": "Usergruppen" },
+        "data": { "title": "Daten", "button1": "Daten einspielen und mappen", "datasources": "Datenquellen",  "persistence": "Persistenz" },
+        "distribution": { "title": "Distribution", "button1": "APIs anbinden", "button2": "Dateien bereitstellen", "api": "API" },
+        "usagePermissions": { "title": "Nutzungsberechtigungen", "button1": "Rate Limiting einstellen" },
+        "applications": { "title": "Applikationen", "button1": "Applikationen anbinden" },
+        "publication": { "title": "Freigabe", "button1": "Freigabe gestalten" }
       }
     }
   },

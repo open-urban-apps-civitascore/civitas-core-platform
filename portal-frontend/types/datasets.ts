@@ -1,3 +1,5 @@
+import { CheckedState } from '@radix-ui/react-checkbox'
+import { JSX } from 'react'
 import { z } from 'zod'
 
 import { Item } from './common'
@@ -57,3 +59,19 @@ export const DatasetFormSchema = z.object({
 })
 
 export type DatasetFormData = z.infer<typeof DatasetFormSchema>
+
+export type CompletionStepKey =
+  | 'metadata'
+  | 'accessPermissions'
+  | 'data'
+  | 'distribution'
+  | 'usagePermissions'
+  | 'applications'
+  | 'publication'
+
+export type CompletionStepData = {
+  key: CompletionStepKey
+  isCompleted: CheckedState
+  content?: JSX.Element
+  buttons: number
+}

@@ -82,12 +82,13 @@
       },
       "completion": {
         "title": "Creation Progress",
-        "metadata": "Metadata",
-        "groups": "Group & Role Assignment",
-        "configuration": "Data Configuration",
-        "distribution": "Distributions / Applications / APIs",
-        "permissions": "User Data Permissions",
-        "publication": "Publication"
+        "metadata": { "title": "Metadata", "button1": "Enter metadata", "requirementsMet": "Minimal requirements met" },
+        "accessPermissions": { "title": "Access permissions", "button1": "Add roles and user groups", "userGroups": "User groups" },
+        "data": { "title": "Data", "button1": "Ingest and map data", "datasources": "Datenquellen", "persistence": "Persistence" },
+        "distribution": { "title": "Distribution", "button1": "Integrate APIs", "button2": "Provide files", "api": "API" },
+        "usagePermissions": { "title": "Usage Permissions", "button1": "Configure rate limiting" },
+        "applications": { "title": "Applications", "button1": "Integrate applications" },
+        "publication": { "title": "Publications", "button1": "Configure publicatiƒon" }
       }
     }
   },
