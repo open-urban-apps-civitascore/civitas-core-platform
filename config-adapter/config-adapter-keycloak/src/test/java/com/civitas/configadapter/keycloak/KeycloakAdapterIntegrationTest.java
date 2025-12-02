@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.configuration.ApplicationConfig;
@@ -28,7 +29,7 @@ import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
-import com.civitas.configadapter.model.Topics;
+
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;

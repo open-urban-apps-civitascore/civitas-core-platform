@@ -827,6 +827,8 @@ civitas-config-adapter/
 ├── config-adapter-api/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/configadapter/
+│       ├── Topics.java
+│       ├── ConfigBase.java
 │       ├── adapter/
 │       │   ├── ConfigAdapter.java
 │       │   └── AbstractConfigAdapter.java
@@ -834,6 +836,7 @@ civitas-config-adapter/
 │       │   ├── AdapterConfig.java             # Interface for adapter configuration
 │       │   └── ApplicationConfig.java         # Interface for application configuration
 │       ├── messaging/
+│       │   ├── EventBase.java
 │       │   ├── EventConsumer.java
 │       │   └── EventPublisher.java
 │       └── model/
@@ -841,8 +844,7 @@ civitas-config-adapter/
 │           ├── ConfigResultEvent.java
 │           ├── Metadata.java
 │           ├── Payload.java
-│           ├── Config.java                    # Event config data model
-│           └── Topics.java
+│           └── Config.java                    # Event config data model
 ├── config-adapter-configuration/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/configadapter/configuration/

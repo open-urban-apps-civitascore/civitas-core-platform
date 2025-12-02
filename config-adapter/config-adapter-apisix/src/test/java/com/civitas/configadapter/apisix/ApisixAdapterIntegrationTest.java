@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.Config;
@@ -24,7 +25,6 @@ import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
-import com.civitas.configadapter.model.Topics;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;

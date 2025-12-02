@@ -10,9 +10,10 @@
  */
 package com.civitas.configadapter.adapter;
 
+import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
-import com.civitas.configadapter.model.Topics;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;

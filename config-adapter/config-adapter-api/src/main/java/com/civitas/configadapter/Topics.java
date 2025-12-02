@@ -8,7 +8,7 @@
  *
  * <p>Contributors: Data In Motion - initial API and implementation
  */
-package com.civitas.configadapter.model;
+package com.civitas.configadapter;
 
 import java.util.Arrays;
 import java.util.Optional;

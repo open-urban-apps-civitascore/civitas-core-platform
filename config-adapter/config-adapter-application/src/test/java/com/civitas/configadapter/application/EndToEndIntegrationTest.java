@@ -15,6 +15,7 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.keycloak.KeycloakAdapter;
 import com.civitas.configadapter.model.Config;
@@ -22,7 +23,6 @@ import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
-import com.civitas.configadapter.model.Topics;
 import com.civitas.event.handler.kafka.KafkaEventHandler;
 import com.civitas.event.handler.kafka.ObjectMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
