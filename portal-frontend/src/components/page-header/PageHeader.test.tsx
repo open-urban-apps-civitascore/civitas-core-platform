@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it } from 'vitest'
 
@@ -14,6 +14,22 @@ const tabsMock = [
 ]
 
 describe('PageHeader', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('renders nothing when no properties provided provided', () => {
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <PageHeader />
+      </NextIntlClientProvider>,
+    )
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('pageHeaderBadge')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('primaryTabs')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('subTabs')).not.toBeInTheDocument()
+  })
   it('renders only the title when only a title is provided', () => {
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
@@ -23,6 +39,26 @@ describe('PageHeader', () => {
     expect(screen.getByRole('heading')).toHaveTextContent('Test Title')
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     expect(screen.queryByTestId('pageHeaderBadge')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('primaryTabs')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('subTabs')).not.toBeInTheDocument()
+  })
+  it('renders only a tab section when only tabs are provided', () => {
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <PageHeader
+          tabs={{
+            tabs: tabsMock,
+            onClick: onTabClickMock,
+            selectedTab: tabsMock[0].value,
+          }}
+        />
+      </NextIntlClientProvider>,
+    )
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('pageHeaderBadge')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).toBeInTheDocument()
+    expect(screen.queryByTestId('primaryTabs')).toBeInTheDocument()
+    expect(screen.queryByTestId('subTabs')).not.toBeInTheDocument()
   })
 
   it('renders the title and a badge when a title and a badge title are provided', () => {
@@ -129,5 +165,26 @@ describe('PageHeader', () => {
     expect(screen.getByTestId('subTabs')).toBeInTheDocument()
     expect(screen.getAllByRole('tab')).toHaveLength(6)
     expect(screen.getByTestId('pageHeaderBadge')).toHaveTextContent('Badge Title')
+  })
+
+  it('triggers the tab click handler when clicking on a tab', () => {
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <PageHeader
+          title="Test Title"
+          badgeTitle="Badge Title"
+          tabs={{
+            tabs: tabsMock,
+            onClick: onTabClickMock,
+            selectedTab: tabsMock[0].value,
+          }}
+        />
+      </NextIntlClientProvider>,
+    )
+    const tabs = screen.getAllByRole('tab')
+    fireEvent.click(tabs[1])
+    expect(onTabClickMock).toHaveBeenCalledOnce()
+    fireEvent.click(tabs[2])
+    expect(onTabClickMock).toHaveBeenCalledTimes(2)
   })
 })

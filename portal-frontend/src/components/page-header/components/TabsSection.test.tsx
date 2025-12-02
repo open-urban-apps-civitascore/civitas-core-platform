@@ -43,6 +43,7 @@ describe('TabsSection', () => {
 
 describe('TabsSection primary tabs', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
         <TabsSection tabs={tabsMock} onClick={onTabClickMock} selectedTab={tabsMock[0].value} />
@@ -68,6 +69,7 @@ describe('TabsSection primary tabs', () => {
 
 describe('TabsSection subtabs', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
         <TabsSection tabs={tabsMock} onClick={onTabClickMock} selectedTab={tabsMock[0].value} isSubTabsSection />
