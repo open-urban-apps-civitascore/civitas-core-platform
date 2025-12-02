@@ -1,11 +1,10 @@
 import { Circle, CircleCheckBig } from 'lucide-react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { useTranslations } from 'next-intl'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { CompletionStepData } from '@/types/datasets'
+import { CompletionStepData, CompletionStepParam } from '@/types/datasets'
 
 interface CompletionStepProps {
   step: CompletionStepData
@@ -17,36 +16,38 @@ interface CompletionStepProps {
 
 export const CompletionStep = (props: CompletionStepProps) => {
   const { step, datasetId, disabled = false, className } = props
-  const t = useTranslations('datasets')
   const searchParams = useSearchParams()
 
-  const ButtonLink = ({ button }: { button: 'button1' | 'button2' }) =>
+  const ButtonLink = ({ buttonText, routeParam }: { buttonText: string; routeParam: CompletionStepParam }) =>
     disabled ? (
       <Button variant="outline" disabled>
-        {t(`overview.completion.${step.key}.${button}`)}
+        {buttonText}
       </Button>
     ) : (
       <Button asChild variant="outline">
-        <Link href={`/datasets/${datasetId}/${step.key}?${searchParams.toString()}`}>
-          {t(`overview.completion.${step.key}.${button}`)}
-        </Link>
+        <Link href={`/datasets/${datasetId}/${routeParam}?${searchParams?.toString()}`}>{buttonText}</Link>
       </Button>
     )
   return (
-    <div>
+    <div data-testid="completionStep">
       <div className={cn('flex justify-between items-center ', className)}>
         <div className="w-full items-center flex gap-2">
-          {step.isCompleted ? <CircleCheckBig /> : <Circle />}
+          {step.isCompleted ? <CircleCheckBig data-testid="circleCheck" /> : <Circle data-testid="circle" />}
           <div className="flex-1">
-            <h3 className="text-2xl font-bold">{t(`overview.completion.${step.key}.title`)}</h3>
+            <h3 className="text-2xl font-bold">{step.title}</h3>
           </div>
         </div>
         <div className="flex gap-10">
-          <ButtonLink button="button1" />
-          {step.buttons === 2 && <ButtonLink button="button2" />}
+          {step.buttons.map(button => (
+            <ButtonLink key={button.text} buttonText={button.text} routeParam={button.routeParam} />
+          ))}
         </div>
       </div>
-      {step.content && <div className="font-semibold mt-6 ml-8.5">{step.content}</div>}
+      {step.content && (
+        <div data-testid="completionStepContent" className="font-semibold mt-6 ml-8.5">
+          {step.content}
+        </div>
+      )}
     </div>
   )
 }

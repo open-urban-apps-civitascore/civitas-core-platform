@@ -60,7 +60,7 @@ export const DatasetFormSchema = z.object({
 
 export type DatasetFormData = z.infer<typeof DatasetFormSchema>
 
-export type CompletionStepKey =
+export type CompletionStepParam =
   | 'metadata'
   | 'accessPermissions'
   | 'data'
@@ -70,8 +70,8 @@ export type CompletionStepKey =
   | 'publication'
 
 export type CompletionStepData = {
-  key: CompletionStepKey
+  title: string
   isCompleted: CheckedState
+  buttons: { text: string; routeParam: CompletionStepParam }[]
   content?: JSX.Element
-  buttons: number
 }

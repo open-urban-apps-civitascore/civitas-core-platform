@@ -48,21 +48,21 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const completionSteps: CompletionStepData[] = [
     {
-      key: 'metadata',
+      title: t('overview.completion.metadata.title'),
       isCompleted: hasMetadata,
-      buttons: 1,
+      buttons: [{ text: t('overview.completion.metadata.button'), routeParam: 'metadata' }],
       content: hasMetadata ? <p>{t('overview.completion.metadata.requirementsMet')}</p> : undefined,
     },
     {
-      key: 'accessPermissions',
+      title: t('overview.completion.accessPermissions.title'),
       isCompleted: groups.length > 0,
-      buttons: 1,
+      buttons: [{ text: t('overview.completion.accessPermissions.button'), routeParam: 'usagePermissions' }],
       content: groups.length > 0 ? getList(t('overview.completion.accessPermissions.userGroups'), groups) : undefined,
     },
     {
-      key: 'data',
+      title: t('overview.completion.data.title'),
       isCompleted: datasources.length > 0 && persistence.length > 0,
-      buttons: 1,
+      buttons: [{ text: t('overview.completion.data.button'), routeParam: 'data' }],
       content:
         datasources.length > 0 || persistence.length > 0 ? (
           <>
@@ -72,14 +72,29 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         ) : undefined,
     },
     {
-      key: 'distribution',
+      title: t('overview.completion.distribution.title'),
       isCompleted: apis.length > 0,
-      buttons: 2,
+      buttons: [
+        { text: t('overview.completion.distribution.button1'), routeParam: 'distribution' },
+        { text: t('overview.completion.distribution.button2'), routeParam: 'distribution' },
+      ],
       content: apis.length > 0 ? getList(t('overview.completion.distribution.api'), apis) : undefined,
     },
-    { key: 'usagePermissions', isCompleted: false, buttons: 1 },
-    { key: 'applications', isCompleted: false, buttons: 1 },
-    { key: 'publication', isCompleted: false, buttons: 1 },
+    {
+      title: t('overview.completion.usagePermissions.title'),
+      isCompleted: false,
+      buttons: [{ text: t('overview.completion.usagePermissions.button'), routeParam: 'usagePermissions' }],
+    },
+    {
+      title: t('overview.completion.applications.title'),
+      isCompleted: false,
+      buttons: [{ text: t('overview.completion.applications.button'), routeParam: 'applications' }],
+    },
+    {
+      title: t('overview.completion.publication.title'),
+      isCompleted: false,
+      buttons: [{ text: t('overview.completion.publication.button'), routeParam: 'publication' }],
+    },
   ]
 
   if (!dataset) {
@@ -102,7 +117,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
           <div className="mt-12">
             {completionSteps.map((step, index) => (
               <DetailsFieldContainer
-                key={step.key}
+                key={step.title}
                 className={cn(index === completionSteps.length - 1 && 'border-b-0')}
               >
                 <CompletionStep step={step} datasetId={dataset.id} disabled={!isEditMode} />
