@@ -115,7 +115,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={handleSubmit} className={cn('flex gap-2 pt-2')}>
+      <form data-testid="datasetBaseInfoForm" onSubmit={handleSubmit} className={cn('flex gap-2 pt-2')}>
         {dataset.name ? <CircleCheckBig /> : <Circle />}
         <div className={cn('w-full flex flex-col')}>
           <DetailsFieldContainer className="max-w-250 pt-0">
@@ -162,6 +162,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
               <FormLabel>{t('overview.info.tags')}</FormLabel>
               <div>
                 <div
+                  data-testid="tagsField"
                   className={cn(
                     'flex flex-wrap min-h-9',
                     'file:text-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex w-full min-w-0 rounded-md border bg-transparent px-0.5 py-0.5 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
@@ -189,6 +190,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
                   {(!isReadOnly || (isReadOnly && tagsWatch.length === 0)) && (
                     <input
                       id="datasetTags"
+                      data-testid="tagsInput"
                       placeholder={t('overview.info.typeTag')}
                       onKeyUp={handleAddTag}
                       onKeyDown={e => {

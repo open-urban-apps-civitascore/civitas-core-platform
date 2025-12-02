@@ -61,6 +61,7 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
             <ShadcnSelect value={field.value} onValueChange={onChange ?? field.onChange}>
               <SelectTrigger
                 id={id}
+                data-testid={`${name}SelectTrigger`}
                 aria-label={label}
                 className={cn(
                   'w-full disabled:opacity-100 disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0 disabled:pointer-events-none',
