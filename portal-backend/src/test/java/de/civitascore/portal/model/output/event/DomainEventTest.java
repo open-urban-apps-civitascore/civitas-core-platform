@@ -1,6 +1,7 @@
 package de.civitascore.portal.model.output.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.time.Instant;
 import java.util.Map;
