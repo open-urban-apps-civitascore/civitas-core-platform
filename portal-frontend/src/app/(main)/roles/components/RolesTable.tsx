@@ -6,7 +6,7 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
 
-import { RoleResponse } from '../../../../../types/roles'
+import { ROLE_ORIGINS, RoleResponse } from '../../../../../types/roles'
 import { TableProps } from '../../../../../types/table'
 
 interface RolesTableProps extends TableProps<RoleResponse> {
@@ -27,9 +27,7 @@ export const RolesTable = (props: RolesTableProps) => {
     onPaginationChange,
     onSortingChange,
   } = props
-
   const t = useTranslations('roles')
-
   const locale = useLocale()
 
   const columnHelper = createColumnHelper<RoleResponse>()
@@ -45,28 +43,68 @@ export const RolesTable = (props: RolesTableProps) => {
         return <SortableTableHeader column={column} title={t('tableHeaders.name')} />
       },
       cell: info => info.getValue(),
+      meta: {
+        style: {
+          width: '17.5%',
+        },
+      },
     }),
+
     columnHelper.accessor('description', {
       header: () => t('tableHeaders.description'),
       cell: info => info.getValue(),
       meta: {
         style: {
-          width: '35%',
+          width: '25%',
           minWidth: '200px',
         },
       },
     }),
-    columnHelper.accessor('createdAt', {
-      header: () => t('tableHeaders.createdAt'),
-      cell: info => formatDate(info.getValue(), locale),
+    columnHelper.accessor('groups', {
+      header: () => t('tableHeaders.groups'),
+      cell: info => info.getValue()?.length,
+      meta: {
+        style: {
+          width: '10%',
+        },
+      },
     }),
-    columnHelper.accessor('user', {
+    columnHelper.accessor('users', {
       header: () => t('tableHeaders.user'),
       cell: info => info.getValue()?.length,
+      meta: {
+        style: {
+          width: '10%',
+        },
+      },
     }),
-    columnHelper.accessor('permissions', {
-      header: () => t('tableHeaders.permissions'),
-      cell: info => info.getValue()?.length,
+    columnHelper.accessor('lastUpdated', {
+      header: () => t('tableHeaders.lastUpdated'),
+      cell: info => formatDate(info.getValue(), locale),
+      meta: {
+        style: {
+          width: '12.5%',
+          textAlign: 'center',
+        },
+      },
+    }),
+    columnHelper.accessor('updatedBy', {
+      header: () => t('tableHeaders.updatedBy'),
+      cell: info => info.getValue(),
+      meta: {
+        style: {
+          width: '12.5%',
+        },
+      },
+    }),
+    columnHelper.accessor('roleOrigin', {
+      header: () => t('tableHeaders.roleOrigin'),
+      cell: info => (info.getValue() === ROLE_ORIGINS.DEFAULT ? t('defaultRole') : t('customRole')),
+      meta: {
+        style: {
+          width: '12.5%',
+        },
+      },
     }),
   ]
 

@@ -8,6 +8,7 @@
 include:
   - .gitlab/ci/frontend.yml
   - .gitlab/ci/backend.yml
+  - .gitlab/ci/config-adapter.yml
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml

@@ -16,11 +16,13 @@ export const NoDataPage = (props: NoDataPageProps) => {
   return (
     <div className={cn('h-full flex flex-col justify-center items-center', divProps.className)}>
       <p className="text-xl font-semibold mb-2">{title}</p>
-      <p className="text-[muted-foreground] mb-12">{subTitle}</p>
-      <Button onClick={onButtonClick}>
-        <Plus />
-        {buttonText}
-      </Button>
+      {subTitle && <p className="text-[muted-foreground] mb-12">{subTitle}</p>}
+      {buttonText && (
+        <Button onClick={onButtonClick}>
+          <Plus />
+          {buttonText}
+        </Button>
+      )}
     </div>
   )
 }

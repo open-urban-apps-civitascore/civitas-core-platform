@@ -3,6 +3,7 @@
     "type-to-search": "Zum Suchen tippen",
     "search": "Durchsuchen",
     "noResults": "Es gibt leider keine Ergebnisse.",
+    "noData": "Keine Daten",
     "loading": "Lädt...",
     "actions": {
       "submit": "Speichern",
@@ -24,7 +25,8 @@
   },
   "languages": {
     "german": "Deutsch",
-    "english": "Englisch"
+    "english": "Englisch",
+    "selectLanguagePlaceholder": "Sprache wählen"
   },
   "sidebar": {
     "home": "Home",
@@ -34,20 +36,23 @@
     "all-datasets": "Alle Datensätze",
     "documentation": "Dokumentation",
     "logout": "Abmelden",
-    "datasets": "Datensätze",
+    "ourData": "Unsere Daten",
+    "datasets": "Unsere Daten",
     "permissions": "Berechtigungen",
-    "roles": "Rollen Management",
+    "roles": "Rollen",
     "create": "erstellen",
     "edit": "bearbeiten",
     "users": "User Management",
     "groups": "Gruppen",
     "dataspaces": "Datenräume",
-    "tenants": "Mandanten-Management"
+    "tenants": "Mandanten-Management",
+    "uml-modeler": "UML Modeler"
   },
   "datasets": {
     "title": "Datensätze",
     "subtitle": "Alle verfügbaren Datensätze unserer Organisation",
     "searchDatasets": "Datensätze durchsuchen",
+    "newDataset": "Neuer Datensatz",
     "tableHeaders": {
       "name": "Name",
       "dataSpace": "Datenraum",
@@ -64,7 +69,26 @@
         "closed": "geschlossen"
       }
     },
-    "newDataset": "Neuer Datensatz"
+    "overview": {
+      "title": "Übersicht: Dataset erstellen",
+      "info": {
+        "title": "Basisinformationen",
+        "dataspace": "Datenraum",
+        "name": "Name",
+        "description": "Beschreibung",
+        "tags": "Tags",
+        "typeTag": "Tag eingeben..."
+      },
+      "completion": {
+        "title": "Erstellungsfortschritt",
+        "metadata": "Metadaten",
+        "groups": "Gruppen- & Rollenzuweisung",
+        "configuration": "Datenkonfiguration",
+        "distribution": "Distribution / Applikationen / APIs",
+        "permissions": "Nutzerdatenberechtigungen",
+        "publication": "Freigabe"
+      }
+    }
   },
   "users": {
     "title": "Übersicht: User",
@@ -212,8 +236,9 @@
   },
   "roles": {
     "title": "Rollen",
-    "newRole": "Neue Rolle",
-    "systemRoles": "Systemrollen",
+    "newRole": "Rolle erstellen",
+    "overView": "Übersicht:",
+    "systemRoles": " Systemrollen",
     "dataRoles": "Datenrollen",
     "governanceRoles": "Governancerollen",
     "roles": "Einzelrollen",
@@ -221,25 +246,59 @@
     "tableHeaders": {
       "name": "Name",
       "description": "Beschreibung",
-      "permissions": "Berechtigungen",
       "user": "User",
-      "createdAt": "erstellt"
+      "groups": "Gruppen",
+      "lastUpdated": "letztes Update",
+      "updatedBy": "Geändert von",
+      "roleOrigin": "Typ"
     },
-    "form": {
-      "title": { "createRole": "Rolle erstellen" },
-      "inputs": {
-        "name": "Name der Rolle",
-        "description": "Beschreibung der Rolle"
-      },
-      "formErrors": {
-        "name": {
-          "minLength": "Name muss mindestens 2 Zeichen lang sein.",
-          "maxLength": "Name darf höchstens 30 Zeichen lang sein."
+    "defaultRole": "Standard",
+    "customRole": "Eigene",
+    "searchRoles": "Rollen durchsuchen",
+    "tabLabels": {
+      "basicInformation": "Informationen",
+      "permissions": "Berechtigungen",
+      "groupAssignment": "Mitgliedschaft"
+    },
+    "baseInfoTab": {
+      "heading": "Basisinformationen",
+      "form": {
+        "inputs": {
+          "name": "Name der Rolle",
+          "description": "Beschreibung der Rolle",
+          "roleOrigin": "Typ"
         },
-        "description": {
-          "maxLength": "Beschreibung darf höchstens 100 Zeichen lang sein."
+        "placeholders": {
+          "name": "Name der Rolle",
+          "description": "Beschreibung der Rolle"
+        },
+        "formErrors": {
+          "name": {
+            "minLength": "Name muss mindestens 2 Zeichen lang sein.",
+            "maxLength": "Name darf höchstens 30 Zeichen lang sein."
+          },
+          "description": {
+            "maxLength": "Beschreibung darf höchstens 100 Zeichen lang sein."
+          }
         }
+      },
+      "securityArea": {
+        "heading": "Sicherheitsbereich",
+        "description": "Rolle löschen",
+        "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
+        "deleteButton": "Rolle löschen"
       }
+    },
+    "permissionsTab": {
+      "heading": "Berechtigungen",
+      "searchPermissions": "Berechtigung suchen...",
+      "selectedPersmissions": "{count} ausgewählt",
+      "roleTemplate": {
+        "placeholder": "Rolle als Vorlage auswählen"
+      }
+    },
+    "groupAssignmentTab": {
+      "heading": "Mitgliedschaften"
     }
   }
 }

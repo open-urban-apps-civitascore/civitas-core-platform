@@ -4,21 +4,30 @@ import { useLocale, useTranslations } from 'next-intl'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Badge } from '@/components/ui/badge'
+import { DatasetTableData } from '@/types/datasets'
 import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
 
-import { Dataset } from '../page'
-
-interface DatasetsTableProps extends TableProps<Dataset> {
-  datasets: Dataset[]
+interface DatasetsTableProps extends TableProps<DatasetTableData> {
+  datasets: DatasetTableData[]
 }
 
 const DatasetsTable = (props: DatasetsTableProps) => {
-  const { datasets, rowCount, pageIndex, totalPages, pageSize, sorting, onPaginationChange, onSortingChange } = props
+  const {
+    datasets,
+    rowCount,
+    pageIndex,
+    totalPages,
+    pageSize,
+    sorting,
+    onPaginationChange,
+    onSortingChange,
+    onRowClick,
+  } = props
   const t = useTranslations('datasets')
   const locale = useLocale()
-  const columnHelper = createColumnHelper<Dataset>()
+  const columnHelper = createColumnHelper<DatasetTableData>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -36,7 +45,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('dataSpace', {
+    columnHelper.accessor('dataspace', {
       header: t('tableHeaders.dataSpace'),
       cell: info => info.getValue(),
     }),
@@ -81,7 +90,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
                 {value.format}
               </Badge>
               <a href={value.url} target="_blank" className="underline">
-                {value.name}
+                {value.title}
               </a>
             </>
           )
@@ -93,6 +102,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
   ]
 
   const table = useReactTable({
+    getRowId: row => row.id,
     columns: columns,
     data: datasets,
     getCoreRowModel: getCoreRowModel(),
@@ -112,7 +122,15 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
   })
 
-  return <DataTable table={table} pageIndex={pageIndex} pageSize={pageSize} totalPages={totalPages} />
+  return (
+    <DataTable
+      table={table}
+      pageIndex={pageIndex}
+      pageSize={pageSize}
+      totalPages={totalPages}
+      onRowClick={onRowClick}
+    />
+  )
 }
 
 export default DatasetsTable

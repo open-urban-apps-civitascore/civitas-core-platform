@@ -1,6 +1,8 @@
 'use client'
 
+import { Row } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
@@ -11,77 +13,43 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { isPageIndexHigherThanTotalPages } from '@/utils/table'
+import { DatasetResponse, DatasetTableData } from '@/types/datasets'
 
 import DatasetsTable from './components/DatasetsTable'
 
-export type Status = 'open' | 'closed' | null
-export type Creator = { id: string; firstName: string; lastName: string }
-export type Distribution = {
-  format: string
-  name: string
-  url: string
+export const mapDatasetsToListData = (datasets: DatasetResponse[]): DatasetTableData[] => {
+  const datasetsMap = datasets.flatMap(dataset => {
+    try {
+      const data = {
+        id: dataset.id,
+        name: dataset.name,
+        dataspace: dataset.dataspace?.title || '',
+        department: dataset.department?.title || '',
+        creator: dataset.creator.map(creator => `${creator.firstName} ${creator.lastName}`),
+        lastUpdated: dataset.lastUpdated,
+        status: dataset.status,
+        releaseProcess: null,
+        distribution: dataset.distribution
+          ? {
+              format: dataset.distribution?.format,
+              title: dataset.distribution?.title,
+              url: dataset.distribution?.url,
+            }
+          : null,
+      }
+      return data
+    } catch (error) {
+      console.error(dataset, error)
+      return []
+    }
+  })
+  return datasetsMap
 }
-
-export type Category = { id: string; name: string }
-
-export type Catalog = {
-  id: string
-  [`dct:title`]: string
-  [`dct:description`]: string
-  [`dct:publisherId`]: string
-  [`dcat:datasetIds`]: string[]
-  [`dct:issued`]: string
-  [`dct:modified`]: string
-}
-
-export type DatasetResponse = {
-  id: string
-  name: string
-  creator: Creator[]
-  issued: string
-  lastUpdated: string
-  status: Status
-  distribution: (Distribution & { id: string }) | null
-  catalog: string[]
-  series: Category
-  department: Category
-}
-
-export type Dataset = {
-  id: string
-  name: string
-  dataSpace: string
-  department: string
-  creator: string[]
-  lastUpdated: string
-  status: Status
-  releaseProcess: null
-  distribution: Distribution | null
-}
-
-export const mapDatasets = (datasets: DatasetResponse[]): Dataset[] =>
-  datasets.map(dataset => ({
-    id: dataset.id,
-    name: dataset.name,
-    dataSpace: dataset.series.name,
-    department: dataset.department.name,
-    creator: dataset.creator.map(creator => `${creator.firstName} ${creator.lastName}`),
-    lastUpdated: dataset.lastUpdated,
-    status: dataset.status,
-    releaseProcess: null,
-    distribution: dataset.distribution
-      ? {
-          format: dataset.distribution?.format,
-          name: dataset.distribution?.name,
-          url: dataset.distribution?.url,
-        }
-      : null,
-  }))
 
 const DatasetsPage = () => {
   const t = useTranslations('datasets')
-  const [datasets, setDatasets] = useState<Dataset[]>([])
+  const router = useRouter()
+  const [datasets, setDatasets] = useState<DatasetTableData[]>([])
   const [rowCount, setRowCount] = useState(0)
 
   const {
@@ -89,20 +57,13 @@ const DatasetsPage = () => {
     setPaginationParams,
     setSearchParam,
     getApiRequestParamsByUrl,
+    setTotalPages,
     pageIndex,
     pageSize,
     sorting,
     search,
+    totalPages,
   } = useQueryParams()
-
-  const totalPages = Math.ceil(rowCount / pageSize)
-
-  useEffect(() => {
-    if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
-      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalPages, pageIndex, pageSize])
 
   const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
@@ -112,22 +73,34 @@ const DatasetsPage = () => {
     const getDatasets = async () => {
       try {
         const datasetsResponse = await fetch(`${URL}/datasets?${params.toString()}`)
+        if (!datasetsResponse.ok) {
+          throw new Error('An error occurred while loading data')
+        }
         const datasetsData: DatasetResponse[] = await datasetsResponse.json()
-        const datasets = mapDatasets(datasetsData)
+        const datasets = mapDatasetsToListData(datasetsData)
         setDatasets(datasets)
         const totalCount = Number(datasetsResponse.headers.get('X-Total-Count')) || 0
         if (rowCount !== totalCount) {
           setRowCount(totalCount)
         }
+        setTotalPages(Math.ceil(totalCount / pageSize))
       } catch (error) {
         console.error(error)
       }
     }
     getDatasets()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
 
+  const handleRowClick = (row: Row<DatasetTableData>) => {
+    if (row.id) {
+      const params = getApiRequestParamsByUrl()
+      router.push(`datasets/${row.id}?${params.toString()}`)
+    }
+  }
+
   const CustomElement = (
-    <Button>
+    <Button onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}>
       <Plus />
       {t('newDataset')}
     </Button>
@@ -153,6 +126,7 @@ const DatasetsPage = () => {
             totalPages={totalPages}
             onPaginationChange={setPaginationParams}
             onSortingChange={setSortingParams}
+            onRowClick={handleRowClick}
           />
         </TableContainer>
       </PageBackground>

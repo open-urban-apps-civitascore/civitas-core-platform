@@ -1,31 +1,35 @@
 [
   {
     "id": "1",
-    "name": "Bebauungspläne der Stadt Musterstadt (XPlanung)",
-    "creator": [{ "id": "1", "firstName": "Maximilian", "lastName": "Müller" }],
+    "name": "Test Dataset 1",
+    "description": "Test description",
+    "creator": [{ "id": "1", "firstName": "Test", "lastName": "User1" }],
     "issued": "2023-09-10T08:00:00Z",
     "lastUpdated": "2023-09-10T08:00:00Z",
     "status": null,
     "distribution": null,
     "catalog": ["1"],
-    "series": { "id": "1", "name": "Verkehr" },
-    "department": { "id": "1", "name": "Stadtentwicklung" }
+    "dataspace": {"id": "1", "title": "Dataspace 1"},
+    "department": { "id": "1", "title": "Stadtentwicklung" },
+    "tags": []
   },
   {
     "id": "2",
-    "name": "Spielplätze",
-    "creator": [{ "id": "2", "firstName": "Sophie", "lastName": "Schneider" }],
+    "name": "Test Dataset 2",
+    "description": "Test description",
+    "creator": [{ "id": "2", "firstName": "Test", "lastName": "User2" }],
     "issued": "2023-01-01T08:00:00Z",
     "lastUpdated": "2023-01-01T08:00:00Z",
     "status": "open",
     "distribution": {
       "id": "2",
       "format": "DOCX",
-      "name": "Superset",
+      "title": "Superset",
       "url": "https://superset.de"
     },
     "catalog": ["1"],
-    "series": { "id": "2", "name": "Umwelt" },
-    "department": { "id": "2", "name": "Verkehrsplanung" }
+    "dataspace": null,
+    "department": { "id": "2", "title": "Verkehrsplanung" },
+    "tags": []
   }
 ]

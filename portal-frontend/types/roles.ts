@@ -1,6 +1,9 @@
 import z from 'zod'
 
 import { Item } from './common'
+import { Group } from './groups'
+import { Permission } from './permissions'
+import { UserResponse } from './users'
 
 export const ROLE_TYPES = {
   SYSTEM: 'system',
@@ -17,11 +20,22 @@ export type BaseRole = {
   type: RoleType
 }
 
+export const ROLE_ORIGINS = {
+  DEFAULT: 'default',
+  CUSTOM: 'custom',
+} as const
+
+export type RoleOrigin = (typeof ROLE_ORIGINS)[keyof typeof ROLE_ORIGINS]
+
 export type RoleResponse = BaseRole & {
   tenant: string
-  permissions: string[] | null
-  user: string[] | null
+  permissions: Permission['id'][]
+  users: UserResponse['id'][]
   createdAt: string
+  lastUpdated: string | null
+  updatedBy: string | null
+  groups: Group['id'][]
+  roleOrigin: RoleOrigin
 }
 
 export type UserRolesTableData = {
@@ -32,8 +46,7 @@ export type UserRolesTableData = {
   inherited: boolean
   type: RoleType
 }
-
-export type RoleInput = Omit<RoleResponse, 'id'>
+export type RoleInput = Omit<RoleResponse, 'id' | 'lastUpdated' | 'updatedBy'>
 
 export type RoleUpdate = RoleResponse
 
@@ -49,13 +62,11 @@ export type Role = {
 }
 
 export const roleSchema = z.object({
-  name: z
-    .string()
-    .min(2, {
-      message: 'roles.form.formErrors.name.minLength',
-    })
-    .max(30, { message: 'roles.form.formErrors.name.maxLength' }),
-  description: z.string().max(100, { message: 'roles.form.formErrors.description.maxLength' }).optional(),
+  name: z.string().trim().min(2, {
+    message: 'common.errors.atLeast2',
+  }),
+  description: z.string().optional(),
+  roleOrigin: z.enum(['default', 'custom']),
 })
 
 export type FormRole = z.infer<typeof roleSchema>
