@@ -155,6 +155,8 @@ apisix.topics=core.civitas.api.backend.created,core.civitas.api.backend.updated,
 
 **Usage:** Production-ready adapter that integrates with Apache APISIX API Gateway for managing upstream backend services.
 
+**Documentation:** For detailed documentation including event formats, error handling, and integration examples, see [APISIX Adapter Documentation](config-adapter-apisix/README.md).
+
 ### 7. config-adapter-examples
 Example adapter implementations for reference and testing.
 
