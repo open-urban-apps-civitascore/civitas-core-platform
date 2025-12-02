@@ -22,6 +22,63 @@ spring:
           # Token issuer validation
           issuer-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}"
 
+  # Kafka Configuration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+      # Acknowledgement level: "all" (or "-1") waits for all in-sync replicas to acknowledge
+      # Provides strongest durability guarantee - no data loss if at least one replica survives
+      acks: all
+
+      # Maximum retries: Integer.MAX_VALUE (2147483647) for unlimited retry attempts
+      # Combined with idempotence, ensures messages are delivered exactly once
+      retries: 2147483647
+
+      # Batch size in bytes: 16KB (16384 bytes)
+      # Producer will attempt to batch records together into fewer requests
+      # Larger batches = better throughput but higher latency
+      batch-size: 16384
+
+      # Total memory buffer for the producer: 32MB (33554432 bytes)
+      # Used to buffer records waiting to be sent to the server
+      # If buffer fills up, send() will block for max.block.ms (default 60s)
+      buffer-memory: 33554432
+
+      properties:
+        # Idempotent producer: Ensures exactly-once delivery semantics per partition
+        # Prevents duplicate messages even when retries occur
+        # Requires: acks=all, retries>0, max.in.flight.requests<=5
+        enable.idempotence: true
+
+        # Max unacknowledged requests: 5 (maximum allowed with idempotence)
+        # Number of requests that can be sent without blocking while awaiting acknowledgement
+        # Lower value = more ordering guarantees, higher value = better throughput
+        max.in.flight.requests.per.connection: 5
+
+        # Compression codec: Snappy (fast compression with good ratio)
+        # Reduces network bandwidth and storage at the cost of CPU
+        # Alternatives: gzip (better compression), lz4 (faster), zstd (balanced)
+        compression.type: snappy
+
+        # Linger time: 10ms - maximum time to wait before sending a batch
+        # Allows more records to accumulate in the batch for better throughput
+        # Trade-off: slightly higher latency for better efficiency
+        linger.ms: 10
+
+        # Native Kafka batch size (duplicates Spring Boot's batch-size setting)
+        # 16KB - producer groups multiple records into a single batch
+        batch.size: 16384
+    consumer:
+      group-id: civitas-portal-backend
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring.json.trusted.packages: de.civitascore.portal.model.output.event
+
 management:
   endpoints:
     web:
@@ -39,3 +96,18 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
+
+
+
+# Transactional Outbox Configuration
+outbox:
+  max-retries: 5
+  batch-size: 100
+  poll-delay: 5000  # in ms
+  publish-timeout-seconds: 5
+  payload-size-warning-bytes: 100000  # Warn if event payload exceeds 100KB
+
+# Kafka Topic Configuration
+kafka:
+  topic-prefix: ${KAFKA_TOPIC_PREFIX:""}
+

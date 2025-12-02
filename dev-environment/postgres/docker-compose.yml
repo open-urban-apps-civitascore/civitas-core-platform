@@ -8,7 +8,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U iot -d portal_backend"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d portal_backend"]
       interval: 5s
       timeout: 5s
       retries: 10
