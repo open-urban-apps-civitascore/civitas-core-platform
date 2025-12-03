@@ -1,0 +1,47 @@
+package de.civitascore.portal.service;
+
+import de.civitascore.portal.mapper.DistributionMapper;
+import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.input.DistributionInputDTO;
+import de.civitascore.portal.repository.DistributionRepository;
+import de.civitascore.portal.repository.ResourceRepository;
+import java.util.Optional;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class DistributionService extends BaseService<Distribution, DistributionInputDTO> {
+
+  private final DistributionRepository distributionRepository;
+  private final DistributionMapper distributionMapper;
+  private final ResourceRepository resourceRepository;
+
+  @Override
+  protected DistributionRepository getRepository() {
+    return distributionRepository;
+  }
+
+  @Override
+  protected DistributionMapper getMapper() {
+    return distributionMapper;
+  }
+
+  @Override
+  protected String getEntityName() {
+    return Distribution.class.getSimpleName();
+  }
+
+  @Override
+  protected Distribution postConvertToEntity(Distribution entity, DistributionInputDTO input) {
+    // Set resource
+    Optional.ofNullable(input.getResourceId())
+        .flatMap(resourceRepository::findById)
+        .ifPresentOrElse(entity::setResource, () -> entity.setResource(null));
+
+    // dataSet and activity are not updatable through input DTO
+    // They are managed by their respective owning entities (DataSet/Activity)
+
+    return super.postConvertToEntity(entity, input);
+  }
+}

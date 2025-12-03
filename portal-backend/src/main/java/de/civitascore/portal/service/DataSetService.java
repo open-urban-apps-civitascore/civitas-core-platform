@@ -5,26 +5,54 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.repository.AgentRepository;
+import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSetSeriesRepository;
+import de.civitascore.portal.repository.DataSpaceRepository;
+import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
 public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
 
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
   private final UserService userService;
-  private final DataSpaceService dataSpaceService;
+  private final DataSpaceRepository dataSpaceRepository;
+  private final DataSetSeriesRepository dataSetSeriesRepository;
+  private final AgentRepository agentRepository;
+  private final DistributionRepository distributionRepository;
+  private final CatalogRepository catalogRepository;
   private final ObjectMapper objectMapper;
+
+  public DataSetService(
+      DataSetRepository dataSetRepository,
+      DataSetMapper dataSetMapper,
+      UserService userService,
+      DataSpaceRepository dataSpaceRepository,
+      DataSetSeriesRepository dataSetSeriesRepository,
+      AgentRepository agentRepository,
+      DistributionRepository distributionRepository,
+      CatalogRepository catalogRepository,
+      ObjectMapper objectMapper) {
+    this.dataSetRepository = dataSetRepository;
+    this.dataSetMapper = dataSetMapper;
+    this.userService = userService;
+    this.dataSpaceRepository = dataSpaceRepository;
+    this.dataSetSeriesRepository = dataSetSeriesRepository;
+    this.agentRepository = agentRepository;
+    this.distributionRepository = distributionRepository;
+    this.catalogRepository = catalogRepository;
+    this.objectMapper = objectMapper;
+  }
 
   @Override
   protected DataSetRepository getRepository() {
@@ -58,20 +86,38 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
 
   @Override
   protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
-    if (input.getOwnerUserId() != null) {
-      entity.setOwner(userService.findById(input.getOwnerUserId()));
-    } else {
-      entity.setOwner(null);
-    }
+    Optional.ofNullable(input.getOwnerUserId())
+        .map(userService::findById)
+        .ifPresentOrElse(entity::setOwner, () -> entity.setOwner(null));
 
-    // Use findAllById for efficient batch loading of dataSpaces instead of N+1 queries
-    if (Objects.nonNull(input.getDataSpaceIds())) {
-      entity.setDataSpaces(new HashSet<>());
-      if (!input.getDataSpaceIds().isEmpty()) {
-        entity.setDataSpaces(
-            new HashSet<>(dataSpaceService.getRepository().findAllById(input.getDataSpaceIds())));
-      }
-    }
+    // Set dataSetSeries
+    Optional.ofNullable(input.getDataSetSeriesId())
+        .flatMap(dataSetSeriesRepository::findById)
+        .ifPresentOrElse(entity::setDataSetSeries, () -> entity.setDataSetSeries(null));
+
+    // Set dataSpaces
+    Optional.ofNullable(input.getDataSpaceIds())
+        .map(dataSpaceRepository::findAllById)
+        .map(HashSet::new)
+        .ifPresent(entity::setDataSpaces);
+
+    // Set agents
+    Optional.ofNullable(input.getAgentIds())
+        .map(agentRepository::findAllById)
+        .map(HashSet::new)
+        .ifPresent(entity::setAgents);
+
+    // Set distributions
+    Optional.ofNullable(input.getDistributionIds())
+        .map(distributionRepository::findAllById)
+        .map(HashSet::new)
+        .ifPresent(entity::setDistributions);
+
+    // Set catalogs
+    Optional.ofNullable(input.getCatalogIds())
+        .map(catalogRepository::findAllById)
+        .map(HashSet::new)
+        .ifPresent(entity::setCatalogs);
 
     return super.postConvertToEntity(entity, input);
   }

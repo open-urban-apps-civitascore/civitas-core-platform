@@ -9,6 +9,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.util.HashSet;
@@ -31,9 +32,19 @@ import lombok.Setter;
 @Setter
 public class DataSet extends NamedEntity {
 
+  @Column(name = "identifier")
+  private String identifier;
+
+  @Column(name = "version")
+  private String version;
+
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owner_user_id")
   private User owner;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "dataset_series_id")
+  private DataSetSeries dataSetSeries;
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
@@ -41,6 +52,19 @@ public class DataSet extends NamedEntity {
       joinColumns = @JoinColumn(name = "dataset_id"),
       inverseJoinColumns = @JoinColumn(name = "dataspace_id"))
   private Set<DataSpace> dataSpaces = new HashSet<>();
+
+  @ManyToMany(fetch = FetchType.LAZY)
+  @JoinTable(
+      name = "dataset_agents",
+      joinColumns = @JoinColumn(name = "dataset_id"),
+      inverseJoinColumns = @JoinColumn(name = "agent_id"))
+  private Set<Agent> agents = new HashSet<>();
+
+  @OneToMany(mappedBy = "dataSet", fetch = FetchType.LAZY)
+  private Set<Distribution> distributions = new HashSet<>();
+
+  @ManyToMany(mappedBy = "dataSets", fetch = FetchType.LAZY)
+  private Set<Catalog> catalogs = new HashSet<>();
 
   @Column(name = "external_id")
   private String externalId;
