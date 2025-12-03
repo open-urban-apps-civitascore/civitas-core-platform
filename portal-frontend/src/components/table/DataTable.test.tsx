@@ -7,6 +7,10 @@ import messages from '@/messages/de.json'
 
 import { DataTable } from './DataTable'
 
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+}))
+
 type Row = {
   readonly id: number
   readonly name: `item${number}`
@@ -53,7 +57,6 @@ const TestWrapper = (props: TestWrapperProps) => {
   })
 
   return (
-    <NextIntlClientProvider locale="de" messages={messages}>
       <DataTable
         table={table}
         pageIndex={pagination.pageIndex}
@@ -61,7 +64,6 @@ const TestWrapper = (props: TestWrapperProps) => {
         totalPages={Math.ceil(mockTableData.length / pagination.pageSize)}
         isLoading={isLoading}
       />
-    </NextIntlClientProvider>
   )
 }
 
@@ -163,6 +165,6 @@ describe('DataTable with no data rows', () => {
     const rows = screen.getAllByRole('row')
     expect(rows).toHaveLength(2)
     const [_headerRow, ...bodyRows] = rows
-    expect(bodyRows[0]).toHaveTextContent('Es gibt leider keine Ergebnisse.')
+    expect(bodyRows[0]).toHaveTextContent('noResults')
   })
 })
