@@ -1,15 +1,14 @@
 import { createColumnHelper, getCoreRowModel, getPaginationRowModel, useReactTable } from '@tanstack/react-table'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { NextIntlClientProvider } from 'next-intl'
 import { useState } from 'react'
 
-import messages from '@/messages/de.json'
-
-import { DataTable } from './DataTable'
+import { DataTable, DataTableProps } from './DataTable'
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }))
+
+const onRowClickMock = vi.fn()
 
 type Row = {
   readonly id: number
@@ -36,12 +35,12 @@ const mockColumns = Object.keys(mockTableData[0]).map(key =>
   }),
 )
 
-interface TestWrapperProps {
+interface TestWrapperProps extends Omit<DataTableProps<Row>, 'table' | 'pageSize' | 'pageIndex' | 'totalPages'> {
   hasEmptyRows?: boolean
-  isLoading?: boolean
 }
+
 const TestWrapper = (props: TestWrapperProps) => {
-  const { hasEmptyRows = false, isLoading = false } = props
+  const { hasEmptyRows = false, ...tableProps } = props
   const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize: 10,
@@ -57,13 +56,13 @@ const TestWrapper = (props: TestWrapperProps) => {
   })
 
   return (
-      <DataTable
-        table={table}
-        pageIndex={pagination.pageIndex}
-        pageSize={pagination.pageSize}
-        totalPages={Math.ceil(mockTableData.length / pagination.pageSize)}
-        isLoading={isLoading}
-      />
+    <DataTable
+      table={table}
+      pageIndex={pagination.pageIndex}
+      pageSize={pagination.pageSize}
+      totalPages={Math.ceil(mockTableData.length / pagination.pageSize)}
+      {...tableProps}
+    />
   )
 }
 
@@ -166,5 +165,36 @@ describe('DataTable with no data rows', () => {
     expect(rows).toHaveLength(2)
     const [_headerRow, ...bodyRows] = rows
     expect(bodyRows[0]).toHaveTextContent('noResults')
+  })
+})
+
+describe('DataTable layout', () => {
+  it('renders the data table with card styles when hasCard is true', () => {
+    render(<TestWrapper />)
+    expect(screen.getByTestId('dataTableScrollArea')).toHaveClass('rounded-md border-1')
+  })
+  it('renders the data table without card styles when hasCard is false', () => {
+    render(<TestWrapper hasCard={false} />)
+    expect(screen.getByTestId('dataTableScrollArea')).not.toHaveClass('rounded-md border-1')
+  })
+})
+
+describe('DataTable row click', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+  it('rows click is disabled when isRowClickable is false', () => {
+    render(<TestWrapper isRowClickable={() => false} onRowClick={onRowClickMock} />)
+    const rows = screen.getAllByRole('row')
+    expect(rows[1]).not.toHaveClass('cursor-pointer')
+    fireEvent.click(rows[1])
+    expect(onRowClickMock).not.toHaveBeenCalled()
+  })
+  it('rows click is enabled when isRowClickable is true', () => {
+    render(<TestWrapper isRowClickable={() => true} onRowClick={onRowClickMock} />)
+    const rows = screen.getAllByRole('row')
+    expect(rows[1]).toHaveClass('cursor-pointer')
+    fireEvent.click(rows[1])
+    expect(onRowClickMock).toHaveBeenCalledOnce()
   })
 })

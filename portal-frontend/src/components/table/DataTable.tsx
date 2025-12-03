@@ -60,6 +60,7 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
     <div data-testid="dataTable" className="@container h-full w-full">
       <div className="h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]">
         <ScrollArea
+          data-testid="dataTableScrollArea"
           className={cn('h-[calc(100%-var(--pagination-height))] w-full bg-white', hasCard && 'rounded-md border-1')}
         >
           <ShadCnTable aria-labelledby="subheading" tableContainerProps={{ className: '' }} {...tableProps}>
