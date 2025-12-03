@@ -14,7 +14,7 @@ const onCancelClickMock = vi.fn()
 const onConfirmClickMock = vi.fn()
 const handleSubmitMock = vi.fn()
 
-describe('SearchField', () => {
+describe('ActionButtons', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -101,7 +101,7 @@ describe('SearchField', () => {
     expect(cancelButton).toBeDisabled()
     expect(confirmButton).toBeDisabled()
     fireEvent.click(cancelButton)
-    expect(onConfirmClickMock).not.toHaveBeenCalled()
+    expect(onCancelClickMock).not.toHaveBeenCalled()
     fireEvent.click(confirmButton)
     expect(onConfirmClickMock).not.toHaveBeenCalled()
   })
