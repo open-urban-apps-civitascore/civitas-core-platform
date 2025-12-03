@@ -75,8 +75,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       title: t('overview.completion.distribution.title'),
       isCompleted: apis.length > 0,
       buttons: [
-        { text: t('overview.completion.distribution.button1'), routeParam: 'distribution' },
-        { text: t('overview.completion.distribution.button2'), routeParam: 'distribution' },
+        { text: t('overview.completion.distribution.button1'), routeParam: 'distribution/apis' },
+        { text: t('overview.completion.distribution.button2'), routeParam: 'distribution/files' },
       ],
       content: apis.length > 0 ? getList(t('overview.completion.distribution.api'), apis) : undefined,
     },
