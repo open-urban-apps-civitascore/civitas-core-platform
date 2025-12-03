@@ -154,7 +154,7 @@ describe('DataTable with data rows', () => {
 })
 
 describe('DataTable with no data rows', () => {
-  it('renders the loading skeleton when loading and no row data', () => {
+  it('renders the loading skeleton when no row data and loading', () => {
     render(<TestWrapper isLoading hasEmptyRows />)
     expect(screen.getByTestId('dataTableSkeleton')).toBeInTheDocument()
   })
