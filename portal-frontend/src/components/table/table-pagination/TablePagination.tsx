@@ -29,10 +29,14 @@ const TablePagination = <T,>(props: TablePaginationProps<T>) => {
           <div className="flex items-center space-x-2">
             <span className="@max-md:hidden">{t('resultsPerPage')}</span>
             <Select value={String(pageSize)} onValueChange={value => table.setPageSize(Number(value))}>
-              <SelectTrigger className="w-[80px] bg-white" aria-label={t('aria.resultsPerPage')}>
+              <SelectTrigger
+                data-testid="pageSizeTrigger"
+                className="w-[80px] bg-white"
+                aria-label={t('aria.resultsPerPage')}
+              >
                 <SelectValue placeholder={pageSize} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent data-testid="pageSizeContent">
                 {[5, 10, 20, 25].map(size => (
                   <SelectItem key={size} value={String(size)}>
                     {size}
@@ -48,6 +52,7 @@ const TablePagination = <T,>(props: TablePaginationProps<T>) => {
         </div>
         <div className="flex space-x-2">
           <Button
+            data-testid="prevPage"
             variant="outline"
             size="icon"
             aria-label={t('aria.previousPage')}
@@ -57,10 +62,14 @@ const TablePagination = <T,>(props: TablePaginationProps<T>) => {
             ‹
           </Button>
           <Select value={String(pageIndex)} onValueChange={value => table.setPageIndex(Number(value))}>
-            <SelectTrigger className="w-[80px] bg-white" aria-label={t('aria.resultsPerPage')}>
+            <SelectTrigger
+              data-testid="pageSelectTrigger"
+              className="w-[80px] bg-white"
+              aria-label={t('aria.resultsPerPage')}
+            >
               <SelectValue placeholder={pageIndex} />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent data-testid="pageSelectContent">
               {Array.from({ length: totalPages }, (_, i) => i).map(page => (
                 <SelectItem key={page} value={String(page)}>
                   {page + 1}
@@ -69,6 +78,7 @@ const TablePagination = <T,>(props: TablePaginationProps<T>) => {
             </SelectContent>
           </Select>
           <Button
+            data-testid="nextPage"
             variant="outline"
             size="icon"
             aria-label={t('aria.nextPage')}
