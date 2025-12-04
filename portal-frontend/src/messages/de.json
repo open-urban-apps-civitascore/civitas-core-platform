@@ -298,7 +298,15 @@
       }
     },
     "groupAssignmentTab": {
-      "heading": "Mitgliedschaften"
+      "heading": "Mitgliedschaften",
+      "addGroup": "Gruppen hinzufügen",
+      "tableHeaders": {
+        "name": "Name",
+        "usersCount": "Anzahl User",
+        "contact": "Ansprechpartner",
+        "description": "Beschreibung"
+      },
+      "noGroupsAssigned": "Es sind noch keine Gruppen zugeordnet."
     }
   }
 }
