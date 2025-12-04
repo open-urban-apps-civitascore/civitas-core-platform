@@ -18,7 +18,7 @@ export const PageHeader = (props: PageHeaderProps) => {
   const isMobile = useIsMobile()
   return (
     <div
-      id="heading"
+      id="pageHeader"
       className={cn(
         'w-full max-w-full  flex flex-col gap-[var(--layout-padding)] h-[var(--title-height)] py-[var(--layout-padding)] border-b-1',
         className,
@@ -26,10 +26,10 @@ export const PageHeader = (props: PageHeaderProps) => {
       style={style}
     >
       {tabs && (
-        <TabsSection tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} isHeading={!title} />
+        <TabsSection testId="primaryTabs" tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} />
       )}
       <div
-        id="heading"
+        id="pageHeaderTitle"
         className={`flex-1 flex w-full min-w-0 ${title ? 'justify-between' : 'justify-end'} items-center px-[var(--layout-padding)]`}
       >
         {title && (
@@ -43,12 +43,17 @@ export const PageHeader = (props: PageHeaderProps) => {
             >
               {title}
             </h1>
-            {badgeTitle && <Badge variant="outline">{badgeTitle}</Badge>}
+            {badgeTitle && (
+              <Badge data-testid="pageHeaderBadge" variant="outline">
+                {badgeTitle}
+              </Badge>
+            )}
           </div>
         )}
       </div>
       {subTabs && (
         <TabsSection
+          testId="subTabs"
           tabs={subTabs.tabs}
           selectedTab={subTabs.selectedTab}
           onClick={subTabs.onClick}
