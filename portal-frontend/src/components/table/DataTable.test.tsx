@@ -1,8 +1,15 @@
-import { createColumnHelper, getCoreRowModel, getPaginationRowModel, useReactTable } from '@tanstack/react-table'
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@tanstack/react-table'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 
 import { DataTable, DataTableProps } from './DataTable'
+import { SortableTableHeader } from './sortable-table-header/SortableTableHeader'
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -30,19 +37,20 @@ const columnHelper = createColumnHelper<Row>()
 
 const mockColumns = Object.keys(mockTableData[0]).map(key =>
   columnHelper.accessor(key as keyof Row, {
-    header: key,
+    header: ({ column }) => (key === 'id' ? <SortableTableHeader title={key} column={column} /> : key),
     cell: info => String(info.getValue()),
   }),
 )
 
 interface TestWrapperProps extends Omit<DataTableProps<Row>, 'table' | 'pageSize' | 'pageIndex' | 'totalPages'> {
+  pageIndex?: number
   hasEmptyRows?: boolean
 }
 
 const TestWrapper = (props: TestWrapperProps) => {
   const { hasEmptyRows = false, ...tableProps } = props
   const [pagination, setPagination] = useState({
-    pageIndex: 0,
+    pageIndex: tableProps.pageIndex ?? 0,
     pageSize: 10,
   })
 
@@ -53,6 +61,7 @@ const TestWrapper = (props: TestWrapperProps) => {
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
   })
 
   return (
@@ -66,11 +75,9 @@ const TestWrapper = (props: TestWrapperProps) => {
   )
 }
 
-describe('DataTable with data rows', () => {
-  beforeEach(() => {
-    render(<TestWrapper />)
-  })
+describe('DataTable', () => {
   it('renders the table with its content', () => {
+    render(<TestWrapper />)
     expect(screen.getByTestId('dataTable')).toBeInTheDocument()
     expect(screen.getAllByRole('columnheader')).toHaveLength(3)
     const rows = screen.getAllByRole('row')
@@ -83,8 +90,11 @@ describe('DataTable with data rows', () => {
       expect(bodyRows[i]).toHaveTextContent(`item${i}`)
     }
   })
+})
 
+describe('DataTable pagination', () => {
   it('renders the next page content when paginating with next button', async () => {
+    render(<TestWrapper />)
     fireEvent.click(screen.getByTestId('nextPage'))
     const rows = screen.getAllByRole('row')
     expect(rows).toHaveLength(11)
@@ -92,22 +102,21 @@ describe('DataTable with data rows', () => {
     for (let i = 1; i < 10; i++) {
       expect(bodyRows[i]).toHaveTextContent(`item${i + 10}`)
     }
-    fireEvent.click(screen.getByTestId('pageSelectTrigger'))
-    const paginationSelection = screen.getByTestId('pageSelectContent')
-    await waitFor(() => {
-      const options = within(paginationSelection).getAllByRole('option')
-      expect(options).toHaveLength(5)
-      fireEvent.click(options[2])
-      const updatedRows = screen.getAllByRole('row')
-      expect(updatedRows).toHaveLength(11)
-      const [_headerRow, ...bodyRows] = updatedRows
-      for (let i = 1; i < 10; i++) {
-        expect(bodyRows[i]).toHaveTextContent(`item${i + 20}`)
-      }
-    })
+  })
+
+  it('renders the next page content when paginating with previous button', async () => {
+    render(<TestWrapper pageIndex={1} />)
+    fireEvent.click(screen.getByTestId('prevPage'))
+    const rows = screen.getAllByRole('row')
+    expect(rows).toHaveLength(11)
+    const [_headerRow, ...bodyRows] = rows
+    for (let i = 1; i < 10; i++) {
+      expect(bodyRows[i]).toHaveTextContent(`item${i}`)
+    }
   })
 
   it('renders the correct content when paginating with page selection', async () => {
+    render(<TestWrapper />)
     fireEvent.click(screen.getByTestId('pageSelectTrigger'))
     const paginationSelection = screen.getByTestId('pageSelectContent')
     const options = within(paginationSelection).getAllByRole('option')
@@ -124,6 +133,7 @@ describe('DataTable with data rows', () => {
   })
 
   it('renders 5 rows when changing the page size to 5', async () => {
+    render(<TestWrapper />)
     fireEvent.click(screen.getByTestId('pageSizeTrigger'))
     const pageSizeSelection = screen.getByTestId('pageSizeContent')
     const options = within(pageSizeSelection).getAllByRole('option')
@@ -139,6 +149,7 @@ describe('DataTable with data rows', () => {
   })
 
   it('renders 20 rows when changing the page size to 20', async () => {
+    render(<TestWrapper />)
     fireEvent.click(screen.getByTestId('pageSizeTrigger'))
     const pageSizeSelection = screen.getByTestId('pageSizeContent')
     const options = within(pageSizeSelection).getAllByRole('option')
@@ -176,6 +187,51 @@ describe('DataTable layout', () => {
   it('renders the data table without card styles when hasCard is false', () => {
     render(<TestWrapper hasCard={false} />)
     expect(screen.getByTestId('dataTableScrollArea')).not.toHaveClass('rounded-md border-1')
+  })
+})
+
+describe('DataTable sorting', () => {
+  it('sorts rows ascending on one sort button click', async () => {
+    render(<TestWrapper />)
+    const nameColumn = screen.getByRole('columnheader', { name: 'id' })
+    const sortButton = await within(screen.getByTestId('sortableTableHeader')).findByRole('button')
+    expect(nameColumn).toHaveAttribute('aria-sort', 'none')
+
+    // check ascending sorting
+    fireEvent.click(sortButton)
+    expect(nameColumn).toHaveAttribute('aria-sort', 'ascending')
+    // verify sorted rows
+    const [_headerRow1, ...bodyRows] = screen.getAllByRole('row')
+    const rowIds = bodyRows.map(row => Number(within(row).getAllByRole('cell')[0]))
+    const isAscending = () => {
+      for (let i = 1; i < rowIds.length; i++) {
+        if (rowIds[i] < rowIds[i - 1]) return false
+      }
+      return true
+    }
+    expect(isAscending()).toBeTruthy()
+  })
+
+  it('sorts rows decending on two sort button clicks', async () => {
+    render(<TestWrapper />)
+    const nameColumn = screen.getByRole('columnheader', { name: 'id' })
+    const sortButton = await within(screen.getByTestId('sortableTableHeader')).findByRole('button')
+    expect(nameColumn).toHaveAttribute('aria-sort', 'none')
+
+    // check descending sorting
+    fireEvent.click(sortButton)
+    fireEvent.click(sortButton)
+    expect(nameColumn).toHaveAttribute('aria-sort', 'descending')
+    // verify sorted rows
+    const [_headerRow1, ...bodyRows] = screen.getAllByRole('row')
+    const rowIds = bodyRows.map(row => Number(within(row).getAllByRole('cell')[0]))
+    const isDescending = () => {
+      for (let i = 1; i < rowIds.length; i++) {
+        if (rowIds[i] > rowIds[i - 1]) return false
+      }
+      return true
+    }
+    expect(isDescending()).toBeTruthy()
   })
 })
 
