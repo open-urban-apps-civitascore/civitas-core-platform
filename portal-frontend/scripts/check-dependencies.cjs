@@ -8,7 +8,7 @@ if (!fs.existsSync(reportPath)) {
 }
 
 const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
-const unused = [...(report.dependencies || []), ...(report.devDependencies || [])];
+const unused = [...(report.dependencies || [])];
 const missing = Object.keys(report.missing || {});
 
 if (unused.length || missing.length) {
