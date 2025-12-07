@@ -27,6 +27,7 @@ const eslintConfig = [
   {
     ignores: [
       'src/components/ui/**',
+      'scripts/**',
       'eslint.config.mjs',
       'next-env.d.ts',
       '.next',
