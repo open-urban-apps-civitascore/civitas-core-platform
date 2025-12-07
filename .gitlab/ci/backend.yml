@@ -32,6 +32,24 @@ lint-backend:
     - cd portal-backend
     - mvn spotless:check
 
+dependency-prune-backend:
+  extends: .only-backend-changes
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: lint
+  needs: []
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: backend-maven
+      files:
+        - portal-backend/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd portal-backend
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false
+
 test-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-21-alpine
@@ -68,7 +86,7 @@ build-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: build
-  needs: ['lint-backend', 'test-backend', 'secret_detection', 'gitlab-advanced-sast', 'dependency-scanning']
+  needs: ['lint-backend', 'dependency-prune-backend', 'test-backend', 'secret_detection', 'gitlab-advanced-sast', 'dependency-scanning']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:

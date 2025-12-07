@@ -51,6 +51,34 @@ lint-frontend:
     reports:
       codequality: $ESLINT_CODE_QUALITY_REPORT
 
+dependency-prune-frontend:
+  extends: .only-frontend-changes
+  image: node:22
+  stage: lint
+  needs: []
+  variables:
+    PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
+  cache:
+    key:
+      prefix: frontend-pnpm
+      files:
+        - portal-frontend/pnpm-lock.yaml
+    paths:
+      - portal-frontend/.pnpm-store
+  script:
+    - cd portal-frontend
+    - set -euo pipefail
+    - corepack enable >/dev/null 2>&1 || true
+    - pnpm config set store-dir $PNPM_STORE_DIR
+    - pnpm install --frozen-lockfile
+    - pnpm dlx depcheck --json > depcheck-report.json
+    - node scripts/check-dependencies.cjs depcheck-report.json
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - portal-frontend/depcheck-report.json
+
 test-frontend:
   extends: .only-frontend-changes
   image: node:22
@@ -89,7 +117,7 @@ build-frontend:
   extends: .only-frontend-changes
   image: node:22
   stage: build
-  needs: ['lint-frontend', 'test-frontend', 'secret_detection', 'gitlab-advanced-sast', 'dependency-scanning']
+  needs: ['lint-frontend', 'dependency-prune-frontend', 'test-frontend', 'secret_detection', 'gitlab-advanced-sast', 'dependency-scanning']
   variables:
     NODE_ENV: production
     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
