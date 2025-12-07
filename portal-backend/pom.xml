@@ -39,6 +39,7 @@
         <spring-kafka.version>3.3.11</spring-kafka.version>
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
+        <cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -346,6 +347,17 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>${cyclonedx-maven-plugin.version}</version>
+                <configuration>
+                    <outputFormat>json</outputFormat>
+                    <schemaVersion>1.5</schemaVersion>
+                    <includeBomSerialNumber>true</includeBomSerialNumber>
+                    <outputName>portal-backend</outputName>
+                </configuration>
             </plugin>
 
             <!-- Spring Boot plugin -->
