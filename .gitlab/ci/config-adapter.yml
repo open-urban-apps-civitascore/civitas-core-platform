@@ -131,7 +131,9 @@ build-config-adapter-image:
 
 container-scan-config-adapter:
   extends: .only-config-adapter-changes
-  image: aquasec/trivy:0.55.1
+  image:
+    name: aquasec/trivy:0.55.1
+    entrypoint: [""]
   stage: container-qa
   needs: ['build-config-adapter-image']
   variables:

@@ -144,7 +144,9 @@ build-frontend-image:
 
 container-scan-frontend:
   extends: .only-frontend-changes
-  image: aquasec/trivy:0.55.1
+  image:
+    name: aquasec/trivy:0.55.1
+    entrypoint: [""]
   stage: container-qa
   needs: ['build-frontend-image']
   variables:
