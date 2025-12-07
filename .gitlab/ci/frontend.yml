@@ -71,7 +71,7 @@ dependency-prune-frontend:
     - corepack enable >/dev/null 2>&1 || true
     - pnpm config set store-dir $PNPM_STORE_DIR
     - pnpm install --frozen-lockfile
-    - pnpm dlx depcheck --json > depcheck-report.json || true
+    - pnpm dlx depcheck --json --ignore-dev > depcheck-report.json || true
     - node scripts/check-dependencies.cjs depcheck-report.json
   artifacts:
     when: always

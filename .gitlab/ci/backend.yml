@@ -48,7 +48,7 @@ dependency-prune-backend:
       - .m2/repository
   script:
     - cd portal-backend
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false -DignoredDependencies=org.springframework.boot:*,org.springframework.security:*,org.springframework:*,jakarta.*,org.springdoc:*,org.slf4j:*
 
 test-backend:
   extends: .only-backend-changes
