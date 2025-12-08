@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -11,8 +11,11 @@ vi.mock('./components/AppSidebarContent', () => ({
 }))
 
 // Mock auth for AppSidebarFooter which imports signOut
+const { mockSignOut } = vi.hoisted(() => ({
+  mockSignOut: vi.fn(),
+}))
 vi.mock('@/auth', () => ({
-  signOut: vi.fn(),
+  signOut: mockSignOut,
 }))
 
 // Import after mocks
@@ -79,6 +82,51 @@ describe('AppSidebar', () => {
       await renderWithProviders(undefined)
 
       expect(screen.getByText('Guest')).toBeInTheDocument()
+    })
+  })
+
+  describe('dropdown menu', () => {
+    const openDropdownMenu = async () => {
+      const dropdownTrigger = screen.getByRole('button', { name: /John Doe/i })
+      fireEvent.pointerDown(dropdownTrigger, { button: 0, ctrlKey: false })
+
+      // Wait for dropdown to appear
+      await waitFor(() => {
+        expect(dropdownTrigger).toHaveAttribute('data-state', 'open')
+      })
+    }
+
+    it('shows user name and email in dropdown content when opened', async () => {
+      await renderWithProviders(mockUser)
+
+      await openDropdownMenu()
+
+      const userNames = screen.getAllByText('John Doe')
+      const userEmails = screen.getAllByText('john.doe@example.com')
+
+      expect(userNames).toHaveLength(2)
+      expect(userEmails).toHaveLength(2)
+    })
+
+    it('shows logout button in dropdown menu', async () => {
+      await renderWithProviders(mockUser)
+
+      await openDropdownMenu()
+
+      expect(screen.getByRole('menuitem', { name: /Abmelden/i })).toBeInTheDocument()
+    })
+
+    it('triggers signOut when logout button is clicked', async () => {
+      await renderWithProviders(mockUser)
+
+      await openDropdownMenu()
+
+      // Click the logout button
+      const logoutButton = screen.getByRole('menuitem', { name: /Abmelden/i })
+      fireEvent.click(logoutButton)
+
+      // signOut should have been called
+      expect(mockSignOut).toHaveBeenCalledWith({ redirectTo: '/login' })
     })
   })
 })
