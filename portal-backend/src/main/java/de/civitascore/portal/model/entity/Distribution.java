@@ -4,6 +4,7 @@ import de.civitascore.portal.model.entity.base.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -11,7 +12,13 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "distributions")
+@Table(
+    name = "distributions",
+    indexes = {
+      @Index(name = "idx_distribution_resource", columnList = "resource_id"),
+      @Index(name = "idx_distribution_dataset", columnList = "dataset_id"),
+      @Index(name = "idx_distribution_activity", columnList = "activity_id")
+    })
 @Getter
 @Setter
 public class Distribution extends BaseEntity {

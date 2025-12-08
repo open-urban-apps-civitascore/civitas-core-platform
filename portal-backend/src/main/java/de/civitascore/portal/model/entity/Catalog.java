@@ -3,6 +3,7 @@ package de.civitascore.portal.model.entity;
 import de.civitascore.portal.model.entity.base.NamedEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
@@ -22,7 +23,11 @@ public class Catalog extends NamedEntity {
   @JoinTable(
       name = "catalog_children",
       joinColumns = @JoinColumn(name = "parent_catalog_id"),
-      inverseJoinColumns = @JoinColumn(name = "child_catalog_id"))
+      inverseJoinColumns = @JoinColumn(name = "child_catalog_id"),
+      indexes = {
+        @Index(name = "idx_catalog_children_parent", columnList = "parent_catalog_id"),
+        @Index(name = "idx_catalog_children_child", columnList = "child_catalog_id")
+      })
   private Set<Catalog> childCatalogs = new HashSet<>();
 
   @ManyToMany(mappedBy = "childCatalogs", fetch = FetchType.LAZY)
@@ -32,6 +37,10 @@ public class Catalog extends NamedEntity {
   @JoinTable(
       name = "catalog_datasets",
       joinColumns = @JoinColumn(name = "catalog_id"),
-      inverseJoinColumns = @JoinColumn(name = "dataset_id"))
+      inverseJoinColumns = @JoinColumn(name = "dataset_id"),
+      indexes = {
+        @Index(name = "idx_catalog_datasets_catalog", columnList = "catalog_id"),
+        @Index(name = "idx_catalog_datasets_dataset", columnList = "dataset_id")
+      })
   private Set<DataSet> dataSets = new HashSet<>();
 }

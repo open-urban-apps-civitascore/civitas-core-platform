@@ -26,7 +26,8 @@ import lombok.Setter;
             columnNames = {"name"}),
     indexes = {
       @Index(name = "idx_dataset_owner", columnList = "owner_user_id"),
-      @Index(name = "idx_dataset_external_id", columnList = "external_id")
+      @Index(name = "idx_dataset_external_id", columnList = "external_id"),
+      @Index(name = "idx_dataset_series", columnList = "dataset_series_id")
     })
 @Getter
 @Setter
@@ -50,14 +51,22 @@ public class DataSet extends NamedEntity {
   @JoinTable(
       name = "dataset_dataspaces",
       joinColumns = @JoinColumn(name = "dataset_id"),
-      inverseJoinColumns = @JoinColumn(name = "dataspace_id"))
+      inverseJoinColumns = @JoinColumn(name = "dataspace_id"),
+      indexes = {
+        @Index(name = "idx_dataset_dataspaces_dataset", columnList = "dataset_id"),
+        @Index(name = "idx_dataset_dataspaces_dataspace", columnList = "dataspace_id")
+      })
   private Set<DataSpace> dataSpaces = new HashSet<>();
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "dataset_agents",
       joinColumns = @JoinColumn(name = "dataset_id"),
-      inverseJoinColumns = @JoinColumn(name = "agent_id"))
+      inverseJoinColumns = @JoinColumn(name = "agent_id"),
+      indexes = {
+        @Index(name = "idx_dataset_agents_dataset", columnList = "dataset_id"),
+        @Index(name = "idx_dataset_agents_agent", columnList = "agent_id")
+      })
   private Set<Agent> agents = new HashSet<>();
 
   @OneToMany(mappedBy = "dataSet", fetch = FetchType.LAZY)
