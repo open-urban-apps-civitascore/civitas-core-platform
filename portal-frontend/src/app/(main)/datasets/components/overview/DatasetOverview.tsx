@@ -1,11 +1,9 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -31,7 +29,6 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const { dataset, dataspaces, datasources, hasMetadata, apis, groups, persistence, isEditMode } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
-  const [isLoading, setIsLoading] = useState(false)
 
   const getList = (title: string, items: string[]) => (
     <div className="w-[50%] grid grid-cols-2">
@@ -99,10 +96,6 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   if (!dataset) {
     return <NoDataPage title={tCommon('noData')} />
-  }
-
-  if (isLoading) {
-    return <LoadingSpinner title="Loading..." />
   }
 
   return (

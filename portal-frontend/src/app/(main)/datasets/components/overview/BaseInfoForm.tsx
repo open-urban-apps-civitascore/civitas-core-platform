@@ -1,14 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Circle, CircleCheckBig, SquarePen, X } from 'lucide-react'
-import { useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { KeyboardEvent, useEffect, useMemo, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { KeyboardEvent, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { Select } from '@/components/form/fields/Select'
 import { TextField } from '@/components/form/fields/TextField'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,7 +19,6 @@ import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { DatasetFormData, DatasetFormSchema } from '@/types/datasets'
 
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { createDataset, updateDataset } from '../../actions'
 
 interface BaseInfoFormProps {
@@ -36,7 +36,6 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const searchParams = useSearchParams()
   const [isReadOnly, setIsReadOnly] = useState(isEditMode)
   const [isLoading, setIsLoading] = useState(false)
-
 
   const form = useForm<DatasetFormData>({
     resolver: zodResolver(DatasetFormSchema),
@@ -98,7 +97,9 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
     }
     try {
       await updateDataset(updateDatasetData)
+      form.reset(formData)
       router.refresh()
+      setIsReadOnly(true)
     } catch {
       console.error('An error occurred while updating dataset')
     } finally {
