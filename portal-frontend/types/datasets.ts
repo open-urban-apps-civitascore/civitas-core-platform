@@ -64,8 +64,7 @@ export type CompletionStepParam =
   | 'metadata'
   | 'accessPermissions'
   | 'data'
-  | 'distribution/apis'
-  | 'distribution/files'
+  | 'distribution'
   | 'usagePermissions'
   | 'applications'
   | 'publication'
@@ -73,6 +72,6 @@ export type CompletionStepParam =
 export type CompletionStepData = {
   title: string
   isCompleted: CheckedState
-  buttons: { text: string; routeParam: CompletionStepParam }[]
+  buttons: { text: string; routeParam: CompletionStepParam; queryParam?: string }[]
   content?: JSX.Element
 }

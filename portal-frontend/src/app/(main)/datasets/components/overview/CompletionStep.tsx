@@ -18,14 +18,26 @@ export const CompletionStep = (props: CompletionStepProps) => {
   const { step, datasetId, disabled = false, className } = props
   const searchParams = useSearchParams()
 
-  const ButtonLink = ({ buttonText, routeParam }: { buttonText: string; routeParam: CompletionStepParam }) =>
+  const ButtonLink = ({
+    buttonText,
+    routeParam,
+    queryParam,
+  }: {
+    buttonText: string
+    routeParam: CompletionStepParam
+    queryParam?: string
+  }) =>
     disabled ? (
       <Button variant="outline" disabled>
         {buttonText}
       </Button>
     ) : (
       <Button asChild variant="outline">
-        <Link href={`/datasets/${datasetId}/${routeParam}?${searchParams?.toString()}`}>{buttonText}</Link>
+        <Link
+          href={`/datasets/${datasetId}/${routeParam}?${queryParam ? `${queryParam}&` : ''}${searchParams?.toString()}`}
+        >
+          {buttonText}
+        </Link>
       </Button>
     )
   return (
@@ -39,7 +51,12 @@ export const CompletionStep = (props: CompletionStepProps) => {
         </div>
         <div className="flex gap-10">
           {step.buttons.map(button => (
-            <ButtonLink key={button.text} buttonText={button.text} routeParam={button.routeParam} />
+            <ButtonLink
+              key={button.text}
+              buttonText={button.text}
+              routeParam={button.routeParam}
+              queryParam={button.queryParam}
+            />
           ))}
         </div>
       </div>

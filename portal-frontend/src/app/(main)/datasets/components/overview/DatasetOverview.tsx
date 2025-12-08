@@ -75,8 +75,8 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       title: t('overview.completion.distribution.title'),
       isCompleted: apis.length > 0,
       buttons: [
-        { text: t('overview.completion.distribution.button1'), routeParam: 'distribution/apis' },
-        { text: t('overview.completion.distribution.button2'), routeParam: 'distribution/files' },
+        { text: t('overview.completion.distribution.button1'), routeParam: 'distribution', queryParam: 'type=api' },
+        { text: t('overview.completion.distribution.button2'), routeParam: 'distribution', queryParam: 'type=file' },
       ],
       content: apis.length > 0 ? getList(t('overview.completion.distribution.api'), apis) : undefined,
     },
@@ -113,7 +113,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       />
       <PageBackground className="overflow-y-auto">
         <ContentCard className={cn('h-full overflow-auto')}>
-          <BaseInfoForm dataset={dataset} dataspaces={dataspaces} isEditMode={isEditMode} setIsLoading={setIsLoading} />
+          <BaseInfoForm dataset={dataset} dataspaces={dataspaces} isEditMode={isEditMode} />
           <div className="mt-12">
             {completionSteps.map((step, index) => (
               <DetailsFieldContainer

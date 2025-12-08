@@ -75,6 +75,7 @@
       "info": {
         "title": "Basisinformationen",
         "dataspace": "Datenraum",
+        "selectDataspace": "Datenraum wählen...",
         "name": "Name",
         "description": "Beschreibung",
         "tags": "Tags",
