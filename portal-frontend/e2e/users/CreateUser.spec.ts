@@ -41,10 +41,10 @@ test.describe('Create User Flow', async () => {
     await expect(pageHeader).toContainText('Create User')
 
     await expect(page.getByTestId('userDetailsForm')).toBeVisible()
-    const secondaryTabs = page.getByTestId('secondaryTabs')
-    await expect(secondaryTabs).toBeVisible()
-    await expect(secondaryTabs.locator('button')).toHaveCount(5)
-    await expect(secondaryTabs.locator('button').nth(1)).toBeDisabled()
+    const subTabs = page.getByTestId('subTabs')
+    await expect(subTabs).toBeVisible()
+    await expect(subTabs.locator('button')).toHaveCount(5)
+    await expect(subTabs.locator('button').nth(1)).toBeDisabled()
 
     await expect(page.getByTestId('userDetailsForm')).toBeVisible()
     await expect(page.getByTestId('cancelButton')).toBeVisible()

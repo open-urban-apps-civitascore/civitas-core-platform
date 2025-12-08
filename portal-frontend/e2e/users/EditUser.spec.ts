@@ -42,10 +42,10 @@ test.describe('Edit User Page', async () => {
     const userDetailsForm = page.getByTestId('userDetailsForm')
     await page.getByTestId('userDetailsForm').waitFor({ state: 'visible' })
     await expect(userDetailsForm).toBeVisible()
-    const secondaryTabs = page.getByTestId('secondaryTabs')
-    await expect(secondaryTabs).toBeVisible()
+    const subTabs = page.getByTestId('subTabs')
+    await expect(subTabs).toBeVisible()
 
-    const tabButtons = secondaryTabs.locator('button')
+    const tabButtons = subTabs.locator('button')
     await expect(tabButtons).toHaveCount(5)
     for (const tab of await tabButtons.all()) {
       await expect(tab).toBeEnabled()
