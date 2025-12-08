@@ -11,6 +11,7 @@
       "delete": "Löschen",
       "add": "Hinzufügen",
       "edit": "Bearbeiten",
+      "editBase": "Basis bearbeiten",
       "open": "öffnen"
     },
     "errors": {
@@ -76,7 +77,7 @@
         "title": "Basisinformationen",
         "dataspace": "Datenraum",
         "selectDataspace": "Datenraum wählen...",
-        "name": "Name",
+        "name": "Name des Datensatzes",
         "description": "Beschreibung",
         "tags": "Tags",
         "typeTag": "Tag eingeben..."

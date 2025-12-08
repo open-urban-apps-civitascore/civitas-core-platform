@@ -111,7 +111,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const EditButton = (
     <Button variant="outline" type="button" onClick={() => setIsReadOnly(false)}>
       <SquarePen />
-      {tCommon('actions.edit')}
+      {tCommon('actions.editBase')}
     </Button>
   )
 

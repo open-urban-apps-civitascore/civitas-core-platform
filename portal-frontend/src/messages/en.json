@@ -11,6 +11,7 @@
       "delete": "Delete",
       "add": "Add",
       "edit": "Edit",
+      "editBase": "Edit base",
       "open": "open"
     },
     "errors": {
@@ -76,7 +77,7 @@
         "title": "Base Information",
         "dataspace": "Data Space",
          "selectDataspace": "Select Data Space...",
-        "name": "Name",
+        "name": "Name of the Dataset",
         "description": "Description",
         "tags": "Tags",
         "typeTag": "Type tag..."
