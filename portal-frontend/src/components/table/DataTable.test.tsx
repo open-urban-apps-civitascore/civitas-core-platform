@@ -126,7 +126,7 @@ describe('DataTable', () => {
 })
 
 describe('DataTable pagination', () => {
-  it('renders the next page content when paginating with next button', async () => {
+  it('renders the next page content when paginating with next page button', async () => {
     render(<TestWrapper />)
     fireEvent.click(screen.getByTestId('nextPage'))
     const rows = screen.getAllByRole('row')
@@ -137,7 +137,7 @@ describe('DataTable pagination', () => {
     }
   })
 
-  it('renders the next page content when paginating with previous button', async () => {
+  it('renders the previous page content when paginating with previous page button', async () => {
     render(<TestWrapper pageIndex={1} />)
     fireEvent.click(screen.getByTestId('prevPage'))
     const rows = screen.getAllByRole('row')
@@ -198,7 +198,7 @@ describe('DataTable pagination', () => {
   })
 })
 
-describe('DataTable with sub rows', () => {
+describe('DataTable sub rows', () => {
   it('toggles sub rows on expander cell button click', async () => {
     render(<TestWrapper hasSubrows />)
     expect(screen.getAllByRole('row')).toHaveLength(11)
@@ -220,17 +220,6 @@ describe('DataTable with no data rows', () => {
     expect(rows).toHaveLength(2)
     const [_headerRow, ...bodyRows] = rows
     expect(bodyRows[0]).toHaveTextContent('noResults')
-  })
-})
-
-describe('DataTable layout', () => {
-  it('renders the data table with card styles when hasCard is true', () => {
-    render(<TestWrapper />)
-    expect(screen.getByTestId('dataTableScrollArea')).toHaveClass('rounded-md border-1')
-  })
-  it('renders the data table without card styles when hasCard is false', () => {
-    render(<TestWrapper hasCard={false} />)
-    expect(screen.getByTestId('dataTableScrollArea')).not.toHaveClass('rounded-md border-1')
   })
 })
 
@@ -296,5 +285,16 @@ describe('DataTable row click', () => {
     expect(rows[1]).toHaveClass('cursor-pointer')
     fireEvent.click(rows[1])
     expect(onRowClickMock).toHaveBeenCalledOnce()
+  })
+})
+
+describe('DataTable layout', () => {
+  it('renders the data table with card styles when hasCard is true', () => {
+    render(<TestWrapper />)
+    expect(screen.getByTestId('dataTableScrollArea')).toHaveClass('rounded-md border-1')
+  })
+  it('renders the data table without card styles when hasCard is false', () => {
+    render(<TestWrapper hasCard={false} />)
+    expect(screen.getByTestId('dataTableScrollArea')).not.toHaveClass('rounded-md border-1')
   })
 })
