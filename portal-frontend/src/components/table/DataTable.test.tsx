@@ -1,6 +1,8 @@
 import {
+  CellContext,
   createColumnHelper,
   getCoreRowModel,
+  getExpandedRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
@@ -9,6 +11,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { useState } from 'react'
 
 import { DataTable, DataTableProps } from './DataTable'
+import { ExpanderCell } from './expander-cell/ExpanderCell'
 import { SortableTableHeader } from './sortable-table-header/SortableTableHeader'
 
 vi.mock('next-intl', () => ({
@@ -21,6 +24,7 @@ type Row = {
   readonly id: number
   readonly name: `item${number}`
   readonly description: `This is item${number}`
+  readonly subrows?: Row[]
 }
 
 const mockTableData: Row[] = Array.from(
@@ -30,38 +34,67 @@ const mockTableData: Row[] = Array.from(
       id: i,
       name: `item${i}`,
       description: `This is item${i}`,
+      subrows: Array.from({ length: 5 }, (_, i) => ({
+        id: 50 + i,
+        name: `item${50 + i}`,
+        description: `This is item${50 + i}`,
+      })),
     }) as const,
 )
 
 const columnHelper = createColumnHelper<Row>()
 
-const mockColumns = Object.keys(mockTableData[0]).map(key =>
-  columnHelper.accessor(key as keyof Row, {
-    header: ({ column }) => (key === 'id' ? <SortableTableHeader title={key} column={column} /> : key),
-    cell: info => String(info.getValue()),
-  }),
+const mockColumnsWithoutSubrows = Object.keys(mockTableData[0]).flatMap(key =>
+  key !== 'subrows'
+    ? columnHelper.accessor(key as keyof Row, {
+        header: ({ column }) => (key === 'id' ? <SortableTableHeader title={key} column={column} /> : key),
+        cell: info => info.getValue(),
+      })
+    : [],
 )
+
+const mockColumnsWithSubrows = [
+  columnHelper.accessor('id', {
+    header: 'id',
+    cell: info => info.getValue(),
+  }),
+  columnHelper.accessor('name', {
+    header: 'name',
+    cell: ({ row }: CellContext<Row, unknown>) => (
+      <ExpanderCell row={row} value={row.original.name} className="font-medium" />
+    ),
+  }),
+  columnHelper.accessor('description', {
+    header: 'name',
+    cell: info => info.getValue(),
+  }),
+]
 
 interface TestWrapperProps extends Omit<DataTableProps<Row>, 'table' | 'pageSize' | 'pageIndex' | 'totalPages'> {
   pageIndex?: number
   hasEmptyRows?: boolean
+  hasSubrows?: boolean
 }
 
 const TestWrapper = (props: TestWrapperProps) => {
-  const { hasEmptyRows = false, ...tableProps } = props
+  const { hasEmptyRows = false, hasSubrows = false, ...tableProps } = props
   const [pagination, setPagination] = useState({
     pageIndex: tableProps.pageIndex ?? 0,
     pageSize: 10,
   })
 
   const table = useReactTable({
+    getRowId: row => String(row.id),
     data: hasEmptyRows ? [] : mockTableData,
-    columns: mockColumns,
+    columns: hasSubrows ? mockColumnsWithSubrows : mockColumnsWithoutSubrows,
     state: { pagination },
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getSubRows: hasSubrows ? row => row.subrows || [] : undefined,
+    getExpandedRowModel: getExpandedRowModel(),
+    paginateExpandedRows: false,
   })
 
   return (
@@ -165,6 +198,17 @@ describe('DataTable pagination', () => {
   })
 })
 
+describe('DataTable with sub rows', () => {
+  it('toggles sub rows on expander cell button click', async () => {
+    render(<TestWrapper hasSubrows />)
+    expect(screen.getAllByRole('row')).toHaveLength(11)
+    const expanderCells = screen.getAllByTestId('expanderCell')
+    expect(expanderCells).toHaveLength(10)
+    fireEvent.click(await within(expanderCells[0]).findByRole('button'))
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(16))
+  })
+})
+
 describe('DataTable with no data rows', () => {
   it('renders the loading skeleton when no row data and loading', () => {
     render(<TestWrapper isLoading hasEmptyRows />)
@@ -221,7 +265,7 @@ describe('DataTable sorting', () => {
     // check descending sorting
     fireEvent.click(sortButton)
     fireEvent.click(sortButton)
-    expect(nameColumn).toHaveAttribute('aria-sort', 'descending')
+    await waitFor(() => expect(nameColumn).toHaveAttribute('aria-sort', 'descending'))
     // verify sorted rows
     const [_headerRow1, ...bodyRows] = screen.getAllByRole('row')
     const rowIds = bodyRows.map(row => Number(within(row).getAllByRole('cell')[0]))
