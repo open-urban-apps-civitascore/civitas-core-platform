@@ -39,13 +39,14 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
             <FormControl>
               <Input
                 data-testid={`${name}TextField`}
-                className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0 "
+                data-test-element="formField"
+                className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0"
                 placeholder={placeholder}
                 {...field}
                 disabled={disabled}
               />
             </FormControl>
-            <FormMessage className="mt-2" />
+            <FormMessage data-testid={`${name}FormMessage`} className="mt-2" />
           </div>
         </FormItem>
       )}

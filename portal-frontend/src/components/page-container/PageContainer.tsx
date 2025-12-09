@@ -4,9 +4,10 @@ import { cn } from '@/lib/utils'
 
 interface PageContainerProps extends HTMLAttributes<HTMLDivElement> {
   headerType: 'onlyTitle' | 'withPrimaryTabs' | 'withSubTabsOrSubtitle' | 'withBothTabsRows'
+  testId?: string
 }
 export const PageContainer = (props: PageContainerProps) => {
-  const { headerType, children, className } = props
+  const { headerType, children, className, testId } = props
   const tabsAndTitleHeight = 36
   const layoutPadding = 24
   const getHeaderHeight = () => {
@@ -24,7 +25,7 @@ export const PageContainer = (props: PageContainerProps) => {
   const headerHeight = getHeaderHeight()
 
   return (
-    <div style={{ height: '100%', '--title-height': `${headerHeight}` } as CSSProperties}>
+    <div data-testid={testId} style={{ height: '100%', '--title-height': `${headerHeight}` } as CSSProperties}>
       <div
         className={cn(`grid w-full h-full`, className)}
         style={{ gridTemplateRows: `${headerHeight}px minmax(0, calc(100% - ${headerHeight}px))` }}
