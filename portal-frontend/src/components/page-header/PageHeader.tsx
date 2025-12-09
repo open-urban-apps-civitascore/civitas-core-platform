@@ -19,6 +19,7 @@ export const PageHeader = (props: PageHeaderProps) => {
   return (
     <div
       id="pageHeader"
+      data-testid="pageHeader"
       className={cn(
         'w-full max-w-full  flex flex-col gap-[var(--layout-padding)] h-[var(--title-height)] py-[var(--layout-padding)] border-b-1',
         className,
