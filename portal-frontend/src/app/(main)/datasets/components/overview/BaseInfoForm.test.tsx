@@ -1,13 +1,18 @@
 // BaseInfoForm.test.tsx
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { NextIntlClientProvider } from 'next-intl'
-import React from 'react'
 import { vi } from 'vitest'
 
-import messages from '@/messages/de.json'
 import { DatasetFormData } from '@/types/datasets'
 
 import { BaseInfoForm } from './BaseInfoForm'
+
+const CANCEL_BUTTON = 'actions.cancel'
+const CONFIRM_BUTTON = 'actions.submit'
+const EDIT_BUTTON = 'actions.editBase'
+
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+}))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -51,16 +56,12 @@ const dataspaces = [
 ]
 
 const setup = (isEditMode = true) => {
-  const setIsLoading = vi.fn()
   return render(
-    <NextIntlClientProvider locale="de" messages={messages}>
-      <BaseInfoForm
-        dataset={isEditMode ? datasetMock : emptyDatasetMock}
-        dataspaces={dataspaces}
-        isEditMode={isEditMode}
-        setIsLoading={setIsLoading}
-      />
-    </NextIntlClientProvider>,
+    <BaseInfoForm
+      dataset={isEditMode ? datasetMock : emptyDatasetMock}
+      dataspaces={dataspaces}
+      isEditMode={isEditMode}
+    />,
   )
 }
 
@@ -72,9 +73,9 @@ describe('BaseInfoForm', () => {
   test('renders not in read-only mode when creating', () => {
     setup(false)
     expect(screen.getByTestId('datasetBaseInfoForm'))
-    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Abbrechen' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: EDIT_BUTTON })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: CONFIRM_BUTTON })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: CANCEL_BUTTON })).toBeInTheDocument()
     expect(screen.getByTestId('dataspaceSelectTrigger')).toBeEnabled()
     expect(screen.getByTestId('nameTextField')).toBeEnabled()
     expect(screen.getByTestId('descriptionTextField')).toBeEnabled()
@@ -84,9 +85,9 @@ describe('BaseInfoForm', () => {
   test('renders in read-only mode initially when editing', () => {
     setup()
     expect(screen.getByTestId('datasetBaseInfoForm'))
-    expect(screen.getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Abbrechen' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: EDIT_BUTTON })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: CONFIRM_BUTTON })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: CANCEL_BUTTON })).not.toBeInTheDocument()
     expect(screen.getByTestId('dataspaceSelectTrigger')).toBeDisabled()
     expect(screen.getByTestId('nameTextField')).toBeDisabled()
     expect(screen.getByTestId('descriptionTextField')).toBeDisabled()
@@ -96,10 +97,10 @@ describe('BaseInfoForm', () => {
 
   test('clicking edit button disables read-only', () => {
     setup()
-    fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }))
-    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Abbrechen' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: EDIT_BUTTON }))
+    expect(screen.queryByRole('button', { name: EDIT_BUTTON })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: CONFIRM_BUTTON })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: CANCEL_BUTTON })).toBeInTheDocument()
     expect(screen.getByTestId('dataspaceSelectTrigger')).toBeEnabled()
     expect(screen.getByTestId('nameTextField')).toBeEnabled()
     expect(screen.getByTestId('descriptionTextField')).toBeEnabled()
@@ -117,7 +118,7 @@ describe('BaseInfoForm', () => {
 
   test('tags input does not add the same tag twice', () => {
     setup()
-    fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }))
+    fireEvent.click(screen.getByRole('button', { name: EDIT_BUTTON }))
 
     expect(screen.queryByText('tag1')).toBeInTheDocument()
 
@@ -130,7 +131,7 @@ describe('BaseInfoForm', () => {
 
   test('tag gets removed when clicking X on a tag', () => {
     setup()
-    fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }))
+    fireEvent.click(screen.getByRole('button', { name: EDIT_BUTTON }))
 
     expect(screen.getByText('tag1')).toBeInTheDocument()
     const removeBtn = screen.getAllByRole('button').find(button => button.innerHTML.includes('x')) as HTMLElement
@@ -141,25 +142,25 @@ describe('BaseInfoForm', () => {
 
   test('save button gets enabled after changing a form value', () => {
     setup(false)
-    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: CONFIRM_BUTTON })).toBeDisabled()
     fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'new Name' } })
-    expect(screen.getByRole('button', { name: 'Speichern' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: CONFIRM_BUTTON })).toBeEnabled()
   })
 
   test('form validation shows an error for name field when no name provided', async () => {
     setup(false)
     fireEvent.change(screen.getByTestId('descriptionTextField'), { target: { value: 'new Description' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    fireEvent.click(screen.getByRole('button', { name: CONFIRM_BUTTON }))
     await waitFor(() => {
       expect(screen.getByTestId('nameTextField')).toHaveAttribute('aria-invalid', 'true')
-      expect(screen.getByText('Die Eingabe muss mindestens 2 Zeichen lang sein.')).toBeInTheDocument()
+      expect(screen.getByText('common.errors.atLeast2')).toBeInTheDocument()
     })
   })
 
   test('form field error disappears when correct value provided', async () => {
     setup(false)
     fireEvent.change(screen.getByTestId('descriptionTextField'), { target: { value: 'new Description' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    fireEvent.click(screen.getByRole('button', { name: CONFIRM_BUTTON }))
     await waitFor(() => {
       expect(screen.getByTestId('nameTextField')).toHaveAttribute('aria-invalid', 'true')
     })
@@ -172,7 +173,7 @@ describe('BaseInfoForm', () => {
   test('submits createDataset when not edit mode', async () => {
     setup(false)
     fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Name' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    fireEvent.click(screen.getByRole('button', { name: CONFIRM_BUTTON }))
 
     await waitFor(() => {
       expect(mockCreateDataset).toHaveBeenCalled()
@@ -182,10 +183,10 @@ describe('BaseInfoForm', () => {
   test('submits updateDataset when edit mode', async () => {
     setup()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }))
+    fireEvent.click(screen.getByRole('button', { name: EDIT_BUTTON }))
     fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Name' } })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+    fireEvent.click(screen.getByRole('button', { name: CONFIRM_BUTTON }))
 
     await waitFor(() => {
       expect(mockUpdateDataset).toHaveBeenCalled()
