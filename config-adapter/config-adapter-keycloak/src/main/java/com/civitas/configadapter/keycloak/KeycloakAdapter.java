@@ -48,6 +48,9 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   public KeycloakAdapter() {
     this.objectMapper = new ObjectMapper();
+    // Configure to ignore the "resourceType" field when converting to Keycloak representations
+    this.objectMapper.configure(
+        com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
   }
 
   /*
@@ -202,11 +205,23 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   // ============== REALM OPERATIONS ==============
 
+  /**
+   * Extracts the configuration data from a ConfigValue for ObjectMapper conversion.
+   *
+   * @param configValue the typed configuration value
+   * @return the config value object for ObjectMapper conversion
+   */
+  private Object extractConfigData(com.civitas.configadapter.model.ConfigValue configValue) {
+    // With concrete POJOs, we can pass them directly to ObjectMapper
+    // which will map the fields to Keycloak representations
+    return configValue;
+  }
+
   private void createRealm(ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
+      Object configData = extractConfigData(event.payload().config().value());
       RealmRepresentation realmRep =
-          objectMapper.convertValue(configValue, RealmRepresentation.class);
+          objectMapper.convertValue(configData, RealmRepresentation.class);
 
       keycloakClient.realms().create(realmRep);
 
@@ -223,9 +238,9 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void updateRealm(String realmName, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
+      Object configData = extractConfigData(event.payload().config().value());
       RealmRepresentation realmRep =
-          objectMapper.convertValue(configValue, RealmRepresentation.class);
+          objectMapper.convertValue(configData, RealmRepresentation.class);
 
       RealmResource realmResource = keycloakClient.realm(realmName);
       realmResource.update(realmRep);
@@ -255,9 +270,9 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void createClient(String realm, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
+      Object configData = extractConfigData(event.payload().config().value());
       ClientRepresentation clientRep =
-          objectMapper.convertValue(configValue, ClientRepresentation.class);
+          objectMapper.convertValue(configData, ClientRepresentation.class);
 
       RealmResource realmResource = keycloakClient.realm(realm);
 
@@ -276,9 +291,9 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void updateClient(String realm, String clientId, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
+      Object configData = extractConfigData(event.payload().config().value());
       ClientRepresentation clientRep =
-          objectMapper.convertValue(configValue, ClientRepresentation.class);
+          objectMapper.convertValue(configData, ClientRepresentation.class);
 
       RealmResource realmResource = keycloakClient.realm(realm);
       realmResource.clients().get(clientId).update(clientRep);
@@ -337,8 +352,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void createUser(String realm, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
-      UserRepresentation userRep = objectMapper.convertValue(configValue, UserRepresentation.class);
+      Object configData = extractConfigData(event.payload().config().value());
+      UserRepresentation userRep = objectMapper.convertValue(configData, UserRepresentation.class);
 
       List<String> rolesToAssignNames = userRep.getRealmRoles();
       userRep.setRealmRoles(null);
@@ -368,8 +383,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void updateUser(String realm, String userId, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
-      UserRepresentation userRep = objectMapper.convertValue(configValue, UserRepresentation.class);
+      Object configData = extractConfigData(event.payload().config().value());
+      UserRepresentation userRep = objectMapper.convertValue(configData, UserRepresentation.class);
 
       List<String> rolesToAssignNames = userRep.getRealmRoles();
       userRep.setRealmRoles(null);
@@ -469,8 +484,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void createRole(String realm, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
-      RoleRepresentation roleRep = objectMapper.convertValue(configValue, RoleRepresentation.class);
+      Object configData = extractConfigData(event.payload().config().value());
+      RoleRepresentation roleRep = convertToRoleRepresentation(configData);
 
       RealmResource realmResource = keycloakClient.realm(realm);
       realmResource.roles().create(roleRep);
@@ -486,8 +501,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void updateRole(String realm, String roleId, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
-      RoleRepresentation roleRep = objectMapper.convertValue(configValue, RoleRepresentation.class);
+      Object configData = extractConfigData(event.payload().config().value());
+      RoleRepresentation roleRep = convertToRoleRepresentation(configData);
 
       RealmResource realmResource = keycloakClient.realm(realm);
       realmResource.roles().get(roleId).update(roleRep);
@@ -499,6 +514,27 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       logger.error("Failed to update role: {} in realm: {}", roleId, realm, e);
       publishErrorResult(event, "ROLE_UPDATE_FAILED", e.getMessage());
     }
+  }
+
+  /**
+   * Converts RoleConfig to RoleRepresentation with special handling for composite roles. This
+   * method handles the conversion from our simple Set&lt;String&gt; compositeRoles to Keycloak's
+   * complex Composites structure.
+   */
+  private RoleRepresentation convertToRoleRepresentation(Object configData) {
+    RoleRepresentation roleRep = objectMapper.convertValue(configData, RoleRepresentation.class);
+
+    // Handle composite roles conversion if present
+    if (configData instanceof com.civitas.configadapter.model.idm.RoleConfig roleConfig) {
+      if (roleConfig.getCompositeRoles() != null && !roleConfig.getCompositeRoles().isEmpty()) {
+        // Create Keycloak's Composites structure from our simple Set<String>
+        RoleRepresentation.Composites composites = new RoleRepresentation.Composites();
+        composites.setRealm(roleConfig.getCompositeRoles());
+        roleRep.setComposites(composites);
+      }
+    }
+
+    return roleRep;
   }
 
   private void deleteRole(String realm, String roleId, ConfigEvent event) {

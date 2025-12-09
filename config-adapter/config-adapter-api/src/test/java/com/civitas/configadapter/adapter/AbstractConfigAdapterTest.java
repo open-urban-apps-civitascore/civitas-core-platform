@@ -22,7 +22,6 @@ import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.ConfigEvent;
-
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

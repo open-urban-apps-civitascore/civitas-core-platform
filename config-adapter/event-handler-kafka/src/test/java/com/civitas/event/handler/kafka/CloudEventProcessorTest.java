@@ -51,7 +51,7 @@ class CloudEventProcessorTest {
             "operation": "CREATE",
             "config": {
               "path": null,
-              "value": {"enabled": true}
+              "value": {"resourceType": "realm", "realm": "test", "enabled": true}
             }
           }
         }
@@ -165,7 +165,7 @@ class CloudEventProcessorTest {
             "operation": "CREATE",
             "config": {
               "path": null,
-              "value": {"enabled": true}
+              "value": {"resourceType": "realm", "realm": "test", "enabled": true}
             }
           }
         }

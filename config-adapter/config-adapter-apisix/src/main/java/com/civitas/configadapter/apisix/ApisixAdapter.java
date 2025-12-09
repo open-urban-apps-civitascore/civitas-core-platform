@@ -14,7 +14,9 @@ import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.ConfigValue;
 import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.apisix.ApisixConfigValue;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
@@ -172,7 +174,13 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   private void createUpstream(ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
+      ConfigValue configValue = event.payload().config().value();
+      Object upstreamConfig;
+      if (configValue instanceof ApisixConfigValue apisixValue) {
+        upstreamConfig = apisixValue.data();
+      } else {
+        upstreamConfig = configValue;
+      }
 
       Response response =
           client
@@ -180,7 +188,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
               .path("/apisix/admin/upstreams")
               .request(MediaType.APPLICATION_JSON)
               .header("X-API-KEY", adminApiKey)
-              .post(Entity.json(configValue));
+              .post(Entity.json(upstreamConfig));
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
         logger.info("Created APISIX upstream successfully");
@@ -204,7 +212,13 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   private void updateUpstream(String upstreamId, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
+      ConfigValue configValue = event.payload().config().value();
+      Object upstreamConfig;
+      if (configValue instanceof ApisixConfigValue apisixValue) {
+        upstreamConfig = apisixValue.data();
+      } else {
+        upstreamConfig = configValue;
+      }
 
       Response response =
           client
@@ -213,7 +227,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
               .resolveTemplate("id", upstreamId)
               .request(MediaType.APPLICATION_JSON)
               .header("X-API-KEY", adminApiKey)
-              .put(Entity.json(configValue));
+              .put(Entity.json(upstreamConfig));
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
         logger.info("Updated APISIX upstream: {}", upstreamId);

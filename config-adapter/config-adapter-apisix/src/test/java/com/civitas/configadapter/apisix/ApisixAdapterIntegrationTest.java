@@ -17,7 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.civitas.configadapter.Topics;
+import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
+import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
@@ -25,6 +27,7 @@ import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
+import com.civitas.configadapter.model.apisix.ApisixConfigValue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -136,7 +139,7 @@ class ApisixAdapterIntegrationTest {
   }
 
   @Test
-  void shouldCreateUpstream() throws Exception {
+  void createUpstream() {
     Map<String, Object> upstreamConfig =
         Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1, "backend2:8080", 1));
 
@@ -160,7 +163,7 @@ class ApisixAdapterIntegrationTest {
   }
 
   @Test
-  void shouldUpdateUpstream() throws Exception {
+  void updateUpstream() throws Exception {
     String upstreamId = "test-upstream-update";
 
     Map<String, Object> initialConfig =
@@ -197,7 +200,7 @@ class ApisixAdapterIntegrationTest {
   }
 
   @Test
-  void shouldDeleteUpstream() throws Exception {
+  void deleteUpstream() throws Exception {
     String upstreamId = "test-upstream-delete";
 
     Map<String, Object> initialConfig =
@@ -230,7 +233,7 @@ class ApisixAdapterIntegrationTest {
   }
 
   @Test
-  void shouldHandleInvalidUpstreamConfiguration() throws Exception {
+  void handleInvalidUpstreamConfiguration() {
     Map<String, Object> invalidConfig = Map.of("type", "invalid-type");
 
     ConfigEvent event = createConfigEvent("upstreams", Operation.CREATE, invalidConfig);
@@ -333,26 +336,20 @@ class ApisixAdapterIntegrationTest {
     return objectMapper.readTree(response.body());
   }
 
-  private ConfigEvent createConfigEvent(String targetResource, Operation operation, Object value) {
-    return createConfigEventWithCorrelation(
-        targetResource, operation, value, UUID.randomUUID().toString());
-  }
-
-  private ConfigEvent createConfigEventWithCorrelation(
-      String targetResource, Operation operation, Object value, String correlationId) {
+  private ConfigEvent createConfigEvent(
+      String targetResource, Operation operation, Map<String, Object> value) {
     Metadata metadata =
         new Metadata(
             UUID.randomUUID().toString(),
             OffsetDateTime.now(),
             "test.source",
-            correlationId,
+            UUID.randomUUID().toString(),
             "1.0",
             "result.topic");
 
-    Config config = new Config(targetResource, value);
-
+    ApisixConfigValue apisixValue = new ApisixConfigValue(value);
+    Config config = new Config(targetResource, apisixValue);
     Payload payload = new Payload("apisix", targetResource, operation, config);
-
     return new ConfigEvent(metadata, payload);
   }
 
@@ -379,8 +376,6 @@ class ApisixAdapterIntegrationTest {
     }
 
     @Override
-    public void initialize(
-        com.civitas.configadapter.configuration.ApplicationConfig config,
-        com.civitas.configadapter.adapter.ConfigAdapter adapter) {}
+    public void initialize(ApplicationConfig config, ConfigAdapter adapter) {}
   }
 }

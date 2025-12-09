@@ -28,6 +28,7 @@ import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
+import com.civitas.configadapter.model.apisix.ApisixConfigValue;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
@@ -106,7 +107,7 @@ class ApisixAdapterTest {
     private Response mockResponse;
 
     @BeforeEach
-    void setUpProcessEventTests() throws Exception {
+    void setUpProcessEventTests() {
       when(mockConfig.getProperty("apisix.topics"))
           .thenReturn(
               "core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted");
@@ -136,7 +137,7 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testCreateSuccess() throws Exception {
+    void testCreateSuccess() {
       when(mockResponse.getStatus()).thenReturn(200);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"success\":true}");
       when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
@@ -157,11 +158,11 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testCreateFailureHttpError() throws Exception {
+    void testCreateFailureHttpError() {
       when(mockResponse.getStatus()).thenReturn(400);
-      when(mockResponse.readEntity(String.class)).thenReturn("{\"error\":\"Invalid configuration\"}");
-      when(mockBuilder.post(any(Entity.class)))
-          .thenReturn(mockResponse);
+      when(mockResponse.readEntity(String.class))
+          .thenReturn("{\"error\":\"Invalid configuration\"}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
 
       Map<String, Object> upstreamConfig = Map.of("type", "invalid");
 
@@ -178,7 +179,7 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testCreateFailureException() throws Exception {
+    void testCreateFailureException() {
       when(mockBuilder.post(any(Entity.class)))
           .thenThrow(new ProcessingException("Connection refused"));
 
@@ -197,11 +198,10 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testUpdateSuccess() throws Exception {
+    void testUpdateSuccess() {
       when(mockResponse.getStatus()).thenReturn(200);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"success\":true}");
-      when(mockBuilder.put(any(Entity.class)))
-          .thenReturn(mockResponse);
+      when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
 
       Map<String, Object> upstreamConfig =
           Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 2, "backend2:8080", 1));
@@ -220,11 +220,10 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testDeleteSuccess() throws Exception {
+    void testDeleteSuccess() {
       when(mockResponse.getStatus()).thenReturn(200);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"success\":true}");
-      when(mockBuilder.delete())
-          .thenReturn(mockResponse);
+      when(mockBuilder.delete()).thenReturn(mockResponse);
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "upstreams/test-upstream-id", null);
 
@@ -265,7 +264,11 @@ class ApisixAdapterTest {
       Metadata metadata =
           new Metadata("msg-123", OffsetDateTime.now(), "test-source", "corr-123", "v1.0.0", null);
       Payload payload =
-          new Payload("apisix", "upstreams", Operation.CREATE, new Config(null, upstreamConfig));
+          new Payload(
+              "apisix",
+              "upstreams",
+              Operation.CREATE,
+              new Config(null, new ApisixConfigValue(upstreamConfig)));
       ConfigEvent event = new ConfigEvent(metadata, payload);
 
       adapter.processConfigEvent("core.civitas.api.backend.created", event);
@@ -275,7 +278,7 @@ class ApisixAdapterTest {
   }
 
   private ConfigEvent createConfigEvent(
-      Operation operation, String targetResource, Object configValue) {
+      Operation operation, String targetResource, Map<String, Object> configValue) {
     Metadata metadata =
         new Metadata(
             "msg-123",
@@ -284,8 +287,11 @@ class ApisixAdapterTest {
             "corr-123",
             "v1.0.0",
             "test-result-topic");
+
+    ApisixConfigValue apisixValue = new ApisixConfigValue((Map<String, Object>) configValue);
+
     Payload payload =
-        new Payload("apisix", targetResource, operation, new Config(null, configValue));
+        new Payload("apisix", targetResource, operation, new Config(null, apisixValue));
     return new ConfigEvent(metadata, payload);
   }
 }
