@@ -302,7 +302,15 @@
       }
     },
     "groupAssignmentTab": {
-      "heading": "Group Assignments"
+      "heading": "Group Assignments",
+      "addGroup": "Add Groups",
+      "tableHeaders": {
+        "name": "Name",
+        "usersCount": "Amount of Users",
+        "contact": "Contact Person",
+        "description": "Description"
+      },
+      "noGroupsAssigned": "No groups assigned yet."
     }
   }
 }
