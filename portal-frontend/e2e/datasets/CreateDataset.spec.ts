@@ -67,7 +67,7 @@ test.describe('Create Dataset Flow', async () => {
     // verify redirect to new created user's details page in readonly view and check entered dataset information
     await expect(page.getByTestId('datasetPage')).toBeVisible()
     await expect(page.getByTestId('pageHeader')).toContainText(MOCK_DATASET_1.name)
-    await expect(page.getByRole('button', { name: 'Edit Base' })).toBeVisible()
+    await expect(page.getByTestId('editButton')).toBeVisible()
     const fields = page.locator('[data-test-element="formField"]')
     for (const field of await fields.all()) {
       await expect(field).toBeDisabled()

@@ -110,7 +110,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateDataset) : form.handleSubmit(handleCreateDataset)
 
   const EditButton = (
-    <Button variant="outline" type="button" onClick={() => setIsReadOnly(false)}>
+    <Button data-testid="editButton" variant="outline" type="button" onClick={() => setIsReadOnly(false)}>
       <SquarePen />
       {tCommon('actions.editBase')}
     </Button>
