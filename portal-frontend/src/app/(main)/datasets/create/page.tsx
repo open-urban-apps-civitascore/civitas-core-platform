@@ -1,7 +1,7 @@
 import { DatasetFormData } from '@/types/datasets'
 import { DataSpace } from '@/types/dataspaces'
 
-import { DatasetOverview } from '../components/DatasetOverview'
+import { DatasetOverview } from '../components/overview/DatasetOverview'
 
 const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
@@ -31,7 +31,18 @@ const CreateDatasetPage = async () => {
 
   const dataspaces = await getDataspaces()
 
-  return <DatasetOverview dataset={defaultDataset} dataspaces={dataspaces} isEditMode={false} />
+  return (
+    <DatasetOverview
+      dataset={defaultDataset}
+      dataspaces={dataspaces}
+      datasources={[]}
+      groups={[]}
+      hasMetadata={false}
+      apis={[]}
+      persistence={[]}
+      isEditMode={false}
+    />
+  )
 }
 
 export default CreateDatasetPage

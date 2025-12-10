@@ -11,6 +11,7 @@
       "delete": "Löschen",
       "add": "Hinzufügen",
       "edit": "Bearbeiten",
+      "editBase": "Basis bearbeiten",
       "open": "öffnen"
     },
     "errors": {
@@ -70,23 +71,26 @@
       }
     },
     "overview": {
-      "title": "Übersicht: Dataset erstellen",
+      "title": "Erstellen: Neuer Datensatz",
+      "subtitle": "Gib die Basisinformationen ein.",
       "info": {
         "title": "Basisinformationen",
         "dataspace": "Datenraum",
-        "name": "Name",
+        "selectDataspace": "Datenraum wählen...",
+        "name": "Name des Datensatzes",
         "description": "Beschreibung",
         "tags": "Tags",
         "typeTag": "Tag eingeben..."
       },
       "completion": {
         "title": "Erstellungsfortschritt",
-        "metadata": "Metadaten",
-        "groups": "Gruppen- & Rollenzuweisung",
-        "configuration": "Datenkonfiguration",
-        "distribution": "Distribution / Applikationen / APIs",
-        "permissions": "Nutzerdatenberechtigungen",
-        "publication": "Freigabe"
+        "metadata": { "title": "Metadaten", "button": "Metadaten eintragen", "requirementsMet": "Mindestanforderungen erfüllt" },
+        "accessPermissions": { "title": "Zugriffsberechtigungen", "button": "Rollen und Usergruppen hinzufügen", "userGroups": "Usergruppen" },
+        "data": { "title": "Daten", "button": "Daten einspielen und mappen", "datasources": "Datenquellen",  "persistence": "Persistenz" },
+        "distribution": { "title": "Distribution", "button1": "APIs anbinden", "button2": "Dateien bereitstellen", "api": "API" },
+        "usagePermissions": { "title": "Nutzungsberechtigungen", "button": "Rate Limiting einstellen" },
+        "applications": { "title": "Applikationen", "button": "Applikationen anbinden" },
+        "publication": { "title": "Freigabe", "button": "Freigabe gestalten" }
       }
     }
   },
