@@ -2,6 +2,7 @@ package de.civitascore.portal.model.output.event;
 
 import java.time.Instant;
 import java.util.UUID;
+import lombok.Builder;
 
 /**
  * Domain event representing a change in an entity.
@@ -16,6 +17,7 @@ import java.util.UUID;
  * @param schemaVersion version of the event schema (for backwards compatibility)
  * @param timestamp when the event occurred
  */
+@Builder
 public record DomainEvent<T>(
     UUID eventId,
     String eventType,

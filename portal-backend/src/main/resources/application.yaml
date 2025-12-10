@@ -25,6 +25,9 @@ spring:
   # Kafka Configuration
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    topics:
+      # Result topic where config-adapter sends processing results
+      config-adapter-result: civitas.config.result
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -78,6 +81,15 @@ spring:
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       properties:
         spring.json.trusted.packages: de.civitascore.portal.model.output.event
+
+# Event publishing configuration
+event:
+  # Timeout for publishing to Kafka broker (seconds)
+  publish-timeout-seconds: 5
+  # Timeout waiting for config-adapter to process event (seconds)
+  config-adapter-timeout-seconds: 10
+  # Target component for config-adapter (keycloak, ldap, etc.)
+  target-component: keycloak
 
 management:
   endpoints:

@@ -6,7 +6,6 @@ spring:
     password: test
     driver-class-name: org.postgresql.Driver
 
-
   jpa:
     hibernate:
       ddl-auto: create
@@ -16,9 +15,37 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
+  # Kafka Test Configuration
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+    consumer:
+      group-id: test-consumer-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+# Kafka Topics Configuration
+kafka:
+  topic-prefix: # Explicitly empty - no prefix for test environment
+  topics:
+    config-adapter-result: civitas.config.result
+
+# Event Configuration for Tests
+event:
+  publish-timeout-seconds: 10
+  config-adapter-timeout-seconds: 15
+  target-component: keycloak
 
 logging:
   level:
-    de.civitascore: INFO
+    de.civitascore: DEBUG
+    de.civitascore.portal.service.event: DEBUG
     org.springframework.security: INFO
     org.testcontainers: INFO
+    org.apache.kafka: WARN
+    org.springframework.kafka: DEBUG
+

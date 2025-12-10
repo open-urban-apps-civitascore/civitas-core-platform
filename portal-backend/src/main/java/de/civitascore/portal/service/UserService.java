@@ -8,7 +8,7 @@ import de.civitascore.portal.model.input.UserInputDTO;
 import de.civitascore.portal.model.output.event.TopicResolver;
 import de.civitascore.portal.model.output.event.UserEventDTO;
 import de.civitascore.portal.repository.UserRepository;
-import de.civitascore.portal.service.event.EventPublisherService;
+import de.civitascore.portal.service.event.SynchronousEventPublisher;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.UUID;
@@ -23,12 +23,12 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   private final ObjectMapper objectMapper;
 
   public UserService(
-      EventPublisherService events,
+      SynchronousEventPublisher syncEventPublisher,
       TopicResolver topicResolver,
       UserRepository userRepository,
       UserMapper userMapper,
       ObjectMapper objectMapper) {
-    super(events, topicResolver);
+    super(syncEventPublisher, topicResolver);
     this.userRepository = userRepository;
     this.userMapper = userMapper;
     this.objectMapper = objectMapper;
@@ -46,14 +46,13 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
 
   @Override
   protected String getEntityName() {
-    return User.class.getSimpleName();
+    return "User";
   }
 
   @Override
   protected User preSave(User entity) {
-    // Validate unique constraint: email
     validateUniqueEmail(entity);
-    return super.preSave(entity);
+    return entity;
   }
 
   private void validateUniqueEmail(User entity) {
@@ -62,8 +61,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException(
-                    User.class.getSimpleName(), "email", entity.getEmail());
+                throw new UniqueConstraintViolationException("User", "email", entity.getEmail());
               }
             });
   }
@@ -91,7 +89,14 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     } catch (Exception e) {
       throw new RuntimeException("Failed to process update input", e);
     }
-    return super.preProcessUpdateInput(input, existingEntity);
+    return input;
+  }
+
+  @Override
+  protected void updateExternalId(User entity, String externalId) {
+    if (externalId != null && !externalId.isBlank()) {
+      entity.setExternalId(externalId);
+    }
   }
 
   @Override
@@ -101,7 +106,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
 
   @Override
   protected String getRealm(User entity) {
-    return "";
+    return "civitas";
   }
 
   @Override

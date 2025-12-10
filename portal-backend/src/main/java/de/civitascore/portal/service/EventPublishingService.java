@@ -4,131 +4,139 @@ import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.model.output.event.DomainEvent;
 import de.civitascore.portal.model.output.event.EventMetadata;
 import de.civitascore.portal.model.output.event.TopicResolver;
-import de.civitascore.portal.service.event.EventPublisherService;
+import de.civitascore.portal.service.event.SynchronousEventPublisher;
+import de.civitascore.portal.service.event.SynchronousEventPublisher.ConfigAdapterResult;
+import de.civitascore.portal.util.ExternalSystemRejectionException;
+import de.civitascore.portal.util.ExternalSystemTimeoutException;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
+import java.util.concurrent.TimeoutException;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
-@Service
-@Transactional(readOnly = true)
 public abstract class EventPublishingService<T, I extends BaseInputDTO> extends BaseService<T, I> {
-  protected final EventPublisherService events;
+
+  protected final SynchronousEventPublisher syncEventPublisher;
   protected final TopicResolver topicResolver;
 
-  protected EventPublishingService(EventPublisherService events, TopicResolver topicResolver) {
-    this.events = events;
+  protected EventPublishingService(
+      SynchronousEventPublisher syncEventPublisher, TopicResolver topicResolver) {
+    this.syncEventPublisher = syncEventPublisher;
     this.topicResolver = topicResolver;
   }
 
   @Override
-  protected final void postSave(T entity, I input) {
-    String operation = detectOperation();
-    publishEvent(entity, operation);
-    super.postSave(entity, input);
+  @Transactional
+  public T create(I input) {
+    I preProcessedInput = preProcessCreateInput(input);
+    T entity = getMapper().toEntity(preProcessedInput);
+    entity = postConvertToEntity(entity, preProcessedInput);
+    entity = preSave(entity);
+
+    entity = getRepository().saveAndFlush(entity);
+
+    ConfigAdapterResult result = preValidateWithExternalSystem(entity, "create");
+
+    if (result != null && result.resourceId() != null) {
+      updateExternalId(entity, result.resourceId());
+      entity = getRepository().saveAndFlush(entity);
+    }
+
+    postSave(entity, preProcessedInput);
+
+    return entity;
   }
 
   @Override
-  protected final void postDelete(T entity) {
-    publishEvent(entity, "delete");
-    super.postDelete(entity);
+  @Transactional
+  public T update(UUID id, I input) {
+    T entity = findById(id);
+    I preProcessedInput = preProcessUpdateInput(input, entity);
+    getMapper().updateEntity(entity, preProcessedInput);
+    entity = postConvertToEntity(entity, preProcessedInput);
+    entity = preSave(entity);
+
+    entity = getRepository().saveAndFlush(entity);
+
+    ConfigAdapterResult result = preValidateWithExternalSystem(entity, "update");
+
+    if (result != null && result.resourceId() != null) {
+      updateExternalId(entity, result.resourceId());
+      entity = getRepository().saveAndFlush(entity);
+    }
+
+    postSave(entity, preProcessedInput);
+
+    return entity;
+  }
+
+  @Override
+  @Transactional
+  public void deleteById(UUID id) {
+    T entity = findById(id);
+
+    preValidateWithExternalSystem(entity, "delete");
+
+    getRepository().deleteById(id);
+
+    postDelete(entity);
+  }
+
+  protected ConfigAdapterResult preValidateWithExternalSystem(T entity, String operation) {
+    try {
+      String aggregateType = getAggregateType();
+      String topic = topicResolver.resolve(aggregateType, operation);
+      DomainEvent<?> event = createDomainEvent(entity, operation);
+
+      ConfigAdapterResult result = syncEventPublisher.publishAndWaitForResult(topic, event);
+
+      if (!result.isSuccess()) {
+        throw new ExternalSystemRejectionException(
+            String.format(
+                "External system rejected %s: %s - %s",
+                operation, result.errorCode(), result.message()));
+      }
+
+      return result;
+
+    } catch (TimeoutException e) {
+      throw new ExternalSystemTimeoutException(
+          "External system unavailable - cannot complete operation", e);
+    }
+  }
+
+  protected DomainEvent<?> createDomainEvent(T entity, String operation) {
+    UUID entityId = getEntityId(entity);
+
+    if (entityId == null) {
+      throw new IllegalStateException("Cannot create domain event: entity ID is null");
+    }
+
+    Object kafkaRepresentation = toKafkaRepresentation(entity);
+    String realm = getRealm(entity);
+    String aggregateType = getAggregateType();
+
+    EventMetadata metadata = new EventMetadata(realm, null);
+
+    return DomainEvent.builder()
+        .eventId(UUID.randomUUID())
+        .eventType(String.format("%s.%s", aggregateType.toLowerCase(), operation))
+        .entityId(entityId)
+        .aggregateType(aggregateType)
+        .operation(operation)
+        .payload(kafkaRepresentation)
+        .metadata(metadata)
+        .schemaVersion(1)
+        .timestamp(Instant.now())
+        .build();
   }
 
   protected abstract String getAggregateType();
 
   protected abstract String getRealm(T entity);
 
+  protected abstract Object toKafkaRepresentation(T entity);
+
   protected abstract UUID getEntityId(T entity);
 
-  /**
-   * Converts the entity to a Kafka-specific representation.
-   *
-   * <p>Override this method to send a custom DTO instead of the full entity. By default, returns
-   * the entity itself.
-   *
-   * <p>Example:
-   *
-   * <pre>
-   * &#64;Override
-   * protected UserEventDTO toKafkaRepresentation(User entity) {
-   *   return new UserEventDTO(entity.getId(), entity.getEmail(), entity.getFullName());
-   * }
-   * </pre>
-   *
-   * @param entity the entity to convert
-   * @return the Kafka representation (can be entity or custom DTO)
-   */
-  protected Object toKafkaRepresentation(T entity) {
-    return entity;
-  }
-
-  /**
-   * Extracts request metadata for event correlation.
-   *
-   * <p>Returns empty map if no HTTP context is available (e.g., scheduled tasks, batch jobs).
-   * Includes user context for audit trails and optional trace ID for distributed tracing.
-   */
-  protected Map<String, String> getCorrelationIds() {
-    Map<String, String> metadata = new HashMap<>();
-
-    // Add trace ID for distributed tracing (if available)
-    ServletRequestAttributes attributes =
-        (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-    if (attributes != null) {
-      String traceId = attributes.getRequest().getHeader("X-B3-TraceId");
-      if (traceId != null) {
-        metadata.put("traceId", traceId);
-      }
-    }
-
-    // Add user context for audit trail
-    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getPrincipal())) {
-      metadata.put("userId", auth.getName());
-    }
-
-    return metadata;
-  }
-
-  /**
-   * Detects operation type from HTTP request method.
-   *
-   * <p>Falls back to "update" if no request context is available (e.g., scheduled tasks).
-   */
-  private String detectOperation() {
-    ServletRequestAttributes attributes =
-        (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-    if (attributes != null) {
-      String method = attributes.getRequest().getMethod();
-      return switch (method) {
-        case "POST" -> "create";
-        case "PUT", "PATCH" -> "update";
-        case "DELETE" -> "delete";
-        default -> "update";
-      };
-    }
-    return "update"; // fallback for non-HTTP contexts
-  }
-
-  private void publishEvent(T entity, String operation) {
-    Object kafkaPayload = toKafkaRepresentation(entity);
-    DomainEvent<?> event =
-        new DomainEvent<>(
-            UUID.randomUUID(),
-            topicResolver.resolve(getAggregateType(), operation),
-            getEntityId(entity),
-            getAggregateType(),
-            operation,
-            kafkaPayload,
-            new EventMetadata(getRealm(entity), getCorrelationIds()),
-            1,
-            Instant.now());
-    events.publish(event.eventType(), event);
-  }
+  protected void updateExternalId(T entity, String externalId) {}
 }

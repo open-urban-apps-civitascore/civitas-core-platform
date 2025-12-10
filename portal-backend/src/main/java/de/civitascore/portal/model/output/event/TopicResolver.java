@@ -11,9 +11,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class TopicResolver {
-
   private static final String DELIMITER = ".";
-  private static final String ERROR_TOPIC = "events.error";
 
   @Value("${kafka.topic-prefix:}")
   private String topicPrefix;
@@ -28,24 +26,14 @@ public class TopicResolver {
   public String resolve(String aggregateType, String operation) {
     Objects.requireNonNull(aggregateType, "aggregateType must not be null");
     Objects.requireNonNull(operation, "operation must not be null");
-
     String topic = aggregateType + DELIMITER + operation;
     return applyPrefix(topic);
   }
 
-  /**
-   * Returns the error topic name for failed events (Dead Letter Queue).
-   *
-   * @return error topic name
-   */
-  public String error() {
-    return applyPrefix(ERROR_TOPIC);
-  }
-
   private String applyPrefix(String topic) {
-    if (topicPrefix == null || topicPrefix.isBlank()) {
+    if (topicPrefix == null || topicPrefix.trim().isEmpty()) {
       return topic;
     }
-    return topicPrefix + DELIMITER + topic;
+    return topicPrefix.trim() + DELIMITER + topic;
   }
 }
