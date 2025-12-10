@@ -1,3 +1,5 @@
+import { headers } from 'next/headers'
+
 import { DatasetFormData, DatasetResponse } from '@/types/datasets'
 import { DataSpace } from '@/types/dataspaces'
 
@@ -27,11 +29,15 @@ interface DatasetPageProps {
 const DatasetPage = async (props: DatasetPageProps) => {
   const { params } = props
   const { datasetId } = await params
+
   const getData = async () => {
     try {
       const [datasetResponse, dataspacesResponse] = await Promise.all([
-        fetch(`${URL}/datasets/${datasetId}`, {
+        fetch(`${process.env.NEXTAUTH_URL}/api/datasets/${datasetId}`, {
           cache: 'no-store',
+          headers: {
+            cookie: (await headers()).get('cookie') || '',
+          },
         }),
         fetch(`${URL}/dataspaces`, {
           cache: 'no-store',
