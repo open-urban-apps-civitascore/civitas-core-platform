@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 import { getMockDatasetData } from '../../playwright/helpers/dataset/datasetFactory'
-import { pickSelectOption } from '../utils/formUtils'
+import { getSelectOptions } from '../utils/formUtils'
 
 const MOCK_DATASET_1 = getMockDatasetData()
 
@@ -11,7 +11,7 @@ test.describe('Create Dataset Flow', async () => {
   })
 
   test('renders the page elements', async ({ page }) => {
-    const formFieldsCount = 4
+    const formFieldsCount = 3
     await page.getByRole('form').waitFor({ state: 'visible' })
 
     const pageHeader = page.getByTestId('pageHeader')
@@ -42,25 +42,29 @@ test.describe('Create Dataset Flow', async () => {
     await expect(page.getByTestId('confirmButton')).toBeEnabled()
   })
 
-  test('creates new dataset', async ({ page }) => {
+  test('creates new dataset with all the entered information', async ({ page }) => {
     // fill in form data
-    await expect(page.getByTestId('confirmButton')).toBeDisabled()
-
-    await pickSelectOption(page, 'dataspace', 1)
-    await expect(page.getByTestId('confirmButton')).toBeEnabled()
+    let selectOptionText = 'Select Data Space...'
+    const selectedOptions = await getSelectOptions(page, 'dataspace')
+    if ((await selectedOptions.count()) > 0) {
+      selectOptionText = (await selectedOptions.nth(1).textContent()) ?? 'Select Data Space...'
+      await selectedOptions.nth(1).click()
+    }
 
     await page.getByTestId('nameTextField').fill(MOCK_DATASET_1.name)
     await page.getByTestId('descriptionTextField').fill(MOCK_DATASET_1.description)
     await page.getByTestId('tagsInput').fill(MOCK_DATASET_1.tags[0])
     await page.getByTestId('tagsInput').press('Enter')
+    await page.getByTestId('tagsInput').fill(MOCK_DATASET_1.tags[1])
+    await page.getByTestId('tagsInput').press('Enter')
     const tags = page.getByTestId('tagsField').locator('span')
 
-    await expect(tags).toHaveCount(1)
+    await expect(tags).toHaveCount(2)
 
     await page.getByTestId('confirmButton').click()
     await page.waitForLoadState('networkidle')
 
-    // verify redirect to new created user's details page in readonly view
+    // verify redirect to new created user's details page in readonly view and check entered dataset information
     await expect(page.getByTestId('datasetPage')).toBeVisible()
     await expect(page.getByTestId('pageHeader')).toContainText(MOCK_DATASET_1.name)
     await expect(page.getByRole('button', { name: 'Edit Base' })).toBeVisible()
@@ -69,6 +73,24 @@ test.describe('Create Dataset Flow', async () => {
       await expect(field).toBeDisabled()
     }
     await expect(page.getByTestId('tagsInput')).not.toBeVisible()
+    await expect(page.getByTestId('dataspaceSelectTrigger')).toHaveText(selectOptionText)
+    await expect(page.getByTestId('nameTextField')).toHaveValue(MOCK_DATASET_1.name)
+    await expect(page.getByTestId('descriptionTextField')).toHaveValue(MOCK_DATASET_1.description)
+    expect(await tags.allTextContents()).toEqual(MOCK_DATASET_1.tags)
+  })
+
+  test('new created dataset appears in datasets list', async ({ page }) => {
+    // fill in form data
+    const selectedOptions = await getSelectOptions(page, 'dataspace')
+    if ((await selectedOptions.count()) > 0) {
+      await selectedOptions.nth(1).click()
+    }
+
+    await page.getByTestId('nameTextField').fill(MOCK_DATASET_1.name)
+    await page.getByTestId('descriptionTextField').fill(MOCK_DATASET_1.description)
+
+    await page.getByTestId('confirmButton').click()
+    await page.waitForLoadState('networkidle')
 
     // verify new created user appears in users list
     await page.getByTestId('sidebarMenuItem-ourData').click()
