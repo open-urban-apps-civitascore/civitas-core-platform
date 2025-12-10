@@ -68,6 +68,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
 
   const handleCreateDataset = async (formData: DatasetFormData) => {
     setIsLoading(true)
+    const selectedDataspace = dataspaces.find(dataspace => dataspace.value === formData.dataspace)
     try {
       const response = await createDataset({
         ...formData,
@@ -76,7 +77,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
         distribution: null,
         issued: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
-        dataspace: null,
+        dataspace: selectedDataspace ? { id: selectedDataspace?.value, title: selectedDataspace?.label } : null,
         status: null,
       })
 
