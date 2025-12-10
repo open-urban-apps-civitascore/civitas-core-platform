@@ -3,6 +3,7 @@ package de.civitascore.portal.mapper;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
+import de.civitascore.portal.model.output.summary.DataSetSummaryDTO;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -43,6 +44,8 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "catalogIds", ignore = true)
   @Override
   DataSetInputDTO toInput(DataSet entity);
+
+  DataSetSummaryDTO toSummary(DataSet entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "owner", ignore = true)
