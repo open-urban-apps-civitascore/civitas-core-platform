@@ -1,6 +1,8 @@
 package de.civitascore.portal.model.output.event;
 
 import java.util.Objects;
+
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -31,7 +33,7 @@ public class TopicResolver {
   }
 
   private String applyPrefix(String topic) {
-    if (topicPrefix == null || topicPrefix.trim().isEmpty()) {
+    if (StringUtils.isBlank(topicPrefix)) {
       return topic;
     }
     return topicPrefix.trim() + DELIMITER + topic;
