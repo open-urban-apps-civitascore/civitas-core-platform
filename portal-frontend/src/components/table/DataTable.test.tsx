@@ -103,6 +103,7 @@ const TestWrapper = (props: TestWrapperProps) => {
       pageIndex={pagination.pageIndex}
       pageSize={pagination.pageSize}
       totalPages={Math.ceil(mockTableData.length / pagination.pageSize)}
+      testId="dataTable"
       {...tableProps}
     />
   )
@@ -212,7 +213,7 @@ describe('DataTable sub rows', () => {
 describe('DataTable with no data rows', () => {
   it('renders the loading skeleton when no row data and loading', () => {
     render(<TestWrapper isLoading hasEmptyRows />)
-    expect(screen.getByTestId('dataTableSkeleton')).toBeInTheDocument()
+    expect(screen.getByTestId('loadingSkeleton')).toBeInTheDocument()
   })
   it('renders the no results found feedback no row data and not loading', () => {
     render(<TestWrapper hasEmptyRows />)

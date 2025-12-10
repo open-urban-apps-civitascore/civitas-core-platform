@@ -141,8 +141,8 @@ export const RoleDetails = (props: Props): JSX.Element => {
       tenant: 'ExampleCorp', // Placeholder tenant
       users: [],
       permissions: [],
-      createdAt: new Date().toISOString(), // Placeholder createdAt, later set by backend
       groups: [],
+      createdAt: new Date().toISOString(), // Placeholder createdAt, later set by backend
       ...values,
     })
   }
@@ -248,7 +248,9 @@ export const RoleDetails = (props: Props): JSX.Element => {
           />
         )}
 
-        {subTabValue === subTabValues.groupAssignment.value && <GroupAssignmentTab />}
+        {subTabValue === subTabValues.groupAssignment.value && (
+          <GroupAssignmentTab groupIds={selectedRole?.groups || []} />
+        )}
       </PageBackground>
     </PageContainer>
   )
