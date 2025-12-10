@@ -117,7 +117,12 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
 
   return (
     <Form {...form}>
-      <form data-testid="datasetBaseInfoForm" onSubmit={handleSubmit} className={cn('flex gap-2 pt-2')}>
+      <form
+        data-testid="datasetBaseInfoForm"
+        aria-label={`${tCommon('form')} ${t('overview.info.title')}`}
+        onSubmit={handleSubmit}
+        className={cn('flex gap-2 pt-2')}
+      >
         {dataset.name ? <CircleCheckBig /> : <Circle />}
         <div className={cn('w-full flex flex-col')}>
           <DetailsFieldContainer className="max-w-250 pt-0">

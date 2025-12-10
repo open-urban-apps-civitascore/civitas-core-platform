@@ -24,9 +24,10 @@ interface DatasetOverviewProps {
   groups: string[]
   dataspaces: SelectOption[]
   isEditMode: boolean
+  testId?: string
 }
 export const DatasetOverview = (props: DatasetOverviewProps) => {
-  const { dataset, dataspaces, datasources, hasMetadata, apis, groups, persistence, isEditMode } = props
+  const { dataset, dataspaces, datasources, hasMetadata, apis, groups, persistence, isEditMode, testId } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
 
@@ -99,7 +100,11 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   }
 
   return (
-    <PageContainer headerType={isEditMode ? 'onlyTitle' : 'withSubTabsOrSubtitle'} className="overflow-hidden">
+    <PageContainer
+      testId={testId}
+      headerType={isEditMode ? 'onlyTitle' : 'withSubTabsOrSubtitle'}
+      className="overflow-hidden"
+    >
       <PageHeader
         title={isEditMode ? dataset.name : t('overview.title')}
         subtitle={isEditMode ? undefined : t('overview.subtitle')}

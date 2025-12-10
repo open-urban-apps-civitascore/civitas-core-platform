@@ -5,6 +5,7 @@
     "noResults": "Es gibt leider keine Ergebnisse.",
     "noData": "Keine Daten",
     "loading": "Lädt...",
+    "form": "Formular",
     "actions": {
       "submit": "Speichern",
       "cancel": "Abbrechen",

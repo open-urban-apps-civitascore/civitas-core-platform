@@ -15,7 +15,7 @@ export const getMockDatasetData = (overrides: Partial<DatasetResponse> = {}): Da
     distribution: null,
     dataspace: null,
     department: null,
-    tags: [],
+    tags: ['testTag1', 'testTag2'],
     ...overrides,
   }
 }
