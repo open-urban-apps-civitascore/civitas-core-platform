@@ -40,6 +40,12 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
 
   @Parameters({
     @Parameter(
+        name = "name",
+        description =
+            "Filter by concatenated first name and last name (partial match, case-insensitive).",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "string", example = "John Doe")),
+    @Parameter(
         name = "firstName",
         description = "Filter by first name (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
