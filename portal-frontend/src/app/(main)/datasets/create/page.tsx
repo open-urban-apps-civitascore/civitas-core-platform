@@ -33,6 +33,7 @@ const CreateDatasetPage = async () => {
 
   return (
     <DatasetOverview
+	  testId="createDatasetPage"
       dataset={defaultDataset}
       dataspaces={dataspaces}
       datasources={[]}

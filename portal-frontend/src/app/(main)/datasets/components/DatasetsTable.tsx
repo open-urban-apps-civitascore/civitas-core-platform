@@ -124,6 +124,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
 
   return (
     <DataTable
+      testId="datasetsTable"
       table={table}
       pageIndex={pageIndex}
       pageSize={pageSize}
