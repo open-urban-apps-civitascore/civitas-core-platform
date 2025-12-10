@@ -20,7 +20,7 @@ export const ExpanderCell = <T,>(props: ExpanderCellProps<T>) => {
   }
 
   return (
-    <div className={cn('flex items-center min-w-[200px] w-[35%]', className)} {...divProps}>
+    <div data-testid="expanderCell" className={cn('flex items-center min-w-[200px] w-[35%]', className)} {...divProps}>
       {row.getCanExpand() ? (
         <>
           <div

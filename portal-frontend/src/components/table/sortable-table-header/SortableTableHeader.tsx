@@ -13,7 +13,7 @@ interface SortableTableHeaderProps<T, TValue> extends ButtonProps {
 export const SortableTableHeader = <T, TValue>(props: SortableTableHeaderProps<T, TValue>) => {
   const { column, title, className } = props
   return (
-    <>
+    <div data-testid="sortableTableHeader">
       {title}
       <Button
         className={cn('hover:bg-transparent hover:cursor-pointer', className)}
@@ -22,6 +22,6 @@ export const SortableTableHeader = <T, TValue>(props: SortableTableHeaderProps<T
       >
         <ArrowUpDown />
       </Button>
-    </>
+    </div>
   )
 }
