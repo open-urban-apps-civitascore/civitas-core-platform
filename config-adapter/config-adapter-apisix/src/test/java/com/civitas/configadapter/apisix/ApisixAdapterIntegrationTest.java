@@ -75,7 +75,7 @@ class ApisixAdapterIntegrationTest {
           .withEnv("ALLOW_NONE_AUTHENTICATION", "yes")
           .withEnv("ETCD_ADVERTISE_CLIENT_URLS", "http://etcd:2379")
           .withEnv("ETCD_LISTEN_CLIENT_URLS", "http://0.0.0.0:2379")
-          .waitingFor(Wait.forListeningPort())
+          .waitingFor(Wait.forLogMessage(".*ready to serve client requests.*", 1))
           .withReuse(false);
 
   @SuppressWarnings("resource")
@@ -89,7 +89,11 @@ class ApisixAdapterIntegrationTest {
           .withCopyFileToContainer(
               MountableFile.forClasspathResource("apisix-test-config.yaml", 0644),
               "/usr/local/apisix/conf/config.yaml")
-          .waitingFor(Wait.forListeningPort())
+          .waitingFor(
+              Wait.forHttp("/apisix/admin/upstreams")
+                  .forPort(9180)
+                  .withHeader("X-API-KEY", ADMIN_API_KEY)
+                  .forStatusCode(200))
           .withReuse(false);
 
   private ApisixAdapter adapter;
@@ -369,10 +373,6 @@ class ApisixAdapterIntegrationTest {
     @Override
     public String getName() {
       return "test";
-    }
-
-    public void clear() {
-      publishedEvents.clear();
     }
 
     @Override
