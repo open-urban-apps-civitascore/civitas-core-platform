@@ -29,6 +29,7 @@ public abstract class BaseEntity implements Serializable {
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   @Column(name = "id", nullable = false, updatable = false)
+  @Setter(AccessLevel.PUBLIC)
   protected UUID id;
 
   @CreatedDate
