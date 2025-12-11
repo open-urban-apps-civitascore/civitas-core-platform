@@ -54,7 +54,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     {
       title: t('overview.completion.accessPermissions.title'),
       isCompleted: groups.length > 0,
-      buttons: [{ text: t('overview.completion.accessPermissions.button'), routeParam: 'usagePermissions' }],
+      buttons: [{ text: t('overview.completion.accessPermissions.button'), routeParam: 'accessPermissions' }],
       content: groups.length > 0 ? getList(t('overview.completion.accessPermissions.userGroups'), groups) : undefined,
     },
     {

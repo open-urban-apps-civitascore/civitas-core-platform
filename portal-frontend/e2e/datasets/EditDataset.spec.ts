@@ -121,3 +121,33 @@ test.describe('Edit Dataset Page', async () => {
     await expect(page.getByTestId('tagsInput')).not.toBeVisible()
   })
 })
+
+test.describe('Edit Dataset Page completion steps', () => {
+  test.describe.configure({ mode: 'serial' })
+
+  let dataset: DatasetResponse
+  test.beforeEach(async ({ page }) => {
+    dataset = await createTestDataset()
+    await page.goto(`/datasets/${dataset.id}`)
+  })
+
+  test.afterEach(async () => {
+    await removeTestDataset(dataset.id)
+  })
+
+  test('button links navigate to completion steps', async ({ page }) => {
+    const completionSteps = page.getByTestId('completionStep')
+
+    for (const step of await completionSteps.all()) {
+      const stepTitle = await step.locator('h3').textContent()
+      const links = step.locator('a')
+      for (const link of await links.all()) {
+        await link.click()
+        await page.getByRole('link', { name: 'Back' }).waitFor({ state: 'visible' })
+        await expect(page.getByTestId('pageHeader')).toHaveText(stepTitle ?? '')
+        await page.goto(`/datasets/${dataset.id}`)
+        await page.waitForLoadState('networkidle')
+      }
+    }
+  })
+})
