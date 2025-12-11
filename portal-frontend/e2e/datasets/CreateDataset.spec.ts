@@ -30,7 +30,6 @@ test.describe('Create Dataset Flow', async () => {
     }
     await expect(page.getByTestId('tagsInput')).toBeVisible()
     await expect(page.locator('[data-testid^="completionStep-"]')).not.toBeVisible()
-
   })
 
   test('cancel dataset creation navigates to datasets list', async ({ page }) => {
