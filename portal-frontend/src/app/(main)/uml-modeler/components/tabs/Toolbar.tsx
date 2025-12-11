@@ -12,6 +12,7 @@ import { importXmiFromFile } from '../../services/xmiImportService'
 interface ToolbarProps {
   onSave?: () => void
   hasUnsavedChanges?: boolean
+  onExport?: () => void
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ onSave, hasUnsavedChanges = false }) => {
