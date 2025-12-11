@@ -112,16 +112,18 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       <PageBackground className="overflow-y-auto">
         <ContentCard className={cn('h-full overflow-auto')}>
           <BaseInfoForm dataset={dataset} dataspaces={dataspaces} isEditMode={isEditMode} />
-          <div className="mt-12">
-            {completionSteps.map((step, index) => (
-              <DetailsFieldContainer
-                key={step.title}
-                className={cn(index === completionSteps.length - 1 && 'border-b-0')}
-              >
-                <CompletionStep step={step} datasetId={dataset.id} disabled={!isEditMode} />
-              </DetailsFieldContainer>
-            ))}
-          </div>
+          {isEditMode && (
+            <div className="max-w-300 mt-12">
+              {completionSteps.map((step, index) => (
+                <DetailsFieldContainer
+                  key={step.title}
+                  className={cn(index === completionSteps.length - 1 && 'border-b-0')}
+                >
+                  <CompletionStep step={step} datasetId={dataset.id} />
+                </DetailsFieldContainer>
+              ))}
+            </div>
+          )}
         </ContentCard>
       </PageBackground>
     </PageContainer>

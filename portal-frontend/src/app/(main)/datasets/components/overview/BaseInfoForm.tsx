@@ -122,11 +122,11 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
         data-testid="datasetBaseInfoForm"
         aria-label={`${tCommon('form')} ${t('overview.info.title')}`}
         onSubmit={handleSubmit}
-        className={cn('flex gap-2 pt-2')}
+        className={cn('max-w-300 flex gap-2 pt-2')}
       >
         {dataset.name ? <CircleCheckBig /> : <Circle />}
         <div className={cn('w-full flex flex-col')}>
-          <DetailsFieldContainer className="max-w-250 pt-0">
+          <DetailsFieldContainer className="pt-0">
             <SubHeader
               title={t('overview.info.title')}
               titleClassName="text-2xl leading-none font-bold"
@@ -137,7 +137,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
             <LoadingSpinner className="h-[364px]" />
           ) : (
             <>
-              <DetailsFieldContainer className="max-w-250">
+              <DetailsFieldContainer className="max-w-300">
                 <Select
                   id="dataspaceSelect"
                   form={form}
@@ -148,7 +148,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
                   disabled={isReadOnly}
                 />
               </DetailsFieldContainer>
-              <DetailsFieldContainer className="max-w-250">
+              <DetailsFieldContainer className="max-w-300">
                 <TextField
                   id="datasetTitle"
                   form={form}
@@ -159,7 +159,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
                   required
                 />
               </DetailsFieldContainer>
-              <DetailsFieldContainer className="max-w-250">
+              <DetailsFieldContainer className="max-w-300">
                 <TextField
                   id="datasetDescription"
                   form={form}
@@ -169,7 +169,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
                   disabled={isReadOnly}
                 />
               </DetailsFieldContainer>
-              <DetailsFieldContainer className={cn('mb-6 max-w-250')}>
+              <DetailsFieldContainer className={cn('mb-6 max-w-300')}>
                 <FormItem className={cn(isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]')}>
                   <FormLabel>{t('overview.info.tags')}</FormLabel>
                   <div>
