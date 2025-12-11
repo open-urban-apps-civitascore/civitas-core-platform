@@ -6,8 +6,10 @@ import { Input } from '@/components/ui/input'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
-interface TextFieldProps<T extends FieldValues>
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, 'form' | 'onChange'> {
+interface TextFieldProps<T extends FieldValues> extends Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'form' | 'onChange'
+> {
   form: UseFormReturn<T>
   name: Path<T>
   placeholder: string
