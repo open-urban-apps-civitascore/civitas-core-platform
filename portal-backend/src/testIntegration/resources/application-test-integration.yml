@@ -42,10 +42,8 @@ event:
 
 logging:
   level:
-    de.civitascore: DEBUG
-    de.civitascore.portal.service.event: DEBUG
+    de.civitascore: INFO
     org.springframework.security: INFO
     org.testcontainers: INFO
     org.apache.kafka: WARN
-    org.springframework.kafka: DEBUG
 
