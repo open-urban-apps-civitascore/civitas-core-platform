@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -78,7 +79,8 @@ public class SynchronousEventPublisher {
     if (future != null) {
       future.complete(result);
     } else {
-      log.warn("Received result for unknown correlation ID: {}", correlationId);
+      String sanitizedCorrelationId = Encode.forJava(correlationId);
+      log.warn("Received result for unknown correlation ID: {}", sanitizedCorrelationId);
     }
   }
 

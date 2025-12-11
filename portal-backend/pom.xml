@@ -37,6 +37,7 @@
         <tomcat.version>11.0.14</tomcat.version>
         <commons-compress.version>1.27.1</commons-compress.version>
         <spring-kafka.version>3.3.11</spring-kafka.version>
+        <owasp.encoder.version>1.4.0</owasp.encoder.version>
     </properties>
 
     <dependencyManagement>
@@ -79,6 +80,13 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- OWASP Encoder for output encoding -->
+        <dependency>
+            <groupId>org.owasp.encoder</groupId>
+            <artifactId>encoder</artifactId>
+            <version>${owasp.encoder.version}</version>
         </dependency>
 
         <!-- Kafka -->

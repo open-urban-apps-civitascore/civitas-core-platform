@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.service.event.SynchronousEventPublisher.ConfigAdapterResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
@@ -24,7 +25,6 @@ public class ConfigAdapterResultListener {
   public void handleConfigAdapterResult(@Payload String payload) {
     try {
       JsonNode rootNode = objectMapper.readTree(payload);
-
       String correlationId = getText(rootNode, "correlationId");
       if (correlationId == null) {
         log.warn("Received result without correlationId");
@@ -40,8 +40,12 @@ public class ConfigAdapterResultListener {
               getText(rootNode, "errorCode"));
 
       eventPublisher.notifyResult(correlationId, result);
+      String sanitizedCorrelationId = Encode.forJava(correlationId);
+      String sanitizedStatus = Encode.forJava(result.status());
       log.info(
-          "Processed config-adapter result for correlation {}: {}", correlationId, result.status());
+          "Processed config-adapter result for correlation {}: {}",
+          sanitizedCorrelationId,
+          sanitizedStatus);
 
     } catch (Exception e) {
       log.error("Failed to process config-adapter result", e);
