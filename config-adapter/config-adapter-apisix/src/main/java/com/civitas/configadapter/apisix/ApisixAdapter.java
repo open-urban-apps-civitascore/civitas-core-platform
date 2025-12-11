@@ -45,7 +45,10 @@ public class ApisixAdapter extends AbstractConfigAdapter {
     super.initialize(config);
 
     this.adminApiUrl = getAdapterProperty("admin.url", "http://localhost:9180");
-    this.adminApiKey = getAdapterProperty("admin.key", "edd1c9f034335f136f87ad84b625c8f1");
+    this.adminApiKey = getAdapterProperty("admin.key");
+    if (adminApiKey == null || adminApiKey.isBlank()) {
+      throw new IllegalArgumentException("The APISIX admin key cannot be null or blank.");
+    }
 
     if (this.client == null) {
       this.client = createClient();

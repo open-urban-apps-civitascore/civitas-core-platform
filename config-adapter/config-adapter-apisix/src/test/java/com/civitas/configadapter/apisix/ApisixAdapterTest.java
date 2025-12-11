@@ -13,6 +13,7 @@ package com.civitas.configadapter.apisix;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -63,6 +64,7 @@ class ApisixAdapterTest {
 
   @Test
   void testInitializationWithDefaultValues() {
+    when(mockConfig.getProperty("apisix.admin.key")).thenReturn("edd1c9f034335f136f87ad84b625c8f1");
     when(mockConfig.getProperty("apisix.topics"))
         .thenReturn(
             "core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted");
@@ -80,6 +82,7 @@ class ApisixAdapterTest {
   @Test
   void testInitializationWithCustomAdminUrl() {
     when(mockConfig.getProperty("apisix.topics")).thenReturn("core.civitas.api.backend.created");
+    when(mockConfig.getProperty("apisix.admin.key")).thenReturn("edd1c9f034335f136f87ad84b625c8f1");
     when(mockConfig.getProperty("apisix.admin.url")).thenReturn("http://custom-apisix:9180");
 
     adapter.initialize(mockConfig);
@@ -89,8 +92,24 @@ class ApisixAdapterTest {
   }
 
   @Test
+  void testInitializationWithOutAdminKey() {
+    when(mockConfig.getProperty("apisix.topics")).thenReturn("core.civitas.api.backend.created");
+
+    try {
+      adapter.initialize(mockConfig);
+      fail("IllegalArgumentException expected");
+    } catch (IllegalArgumentException e) {
+      assertEquals("The APISIX admin key cannot be null or blank.", e.getMessage());
+    }
+
+    assertNotNull(adapter.getSubscribedTopics());
+    assertEquals(1, adapter.getSubscribedTopics().size());
+  }
+
+  @Test
   void testCloseAdapter() {
     when(mockConfig.getProperty("apisix.topics")).thenReturn("core.civitas.api.backend.created");
+    when(mockConfig.getProperty("apisix.admin.key")).thenReturn("edd1c9f034335f136f87ad84b625c8f1");
 
     adapter.initialize(mockConfig);
     adapter.close();
@@ -113,7 +132,7 @@ class ApisixAdapterTest {
               "core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted");
       when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
           .thenReturn("http://localhost:9180");
-      when(mockConfig.getProperty("apisix.admin.key", "edd1c9f034335f136f87ad84b625c8f1"))
+      when(mockConfig.getProperty("apisix.admin.key"))
           .thenReturn("edd1c9f034335f136f87ad84b625c8f1");
 
       // Mock the JAX-RS Client fluent API chain
