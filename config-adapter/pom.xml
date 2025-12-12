@@ -25,6 +25,7 @@
 		<module>event-handler-kafka</module>
 		<module>config-adapter-application</module>
 		<module>config-adapter-keycloak</module>
+		<module>config-adapter-apisix</module>
 		<module>config-adapter-examples</module>
 	</modules>
 
@@ -38,6 +39,8 @@
 		<cloudevents.version>3.0.0</cloudevents.version>
 		<slf4j.version>2.0.9</slf4j.version>
 		<jackson.version>2.16.1</jackson.version>
+		<jakarta.ws.rs.version>3.1.0</jakarta.ws.rs.version>
+		<jersey.version>3.1.5</jersey.version>
 		<commons.configuration2.version>2.11.0</commons.configuration2.version>
 		<junit.version>5.10.1</junit.version>
 		<mockito.version>5.8.0</mockito.version>
@@ -96,6 +99,28 @@
 				<groupId>com.fasterxml.jackson.datatype</groupId>
 				<artifactId>jackson-datatype-jsr310</artifactId>
 				<version>${jackson.version}</version>
+			</dependency>
+
+			<!-- JAX-RS / Jersey -->
+			<dependency>
+				<groupId>jakarta.ws.rs</groupId>
+				<artifactId>jakarta.ws.rs-api</artifactId>
+				<version>${jakarta.ws.rs.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.glassfish.jersey.core</groupId>
+				<artifactId>jersey-client</artifactId>
+				<version>${jersey.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.glassfish.jersey.inject</groupId>
+				<artifactId>jersey-hk2</artifactId>
+				<version>${jersey.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.glassfish.jersey.media</groupId>
+				<artifactId>jersey-media-json-jackson</artifactId>
+				<version>${jersey.version}</version>
 			</dependency>
 
 			<!-- Apache Commons -->
