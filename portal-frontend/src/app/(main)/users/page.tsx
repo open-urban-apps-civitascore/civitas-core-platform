@@ -10,6 +10,10 @@ import { mapListUsers } from '@/utils/users'
 
 import { UsersListContent } from './components/users-list/UsersListContent'
 import { getQueryParams } from '@/utils/getQueryParams'
+import { getServerSession } from 'next-auth/next'
+import { auth } from '@/auth'
+import { cookies } from 'next/headers'
+import { getToken } from '@auth/core/jwt'
 
 const URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
 
@@ -30,24 +34,28 @@ type Props = {
 }
 
 const getUserListData = async (params: URLSearchParams) => {
-  try {
-    const [usersResponse, authoritiesResponse] = await Promise.all([
-      fetch(`${URL}/users?${params.toString()}`, {
-        cache: 'no-store',
-      }),
-      fetch(`${URL}/authorities`, {
-        cache: 'no-store',
-      }),
-    ])
+  const session = await auth()
 
-    if (!authoritiesResponse || !usersResponse) {
+  if (!session?.accessToken) {
+    console.error('Unauthorized')
+    throw new Error('Unauthorized')
+  }
+
+  try {
+    const usersResponse = await fetch(`${URL}/users?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${session?.accessToken}`,
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    })
+
+    if (!usersResponse) {
       throw new Error('An error occurred while loading user list data')
     }
 
-    const [usersData, _authoritiesData]: [Record<'content', unknown>, unknown] = await Promise.all([
-      usersResponse.json(),
-      authoritiesResponse.json(),
-    ])
+    const usersData = await usersResponse.json()
 
     const users = mapListUsers(usersData.content as UserResponse[], [])
     const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0

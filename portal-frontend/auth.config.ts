@@ -101,7 +101,8 @@ export const authConfig = {
         }
       }
     },
-    session({ session }) {
+    async session({ session, token }) {
+      session.accessToken = token.access_token as string
       return session
     },
   },
