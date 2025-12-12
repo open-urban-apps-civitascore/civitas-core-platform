@@ -5,15 +5,11 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Item } from '@/types/common'
-import { Authority, UserResponse } from '@/types/users'
+import { UserResponse } from '@/types/users'
 import { mapListUsers } from '@/utils/users'
 
-import { UsersListContent } from './components/users-list/UsersListContent'
-import { getQueryParams } from '@/utils/getQueryParams'
-import { getServerSession } from 'next-auth/next'
 import { auth } from '@/auth'
-import { cookies } from 'next/headers'
-import { getToken } from '@auth/core/jwt'
+import { UsersListContent } from './components/users-list/UsersListContent'
 
 const URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
 
@@ -75,16 +71,14 @@ const UsersPage = async ({ searchParams }: Props) => {
   const pageIndex = parseInt(params.page || '0')
   const pageSize = parseInt(params.pageSize || '10')
   const sort = params.sort || ''
-  const order = params.order === 'asc' || params.order === 'desc' ? params.order : 'asc'
   const search = params.search || ''
 
   const apiParams = new URLSearchParams()
-  apiParams.set('_page', String(pageIndex + 1))
-  apiParams.set('_limit', String(pageSize))
+  apiParams.set('page', String(pageIndex + 1))
+  apiParams.set('size', String(pageSize))
 
   if (sort) {
-    apiParams.set('_sort', sort)
-    apiParams.set('_order', order)
+    apiParams.set('sort', sort)
   }
 
   if (search) {
@@ -94,7 +88,11 @@ const UsersPage = async ({ searchParams }: Props) => {
   const { users, totalCount } = await getUserListData(apiParams)
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 
-  const sorting = sort ? [{ id: sort, desc: order === 'desc' }] : []
+  const sortArr = JSON.parse(sort)
+
+  const sorting = sortArr
+    ? [{ id: sortArr[0].split(',')[0], desc: sortArr[0].split(',')[1] === 'DESC' ? 'desc' : 'asc' }]
+    : []
 
   return (
     <PageContainer headerType="onlyTitle" testId="usersPage">

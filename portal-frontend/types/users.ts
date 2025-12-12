@@ -61,7 +61,7 @@ export type GroupUser = {
   isActive: boolean
 }
 
-export const TitleSchema = z.enum(['male', 'female'])
+export const TitleSchema = z.enum(['MR', 'MS', 'OTHER'])
 
 export type TitleSchemaType = z.infer<typeof TitleSchema>
 

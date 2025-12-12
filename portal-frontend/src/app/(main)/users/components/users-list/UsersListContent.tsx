@@ -47,11 +47,10 @@ export const UsersListContent = ({
     const params = new URLSearchParams(window.location.search)
 
     if (newSorting.length > 0) {
-      params.set('sort', newSorting[0].id)
-      params.set('order', newSorting[0].desc ? 'desc' : 'asc')
+      const sort = [`${newSorting[0].id},${newSorting[0].desc ? 'DESC' : 'ASC'}`]
+      params.set('sort', sort.toString())
     } else {
       params.delete('sort')
-      params.delete('order')
     }
 
     router.push(`?${params.toString()}`)

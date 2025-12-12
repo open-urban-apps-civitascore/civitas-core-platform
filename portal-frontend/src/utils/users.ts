@@ -14,9 +14,9 @@ export const mapListUsers = (users: UserResponse[], authorities: Authority[]): L
     const department = authority?.departments.find(department => department.id === user.authority?.department?.id)
     return {
       id: user.id,
-      displayName: user.displayName,
-      authority: authority?.title ?? '',
-      department: department?.title ?? '',
+      displayName: `${user.firstName} ${user.lastName}`,
+      authority: authority?.title ?? '-',
+      department: department?.title ?? '-',
       email: user.email,
       isActive: user.active,
     }
