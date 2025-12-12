@@ -2,6 +2,7 @@ package de.civitascore.portal.configuration;
 
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.lang.NonNull;
@@ -19,32 +20,30 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @Slf4j
-public class AuditorAwareImpl implements AuditorAware<String> {
-
-  private static final String SYSTEM_AUDITOR = "system";
+public class AuditorAwareImpl implements AuditorAware<UUID> {
 
   @Override
-  @NonNull public Optional<String> getCurrentAuditor() {
+  @NonNull public Optional<UUID> getCurrentAuditor() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
     if (authentication == null || !authentication.isAuthenticated()) {
       log.trace("No authenticated user found, using system auditor");
-      return Optional.of(SYSTEM_AUDITOR);
+      return Optional.empty();
     }
 
     if (authentication.getPrincipal() instanceof PrincipalUserDetails userDetails) {
-      String userId = userDetails.getUserId();
-      if (userId != null && !userId.isBlank()) {
+      UUID userId = userDetails.getUserId();
+      if (userId != null) {
         log.trace("Using auditor ID from JWT: {}", userId);
         return Optional.of(userId);
       }
       log.warn(
           "User ID is null or blank in JWT for email {}, using system auditor",
           userDetails.getEmail());
-      return Optional.of(SYSTEM_AUDITOR);
+      return Optional.empty();
     }
 
     log.trace("Principal is not PrincipalUserDetails, using system auditor");
-    return Optional.of(SYSTEM_AUDITOR);
+    return Optional.empty();
   }
 }
