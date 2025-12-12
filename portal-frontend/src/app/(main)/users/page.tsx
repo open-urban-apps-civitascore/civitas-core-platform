@@ -11,7 +11,7 @@ import { mapListUsers } from '@/utils/users'
 import { UsersListContent } from './components/users-list/UsersListContent'
 import { getQueryParams } from '@/utils/getQueryParams'
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+const URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
 
 export type UserAuthority = Item & {
   department: Item
@@ -44,12 +44,12 @@ const getUserListData = async (params: URLSearchParams) => {
       throw new Error('An error occurred while loading user list data')
     }
 
-    const [usersData, authoritiesData]: [UserResponse[], Authority[]] = await Promise.all([
+    const [usersData, _authoritiesData]: [Record<'content', unknown>, unknown] = await Promise.all([
       usersResponse.json(),
       authoritiesResponse.json(),
     ])
 
-    const users = mapListUsers(usersData, authoritiesData)
+    const users = mapListUsers(usersData.content as UserResponse[], [])
     const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
 
     return { users, totalCount }
