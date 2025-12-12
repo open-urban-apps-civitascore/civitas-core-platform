@@ -1,5 +1,8 @@
 package de.civitascore.portal.service;
 
+import static java.net.URLEncoder.encode;
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import de.civitascore.portal.configuration.ModelAtlasConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -7,8 +10,6 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.multipart.MultipartFile;
-
-import static java.net.URLEncoder.encode;
 
 @Slf4j
 @Service
@@ -28,7 +29,10 @@ public class ModelRestClientRequestService {
     String baseUrl =
         String.format("%s:%d", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
 
-    String endpoint = String.format("/%s/schema/stages/%s?nsUri=%s", modelAtlasConfig.getScope(), modelAtlasConfig.getStage(), encode(nsUri, java.nio.charset.StandardCharsets.UTF_8));
+    String endpoint =
+        String.format(
+            "/%s/schema/stages/%s?nsUri=%s",
+            modelAtlasConfig.getScope(), modelAtlasConfig.getStage(), encode(nsUri, UTF_8));
 
     try {
       RestClient restClient = restClientBuilder.baseUrl(baseUrl).build();
@@ -44,6 +48,38 @@ public class ModelRestClientRequestService {
     } catch (Exception e) {
       log.error("Failed to upload model file to Model Atlas", e);
       throw new RuntimeException("Failed to upload model file to Model Atlas", e);
+    }
+  }
+
+  /**
+   * Download a model file from the external Model Atlas service.
+   *
+   * @param nsUri the namespace URI of the model to download
+   * @param acceptHeader the desired response format (e.g., application/json, application/xml)
+   * @return response from the external service in the requested format
+   */
+  public String downloadModelFile(String nsUri, String acceptHeader) {
+    String baseUrl =
+        String.format("%s:%d", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
+
+    String endpoint =
+        String.format(
+            "/%s/schema/stages/%s/content?nsUri=%s",
+            modelAtlasConfig.getScope(), modelAtlasConfig.getStage(), encode(nsUri, UTF_8));
+
+    try {
+      RestClient restClient = restClientBuilder.baseUrl(baseUrl).build();
+
+      return restClient
+          .get()
+          .uri(endpoint)
+          .accept(MediaType.parseMediaType(acceptHeader))
+          .retrieve()
+          .body(String.class);
+
+    } catch (Exception e) {
+      log.error("Failed to download model file from Model Atlas", e);
+      throw new RuntimeException("Failed to download model file from Model Atlas", e);
     }
   }
 }

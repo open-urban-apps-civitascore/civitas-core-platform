@@ -11,9 +11,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
@@ -37,7 +40,36 @@ public class ModelController {
       summary = "Upload a model file",
       description = "Upload a model file to the external Model Atlas service")
   public ResponseEntity<String> uploadModel(@Valid @ModelAttribute ModelInputDTO modelInputDTO) {
-    String response = modelService.uploadModel(modelInputDTO.getModelFile(), modelInputDTO.getNsUri());
+    String response =
+        modelService.uploadModel(modelInputDTO.getModelFile(), modelInputDTO.getNsUri());
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
+  /**
+   * Download a model file from the Model Atlas service.
+   *
+   * @param nsUri the namespace URI of the model to download
+   * @param acceptHeader the desired response format (application/json, application/xml,
+   *     application/ecore+xml, application/schema+json)
+   * @return response from the external service in the requested format
+   */
+  @GetMapping(
+      value = "/download",
+      produces = {
+        MediaType.APPLICATION_JSON_VALUE,
+        MediaType.APPLICATION_XML_VALUE,
+        "application/ecore+xml",
+        "application/schema+json"
+      })
+  @Operation(
+      summary = "Download a model file",
+      description =
+          "Download a model file from the external Model Atlas service in the requested format")
+  public ResponseEntity<String> downloadModel(
+      @RequestParam String nsUri,
+      @RequestHeader(value = "Accept", defaultValue = MediaType.APPLICATION_XML_VALUE)
+          String acceptHeader) {
+    String response = modelService.downloadModel(nsUri, acceptHeader);
+    return ResponseEntity.ok().contentType(MediaType.parseMediaType(acceptHeader)).body(response);
   }
 }
