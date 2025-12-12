@@ -1,13 +1,11 @@
-'use client'
-
-import { useTranslations } from 'next-intl'
+import { getTranslations } from 'next-intl/server'
 
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 
-const TableEditorPage = () => {
-  const t = useTranslations('datasets')
+const TableEditorPage = async () => {
+  const t = await getTranslations('datasets')
 
   return (
     <PageContainer headerType="onlyTitle">

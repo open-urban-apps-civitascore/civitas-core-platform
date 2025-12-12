@@ -1,18 +1,26 @@
-'use client'
-
 import Link from 'next/link'
-import { useParams, useSearchParams } from 'next/navigation'
-import { useTranslations } from 'next-intl'
+import { getTranslations } from 'next-intl/server'
 
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Button } from '@/components/ui/button'
 
-const DataModePage = () => {
-  const t = useTranslations('datasets')
-  const { datasetId } = useParams()
-  const searchParams = useSearchParams()
+type PageProps = {
+  params: Promise<{ datasetId: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}
+
+const DataModePage = async ({ params, searchParams }: PageProps) => {
+  const t = await getTranslations('datasets')
+  const { datasetId } = await params
+  const resolvedSearchParams = await searchParams
+
+  const searchParamsString = new URLSearchParams(
+    Object.entries(resolvedSearchParams)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, Array.isArray(value) ? value[0] : value] as [string, string]),
+  ).toString()
 
   return (
     <PageContainer headerType="onlyTitle">
@@ -27,7 +35,9 @@ const DataModePage = () => {
                 variant="outline"
                 className="border-2 border-[#F59E0B] text-[#F59E0B] hover:bg-[#F59E0B]/10"
               >
-                <Link href={`/datasets/${datasetId}/data/table-editor?${searchParams.toString()}`}>
+                <Link
+                  href={`/datasets/${datasetId}/data/table-editor${searchParamsString ? `?${searchParamsString}` : ''}`}
+                >
                   {t('dataMode.tableEditor')}
                 </Link>
               </Button>
@@ -39,7 +49,9 @@ const DataModePage = () => {
                 variant="outline"
                 className="border-2 border-[#22C55E] text-[#22C55E] hover:bg-[#22C55E]/10"
               >
-                <Link href={`/datasets/${datasetId}/data/pipeline-editor?${searchParams.toString()}`}>
+                <Link
+                  href={`/datasets/${datasetId}/data/pipeline-editor${searchParamsString ? `?${searchParamsString}` : ''}`}
+                >
                   {t('dataMode.pipelineEditor')}
                 </Link>
               </Button>
