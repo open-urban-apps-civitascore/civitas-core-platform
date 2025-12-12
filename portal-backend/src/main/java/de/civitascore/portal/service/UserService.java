@@ -72,6 +72,10 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
       String inputJson = objectMapper.writeValueAsString(input);
       JsonNode jsonNode = objectMapper.readTree(inputJson);
 
+      if (jsonNode.has("title") && StringUtils.isBlank(jsonNode.get("title").asText())) {
+        throw new InvalidInputException(
+            "title", existingEntity.getId(), "Title cannot be null or blank");
+      }
       if (jsonNode.has("firstName") && StringUtils.isBlank(jsonNode.get("firstName").asText())) {
         throw new InvalidInputException(
             "firstName", existingEntity.getId(), "First name cannot be null or blank");

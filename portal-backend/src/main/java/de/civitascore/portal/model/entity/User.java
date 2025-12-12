@@ -1,8 +1,11 @@
 package de.civitascore.portal.model.entity;
 
+import de.civitascore.portal.model.embedded.UserTitleType;
 import de.civitascore.portal.model.entity.base.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.ManyToMany;
@@ -30,6 +33,10 @@ import lombok.Setter;
 @Getter
 @Setter
 public class User extends BaseEntity {
+
+  @Enumerated(EnumType.STRING)
+  @NotBlank @Column(name = "title", nullable = false)
+  private UserTitleType title = UserTitleType.OTHER;
 
   @NotBlank @Column(name = "first_name", nullable = false)
   private String firstName;
