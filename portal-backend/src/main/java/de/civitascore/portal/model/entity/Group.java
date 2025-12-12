@@ -71,4 +71,17 @@ public class Group extends NamedEntity {
       this.childGroups.addAll(childGroups);
     }
   }
+
+  /**
+   * Recursively collects all child groups in the hierarchy.
+   *
+   * @return a set of all child groups
+   */
+  public Set<Group> getChildGroupsRecursive() {
+    Set<Group> allChildGroups = new HashSet<>(childGroups);
+    for (Group child : childGroups) {
+      allChildGroups.addAll(child.getChildGroupsRecursive());
+    }
+    return allChildGroups;
+  }
 }

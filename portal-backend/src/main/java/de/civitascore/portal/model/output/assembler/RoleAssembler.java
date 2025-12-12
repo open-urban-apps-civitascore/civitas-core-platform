@@ -2,8 +2,15 @@ package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.PermissionMapper;
 import de.civitascore.portal.mapper.RoleMapper;
+import de.civitascore.portal.mapper.UserMapper;
+import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.output.RoleOutputDTO;
+import de.civitascore.portal.service.AssignmentService;
+import de.civitascore.portal.service.UserService;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +22,11 @@ public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
 
   private final RoleMapper roleMapper;
   private final PermissionMapper permissionMapper;
+
+  private final UserService userService;
+  private final UserMapper userMapper;
+
+  private final AssignmentService assignmentService;
 
   @Override
   public RoleOutputDTO mapToBaseDto(Role entity) {
@@ -34,5 +46,46 @@ public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
   @SuppressWarnings("unchecked")
   public <I> I toInput(Role entity) {
     return (I) roleMapper.toInput(entity);
+  }
+
+  @Override
+  public RoleOutputDTO enrichDto(RoleOutputDTO dto, Role entity) {
+    dto.setModifiedBy(null);
+    dto.setGroupCount(0L);
+    dto.setUserCount(0L);
+
+    // could fail when modifiedBy is not a UUID or user not found
+    try {
+      User modifier = userService.getReferenceById(entity.getModifiedBy());
+
+      dto.setModifiedBy(userMapper.toSummary(modifier));
+    } catch (Exception e) {
+      // Ignore exceptions during enrichment of modifiedBy
+    }
+
+    Set<Group> groups =
+        assignmentService.findAllByRoleId(entity.getId()).stream()
+            .map(Assignment::getGroup)
+            .collect(Collectors.toSet());
+    groups.addAll(
+        groups.stream()
+            .map(Group::getChildGroupsRecursive)
+            .flatMap(Set::stream)
+            .collect(Collectors.toSet()));
+
+    Set<User> members =
+        groups.stream().flatMap(group -> group.getMembers().stream()).collect(Collectors.toSet());
+
+    Long totalGroups = (long) groups.size();
+    Long totalMembers = (long) members.size();
+
+    if (totalGroups != null) {
+      dto.setGroupCount(totalGroups);
+    }
+    if (totalMembers != null) {
+      dto.setUserCount(totalMembers);
+    }
+
+    return dto;
   }
 }

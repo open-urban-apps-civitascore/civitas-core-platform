@@ -8,6 +8,7 @@ import de.civitascore.portal.model.input.AssignmentInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -70,6 +71,7 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   @Override
   public Assignment findById(UUID id) {
     preProcessLoad(id);
+
     Assignment entity =
         assignmentRepository
             .findByIdWithRelations(id)
@@ -102,5 +104,9 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
       throw new RuntimeException("Failed to process update input", e);
     }
     return super.preProcessUpdateInput(input, existingEntity);
+  }
+
+  public List<Assignment> findAllByRoleId(UUID roleId) {
+    return getRepository().findAllByRoleId(roleId);
   }
 }

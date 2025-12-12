@@ -88,6 +88,11 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
 
   @Override
   protected RoleInputDTO preProcessUpdateInput(RoleInputDTO input, Role existingEntity) {
+    if (existingEntity.getIsProtected()) {
+      throw new InvalidInputException(
+          "role", existingEntity.getId(), "Protected roles cannot be modified");
+    }
+
     try {
       String inputJson = objectMapper.writeValueAsString(input);
       JsonNode jsonNode = objectMapper.readTree(inputJson);
@@ -106,5 +111,17 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
       throw new RuntimeException("Failed to process update input", e);
     }
     return super.preProcessUpdateInput(input, existingEntity);
+  }
+
+  @Override
+  protected Role preProcessDelete(UUID id) {
+    Role existingEntity = super.preProcessDelete(id);
+
+    if (existingEntity != null && existingEntity.getIsProtected()) {
+      throw new InvalidInputException(
+          "role", existingEntity.getId(), "Protected roles cannot be deleted");
+    }
+
+    return existingEntity;
   }
 }
