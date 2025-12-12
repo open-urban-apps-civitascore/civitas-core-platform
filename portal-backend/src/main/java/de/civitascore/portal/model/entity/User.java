@@ -35,7 +35,7 @@ import lombok.Setter;
 public class User extends BaseEntity {
 
   @Enumerated(EnumType.STRING)
-  @NotBlank @Column(name = "title", nullable = false)
+  @Column(name = "title", nullable = false)
   private UserTitleType title = UserTitleType.OTHER;
 
   @NotBlank @Column(name = "first_name", nullable = false)
