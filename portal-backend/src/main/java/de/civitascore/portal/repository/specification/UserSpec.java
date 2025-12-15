@@ -25,18 +25,14 @@ interface UserActiveSpec extends BaseSpec<User> {}
 interface UserExternalIdSpec extends BaseSpec<User> {}
 
 @Or({
-  @Spec(path = "firstName", params = "q", spec = LikeIgnoreCase.class),
-  @Spec(path = "lastName", params = "q", spec = LikeIgnoreCase.class),
+  @Spec(
+      path = "firstName,lastName",
+      params = "q",
+      paramSeparator = ' ',
+      spec = LikeConcatenated.class),
   @Spec(path = "email", params = "q", spec = LikeIgnoreCase.class)
 })
 interface UserQuickSearchSpec extends BaseSpec<User> {}
-
-@Spec(
-    path = "firstName,lastName",
-    params = "name",
-    paramSeparator = ' ',
-    spec = LikeConcatenated.class)
-interface UserNameSpec extends BaseSpec<User> {}
 
 public interface UserSpec
     extends UserEmailSpec,
@@ -44,5 +40,4 @@ public interface UserSpec
         UserLastNameSpec,
         UserActiveSpec,
         UserExternalIdSpec,
-        UserQuickSearchSpec,
-        UserNameSpec {}
+        UserQuickSearchSpec {}
