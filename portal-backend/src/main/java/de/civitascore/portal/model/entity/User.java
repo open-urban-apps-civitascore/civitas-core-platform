@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Formula;
 
 @Entity
 @Table(
@@ -59,7 +60,6 @@ public class User extends BaseEntity {
   @ManyToMany(fetch = FetchType.LAZY, mappedBy = "members")
   private Set<Group> groups = new HashSet<>();
 
-  public String getFullName() {
-    return firstName + " " + lastName;
-  }
+  @Formula("first_name || ' ' || last_name")
+  private String fullName;
 }
