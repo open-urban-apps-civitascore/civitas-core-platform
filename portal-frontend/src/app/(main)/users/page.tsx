@@ -34,20 +34,11 @@ const getUserListData = async (params: URLSearchParams) => {
 
   if (!session?.accessToken) {
     console.error('Unauthorized')
-    throw new Error('Unauthorized')
+    return { users: [], totalCount: 0 }
   }
+
   try {
-        const queryParts: string[] = []
-    
-    params.forEach((value, key) => {
-      queryParts.push(`${decodeURIComponent(key)}=${decodeURIComponent(value)}`)
-    })
-    
-    const queryString = queryParts.join('&')
-    const decodedParams = decodeURIComponent(params.toString())
-    console.log('FETCHING USERS WITH PARAMS:', decodedParams)
-    console.log('FETCHING USERS WITH REQUEST:', `${URL}/users?${queryString}`)
-    const usersResponse = await fetch(`${URL}/users?${decodedParams}`, {
+    const usersResponse = await fetch(`${URL}/users?${decodeURIComponent(params.toString())}`, {
       headers: {
         Authorization: `Bearer ${session?.accessToken}`,
         // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -72,13 +63,7 @@ const getUserListData = async (params: URLSearchParams) => {
   }
 }
 
-const UsersPage = async ({ searchParams }: Props) => {
-  const t = await getTranslations('users')
-  const params = await searchParams
-
-  console.log('SEARCH PARAMS:', params)
-
-  // Parse search params
+const getRequestParams = (params: SearchParams) => {
   const pageIndex = parseInt(params.page || '0')
   const pageSize = parseInt(params.pageSize || '10')
   const sort = params.sort ? [params.sort].flatMap(entry => entry) : []
@@ -94,9 +79,19 @@ const UsersPage = async ({ searchParams }: Props) => {
     apiParams.set('q', encodeURIComponent(search))
   }
 
+  return { apiParams, pageIndex, pageSize, sort, search }
+}
+
+const UsersPage = async ({ searchParams }: Props) => {
+  const t = await getTranslations('users')
+  const params = await searchParams
+
+  const { apiParams, pageSize, sort, pageIndex, search } = getRequestParams(params)
+
   const { users, totalCount } = await getUserListData(apiParams)
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 
+  // sorting for users table
   const sorting = sort.map((entry: string) => ({ id: entry.split(',')[0], desc: entry.split(',')[1] === 'DESC' }))
 
   return (
