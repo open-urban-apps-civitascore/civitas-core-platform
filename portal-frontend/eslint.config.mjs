@@ -38,7 +38,7 @@ const eslintConfig = [
       browser: true,
       es2022: true,
     },
-    extends: ['next/core-web-vitals', 'plugin:@typescript-eslint/recommended', 'plugin:prettier/recommended'],
+    extends: ['next/core-web-vitals', 'plugin:@typescript-eslint/recommended'],
     parser: '@typescript-eslint/parser',
     parserOptions: {
       ecmaVersion: 2022,
