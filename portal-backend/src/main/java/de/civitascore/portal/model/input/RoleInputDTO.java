@@ -19,5 +19,5 @@ public class RoleInputDTO extends BaseInputDTO {
 
   private List<UUID> permissionIds;
 
-  private Boolean isProtected;
+  private Boolean isProtected = false;
 }

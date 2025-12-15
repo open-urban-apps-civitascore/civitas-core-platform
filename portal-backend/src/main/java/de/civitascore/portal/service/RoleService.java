@@ -6,6 +6,7 @@ import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.repository.RoleRepository;
+import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
@@ -89,7 +90,7 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
   @Override
   protected RoleInputDTO preProcessUpdateInput(RoleInputDTO input, Role existingEntity) {
     if (existingEntity.getIsProtected()) {
-      throw new InvalidInputException(
+      throw new ForbiddenException(
           "role", existingEntity.getId(), "Protected roles cannot be modified");
     }
 
@@ -118,7 +119,7 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
     Role existingEntity = super.preProcessDelete(id);
 
     if (existingEntity != null && existingEntity.getIsProtected()) {
-      throw new InvalidInputException(
+      throw new ForbiddenException(
           "role", existingEntity.getId(), "Protected roles cannot be deleted");
     }
 
