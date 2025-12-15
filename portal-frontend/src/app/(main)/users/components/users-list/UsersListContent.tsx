@@ -46,20 +46,15 @@ export const UsersListContent = ({
     const newSorting = typeof updater === 'function' ? updater(initialSorting) : updater
     const params = new URLSearchParams(window.location.search)
 
-    console.log('PARAMS', params.toString())
-    console.log('NEW SORTING', newSorting)
-
     const existingSorts = params.getAll('sort')
-    console.log('EXISTING SORTS', existingSorts)
     params.delete('sort')
 
     newSorting.forEach(sort => {
       const newSortStr = `${sort.id},${sort.desc ? 'DESC' : 'ASC'}`
-      console.log('NEW SORTING ID', sort.id)
       const existingIndex = existingSorts.findIndex(existingSort => existingSort.startsWith(`${sort.id}`))
-      console.log('EXISTING INDEX', existingIndex)
 
       if (existingIndex >= 0) {
+        // if sort for this id already exists, replace it
         existingSorts[existingIndex] = newSortStr
       } else {
         existingSorts.push(newSortStr)
@@ -112,7 +107,8 @@ export const UsersListContent = ({
         totalPages={totalPages}
         rowSelection={rowSelection}
         setRowSelection={setRowSelection}
-        onRowClick={handleRowClick}
+        // disabled for now as users list is working with api and detail page with json-server
+        // onRowClick={handleRowClick}
         onSortingChange={handleSortingChange}
         onPaginationChange={handlePaginationChange}
         isLoading={false}

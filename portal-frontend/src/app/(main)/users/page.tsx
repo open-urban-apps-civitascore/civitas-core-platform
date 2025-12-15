@@ -75,10 +75,12 @@ const getRequestParams = (params: SearchParams) => {
 
   sort.forEach(s => {
     if (s.startsWith('name,')) {
+      // api only accepts firstName and lastName for sorting
       const descValue = s.split(',')[1]
       apiParams.append('sort', `firstName,${descValue}`)
       apiParams.append('sort', `lastName,${descValue}`)
     } else {
+      // other sort fields can be passed as is
       apiParams.append('sort', s)
     }
   })
@@ -98,7 +100,7 @@ const UsersPage = async ({ searchParams }: Props) => {
   const { users, totalCount } = await getUserListData(apiParams)
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 
-  // sorting for users table
+  // sorting for table as SortingState
   const sorting = sort.map((entry: string) => ({ id: entry.split(',')[0], desc: entry.split(',')[1] === 'DESC' }))
 
   return (
