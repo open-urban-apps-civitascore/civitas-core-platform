@@ -21,6 +21,7 @@ class CustomJwtAuthenticationConverterTest {
     Jwt jwt =
         Jwt.withTokenValue("token")
             .header("alg", "RS256")
+            .claim("sub", "12345678-1234-1234-1234-123456789012")
             .claim("preferred_username", "testuser")
             .claim("email", "test@example.com")
             .claim("given_name", "Test")
