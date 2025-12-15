@@ -73,8 +73,15 @@ const getRequestParams = (params: SearchParams) => {
   apiParams.set('page', String(pageIndex))
   apiParams.set('size', String(pageSize))
 
-  sort.forEach(s => apiParams.append('sort', s))
-
+  sort.forEach(s => {
+    if (s.startsWith('name,')) {
+      const descValue = s.split(',')[1]
+      apiParams.append('sort', `firstName,${descValue}`)
+      apiParams.append('sort', `lastName,${descValue}`)
+    } else {
+      apiParams.append('sort', s)
+    }
+  })
   if (search) {
     apiParams.set('q', encodeURIComponent(search))
   }
