@@ -35,12 +35,15 @@ export const UsersListContent = ({
   const router = useRouter()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
-  const handleRowClick = (row: Row<ListUser>) => {
-    if (row.id) {
-      const params = new URLSearchParams(window.location.search)
-      router.push(`users/${row.id}?${params.toString()}`)
-    }
-  }
+  // handleRowClick is disabled for now as users list is working with api and detail page with json-server
+  // has to be enabled again, when other requests are working with api as well
+
+  // const handleRowClick = (row: Row<ListUser>) => {
+  //   if (row.id) {
+  //     const params = new URLSearchParams(window.location.search)
+  //     router.push(`users/${row.id}?${params.toString()}`)
+  //   }
+  // }
 
   const handleSortingChange = (updater: Updater<SortingState>) => {
     const newSorting = typeof updater === 'function' ? updater(initialSorting) : updater
