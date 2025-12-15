@@ -30,8 +30,6 @@ const getUserListData = async (params: URLSearchParams) => {
     return { users: [], totalCount: 0 }
   }
 
-  console.log('PARAMS: ', params.toString())
-
   try {
     const usersResponse = await fetch(`${URL}/users?${decodeURIComponent(params.toString())}`, {
       headers: {

@@ -83,7 +83,7 @@ export const UserForm = (props: UserFormProps) => {
       value: 'OTHER',
       label: t('info.title.other'),
     },
-  ] as const
+  ]
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(UserFormSchema),
