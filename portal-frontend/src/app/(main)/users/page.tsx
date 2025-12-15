@@ -1,5 +1,6 @@
 import { getTranslations } from 'next-intl/server'
 
+import { auth } from '@/auth'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -8,7 +9,6 @@ import { Item } from '@/types/common'
 import { UserResponse } from '@/types/users'
 import { mapListUsers } from '@/utils/users'
 
-import { auth } from '@/auth'
 import { UsersListContent } from './components/users-list/UsersListContent'
 
 const URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
@@ -22,7 +22,7 @@ type SearchParams = {
   pageSize?: string
   sort?: string
   order?: string
-  search?: string
+  q?: string
 }
 
 type Props = {
@@ -36,9 +36,18 @@ const getUserListData = async (params: URLSearchParams) => {
     console.error('Unauthorized')
     throw new Error('Unauthorized')
   }
-
   try {
-    const usersResponse = await fetch(`${URL}/users?${params.toString()}`, {
+        const queryParts: string[] = []
+    
+    params.forEach((value, key) => {
+      queryParts.push(`${decodeURIComponent(key)}=${decodeURIComponent(value)}`)
+    })
+    
+    const queryString = queryParts.join('&')
+    const decodedParams = decodeURIComponent(params.toString())
+    console.log('FETCHING USERS WITH PARAMS:', decodedParams)
+    console.log('FETCHING USERS WITH REQUEST:', `${URL}/users?${queryString}`)
+    const usersResponse = await fetch(`${URL}/users?${decodedParams}`, {
       headers: {
         Authorization: `Bearer ${session?.accessToken}`,
         // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -47,19 +56,19 @@ const getUserListData = async (params: URLSearchParams) => {
       cache: 'no-store',
     })
 
-    if (!usersResponse) {
+    if (!usersResponse.ok) {
       throw new Error('An error occurred while loading user list data')
     }
 
     const usersData = await usersResponse.json()
 
     const users = mapListUsers(usersData.content as UserResponse[], [])
-    const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
+    const totalCount = Number(usersData.totalElements) || 0
 
     return { users, totalCount }
   } catch (error) {
     console.error(error)
-    throw new Error('An error occurred while loading user list data')
+    return { users: [], totalCount: 0 }
   }
 }
 
@@ -67,32 +76,28 @@ const UsersPage = async ({ searchParams }: Props) => {
   const t = await getTranslations('users')
   const params = await searchParams
 
+  console.log('SEARCH PARAMS:', params)
+
   // Parse search params
   const pageIndex = parseInt(params.page || '0')
   const pageSize = parseInt(params.pageSize || '10')
-  const sort = params.sort || ''
-  const search = params.search || ''
+  const sort = params.sort ? [params.sort].flatMap(entry => entry) : []
+  const search = params.q || ''
 
   const apiParams = new URLSearchParams()
-  apiParams.set('page', String(pageIndex + 1))
+  apiParams.set('page', String(pageIndex))
   apiParams.set('size', String(pageSize))
 
-  if (sort) {
-    apiParams.set('sort', sort)
-  }
+  sort.forEach(s => apiParams.append('sort', s))
 
   if (search) {
-    apiParams.set('q', search)
+    apiParams.set('q', encodeURIComponent(search))
   }
 
   const { users, totalCount } = await getUserListData(apiParams)
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 
-  const sortArr = JSON.parse(sort)
-
-  const sorting = sortArr
-    ? [{ id: sortArr[0].split(',')[0], desc: sortArr[0].split(',')[1] === 'DESC' ? 'desc' : 'asc' }]
-    : []
+  const sorting = sort.map((entry: string) => ({ id: entry.split(',')[0], desc: entry.split(',')[1] === 'DESC' }))
 
   return (
     <PageContainer headerType="onlyTitle" testId="usersPage">

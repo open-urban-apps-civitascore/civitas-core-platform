@@ -6,7 +6,6 @@ import { UserDetails } from '../components/UserDetails'
 
 export const defaultFormUser: UserResponse = {
   id: '',
-  displayName: '',
   firstName: '',
   lastName: '',
   title: 'male' as TitleSchemaType,

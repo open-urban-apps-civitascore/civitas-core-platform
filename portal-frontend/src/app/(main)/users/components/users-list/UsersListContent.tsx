@@ -46,13 +46,26 @@ export const UsersListContent = ({
     const newSorting = typeof updater === 'function' ? updater(initialSorting) : updater
     const params = new URLSearchParams(window.location.search)
 
-    if (newSorting.length > 0) {
-      const sort = [`${newSorting[0].id},${newSorting[0].desc ? 'DESC' : 'ASC'}`]
-      params.set('sort', sort.toString())
-    } else {
-      params.delete('sort')
-    }
+    console.log('PARAMS', params.toString())
+    console.log('NEW SORTING', newSorting)
 
+    const existingSorts = params.getAll('sort')
+    console.log('EXISTING SORTS', existingSorts)
+    params.delete('sort')
+
+    newSorting.forEach(sort => {
+      const newSortStr = `${sort.id},${sort.desc ? 'DESC' : 'ASC'}`
+      console.log('NEW SORTING ID', sort.id)
+      const existingIndex = existingSorts.findIndex(existingSort => existingSort.startsWith(`${sort.id}`))
+      console.log('EXISTING INDEX', existingIndex)
+
+      if (existingIndex >= 0) {
+        existingSorts[existingIndex] = newSortStr
+      } else {
+        existingSorts.push(newSortStr)
+      }
+    })
+    existingSorts.forEach(existingSort => params.append('sort', existingSort))
     router.push(`?${params.toString()}`)
   }
 
@@ -69,15 +82,15 @@ export const UsersListContent = ({
 
   const handleSearchChange = (searchString: string) => {
     const params = new URLSearchParams(window.location.search)
+    const queryParts = Array.from(params.entries()).flatMap(([key, value]) =>
+      key === 'q' ? [] : `${key}=${encodeURIComponent(value)}`,
+    )
 
     if (searchString) {
-      params.set('search', searchString)
-    } else {
-      params.delete('search')
+      queryParts.push(`q=${encodeURIComponent(searchString)}`)
     }
-    params.set('page', '0') // Reset to first page on search
 
-    router.push(`?${params.toString()}`)
+    router.push(`?${queryParts.join('&')}`)
   }
 
   const CustomElement = (
