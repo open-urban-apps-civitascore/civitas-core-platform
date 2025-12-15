@@ -1,6 +1,6 @@
 'use client'
 
-import { PaginationState, Row, RowSelectionState, SortingState, Updater } from '@tanstack/react-table'
+import { PaginationState, RowSelectionState, SortingState, Updater } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'

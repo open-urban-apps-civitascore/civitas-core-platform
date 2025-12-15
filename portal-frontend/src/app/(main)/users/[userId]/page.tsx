@@ -44,7 +44,14 @@ const UserDetailsPage = async (props: PageProps) => {
 
   const userData = await getUserData(userId)
 
-  return <UserDetails testId="userDetailsPage" userData={userData} isEditMode title={userData.displayName} />
+  return (
+    <UserDetails
+      testId="userDetailsPage"
+      userData={userData}
+      isEditMode
+      title={`${userData.firstName} ${userData.lastName}`}
+    />
+  )
 }
 
 export default UserDetailsPage

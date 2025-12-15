@@ -112,7 +112,7 @@
       "subheader": "Persönliche Angaben und allgemeine Informationen.",
       "id": "ID",
       "displayName": "Anzeigename",
-      "title": { "title": "Anrede", "male": "Herr", "female": "Frau" },
+      "title": { "title": "Anrede", "mr": "Herr", "ms": "Frau", "other": "Keine Angabe" },
       "firstName": "Vorname",
       "lastName": "Name",
       "authority": "Amt",

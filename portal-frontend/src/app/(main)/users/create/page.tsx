@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server'
 
-import { TitleSchemaType, UserResponse } from '@/types/users'
+import { TitleType, UserResponse } from '@/types/users'
 
 import { UserDetails } from '../components/UserDetails'
 
@@ -8,7 +8,7 @@ export const defaultFormUser: UserResponse = {
   id: '',
   firstName: '',
   lastName: '',
-  title: 'male' as TitleSchemaType,
+  title: 'male' as TitleType,
   email: '',
   active: false,
   authority: null,

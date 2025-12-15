@@ -22,7 +22,7 @@ export type UserResponse = {
   lastName: string
   email: string
   phone: string
-  title: TitleSchemaType
+  title: TitleType
   authority: UserAuthority | null
   groups: string[]
   active: boolean
@@ -62,7 +62,7 @@ export type GroupUser = {
 
 export const TitleSchema = z.enum(['MR', 'MS', 'OTHER'])
 
-export type TitleSchemaType = z.infer<typeof TitleSchema>
+export type TitleType = z.infer<typeof TitleSchema>
 
 export const PhoneSchema = z.string().superRefine((value, ctx) => {
   const phoneNumber = parsePhoneNumberFromString(value, 'DE')

@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Item } from '@/types/common'
 import { UserResponse } from '@/types/users'
+import { getRequestParams, RequestParams } from '@/utils/getRequestParams'
 import { mapListUsers } from '@/utils/users'
 
 import { UsersListContent } from './components/users-list/UsersListContent'
@@ -15,14 +16,6 @@ const URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
 
 export type UserAuthority = Item & {
   department: Item
-}
-
-export type RequestParams = {
-  page?: string
-  pageSize?: string
-  sort?: string | string[]
-  order?: string
-  q?: string
 }
 
 type Props = {
@@ -36,6 +29,8 @@ const getUserListData = async (params: URLSearchParams) => {
     console.error('Unauthorized')
     return { users: [], totalCount: 0 }
   }
+
+  console.log('PARAMS: ', params.toString())
 
   try {
     const usersResponse = await fetch(`${URL}/users?${decodeURIComponent(params.toString())}`, {
@@ -61,25 +56,6 @@ const getUserListData = async (params: URLSearchParams) => {
     console.error(error)
     return { users: [], totalCount: 0 }
   }
-}
-
-export const getRequestParams = (params: RequestParams) => {
-  const pageIndex = parseInt(params.page || '0')
-  const pageSize = parseInt(params.pageSize || '10')
-  const sort = params.sort ? [params.sort].flatMap(entry => entry) : []
-  const search = params.q || ''
-
-  const apiParams = new URLSearchParams()
-  apiParams.set('page', String(pageIndex))
-  apiParams.set('size', String(pageSize))
-
-  sort.forEach(s => apiParams.append('sort', s))
-
-  if (search) {
-    apiParams.set('q', encodeURIComponent(search))
-  }
-
-  return { apiParams, pageIndex, pageSize, sort, search }
 }
 
 const UsersPage = async ({ searchParams }: Props) => {
