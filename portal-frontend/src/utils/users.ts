@@ -14,7 +14,7 @@ export const mapListUsers = (users: UserResponse[], authorities: Authority[]): L
     const department = authority?.departments.find(department => department.id === user.authority?.department?.id)
     return {
       id: user.id,
-      name: `${user.firstName} ${user.lastName}`,
+      fullName: `${user.firstName} ${user.lastName}`,
       authority: authority?.title ?? '-',
       department: department?.title ?? '-',
       email: user.email,
@@ -32,7 +32,7 @@ export const mapGroupListUsers = (
     const department = authority?.departments.find(department => department.id === user.authority?.department?.id)
     return {
       id: user.id,
-      name: `${user.firstName} ${user.lastName}`,
+      fullName: `${user.firstName} ${user.lastName}`,
       authority: authority?.title ?? '',
       department: department?.title ?? '',
       email: user.email,
@@ -45,7 +45,7 @@ export const mapGoupAssignmentUsers = (users: UserResponse[]): GroupAssignmentUs
   users.map(user => {
     return {
       id: user.id,
-      name: `${user.firstName} ${user.lastName}`,
+      fullName: `${user.firstName} ${user.lastName}`,
       email: user.email,
       isActive: user.active,
     }

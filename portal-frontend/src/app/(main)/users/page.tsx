@@ -17,16 +17,16 @@ export type UserAuthority = Item & {
   department: Item
 }
 
-type SearchParams = {
+export type RequestParams = {
   page?: string
   pageSize?: string
-  sort?: string
+  sort?: string | string[]
   order?: string
   q?: string
 }
 
 type Props = {
-  searchParams: Promise<SearchParams>
+  searchParams: Promise<RequestParams>
 }
 
 const getUserListData = async (params: URLSearchParams) => {
@@ -63,7 +63,7 @@ const getUserListData = async (params: URLSearchParams) => {
   }
 }
 
-const getRequestParams = (params: SearchParams) => {
+export const getRequestParams = (params: RequestParams) => {
   const pageIndex = parseInt(params.page || '0')
   const pageSize = parseInt(params.pageSize || '10')
   const sort = params.sort ? [params.sort].flatMap(entry => entry) : []
@@ -73,17 +73,8 @@ const getRequestParams = (params: SearchParams) => {
   apiParams.set('page', String(pageIndex))
   apiParams.set('size', String(pageSize))
 
-  sort.forEach(s => {
-    if (s.startsWith('name,')) {
-      // api only accepts firstName and lastName for sorting
-      const descValue = s.split(',')[1]
-      apiParams.append('sort', `firstName,${descValue}`)
-      apiParams.append('sort', `lastName,${descValue}`)
-    } else {
-      // other sort fields can be passed as is
-      apiParams.append('sort', s)
-    }
-  })
+  sort.forEach(s => apiParams.append('sort', s))
+
   if (search) {
     apiParams.set('q', encodeURIComponent(search))
   }

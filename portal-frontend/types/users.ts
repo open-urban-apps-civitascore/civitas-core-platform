@@ -34,7 +34,7 @@ export type CreateUserData = Omit<UpdateUserData, 'id'>
 
 export type ListUser = {
   id: string
-  name: string
+  fullName: string
   authority: string
   department: string
   email: string
@@ -47,14 +47,14 @@ export type GroupListUser = Omit<ListUser, 'roles'> & {
 
 export type GroupAssignmentUser = {
   id: string
-  name: string
+  fullName: string
   email: string
   isActive: boolean
 }
 
 export type GroupUser = {
   id: string
-  name: string
+  fullName: string
   email: string
   authority: UserAuthority | null
   isActive: boolean
