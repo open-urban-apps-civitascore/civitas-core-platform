@@ -50,7 +50,7 @@ dependency-prune-config-adapter:
     - cd config-adapter
     - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false
   allow_failure:
-    exit-codes:
+    exit_codes:
       - 1
 
 test-config-adapter:
