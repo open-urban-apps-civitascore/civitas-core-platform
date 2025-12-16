@@ -15,6 +15,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Formula;
@@ -60,6 +61,7 @@ public class User extends BaseEntity {
   @ManyToMany(fetch = FetchType.LAZY, mappedBy = "members")
   private Set<Group> groups = new HashSet<>();
 
+  @Setter(AccessLevel.NONE)
   @Formula("first_name || ' ' || last_name")
   private String fullName;
 }
