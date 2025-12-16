@@ -69,7 +69,8 @@ test-backend:
       - .m2/repository
   script:
     - cd portal-backend
-    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report
+    # Unit tests use Maven cache, no need for published artifacts yet
+    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report -s ci_settings.xml
     # To print coverage, picked up by coverage regex
     - cat target/site/jacoco/index.html| grep -o '<tfoot>.*</tfoot>'
   coverage: '/Total.*?([0-9]{1,3})%/'
@@ -114,7 +115,15 @@ build-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: build
-  needs: ['lint-backend', 'dependency-prune-backend', 'test-backend', 'secret_detection', 'gitlab-advanced-sast', 'dependency-scanning']
+  needs:
+    - job: 'lint-backend'
+    - job: 'dependency-prune-backend'
+    - job: 'test-backend'
+    - job: 'secret_detection'
+    - job: 'gitlab-advanced-sast'
+    - job: 'dependency-scanning'
+    - job: 'publish-config-adapter'
+      optional: true  # Optional because config-adapter might not have changed
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -126,7 +135,9 @@ build-backend:
       - .m2/repository
   script:
     - cd portal-backend
-    - mvn package -DskipTests
+    # Use GitLab Maven repository for config-adapter dependencies
+    - |
+      mvn package -DskipTests -s ci_settings.xml
   artifacts:
     when: on_success
     paths:
