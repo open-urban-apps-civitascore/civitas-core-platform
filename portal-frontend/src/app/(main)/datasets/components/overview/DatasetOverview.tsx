@@ -24,9 +24,10 @@ interface DatasetOverviewProps {
   groups: string[]
   dataspaces: SelectOption[]
   isEditMode: boolean
+  testId?: string
 }
 export const DatasetOverview = (props: DatasetOverviewProps) => {
-  const { dataset, dataspaces, datasources, hasMetadata, apis, groups, persistence, isEditMode } = props
+  const { dataset, dataspaces, datasources, hasMetadata, apis, groups, persistence, isEditMode, testId } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
 
@@ -53,7 +54,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     {
       title: t('overview.completion.accessPermissions.title'),
       isCompleted: groups.length > 0,
-      buttons: [{ text: t('overview.completion.accessPermissions.button'), routeParam: 'usagePermissions' }],
+      buttons: [{ text: t('overview.completion.accessPermissions.button'), routeParam: 'accessPermissions' }],
       content: groups.length > 0 ? getList(t('overview.completion.accessPermissions.userGroups'), groups) : undefined,
     },
     {
@@ -99,7 +100,11 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   }
 
   return (
-    <PageContainer headerType={isEditMode ? 'onlyTitle' : 'withSubTabsOrSubtitle'} className="overflow-hidden">
+    <PageContainer
+      testId={testId}
+      headerType={isEditMode ? 'onlyTitle' : 'withSubTabsOrSubtitle'}
+      className="overflow-hidden"
+    >
       <PageHeader
         title={isEditMode ? dataset.name : t('overview.title')}
         subtitle={isEditMode ? undefined : t('overview.subtitle')}
@@ -107,16 +112,18 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       <PageBackground className="overflow-y-auto">
         <ContentCard className={cn('h-full overflow-auto')}>
           <BaseInfoForm dataset={dataset} dataspaces={dataspaces} isEditMode={isEditMode} />
-          <div className="mt-12">
-            {completionSteps.map((step, index) => (
-              <DetailsFieldContainer
-                key={step.title}
-                className={cn(index === completionSteps.length - 1 && 'border-b-0')}
-              >
-                <CompletionStep step={step} datasetId={dataset.id} disabled={!isEditMode} />
-              </DetailsFieldContainer>
-            ))}
-          </div>
+          {isEditMode && (
+            <div className="max-w-300 mt-12">
+              {completionSteps.map((step, index) => (
+                <DetailsFieldContainer
+                  key={step.title}
+                  className={cn(index === completionSteps.length - 1 && 'border-b-0')}
+                >
+                  <CompletionStep step={step} datasetId={dataset.id} />
+                </DetailsFieldContainer>
+              ))}
+            </div>
+          )}
         </ContentCard>
       </PageBackground>
     </PageContainer>

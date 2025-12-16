@@ -7,3 +7,11 @@ export const pickSelectOption = async (page: Page, fieldName: string, option: 'P
   const selectedOption = page.getByTestId(`${fieldName}SelectItem${option}`)
   await selectedOption.click()
 }
+
+export const getSelectOptions = async (page: Page, fieldName: string) => {
+  const selectTrigger = page.getByTestId(`${fieldName}SelectTrigger`)
+  await selectTrigger.click()
+
+  const selectedOptions = page.getByRole('option')
+  return selectedOptions
+}

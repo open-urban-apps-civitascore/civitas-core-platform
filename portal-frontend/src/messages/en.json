@@ -5,6 +5,7 @@
     "noResults": "No results found.",
     "noData": "No Data",
     "loading": "Loading...",
+    "form": "Form",
     "actions": {
       "submit": "Save",
       "cancel": "Cancel",

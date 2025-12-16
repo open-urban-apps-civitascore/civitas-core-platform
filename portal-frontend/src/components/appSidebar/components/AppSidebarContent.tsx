@@ -30,7 +30,7 @@ export const AppSidebarContent = async () => {
         <SidebarMenu>
           {appSidebarNavItems.map(item => (
             <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
-              <SidebarMenuItem>
+              <SidebarMenuItem data-testid={`sidebarMenuItem-${item.title}`}>
                 <SidebarMenuButton asChild tooltip={getMenuItemTitle(item)}>
                   <a href={item.url}>
                     <item.icon />
