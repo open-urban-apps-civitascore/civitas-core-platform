@@ -14,7 +14,12 @@ import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.ConfigValue;
 import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.idm.ClientConfig;
+import com.civitas.configadapter.model.idm.RealmConfig;
+import com.civitas.configadapter.model.idm.RoleConfig;
+import com.civitas.configadapter.model.idm.UserConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
@@ -100,8 +105,18 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         targetResource);
 
     try {
-      // Parse the target resource to determine resource type and identifiers
-      ResourceInfo resourceInfo = parseTargetResource(targetResource);
+      // Use semantic fields: targetComponent is the resource type, targetResource is the realm
+      String realm = targetResource;
+      String resourceType = targetComponent;
+      String resourceId = extractResourceId(event.payload().config().value());
+
+      ResourceInfo resourceInfo = new ResourceInfo(resourceType, realm, resourceId);
+
+      logger.debug(
+          "Resource info - Type: {}, Realm: {}, ID: {}",
+          resourceInfo.type,
+          resourceInfo.realm,
+          resourceInfo.id);
 
       switch (operation) {
         case CREATE -> handleCreate(resourceInfo, event);
@@ -120,45 +135,37 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   }
 
   /**
-   * Parses the targetResource string to extract resource type, realm, and resource ID. Expected
-   * format: "realms/{realm}/users/{userId}" or "realms/{realm}" or "users/{userId}"
+   * Extracts the resource ID from the config value for UPDATE/DELETE operations. For CREATE
+   * operations, the ID may be null and will be assigned by Keycloak.
+   *
+   * <p>Different Keycloak resources use different identifiers:
+   *
+   * <ul>
+   *   <li>Users/Clients: UUID (e.g., "06702f15-1439-4958-b069-2ac5716c7a5c")
+   *   <li>Roles: Name (e.g., "admin") - roles are accessed by name in Keycloak API
+   *   <li>Realms: Realm name (e.g., "civitas-core")
+   * </ul>
+   *
+   * @param configValue the configuration value containing the resource data
+   * @return the resource ID if present, null otherwise
    */
-  private ResourceInfo parseTargetResource(String targetResource) {
-    String[] parts = targetResource.split("/");
-
-    String realm = null;
-    String resourceType = null;
-    String resourceId = null;
-
-    for (int i = 0; i < parts.length; i++) {
-      if ("realms".equals(parts[i]) && i + 1 < parts.length) {
-        realm = parts[i + 1];
-      } else if ("users".equals(parts[i])) {
-        resourceType = "user";
-        if (i + 1 < parts.length) {
-          resourceId = parts[i + 1];
-        }
-      } else if ("clients".equals(parts[i])) {
-        resourceType = "client";
-        if (i + 1 < parts.length) {
-          resourceId = parts[i + 1];
-        }
-      } else if ("roles".equals(parts[i])) {
-        resourceType = "role";
-        if (i + 1 < parts.length) {
-          resourceId = parts[i + 1];
-        }
-      }
+  private String extractResourceId(ConfigValue configValue) {
+    if (configValue == null) {
+      return null;
     }
 
-    // If only "realms/{realm}" then it's a realm operation
-    if (resourceType == null && realm != null) {
-      resourceType = "realm";
-      resourceId = realm;
+    // Extract ID from IDM config values (UserConfig, ClientConfig, RoleConfig, RealmConfig)
+    if (configValue instanceof UserConfig userConfig) {
+      return userConfig.getId(); // UUID for users
+    } else if (configValue instanceof ClientConfig clientConfig) {
+      return clientConfig.getId(); // UUID for clients
+    } else if (configValue instanceof RoleConfig roleConfig) {
+      return roleConfig.getName(); // NAME for roles (roles are accessed by name, not UUID)
+    } else if (configValue instanceof RealmConfig realmConfig) {
+      return realmConfig.getRealm(); // Realm name
     }
 
-    logger.debug("Parsed resource - Type: {}, Realm: {}, ID: {}", resourceType, realm, resourceId);
-    return new ResourceInfo(resourceType, realm, resourceId);
+    return null;
   }
 
   private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event) {
@@ -372,8 +379,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       AssignRealmRolesToUser(rolesToAssignNames, realmResource, userId);
       AssignClientRolesToUser(clientRolesMap, realmResource, userId);
 
-      logger.info("Created user: {} in realm: {}", userRep.getUsername(), realm);
-      publishSuccessResult(event, "User created successfully", userRep.getUsername());
+      logger.info("Created user: {} (ID: {}) in realm: {}", userRep.getUsername(), userId, realm);
+      publishSuccessResult(event, "User created successfully", userId);
 
     } catch (Exception e) {
       logger.error("Failed to create user in realm: {}", realm, e);
