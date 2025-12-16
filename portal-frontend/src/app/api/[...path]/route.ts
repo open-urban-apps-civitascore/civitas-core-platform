@@ -54,6 +54,11 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
       })
     }
 
+    // Remove encoding headers for JSON responses
+    responseHeaders.delete('content-encoding')
+    responseHeaders.delete('content-length')
+    responseHeaders.delete('transfer-encoding')
+
     // JSON responses
     const data = await response.json()
     return NextResponse.json(data, {
