@@ -18,7 +18,7 @@ import { RoleTemplateSelect } from './RoleTemplateSelect'
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 type PermissionsTabProps = {
-  updatePermissions: (permissionIds: string[]) => void
+  onPermissionUpdate: (permissionIds: string[]) => void
   currentSelectedPermissionIds?: Permission['id'][]
   roleType: string
   hasPermissionsTabBeenSaved: boolean
@@ -36,7 +36,7 @@ const mapPermissions = (permissionsInput: Permission[]): PermissionItem[] => {
 
 export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   const {
-    updatePermissions,
+    onPermissionUpdate,
     currentSelectedPermissionIds,
     roleType,
     hasPermissionsTabBeenSaved,
@@ -194,7 +194,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
           {!isDefaultRole && (
             <ActionButtons
               confirmButtonType="button"
-              onConfirmClick={() => updatePermissions(checkedPermissionItems.map(item => item.value))}
+              onConfirmClick={() => onPermissionUpdate(checkedPermissionItems.map(item => item.value))}
               onCancelClick={() => router.push(`/roles?_tab=${roleType || ROLE_TYPES.SYSTEM}`)}
               isConfirmButtonDisabled={isLoading || !arePermissionsTouched || hasPermissionsTabBeenSaved}
               isCancelButtonDisabled={isLoading}
