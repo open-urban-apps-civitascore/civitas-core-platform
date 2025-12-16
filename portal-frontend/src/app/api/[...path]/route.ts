@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
-const BACKEND_URL = 'http://localhost:3001'
-
 interface RouteContext {
   params: Promise<{ path: string[] }>
 }
@@ -25,7 +23,7 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     const { path } = await context.params
     const pathString = path.join('/')
     const searchParams = request.nextUrl.searchParams.toString()
-    const url = `${BACKEND_URL}/${pathString}${searchParams ? `?${searchParams}` : ''}`
+    const url = `${process.env.API_BASE_URL}:${process.env.API_PORT}/${pathString}${searchParams ? `?${searchParams}` : ''}`
 
     const headers: HeadersInit = {
       Authorization: `Bearer ${token.access_token}`,
