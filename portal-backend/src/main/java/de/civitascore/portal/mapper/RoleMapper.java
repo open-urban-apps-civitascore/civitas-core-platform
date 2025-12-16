@@ -34,7 +34,7 @@ public interface RoleMapper extends DtoMapper<RoleInputDTO, RoleOutputDTO, Role>
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "permissions", ignore = true)
-  @Mapping(target = "isProtected", ignore = true)
+  @Mapping(target = "isReadonly", ignore = true)
   @Override
   void updateEntity(@MappingTarget Role entity, RoleInputDTO input);
 }

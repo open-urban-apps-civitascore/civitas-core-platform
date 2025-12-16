@@ -15,7 +15,7 @@ public class RoleOutputDTO extends BaseOutputDTO {
   private String description;
   private RoleType roleType;
   private List<PermissionSummaryDTO> permissions;
-  private Boolean isProtected;
+  private Boolean isReadonly;
   @Nullable private UserSummaryDTO modifiedBy;
   private Long groupCount;
   private Long userCount;

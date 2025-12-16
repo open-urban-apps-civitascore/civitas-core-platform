@@ -89,9 +89,9 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
 
   @Override
   protected RoleInputDTO preProcessUpdateInput(RoleInputDTO input, Role existingEntity) {
-    if (existingEntity.getIsProtected()) {
+    if (existingEntity.getIsReadonly()) {
       throw new ForbiddenException(
-          "role", existingEntity.getId(), "Protected roles cannot be modified");
+          "role", existingEntity.getId(), "Readonly roles cannot be modified");
     }
 
     try {
@@ -118,9 +118,9 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
   protected Role preProcessDelete(UUID id) {
     Role existingEntity = super.preProcessDelete(id);
 
-    if (existingEntity != null && existingEntity.getIsProtected()) {
+    if (existingEntity != null && existingEntity.getIsReadonly()) {
       throw new ForbiddenException(
-          "role", existingEntity.getId(), "Protected roles cannot be deleted");
+          "role", existingEntity.getId(), "Readonly roles cannot be deleted");
     }
 
     return existingEntity;
