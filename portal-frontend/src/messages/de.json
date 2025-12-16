@@ -59,11 +59,10 @@
       "name": "Name",
       "dataSpace": "Datenraum",
       "department": "Fachbereich",
-      "creator": "Ansprechperson",
+      "contact": "Ansprechperson",
       "lastUpdated": "Zuletzt aktualisiert",
-      "status": "Zugriffsstatus",
-      "releaseProcess": "Freigabeprozess",
-      "distribution": "Distribution"
+      "access": "Zugriff",
+      "status": "Status"
     },
     "tableValues": {
       "status": {

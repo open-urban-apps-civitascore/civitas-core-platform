@@ -3,11 +3,12 @@ import { useLocale, useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { DatasetTableData } from '@/types/datasets'
 import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
+import { LockKeyhole, LockOpen } from 'lucide-react'
 
 interface DatasetsTableProps extends TableProps<DatasetTableData> {
   datasets: DatasetTableData[]
@@ -40,63 +41,66 @@ const DatasetsTable = (props: DatasetsTableProps) => {
       cell: info => info.getValue(),
       meta: {
         style: {
-          width: '22.22%',
-          minWidth: '200px',
+          minWidth: '250px',
         },
       },
     }),
     columnHelper.accessor('dataspace', {
       header: t('tableHeaders.dataSpace'),
-      cell: info => info.getValue(),
+      cell: info => info.getValue()?.name || '-',
+      meta: {
+        style: {
+          minWidth: '150px',
+        },
+      },
     }),
-    columnHelper.accessor('department', {
-      header: t('tableHeaders.department'),
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor('creator', {
-      header: t('tableHeaders.creator'),
-      cell: info => info.getValue(),
+    columnHelper.accessor('contact', {
+      header: t('tableHeaders.contact'),
+      cell: info => `${info.getValue().firstName} ${info.getValue().lastName}`,
+      meta: {
+        style: {
+          minWidth: '100px',
+        },
+      },
     }),
     columnHelper.accessor('lastUpdated', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.lastUpdated')} />,
       cell: info => formatDate(info.getValue(), locale),
+      meta: {
+        style: {
+          width: '150px',
+        },
+      },
+    }),
+    columnHelper.accessor('access', {
+      header: t('tableHeaders.access'),
+      cell: info => (
+        <div
+          className={cn(
+            'flex justify-center items-center rounded-md w-9 h-9 border-solid border-1 border-border',
+            info.getValue() ? 'bg-primary/20' : 'bg-secondary',
+          )}
+        >
+          {info.getValue() ? (
+            <LockOpen className="h-4 w-4 text-primary" />
+          ) : (
+            <LockKeyhole className="h-4 w-4 text-muted-foreground" />
+          )}
+        </div>
+      ),
+      meta: {
+        style: {
+          width: '100px',
+        },
+      },
     }),
     columnHelper.accessor('status', {
       header: t('tableHeaders.status'),
-      cell: info => {
-        const value = info.getValue()
-        switch (value) {
-          case 'open':
-            return t(`tableValues.status.${value}`)
-          case 'closed':
-            return `🔒 ${t(`tableValues.status.${value}`)}`
-          default:
-            return ''
-        }
-      },
-    }),
-    columnHelper.accessor('releaseProcess', {
-      header: t('tableHeaders.releaseProcess'),
-      cell: '',
-    }),
-    columnHelper.accessor('distribution', {
-      header: t('tableHeaders.distribution'),
-      cell: info => {
-        const value = info.getValue()
-        if (value) {
-          return (
-            <>
-              <Badge className="mr-3" variant="secondary">
-                {value.format}
-              </Badge>
-              <a href={value.url} target="_blank" className="underline">
-                {value.title}
-              </a>
-            </>
-          )
-        } else {
-          return ''
-        }
+      cell: info => info.getValue(),
+      meta: {
+        style: {
+          width: '150px',
+        },
       },
     }),
   ]

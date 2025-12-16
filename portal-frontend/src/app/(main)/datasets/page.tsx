@@ -17,34 +17,26 @@ import { DatasetResponse, DatasetTableData } from '@/types/datasets'
 
 import DatasetsTable from './components/DatasetsTable'
 
-export const mapDatasetsToListData = (datasets: DatasetResponse[]): DatasetTableData[] => {
-  const datasetsMap = datasets.flatMap(dataset => {
-    try {
-      const data = {
-        id: dataset.id,
-        name: dataset.name,
-        dataspace: dataset.dataspace?.title || '',
-        department: dataset.department?.title || '',
-        creator: dataset.creator.map(creator => `${creator.firstName} ${creator.lastName}`),
-        lastUpdated: dataset.lastUpdated,
-        status: dataset.status,
-        releaseProcess: null,
-        distribution: dataset.distribution
-          ? {
-              format: dataset.distribution?.format,
-              title: dataset.distribution?.title,
-              url: dataset.distribution?.url,
-            }
-          : null,
-      }
-      return data
-    } catch (error) {
-      console.error(dataset, error)
-      return []
-    }
-  })
-  return datasetsMap
-}
+// export const mapDatasetsToListData = (datasets: DatasetResponse[]): DatasetTableData[] => {
+//   const datasetsMap = datasets.flatMap(dataset => {
+//     try {
+//       const data = {
+//         id: dataset.id,
+//         name: dataset.name,
+//         dataspace: dataset.dataspace?.name || '',
+//         contact: `${dataset.contact.firstName} ${dataset.contact.lastName}`,
+//         lastUpdated: dataset.lastUpdated,
+//         status: dataset.status,
+//         access: dataset.access,
+//       }
+//       return data
+//     } catch (error) {
+//       console.error('An error occurred while transforming dataset data: ', dataset, error)
+//       return []
+//     }
+//   })
+//   return datasetsMap
+// }
 
 const DatasetsPage = () => {
   const t = useTranslations('datasets')
@@ -77,8 +69,8 @@ const DatasetsPage = () => {
           throw new Error('An error occurred while loading data')
         }
         const datasetsData: DatasetResponse[] = await datasetsResponse.json()
-        const datasets = mapDatasetsToListData(datasetsData)
-        setDatasets(datasets)
+        // const datasets = mapDatasetsToListData(datasetsData)
+        setDatasets(datasetsData)
         const totalCount = Number(datasetsResponse.headers.get('X-Total-Count')) || 0
         if (rowCount !== totalCount) {
           setRowCount(totalCount)
