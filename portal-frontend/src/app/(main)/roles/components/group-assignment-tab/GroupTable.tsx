@@ -103,6 +103,7 @@ export const GroupTable = (props: GroupTableProps) => {
       totalPages={totalPages}
       isLoading={isLoading}
       onRowClick={onRowClick}
+      isRowClickable={row => !row.original.parent}
     />
   )
 }
