@@ -42,13 +42,24 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
 
     const response = await fetch(url, fetchOptions)
 
+    // Forward response headers from backend
+    const responseHeaders = new Headers(response.headers)
+
+    // Non-JSON responses, stream the body directly
     const contentType = response.headers.get('content-type')
     if (!contentType || !contentType.includes('application/json')) {
-      return new NextResponse(null, { status: response.status })
+      return new NextResponse(response.body, {
+        status: response.status,
+        headers: responseHeaders,
+      })
     }
 
+    // JSON responses
     const data = await response.json()
-    return NextResponse.json(data, { status: response.status })
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: responseHeaders,
+    })
   } catch (error) {
     console.error('Proxy error:', error)
     return NextResponse.json({ error: 'Proxy error' }, { status: 500 })
