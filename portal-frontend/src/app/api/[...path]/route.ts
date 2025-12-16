@@ -25,20 +25,19 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     const searchParams = request.nextUrl.searchParams.toString()
     const url = `${process.env.API_BASE_URL}:${process.env.API_PORT}/${pathString}${searchParams ? `?${searchParams}` : ''}`
 
-    const headers: HeadersInit = {
-      Authorization: `Bearer ${token.access_token}`,
-      /* eslint-disable @typescript-eslint/naming-convention */
-      'Content-Type': 'application/json',
-    }
+    // Forward all original headers from the request
+    const headers = new Headers(request.headers)
+
+    headers.set('Authorization', `Bearer ${token.access_token}`)
+
+    // Remove host header to avoid conflicts with backend
+    headers.delete('host')
 
     const fetchOptions: RequestInit = { method, headers }
 
     // Include body for methods that support it
     if (['POST', 'PUT', 'PATCH'].includes(method)) {
-      const body = await request.text()
-      if (body) {
-        fetchOptions.body = body
-      }
+      fetchOptions.body = await request.arrayBuffer()
     }
 
     const response = await fetch(url, fetchOptions)
