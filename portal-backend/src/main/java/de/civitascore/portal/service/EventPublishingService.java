@@ -1,27 +1,28 @@
 package de.civitascore.portal.service;
 
+import com.civitas.configadapter.Topics;
+import com.civitas.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.ConfigValue;
+import com.civitas.configadapter.model.Operation;
 import de.civitascore.portal.model.input.BaseInputDTO;
-import de.civitascore.portal.model.output.event.DomainEvent;
-import de.civitascore.portal.model.output.event.EventMetadata;
-import de.civitascore.portal.model.output.event.TopicResolver;
-import de.civitascore.portal.service.event.SynchronousEventPublisher;
-import de.civitascore.portal.service.event.SynchronousEventPublisher.ConfigAdapterResult;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
-import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
 public abstract class EventPublishingService<T, I extends BaseInputDTO> extends BaseService<T, I> {
 
-  protected final SynchronousEventPublisher syncEventPublisher;
-  protected final TopicResolver topicResolver;
+  protected final ConfigEventPublisherService configEventPublisher;
 
-  protected EventPublishingService(
-      SynchronousEventPublisher syncEventPublisher, TopicResolver topicResolver) {
-    this.syncEventPublisher = syncEventPublisher;
-    this.topicResolver = topicResolver;
+  @Value("${event.config-adapter-timeout-seconds:10}")
+  private int configAdapterTimeoutSeconds;
+
+  protected EventPublishingService(ConfigEventPublisherService configEventPublisher) {
+    this.configEventPublisher = configEventPublisher;
   }
 
   @Override
@@ -34,9 +35,9 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
 
     entity = getRepository().saveAndFlush(entity);
 
-    ConfigAdapterResult result = preValidateWithExternalSystem(entity, "create");
+    ConfigResultEvent result = preValidateWithExternalSystem(entity, "create");
 
-    if (result != null && result.resourceId() != null) {
+    if (result != null && result.resourceId() != null && !result.resourceId().isBlank()) {
       updateExternalId(entity, result.resourceId());
       entity = getRepository().saveAndFlush(entity);
     }
@@ -57,9 +58,9 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
 
     entity = getRepository().saveAndFlush(entity);
 
-    ConfigAdapterResult result = preValidateWithExternalSystem(entity, "update");
+    ConfigResultEvent result = preValidateWithExternalSystem(entity, "update");
 
-    if (result != null && result.resourceId() != null) {
+    if (result != null && result.resourceId() != null && !result.resourceId().isBlank()) {
       updateExternalId(entity, result.resourceId());
       entity = getRepository().saveAndFlush(entity);
     }
@@ -81,18 +82,25 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
     postDelete(entity);
   }
 
-  protected ConfigAdapterResult preValidateWithExternalSystem(T entity, String operation) {
+  protected ConfigResultEvent preValidateWithExternalSystem(T entity, String operation) {
     try {
-      String aggregateType = getAggregateType();
-      String topic = topicResolver.resolve(aggregateType, operation);
-      DomainEvent<?> event = createDomainEvent(entity, operation);
+      Topics topic = resolveTopic(operation);
+      String targetComponent = getTargetComponent();
+      String targetResource = getRealm(entity);
+      Operation configOperation = resolveOperation(operation);
+      String configPath = getConfigPath();
+      ConfigValue configValue = toConfigValue(entity);
 
-      ConfigAdapterResult result = syncEventPublisher.publishAndWaitForResult(topic, event);
+      CompletableFuture<ConfigResultEvent> futureResult =
+          configEventPublisher.publishConfigEvent(
+              topic, targetComponent, targetResource, configOperation, configPath, configValue);
 
-      if (!result.isSuccess()) {
+      ConfigResultEvent result = futureResult.get(configAdapterTimeoutSeconds, TimeUnit.SECONDS);
+
+      if (result != null && result.status() == ConfigResultEvent.Status.FAILURE) {
         throw new ExternalSystemRejectionException(
             String.format(
-                "External system rejected %s: %s - %s",
+                "Config Adapter rejected %s: %s - %s",
                 operation, result.errorCode(), result.message()));
       }
 
@@ -100,41 +108,38 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
 
     } catch (TimeoutException e) {
       throw new ExternalSystemTimeoutException(
-          "External system unavailable - cannot complete operation", e);
+          "Config Adapter unavailable - cannot complete operation (timeout)", e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new ExternalSystemTimeoutException("Config Adapter request was interrupted", e);
+    } catch (Exception e) {
+      if (e instanceof ExternalSystemRejectionException
+          || e instanceof ExternalSystemTimeoutException) {
+        throw (RuntimeException) e;
+      }
+      throw new ExternalSystemRejectionException(
+          "Failed to validate with Config Adapter: " + e.getMessage());
     }
   }
 
-  protected DomainEvent<?> createDomainEvent(T entity, String operation) {
-    UUID entityId = getEntityId(entity);
-
-    if (entityId == null) {
-      throw new IllegalStateException("Cannot create domain event: entity ID is null");
-    }
-
-    Object kafkaRepresentation = toKafkaRepresentation(entity);
-    String realm = getRealm(entity);
-    String aggregateType = getAggregateType();
-
-    EventMetadata metadata = new EventMetadata(realm, null);
-
-    return DomainEvent.builder()
-        .eventId(UUID.randomUUID())
-        .eventType(String.format("%s.%s", aggregateType.toLowerCase(), operation))
-        .entityId(entityId)
-        .aggregateType(aggregateType)
-        .operation(operation)
-        .payload(kafkaRepresentation)
-        .metadata(metadata)
-        .schemaVersion(1)
-        .timestamp(Instant.now())
-        .build();
+  private Operation resolveOperation(String operation) {
+    return switch (operation.toLowerCase()) {
+      case "create" -> Operation.CREATE;
+      case "update" -> Operation.UPDATE;
+      case "delete" -> Operation.DELETE;
+      default -> throw new IllegalArgumentException("Unknown operation: " + operation);
+    };
   }
 
-  protected abstract String getAggregateType();
+  protected abstract Topics resolveTopic(String operation);
+
+  protected abstract String getTargetComponent();
 
   protected abstract String getRealm(T entity);
 
-  protected abstract Object toKafkaRepresentation(T entity);
+  protected abstract String getConfigPath();
+
+  protected abstract ConfigValue toConfigValue(T entity);
 
   protected abstract UUID getEntityId(T entity);
 

@@ -16,8 +16,10 @@ spring:
         format_sql: true
 
   # Kafka Test Configuration
+  # Note: spring.embedded.kafka.brokers is only available in tests with @EmbeddedKafka
+  # For other tests, this defaults to localhost:9092 (but won't be used if kafka.enabled=false)
   kafka:
-    bootstrap-servers: ${spring.embedded.kafka.brokers}
+    bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -28,8 +30,15 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
-# Kafka Topics Configuration
+# Kafka Configuration for CloudEventPublisher
+# Only enabled in tests with @EmbeddedKafka (EventPublishingIntegrationTest)
 kafka:
+  enabled: false  # Default to disabled for tests without embedded Kafka
+  bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
+  acks: all
+  retries: 3
+  result-topic: core.civitas.config.results
+  result-timeout-ms: 10000
   topic-prefix: # Explicitly empty - no prefix for test environment
   topics:
     config-adapter-result: civitas.config.result
@@ -40,10 +49,16 @@ event:
   config-adapter-timeout-seconds: 15
   target-component: keycloak
 
+# Keycloak Configuration
+keycloak:
+  target-realm: "civitas-core"  # Target realm for user/group/role management
+
 logging:
   level:
     de.civitascore: INFO
     org.springframework.security: INFO
     org.testcontainers: INFO
     org.apache.kafka: WARN
+    kafka: WARN
+    org.hibernate: WARN
 

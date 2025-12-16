@@ -40,6 +40,7 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
+        <config-adapter.version>1.0.0-SNAPSHOT</config-adapter.version>
     </properties>
 
     <dependencyManagement>
@@ -49,6 +50,12 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-compress</artifactId>
                 <version>${commons-compress.version}</version>
+            </dependency>
+            <!-- Required by commons-compress for Testcontainers -->
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.18.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -154,6 +161,17 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-admin-client</artifactId>
+            <version>26.0.7</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
@@ -195,6 +213,34 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Config adapter -->
+        <dependency>
+            <groupId>com.civitas</groupId>
+            <artifactId>config-adapter-api</artifactId>
+            <version>${config-adapter.version}</version>
+        </dependency>
+
+        <!-- Config adapter - Kafka event handler -->
+        <dependency>
+            <groupId>com.civitas</groupId>
+            <artifactId>event-handler-kafka</artifactId>
+            <version>${config-adapter.version}</version>
+        </dependency>
+
+        <!-- Config adapter - Keycloak adapter for integration tests -->
+        <dependency>
+            <groupId>com.civitas</groupId>
+            <artifactId>config-adapter-keycloak</artifactId>
+            <version>${config-adapter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.civitas</groupId>
+            <artifactId>config-adapter-configuration</artifactId>
+            <version>${config-adapter.version}</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -231,7 +277,7 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <!-- Build Helper for testIntegration directory - only for integration-test phase -->
+            <!-- Build Helper for testIntegration directory -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
@@ -239,7 +285,7 @@
                 <executions>
                     <execution>
                         <id>add-integration-test-sources</id>
-                        <phase>pre-integration-test</phase>
+                        <phase>generate-test-sources</phase>
                         <goals>
                             <goal>add-test-source</goal>
                         </goals>
@@ -251,7 +297,7 @@
                     </execution>
                     <execution>
                         <id>add-integration-test-resources</id>
-                        <phase>pre-integration-test</phase>
+                        <phase>generate-test-resources</phase>
                         <goals>
                             <goal>add-test-resource</goal>
                         </goals>
@@ -299,11 +345,12 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire.version}</version>
                 <configuration>
-                    <!-- Only run tests from src/test/java -->
-                    <testSourceDirectory>${project.basedir}/src/test/java</testSourceDirectory>
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
+                    <excludes>
+                        <exclude>**/*IntegrationTest.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
 

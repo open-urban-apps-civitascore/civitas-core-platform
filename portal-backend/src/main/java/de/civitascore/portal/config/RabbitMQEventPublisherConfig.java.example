@@ -1,0 +1,96 @@
+package de.civitascore.portal.config;
+
+import de.civitascore.portal.messaging.CloudEventPublisher;
+import de.civitascore.portal.messaging.rabbitmq.RabbitMQCloudEventPublisher;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.validation.annotation.Validated;
+
+/**
+ * Example RabbitMQ Configuration for CloudEvent publishing.
+ *
+ * <p>To use this configuration:
+ *
+ * <ol>
+ *   <li>Add dependency to pom.xml:
+ *       <pre>{@code
+ * <dependency>
+ *     <groupId>org.springframework.boot</groupId>
+ *     <artifactId>spring-boot-starter-amqp</artifactId>
+ * </dependency>
+ * }</pre>
+ *   <li>Rename this file to RabbitMQEventPublisherConfig.java (remove .example)
+ *   <li>Add configuration to application-local.yaml:
+ *       <pre>{@code
+ * rabbitmq:
+ *   enabled: true
+ *   host: localhost
+ *   port: 5672
+ *   username: guest
+ *   password: guest
+ *   exchange: civitas.config.events
+ *   virtual-host: /
+ * }</pre>
+ *   <li>Disable Kafka if needed: kafka.enabled=false
+ * </ol>
+ */
+@Configuration
+@Slf4j
+public class RabbitMQEventPublisherConfig {
+
+  /* Uncomment when spring-boot-starter-amqp is added:
+
+  @Bean
+  @ConditionalOnProperty(name = "rabbitmq.enabled", havingValue = "true")
+  public CloudEventPublisher rabbitMQCloudEventPublisher(
+      RabbitTemplate rabbitTemplate,
+      RabbitMQConfigProperties rabbitMQProperties) {
+
+    log.info(
+        "Initializing RabbitMQ CloudEvent publisher with exchange: {}",
+        rabbitMQProperties.getExchange());
+
+    // Configure Jackson for CloudEvents serialization
+    rabbitTemplate.setMessageConverter(new Jackson2JsonMessageConverter());
+
+    return new RabbitMQCloudEventPublisher(rabbitTemplate, rabbitMQProperties.getExchange());
+  }
+
+  @Bean
+  @ConditionalOnProperty(name = "rabbitmq.enabled", havingValue = "true")
+  public Exchange configEventsExchange(RabbitMQConfigProperties rabbitMQProperties) {
+    return new TopicExchange(rabbitMQProperties.getExchange(), true, false);
+  }
+
+  @Bean
+  @ConfigurationProperties(prefix = "rabbitmq")
+  @Validated
+  public RabbitMQConfigProperties rabbitMQConfigProperties() {
+    return new RabbitMQConfigProperties();
+  }
+
+  public static class RabbitMQConfigProperties {
+    private boolean enabled = false;
+    private String exchange = "civitas.config.events";
+
+    public boolean isEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public String getExchange() {
+      return exchange;
+    }
+
+    public void setExchange(String exchange) {
+      this.exchange = exchange;
+    }
+  }
+  */
+}
