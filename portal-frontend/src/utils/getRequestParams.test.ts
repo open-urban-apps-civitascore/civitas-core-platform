@@ -17,7 +17,7 @@ describe('getRequestParams', () => {
     expect(result.search).toBe('firstName lastName')
     expect(result.apiParams.get('page')).toBe('1')
     expect(result.apiParams.get('size')).toBe('20')
-    expect(result.apiParams.get('q')).toBe('firstName%20lastName')
+    expect(result.apiParams.get('q')).toBe('firstName lastName')
     expect(result.apiParams.getAll('sort')).toEqual(['fullName,ASC'])
   })
 
