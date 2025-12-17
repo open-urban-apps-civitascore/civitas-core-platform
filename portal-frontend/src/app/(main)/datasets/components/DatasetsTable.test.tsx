@@ -33,16 +33,7 @@ describe('DatasetsTable', () => {
   })
 
   it('renders the header and header content correctly', async () => {
-    ;[
-      'Name',
-      'Datenraum',
-      'Fachbereich',
-      'Ansprechperson',
-      'Zuletzt aktualisiert',
-      'Zugriffsstatus',
-      'Freigabeprozess',
-      'Distribution',
-    ].forEach(headerText => {
+    ;['Name', 'Datenraum', 'Ansprechperson', 'Zuletzt aktualisiert', 'Zugriff', 'Status'].forEach(headerText => {
       expect(screen.getByRole('columnheader', { name: headerText })).toBeDefined()
     })
     expect(screen.queryByRole('columnheader', { name: 'id' })).toBeNull()
@@ -57,9 +48,9 @@ describe('DatasetsTable', () => {
     const cells = within(dataRow).getAllByRole('cell')
 
     expect(cells[0]).toHaveTextContent(mappedDatasets[0].name)
-    expect(cells[1]).toHaveTextContent(mappedDatasets[0].dataspace)
-    expect(cells[2]).toHaveTextContent(mappedDatasets[0].department)
-    expect(cells[3]).toHaveTextContent(mappedDatasets[0].creator[0])
-    expect(cells[4]).toHaveTextContent('10.09.2023')
+    expect(cells[1]).toHaveTextContent(mappedDatasets[0].dataspace?.name as string)
+    expect(cells[2]).toHaveTextContent(`${mappedDatasets[0].contact.firstName} ${mappedDatasets[0].contact.lastName}`)
+    expect(cells[3]).toHaveTextContent('10.09.2023')
+    expect(cells[4].querySelector('svg')).toHaveClass('lucide-lock-open')
   })
 })

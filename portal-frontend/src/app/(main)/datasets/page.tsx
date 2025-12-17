@@ -17,27 +17,6 @@ import { DatasetResponse, DatasetTableData } from '@/types/datasets'
 
 import DatasetsTable from './components/DatasetsTable'
 
-// export const mapDatasetsToListData = (datasets: DatasetResponse[]): DatasetTableData[] => {
-//   const datasetsMap = datasets.flatMap(dataset => {
-//     try {
-//       const data = {
-//         id: dataset.id,
-//         name: dataset.name,
-//         dataspace: dataset.dataspace?.name || '',
-//         contact: `${dataset.contact.firstName} ${dataset.contact.lastName}`,
-//         lastUpdated: dataset.lastUpdated,
-//         status: dataset.status,
-//         access: dataset.access,
-//       }
-//       return data
-//     } catch (error) {
-//       console.error('An error occurred while transforming dataset data: ', dataset, error)
-//       return []
-//     }
-//   })
-//   return datasetsMap
-// }
-
 const DatasetsPage = () => {
   const t = useTranslations('datasets')
   const router = useRouter()
