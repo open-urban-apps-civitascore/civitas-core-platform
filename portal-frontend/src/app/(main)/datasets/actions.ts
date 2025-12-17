@@ -1,17 +1,16 @@
 'use server'
 
-import { DatasetResponse } from '@/types/datasets'
+import { headers } from 'next/headers'
 
-const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
+import { DatasetResponse } from '@/types/datasets'
 
 export const createDataset = async (datasetData: DatasetResponse) => {
   console.log('creating dataset')
   try {
-    const response = await fetch(`${URL}/datasets`, {
+    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/datasets`, {
       method: 'POST',
       headers: {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        'Content-Type': 'application/json',
+        cookie: (await headers()).get('cookie') || '',
       },
       body: JSON.stringify(datasetData),
     })
@@ -30,11 +29,10 @@ export const createDataset = async (datasetData: DatasetResponse) => {
 
 export const updateDataset = async (updateDatasetData: Partial<DatasetResponse>) => {
   try {
-    const response = await fetch(`${URL}/datasets/${updateDatasetData.id}`, {
+    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/datasets/${updateDatasetData.id}`, {
       method: 'PATCH',
       headers: {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        'Content-Type': 'application/json',
+        cookie: (await headers()).get('cookie') || '',
       },
       body: JSON.stringify(updateDatasetData),
     })

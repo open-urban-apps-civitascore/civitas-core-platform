@@ -18,10 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.ConfigEvent;
-import com.civitas.configadapter.model.Topics;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 

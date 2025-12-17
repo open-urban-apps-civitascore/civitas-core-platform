@@ -5,6 +5,7 @@
     "noResults": "No results found.",
     "noData": "No Data",
     "loading": "Loading...",
+    "form": "Form",
     "actions": {
       "submit": "Save",
       "cancel": "Cancel",
@@ -311,7 +312,16 @@
         "contact": "Contact Person",
         "description": "Description"
       },
-      "noGroupsAssigned": "No groups assigned yet."
+      "noGroupsAssigned": "No groups assigned yet.",
+      "modal": {
+        "title": "Add Group",
+        "description": "to Role {roleName}",
+        "tableHeaders": {
+          "name": "Name",
+          "usersCount": "Amount of Users",
+          "description": "Description"
+        }
+      }
     }
   }
 }

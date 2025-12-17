@@ -24,6 +24,7 @@ import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
+import com.civitas.configadapter.model.idm.UserConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
@@ -298,12 +299,12 @@ class KafkaEventHandlerIntegrationTest {
             "1.0",
             "result.topic");
 
-    Map<String, Object> userData = new HashMap<>();
-    userData.put("username", "testuser");
-    userData.put("email", "test@example.com");
-    userData.put("enabled", true);
+    UserConfig userConfig = new UserConfig();
+    userConfig.setUsername("testuser");
+    userConfig.setEmail("test@example.com");
+    userConfig.setEnabled(true);
 
-    Config config = new Config("users/" + userId, userData);
+    Config config = new Config("users/" + userId, userConfig);
 
     Payload payload = new Payload("user", "users/" + userId, Operation.CREATE, config);
 

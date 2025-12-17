@@ -72,7 +72,7 @@ const DatasetsPage = () => {
 
     const getDatasets = async () => {
       try {
-        const datasetsResponse = await fetch(`${URL}/datasets?${params.toString()}`)
+        const datasetsResponse = await fetch(`/api/datasets?${params.toString()}`)
         if (!datasetsResponse.ok) {
           throw new Error('An error occurred while loading data')
         }
@@ -107,7 +107,7 @@ const DatasetsPage = () => {
   )
 
   return (
-    <PageContainer headerType="onlyTitle">
+    <PageContainer testId="datasetsPage" headerType="onlyTitle">
       <PageHeader title={t('title')} />
       <PageBackground>
         <SearchHeader

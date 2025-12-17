@@ -13,6 +13,17 @@ package com.civitas.configadapter.model;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-/** Represents the "config" object within the payload. */
+/**
+ * Represents the "config" object within the payload.
+ *
+ * <p>The value field contains typed configuration data specific to the target adapter:
+ *
+ * <ul>
+ *   <li>{@link IdmConfigValue} - For identity management resources (Keycloak users, realms,
+ *       clients)
+ *   <li>{@link ApisixConfigValue} - For APISIX API Gateway resources (upstreams, routes)
+ *   <li>{@link GenericConfigValue} - Generic fallback for other adapter types
+ * </ul>
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record Config(@JsonProperty("path") String path, @JsonProperty("value") Object value) {}
+public record Config(@JsonProperty("path") String path, @JsonProperty("value") ConfigValue value) {}

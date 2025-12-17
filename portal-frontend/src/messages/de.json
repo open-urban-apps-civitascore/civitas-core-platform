@@ -5,6 +5,7 @@
     "noResults": "Es gibt leider keine Ergebnisse.",
     "noData": "Keine Daten",
     "loading": "Lädt...",
+    "form": "Formular",
     "actions": {
       "submit": "Speichern",
       "cancel": "Abbrechen",
@@ -310,7 +311,16 @@
         "contact": "Ansprechpartner",
         "description": "Beschreibung"
       },
-      "noGroupsAssigned": "Es sind noch keine Gruppen zugeordnet."
+      "noGroupsAssigned": "Es sind noch keine Gruppen zugeordnet.",
+      "modal": {
+        "title": "Gruppe hinzufügen",
+        "description": "zur Rolle {roleName}",
+        "tableHeaders": {
+          "name": "Name",
+          "usersCount": "Anzahl User",
+          "description": "Beschreibung"
+        }
+      }
     }
   }
 }
