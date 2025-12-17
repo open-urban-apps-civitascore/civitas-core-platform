@@ -36,7 +36,6 @@ public class ConfigAdapterTestHelper implements AutoCloseable {
 
   private final KeycloakAdapter keycloakAdapter;
   private final KafkaMessageListenerContainer<String, CloudEvent> kafkaConsumer;
-  private final KafkaTemplate<String, String> kafkaTemplate;
   private final ObjectMapper objectMapper;
 
   public ConfigAdapterTestHelper(
@@ -44,7 +43,6 @@ public class ConfigAdapterTestHelper implements AutoCloseable {
       String kafkaBrokers,
       KafkaTemplate<String, String> kafkaTemplate) {
 
-    this.kafkaTemplate = kafkaTemplate;
     this.objectMapper = new ObjectMapper();
     this.objectMapper.registerModule(new JavaTimeModule());
 
