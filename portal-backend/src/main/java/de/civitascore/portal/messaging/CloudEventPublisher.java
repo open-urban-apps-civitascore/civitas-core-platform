@@ -56,14 +56,14 @@ public interface CloudEventPublisher {
   String getResultTopic();
 
   /** Exception thrown when event publishing fails. */
-  class PublishException extends Exception {
+  class CloudPublishException extends Exception {
     private static final long serialVersionUID = 1L;
 
-    public PublishException(String message, Throwable cause) {
+    public CloudPublishException(String message, Throwable cause) {
       super(message, cause);
     }
 
-    public PublishException(String message) {
+    public CloudPublishException(String message) {
       super(message);
     }
   }

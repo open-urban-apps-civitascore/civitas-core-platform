@@ -94,7 +94,7 @@ public class KafkaCloudEventPublisher implements CloudEventPublisher {
             resultEvent.errorCode(),
             resultEvent.message());
         future.completeExceptionally(
-            new PublishException(
+            new CloudPublishException(
                 "Config Adapter processing failed: "
                     + resultEvent.message()
                     + " (errorCode="
@@ -138,7 +138,7 @@ public class KafkaCloudEventPublisher implements CloudEventPublisher {
               CompletableFuture<ConfigResultEvent> pending = pendingRequests.remove(messageId);
               if (pending != null && !pending.isDone()) {
                 pending.completeExceptionally(
-                    new PublishException(
+                    new CloudPublishException(
                         "Timeout waiting for Config Adapter result: messageId="
                             + messageId
                             + ", timeout="
@@ -171,7 +171,7 @@ public class KafkaCloudEventPublisher implements CloudEventPublisher {
                 exception);
             pendingRequests.remove(messageId);
             resultFuture.completeExceptionally(
-                new PublishException(
+                new CloudPublishException(
                     "Failed to publish CloudEvent to Kafka: messageId=" + messageId, exception));
           } else {
             log.debug(
