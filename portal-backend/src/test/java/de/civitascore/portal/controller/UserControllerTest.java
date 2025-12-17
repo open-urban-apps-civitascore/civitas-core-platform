@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import de.civitascore.portal.model.embedded.UserTitleType;
 import de.civitascore.portal.model.output.PrincipalUserOutput;
 import de.civitascore.portal.model.output.assembler.UserAssembler;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
@@ -67,7 +68,8 @@ class UserControllerTest {
         .andExpect(jsonPath("$.lastName").value("User"))
         .andExpect(jsonPath("$.roles").isArray())
         .andExpect(jsonPath("$.roles[0]").value("ADMIN"))
-        .andExpect(jsonPath("$.roles[1]").value("USER"));
+        .andExpect(jsonPath("$.roles[1]").value("USER"))
+        .andExpect(jsonPath("$.title").value("OTHER"));
   }
 
   @Test
@@ -145,6 +147,7 @@ class UserControllerTest {
     // given
     PrincipalUserDetails userDetails =
         PrincipalUserDetails.builder()
+            .title(UserTitleType.MS)
             .username("factorytest")
             .email("factory@test.com")
             .tenantId("factory-tenant")
@@ -163,5 +166,6 @@ class UserControllerTest {
     assertThat(output.firstName()).isEqualTo("Factory");
     assertThat(output.lastName()).isEqualTo("Test");
     assertThat(output.roles()).containsExactly("TESTER");
+    assertThat(output.title()).isEqualTo(UserTitleType.MS);
   }
 }

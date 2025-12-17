@@ -2,6 +2,7 @@ package de.civitascore.portal.repository.specification;
 
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.repository.specification.base.BaseSpec;
+import de.civitascore.portal.repository.specification.base.LikeConcatenated;
 import net.kaczmarzyk.spring.data.jpa.domain.Equal;
 import net.kaczmarzyk.spring.data.jpa.domain.EqualIgnoreCase;
 import net.kaczmarzyk.spring.data.jpa.domain.LikeIgnoreCase;
@@ -24,8 +25,11 @@ interface UserActiveSpec extends BaseSpec<User> {}
 interface UserExternalIdSpec extends BaseSpec<User> {}
 
 @Or({
-  @Spec(path = "firstName", params = "q", spec = LikeIgnoreCase.class),
-  @Spec(path = "lastName", params = "q", spec = LikeIgnoreCase.class),
+  @Spec(
+      path = "firstName,lastName",
+      params = "q",
+      paramSeparator = ' ',
+      spec = LikeConcatenated.class),
   @Spec(path = "email", params = "q", spec = LikeIgnoreCase.class)
 })
 interface UserQuickSearchSpec extends BaseSpec<User> {}
