@@ -13,9 +13,10 @@
 
 	<licenses>
 		<license>
-			<name>European Union Public License 1.2</name>
+			<name>EUPL-1.2</name>
 			<url>https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12</url>
 			<distribution>repo</distribution>
+			<comments>European Union Public License v1.2</comments>
 		</license>
 	</licenses>
 
@@ -52,8 +53,8 @@
 		<commons.io.version>2.21.0</commons.io.version>
 		<commons.lang.version>3.20.0</commons.lang.version>
 		<commons.compress.version>1.28.0</commons.compress.version>
-  		<lz4.version>1.8.1</lz4.version>
-  		<at.yawk.lz4.version>1.10.1</at.yawk.lz4.version>
+		<lz4.version>1.8.1</lz4.version>
+		<at.yawk.lz4.version>1.10.1</at.yawk.lz4.version>
 	</properties>
 
 	<dependencyManagement>
@@ -150,7 +151,7 @@
 				<version>${commons.compress.version}</version>
 			</dependency>
 
-   			<!-- lz4 -->
+			<!-- lz4 -->
 			<dependency>
 				<groupId>org.lz4</groupId>
 				<artifactId>lz4-java</artifactId>
@@ -262,14 +263,13 @@
 						</includes>
 						<licenseHeader>
 							<content>/**
- * Copyright (c) 2012 - $YEAR Data In Motion and others. All rights reserved.
+ * &lt;p&gt;This work and the accompanying materials are made available under the terms of the European Union Public License License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
- * &lt;p&gt;This program and the accompanying materials are made available under the terms of the Eclipse
- * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0/
+ * &lt;p&gt;SPDX-License-Identifier: EUPL-1.2
  *
- * &lt;p&gt;SPDX-License-Identifier: EPL-2.0
+ * &lt;p&gt;This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) $YEAR Civitas Connect e. V. and others.
  *
- * &lt;p&gt;Contributors: Data In Motion - initial API and implementation
  */</content>
 						</licenseHeader>
 						<googleJavaFormat />
