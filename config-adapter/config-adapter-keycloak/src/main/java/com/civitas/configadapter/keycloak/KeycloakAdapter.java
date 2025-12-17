@@ -92,6 +92,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   @Override
   public void processConfigEvent(String topic, ConfigEvent event) {
+    if(event == null) {
+      logger.warn("Null event send to topic {}", topic);
+      return;
+    }
     Operation operation = event.payload().operation();
     String targetResource = event.payload().targetResource();
     String targetComponent = event.payload().targetComponent();
