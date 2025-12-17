@@ -15,6 +15,7 @@ import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.keycloak.KeycloakAdapter;
 import com.civitas.configadapter.model.Config;
@@ -22,7 +23,9 @@ import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
-import com.civitas.configadapter.model.Topics;
+import com.civitas.configadapter.model.idm.IdmConfigValue;
+import com.civitas.configadapter.model.idm.RealmConfig;
+import com.civitas.configadapter.model.idm.UserConfig;
 import com.civitas.event.handler.kafka.KafkaEventHandler;
 import com.civitas.event.handler.kafka.ObjectMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -213,15 +216,15 @@ class EndToEndIntegrationTest {
   @Test
   @Order(1)
   void shouldHandleCompleteRealmCreationFlow() throws Exception {
-    // Given - create realm configuration
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("e2e-test-realm");
-    realmRep.setEnabled(true);
-    realmRep.setDisplayName("E2E Test Realm");
+    // Given - create RealmConfig directly (as developers would)
+    RealmConfig realmConfig = new RealmConfig();
+    realmConfig.setRealm("e2e-test-realm");
+    realmConfig.setEnabled(true);
+    realmConfig.setDisplayName("E2E Test Realm");
 
     ConfigEvent configEvent =
         createConfigEvent(
-            "realms/e2e-test-realm", "realm", Operation.CREATE, realmRep, "correlation123");
+            "realms/e2e-test-realm", "realm", Operation.CREATE, realmConfig, "correlation123");
 
     CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_CREATED.toString());
 
@@ -251,20 +254,20 @@ class EndToEndIntegrationTest {
     realmRep.setEnabled(true);
     keycloakClient.realms().create(realmRep);
 
-    // Create user configuration
-    UserRepresentation userRep = new UserRepresentation();
-    userRep.setUsername("e2euser");
-    userRep.setEmail("e2euser@example.com");
-    userRep.setFirstName("E2E");
-    userRep.setLastName("User");
-    userRep.setEnabled(true);
+    // Create UserConfig directly
+    UserConfig userConfig = new UserConfig();
+    userConfig.setUsername("e2euser");
+    userConfig.setEmail("e2euser@example.com");
+    userConfig.setFirstName("E2E");
+    userConfig.setLastName("User");
+    userConfig.setEnabled(true);
 
     ConfigEvent configEvent =
         createConfigEvent(
             "realms/user-e2e-realm/users/e2euser",
             "user",
             Operation.CREATE,
-            userRep,
+            userConfig,
             "correlationuser123");
 
     CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.USER_CREATED.toString());
@@ -290,15 +293,15 @@ class EndToEndIntegrationTest {
   @Order(3)
   void shouldHandleErrorsEndToEnd() throws Exception {
     // Given - try to update non-existent realm
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("non-existent-realm");
+    RealmConfig realmConfig = new RealmConfig();
+    realmConfig.setRealm("non-existent-realm");
 
     ConfigEvent configEvent =
         createConfigEvent(
             "realms/non-existent-realm",
             "realm",
             Operation.UPDATE,
-            realmRep,
+            realmConfig,
             "correlationerror123");
 
     CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_UPDATED.toString());
@@ -322,16 +325,16 @@ class EndToEndIntegrationTest {
     String correlationId = "testcorrelation" + UUID.randomUUID();
     String messageId = UUID.randomUUID().toString();
 
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("correlation-test-realm");
-    realmRep.setEnabled(true);
+    RealmConfig realmConfig = new RealmConfig();
+    realmConfig.setRealm("correlation-test-realm");
+    realmConfig.setEnabled(true);
 
     ConfigEvent configEvent =
         createConfigEventWithMessageId(
             "realms/correlation-test-realm",
             "realm",
             Operation.CREATE,
-            realmRep,
+            realmConfig,
             correlationId,
             messageId);
 
@@ -356,27 +359,28 @@ class EndToEndIntegrationTest {
     // This test verifies the adapter can handle multiple operations in sequence
 
     // 1. Create realm
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("seq-test-realm");
-    realmRep.setEnabled(true);
+    RealmConfig realmConfig = new RealmConfig();
+    realmConfig.setRealm("seq-test-realm");
+    realmConfig.setEnabled(true);
 
     sendEventAndWaitForResult(
         Topics.REALM_CREATED.toString(),
-        createConfigEvent("realms/seq-test-realm", "realm", Operation.CREATE, realmRep, "seq-1"));
+        createConfigEvent(
+            "realms/seq-test-realm", "realm", Operation.CREATE, realmConfig, "seq-1"));
 
     // 2. Create user
-    UserRepresentation userRep = new UserRepresentation();
-    userRep.setUsername("sequser");
-    userRep.setEmail("sequser@example.com");
-    userRep.setEnabled(true);
+    UserConfig userConfig = new UserConfig();
+    userConfig.setUsername("sequser");
+    userConfig.setEmail("sequser@example.com");
+    userConfig.setEnabled(true);
 
     sendEventAndWaitForResult(
         Topics.USER_CREATED.toString(),
         createConfigEvent(
-            "realms/seq-test-realm/users/sequser", "user", Operation.CREATE, userRep, "seq-2"));
+            "realms/seq-test-realm/users/sequser", "user", Operation.CREATE, userConfig, "seq-2"));
 
     // 3. Update user
-    userRep.setFirstName("Updated");
+    userConfig.setFirstName("Updated");
     List<UserRepresentation> users =
         keycloakClient.realm("seq-test-realm").users().search("sequser");
     String userId = users.get(0).getId();
@@ -384,7 +388,11 @@ class EndToEndIntegrationTest {
     sendEventAndWaitForResult(
         Topics.USER_UPDATED.toString(),
         createConfigEvent(
-            "realms/seq-test-realm/users/" + userId, "user", Operation.UPDATE, userRep, "seq-3"));
+            "realms/seq-test-realm/users/" + userId,
+            "user",
+            Operation.UPDATE,
+            userConfig,
+            "seq-3"));
 
     // Verify all operations succeeded
     RealmRepresentation realm = keycloakClient.realm("seq-test-realm").toRepresentation();
@@ -412,34 +420,35 @@ class EndToEndIntegrationTest {
         .untilAsserted(assertion);
   }
 
+  /** Creates a ConfigEvent with a config value - demonstrates how developers use the API. */
   private ConfigEvent createConfigEvent(
       String targetResource,
       String targetComponent,
       Operation operation,
-      Object value,
+      IdmConfigValue configValue,
       String correlationId) {
     return createConfigEventWithMessageId(
         targetResource,
         targetComponent,
         operation,
-        value,
+        configValue,
         correlationId,
         UUID.randomUUID().toString());
   }
 
+  /** Creates a ConfigEvent with a specific message ID for testing message tracking. */
   private ConfigEvent createConfigEventWithMessageId(
       String targetResource,
       String targetComponent,
       Operation operation,
-      Object value,
+      IdmConfigValue configValue,
       String correlationId,
       String messageId) {
     Metadata metadata =
         new Metadata(
             messageId, OffsetDateTime.now(), "e2e.test", correlationId, "1.0", "result.topic");
 
-    Config config = new Config(targetResource, value);
-
+    Config config = new Config(targetResource, configValue);
     Payload payload = new Payload(targetComponent, targetResource, operation, config);
 
     return new ConfigEvent(metadata, payload);

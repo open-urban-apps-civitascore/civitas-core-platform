@@ -107,7 +107,7 @@ const DatasetsPage = () => {
   )
 
   return (
-    <PageContainer headerType="onlyTitle">
+    <PageContainer testId="datasetsPage" headerType="onlyTitle">
       <PageHeader title={t('title')} />
       <PageBackground>
         <SearchHeader

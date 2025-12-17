@@ -5,12 +5,14 @@
     "noResults": "No results found.",
     "noData": "No Data",
     "loading": "Loading...",
+    "form": "Form",
     "actions": {
       "submit": "Save",
       "cancel": "Cancel",
       "delete": "Delete",
       "add": "Add",
       "edit": "Edit",
+      "editBase": "Edit base",
       "open": "open"
     },
     "errors": {
@@ -70,23 +72,26 @@
       }
     },
     "overview": {
-      "title": "Overview: Create Dataset",
+      "title": "Create: New Dataset",
+      "subtitle": "Enter the base information.",
       "info": {
         "title": "Base Information",
         "dataspace": "Data Space",
-        "name": "Name",
+         "selectDataspace": "Select Data Space...",
+        "name": "Name of the Dataset",
         "description": "Description",
         "tags": "Tags",
         "typeTag": "Type tag..."
       },
       "completion": {
         "title": "Creation Progress",
-        "metadata": "Metadata",
-        "groups": "Group & Role Assignment",
-        "configuration": "Data Configuration",
-        "distribution": "Distributions / Applications / APIs",
-        "permissions": "User Data Permissions",
-        "publication": "Publication"
+        "metadata": { "title": "Metadata", "button": "Enter metadata", "requirementsMet": "Minimal requirements met" },
+        "accessPermissions": { "title": "Access permissions", "button": "Add roles and user groups", "userGroups": "User groups" },
+        "data": { "title": "Data", "button": "Ingest and map data", "datasources": "Datenquellen", "persistence": "Persistence" },
+        "distribution": { "title": "Distribution", "button1": "Integrate APIs", "button2": "Provide files", "api": "API" },
+        "usagePermissions": { "title": "Usage Permissions", "button": "Configure rate limiting" },
+        "applications": { "title": "Applications", "button": "Integrate applications" },
+        "publication": { "title": "Publications", "button": "Configure publication" }
       }
     }
   },
@@ -307,7 +312,16 @@
         "contact": "Contact Person",
         "description": "Description"
       },
-      "noGroupsAssigned": "No groups assigned yet."
+      "noGroupsAssigned": "No groups assigned yet.",
+      "modal": {
+        "title": "Add Group",
+        "description": "to Role {roleName}",
+        "tableHeaders": {
+          "name": "Name",
+          "usersCount": "Amount of Users",
+          "description": "Description"
+        }
+      }
     }
   }
 }

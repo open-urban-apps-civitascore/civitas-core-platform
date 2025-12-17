@@ -6,8 +6,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
-interface TextAreaProps<T extends FieldValues>
-  extends Omit<InputHTMLAttributes<HTMLTextAreaElement>, 'form' | 'onChange'> {
+interface TextAreaProps<T extends FieldValues> extends Omit<
+  InputHTMLAttributes<HTMLTextAreaElement>,
+  'form' | 'onChange'
+> {
   form: UseFormReturn<T>
   name: Path<T>
   placeholder: string

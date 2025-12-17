@@ -5,21 +5,34 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.UserInputDTO;
+import de.civitascore.portal.model.output.event.TopicResolver;
+import de.civitascore.portal.model.output.event.UserEventDTO;
 import de.civitascore.portal.repository.UserRepository;
+import de.civitascore.portal.service.event.SynchronousEventPublisher;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
-import java.util.Optional;
-import lombok.RequiredArgsConstructor;
+import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
-public class UserService extends BaseService<User, UserInputDTO> {
+public class UserService extends EventPublishingService<User, UserInputDTO> {
 
   private final UserRepository userRepository;
   private final UserMapper userMapper;
   private final ObjectMapper objectMapper;
+
+  public UserService(
+      SynchronousEventPublisher syncEventPublisher,
+      TopicResolver topicResolver,
+      UserRepository userRepository,
+      UserMapper userMapper,
+      ObjectMapper objectMapper) {
+    super(syncEventPublisher, topicResolver);
+    this.userRepository = userRepository;
+    this.userMapper = userMapper;
+    this.objectMapper = objectMapper;
+  }
 
   @Override
   protected UserRepository getRepository() {
@@ -33,14 +46,13 @@ public class UserService extends BaseService<User, UserInputDTO> {
 
   @Override
   protected String getEntityName() {
-    return User.class.getSimpleName();
+    return "User";
   }
 
   @Override
   protected User preSave(User entity) {
-    // Validate unique constraint: email
     validateUniqueEmail(entity);
-    return super.preSave(entity);
+    return entity;
   }
 
   private void validateUniqueEmail(User entity) {
@@ -49,8 +61,7 @@ public class UserService extends BaseService<User, UserInputDTO> {
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException(
-                    User.class.getSimpleName(), "email", entity.getEmail());
+                throw new UniqueConstraintViolationException("User", "email", entity.getEmail());
               }
             });
   }
@@ -78,10 +89,39 @@ public class UserService extends BaseService<User, UserInputDTO> {
     } catch (Exception e) {
       throw new RuntimeException("Failed to process update input", e);
     }
-    return super.preProcessUpdateInput(input, existingEntity);
+    return input;
   }
 
-  public Optional<User> findByEmail(String email) {
-    return userRepository.findByEmail(email);
+  @Override
+  protected void updateExternalId(User entity, String externalId) {
+    if (externalId != null && !externalId.isBlank()) {
+      entity.setExternalId(externalId);
+    }
+  }
+
+  @Override
+  protected String getAggregateType() {
+    return User.class.getSimpleName();
+  }
+
+  @Override
+  protected String getRealm(User entity) {
+    return "civitas";
+  }
+
+  @Override
+  protected UUID getEntityId(User entity) {
+    return entity.getId();
+  }
+
+  @Override
+  protected UserEventDTO toKafkaRepresentation(User entity) {
+    return new UserEventDTO(
+        entity.getId(),
+        entity.getFirstName(),
+        entity.getLastName(),
+        entity.getEmail(),
+        entity.getActive(),
+        entity.getExternalId());
   }
 }

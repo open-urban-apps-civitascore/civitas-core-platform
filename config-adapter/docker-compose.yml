@@ -69,6 +69,7 @@ services:
 
 networks:
   civitas-network:
+    name: civitas-network
     driver: bridge
 
 volumes:

@@ -90,7 +90,7 @@ export const UserDetails = (props: UserDetailsProps) => {
   }
 
   return (
-    <PageContainer headerType="withSubTabs" className="overflow-hidden" testId={testId}>
+    <PageContainer testId={testId} headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader
         title={title}
         subTabs={{ tabs: tabs, selectedTab: subTabValue || defaultTab, onClick: newTab => handleSelectTab(newTab) }}

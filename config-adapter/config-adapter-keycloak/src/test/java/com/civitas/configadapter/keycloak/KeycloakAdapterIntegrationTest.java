@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.configuration.ApplicationConfig;
@@ -28,7 +29,12 @@ import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
-import com.civitas.configadapter.model.Topics;
+import com.civitas.configadapter.model.idm.ClientConfig;
+import com.civitas.configadapter.model.idm.IdmConfigValue;
+import com.civitas.configadapter.model.idm.RealmConfig;
+import com.civitas.configadapter.model.idm.RoleConfig;
+import com.civitas.configadapter.model.idm.UserConfig;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -77,6 +83,7 @@ class KeycloakAdapterIntegrationTest {
   private KeycloakAdapter adapter;
   private TestEventPublisher eventPublisher;
   private Keycloak keycloakClient;
+  private ObjectMapper objectMapper;
 
   @BeforeEach
   void setUp() throws InterruptedException {
@@ -121,6 +128,9 @@ class KeycloakAdapterIntegrationTest {
 
     // Create Keycloak client for verification
     keycloakClient = Keycloak.getInstance(keycloakUrl, "master", "admin", "admin", "admin-cli");
+
+    // Create ObjectMapper for test conversions
+    objectMapper = new ObjectMapper();
   }
 
   @AfterEach
@@ -136,13 +146,14 @@ class KeycloakAdapterIntegrationTest {
   @Test
   @Order(1)
   void shouldCreateRealm() {
-    // Given
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("test-realm");
-    realmRep.setEnabled(true);
-    realmRep.setDisplayName("Test Realm");
+    // Given - Create RealmConfig directly (as a developer would)
+    RealmConfig realmConfig = new RealmConfig();
+    realmConfig.setRealm("test-realm");
+    realmConfig.setEnabled(true);
+    realmConfig.setDisplayName("Test Realm");
 
-    ConfigEvent event = createConfigEvent("realms/test-realm", "realm", Operation.CREATE, realmRep);
+    ConfigEvent event =
+        createConfigEvent("realms/test-realm", "realm", Operation.CREATE, realmConfig);
 
     // When
     adapter.processConfigEvent(Topics.REALM_CREATED.toString(), event);
@@ -170,12 +181,14 @@ class KeycloakAdapterIntegrationTest {
     realmRep.setEnabled(true);
     keycloakClient.realms().create(realmRep);
 
-    // Update configuration
-    realmRep.setDisplayName("Updated Realm");
-    realmRep.setEnabled(false);
+    // Create update configuration using our ConfigValue
+    RealmConfig updateConfig = new RealmConfig();
+    updateConfig.setRealm("update-realm");
+    updateConfig.setDisplayName("Updated Realm");
+    updateConfig.setEnabled(false);
 
     ConfigEvent event =
-        createConfigEvent("realms/update-realm", "realm", Operation.UPDATE, realmRep);
+        createConfigEvent("realms/update-realm", "realm", Operation.UPDATE, updateConfig);
 
     // When
     adapter.processConfigEvent(Topics.REALM_UPDATED.toString(), event);
@@ -205,18 +218,17 @@ class KeycloakAdapterIntegrationTest {
 
     keycloakClient.realm("user-realm").roles().create(initialRoleRep);
 
-    UserRepresentation userRep = new UserRepresentation();
-    userRep.setUsername("testuser");
-    userRep.setEmail("testuser@example.com");
-    userRep.setFirstName("Test");
-    userRep.setLastName("User");
-    userRep.setEnabled(true);
-    List<String> roles = new ArrayList<>();
-    roles.add("testrole");
-    userRep.setRealmRoles(roles);
+    // Create UserConfig directly
+    UserConfig userConfig = new UserConfig();
+    userConfig.setUsername("testuser");
+    userConfig.setEmail("testuser@example.com");
+    userConfig.setFirstName("Test");
+    userConfig.setLastName("User");
+    userConfig.setEnabled(true);
+    userConfig.setRealmRoles(List.of("testrole"));
 
     ConfigEvent event =
-        createConfigEvent("realms/user-realm/users/testuser", "user", Operation.CREATE, userRep);
+        createConfigEvent("realms/user-realm/users/testuser", "user", Operation.CREATE, userConfig);
 
     // When
     adapter.processConfigEvent(Topics.USER_CREATED.toString(), event);
@@ -250,15 +262,16 @@ class KeycloakAdapterIntegrationTest {
     realmRep.setEnabled(true);
     keycloakClient.realms().create(realmRep);
 
-    ClientRepresentation clientRep = new ClientRepresentation();
-    clientRep.setClientId("test-client");
-    clientRep.setEnabled(true);
-    clientRep.setPublicClient(false);
-    clientRep.setDirectAccessGrantsEnabled(true);
+    // Create ClientConfig directly
+    ClientConfig clientConfig = new ClientConfig();
+    clientConfig.setClientId("test-client");
+    clientConfig.setEnabled(true);
+    clientConfig.setPublicClient(false);
+    clientConfig.setDirectAccessGrantsEnabled(true);
 
     ConfigEvent event =
         createConfigEvent(
-            "realms/client-realm/clients/test-client", "client", Operation.CREATE, clientRep);
+            "realms/client-realm/clients/test-client", "client", Operation.CREATE, clientConfig);
 
     // When
     adapter.processConfigEvent(Topics.CLIENT_CREATED.toString(), event);
@@ -311,12 +324,13 @@ class KeycloakAdapterIntegrationTest {
     realmRep.setEnabled(true);
     keycloakClient.realms().create(realmRep);
 
-    RoleRepresentation roleRep = new RoleRepresentation();
-    roleRep.setName("testrole");
+    // Create RoleConfig directly
+    RoleConfig roleConfig = new RoleConfig();
+    roleConfig.setName("testrole");
 
     ConfigEvent event =
         createConfigEvent(
-            "realms/role-create-realm/roles/testrole", "role", Operation.CREATE, roleRep);
+            "realms/role-create-realm/roles/testrole", "role", Operation.CREATE, roleConfig);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_CREATED.toString(), event);
@@ -347,16 +361,15 @@ class KeycloakAdapterIntegrationTest {
 
     keycloakClient.realm("role-nested-create-realm").roles().create(nestedRoleRep);
 
-    RoleRepresentation roleRep = new RoleRepresentation();
-    roleRep.setName("testrole");
-    roleRep.setComposite(true);
-    RoleRepresentation.Composites composites = new RoleRepresentation.Composites();
-    composites.setRealm(Set.of("nestedtestrole"));
-    roleRep.setComposites(composites);
+    // Create RoleConfig with composite roles using our simple API
+    RoleConfig roleConfig = new RoleConfig();
+    roleConfig.setName("testrole");
+    roleConfig.setComposite(true);
+    roleConfig.setCompositeRoles(Set.of("nestedtestrole")); // Simple Set<String>!
 
     ConfigEvent event =
         createConfigEvent(
-            "realms/role-nested-create-realm/roles/testrole", "role", Operation.CREATE, roleRep);
+            "realms/role-nested-create-realm/roles/testrole", "role", Operation.CREATE, roleConfig);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_CREATED.toString(), event);
@@ -399,12 +412,13 @@ class KeycloakAdapterIntegrationTest {
 
     keycloakClient.realm("role-update-realm").roles().create(initialRoleRep);
 
-    RoleRepresentation roleRep = new RoleRepresentation();
-    roleRep.setName("testrole");
-    roleRep.setDescription("new description");
+    // Create RoleConfig for update
+    RoleConfig roleConfig = new RoleConfig();
+    roleConfig.setName("testrole");
+    roleConfig.setDescription("new description");
     ConfigEvent event =
         createConfigEvent(
-            "realms/role-update-realm/roles/testrole", "role", Operation.UPDATE, roleRep);
+            "realms/role-update-realm/roles/testrole", "role", Operation.UPDATE, roleConfig);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_UPDATED.toString(), event);
@@ -419,7 +433,7 @@ class KeycloakAdapterIntegrationTest {
             .orElseThrow(
                 () -> new AssertionError("The expected role 'testrole' could not be found."));
 
-    assertEquals(roleRep.getDescription(), addedRole.getDescription(), "Role not updated");
+    assertEquals(roleConfig.getDescription(), addedRole.getDescription(), "Role not updated");
 
     // Verify success result
     assertEquals(1, eventPublisher.getPublishedEvents().size());
@@ -441,11 +455,12 @@ class KeycloakAdapterIntegrationTest {
 
     keycloakClient.realm("role-delete-realm").roles().create(initialRoleRep);
 
-    RoleRepresentation roleRep = new RoleRepresentation();
-    roleRep.setName("testrole");
+    // For delete, we just need the role name
+    RoleConfig roleConfig = new RoleConfig();
+    roleConfig.setName("testrole");
     ConfigEvent event =
         createConfigEvent(
-            "realms/role-delete-realm/roles/testrole", "role", Operation.DELETE, roleRep);
+            "realms/role-delete-realm/roles/testrole", "role", Operation.DELETE, roleConfig);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_DELETED.toString(), event);
@@ -467,11 +482,11 @@ class KeycloakAdapterIntegrationTest {
   @Order(10)
   void shouldPublishErrorResultOnFailure() {
     // Given - try to update non-existent realm
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("non-existent-realm");
+    RealmConfig realmConfig = new RealmConfig();
+    realmConfig.setRealm("non-existent-realm");
 
     ConfigEvent event =
-        createConfigEvent("realms/non-existent-realm", "realm", Operation.UPDATE, realmRep);
+        createConfigEvent("realms/non-existent-realm", "realm", Operation.UPDATE, realmConfig);
 
     // When
     adapter.processConfigEvent(Topics.REALM_UPDATED.toString(), event);
@@ -488,13 +503,13 @@ class KeycloakAdapterIntegrationTest {
   void shouldHandleCorrelationIdInResults() {
     // Given
     String correlationId = UUID.randomUUID().toString();
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("correlation-realm");
-    realmRep.setEnabled(true);
+    RealmConfig realmConfig = new RealmConfig();
+    realmConfig.setRealm("correlation-realm");
+    realmConfig.setEnabled(true);
 
     ConfigEvent event =
         createConfigEventWithCorrelation(
-            "realms/correlation-realm", "realm", Operation.CREATE, realmRep, correlationId);
+            "realms/correlation-realm", "realm", Operation.CREATE, realmConfig, correlationId);
 
     // When
     adapter.processConfigEvent(Topics.REALM_CREATED.toString(), event);
@@ -523,17 +538,25 @@ class KeycloakAdapterIntegrationTest {
         .untilAsserted(assertion);
   }
 
+  /**
+   * Creates a ConfigEvent with a config value. This is how developers would use the API in
+   * production - create ConfigValue objects directly and wrap them in ConfigEvent.
+   */
   private ConfigEvent createConfigEvent(
-      String targetResource, String targetComponent, Operation operation, Object value) {
+      String targetResource,
+      String targetComponent,
+      Operation operation,
+      IdmConfigValue configValue) {
     return createConfigEventWithCorrelation(
-        targetResource, targetComponent, operation, value, UUID.randomUUID().toString());
+        targetResource, targetComponent, operation, configValue, UUID.randomUUID().toString());
   }
 
+  /** Creates a ConfigEvent with a correlation ID. Used for testing correlation ID propagation. */
   private ConfigEvent createConfigEventWithCorrelation(
       String targetResource,
       String targetComponent,
       Operation operation,
-      Object value,
+      IdmConfigValue configValue,
       String correlationId) {
     Metadata metadata =
         new Metadata(
@@ -544,8 +567,7 @@ class KeycloakAdapterIntegrationTest {
             "1.0",
             "result.topic");
 
-    Config config = new Config(targetResource, value);
-
+    Config config = new Config(targetResource, configValue);
     Payload payload = new Payload(targetComponent, targetResource, operation, config);
 
     return new ConfigEvent(metadata, payload);

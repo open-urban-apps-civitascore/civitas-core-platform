@@ -66,7 +66,7 @@ const UsersTable = (props: UsersTableProps) => {
       cell: info => formatDate(info.getValue(), locale),
     }),
     columnHelper.accessor('isActive', {
-      header: tUsers('info.active'),
+      header: tUsers('info.status.active'),
       cell: info => <StatusLabel isChecked={info.getValue()} />,
     }),
   ]
