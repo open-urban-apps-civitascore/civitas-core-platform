@@ -11,8 +11,7 @@ import { getRequestParams, RequestParams } from '@/utils/getRequestParams'
 import { mapListUsers } from '@/utils/users'
 
 import { UsersListContent } from './components/users-list/UsersListContent'
-
-const URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
+import { headers } from 'next/headers'
 
 export type UserAuthority = Item & {
   department: Item
@@ -23,22 +22,16 @@ type Props = {
 }
 
 const getUserListData = async (params: URLSearchParams) => {
-  const session = await auth()
-
-  if (!session?.accessToken) {
-    console.error('Unauthorized')
-    return { users: [], totalCount: 0 }
-  }
-
   try {
-    const usersResponse = await fetch(`${URL}/users?${decodeURIComponent(params.toString())}`, {
-      headers: {
-        Authorization: `Bearer ${session?.accessToken}`,
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        'Content-Type': 'application/json',
+    const usersResponse = await fetch(
+      `${process.env.NEXTAUTH_URL}/api/users?${decodeURIComponent(params.toString())}`,
+      {
+        headers: {
+          cookie: (await headers()).get('cookie') || '',
+        },
+        cache: 'no-store',
       },
-      cache: 'no-store',
-    })
+    )
 
     if (!usersResponse.ok) {
       throw new Error('An error occurred while loading user list data')

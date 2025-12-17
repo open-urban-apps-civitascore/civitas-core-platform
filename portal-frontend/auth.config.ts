@@ -101,9 +101,12 @@ export const authConfig = {
         }
       }
     },
-    async session({ session, token }) {
-      session.accessToken = token.access_token as string
-      return session
+
+    session({ session, token }) {
+      return {
+        ...session,
+        error: token.error as string | undefined,
+      }
     },
   },
   providers: [], // Providers are handled in auth.ts
