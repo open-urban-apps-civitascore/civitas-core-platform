@@ -14,7 +14,6 @@ import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
-import com.civitas.configadapter.model.ConfigValue;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.idm.ClientConfig;
 import com.civitas.configadapter.model.idm.RealmConfig;
@@ -108,7 +107,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       // Use semantic fields: targetComponent is the resource type, targetResource is the realm
       String realm = targetResource;
       String resourceType = targetComponent;
-      String resourceId = extractResourceId(event.payload().config().value());
+      String resourceId = extractResourceId(event);
 
       ResourceInfo resourceInfo = new ResourceInfo(resourceType, realm, resourceId);
 
@@ -146,26 +145,24 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
    *   <li>Realms: Realm name (e.g., "civitas-core")
    * </ul>
    *
-   * @param configValue the configuration value containing the resource data
+   * @param event the configuration value containing the resource data
    * @return the resource ID if present, null otherwise
    */
-  private String extractResourceId(ConfigValue configValue) {
-    if (configValue == null) {
-      return null;
-    }
-
+  private String extractResourceId(ConfigEvent event) {
     // Extract ID from IDM config values (UserConfig, ClientConfig, RoleConfig, RealmConfig)
-    if (configValue instanceof UserConfig userConfig) {
-      return userConfig.getId(); // UUID for users
-    } else if (configValue instanceof ClientConfig clientConfig) {
-      return clientConfig.getId(); // UUID for clients
-    } else if (configValue instanceof RoleConfig roleConfig) {
-      return roleConfig.getName(); // NAME for roles (roles are accessed by name, not UUID)
-    } else if (configValue instanceof RealmConfig realmConfig) {
-      return realmConfig.getRealm(); // Realm name
-    }
-
-    return null;
+    return switch (event.payload().config().value()) {
+      case null -> null;
+      case UserConfig userConfig -> userConfig.getId(); // UUID for users
+      case ClientConfig clientConfig -> clientConfig.getId(); // UUID for clients
+      case RoleConfig roleConfig -> roleConfig.getName(); // Name for roles
+      case RealmConfig realmConfig -> realmConfig.getRealm(); // Realm name
+      default -> {
+        logger.warn("Unknown ConfigValue class: {}", event.getClass());
+        publishErrorResult(
+            event, "UNKNOWN_RESOURCE_TYPE", "Unknown ConfigValue class: " + event.getClass());
+        yield null;
+      }
+    };
   }
 
   private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event) {
