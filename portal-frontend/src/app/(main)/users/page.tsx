@@ -1,145 +1,76 @@
-'use client'
-
-import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { headers } from 'next/headers'
+import { getTranslations } from 'next-intl/server'
 
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
-import { Button } from '@/components/ui/button'
-import { useQueryParams } from '@/hooks/useQueryParams'
 import { Item } from '@/types/common'
-import { Authority, ListUser, UserResponse } from '@/types/users'
-import { isPageIndexHigherThanTotalPages } from '@/utils/table'
+import { UserResponse } from '@/types/users'
+import { getRequestParams, RequestParams } from '@/utils/getRequestParams'
 import { mapListUsers } from '@/utils/users'
 
-import UsersTable from './components/UsersTable'
-
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+import { UsersListContent } from './components/users-list/UsersListContent'
 
 export type UserAuthority = Item & {
   department: Item
 }
 
-export const getSortParam = (sorting: SortingState) => {
-  if (sorting.length > 0) {
-    const sortingId = sorting[0]?.id
-    const sortParam = `&_sort=${sortingId}`
-    const orderParam = sorting[0]?.desc ? `&_order=desc` : `&_order=asc`
-    return `${sortParam}${orderParam}`
-  }
-  return ''
+type Props = {
+  searchParams: Promise<RequestParams>
 }
 
-const UsersPage = () => {
-  const t = useTranslations('users')
-  const router = useRouter()
-  const [listUsers, setListUsers] = useState<ListUser[]>([])
-  const [rowCount, setRowCount] = useState(0)
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [isLoading, setIsLoading] = useState(true)
+const getUserListData = async (params: URLSearchParams) => {
+  try {
+    const usersResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/users?${params.toString()}`, {
+      headers: {
+        cookie: (await headers()).get('cookie') || '',
+      },
+      cache: 'no-store',
+    })
 
-  const {
-    setSortingParams,
-    setPaginationParams,
-    setSearchParam,
-    getApiRequestParamsByUrl,
-    setTotalPages,
-    pageIndex,
-    pageSize,
-    sorting,
-    search,
-    totalPages,
-  } = useQueryParams()
-
-  useEffect(() => {
-    if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
-      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
+    if (!usersResponse.ok) {
+      throw new Error('An error occurred while loading user list data')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalPages, pageIndex, pageSize])
 
-  const getUserListData = async () => {
-    const params = getApiRequestParamsByUrl()
+    const usersData = await usersResponse.json()
 
-    try {
-      setIsLoading(true)
-      const [usersResponse, authoritiesResponse] = await Promise.all([
-        fetch(`${URL}/users?${params.toString()}`, {
-          cache: 'no-store',
-        }),
-        fetch(`${URL}/authorities`, {
-          cache: 'no-store',
-        }),
-      ])
-      if (!authoritiesResponse || !usersResponse) {
-        throw new Error('An error occurred while loading form data')
-      }
+    const users = mapListUsers(usersData.content as UserResponse[], [])
+    const totalCount = Number(usersData.totalElements) || 0
 
-      const [usersData, authoritiesData]: [UserResponse[], Authority[]] = await Promise.all([
-        usersResponse.json(),
-        authoritiesResponse.json(),
-      ])
-
-      const users = mapListUsers(usersData, authoritiesData)
-      setListUsers(users)
-      setIsLoading(false)
-
-      const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
-      setTotalPages(Math.ceil(totalCount / pageSize) || 1)
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-      }
-    } catch (error) {
-      console.error(error)
-      setIsLoading(false)
-      throw new Error('An error occurred while loading form data')
-    }
+    return { users, totalCount }
+  } catch (error) {
+    console.error(error)
+    return { users: [], totalCount: 0 }
   }
+}
 
-  useEffect(() => {
-    getUserListData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
+const UsersPage = async ({ searchParams }: Props) => {
+  const t = await getTranslations('users')
+  const params = await searchParams
 
-  const handleRowClick = (row: Row<ListUser>) => {
-    if (row.id) {
-      const params = getApiRequestParamsByUrl()
-      router.push(`users/${row.id}?${params}`, {})
-    }
-  }
+  const { apiParams, pageSize, sort, pageIndex, search } = getRequestParams(params)
 
-  const CustomElement = (
-    <Button data-testid="addUserButton" onClick={() => router.push('/users/create')}>
-      <Plus />
-      {t('newUser')}
-    </Button>
-  )
+  const { users, totalCount } = await getUserListData(apiParams)
+  const totalPages = Math.ceil(totalCount / pageSize) || 1
+
+  // sorting for table as SortingState
+  const sorting = sort.map((entry: string) => ({ id: entry.split(',')[0], desc: entry.split(',')[1] === 'DESC' }))
 
   return (
     <PageContainer headerType="onlyTitle" testId="usersPage">
       <PageHeader title={t('title')} />
       <PageBackground>
-        <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />
         <TableContainer>
-          <UsersTable
-            users={listUsers}
-            rowCount={rowCount}
+          <UsersListContent
+            users={users}
+            totalCount={totalCount}
             pageIndex={pageIndex}
             pageSize={pageSize}
             sorting={sorting}
             totalPages={totalPages}
-            rowSelection={rowSelection}
-            setRowSelection={setRowSelection}
-            onRowClick={handleRowClick}
-            onSortingChange={setSortingParams}
-            onPaginationChange={setPaginationParams}
-            isLoading={isLoading}
+            search={search}
+            newUserLabel={t('newUser')}
           />
         </TableContainer>
       </PageBackground>

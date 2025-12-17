@@ -39,7 +39,7 @@ const UsersTable = (props: UsersTableProps) => {
       cell: info => info.getValue(),
       enableHiding: true,
     }),
-    columnHelper.accessor('displayName', {
+    columnHelper.accessor('fullName', {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.displayName')} />,
       cell: info => info.getValue(),
       meta: {
