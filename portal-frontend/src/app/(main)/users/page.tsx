@@ -1,6 +1,6 @@
+import { headers } from 'next/headers'
 import { getTranslations } from 'next-intl/server'
 
-import { auth } from '@/auth'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -11,7 +11,6 @@ import { getRequestParams, RequestParams } from '@/utils/getRequestParams'
 import { mapListUsers } from '@/utils/users'
 
 import { UsersListContent } from './components/users-list/UsersListContent'
-import { headers } from 'next/headers'
 
 export type UserAuthority = Item & {
   department: Item
