@@ -88,30 +88,39 @@ public class ConfigEventPublisherService {
       cloudEvent = convertToCloudEvent(messageId, topic, configEvent);
     } catch (Exception e) {
       log.error(
-          "Error converting ConfigEvent: messageId={}, topic={}",
-          messageId,
-          topic.getValue(),
-          e);
+          "Error converting ConfigEvent: messageId={}, topic={}", messageId, topic.getValue(), e);
       return CompletableFuture.failedFuture(e);
     }
 
     // Publish to messaging system if available
     if (cloudEventPublisher.isPresent()) {
-      CompletableFuture<ConfigResultEvent> future = cloudEventPublisher.get().publishAsync(topic.getValue(), messageId, cloudEvent);
+      CompletableFuture<ConfigResultEvent> future =
+          cloudEventPublisher.get().publishAsync(topic.getValue(), messageId, cloudEvent);
 
       // Add logging callbacks
       future
-          .thenAccept(result -> log.info("Config Adapter processed event successfully: messageId={}, operation={}, status={}",
-              messageId, result.operation(), result.status())) //
-          .exceptionally(ex -> {
-            log.error("Config Adapter processing failed: messageId={}, error={}", messageId, ex.getMessage());
-            return null;
-          });
+          .thenAccept(
+              result ->
+                  log.info(
+                      "Config Adapter processed event successfully: messageId={}, operation={}, status={}",
+                      messageId,
+                      result.operation(),
+                      result.status())) //
+          .exceptionally(
+              ex -> {
+                log.error(
+                    "Config Adapter processing failed: messageId={}, error={}",
+                    messageId,
+                    ex.getMessage());
+                return null;
+              });
 
       return future;
     } else {
-      log.debug("No publisher configured - ConfigEvent logged only: messageId={}, topic={}",
-          messageId, topic.getValue());
+      log.debug(
+          "No publisher configured - ConfigEvent logged only: messageId={}, topic={}",
+          messageId,
+          topic.getValue());
       // Return a completed future with a mock success result
       return CompletableFuture.completedFuture(null);
     }

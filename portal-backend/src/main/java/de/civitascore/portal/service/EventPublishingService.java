@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,21 +31,7 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
   public T create(I input) {
     I preProcessedInput = preProcessCreateInput(input);
     T entity = getMapper().toEntity(preProcessedInput);
-    entity = postConvertToEntity(entity, preProcessedInput);
-    entity = preSave(entity);
-
-    entity = getRepository().saveAndFlush(entity);
-
-    ConfigResultEvent result = preValidateWithExternalSystem(entity, "create");
-
-    if (result != null && result.resourceId() != null && !result.resourceId().isBlank()) {
-      updateExternalId(entity, result.resourceId());
-      entity = getRepository().saveAndFlush(entity);
-    }
-
-    postSave(entity, preProcessedInput);
-
-    return entity;
+    return publishToExternalSystemAndSave(preProcessedInput, entity, "create");
   }
 
   @Override
@@ -53,20 +40,22 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
     T entity = findById(id);
     I preProcessedInput = preProcessUpdateInput(input, entity);
     getMapper().updateEntity(entity, preProcessedInput);
+    return publishToExternalSystemAndSave(preProcessedInput, entity, "update");
+  }
+
+  private T publishToExternalSystemAndSave(I preProcessedInput, T entity, String operation) {
     entity = postConvertToEntity(entity, preProcessedInput);
     entity = preSave(entity);
 
     entity = getRepository().saveAndFlush(entity);
+    ConfigResultEvent result = preValidateWithExternalSystem(entity, operation);
 
-    ConfigResultEvent result = preValidateWithExternalSystem(entity, "update");
-
-    if (result != null && result.resourceId() != null && !result.resourceId().isBlank()) {
+    if (result != null && !Strings.isBlank(result.resourceId())) {
       updateExternalId(entity, result.resourceId());
       entity = getRepository().saveAndFlush(entity);
     }
 
     postSave(entity, preProcessedInput);
-
     return entity;
   }
 
