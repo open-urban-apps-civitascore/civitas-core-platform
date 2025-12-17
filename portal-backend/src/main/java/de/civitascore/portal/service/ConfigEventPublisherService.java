@@ -8,6 +8,7 @@ import com.civitas.configadapter.model.ConfigValue;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.messaging.CloudEventPublisher;
 import io.cloudevents.CloudEvent;
@@ -81,56 +82,43 @@ public class ConfigEventPublisherService {
         messageId,
         resultTopic);
 
+    // Convert to CloudEvent
+    CloudEvent cloudEvent;
+    try {
+      cloudEvent = convertToCloudEvent(messageId, topic, configEvent);
+    } catch (Exception e) {
+      log.error(
+          "Error converting ConfigEvent: messageId={}, topic={}",
+          messageId,
+          topic.getValue(),
+          e);
+      return CompletableFuture.failedFuture(e);
+    }
+
     // Publish to messaging system if available
-    return cloudEventPublisher
-        .<CompletableFuture<ConfigResultEvent>>map(
-            publisher -> {
-              try {
-                CloudEvent cloudEvent = convertToCloudEvent(messageId, topic, configEvent);
-                CompletableFuture<ConfigResultEvent> future =
-                    publisher.publishAsync(topic.getValue(), messageId, cloudEvent);
+    if (cloudEventPublisher.isPresent()) {
+      CompletableFuture<ConfigResultEvent> future = cloudEventPublisher.get().publishAsync(topic.getValue(), messageId, cloudEvent);
 
-                // Add logging callbacks
-                future
-                    .thenAccept(
-                        result ->
-                            log.info(
-                                "Config Adapter processed event successfully: messageId={}, operation={}, status={}",
-                                messageId,
-                                result.operation(),
-                                result.status()))
-                    .exceptionally(
-                        ex -> {
-                          log.error(
-                              "Config Adapter processing failed: messageId={}, error={}",
-                              messageId,
-                              ex.getMessage());
-                          return null;
-                        });
+      // Add logging callbacks
+      future
+          .thenAccept(result -> log.info("Config Adapter processed event successfully: messageId={}, operation={}, status={}",
+              messageId, result.operation(), result.status())) //
+          .exceptionally(ex -> {
+            log.error("Config Adapter processing failed: messageId={}, error={}", messageId, ex.getMessage());
+            return null;
+          });
 
-                return future;
-              } catch (Exception e) {
-                log.error(
-                    "Error converting or publishing ConfigEvent: messageId={}, topic={}",
-                    messageId,
-                    topic.getValue(),
-                    e);
-                return CompletableFuture.failedFuture(e);
-              }
-            })
-        .orElseGet(
-            () -> {
-              log.debug(
-                  "No publisher configured - ConfigEvent logged only: messageId={}, topic={}",
-                  messageId,
-                  topic.getValue());
-              // Return a completed future with a mock success result
-              return CompletableFuture.completedFuture(null);
-            });
+      return future;
+    } else {
+      log.debug("No publisher configured - ConfigEvent logged only: messageId={}, topic={}",
+          messageId, topic.getValue());
+      // Return a completed future with a mock success result
+      return CompletableFuture.completedFuture(null);
+    }
   }
 
   private CloudEvent convertToCloudEvent(String messageId, Topics topic, ConfigEvent configEvent)
-      throws Exception {
+      throws JsonProcessingException {
     String configEventJson = objectMapper.writeValueAsString(configEvent);
 
     return CloudEventBuilder.v1()
