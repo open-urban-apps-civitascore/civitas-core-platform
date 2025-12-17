@@ -48,7 +48,10 @@
     "groups": "Gruppen",
     "dataspaces": "Datenräume",
     "tenants": "Mandanten-Management",
-    "uml-modeler": "UML Modeler"
+    "uml-modeler": "UML Modeler",
+    "data": "Daten",
+    "table-editor": "Table Editor",
+    "pipeline-editor": "Pipeline Editor"
   },
   "datasets": {
     "title": "Datensätze",
@@ -85,14 +88,39 @@
       },
       "completion": {
         "title": "Erstellungsfortschritt",
-        "metadata": { "title": "Metadaten", "button": "Metadaten eintragen", "requirementsMet": "Mindestanforderungen erfüllt" },
-        "accessPermissions": { "title": "Zugriffsberechtigungen", "button": "Rollen und Usergruppen hinzufügen", "userGroups": "Usergruppen" },
-        "data": { "title": "Daten", "button": "Daten einspielen und mappen", "datasources": "Datenquellen",  "persistence": "Persistenz" },
-        "distribution": { "title": "Distribution", "button1": "APIs anbinden", "button2": "Dateien bereitstellen", "api": "API" },
+        "metadata": {
+          "title": "Metadaten",
+          "button": "Metadaten eintragen",
+          "requirementsMet": "Mindestanforderungen erfüllt"
+        },
+        "accessPermissions": {
+          "title": "Zugriffsberechtigungen",
+          "button": "Rollen und Usergruppen hinzufügen",
+          "userGroups": "Usergruppen"
+        },
+        "data": {
+          "title": "Daten",
+          "button": "Daten einspielen und mappen",
+          "datasources": "Datenquellen",
+          "persistence": "Persistenz"
+        },
+        "distribution": {
+          "title": "Distribution",
+          "button1": "APIs anbinden",
+          "button2": "Dateien bereitstellen",
+          "api": "API"
+        },
         "usagePermissions": { "title": "Nutzungsberechtigungen", "button": "Rate Limiting einstellen" },
         "applications": { "title": "Applikationen", "button": "Applikationen anbinden" },
         "publication": { "title": "Freigabe", "button": "Freigabe gestalten" }
       }
+    },
+    "dataMode": {
+      "selectMode": "In welchem Modus möchtest du den Datensatz erstellen?",
+      "tableEditor": "Table Editor",
+      "pipelineEditor": "Pipeline Editor",
+      "tableDescription": "Eine Oberfläche, die sich an Excel-Workflows orientiert. Für Datensätze mit einem übersichtlichen Datenfluss – basierend auf Datei-Importe, wenigen Datenquellen, wenigen Transformationen, …",
+      "pipelineDescription": "Eine Oberfläche, die sich an node based programming orientiert. Für Datensätze mit einem komplexen Datenfluss – basierend auf vielen Datenquellen, vielen Transformationen, …"
     }
   },
   "users": {

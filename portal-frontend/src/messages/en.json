@@ -48,7 +48,10 @@
     "groups": "Groups",
     "dataspaces": "Data Spaces",
     "tenants": "Tenant Management",
-    "uml-modeler": "UML Modeler"
+    "uml-modeler": "UML Modeler",
+    "data": "Data",
+    "table-editor": "Table Editor",
+    "pipeline-editor": "Pipeline Editor"
   },
   "datasets": {
     "title": "Datasets",
@@ -77,7 +80,7 @@
       "info": {
         "title": "Base Information",
         "dataspace": "Data Space",
-         "selectDataspace": "Select Data Space...",
+        "selectDataspace": "Select Data Space...",
         "name": "Name of the Dataset",
         "description": "Description",
         "tags": "Tags",
@@ -86,13 +89,34 @@
       "completion": {
         "title": "Creation Progress",
         "metadata": { "title": "Metadata", "button": "Enter metadata", "requirementsMet": "Minimal requirements met" },
-        "accessPermissions": { "title": "Access permissions", "button": "Add roles and user groups", "userGroups": "User groups" },
-        "data": { "title": "Data", "button": "Ingest and map data", "datasources": "Datenquellen", "persistence": "Persistence" },
-        "distribution": { "title": "Distribution", "button1": "Integrate APIs", "button2": "Provide files", "api": "API" },
+        "accessPermissions": {
+          "title": "Access permissions",
+          "button": "Add roles and user groups",
+          "userGroups": "User groups"
+        },
+        "data": {
+          "title": "Data",
+          "button": "Ingest and map data",
+          "datasources": "Datenquellen",
+          "persistence": "Persistence"
+        },
+        "distribution": {
+          "title": "Distribution",
+          "button1": "Integrate APIs",
+          "button2": "Provide files",
+          "api": "API"
+        },
         "usagePermissions": { "title": "Usage Permissions", "button": "Configure rate limiting" },
         "applications": { "title": "Applications", "button": "Integrate applications" },
         "publication": { "title": "Publications", "button": "Configure publication" }
       }
+    },
+    "dataMode": {
+      "selectMode": "In which mode would you like to create the dataset?",
+      "tableEditor": "Table Editor",
+      "pipelineEditor": "Pipeline Editor",
+      "tableDescription": "An interface oriented towards Excel workflows. For datasets with a clear data flow – based on file imports, few data sources, few transformations, …",
+      "pipelineDescription": "An interface oriented towards node based programming. For datasets with a complex data flow – based on many data sources, many transformations, …"
     }
   },
   "users": {
