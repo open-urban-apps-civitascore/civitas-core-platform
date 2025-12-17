@@ -17,7 +17,10 @@
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
     "json-server": "source .env.local && npx json-server json-server/db.json -p $JSON_SERVER_PORT",
-    "fetch-design-tokens": "npx shadcn@latest add https://rdhlrr8yducbb6dq.public.blob.vercel-storage.com/figma-to-shadcn/v4-variables-874296775744998506-9vlyIlh2ztIwRvlO8zaz1JlkduI51J.json"
+    "fetch-design-tokens": "npx shadcn@latest add https://rdhlrr8yducbb6dq.public.blob.vercel-storage.com/figma-to-shadcn/v4-variables-874296775744998506-9vlyIlh2ztIwRvlO8zaz1JlkduI51J.json",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "preview-storybook": "pnpm dlx http-server storybook-static"
   },
   "dependencies": {
     "@auth/core": "^0.40.0",
@@ -56,8 +59,13 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@chromatic-com/storybook": "^4.1.2",
     "@eslint/eslintrc": "^3",
     "@next/eslint-plugin-next": "^15.5.2",
+    "@storybook/addon-a11y": "^10.0.6",
+    "@storybook/addon-docs": "^10.0.6",
+    "@storybook/addon-onboarding": "^10.0.6",
+    "@storybook/addon-vitest": "^10.0.6",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "16.3.0",
@@ -78,15 +86,20 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-simple-import-sort": "^12.1.1",
+    "eslint-plugin-storybook": "^10.0.6",
     "eslint-plugin-unused-imports": "^4.2.0",
     "gitlab-pnpm-audit-parser": "^1.0.2",
     "happy-dom": "20.0.2",
     "json-server": "0.17.4",
     "prettier": "^3.6.2",
+    "storybook": "^10.0.6",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.7",
     "typescript": "^5",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "3.2.4"
+    "vitest": "3.2.4",
+    "@storybook/nextjs-vite": "^10.0.6",
+    "playwright": "^1.56.1",
+    "@vitest/browser": "3.2.4"
   }
 }
