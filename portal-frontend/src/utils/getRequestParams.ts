@@ -19,7 +19,7 @@ export const getRequestParams = (params: RequestParams) => {
   sort.forEach(s => apiParams.append('sort', s))
 
   if (search) {
-    apiParams.set('q', encodeURIComponent(search))
+    apiParams.set('q', search)
   }
 
   return { apiParams, pageIndex, pageSize, sort, search }

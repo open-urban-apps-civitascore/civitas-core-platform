@@ -22,15 +22,12 @@ type Props = {
 
 const getUserListData = async (params: URLSearchParams) => {
   try {
-    const usersResponse = await fetch(
-      `${process.env.NEXTAUTH_URL}/api/users?${decodeURIComponent(params.toString())}`,
-      {
-        headers: {
-          cookie: (await headers()).get('cookie') || '',
-        },
-        cache: 'no-store',
+    const usersResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/users?${params.toString()}`, {
+      headers: {
+        cookie: (await headers()).get('cookie') || '',
       },
-    )
+      cache: 'no-store',
+    })
 
     if (!usersResponse.ok) {
       throw new Error('An error occurred while loading user list data')

@@ -81,12 +81,13 @@ export const UsersListContent = ({
   const handleSearchChange = (searchString: string) => {
     const params = new URLSearchParams(window.location.search)
     const queryParts = Array.from(params.entries()).flatMap(([key, value]) =>
-      key === 'q' ? [] : `${key}=${encodeURIComponent(value)}`,
+      key === 'q' || key === 'page' ? [] : `${key}=${encodeURIComponent(value)}`,
     )
 
     if (searchString) {
       queryParts.push(`q=${encodeURIComponent(searchString)}`)
     }
+    queryParts.push(`page=0`) // reset to first page on search
 
     router.push(`?${queryParts.join('&')}`)
   }
@@ -114,7 +115,6 @@ export const UsersListContent = ({
         // onRowClick={handleRowClick}
         onSortingChange={handleSortingChange}
         onPaginationChange={handlePaginationChange}
-        isLoading={false}
       />
     </>
   )
