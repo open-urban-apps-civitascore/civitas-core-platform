@@ -3,7 +3,9 @@ import { LockKeyhole, LockOpen } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { DatasetTableData } from '@/types/datasets'
 import { TableProps } from '@/types/table'
@@ -25,8 +27,6 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     onPaginationChange,
     onSortingChange,
     onRowClick,
-    onCellClick,
-    isCellClickable,
   } = props
   const t = useTranslations('datasets')
   const locale = useLocale()
@@ -40,7 +40,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     }),
     columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
-      cell: info => info.getValue(),
+      cell: info => (info.getValue() ? <LinkCell href={`datasets/${info.row.id}`}>{info.getValue()}</LinkCell> : '-'),
       meta: {
         style: {
           minWidth: '250px',
@@ -49,7 +49,12 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     }),
     columnHelper.accessor('dataspace', {
       header: t('tableHeaders.dataSpace'),
-      cell: info => info.getValue()?.name || '-',
+      cell: info =>
+        info.getValue() ? (
+          <LinkCell href={`dataspaces/${info.getValue()?.id}`}>{info.getValue()?.name || ''}</LinkCell>
+        ) : (
+          '-'
+        ),
       meta: {
         style: {
           minWidth: '150px',
@@ -58,10 +63,25 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     }),
     columnHelper.accessor('contact', {
       header: t('tableHeaders.contact'),
-      cell: info => (info.getValue() ? `${info.getValue().firstName} ${info.getValue().lastName}` : '-'),
+      cell: info =>
+        info.getValue() ? (
+          <LinkCell className="hover:no-underline" href={`users/${info.getValue().id}`}>
+            <div className="flex items-center gap-1.5">
+              <Avatar className="AvatarRoot border-1" style={{ textDecoration: 'none !important' }}>
+                <AvatarFallback
+                  className="AvatarFallback"
+                  style={{ textDecoration: 'none !important' }}
+                >{`${info.getValue().firstName.charAt(0)}${info.getValue().lastName.charAt(0)}`}</AvatarFallback>
+              </Avatar>
+              <span className="group-hover/link:underline decoration-outline decoration-1.5">{`${info.getValue().firstName} ${info.getValue().lastName}`}</span>
+            </div>
+          </LinkCell>
+        ) : (
+          '-'
+        ),
       meta: {
         style: {
-          minWidth: '100px',
+          minWidth: '230px',
         },
       },
     }),
@@ -136,8 +156,6 @@ const DatasetsTable = (props: DatasetsTableProps) => {
       pageSize={pageSize}
       totalPages={totalPages}
       onRowClick={onRowClick}
-      onCellClick={onCellClick}
-      isCellClickable={isCellClickable}
     />
   )
 }

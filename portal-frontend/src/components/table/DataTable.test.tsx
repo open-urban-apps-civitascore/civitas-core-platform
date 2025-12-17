@@ -19,7 +19,6 @@ vi.mock('next-intl', () => ({
 }))
 
 const onRowClickMock = vi.fn()
-const onCellClickMock = vi.fn()
 
 type Row = {
   readonly id: number
@@ -287,26 +286,6 @@ describe('DataTable row click', () => {
     expect(rows[1]).toHaveClass('cursor-pointer')
     fireEvent.click(rows[1])
     expect(onRowClickMock).toHaveBeenCalledOnce()
-  })
-})
-
-describe('DataTable cell click', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-  it('rows click is disabled when isCellClickable is false', () => {
-    render(<TestWrapper isCellClickable={() => false} onCellClick={onCellClickMock} />)
-    const rowCells = screen.getAllByRole('row')[1].querySelectorAll('td')
-    expect(rowCells[1]).not.toHaveClass('cursor-pointer')
-    fireEvent.click(rowCells[1])
-    expect(onCellClickMock).not.toHaveBeenCalled()
-  })
-  it('rows click is enabled when isCellClickable is true', () => {
-    render(<TestWrapper isCellClickable={() => true} onCellClick={onCellClickMock} />)
-    const rowCells = screen.getAllByRole('row')[1].querySelectorAll('td')
-    expect(rowCells[1]).toHaveClass('cursor-pointer')
-    fireEvent.click(rowCells[1])
-    expect(onCellClickMock).toHaveBeenCalledOnce()
   })
 })
 

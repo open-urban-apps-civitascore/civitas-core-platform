@@ -1,6 +1,5 @@
 import { ScrollArea } from '@radix-ui/react-scroll-area'
 import { flexRender, Row, SortDirection, Table } from '@tanstack/react-table'
-import { ChevronRight } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { ComponentProps } from 'react'
 
@@ -31,9 +30,7 @@ export interface DataTableProps<T> extends ComponentProps<'table'> {
   hasCard?: boolean
   testId?: string
   isRowClickable?: (row: Row<T>) => boolean
-  isCellClickable?: (row: Row<T>, columnId: keyof T) => boolean
   onRowClick?: (row: Row<T>) => void
-  onCellClick?: (row: Row<T>, columnId: string) => void
 }
 
 const LoadingSkeleton = () => (
@@ -55,8 +52,6 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
     hasCard = true,
     onRowClick,
     isRowClickable = () => true,
-    isCellClickable = () => true,
-    onCellClick,
     testId,
     ...tableProps
   } = props
@@ -101,28 +96,12 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                   >
                     {row.getVisibleCells().map(cell => (
                       <TableCell
-                        className={cn(
-                          'whitespace-normal px-3 group/cell',
-                          onCellClick &&
-                            isCellClickable(row, cell.column.id as keyof T) &&
-                            'cursor-pointer hover:underline decoration-outline decoration-1.5',
-                        )}
+                        className={cn('whitespace-normal px-3 group/cell')}
                         key={cell.id}
                         style={cell.column.columnDef.meta?.style}
-                        onClick={
-                          onCellClick && isCellClickable(row, cell.column.id as keyof T)
-                            ? e => {
-                                e.stopPropagation()
-                                props.onCellClick?.(row, cell.column.id)
-                              }
-                            : () => null
-                        }
                       >
                         <div className="flex justify-between items-center">
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          {onCellClick && isCellClickable(row, cell.column.id as keyof T) && (
-                            <ChevronRight className="text-muted-foreground opacity-0 group-hover/cell:opacity-100 transition-opacity" />
-                          )}
                         </div>
                       </TableCell>
                     ))}

@@ -1,9 +1,8 @@
 'use client'
 
-import { Row } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -62,30 +61,6 @@ const DatasetsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
 
-  const handleCellClick = (row: Row<DatasetTableData>, columnId: keyof DatasetTableData) => {
-    console.log('Cell clicked:', row, columnId)
-    let routeParam1 = 'datasets'
-    let routeParam2
-    switch (columnId) {
-      case 'dataspace':
-        routeParam1 = 'dataspaces'
-        routeParam2 = row.original[columnId]?.id
-        break
-      case 'contact':
-        routeParam1 = 'users'
-        routeParam2 = row.original[columnId].id
-        break
-      default:
-        routeParam1 = 'datasets'
-        routeParam2 = row.id
-    }
-    if (routeParam1 && routeParam2)
-      router.push(`${routeParam1}/${routeParam2}?${getApiRequestParamsByUrl().toString()}`)
-  }
-
-  const isCellClickable = (row: Row<DatasetTableData>, columnId: string) =>
-    (columnId === 'name' || columnId === 'contact' || columnId === 'dataspace') && !!row.original[columnId]
-
   const CustomElement = (
     <Button onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}>
       <Plus />
@@ -113,8 +88,6 @@ const DatasetsPage = () => {
             totalPages={totalPages}
             onPaginationChange={setPaginationParams}
             onSortingChange={setSortingParams}
-            onCellClick={handleCellClick}
-            isCellClickable={isCellClickable}
           />
         </TableContainer>
       </PageBackground>
