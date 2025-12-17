@@ -69,7 +69,6 @@ const DatasetsPage = () => {
           throw new Error('An error occurred while loading data')
         }
         const datasetsData: DatasetResponse[] = await datasetsResponse.json()
-        // const datasets = mapDatasetsToListData(datasetsData)
         setDatasets(datasetsData)
         const totalCount = Number(datasetsResponse.headers.get('X-Total-Count')) || 0
         if (rowCount !== totalCount) {
@@ -84,12 +83,29 @@ const DatasetsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
 
-  const handleRowClick = (row: Row<DatasetTableData>) => {
-    if (row.id) {
-      const params = getApiRequestParamsByUrl()
-      router.push(`datasets/${row.id}?${params.toString()}`)
+  const handleCellClick = (row: Row<DatasetTableData>, columnId: keyof DatasetTableData) => {
+    console.log('Cell clicked:', row, columnId)
+    let routeParam1 = 'datasets'
+    let routeParam2
+    switch (columnId) {
+      case 'dataspace':
+        routeParam1 = 'dataspaces'
+        routeParam2 = row.original[columnId]?.id
+        break
+      case 'contact':
+        routeParam1 = 'users'
+        routeParam2 = row.original[columnId].id
+        break
+      default:
+        routeParam1 = 'datasets'
+        routeParam2 = row.id
     }
+    if (routeParam1 && routeParam2)
+      router.push(`${routeParam1}/${routeParam2}?${getApiRequestParamsByUrl().toString()}`)
   }
+
+  const isCellClickable = (row: Row<DatasetTableData>, columnId: string) =>
+    (columnId === 'name' || columnId === 'contact' || columnId === 'dataspace') && !!row.original[columnId]
 
   const CustomElement = (
     <Button onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}>
@@ -118,7 +134,8 @@ const DatasetsPage = () => {
             totalPages={totalPages}
             onPaginationChange={setPaginationParams}
             onSortingChange={setSortingParams}
-            onRowClick={handleRowClick}
+            onCellClick={handleCellClick}
+            isCellClickable={isCellClickable}
           />
         </TableContainer>
       </PageBackground>

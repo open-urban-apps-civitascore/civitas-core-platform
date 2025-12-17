@@ -1,4 +1,5 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
+import { LockKeyhole, LockOpen } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
@@ -8,7 +9,6 @@ import { DatasetTableData } from '@/types/datasets'
 import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
-import { LockKeyhole, LockOpen } from 'lucide-react'
 
 interface DatasetsTableProps extends TableProps<DatasetTableData> {
   datasets: DatasetTableData[]
@@ -25,6 +25,8 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     onPaginationChange,
     onSortingChange,
     onRowClick,
+    onCellClick,
+    isCellClickable,
   } = props
   const t = useTranslations('datasets')
   const locale = useLocale()
@@ -56,7 +58,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     }),
     columnHelper.accessor('contact', {
       header: t('tableHeaders.contact'),
-      cell: info => `${info.getValue().firstName} ${info.getValue().lastName}`,
+      cell: info => (info.getValue() ? `${info.getValue().firstName} ${info.getValue().lastName}` : '-'),
       meta: {
         style: {
           minWidth: '100px',
@@ -134,6 +136,8 @@ const DatasetsTable = (props: DatasetsTableProps) => {
       pageSize={pageSize}
       totalPages={totalPages}
       onRowClick={onRowClick}
+      onCellClick={onCellClick}
+      isCellClickable={isCellClickable}
     />
   )
 }

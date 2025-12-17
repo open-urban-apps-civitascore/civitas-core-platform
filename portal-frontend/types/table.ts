@@ -13,6 +13,8 @@ export interface TableProps<T> {
   rowSelection?: RowSelectionState
   setRowSelection?: Dispatch<SetStateAction<RowSelectionState>>
   onRowClick?: (row: Row<T>) => void
+  onCellClick?: (row: Row<T>, columnId: keyof T) => void
+  isCellClickable?: (row: Row<T>, columnId: string) => boolean
   onPaginationChange: (newPagination: PaginationState) => void
   onSortingChange: (newSorting: SortingState) => void
   isLoading?: boolean
