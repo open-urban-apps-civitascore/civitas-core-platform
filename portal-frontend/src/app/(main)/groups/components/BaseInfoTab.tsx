@@ -93,7 +93,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
         const contactData: UserResponse = await usersResponse.json()
         const contact = {
           id: contactData.id,
-          displayName: contactData.displayName,
+          displayName: `${contactData.firstName} ${contactData.lastName}`,
           email: contactData.email,
         }
         setSelectedContact(contact)
@@ -183,7 +183,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
       const contactsData: UserResponse[] = await usersResponse.json()
       const contacts = contactsData.map(contact => ({
         id: contact.id,
-        displayName: contact.displayName,
+        displayName: `${contact.firstName} ${contact.lastName}`,
         email: contact.email,
       }))
       setContacts(contacts)

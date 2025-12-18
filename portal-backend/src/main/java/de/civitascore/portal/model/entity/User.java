@@ -1,8 +1,11 @@
 package de.civitascore.portal.model.entity;
 
+import de.civitascore.portal.model.embedded.UserTitleType;
 import de.civitascore.portal.model.entity.base.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.ManyToMany;
@@ -12,8 +15,10 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.Formula;
 
 @Entity
 @Table(
@@ -30,6 +35,10 @@ import lombok.Setter;
 @Getter
 @Setter
 public class User extends BaseEntity {
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "title", nullable = false)
+  private UserTitleType title = UserTitleType.OTHER;
 
   @NotBlank @Column(name = "first_name", nullable = false)
   private String firstName;
@@ -52,7 +61,7 @@ public class User extends BaseEntity {
   @ManyToMany(fetch = FetchType.LAZY, mappedBy = "members")
   private Set<Group> groups = new HashSet<>();
 
-  public String getFullName() {
-    return firstName + " " + lastName;
-  }
+  @Setter(AccessLevel.NONE)
+  @Formula("first_name || ' ' || last_name")
+  private String fullName;
 }

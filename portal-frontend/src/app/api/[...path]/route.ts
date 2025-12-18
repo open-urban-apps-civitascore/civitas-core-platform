@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
+const JSON_SERVER_URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
+const API_URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
 interface RouteContext {
   params: Promise<{ path: string[] }>
 }
@@ -23,7 +25,9 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     const { path } = await context.params
     const pathString = path.join('/')
     const searchParams = request.nextUrl.searchParams.toString()
-    const url = `${process.env.API_BASE_URL}:${process.env.API_PORT}/${pathString}${searchParams ? `?${searchParams}` : ''}`
+
+    const searchParamsString = searchParams ? `?${searchParams}` : ''
+    const url = `${pathString === 'users' ? API_URL : JSON_SERVER_URL}/${pathString}${searchParamsString}`
 
     // Forward all original headers from the request
     const headers = new Headers(request.headers)

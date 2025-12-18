@@ -2,6 +2,7 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.embedded.UserTitleType;
 import de.civitascore.portal.model.input.UserInputDTO;
 import de.civitascore.portal.model.output.UserOutputDTO;
 import de.civitascore.portal.repository.UserRepository;
@@ -57,6 +58,7 @@ class UserControllerIntegrationTest
   @Override
   protected UserInputDTO createUpdateInput() {
     UserInputDTO input = new UserInputDTO();
+    input.setTitle(UserTitleType.MS);
     input.setFirstName("Updated");
     input.setLastName("User");
     input.setEmail("updated.user@example.com");
@@ -99,6 +101,7 @@ class UserControllerIntegrationTest
 
       UserOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
+      assertThat(output.getTitle()).as("Title should match input").isEqualTo(input.getTitle());
       assertThat(output.getFirstName())
           .as("First name should match input")
           .isEqualTo(input.getFirstName());
@@ -275,6 +278,7 @@ class UserControllerIntegrationTest
           .isEqualTo(updateInput.getFirstName());
       assertThat(output.getEmail()).as("Email should be updated").isEqualTo(updateInput.getEmail());
       assertThat(output.getModifiedAt()).isNotNull();
+      assertThat(output.getTitle()).as("Title should be updated").isEqualTo(updateInput.getTitle());
     }
 
     @Test
@@ -364,6 +368,9 @@ class UserControllerIntegrationTest
       assertThat(response.getBody().getActive())
           .as("Active should remain unchanged")
           .isEqualTo(initialUser.getActive());
+      assertThat(response.getBody().getTitle())
+          .as("Title should remain unchanged")
+          .isEqualTo(initialUser.getTitle());
     }
 
     @Test
@@ -384,6 +391,7 @@ class UserControllerIntegrationTest
       assertThat(response.getBody().getLastName()).isEqualTo(initialUser.getLastName());
       assertThat(response.getBody().getEmail()).isEqualTo(initialUser.getEmail());
       assertThat(response.getBody().getPhone()).isEqualTo(initialUser.getPhone());
+      assertThat(response.getBody().getTitle()).isEqualTo(initialUser.getTitle());
     }
 
     @Test
@@ -411,6 +419,7 @@ class UserControllerIntegrationTest
       patchMap.put("email", "patched@example.com");
       patchMap.put("phone", "+49999999999");
       patchMap.put("active", false);
+      patchMap.put("title", "MS");
 
       ResponseEntity<UserOutputDTO> response = performPatch(userId, patchMap);
 
@@ -420,6 +429,7 @@ class UserControllerIntegrationTest
       assertThat(response.getBody().getEmail()).isEqualTo("patched@example.com");
       assertThat(response.getBody().getPhone()).isEqualTo("+49999999999");
       assertThat(response.getBody().getActive()).isFalse();
+      assertThat(response.getBody().getTitle()).isEqualTo("MS");
     }
 
     @Test

@@ -131,7 +131,7 @@
       "subheader": "Personal details and general information.",
       "id": "ID",
       "displayName": "Display Name",
-      "title": { "title": "Title", "male": "Mr", "female": "Ms" },
+      "title": { "title": "Title", "mr": "Mr", "ms": "Ms", "other": "No Specification" },
       "firstName": "First Name",
       "lastName": "Last Name",
       "authority": "Authority",

@@ -101,6 +101,7 @@ export const authConfig = {
         }
       }
     },
+
     session({ session, token }) {
       return {
         ...session,
