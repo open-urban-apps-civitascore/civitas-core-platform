@@ -38,6 +38,7 @@
         <commons-compress.version>1.27.1</commons-compress.version>
         <spring-kafka.version>3.3.11</spring-kafka.version>
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
+        <apache-jena.version>5.6.0</apache-jena.version>
     </properties>
 
     <dependencyManagement>
@@ -107,6 +108,15 @@
             <artifactId>flyway-database-postgresql</artifactId>
             <version>${flyway.version}</version>
         </dependency>
+
+        <!-- Serialization -->
+        <dependency>
+            <groupId>org.apache.jena</groupId>
+            <artifactId>apache-jena-libs</artifactId>
+            <version>${apache-jena.version}</version>
+            <type>pom</type>
+        </dependency>
+
 
         <!-- Actuator + OpenAPI -->
         <dependency>
