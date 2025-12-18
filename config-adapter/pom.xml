@@ -55,6 +55,7 @@
 		<commons.compress.version>1.28.0</commons.compress.version>
 		<lz4.version>1.8.1</lz4.version>
 		<at.yawk.lz4.version>1.10.1</at.yawk.lz4.version>
+		<cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
 	</properties>
 
 	<dependencyManagement>
@@ -311,6 +312,17 @@
 						</configuration>
 					</execution>
 				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.cyclonedx</groupId>
+				<artifactId>cyclonedx-maven-plugin</artifactId>
+				<version>${cyclonedx-maven-plugin.version}</version>
+				<configuration>
+					<outputFormat>json</outputFormat>
+					<schemaVersion>1.5</schemaVersion>
+					<includeBomSerialNumber>true</includeBomSerialNumber>
+					<outputName>config-adapter</outputName>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
