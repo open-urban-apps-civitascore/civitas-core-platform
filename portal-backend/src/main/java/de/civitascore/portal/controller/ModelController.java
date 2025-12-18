@@ -58,8 +58,10 @@ public class ModelController {
       produces = {
         MediaType.APPLICATION_JSON_VALUE,
         MediaType.APPLICATION_XML_VALUE,
-        "application/ecore+xml",
-        "application/schema+json"
+        "application/ecore+xmi",
+        "application/ecore",
+        "application/schema+json",
+        "application/uml"
       })
   @Operation(
       summary = "Download a model file",

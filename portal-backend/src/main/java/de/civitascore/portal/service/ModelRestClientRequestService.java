@@ -27,7 +27,7 @@ public class ModelRestClientRequestService {
    */
   public String uploadModelFile(MultipartFile modelFile, String nsUri) {
     String baseUrl =
-        String.format("%s:%d", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
+        String.format("%s:%d/atlas/rest", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
 
     String endpoint =
         String.format(
@@ -40,7 +40,7 @@ public class ModelRestClientRequestService {
       return restClient
           .post()
           .uri(endpoint)
-          .contentType(MediaType.APPLICATION_XML)
+          .contentType(MediaType.parseMediaType("application/uml"))
           .body(modelFile.getResource())
           .retrieve()
           .body(String.class);
@@ -60,7 +60,7 @@ public class ModelRestClientRequestService {
    */
   public String downloadModelFile(String nsUri, String acceptHeader) {
     String baseUrl =
-        String.format("%s:%d", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
+        String.format("%s:%d/atlas/rest", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
 
     String endpoint =
         String.format(
