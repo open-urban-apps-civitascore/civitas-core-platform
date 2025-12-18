@@ -1,0 +1,102 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "baseBranches": ["develop"],
+  "platform": "gitlab",
+  "labels": ["v::2", "team data mgmt", "dependencies"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "schedule": ["after 10pm every weekday", "before 5am every weekday", "every weekend"],
+  "timezone": "UTC",
+  "rangeStrategy": "bump",
+  "semanticCommits": "enabled",
+  "separateMajorMinor": true,
+  "separateMultipleMajor": true,
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "assignees": []
+  },
+  "packageRules": [
+    {
+      "description": "Frontend dependencies (Next.js/React)",
+      "matchPaths": ["portal-frontend/**"],
+      "groupName": "frontend dependencies",
+      "commitMessagePrefix": "chore(frontend):",
+      "addLabels": ["cop frontend"]
+    },
+    {
+      "description": "Backend dependencies (Spring Boot)",
+      "matchPaths": ["portal-backend/**"],
+      "groupName": "backend dependencies",
+      "commitMessagePrefix": "chore(backend):",
+      "addLabels": ["cop backend"]
+    },
+    {
+      "description": "Config Adapter dependencies",
+      "matchPaths": ["config-adapter/**"],
+      "groupName": "config-adapter dependencies",
+      "commitMessagePrefix": "chore(config-adapter):",
+      "addLabels": ["cop backend"]
+    },
+    {
+      "description": "Group Spring Boot dependencies",
+      "matchPackagePatterns": ["^org\\.springframework"],
+      "groupName": "Spring Boot dependencies",
+      "matchPaths": ["portal-backend/**", "config-adapter/**"]
+    },
+    {
+      "description": "Group React ecosystem",
+      "matchPackagePatterns": ["^react", "^@types/react"],
+      "groupName": "React ecosystem",
+      "matchPaths": ["portal-frontend/**"]
+    },
+    {
+      "description": "Group Next.js related packages",
+      "matchPackageNames": ["next"],
+      "matchPackagePatterns": ["^@next/", "^next-"],
+      "groupName": "Next.js",
+      "matchPaths": ["portal-frontend/**"]
+    },
+    {
+      "description": "Group testing libraries",
+      "matchPackagePatterns": ["^@testing-library/", "^vitest", "^@vitest/", "^@playwright/", "junit", "mockito"],
+      "groupName": "testing libraries"
+    },
+    {
+      "description": "Group linting and formatting tools",
+      "matchPackagePatterns": ["^eslint", "^@eslint/", "^prettier", "^@prettier/", "checkstyle", "spotbugs"],
+      "groupName": "linting and formatting"
+    },
+    {
+      "description": "Pin Docker digests",
+      "matchDatasources": ["docker"],
+      "pinDigests": true
+    },
+    {
+      "description": "Update Docker base images",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "groupName": "Docker base images",
+      "commitMessagePrefix": "chore(docker):"
+    }
+  ],
+  "maven": {
+    "enabled": true
+  },
+  "npm": {
+    "enabled": true
+  },
+  "dockerfile": {
+    "enabled": true
+  },
+  "docker-compose": {
+    "enabled": true
+  },
+  "postUpdateOptions": [
+    "npmDedupe"
+  ],
+  "ignoreDeps": [],
+  "ignorePresets": []
+}
