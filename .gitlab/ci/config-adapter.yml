@@ -171,7 +171,7 @@ publish-config-adapter:
         -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
         -s ci_settings.xml
 
-deploy-config-adapter:
+build-config-adapter-image:
   extends: .only-config-adapter-changes
   image: docker:27-dind
   stage: build
