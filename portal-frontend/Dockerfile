@@ -14,6 +14,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./package.json
 COPY .next ./.next
 COPY public ./public
+COPY json-server ./json-server
+
+# Create cache directory for Next.js image optimization
+RUN mkdir -p .next/cache/images
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -22,4 +26,9 @@ RUN addgroup -g 1001 -S nodejs && \
 USER nextjs
 
 EXPOSE 80
-CMD ["node_modules/.bin/next", "start"]
+ENV NODE_ENV=production
+
+# Temporary fix to run json-server alongside nextjs until proper backend is available
+# Using concurrently to run both services and crash container if either service fails
+CMD ["concurrently", "--kill-others", "--names", "JSON-SERVER,NEXT", "-c", "blue,green", "json-server json-server/db.json -p 3001", "node_modules/.bin/next start"]
+# CMD ["node_modules/.bin/next", "start"]
