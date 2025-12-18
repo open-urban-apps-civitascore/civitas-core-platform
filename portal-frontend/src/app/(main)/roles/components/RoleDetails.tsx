@@ -141,8 +141,8 @@ export const RoleDetails = (props: Props): JSX.Element => {
       tenant: 'ExampleCorp', // Placeholder tenant
       users: [],
       permissions: [],
-      createdAt: new Date().toISOString(), // Placeholder createdAt, later set by backend
       groups: [],
+      createdAt: new Date().toISOString(), // Placeholder createdAt, later set by backend
       ...values,
     })
   }
@@ -175,10 +175,16 @@ export const RoleDetails = (props: Props): JSX.Element => {
     }
   }
 
-  const updatePermissions = (permissionIds: string[]): void => {
+  const handlePermissionUpdate = (permissionIds: string[]): void => {
     if (!selectedRole || !roleId) return
 
     updateRole(roleId, { ...selectedRole, permissions: permissionIds })
+  }
+
+  const handleGroupAssigmentUpdate = (newGroupIds: string[]): void => {
+    if (!selectedRole || !roleId) return
+
+    updateRole(roleId, { ...selectedRole, groups: newGroupIds })
   }
 
   const subTabValues: Record<'basicInformation' | 'permissions' | 'groupAssignment', Tab> = {
@@ -213,7 +219,7 @@ export const RoleDetails = (props: Props): JSX.Element => {
   const badgeTitle = roleType ? tRoles(`${roleType}Roles`).slice(0, -1) : undefined
 
   return (
-    <PageContainer headerType="withSubTabs">
+    <PageContainer headerType="withSubTabsOrSubtitle">
       <PageHeader
         title={roleId ? selectedRole?.name : tRoles('newRole')}
         badgeTitle={badgeTitle}
@@ -239,7 +245,7 @@ export const RoleDetails = (props: Props): JSX.Element => {
 
         {subTabValue === subTabValues.permissions.value && (
           <PermissionsTab
-            updatePermissions={updatePermissions}
+            onPermissionUpdate={handlePermissionUpdate}
             currentSelectedPermissionIds={selectedRole?.permissions || []}
             roleType={tabValue}
             hasPermissionsTabBeenSaved={hasPermissionsTabBeenSaved}
@@ -248,7 +254,13 @@ export const RoleDetails = (props: Props): JSX.Element => {
           />
         )}
 
-        {subTabValue === subTabValues.groupAssignment.value && <GroupAssignmentTab />}
+        {subTabValue === subTabValues.groupAssignment.value && (
+          <GroupAssignmentTab
+            groupIds={selectedRole?.groups || []}
+            onGroupAssignmentUpdate={handleGroupAssigmentUpdate}
+            roleName={selectedRole?.name || ''}
+          />
+        )}
       </PageBackground>
     </PageContainer>
   )

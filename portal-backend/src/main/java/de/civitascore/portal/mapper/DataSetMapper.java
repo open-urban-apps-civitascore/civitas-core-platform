@@ -13,11 +13,22 @@ import org.mapstruct.ReportingPolicy;
 @Mapper(
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
-    uses = {UserMapper.class, DataSpaceMapper.class},
+    uses = {
+      UserMapper.class,
+      DataSpaceMapper.class,
+      DataSetSeriesMapper.class,
+      AgentMapper.class,
+      DistributionMapper.class,
+      CatalogMapper.class
+    },
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputDTO, DataSet> {
   @Mapping(target = "owner", ignore = true)
+  @Mapping(target = "dataSetSeries", ignore = true)
   @Mapping(target = "dataSpaces", ignore = true)
+  @Mapping(target = "agents", ignore = true)
+  @Mapping(target = "distributions", ignore = true)
+  @Mapping(target = "catalogs", ignore = true)
   @Override
   DataSet toEntity(DataSetInputDTO input);
 
@@ -25,13 +36,21 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   DataSetOutputDTO toOutput(DataSet entity);
 
   @Mapping(target = "ownerUserId", source = "owner.id")
+  @Mapping(target = "dataSetSeriesId", source = "dataSetSeries.id")
   @Mapping(target = "dataSpaceIds", ignore = true)
+  @Mapping(target = "agentIds", ignore = true)
+  @Mapping(target = "distributionIds", ignore = true)
+  @Mapping(target = "catalogIds", ignore = true)
   @Override
   DataSetInputDTO toInput(DataSet entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "owner", ignore = true)
+  @Mapping(target = "dataSetSeries", ignore = true)
   @Mapping(target = "dataSpaces", ignore = true)
+  @Mapping(target = "agents", ignore = true)
+  @Mapping(target = "distributions", ignore = true)
+  @Mapping(target = "catalogs", ignore = true)
   @Override
   void updateEntity(@MappingTarget DataSet entity, DataSetInputDTO input);
 }

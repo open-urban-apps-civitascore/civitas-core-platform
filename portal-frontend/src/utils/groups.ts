@@ -16,3 +16,16 @@ export const mapGroupToBaseFormData = (groupData: Group): GroupBaseFormData => (
   description: groupData.description || '',
   contact: groupData.contact?.id || '',
 })
+
+export const flattenGroups = (groups: Group[]): Group[] => {
+  const result: Group[] = []
+
+  const processGroup = (group: Group) => {
+    result.push({ ...group, subgroups: [] })
+    group.subgroups?.forEach(processGroup)
+  }
+
+  groups.forEach(processGroup)
+
+  return result
+}

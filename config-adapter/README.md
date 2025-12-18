@@ -125,7 +125,39 @@ Production implementation of Keycloak adapter.
 
 **Usage:** Production-ready adapter that integrates with Keycloak for user, realm, and client management.
 
-### 6. config-adapter-examples
+### 6. config-adapter-apisix
+Production implementation of APISIX adapter for managing API Gateway upstreams.
+
+**Key Components:**
+- `ApisixAdapter` - Manages APISIX upstream configuration via Admin API
+
+**Supported Operations:**
+- CREATE - Create new APISIX upstreams
+- UPDATE - Update existing APISIX upstreams
+- DELETE - Delete APISIX upstreams
+
+**Subscribed Topics:**
+- `core.civitas.api.backend.created`
+- `core.civitas.api.backend.updated`
+- `core.civitas.api.backend.deleted`
+
+**Configuration Properties:**
+```properties
+# APISIX Admin API URL (default: http://localhost:9180)
+apisix.admin.url=http://localhost:9180
+
+# APISIX Admin API Key (default: edd1c9f034335f136f87ad84b625c8f1)
+apisix.admin.key=edd1c9f034335f136f87ad84b625c8f1
+
+# Topics to subscribe to
+apisix.topics=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted
+```
+
+**Usage:** Production-ready adapter that integrates with Apache APISIX API Gateway for managing upstream backend services.
+
+**Documentation:** For detailed documentation including event formats, error handling, and integration examples, see [APISIX Adapter Documentation](config-adapter-apisix/README.md).
+
+### 7. config-adapter-examples
 Example adapter implementations for reference and testing.
 
 **Key Components:**
@@ -156,7 +188,7 @@ The framework supports configuring multiple adapters to run independently. Each 
 
 **Multiple Adapters (comma-separated short names)**
 ```properties
-adapters=keycloak,dummylog
+adapters=keycloak,apisix,dummylog
 eventhandler.name=kafka
 ```
 
@@ -173,7 +205,7 @@ eventhandler.name=kafka
 
 ```properties
 # Multiple adapters - each will get its own consumer (short names matched via ServiceLoader)
-adapters=keycloak,dummylog
+adapters=keycloak,apisix,dummylog
 
 # Event handler name (implements both EventConsumer and EventPublisher)
 eventhandler.name=kafka
@@ -192,6 +224,11 @@ keycloak.realm=master
 keycloak.username=admin
 keycloak.password=admin
 keycloak.client.id=admin-cli
+
+# APISIX settings
+apisix.admin.url=http://localhost:9180
+apisix.admin.key=edd1c9f034335f136f87ad84b625c8f1
+apisix.topics=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted
 
 # DummyLogAdapter topic configuration
 dummylog.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.user.deleted
@@ -790,6 +827,8 @@ civitas-config-adapter/
 ├── config-adapter-api/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/configadapter/
+│       ├── Topics.java
+│       ├── ConfigBase.java
 │       ├── adapter/
 │       │   ├── ConfigAdapter.java
 │       │   └── AbstractConfigAdapter.java
@@ -797,6 +836,7 @@ civitas-config-adapter/
 │       │   ├── AdapterConfig.java             # Interface for adapter configuration
 │       │   └── ApplicationConfig.java         # Interface for application configuration
 │       ├── messaging/
+│       │   ├── EventBase.java
 │       │   ├── EventConsumer.java
 │       │   └── EventPublisher.java
 │       └── model/
@@ -804,8 +844,7 @@ civitas-config-adapter/
 │           ├── ConfigResultEvent.java
 │           ├── Metadata.java
 │           ├── Payload.java
-│           ├── Config.java                    # Event config data model
-│           └── Topics.java
+│           └── Config.java                    # Event config data model
 ├── config-adapter-configuration/
 │   ├── pom.xml
 │   └── src/main/java/com/civitas/configadapter/configuration/

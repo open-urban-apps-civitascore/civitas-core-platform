@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>com.civitas</groupId>
@@ -12,12 +11,21 @@
 	<name>Civitas Config Adapter Parent</name>
 	<description>Parent POM for Civitas Config Adapter modules</description>
 
+	<licenses>
+		<license>
+			<name>European Union Public License 1.2</name>
+			<url>https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+
 	<modules>
 		<module>config-adapter-api</module>
 		<module>config-adapter-configuration</module>
 		<module>event-handler-kafka</module>
 		<module>config-adapter-application</module>
 		<module>config-adapter-keycloak</module>
+		<module>config-adapter-apisix</module>
 		<module>config-adapter-examples</module>
 	</modules>
 
@@ -31,6 +39,8 @@
 		<cloudevents.version>3.0.0</cloudevents.version>
 		<slf4j.version>2.0.9</slf4j.version>
 		<jackson.version>2.16.1</jackson.version>
+		<jakarta.ws.rs.version>3.1.0</jakarta.ws.rs.version>
+		<jersey.version>3.1.5</jersey.version>
 		<commons.configuration2.version>2.11.0</commons.configuration2.version>
 		<junit.version>5.10.1</junit.version>
 		<mockito.version>5.8.0</mockito.version>
@@ -42,6 +52,8 @@
 		<commons.io.version>2.21.0</commons.io.version>
 		<commons.lang.version>3.20.0</commons.lang.version>
 		<commons.compress.version>1.28.0</commons.compress.version>
+  		<lz4.version>1.8.1</lz4.version>
+  		<at.yawk.lz4.version>1.10.1</at.yawk.lz4.version>
 	</properties>
 
 	<dependencyManagement>
@@ -89,6 +101,28 @@
 				<version>${jackson.version}</version>
 			</dependency>
 
+			<!-- JAX-RS / Jersey -->
+			<dependency>
+				<groupId>jakarta.ws.rs</groupId>
+				<artifactId>jakarta.ws.rs-api</artifactId>
+				<version>${jakarta.ws.rs.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.glassfish.jersey.core</groupId>
+				<artifactId>jersey-client</artifactId>
+				<version>${jersey.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.glassfish.jersey.inject</groupId>
+				<artifactId>jersey-hk2</artifactId>
+				<version>${jersey.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>org.glassfish.jersey.media</groupId>
+				<artifactId>jersey-media-json-jackson</artifactId>
+				<version>${jersey.version}</version>
+			</dependency>
+
 			<!-- Apache Commons -->
 			<dependency>
 				<groupId>org.apache.commons</groupId>
@@ -114,6 +148,18 @@
 				<groupId>org.apache.commons</groupId>
 				<artifactId>commons-compress</artifactId>
 				<version>${commons.compress.version}</version>
+			</dependency>
+
+   			<!-- lz4 -->
+			<dependency>
+				<groupId>org.lz4</groupId>
+				<artifactId>lz4-java</artifactId>
+				<version>${lz4.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>at.yawk.lz4</groupId>
+				<artifactId>lz4-java</artifactId>
+				<version>${at.yawk.lz4.version}</version>
 			</dependency>
 
 			<!-- Logging -->

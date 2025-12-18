@@ -14,6 +14,15 @@ spring:
     properties:
       hibernate.format_sql: true
 
+  # Kafka local deployment settings
+  kafka:
+    bootstrap-servers: localhost:9092
+
 keycloak:
   realm: "iot"
   auth-server-url: http://localhost:8080
+
+# Kafka Topic Configuration for local
+kafka:
+  topic-prefix: ""  # Empty for local
+
