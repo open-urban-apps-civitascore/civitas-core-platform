@@ -1,7 +1,7 @@
 /**
  * XMI Export Service
  *
- * Converts UML diagram data to XMI 2.5.1 format for export.
+ * Converts UML diagram data to XMI format compatible with Eclipse UML2 5.0.0.
  * Designed for easy extension to support import functionality in the future.
  */
 
@@ -20,9 +20,14 @@ import type {
   Visibility,
 } from '../types/uml'
 
-// XMI Namespaces
+// XMI Namespaces - Eclipse UML2 5.0.0 compatible
 const XMI_NAMESPACE = 'http://www.omg.org/spec/XMI/20131001'
-const UML_NAMESPACE = 'http://www.omg.org/spec/UML/20161101'
+const UML_NAMESPACE = 'http://www.eclipse.org/uml2/5.0.0/UML'
+const XMI_VERSION = '20131001'
+
+// Default package configuration
+const DEFAULT_PACKAGE_URI = 'http://civitas.org/model/test'
+const DEFAULT_PACKAGE_NAME = 'testPackage'
 
 // Visibility mapping to UML
 const VISIBILITY_XMI_MAP: Record<Visibility, string> = {
@@ -32,22 +37,33 @@ const VISIBILITY_XMI_MAP: Record<Visibility, string> = {
   package: 'package',
 }
 
-// Primitive type mapping to XMI href
+// Primitive type mapping to XMI href (using 20131001 namespace for Eclipse compatibility)
 const PRIMITIVE_TYPE_HREF: Record<string, string> = {
-  String: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#String',
-  Integer: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#Integer',
-  Boolean: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#Boolean',
-  Real: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#Real',
-  UnlimitedNatural: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#UnlimitedNatural',
+  String: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
+  Integer: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
+  Boolean: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Boolean',
+  Real: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
+  UnlimitedNatural: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#UnlimitedNatural',
   // Extended types mapped to closest UML primitive
-  Float: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#Real',
-  Double: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#Real',
-  Long: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#Integer',
-  Short: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#Integer',
-  Byte: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#Integer',
-  Character: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#String',
-  Date: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#String',
-  void: 'http://www.omg.org/spec/UML/20161101/PrimitiveTypes.xmi#String',
+  Float: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
+  Double: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Real',
+  Long: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
+  Short: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
+  Byte: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#Integer',
+  Character: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
+  Date: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
+  void: 'http://www.omg.org/spec/UML/20131001/PrimitiveTypes.xmi#String',
+}
+
+/**
+ * Generates a unique ID (UUID v4 format)
+ */
+const generateId = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
 }
 
 /**
@@ -60,6 +76,22 @@ const escapeXml = (text: string): string => {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;')
+}
+
+/**
+ * Generates eAnnotations for layout information (Eclipse EMF compatible)
+ */
+const generateEAnnotation = (x: number, y: number, indent: string): string => {
+  const annotationId = generateId()
+  const xDetailsId = generateId()
+  const yDetailsId = generateId()
+
+  return [
+    `${indent}<eAnnotations xmi:id="${annotationId}" source="nodeLayout">`,
+    `${indent}  <details xmi:id="${xDetailsId}" key="x" value="${x}"/>`,
+    `${indent}  <details xmi:id="${yDetailsId}" key="y" value="${y}"/>`,
+    `${indent}</eAnnotations>`,
+  ].join('\n')
 }
 
 /**
@@ -107,9 +139,7 @@ const parameterToXmi = (param: UMLParameter, indent: string): string => {
   const direction = param.direction || 'in'
   const childIndent = `${indent}  `
 
-  lines.push(
-    `${indent}<ownedParameter xmi:type="uml:Parameter" xmi:id="${param.id}" name="${escapeXml(param.name)}" direction="${direction}">`,
-  )
+  lines.push(`${indent}<ownedParameter xmi:id="${param.id}" name="${escapeXml(param.name)}" direction="${direction}">`)
   lines.push(typeToXmi(param.type, childIndent))
 
   if (param.multiplicity) {
@@ -130,7 +160,7 @@ const attributeToXmi = (attr: UMLAttribute, indent: string): string => {
   const visibility = VISIBILITY_XMI_MAP[attr.visibility]
   const childIndent = `${indent}  `
 
-  let propertyAttrs = `xmi:type="uml:Property" xmi:id="${attr.id}" name="${escapeXml(attr.name)}" visibility="${visibility}"`
+  let propertyAttrs = `xmi:id="${attr.id}" name="${escapeXml(attr.name)}" visibility="${visibility}"`
 
   if (attr.isStatic) {
     propertyAttrs += ' isStatic="true"'
@@ -165,7 +195,7 @@ const operationToXmi = (op: UMLOperation, indent: string): string => {
   const childIndent = `${indent}  `
   const grandchildIndent = `${indent}    `
 
-  let opAttrs = `xmi:type="uml:Operation" xmi:id="${op.id}" name="${escapeXml(op.name)}" visibility="${visibility}"`
+  let opAttrs = `xmi:id="${op.id}" name="${escapeXml(op.name)}" visibility="${visibility}"`
 
   if (op.isStatic) {
     opAttrs += ' isStatic="true"'
@@ -179,7 +209,7 @@ const operationToXmi = (op: UMLOperation, indent: string): string => {
   // Return parameter
   if (op.returnType) {
     const returnId = `${op.id}_return`
-    lines.push(`${childIndent}<ownedParameter xmi:type="uml:Parameter" xmi:id="${returnId}" direction="return">`)
+    lines.push(`${childIndent}<ownedParameter xmi:id="${returnId}" direction="return">`)
     lines.push(typeToXmi(op.returnType, grandchildIndent))
     lines.push(`${childIndent}</ownedParameter>`)
   }
@@ -206,6 +236,9 @@ const classToXmi = (element: UMLClass, node: UMLNode, indent: string): string =>
   }
 
   lines.push(`${indent}<packagedElement ${classAttrs}>`)
+
+  // eAnnotations for layout (must be first child for Eclipse compatibility)
+  lines.push(generateEAnnotation(node.position.x, node.position.y, childIndent))
 
   // Documentation as comment
   if (element.documentation) {
@@ -241,6 +274,9 @@ const interfaceToXmi = (element: UMLInterface, node: UMLNode, indent: string): s
     `${indent}<packagedElement xmi:type="uml:Interface" xmi:id="${element.id}" name="${escapeXml(element.name)}">`,
   )
 
+  // eAnnotations for layout (must be first child for Eclipse compatibility)
+  lines.push(generateEAnnotation(node.position.x, node.position.y, childIndent))
+
   // Documentation as comment
   if (element.documentation) {
     const commentId = `${element.id}_comment`
@@ -269,6 +305,9 @@ const abstractClassToXmi = (element: UMLAbstractClass, node: UMLNode, indent: st
   lines.push(
     `${indent}<packagedElement xmi:type="uml:Class" xmi:id="${element.id}" name="${escapeXml(element.name)}" isAbstract="true">`,
   )
+
+  // eAnnotations for layout (must be first child for Eclipse compatibility)
+  lines.push(generateEAnnotation(node.position.x, node.position.y, childIndent))
 
   // Documentation as comment
   if (element.documentation) {
@@ -303,6 +342,9 @@ const enumerationToXmi = (element: UMLEnumeration, node: UMLNode, indent: string
   lines.push(
     `${indent}<packagedElement xmi:type="uml:Enumeration" xmi:id="${element.id}" name="${escapeXml(element.name)}">`,
   )
+
+  // eAnnotations for layout (must be first child for Eclipse compatibility)
+  lines.push(generateEAnnotation(node.position.x, node.position.y, childIndent))
 
   // Documentation as comment
   if (element.documentation) {
@@ -366,7 +408,7 @@ const relationshipToXmi = (relationship: UMLRelationship, edge: UMLEdge, indent:
       const targetEndId = `${relationship.id}_target`
 
       // Source end
-      let sourceEndAttrs = `xmi:type="uml:Property" xmi:id="${sourceEndId}" type="${relationship.source}"`
+      let sourceEndAttrs = `xmi:id="${sourceEndId}" type="${relationship.source}"`
       if (relationship.sourceRole) {
         sourceEndAttrs += ` name="${escapeXml(relationship.sourceRole)}"`
       }
@@ -379,7 +421,7 @@ const relationshipToXmi = (relationship: UMLRelationship, edge: UMLEdge, indent:
       lines.push(`${childIndent}</memberEnd>`)
 
       // Target end (with aggregation kind for aggregation/composition)
-      let targetEndAttrs = `xmi:type="uml:Property" xmi:id="${targetEndId}" type="${relationship.target}"`
+      let targetEndAttrs = `xmi:id="${targetEndId}" type="${relationship.target}"`
       if (relationship.targetRole) {
         targetEndAttrs += ` name="${escapeXml(relationship.targetRole)}"`
       }
@@ -430,41 +472,7 @@ const relationshipToXmi = (relationship: UMLRelationship, edge: UMLEdge, indent:
 }
 
 /**
- * Generates XMI diagram extensions for node positions
- * This preserves layout information for potential future import
- */
-const generateDiagramExtension = (diagram: UMLDiagram, indent: string): string => {
-  const lines: string[] = []
-  const childIndent = `${indent}  `
-  const grandchildIndent = `${indent}    `
-
-  lines.push(`${indent}<xmi:Extension extender="civitas-uml-modeler">`)
-  lines.push(`${childIndent}<diagram id="${diagram.id}" name="${escapeXml(diagram.name)}">`)
-
-  // Node positions
-  for (const node of diagram.nodes) {
-    const widthAttr = node.width ? ` width="${node.width}"` : ''
-    const heightAttr = node.height ? ` height="${node.height}"` : ''
-    lines.push(
-      `${grandchildIndent}<nodeLayout elementId="${node.data.element.id}" x="${node.position.x}" y="${node.position.y}"${widthAttr}${heightAttr}/>`,
-    )
-  }
-
-  // Viewport
-  if (diagram.viewport) {
-    lines.push(
-      `${grandchildIndent}<viewport x="${diagram.viewport.x}" y="${diagram.viewport.y}" zoom="${diagram.viewport.zoom}"/>`,
-    )
-  }
-
-  lines.push(`${childIndent}</diagram>`)
-  lines.push(`${indent}</xmi:Extension>`)
-
-  return lines.join('\n')
-}
-
-/**
- * Main export function - converts a UMLDiagram to XMI format
+ * Main export function - converts a UMLDiagram to XMI format (Eclipse UML2 5.0.0 compatible)
  */
 export const exportToXmi = (diagram: UMLDiagram): string => {
   const lines: string[] = []
@@ -472,12 +480,17 @@ export const exportToXmi = (diagram: UMLDiagram): string => {
   // XML declaration
   lines.push('<?xml version="1.0" encoding="UTF-8"?>')
 
-  // XMI root element with namespaces
-  lines.push(`<xmi:XMI xmlns:xmi="${XMI_NAMESPACE}" xmlns:uml="${UML_NAMESPACE}">`)
-
-  // UML Model
+  // UML Model as root element with namespaces (Eclipse UML2 format)
   const modelId = `${diagram.id}_model`
-  lines.push(`  <uml:Model xmi:id="${modelId}" name="${escapeXml(diagram.name)}">`)
+  lines.push(
+    `<uml:Model xmi:version="${XMI_VERSION}" xmlns:xmi="${XMI_NAMESPACE}" xmlns:uml="${UML_NAMESPACE}" xmi:id="${modelId}" name="${escapeXml(diagram.name)}">`,
+  )
+
+  // Package wrapper for all elements
+  const packageId = generateId()
+  lines.push(
+    `  <packagedElement xmi:type="uml:Package" xmi:id="${packageId}" name="${DEFAULT_PACKAGE_NAME}" URI="${DEFAULT_PACKAGE_URI}">`,
+  )
 
   // Export all elements (nodes)
   for (const node of diagram.nodes) {
@@ -495,12 +508,11 @@ export const exportToXmi = (diagram: UMLDiagram): string => {
     }
   }
 
-  lines.push('  </uml:Model>')
+  // Close package
+  lines.push('  </packagedElement>')
 
-  // Diagram extension for layout preservation
-  lines.push(generateDiagramExtension(diagram, '  '))
-
-  lines.push('</xmi:XMI>')
+  // Close model
+  lines.push('</uml:Model>')
 
   return lines.join('\n')
 }
