@@ -5,6 +5,9 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 
+# TO BE REMOVED. Part of JSON-Server below
+RUN pnpm add concurrently 
+
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
