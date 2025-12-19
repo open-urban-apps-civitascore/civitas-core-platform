@@ -37,7 +37,7 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
   @Override
   @Transactional
   public T update(UUID id, I input) {
-    T entity = findById(id);
+    T entity = findByIdOrThrow(id);
     I preProcessedInput = preProcessUpdateInput(input, entity);
     getMapper().updateEntity(entity, preProcessedInput);
     return publishToExternalSystemAndSave(preProcessedInput, entity, "update");
@@ -62,7 +62,7 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
   @Override
   @Transactional
   public void deleteById(UUID id) {
-    T entity = findById(id);
+    T entity = findByIdOrThrow(id);
 
     preValidateWithExternalSystem(entity, "delete");
 

@@ -90,7 +90,7 @@ public abstract class BaseController<
 
   @GetMapping("/{id}")
   public ResponseEntity<O> getById(@PathVariable UUID id) {
-    E entity = getService().findById(id);
+    E entity = getService().findByIdOrThrow(id);
     O output = getAssembler().toOutput(entity);
     return ResponseEntity.ok(output);
   }
@@ -119,7 +119,7 @@ public abstract class BaseController<
   @PatchMapping("/{id}")
   public ResponseEntity<O> patch(@PathVariable UUID id, @RequestBody JsonNode updates)
       throws IOException {
-    E current = getService().findById(id);
+    E current = getService().findByIdOrThrow(id);
     I currentDto = getAssembler().toInput(current);
     I patchedDto = objectMapper.readerForUpdating(currentDto).readValue(updates);
     E updated = getService().update(id, patchedDto);

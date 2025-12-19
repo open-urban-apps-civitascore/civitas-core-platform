@@ -5,6 +5,7 @@ import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.repository.BaseRepository;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.io.Serializable;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -71,7 +72,7 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
    */
   @Transactional
   public T update(UUID id, I input) {
-    T entity = findById(id);
+    T entity = findByIdOrThrow(id);
     I preProcessedInput = preProcessUpdateInput(input, entity);
     getMapper().updateEntity(entity, preProcessedInput);
     entity = postConvertToEntity(entity, preProcessedInput);
@@ -107,20 +108,37 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
    * <p>This method uses lifecycle hooks:
    *
    * <ul>
-   *   <li>{@link #preProcessLoad(Serializable)} - load and optionally process entity
+   *   <li>{@link #postLoad(Object)} - customize entity after loading
+   * </ul>
+   *
+   * @param id the entity ID
+   * @return Optional of the entity
+   * @throws IllegalArgumentException if id is null
+   */
+  public Optional<T> findById(UUID id) {
+    @SuppressWarnings("null")
+    Optional<T> entity = getRepository().findById(id);
+
+    return postLoad(entity);
+  }
+
+  /**
+   * Find an entity by ID or throw ResourceNotFoundException if not found.
+   *
+   * <p>This method uses lifecycle hooks:
+   *
+   * <ul>
+   *   <li>{@link #findById(UUID)} - load entity by ID
    *   <li>{@link #postLoad(Object)} - customize entity after loading
    * </ul>
    *
    * @param id the entity ID
    * @return the entity
+   * @throws IllegalArgumentException if id is null
    * @throws ResourceNotFoundException if entity not found
    */
-  public T findById(UUID id) {
-    T entity = preProcessLoad(id);
-    if (entity == null) {
-      throw new ResourceNotFoundException(getEntityName(), id);
-    }
-    return postLoad(entity);
+  public T findByIdOrThrow(UUID id) {
+    return findById(id).orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
   }
 
   @Transactional
@@ -252,23 +270,12 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
   }
 
   /**
-   * Load entity by ID from database. Override this method to add custom loading logic or caching.
-   * The returned entity will be passed to {@link #postLoad(Object)}.
-   *
-   * @param id the entity ID
-   * @return the loaded entity or null if not found
-   */
-  protected T preProcessLoad(UUID id) {
-    return getRepository().findById(id).orElse(null);
-  }
-
-  /**
    * Post-process entity after loading.
    *
    * @param entity the loaded entity
    * @return the processed entity
    */
-  protected T postLoad(T entity) {
+  protected Optional<T> postLoad(Optional<T> entity) {
     return entity;
   }
 

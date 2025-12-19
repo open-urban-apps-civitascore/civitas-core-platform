@@ -8,10 +8,10 @@ import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -46,12 +46,8 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
    * Role along with all Permissions in a single JOIN query, preventing N+1 query problems.
    */
   @Override
-  public Role findById(UUID id) {
-    preProcessLoad(id);
-    Role entity =
-        roleRepository
-            .findByIdWithRelations(id)
-            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+  public Optional<Role> findById(UUID id) {
+    Optional<Role> entity = roleRepository.findByIdWithRelations(id);
     return postLoad(entity);
   }
 
