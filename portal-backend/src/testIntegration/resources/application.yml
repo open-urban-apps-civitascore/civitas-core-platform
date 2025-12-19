@@ -1,7 +1,7 @@
 logging:
   level:
     root: INFO
-    org.hibernate: INFO
+    org.hibernate: WARN
     org.flywaydb: INFO
 
 server:

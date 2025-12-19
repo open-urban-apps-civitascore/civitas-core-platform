@@ -26,7 +26,7 @@ docker-compose docker-compose.yml up -d
 
 ### 2. Run Application
 ```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=local
+mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
 ```
 
 **Access Points:**
@@ -45,17 +45,19 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local
 
 ### Key Configuration
 ```yaml
-# application-local.yml
+# application-local.yaml
 server:
   port: 8089
+keycloak:
+  realm: civitas-core
+  auth-server-url: http://localhost:8080
+
+# application-postgres.yaml
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/portal_backend
     username: admin
     password: admin
-keycloak:
-  realm: civitas-core
-  auth-server-url: http://localhost:8080
 ```
 
 ### Project Structure
@@ -78,11 +80,12 @@ portal-backend/
 ### Essential Commands
 ```bash
 # Development
-mvn spring-boot:run -Dspring-boot.run.profiles=local
+mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
 
 # Testing
-mvn test                    # Unit tests
-mvn verify                  # Full test suite
+mvn test                    # Unit tests only (~10 tests, no infrastructure required)
+mvn verify                  # Full test suite (~220 tests with Testcontainers)
+mvn clean verify            # Clean build with full test suite (recommended)
 mvn spotless:apply          # Format code
 mvn spotless:check          # Check formatting
 
@@ -104,7 +107,7 @@ The `civitas-core` realm is automatically imported from `/civitias-core-platform
 
 ### Getting JWT Tokens
 ```bash
-curl -X POST http://localhost:8080/realms/iot/protocol/openid-connect/token \
+curl -X POST http://localhost:8080/realms/civitas-core/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=password&client_id=your-client&username=user&password=pass"
 ```
@@ -147,8 +150,8 @@ docker-compose -f docker-compose.yml down -v && docker volume prune
 
 ### Development Workflow
 1. Start infrastructure: `docker-compose -f docker-compose.yml up -d`
-2. Run application: `mvn spring-boot:run -Dspring-boot.run.profiles=local`
+2. Run application: `mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres`
 3. Make changes
-4. Test: `mvn test` (quick) or `mvn verify` (full)
+4. Test: `mvn test` (unit tests only) or `mvn clean verify` (full test suite)
 5. Format: `mvn spotless:apply`
 6. Commit & push
