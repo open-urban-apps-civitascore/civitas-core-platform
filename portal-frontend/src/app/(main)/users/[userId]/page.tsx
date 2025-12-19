@@ -23,15 +23,17 @@ const UserDetailsPage = async (props: PageProps) => {
           cache: 'no-store',
         }),
       ])
-      if (!userResponse || !groupsResponse) {
-        throw new Error('An error occurred while loading data')
+      if (!userResponse.ok || !groupsResponse.ok) {
+        console.error('An error occurred while loading user data')
+        return null
       }
 
       const userData: UserResponse = await userResponse.json()
       const groupsData: Group[] = await groupsResponse.json()
 
       if (!userData || Object.keys(userData).length === 0) {
-        throw new Error('User not found')
+        console.error('User not found')
+        return null
       }
       const groupsContainingUser = groupsData.filter(group => group.users.find(user => user.id === userData.id))
       const user = { ...userData, groups: groupsContainingUser.map(group => group.id) }
@@ -44,7 +46,14 @@ const UserDetailsPage = async (props: PageProps) => {
 
   const userData = await getUserData(userId)
 
-  return <UserDetails testId="userDetailsPage" userData={userData} isEditMode title={userData.displayName} />
+  return (
+    <UserDetails
+      testId="userDetailsPage"
+      userData={userData}
+      isEditMode
+      title={userData?.displayName || 'User not found'}
+    />
+  )
 }
 
 export default UserDetailsPage

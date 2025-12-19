@@ -65,15 +65,15 @@ const DatasetsTable = (props: DatasetsTableProps) => {
       header: t('tableHeaders.contact'),
       cell: info =>
         info.getValue() ? (
-          <LinkCell className="hover:no-underline" href={`users/${info.getValue().id}`}>
+          <LinkCell className="hover:no-underline" href={`users/${info.getValue()?.id}`}>
             <div className="flex items-center gap-1.5">
               <Avatar className="AvatarRoot border-1" style={{ textDecoration: 'none !important' }}>
                 <AvatarFallback
                   className="AvatarFallback"
                   style={{ textDecoration: 'none !important' }}
-                >{`${info.getValue().firstName.charAt(0)}${info.getValue().lastName.charAt(0)}`}</AvatarFallback>
+                >{`${info.getValue()?.firstName.charAt(0)}${info.getValue()?.lastName.charAt(0)}`}</AvatarFallback>
               </Avatar>
-              <span className="group-hover/link:underline decoration-outline decoration-1.5">{`${info.getValue().firstName} ${info.getValue().lastName}`}</span>
+              <span className="group-hover/link:underline decoration-outline decoration-1.5">{`${info.getValue()?.firstName} ${info.getValue()?.lastName}`}</span>
             </div>
           </LinkCell>
         ) : (

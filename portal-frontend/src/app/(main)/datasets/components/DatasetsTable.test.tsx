@@ -48,7 +48,9 @@ describe('DatasetsTable', () => {
 
     expect(cells1[0]).toHaveTextContent(mappedDatasets[0].name)
     expect(cells1[1]).toHaveTextContent(mappedDatasets[0].dataspace?.name as string)
-    expect(cells1[2]).toHaveTextContent(`${mappedDatasets[0].contact.firstName} ${mappedDatasets[0].contact.lastName}`)
+    expect(cells1[2]).toHaveTextContent(
+      `${mappedDatasets[0].contact?.firstName} ${mappedDatasets[0].contact?.lastName}`,
+    )
     expect(cells1[3]).toHaveTextContent('10.09.2023')
     expect(cells1[4].querySelector('svg')).toHaveClass('lucide-lock-open')
 
@@ -57,7 +59,9 @@ describe('DatasetsTable', () => {
 
     expect(cells2[0]).toHaveTextContent(mappedDatasets[1].name)
     expect(cells2[1]).toHaveTextContent('-')
-    expect(cells2[2]).toHaveTextContent(`${mappedDatasets[1].contact.firstName} ${mappedDatasets[1].contact.lastName}`)
+    expect(cells2[2]).toHaveTextContent(
+      `${mappedDatasets[1].contact?.firstName} ${mappedDatasets[1].contact?.lastName}`,
+    )
     expect(cells2[3]).toHaveTextContent('01.01.2023')
     expect(cells2[4].querySelector('svg')).toHaveClass('lucide-lock-keyhole')
   })

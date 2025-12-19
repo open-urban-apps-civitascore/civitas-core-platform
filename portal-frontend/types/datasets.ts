@@ -33,7 +33,7 @@ export type DatasetResponse = {
   id: string
   name: string
   description: string
-  contact: Contact
+  contact: Contact | null
   issued: string
   lastUpdated: string
   access: boolean
@@ -46,7 +46,7 @@ export type DatasetTableData = {
   id: string
   name: string
   dataspace: Item2 | null
-  contact: Contact
+  contact: Contact | null
   lastUpdated: string
   access: boolean
   status: DatasetStatus

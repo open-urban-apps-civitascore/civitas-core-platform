@@ -9,14 +9,13 @@ export const getMockDatasetData = (overrides: Partial<DatasetResponse> = {}): Da
     id: id,
     name: name,
     description: 'Dataset Description',
-    creator: [],
+    contact: { id: `test-contact-${crypto.randomUUID()}`, firstName: 'Test', lastName: 'Contact' },
     issued: new Date().toISOString(),
     lastUpdated: new Date().toISOString(),
-    status: null,
-    distribution: null,
-    dataspace: null,
-    department: null,
+    dataspace: { id: `test-dataspace-${crypto.randomUUID()}`, name: 'Test Dataspace' },
     tags: ['testTag1', 'testTag2'],
+    access: true,
+    status: 'draft',
     ...overrides,
   }
 }
