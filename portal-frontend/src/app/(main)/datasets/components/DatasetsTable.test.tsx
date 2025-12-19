@@ -40,17 +40,25 @@ describe('DatasetsTable', () => {
   })
 
   it('renders the rows and row content correctly', async () => {
-    screen.debug()
     const rows = screen.getAllByRole('row')
     expect(rows).toHaveLength(3)
 
-    const dataRow = rows[1]
-    const cells = within(dataRow).getAllByRole('cell')
+    const dataRow1 = rows[1]
+    const cells1 = within(dataRow1).getAllByRole('cell')
 
-    expect(cells[0]).toHaveTextContent(mappedDatasets[0].name)
-    expect(cells[1]).toHaveTextContent(mappedDatasets[0].dataspace?.name as string)
-    expect(cells[2]).toHaveTextContent(`${mappedDatasets[0].contact.firstName} ${mappedDatasets[0].contact.lastName}`)
-    expect(cells[3]).toHaveTextContent('10.09.2023')
-    expect(cells[4].querySelector('svg')).toHaveClass('lucide-lock-open')
+    expect(cells1[0]).toHaveTextContent(mappedDatasets[0].name)
+    expect(cells1[1]).toHaveTextContent(mappedDatasets[0].dataspace?.name as string)
+    expect(cells1[2]).toHaveTextContent(`${mappedDatasets[0].contact.firstName} ${mappedDatasets[0].contact.lastName}`)
+    expect(cells1[3]).toHaveTextContent('10.09.2023')
+    expect(cells1[4].querySelector('svg')).toHaveClass('lucide-lock-open')
+
+    const dataRow2 = rows[2]
+    const cells2 = within(dataRow2).getAllByRole('cell')
+
+    expect(cells2[0]).toHaveTextContent(mappedDatasets[1].name)
+    expect(cells2[1]).toHaveTextContent('-')
+    expect(cells2[2]).toHaveTextContent(`${mappedDatasets[1].contact.firstName} ${mappedDatasets[1].contact.lastName}`)
+    expect(cells2[3]).toHaveTextContent('01.01.2023')
+    expect(cells2[4].querySelector('svg')).toHaveClass('lucide-lock-keyhole')
   })
 })
