@@ -96,8 +96,6 @@ test-backend:
       optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
-    DOCKER_DRIVER: overlay2
-    DOCKER_HOST: tcp://docker:2375
   cache:
     key:
       prefix: backend-maven
