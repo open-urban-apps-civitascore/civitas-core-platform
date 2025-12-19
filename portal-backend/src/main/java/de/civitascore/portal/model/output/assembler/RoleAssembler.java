@@ -10,6 +10,7 @@ import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.service.AssignmentService;
 import de.civitascore.portal.service.UserService;
+import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -54,13 +55,16 @@ public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
     dto.setGroupCount(0L);
     dto.setUserCount(0L);
 
-    // could fail when modifiedBy is not a UUID or user not found
     try {
-      User modifier = userService.getReferenceById(entity.getModifiedBy());
+      UUID modifierId = entity.getModifiedBy();
 
-      dto.setModifiedBy(userMapper.toSummary(modifier));
-    } catch (Exception e) {
-      // Ignore exceptions during enrichment of modifiedBy
+      if (modifierId != null) {
+        User modifier = userService.findByIdOrThrow(modifierId);
+
+        dto.setModifiedBy(userMapper.toSummary(modifier));
+      }
+    } catch (ResourceNotFoundException e) {
+      // modifierId refers to a user that no longer exists -> leave modifiedBy as null
     }
 
     Set<Group> groups =
