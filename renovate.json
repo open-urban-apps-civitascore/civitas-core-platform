@@ -4,12 +4,9 @@
     "config:recommended"
   ],
   "baseBranches": ["develop"],
-  "platform": "gitlab",
   "labels": ["v::2", "team data mgmt", "dependencies"],
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
-  "schedule": ["after 10pm every weekday", "before 5am every weekday", "every weekend"],
-  "timezone": "UTC",
   "rangeStrategy": "bump",
   "semanticCommits": "enabled",
   "separateMajorMinor": true,
@@ -96,7 +93,5 @@
   },
   "postUpdateOptions": [
     "npmDedupe"
-  ],
-  "ignoreDeps": [],
-  "ignorePresets": []
+  ]
 }
