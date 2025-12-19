@@ -13,7 +13,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '../../ui/sidebar'
-import { appSidebarNavItems } from '../appSidebarMockItems'
+import { appSidebarNavItems } from '../appSidebarItems'
 
 export const AppSidebarContent = async () => {
   const tNav = await getTranslations('sidebar')
