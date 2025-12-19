@@ -72,12 +72,16 @@ export const UserForm = (props: UserFormProps) => {
 
   const titleOptions = [
     {
-      value: 'male',
-      label: t('info.title.male'),
+      value: 'MR',
+      label: t('info.title.mr'),
     },
     {
-      value: 'female',
-      label: t('info.title.female'),
+      value: 'MS',
+      label: t('info.title.ms'),
+    },
+    {
+      value: 'OTHER',
+      label: t('info.title.other'),
     },
   ]
 

@@ -24,7 +24,6 @@ const UsersTable = (props: UsersTableProps) => {
     onRowClick,
     onPaginationChange,
     onSortingChange,
-    isLoading,
   } = props
   const t = useTranslations('users')
   const columnHelper = createColumnHelper<ListUser>()
@@ -35,7 +34,7 @@ const UsersTable = (props: UsersTableProps) => {
       cell: info => info.getValue(),
       enableHiding: true,
     }),
-    columnHelper.accessor('displayName', {
+    columnHelper.accessor('fullName', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.displayName')} />,
       cell: info => info.getValue(),
       meta: {
@@ -101,7 +100,6 @@ const UsersTable = (props: UsersTableProps) => {
       pageSize={pageSize}
       totalPages={totalPages}
       onRowClick={onRowClick}
-      isLoading={isLoading}
     />
   )
 }

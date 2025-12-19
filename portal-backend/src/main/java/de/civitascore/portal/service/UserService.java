@@ -1,37 +1,44 @@
 package de.civitascore.portal.service;
 
+import com.civitas.configadapter.Topics;
+import com.civitas.configadapter.model.ConfigValue;
+import com.civitas.configadapter.model.idm.UserConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.UserMapper;
+import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.UserInputDTO;
-import de.civitascore.portal.model.output.event.TopicResolver;
-import de.civitascore.portal.model.output.event.UserEventDTO;
 import de.civitascore.portal.repository.UserRepository;
-import de.civitascore.portal.service.event.SynchronousEventPublisher;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.List;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
+@Slf4j
 public class UserService extends EventPublishingService<User, UserInputDTO> {
 
   private final UserRepository userRepository;
   private final UserMapper userMapper;
   private final ObjectMapper objectMapper;
+  private final String targetRealm;
 
   public UserService(
-      SynchronousEventPublisher syncEventPublisher,
-      TopicResolver topicResolver,
+      ConfigEventPublisherService configEventPublisher,
       UserRepository userRepository,
       UserMapper userMapper,
-      ObjectMapper objectMapper) {
-    super(syncEventPublisher, topicResolver);
+      ObjectMapper objectMapper,
+      @Value("${keycloak.target-realm}") String targetRealm) {
+    super(configEventPublisher);
     this.userRepository = userRepository;
     this.userMapper = userMapper;
     this.objectMapper = objectMapper;
+    this.targetRealm = targetRealm;
   }
 
   @Override
@@ -52,7 +59,31 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   @Override
   protected User preSave(User entity) {
     validateUniqueEmail(entity);
-    return entity;
+    return super.preSave(entity);
+  }
+
+  private UserConfig buildUserConfig(User entity) {
+    UserConfig userConfig = new UserConfig();
+
+    // Set Keycloak user ID if it exists (required for UPDATE/DELETE operations)
+    if (entity.getExternalId() != null && !entity.getExternalId().isBlank()) {
+      userConfig.setId(entity.getExternalId());
+    }
+
+    userConfig.setUsername(entity.getEmail()); // Use email as username
+    userConfig.setEmail(entity.getEmail());
+    userConfig.setFirstName(entity.getFirstName());
+    userConfig.setLastName(entity.getLastName());
+    userConfig.setEnabled(true); // Default to enabled
+    userConfig.setEmailVerified(false); // Default to not verified
+
+    // Map groups
+    if (entity.getGroups() != null && !entity.getGroups().isEmpty()) {
+      List<String> groups = entity.getGroups().stream().map(Group::getName).toList();
+      userConfig.setGroups(groups);
+    }
+
+    return userConfig;
   }
 
   private void validateUniqueEmail(User entity) {
@@ -72,6 +103,10 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
       String inputJson = objectMapper.writeValueAsString(input);
       JsonNode jsonNode = objectMapper.readTree(inputJson);
 
+      if (jsonNode.has("title") && StringUtils.isBlank(jsonNode.get("title").asText())) {
+        throw new InvalidInputException(
+            "title", existingEntity.getId(), "Title cannot be null or blank");
+      }
       if (jsonNode.has("firstName") && StringUtils.isBlank(jsonNode.get("firstName").asText())) {
         throw new InvalidInputException(
             "firstName", existingEntity.getId(), "First name cannot be null or blank");
@@ -100,28 +135,37 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   }
 
   @Override
-  protected String getAggregateType() {
-    return User.class.getSimpleName();
+  protected Topics resolveTopic(String operation) {
+    return switch (operation.toLowerCase()) {
+      case "create" -> Topics.USER_CREATED;
+      case "update" -> Topics.USER_UPDATED;
+      case "delete" -> Topics.USER_DELETED;
+      default -> throw new IllegalArgumentException("Unknown operation for User: " + operation);
+    };
+  }
+
+  @Override
+  protected String getTargetComponent() {
+    return "user";
   }
 
   @Override
   protected String getRealm(User entity) {
-    return "civitas";
+    return targetRealm;
+  }
+
+  @Override
+  protected String getConfigPath() {
+    return "/users";
+  }
+
+  @Override
+  protected ConfigValue toConfigValue(User entity) {
+    return buildUserConfig(entity);
   }
 
   @Override
   protected UUID getEntityId(User entity) {
     return entity.getId();
-  }
-
-  @Override
-  protected UserEventDTO toKafkaRepresentation(User entity) {
-    return new UserEventDTO(
-        entity.getId(),
-        entity.getFirstName(),
-        entity.getLastName(),
-        entity.getEmail(),
-        entity.getActive(),
-        entity.getExternalId());
   }
 }

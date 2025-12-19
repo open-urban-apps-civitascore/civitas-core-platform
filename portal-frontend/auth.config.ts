@@ -101,8 +101,12 @@ export const authConfig = {
         }
       }
     },
-    session({ session }) {
-      return session
+
+    session({ session, token }) {
+      return {
+        ...session,
+        error: token.error as string | undefined,
+      }
     },
   },
   providers: [], // Providers are handled in auth.ts

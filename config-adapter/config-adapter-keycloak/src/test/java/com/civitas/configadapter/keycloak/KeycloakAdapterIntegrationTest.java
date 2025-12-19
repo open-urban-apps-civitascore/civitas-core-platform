@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2012 - 2025 Data In Motion and others. All rights reserved.
+ * This work and the accompanying materials are made available under the terms of the European Union
+ * Public License License (EU-PL) 1.2 which is available at
+ * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
- * <p>This program and the accompanying materials are made available under the terms of the Eclipse
- * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0/
+ * <p>SPDX-License-Identifier: EUPL-1.2
  *
- * <p>SPDX-License-Identifier: EPL-2.0
- *
- * <p>Contributors: Data In Motion - initial API and implementation
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to
+ * all the individual contributors: Copyright (c) 2012-2025 Civitas Connect e. V. and others.
  */
 package com.civitas.configadapter.keycloak;
 
@@ -152,8 +152,7 @@ class KeycloakAdapterIntegrationTest {
     realmConfig.setEnabled(true);
     realmConfig.setDisplayName("Test Realm");
 
-    ConfigEvent event =
-        createConfigEvent("realms/test-realm", "realm", Operation.CREATE, realmConfig);
+    ConfigEvent event = createConfigEvent("test-realm", "realm", Operation.CREATE, realmConfig);
 
     // When
     adapter.processConfigEvent(Topics.REALM_CREATED.toString(), event);
@@ -187,8 +186,7 @@ class KeycloakAdapterIntegrationTest {
     updateConfig.setDisplayName("Updated Realm");
     updateConfig.setEnabled(false);
 
-    ConfigEvent event =
-        createConfigEvent("realms/update-realm", "realm", Operation.UPDATE, updateConfig);
+    ConfigEvent event = createConfigEvent("update-realm", "realm", Operation.UPDATE, updateConfig);
 
     // When
     adapter.processConfigEvent(Topics.REALM_UPDATED.toString(), event);
@@ -227,8 +225,7 @@ class KeycloakAdapterIntegrationTest {
     userConfig.setEnabled(true);
     userConfig.setRealmRoles(List.of("testrole"));
 
-    ConfigEvent event =
-        createConfigEvent("realms/user-realm/users/testuser", "user", Operation.CREATE, userConfig);
+    ConfigEvent event = createConfigEvent("user-realm", "user", Operation.CREATE, userConfig);
 
     // When
     adapter.processConfigEvent(Topics.USER_CREATED.toString(), event);
@@ -269,9 +266,7 @@ class KeycloakAdapterIntegrationTest {
     clientConfig.setPublicClient(false);
     clientConfig.setDirectAccessGrantsEnabled(true);
 
-    ConfigEvent event =
-        createConfigEvent(
-            "realms/client-realm/clients/test-client", "client", Operation.CREATE, clientConfig);
+    ConfigEvent event = createConfigEvent("client-realm", "client", Operation.CREATE, clientConfig);
 
     // When
     adapter.processConfigEvent(Topics.CLIENT_CREATED.toString(), event);
@@ -299,7 +294,9 @@ class KeycloakAdapterIntegrationTest {
     realmRep.setEnabled(true);
     keycloakClient.realms().create(realmRep);
 
-    ConfigEvent event = createConfigEvent("realms/delete-realm", "realm", Operation.DELETE, null);
+    RealmConfig realmConfig = new RealmConfig();
+    realmConfig.setRealm("delete-realm");
+    ConfigEvent event = createConfigEvent("delete-realm", "realm", Operation.DELETE, realmConfig);
 
     // When
     adapter.processConfigEvent(Topics.REALM_DELETED.toString(), event);
@@ -329,8 +326,7 @@ class KeycloakAdapterIntegrationTest {
     roleConfig.setName("testrole");
 
     ConfigEvent event =
-        createConfigEvent(
-            "realms/role-create-realm/roles/testrole", "role", Operation.CREATE, roleConfig);
+        createConfigEvent("role-create-realm", "role", Operation.CREATE, roleConfig);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_CREATED.toString(), event);
@@ -368,8 +364,7 @@ class KeycloakAdapterIntegrationTest {
     roleConfig.setCompositeRoles(Set.of("nestedtestrole")); // Simple Set<String>!
 
     ConfigEvent event =
-        createConfigEvent(
-            "realms/role-nested-create-realm/roles/testrole", "role", Operation.CREATE, roleConfig);
+        createConfigEvent("role-nested-create-realm", "role", Operation.CREATE, roleConfig);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_CREATED.toString(), event);
@@ -409,16 +404,17 @@ class KeycloakAdapterIntegrationTest {
 
     RoleRepresentation initialRoleRep = new RoleRepresentation();
     initialRoleRep.setName("testrole");
+    initialRoleRep.setId("1234");
 
     keycloakClient.realm("role-update-realm").roles().create(initialRoleRep);
 
     // Create RoleConfig for update
     RoleConfig roleConfig = new RoleConfig();
+    roleConfig.setId("testrole");
     roleConfig.setName("testrole");
     roleConfig.setDescription("new description");
     ConfigEvent event =
-        createConfigEvent(
-            "realms/role-update-realm/roles/testrole", "role", Operation.UPDATE, roleConfig);
+        createConfigEvent("role-update-realm", "role", Operation.UPDATE, roleConfig);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_UPDATED.toString(), event);
@@ -457,10 +453,10 @@ class KeycloakAdapterIntegrationTest {
 
     // For delete, we just need the role name
     RoleConfig roleConfig = new RoleConfig();
+    roleConfig.setId("testrole");
     roleConfig.setName("testrole");
     ConfigEvent event =
-        createConfigEvent(
-            "realms/role-delete-realm/roles/testrole", "role", Operation.DELETE, roleConfig);
+        createConfigEvent("role-delete-realm", "role", Operation.DELETE, roleConfig);
 
     // When
     adapter.processConfigEvent(Topics.ROLE_DELETED.toString(), event);
@@ -486,7 +482,7 @@ class KeycloakAdapterIntegrationTest {
     realmConfig.setRealm("non-existent-realm");
 
     ConfigEvent event =
-        createConfigEvent("realms/non-existent-realm", "realm", Operation.UPDATE, realmConfig);
+        createConfigEvent("non-existent-realm", "realm", Operation.UPDATE, realmConfig);
 
     // When
     adapter.processConfigEvent(Topics.REALM_UPDATED.toString(), event);
@@ -509,7 +505,7 @@ class KeycloakAdapterIntegrationTest {
 
     ConfigEvent event =
         createConfigEventWithCorrelation(
-            "realms/correlation-realm", "realm", Operation.CREATE, realmConfig, correlationId);
+            "correlation-realm", "realm", Operation.CREATE, realmConfig, correlationId);
 
     // When
     adapter.processConfigEvent(Topics.REALM_CREATED.toString(), event);

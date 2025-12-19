@@ -8,7 +8,7 @@ export const getMockUserData = (overrides: Partial<UserResponse> = {}): UserResp
   const lastName = 'E2EUserLastName'
   return {
     id: id,
-    title: 'female',
+    title: 'MS',
     firstName: firstName,
     lastName: lastName,
     email: `${firstName}@e2e.test`,
@@ -17,7 +17,6 @@ export const getMockUserData = (overrides: Partial<UserResponse> = {}): UserResp
     phone: '+49 157 11111111',
     active: true,
     positionDescription: 'Test Description',
-    displayName: `${firstName} ${lastName}`,
     ...overrides,
   }
 }

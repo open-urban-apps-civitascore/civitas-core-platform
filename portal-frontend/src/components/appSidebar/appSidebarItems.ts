@@ -1,4 +1,4 @@
-import { BookOpen, Bot, Building2, LucideProps, SquareMenu, SquareTerminal, User } from 'lucide-react'
+import { BookOpen, Building2, LucideProps, SquareMenu, SquareTerminal, User } from 'lucide-react'
 import { ForwardRefExoticComponent, ReactNode, RefAttributes } from 'react'
 
 export interface NavItem {
@@ -41,44 +41,6 @@ export const appSidebarNavItems = [
       {
         title: 'dataspaces',
         url: '/dataspaces',
-      },
-    ],
-  },
-  {
-    title: 'menu-item 2',
-    url: '#',
-    icon: SquareTerminal,
-    items: [
-      {
-        title: 'sub-item 1',
-        url: '#',
-      },
-      {
-        title: 'sub-item 2',
-        url: '#',
-      },
-      {
-        title: 'sub-item 3',
-        url: '#',
-      },
-    ],
-  },
-  {
-    title: 'menu-item 3',
-    url: '#',
-    icon: Bot,
-    items: [
-      {
-        title: 'sub-item 1',
-        url: '#',
-      },
-      {
-        title: 'sub-item 2',
-        url: '#',
-      },
-      {
-        title: 'sub-item 3',
-        url: '#',
       },
     ],
   },

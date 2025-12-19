@@ -51,7 +51,7 @@ const UserDetailsPage = async (props: PageProps) => {
       testId="userDetailsPage"
       userData={userData}
       isEditMode
-      title={userData?.displayName || 'User not found'}
+      title={userData ? `${userData.firstName} ${userData.lastName}` : 'User not found'}
     />
   )
 }

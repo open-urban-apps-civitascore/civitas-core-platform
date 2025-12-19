@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2012 - 2025 Data In Motion and others. All rights reserved.
+ * This work and the accompanying materials are made available under the terms of the European Union
+ * Public License License (EU-PL) 1.2 which is available at
+ * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
- * <p>This program and the accompanying materials are made available under the terms of the Eclipse
- * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0/
+ * <p>SPDX-License-Identifier: EUPL-1.2
  *
- * <p>SPDX-License-Identifier: EPL-2.0
- *
- * <p>Contributors: Data In Motion - initial API and implementation
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to
+ * all the individual contributors: Copyright (c) 2012-2025 Civitas Connect e. V. and others.
  */
 package com.civitas.configadapter.application;
 
@@ -14,6 +14,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.configuration.AppConfig;
@@ -224,7 +225,7 @@ class EndToEndIntegrationTest {
 
     ConfigEvent configEvent =
         createConfigEvent(
-            "realms/e2e-test-realm", "realm", Operation.CREATE, realmConfig, "correlation123");
+            "e2e-test-realm", "realm", Operation.CREATE, realmConfig, "correlation123");
 
     CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_CREATED.toString());
 
@@ -264,11 +265,7 @@ class EndToEndIntegrationTest {
 
     ConfigEvent configEvent =
         createConfigEvent(
-            "realms/user-e2e-realm/users/e2euser",
-            "user",
-            Operation.CREATE,
-            userConfig,
-            "correlationuser123");
+            "user-e2e-realm", "user", Operation.CREATE, userConfig, "correlationuser123");
 
     CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.USER_CREATED.toString());
 
@@ -280,7 +277,13 @@ class EndToEndIntegrationTest {
     CloudEvent resultEvent = waitForResultEvent("correlationuser123", 15000);
     assertNotNull(resultEvent, "Result event should be published");
     assertEquals("SUCCESS", resultEvent.getExtension("status"));
-    assertEquals("e2euser", resultEvent.getExtension("resourceid"));
+
+    // Resource ID should be the Keycloak-generated UUID (used for future UPDATE/DELETE operations)
+    String resourceId = (String) resultEvent.getExtension("resourceid");
+    assertNotNull(resourceId, "Resource ID should be set");
+    assertTrue(
+        resourceId.matches("[0-9a-f-]{36}"),
+        "Resource ID should be a UUID, but was: " + resourceId);
 
     // Verify user was actually created in Keycloak
     List<UserRepresentation> users =
@@ -298,11 +301,7 @@ class EndToEndIntegrationTest {
 
     ConfigEvent configEvent =
         createConfigEvent(
-            "realms/non-existent-realm",
-            "realm",
-            Operation.UPDATE,
-            realmConfig,
-            "correlationerror123");
+            "non-existent-realm", "realm", Operation.UPDATE, realmConfig, "correlationerror123");
 
     CloudEvent cloudEvent = wrapInCloudEvent(configEvent, Topics.REALM_UPDATED.toString());
 
@@ -365,8 +364,7 @@ class EndToEndIntegrationTest {
 
     sendEventAndWaitForResult(
         Topics.REALM_CREATED.toString(),
-        createConfigEvent(
-            "realms/seq-test-realm", "realm", Operation.CREATE, realmConfig, "seq-1"));
+        createConfigEvent("seq-test-realm", "realm", Operation.CREATE, realmConfig, "seq-1"));
 
     // 2. Create user
     UserConfig userConfig = new UserConfig();
@@ -376,23 +374,19 @@ class EndToEndIntegrationTest {
 
     sendEventAndWaitForResult(
         Topics.USER_CREATED.toString(),
-        createConfigEvent(
-            "realms/seq-test-realm/users/sequser", "user", Operation.CREATE, userConfig, "seq-2"));
+        createConfigEvent("seq-test-realm", "user", Operation.CREATE, userConfig, "seq-2"));
 
     // 3. Update user
-    userConfig.setFirstName("Updated");
     List<UserRepresentation> users =
         keycloakClient.realm("seq-test-realm").users().search("sequser");
     String userId = users.get(0).getId();
 
+    userConfig.setId(userId); // Set the Keycloak user ID for UPDATE operation
+    userConfig.setFirstName("Updated");
+
     sendEventAndWaitForResult(
         Topics.USER_UPDATED.toString(),
-        createConfigEvent(
-            "realms/seq-test-realm/users/" + userId,
-            "user",
-            Operation.UPDATE,
-            userConfig,
-            "seq-3"));
+        createConfigEvent("seq-test-realm", "user", Operation.UPDATE, userConfig, "seq-3"));
 
     // Verify all operations succeeded
     RealmRepresentation realm = keycloakClient.realm("seq-test-realm").toRepresentation();

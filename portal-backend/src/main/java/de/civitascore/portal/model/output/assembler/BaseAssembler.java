@@ -14,7 +14,7 @@ public interface BaseAssembler<
 
   /**
    * Convert entity back to input DTO for PATCH operations. Must be implemented by concrete
-   * assemblers that need PATCH support.
+   * assemblers that need PATCH support. TODO: Add generic to the interface to enforce return type?
    */
   default <I> I toInput(E entity) {
     throw new UnsupportedOperationException(
