@@ -96,13 +96,11 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                   >
                     {row.getVisibleCells().map(cell => (
                       <TableCell
-                        className={cn('whitespace-normal px-3 group/cell')}
+                        className={cn('whitespace-normal px-3 group/cell relative h-16')}
                         key={cell.id}
                         style={cell.column.columnDef.meta?.style}
                       >
-                        <div className="flex justify-between items-center">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </div>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}
                   </TableRow>

@@ -12,7 +12,7 @@ export const LinkCell = (props: LinkCellProps) => {
   return (
     <Link
       className={cn(
-        'w-full flex justify-between items-center gap-1.5 group/link hover:underline decoration-1.5 decoration-outline',
+        'w-full h-full flex justify-between items-center gap-1.5 group/link hover:underline decoration-1.5 decoration-outline',
         className,
       )}
       href={href}
