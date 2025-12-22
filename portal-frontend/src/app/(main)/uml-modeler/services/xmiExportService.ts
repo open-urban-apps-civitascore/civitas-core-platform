@@ -25,9 +25,8 @@ const XMI_NAMESPACE = 'http://www.omg.org/spec/XMI/20131001'
 const UML_NAMESPACE = 'http://www.eclipse.org/uml2/5.0.0/UML'
 const XMI_VERSION = '20131001'
 
-// Default package configuration
-const DEFAULT_PACKAGE_URI = 'http://civitas.org/model/test'
-const DEFAULT_PACKAGE_NAME = 'testPackage'
+// Package configuration
+const BASE_PACKAGE_URI = 'http://civitas.org/model'
 
 // Visibility mapping to UML
 const VISIBILITY_XMI_MAP: Record<Visibility, string> = {
@@ -472,10 +471,26 @@ const relationshipToXmi = (relationship: UMLRelationship, edge: UMLEdge, indent:
 }
 
 /**
+ * Sanitizes a name for use in URIs and package names
+ */
+export const sanitizeName = (name: string): string => {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+/**
  * Main export function - converts a UMLDiagram to XMI format (Eclipse UML2 5.0.0 compatible)
  */
 export const exportToXmi = (diagram: UMLDiagram): string => {
   const lines: string[] = []
+
+  // Generate dynamic package name and URI from diagram name
+  const sanitizedName = sanitizeName(diagram.name)
+  const packageName = sanitizedName || 'untitled'
+  const packageUri = `${BASE_PACKAGE_URI}/${packageName}`
 
   // XML declaration
   lines.push('<?xml version="1.0" encoding="UTF-8"?>')
@@ -489,7 +504,7 @@ export const exportToXmi = (diagram: UMLDiagram): string => {
   // Package wrapper for all elements
   const packageId = generateId()
   lines.push(
-    `  <packagedElement xmi:type="uml:Package" xmi:id="${packageId}" name="${DEFAULT_PACKAGE_NAME}" URI="${DEFAULT_PACKAGE_URI}">`,
+    `  <packagedElement xmi:type="uml:Package" xmi:id="${packageId}" name="${packageName}" URI="${packageUri}">`,
   )
 
   // Export all elements (nodes)
