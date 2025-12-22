@@ -132,14 +132,14 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
             row.toggleSelected(!!value)
             setFocus(row.id)
           }}
-          aria-label={`Select user ${row.original.displayName}`}
+          aria-label={`Select user ${row.original.fullName}`}
           id={row.id}
         />
       ),
       enableSorting: false,
       enableHiding: false,
     }),
-    columnHelper.accessor('displayName', {
+    columnHelper.accessor('fullName', {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.displayName')} />,
       cell: info => info.getValue(),
       meta: {

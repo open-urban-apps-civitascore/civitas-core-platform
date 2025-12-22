@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2012 - 2025 Data In Motion and others. All rights reserved.
+ * This work and the accompanying materials are made available under the terms of the European Union
+ * Public License License (EU-PL) 1.2 which is available at
+ * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
- * <p>This program and the accompanying materials are made available under the terms of the Eclipse
- * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0/
+ * <p>SPDX-License-Identifier: EUPL-1.2
  *
- * <p>SPDX-License-Identifier: EPL-2.0
- *
- * <p>Contributors: Data In Motion - initial API and implementation
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to
+ * all the individual contributors: Copyright (c) 2012-2025 Civitas Connect e. V. and others.
  */
 package com.civitas.configadapter.util;
 

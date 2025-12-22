@@ -6,7 +6,12 @@ import de.civitascore.portal.util.KeycloakTokenHelper;
 import de.civitascore.portal.util.TestContainerConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.KeycloakBuilder;
+import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.admin.client.resource.UsersResource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -51,6 +56,8 @@ public abstract class BaseKeycloakIntegrationTest {
   @Autowired protected TestRestTemplate restTemplate;
 
   protected KeycloakTokenHelper tokenHelper;
+  protected Keycloak keycloakAdminClient;
+  protected static final String REALM_NAME = "iot";
 
   @DynamicPropertySource
   static void configureProperties(DynamicPropertyRegistry registry) {
@@ -69,15 +76,35 @@ public abstract class BaseKeycloakIntegrationTest {
   }
 
   @BeforeEach
-  void setUp() {
+  void baseSetUp() {
     if (!POSTGRES.isRunning() || !KEYCLOAK.isRunning()) {
       throw new IllegalStateException("Test containers stopped unexpectedly!");
     }
 
     tokenHelper = new KeycloakTokenHelper(KEYCLOAK);
 
+    keycloakAdminClient =
+        KeycloakBuilder.builder()
+            .serverUrl(KEYCLOAK.getAuthServerUrl())
+            .realm("master")
+            .username(KEYCLOAK.getAdminUsername())
+            .password(KEYCLOAK.getAdminPassword())
+            .clientId("admin-cli")
+            .build();
+
     log.info("PostgreSQL running at " + POSTGRES.getJdbcUrl());
     log.info("Keycloak running at " + KEYCLOAK.getAuthServerUrl());
+  }
+
+  @AfterEach
+  void baseCleanup() {
+    if (keycloakAdminClient != null) {
+      try {
+        keycloakAdminClient.close();
+      } catch (Exception e) {
+        log.warn("Failed to close Keycloak admin client: {}", e.getMessage());
+      }
+    }
   }
 
   @AfterAll
@@ -91,5 +118,13 @@ public abstract class BaseKeycloakIntegrationTest {
 
   protected String getValidAccessToken(String username, String password) {
     return tokenHelper.getAccessToken(username, password);
+  }
+
+  protected RealmResource getRealmResource() {
+    return keycloakAdminClient.realm(REALM_NAME);
+  }
+
+  protected UsersResource getUsersResource() {
+    return getRealmResource().users();
   }
 }

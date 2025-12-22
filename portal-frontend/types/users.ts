@@ -20,10 +20,9 @@ export type UserResponse = {
   id: string
   firstName: string
   lastName: string
-  displayName: string
   email: string
   phone: string
-  title: TitleSchemaType
+  title: TitleType
   authority: UserAuthority | null
   groups: string[]
   active: boolean
@@ -35,7 +34,7 @@ export type CreateUserData = Omit<UpdateUserData, 'id'>
 
 export type ListUser = {
   id: string
-  displayName: string
+  fullName: string
   authority: string
   department: string
   email: string
@@ -48,22 +47,22 @@ export type GroupListUser = Omit<ListUser, 'roles'> & {
 
 export type GroupAssignmentUser = {
   id: string
-  displayName: string
+  fullName: string
   email: string
   isActive: boolean
 }
 
 export type GroupUser = {
   id: string
-  displayName: string
+  fullName: string
   email: string
   authority: UserAuthority | null
   isActive: boolean
 }
 
-export const TitleSchema = z.enum(['male', 'female'])
+export const TitleSchema = z.enum(['MR', 'MS', 'OTHER'])
 
-export type TitleSchemaType = z.infer<typeof TitleSchema>
+export type TitleType = z.infer<typeof TitleSchema>
 
 export const PhoneSchema = z.string().superRefine((value, ctx) => {
   const phoneNumber = parsePhoneNumberFromString(value, 'DE')

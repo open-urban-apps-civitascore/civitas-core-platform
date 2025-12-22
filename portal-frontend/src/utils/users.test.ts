@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { Authority, TitleSchemaType, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+import { Authority, TitleType, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
 
 import { mapFormUserToApiData, mapListUsers, mapUserToFormData } from './users'
 
 const baseFormData: UserFormData = {
   id: '12345',
-  title: 'male' as TitleSchemaType,
+  title: 'MR' as TitleType,
   firstName: 'Max',
   lastName: 'Mustermann',
   email: 'maxmustermann@test.de',
@@ -20,7 +20,7 @@ const baseFormData: UserFormData = {
 const baseUserResponse: UserResponse = {
   id: '12345',
   firstName: 'Max',
-  title: 'male' as TitleSchemaType,
+  title: 'MR' as TitleType,
   lastName: 'Mustermann',
   email: 'maxmustermann@test.de',
   authority: {
@@ -33,7 +33,6 @@ const baseUserResponse: UserResponse = {
   phone: '+49 152 1111111',
   active: true,
   positionDescription: 'Bauingenieur für Kanalisationsbau',
-  displayName: 'Max Mustermann',
 }
 
 const authorities: Authority[] = [
@@ -76,13 +75,13 @@ describe('MapListUsers', () => {
     const users: UserResponse[] = [{ ...baseUserResponse, authority: null }]
     const result = mapListUsers(users, authorities)
 
-    expect(result[0].authority).toBe('')
-    expect(result[0].department).toBe('')
+    expect(result[0].authority).toBe('-')
+    expect(result[0].department).toBe('-')
 
     const users2: UserResponse[] = [{ ...baseUserResponse, authority: { id: 'auth-1', department: null } }]
     const result2 = mapListUsers(users2, authorities)
     expect(result2[0].authority).toBe(authorities[0].title)
-    expect(result2[0].department).toBe('')
+    expect(result2[0].department).toBe('-')
   })
 })
 
@@ -93,7 +92,7 @@ describe('mapFormUserToApiData', () => {
     expect(result).toEqual({
       ...UserFormSchema.parse(baseFormData),
       authority: { id: 'auth-1', department: { id: 'dep-1' } },
-      displayName: baseUserResponse.displayName,
+      displayName: `${baseUserResponse.firstName} ${baseUserResponse.lastName}`,
     })
   })
 
@@ -129,7 +128,7 @@ describe('mapUserToFormData', () => {
   it('should return a user with empty fields if the user data is null', () => {
     expect(mapUserToFormData(null)).toEqual({
       id: '',
-      title: 'male' as TitleSchemaType,
+      title: 'MR' as TitleType,
       firstName: '',
       lastName: '',
       email: '',
