@@ -1,6 +1,5 @@
 'use client'
 
-import { Row } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -17,40 +16,12 @@ import { DatasetResponse, DatasetTableData } from '@/types/datasets'
 
 import DatasetsTable from './components/DatasetsTable'
 
-export const mapDatasetsToListData = (datasets: DatasetResponse[]): DatasetTableData[] => {
-  const datasetsMap = datasets.flatMap(dataset => {
-    try {
-      const data = {
-        id: dataset.id,
-        name: dataset.name,
-        dataspace: dataset.dataspace?.title || '',
-        department: dataset.department?.title || '',
-        creator: dataset.creator.map(creator => `${creator.firstName} ${creator.lastName}`),
-        lastUpdated: dataset.lastUpdated,
-        status: dataset.status,
-        releaseProcess: null,
-        distribution: dataset.distribution
-          ? {
-              format: dataset.distribution?.format,
-              title: dataset.distribution?.title,
-              url: dataset.distribution?.url,
-            }
-          : null,
-      }
-      return data
-    } catch (error) {
-      console.error(dataset, error)
-      return []
-    }
-  })
-  return datasetsMap
-}
-
 const DatasetsPage = () => {
   const t = useTranslations('datasets')
   const router = useRouter()
   const [datasets, setDatasets] = useState<DatasetTableData[]>([])
   const [rowCount, setRowCount] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
 
   const {
     setSortingParams,
@@ -71,14 +42,14 @@ const DatasetsPage = () => {
     const params = getApiRequestParamsByUrl()
 
     const getDatasets = async () => {
+      setIsLoading(true)
       try {
         const datasetsResponse = await fetch(`/api/datasets?${params.toString()}`)
         if (!datasetsResponse.ok) {
           throw new Error('An error occurred while loading data')
         }
         const datasetsData: DatasetResponse[] = await datasetsResponse.json()
-        const datasets = mapDatasetsToListData(datasetsData)
-        setDatasets(datasets)
+        setDatasets(datasetsData)
         const totalCount = Number(datasetsResponse.headers.get('X-Total-Count')) || 0
         if (rowCount !== totalCount) {
           setRowCount(totalCount)
@@ -86,18 +57,13 @@ const DatasetsPage = () => {
         setTotalPages(Math.ceil(totalCount / pageSize))
       } catch (error) {
         console.error(error)
+      } finally {
+        setIsLoading(false)
       }
     }
     getDatasets()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
-
-  const handleRowClick = (row: Row<DatasetTableData>) => {
-    if (row.id) {
-      const params = getApiRequestParamsByUrl()
-      router.push(`datasets/${row.id}?${params.toString()}`)
-    }
-  }
 
   const CustomElement = (
     <Button onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}>
@@ -126,7 +92,7 @@ const DatasetsPage = () => {
             totalPages={totalPages}
             onPaginationChange={setPaginationParams}
             onSortingChange={setSortingParams}
-            onRowClick={handleRowClick}
+            isLoading={isLoading}
           />
         </TableContainer>
       </PageBackground>

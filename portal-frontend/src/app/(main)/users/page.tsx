@@ -30,7 +30,8 @@ const getUserListData = async (params: URLSearchParams) => {
     })
 
     if (!usersResponse.ok) {
-      throw new Error('An error occurred while loading user list data')
+      console.error('An error occurred while loading user list data')
+      return { users: [], totalCount: 0 }
     }
 
     const usersData = await usersResponse.json()

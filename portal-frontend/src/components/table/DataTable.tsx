@@ -96,7 +96,7 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                   >
                     {row.getVisibleCells().map(cell => (
                       <TableCell
-                        className="whitespace-normal px-3"
+                        className={cn('whitespace-normal px-3 group/cell relative h-16')}
                         key={cell.id}
                         style={cell.column.columnDef.meta?.style}
                       >

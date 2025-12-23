@@ -115,7 +115,7 @@ const EditDataSpacePage = () => {
   }
 
   return (
-    <PageContainer headerType="onlyTitle">
+    <PageContainer testId="dataspaceDetailsPage" headerType="onlyTitle">
       <PageHeader title={selectedDataSpace?.name} />
       <PageBackground>
         <DataSpaceForm

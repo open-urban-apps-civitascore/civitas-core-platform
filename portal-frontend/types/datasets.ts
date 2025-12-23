@@ -2,10 +2,17 @@ import { CheckedState } from '@radix-ui/react-checkbox'
 import { JSX } from 'react'
 import { z } from 'zod'
 
-import { Item } from './common'
+import { Item2 } from './common'
 
-export type Status = 'open' | 'closed' | null
-export type Creator = { id: string; firstName: string; lastName: string }
+export const DATASET_STATUS = {
+  DRAFT: 'draft',
+  READY: 'ready',
+  PUBLISHED: 'published',
+} as const
+
+export type DatasetStatus = (typeof DATASET_STATUS)[keyof typeof DATASET_STATUS]
+
+export type Contact = { id: string; firstName: string; lastName: string }
 export type Distribution = {
   format: string
   title: string
@@ -26,26 +33,23 @@ export type DatasetResponse = {
   id: string
   name: string
   description: string
-  creator: Creator[]
+  contact: Contact | null
   issued: string
   lastUpdated: string
-  status: Status
-  distribution: (Distribution & { id: string }) | null
-  dataspace: Item | null
-  department: Item | null
+  access: boolean
+  status: DatasetStatus
+  dataspace: Item2 | null
   tags: string[]
 }
 
 export type DatasetTableData = {
   id: string
   name: string
-  dataspace: string
-  department: string
-  creator: string[]
+  dataspace: Item2 | null
+  contact: Contact | null
   lastUpdated: string
-  status: Status
-  releaseProcess: null
-  distribution: Distribution | null
+  access: boolean
+  status: DatasetStatus
 }
 
 export const DatasetFormSchema = z.object({

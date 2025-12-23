@@ -72,13 +72,13 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
     try {
       const response = await createDataset({
         ...formData,
-        creator: [],
-        department: null,
-        distribution: null,
+        // the contact implementation has to be adjusted once the API is implemented
+        contact: null,
         issued: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
-        dataspace: selectedDataspace ? { id: selectedDataspace?.value, title: selectedDataspace?.label } : null,
-        status: null,
+        dataspace: selectedDataspace ? { id: selectedDataspace?.value, name: selectedDataspace?.label } : null,
+        access: true,
+        status: 'draft',
       })
 
       router.push(`/datasets/${response.id}`)
@@ -93,7 +93,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
     const selectedDataspace = dataspaces.find(dataspace => dataspace.value === formData.dataspace)
     const updateDatasetData = {
       ...formData,
-      dataspace: selectedDataspace ? { id: selectedDataspace?.value, title: selectedDataspace?.label } : null,
+      dataspace: selectedDataspace ? { id: selectedDataspace?.value, name: selectedDataspace?.label } : null,
       lastUpdated: new Date().toISOString(),
     }
     try {
