@@ -1,3 +1,5 @@
+import { getTranslations } from 'next-intl/server'
+
 import { Group } from '@/types/groups'
 import { UserResponse } from '@/types/users'
 
@@ -12,6 +14,7 @@ interface PageProps {
 const UserDetailsPage = async (props: PageProps) => {
   const { params } = props
   const { userId } = await params
+  const t = await getTranslations('users')
 
   const getUserData = async (userId: string) => {
     try {
@@ -51,7 +54,7 @@ const UserDetailsPage = async (props: PageProps) => {
       testId="userDetailsPage"
       userData={userData}
       isEditMode
-      title={userData ? `${userData.firstName} ${userData.lastName}` : 'User not found'}
+      title={userData ? `${userData.firstName} ${userData.lastName}` : t('notFound')}
     />
   )
 }

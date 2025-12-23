@@ -21,6 +21,7 @@ const DatasetsPage = () => {
   const router = useRouter()
   const [datasets, setDatasets] = useState<DatasetTableData[]>([])
   const [rowCount, setRowCount] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
 
   const {
     setSortingParams,
@@ -41,6 +42,7 @@ const DatasetsPage = () => {
     const params = getApiRequestParamsByUrl()
 
     const getDatasets = async () => {
+      setIsLoading(true)
       try {
         const datasetsResponse = await fetch(`/api/datasets?${params.toString()}`)
         if (!datasetsResponse.ok) {
@@ -55,6 +57,8 @@ const DatasetsPage = () => {
         setTotalPages(Math.ceil(totalCount / pageSize))
       } catch (error) {
         console.error(error)
+      } finally {
+        setIsLoading(false)
       }
     }
     getDatasets()
@@ -88,6 +92,7 @@ const DatasetsPage = () => {
             totalPages={totalPages}
             onPaginationChange={setPaginationParams}
             onSortingChange={setSortingParams}
+            isLoading={isLoading}
           />
         </TableContainer>
       </PageBackground>

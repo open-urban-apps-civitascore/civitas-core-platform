@@ -27,6 +27,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     onPaginationChange,
     onSortingChange,
     onRowClick,
+    isLoading,
   } = props
   const t = useTranslations('datasets')
   const locale = useLocale()
@@ -156,6 +157,7 @@ const DatasetsTable = (props: DatasetsTableProps) => {
       pageSize={pageSize}
       totalPages={totalPages}
       onRowClick={onRowClick}
+      isLoading={isLoading}
     />
   )
 }

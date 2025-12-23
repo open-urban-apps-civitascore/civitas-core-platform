@@ -96,7 +96,7 @@ export const UserDetails = (props: UserDetailsProps) => {
         title={title}
         subTabs={{ tabs: tabs, selectedTab: subTabValue || defaultTab, onClick: newTab => handleSelectTab(newTab) }}
       />
-      <PageBackground>{userData ? Content : <NoDataPage title="No User Data" />}</PageBackground>
+      <PageBackground>{userData ? Content : <NoDataPage title={t('notFound')} />}</PageBackground>
     </PageContainer>
   )
 }
