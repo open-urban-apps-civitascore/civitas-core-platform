@@ -4,7 +4,7 @@
     "config:recommended"
   ],
   "baseBranches": ["develop"],
-  "labels": ["v::2", "team data mgmt", "dependencies"],
+  "labels": ["v::2", "dependencies"],
   "prConcurrentLimit": 10,
   "rangeStrategy": "bump",
   "semanticCommits": "enabled",
@@ -20,21 +20,21 @@
       "matchPaths": ["portal-frontend/**"],
       "groupName": "frontend dependencies",
       "commitMessagePrefix": "chore(frontend):",
-      "addLabels": ["cop frontend"]
+      "addLabels": ["cop frontend", "team data mgmt"]
     },
     {
       "description": "Backend dependencies (Spring Boot)",
       "matchPaths": ["portal-backend/**"],
       "groupName": "backend dependencies",
       "commitMessagePrefix": "chore(backend):",
-      "addLabels": ["cop backend"]
+      "addLabels": ["cop backend", "team data mgmt"]
     },
     {
       "description": "Config Adapter dependencies",
       "matchPaths": ["config-adapter/**"],
       "groupName": "config-adapter dependencies",
       "commitMessagePrefix": "chore(config-adapter):",
-      "addLabels": ["cop backend"]
+      "addLabels": ["cop backend", "team interfaces"]
     },
     {
       "description": "Group Spring Boot dependencies",
