@@ -5,6 +5,9 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 
+# TO BE REMOVED. Part of JSON-Server below
+RUN pnpm add concurrently json-server
+
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
@@ -30,5 +33,5 @@ ENV NODE_ENV=production
 
 # Temporary fix to run json-server alongside nextjs until proper backend is available
 # Using concurrently to run both services and crash container if either service fails
-CMD ["concurrently", "--kill-others", "--names", "JSON-SERVER,NEXT", "-c", "blue,green", "json-server json-server/db.json -p 3001", "node_modules/.bin/next start"]
+CMD ["node_modules/.bin/concurrently", "--kill-others", "--names", "JSON-SERVER,NEXT", "-c", "blue,green", "node_modules/.bin/json-server json-server/db.json -p 3001", "node_modules/.bin/next start"]
 # CMD ["node_modules/.bin/next", "start"]
