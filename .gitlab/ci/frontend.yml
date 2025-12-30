@@ -147,14 +147,13 @@ build-frontend:
   extends: .only-frontend-changes
   image: node:22
   stage: build
-  needs:
-    [
+  needs: [
       'lint-frontend',
       'dependency-prune-frontend',
       'test-frontend',
       'secret_detection',
       'gitlab-advanced-sast',
-      'dependency-scanning',
+      # 'dependency-scanning',
     ]
   variables:
     NODE_ENV: production
