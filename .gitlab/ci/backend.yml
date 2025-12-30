@@ -121,9 +121,9 @@ build-backend:
     - job: 'test-backend'
     - job: 'secret_detection'
     - job: 'gitlab-advanced-sast'
-    - job: 'dependency-scanning'
+    # - job: 'dependency-scanning'
     - job: 'publish-config-adapter'
-      optional: true  # Optional because config-adapter might not have changed
+      optional: true # Optional because config-adapter might not have changed
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -178,7 +178,7 @@ container-scan-backend:
   extends: .only-backend-changes
   image:
     name: aquasec/trivy:0.55.1
-    entrypoint: [""]
+    entrypoint: ['']
   stage: container-qa
   needs: ['build-backend-image']
   variables:
@@ -239,6 +239,6 @@ sbom-backend-image:
     when: always
     expire_in: 1 month
     paths:
-    - portal-backend/target/portal-backend-image.cdx.json
+      - portal-backend/target/portal-backend-image.cdx.json
     reports:
       cyclonedx: portal-backend/target/portal-backend-image.cdx.json
