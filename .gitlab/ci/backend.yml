@@ -120,8 +120,11 @@ build-backend:
     - job: 'dependency-prune-backend'
     - job: 'test-backend'
     - job: 'secret_detection'
+      optional: true
     - job: 'gitlab-advanced-sast'
+      optional: true
     # - job: 'dependency-scanning'
+    #   optional: true
     - job: 'publish-config-adapter'
       optional: true # Optional because config-adapter might not have changed
   variables:
