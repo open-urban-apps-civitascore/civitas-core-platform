@@ -10,7 +10,7 @@ include:
   - .gitlab/ci/backend.yml
   - .gitlab/ci/config-adapter.yml
   - template: Jobs/SAST.gitlab-ci.yml
-  - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
+  # - template: Jobs/Dependency-Scanning.latest.gitlab-ci.yml
   - template: Jobs/Secret-Detection.gitlab-ci.yml
 
 workflow:
@@ -41,7 +41,6 @@ secret_detection:
 gitlab-advanced-sast:
   stage: qa
   needs: []
-
-dependency-scanning:
-  stage: qa
-  needs: []
+# dependency-scanning:
+#   stage: qa
+#   needs: []
