@@ -86,31 +86,6 @@ test-backend:
         coverage_format: jacoco
         path: portal-backend/target/site/jacoco/jacoco.xml
 
-sbom-backend:
-  extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
-  stage: qa
-  needs: []
-  variables:
-    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
-  cache:
-    key:
-      prefix: backend-maven
-      files:
-        - portal-backend/pom.xml
-    paths:
-      - .m2/repository
-  script:
-    - cd portal-backend
-    - mvn $MAVEN_CLI_OPTS -B cyclonedx:makeAggregateBom -DskipTests
-  artifacts:
-    when: always
-    expire_in: 1 month
-    paths:
-      - portal-backend/target/portal-backend.cdx.json
-    reports:
-      cyclonedx: portal-backend/target/portal-backend.cdx.json
-
 build-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-21-alpine
