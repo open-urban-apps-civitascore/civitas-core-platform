@@ -1,7 +1,7 @@
 import { ChevronDown } from 'lucide-react'
+import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 
-import Link from 'next/link'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible'
 import {
   SidebarContent,
