@@ -31,10 +31,10 @@ export const AppSidebarContent = async () => {
             item.items ? (
               <Collapsible key={item.title} defaultOpen={item.isActive} className="group/collapsible">
                 <CollapsibleTrigger>
-                  <SidebarMenuButton>
+                  <SidebarMenuButton className="cursor-pointer">
                     <item.icon />
                     <span>{getMenuItemTitle(item)}</span>
-                    <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180 " />
                   </SidebarMenuButton>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
