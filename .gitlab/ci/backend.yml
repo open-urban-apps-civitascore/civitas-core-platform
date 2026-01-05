@@ -244,4 +244,4 @@ sbom-backend-image:
     paths:
       - portal-backend/target/portal-backend-image.cdx.json
     reports:
-      cyclonedx: portal-backend/target/portal-backend-image.cdx.json
+      dependency_scanning: portal-backend/target/portal-backend-image.cdx.json

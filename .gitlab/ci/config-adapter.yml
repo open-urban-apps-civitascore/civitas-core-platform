@@ -277,4 +277,4 @@ sbom-config-adapter-image:
     paths:
       - config-adapter/target/config-adapter-image.cdx.json
     reports:
-      cyclonedx: config-adapter/target/config-adapter-image.cdx.json
+      dependency_scanning: config-adapter/target/config-adapter-image.cdx.json
