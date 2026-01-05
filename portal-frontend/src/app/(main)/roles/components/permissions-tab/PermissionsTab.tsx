@@ -6,8 +6,8 @@ import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
-import { useQueryParams } from '@/hooks/useQueryParams'
+import { SearchHeader } from '@/components/search-area/SearchArea'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { Item } from '@/types/common'
 import { Permission, PermissionItem } from '@/types/permissions'
 import { ROLE_ORIGINS, ROLE_TYPES, RoleResponse } from '@/types/roles'
@@ -17,7 +17,7 @@ import { RoleTemplateSelect } from './RoleTemplateSelect'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-type PermissionsTabProps = {
+interface PermissionsTabProps {
   onPermissionUpdate: (permissionIds: string[]) => void
   currentSelectedPermissionIds?: Permission['id'][]
   roleType: string

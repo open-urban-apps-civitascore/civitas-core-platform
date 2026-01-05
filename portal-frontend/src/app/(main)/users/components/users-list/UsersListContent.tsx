@@ -5,13 +5,13 @@ import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { Button } from '@/components/ui/button'
 import { ListUser } from '@/types/users'
 
 import UsersTable from './UsersTable'
 
-type Props = {
+interface UsersListContentProps {
   users: ListUser[]
   totalCount: number
   pageIndex: number
@@ -31,7 +31,7 @@ export const UsersListContent = ({
   totalPages,
   search,
   newUserLabel,
-}: Props) => {
+}: UsersListContentProps) => {
   const router = useRouter()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 

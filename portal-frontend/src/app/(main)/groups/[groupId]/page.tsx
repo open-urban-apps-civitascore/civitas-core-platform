@@ -1,6 +1,6 @@
 import { Group } from '@/types/groups'
 
-import GroupDetails from '../components/GroupDetails'
+import { GroupDetails } from '../components/GroupDetails'
 
 const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
@@ -8,7 +8,7 @@ interface UpdateGroupPageProps {
   params: Promise<{ groupId: string }>
 }
 
-const UpdateGroupPage = async (props: UpdateGroupPageProps) => {
+const EditGroupPage = async (props: UpdateGroupPageProps) => {
   const { params } = props
   const { groupId } = await params
 
@@ -39,4 +39,4 @@ const UpdateGroupPage = async (props: UpdateGroupPageProps) => {
   return <GroupDetails title={groupData?.title || ''} groupData={groupData} isEditMode />
 }
 
-export default UpdateGroupPage
+export default EditGroupPage

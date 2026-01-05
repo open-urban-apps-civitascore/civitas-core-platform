@@ -4,7 +4,7 @@ import { useReactFlow } from '@xyflow/react'
 import { useCallback } from 'react'
 
 import type { UMLDiagram } from '../types/diagram'
-import { useUMLDiagramCore, type UseUMLDiagramCoreReturn } from './useUMLDiagramCore'
+import { useUMLDiagramCore, type UseUMLDiagramCoreReturn } from './use-uml-dagram-core'
 
 export interface UseUMLDiagramReturn extends UseUMLDiagramCoreReturn {
   // Layout operations that require ReactFlow instance

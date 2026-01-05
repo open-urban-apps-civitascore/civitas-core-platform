@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { ChangeEvent, useCallback, useState } from 'react'
 
 import { UML_STEREOTYPES } from '../../constants/umlTypes'
-import { useActiveDiagram } from '../../hooks/useActiveDiagram'
+import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import type { UMLNode } from '../../types/diagram'
 import { hasAttributes, hasOperations } from '../../types/uml'
 import { AttributeManager } from './AttributeManager'

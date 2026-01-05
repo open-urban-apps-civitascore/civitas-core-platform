@@ -7,17 +7,17 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
-import { useQueryParams } from '@/hooks/useQueryParams'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { Group, GroupTabProps } from '@/types/groups'
 import { Authority, GroupListUser, UserResponse } from '@/types/users'
 import { mapGroupListUsers } from '@/utils/users'
 
 import { patchGroupUsers } from '../../actions'
 import { AssignUsersModal } from './AssignUsersModal'
-import UsersTable from './UsersTable'
+import { UsersTable } from './UsersTable'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 

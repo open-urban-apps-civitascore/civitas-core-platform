@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { Group, UserGroupsListData } from '@/types/groups'

@@ -16,7 +16,7 @@ interface DatasetsTableProps extends TableProps<DatasetTableData> {
   datasets: DatasetTableData[]
 }
 
-const DatasetsTable = (props: DatasetsTableProps) => {
+export const DatasetsTable = (props: DatasetsTableProps) => {
   const {
     datasets,
     rowCount,
@@ -161,5 +161,3 @@ const DatasetsTable = (props: DatasetsTableProps) => {
     />
   )
 }
-
-export default DatasetsTable

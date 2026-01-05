@@ -3,7 +3,7 @@
 import { createContext, useContext } from 'react'
 
 import { createEmptyDiagram } from '../services/diagramService'
-import type { UseUMLDiagramCoreReturn } from './useUMLDiagramCore'
+import type { UseUMLDiagramCoreReturn } from './use-uml-dagram-core'
 
 // Context for sharing UML diagram state between components
 const UMLDiagramContext = createContext<UseUMLDiagramCoreReturn | null>(null)

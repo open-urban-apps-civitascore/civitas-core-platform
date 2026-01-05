@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useCallback } from 'react'
 
 import { UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
-import { useActiveDiagram } from '../../hooks/useActiveDiagram'
+import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import type { UMLAttribute, UMLElement, UMLPrimitiveType, Visibility } from '../../types/uml'
 
 interface AttributeManagerProps {

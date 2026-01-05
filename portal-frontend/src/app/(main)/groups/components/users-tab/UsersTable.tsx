@@ -14,7 +14,7 @@ interface UsersTableProps extends TableProps<GroupListUser> {
   users: GroupListUser[]
 }
 
-const UsersTable = (props: UsersTableProps) => {
+export const UsersTable = (props: UsersTableProps) => {
   const {
     users,
     rowCount,
@@ -106,5 +106,3 @@ const UsersTable = (props: UsersTableProps) => {
     />
   )
 }
-
-export default UsersTable

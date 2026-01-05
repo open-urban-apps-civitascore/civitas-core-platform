@@ -8,13 +8,13 @@ import { useEffect, useState } from 'react'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
-import { useQueryParams } from '@/hooks/useQueryParams'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { DatasetResponse, DatasetTableData } from '@/types/datasets'
 
-import DatasetsTable from './components/DatasetsTable'
+import { DatasetsTable } from './components/DatasetsTable'
 
 const DatasetsPage = () => {
   const t = useTranslations('datasets')

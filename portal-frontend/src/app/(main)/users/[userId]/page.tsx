@@ -11,7 +11,7 @@ interface PageProps {
   params: Promise<{ userId: string }>
 }
 
-const UserDetailsPage = async (props: PageProps) => {
+const EditUserPage = async (props: PageProps) => {
   const { params } = props
   const { userId } = await params
   const t = await getTranslations('users')
@@ -59,4 +59,4 @@ const UserDetailsPage = async (props: PageProps) => {
   )
 }
 
-export default UserDetailsPage
+export default EditUserPage
