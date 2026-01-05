@@ -14,7 +14,7 @@ include:
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Dependency-Scanning.v2.gitlab-ci.yml
     inputs:
-      stage: qa
+      stage: report
   - template: Jobs/Secret-Detection.gitlab-ci.yml
 
 workflow:
