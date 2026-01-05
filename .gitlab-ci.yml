@@ -14,7 +14,7 @@ include:
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Dependency-Scanning.v2.gitlab-ci.yml
     inputs:
-      stage: report
+      stage: qa
   - template: Jobs/Secret-Detection.gitlab-ci.yml
 
 workflow:
@@ -32,16 +32,19 @@ stages: [lint, test, qa, build, container-qa, deploy, report]
 variables:
   GITLAB_ADVANCED_SAST_ENABLED: 'true'
   AST_ENABLE_MR_PIPELINES: 'true' # Enable secret detection in MR pipelines
+  SAST_EXCLUDED_ANALYZERS: 'semgrep' # Disable fall bock sast scanner (only use advanced sast)
   DS_ENFORCE_NEW_ANALYZER: 'true'
   DS_MAX_DEPTH: 3
 
-debug-gitlab-features:
-  stage: lint
-  image: alpine
-  script:
-    - echo "GITLAB_FEATURES = $GITLAB_FEATURES"
-    - echo "CI_COMMIT_BRANCH = $CI_COMMIT_BRANCH"
-    - echo "CI_PIPELINE_SOURCE = $CI_PIPELINE_SOURCE"
-    - echo "CI_OPEN_MERGE_REQUESTS = $CI_OPEN_MERGE_REQUESTS"
-  rules:
-    - when: always
+# ============================================
+# Security & QA Jobs
+# Required for all changes
+# ============================================
+
+secret_detection:
+  stage: qa
+  needs: []
+
+gitlab-advanced-sast:
+  stage: qa
+  needs: []
