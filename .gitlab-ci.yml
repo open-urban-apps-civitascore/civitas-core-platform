@@ -28,6 +28,7 @@ stages: [lint, test, qa, build, container-qa, deploy, report]
 variables:
   GITLAB_ADVANCED_SAST_ENABLED: 'true'
   DS_ENFORCE_NEW_ANALYZER: 'true'
+  DS_MAX_DEPTH: 3
 
 # ============================================
 # Security & QA Jobs
