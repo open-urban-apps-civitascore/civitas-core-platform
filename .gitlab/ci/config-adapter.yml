@@ -98,31 +98,6 @@ test-config-adapter:
         coverage_format: jacoco
         path: config-adapter/*/target/site/jacoco/jacoco.xml
 
-sbom-config-adapter:
-  extends: .only-config-adapter-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
-  stage: qa
-  needs: []
-  variables:
-    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
-  cache:
-    key:
-      prefix: config-adapter-maven
-      files:
-        - config-adapter/pom.xml
-    paths:
-      - .m2/repository
-  script:
-    - cd config-adapter
-    - mvn $MAVEN_CLI_OPTS -B cyclonedx:makeAggregateBom -DskipTests
-  artifacts:
-    when: always
-    expire_in: 1 month
-    paths:
-      - config-adapter/target/config-adapter.cdx.json
-    reports:
-      cyclonedx: config-adapter/target/config-adapter.cdx.json
-
 build-config-adapter:
   extends: .only-config-adapter-changes
   image: maven:3.9-eclipse-temurin-21-alpine

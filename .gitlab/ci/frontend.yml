@@ -113,36 +113,6 @@ test-frontend:
         coverage_format: cobertura
         path: portal-frontend/coverage/cobertura-coverage.xml
 
-sbom-frontend:
-  extends: .only-frontend-changes
-  image: node:22
-  stage: qa
-  needs: []
-  variables:
-    PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
-  cache:
-    key:
-      prefix: frontend-pnpm
-      files:
-        - portal-frontend/pnpm-lock.yaml
-    paths:
-      - portal-frontend/.pnpm-store
-  script:
-    - cd portal-frontend
-    - set -euo pipefail
-    - corepack enable >/dev/null 2>&1 || true
-    - pnpm config set store-dir $PNPM_STORE_DIR
-    - pnpm install --frozen-lockfile
-    - mkdir -p sbom
-    - pnpm dlx cyclonedx-bom -o sbom/portal-frontend.cdx.json -f json
-  artifacts:
-    when: always
-    expire_in: 1 month
-    paths:
-      - portal-frontend/sbom/
-    reports:
-      cyclonedx: portal-frontend/sbom/portal-frontend.cdx.json
-
 build-frontend:
   extends: .only-frontend-changes
   image: node:22
