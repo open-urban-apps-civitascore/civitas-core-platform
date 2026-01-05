@@ -31,5 +31,17 @@ stages: [lint, test, qa, build, container-qa, deploy, report]
 
 variables:
   GITLAB_ADVANCED_SAST_ENABLED: 'true'
+  AST_ENABLE_MR_PIPELINES: 'true' # Enable secret detection in MR pipelines
   DS_ENFORCE_NEW_ANALYZER: 'true'
   DS_MAX_DEPTH: 3
+
+debug-gitlab-features:
+  stage: lint
+  image: alpine
+  script:
+    - echo "GITLAB_FEATURES = $GITLAB_FEATURES"
+    - echo "CI_COMMIT_BRANCH = $CI_COMMIT_BRANCH"
+    - echo "CI_PIPELINE_SOURCE = $CI_PIPELINE_SOURCE"
+    - echo "CI_OPEN_MERGE_REQUESTS = $CI_OPEN_MERGE_REQUESTS"
+  rules:
+    - when: always
