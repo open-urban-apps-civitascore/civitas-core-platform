@@ -5,6 +5,8 @@
 # Local testing:
 # gitlab-ci-local <jobName>
 
+# Change to retrigger all pipeline for a new commit
+
 include:
   - .gitlab/ci/frontend.yml
   - .gitlab/ci/backend.yml
