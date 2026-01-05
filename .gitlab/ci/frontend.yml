@@ -117,16 +117,7 @@ build-frontend:
   extends: .only-frontend-changes
   image: node:22
   stage: build
-  needs:
-    - job: 'lint-frontend'
-    - job: 'dependency-prune-frontend'
-    - job: 'test-frontend'
-    - job: 'secret_detection'
-      optional: true
-    - job: 'gitlab-advanced-sast'
-      optional: true
-    # - job: 'dependency-scanning'
-    #   optional: true
+  needs: ['lint-frontend', 'dependency-prune-frontend', 'test-frontend']
   variables:
     NODE_ENV: production
     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store

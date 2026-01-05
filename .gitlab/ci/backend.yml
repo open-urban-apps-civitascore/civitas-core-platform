@@ -90,18 +90,7 @@ build-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: build
-  needs:
-    - job: 'lint-backend'
-    - job: 'dependency-prune-backend'
-    - job: 'test-backend'
-    - job: 'secret_detection'
-      optional: true
-    - job: 'gitlab-advanced-sast'
-      optional: true
-    # - job: 'dependency-scanning'
-    #   optional: true
-    - job: 'publish-config-adapter'
-      optional: true # Optional because config-adapter might not have changed
+  needs: ['lint-backend', 'dependency-prune-backend', 'test-backend', 'publish-config-adapter']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:

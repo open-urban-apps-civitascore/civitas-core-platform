@@ -102,16 +102,7 @@ build-config-adapter:
   extends: .only-config-adapter-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: build
-  needs:
-    - job: 'lint-config-adapter'
-    - job: 'dependency-prune-config-adapter'
-    - job: 'test-config-adapter'
-    - job: 'secret_detection'
-      optional: true
-    - job: 'gitlab-advanced-sast'
-      optional: true
-    # - job: 'dependency-scanning'
-    #   optional: true
+  needs: ['lint-config-adapter', 'dependency-prune-config-adapter', 'test-config-adapter']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
