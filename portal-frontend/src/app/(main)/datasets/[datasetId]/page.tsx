@@ -33,7 +33,7 @@ const DatasetPage = async (props: DatasetPageProps) => {
   const getData = async () => {
     try {
       const [datasetResponse, dataspacesResponse] = await Promise.all([
-        fetch(`${process.env.NEXTAUTH_URL}/api/datasets/${datasetId}`, {
+        fetch(`${process.env.NEXT_SERVER_URL}/api/datasets/${datasetId}`, {
           cache: 'no-store',
           headers: {
             cookie: (await headers()).get('cookie') || '',
