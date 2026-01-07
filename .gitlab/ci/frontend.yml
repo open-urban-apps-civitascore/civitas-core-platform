@@ -213,8 +213,8 @@ deploy-frontend:
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
 
 sbom-frontend-image:
-  rules:
-    - when: never
+  # rules:
+  #   - when: never
   extends: .only-frontend-changes
   image: docker:27-dind
   stage: report
@@ -239,5 +239,5 @@ sbom-frontend-image:
     expire_in: 1 month
     paths:
       - portal-frontend/sbom/portal-frontend-image.cdx.json
-    reports:
-      cyclonedx: portal-frontend/sbom/portal-frontend-image.cdx.json
+    # reports:
+    #   cyclonedx: portal-frontend/sbom/portal-frontend-image.cdx.json

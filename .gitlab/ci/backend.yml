@@ -217,8 +217,8 @@ deploy-backend:
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
 
 sbom-backend-image:
-  rules:
-    - when: never
+  # rules:
+  #   - when: never
   extends: .only-backend-changes
   image: docker:27-dind
   stage: report
@@ -243,5 +243,5 @@ sbom-backend-image:
     expire_in: 1 month
     paths:
       - portal-backend/target/portal-backend-image.cdx.json
-    reports:
-      cyclonedx: portal-backend/target/portal-backend-image.cdx.json
+    # reports:
+    #   cyclonedx: portal-backend/target/portal-backend-image.cdx.json
