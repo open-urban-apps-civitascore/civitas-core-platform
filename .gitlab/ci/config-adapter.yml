@@ -14,6 +14,40 @@
         - .gitlab-ci.yml
         - .gitlab/ci/config-adapter.yml
 
+# Generate maven dependency graph JSON for license scanning
+# This must always run (needs: []) to ensure dependency scanning has the graph
+# even when the build job is skipped due to no changes
+generate-graph-config-adapter:
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: lint
+  needs: []
+  rules:
+    # Always run on tags
+    - if: $CI_COMMIT_TAG
+    # Always run on main and develop branch
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    # Always run on MR pipelines
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: config-adapter-maven
+      files:
+        - config-adapter/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd config-adapter
+    # Only generate dependency tree, no compilation needed
+    - mvn -B dependency:tree -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - config-adapter/maven.graph.json
+
 lint-config-adapter:
   extends: .only-config-adapter-changes
   image: maven:3.9-eclipse-temurin-21-alpine
