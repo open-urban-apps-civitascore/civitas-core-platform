@@ -5,6 +5,7 @@
     "noResults": "Es gibt leider keine Ergebnisse.",
     "noData": "Keine Daten",
     "loading": "Lädt...",
+    "loadingItems": "Lädt {item} ...",
     "form": "Formular",
     "actions": {
       "submit": "Speichern",
@@ -23,7 +24,7 @@
       "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
       "notFound": "Keine {items} gefunden",
-      "loadingError": "Fehler beim Laden der {item}",
+      "loadingError": "Fehler beim Laden der {item} Daten",
       "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
     }
   },
@@ -125,6 +126,8 @@
     }
   },
   "users": {
+    "users": "Users",
+    "user": "User",
     "title": "Übersicht: User",
     "newUser": "User erstellen",
     "createUser": "User erstellen",

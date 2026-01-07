@@ -1,12 +1,15 @@
 import { getTranslations } from 'next-intl/server'
 
-import { getUsers } from '@/app/services/api/users/userService'
+import { getServerRequestConfig } from '@/app/services/api/client/serverRequestConfig'
+import { fetchUsers } from '@/app/services/api/users/userService'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Item } from '@/types/common'
+import { UserResponse } from '@/types/users'
 import { getRequestParams, RequestParams } from '@/utils/getRequestParams'
+import { mapListUsers } from '@/utils/users'
 
 import { UsersListContent } from './components/users-list/UsersListContent'
 
@@ -24,7 +27,10 @@ const UsersPage = async ({ searchParams }: Props) => {
 
   const { apiParams, pageSize, sort, pageIndex, search } = getRequestParams(params)
 
-  const { users, totalCount } = await getUsers(apiParams)
+  const data = await fetchUsers(getServerRequestConfig(), apiParams)
+
+  const users = mapListUsers(data.content as UserResponse[], [])
+  const totalCount = Number(data.totalElements) || 0
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 
   // sorting for table as SortingState
