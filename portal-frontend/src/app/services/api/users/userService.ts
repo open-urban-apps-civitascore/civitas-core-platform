@@ -1,30 +1,25 @@
-import { headers } from 'next/headers'
+import { AxiosRequestConfig } from 'axios'
 
-import { UserResponse } from '@/types/users'
-import { mapListUsers } from '@/utils/users'
+import { axiosClient } from '../client/client'
 
-export const getUsers = async (params: URLSearchParams) => {
+export const fetchUsers = async (requestConfig: Promise<AxiosRequestConfig>, params?: URLSearchParams) => {
   try {
-    const usersResponse = await fetch(`${process.env.NEXT_SERVER_URL}/api/users?${params.toString()}`, {
-      headers: {
-        cookie: (await headers()).get('cookie') || '',
-      },
-      cache: 'no-store',
-    })
-
-    if (!usersResponse.ok) {
-      console.error('An error occurred while loading user list data')
-      throw new Error('Failed to fetch user list')
-    }
-
-    const usersData = await usersResponse.json()
-
-    const users = mapListUsers(usersData.content as UserResponse[], [])
-    const totalCount = Number(usersData.totalElements) || 0
-
-    return { users, totalCount }
+    const config = await requestConfig
+    const { data } = await axiosClient.get(`/api/users?${params?.toString() || ''}`, config)
+    return data
   } catch (error) {
     console.error(error)
-    throw new Error(`Failed to fetch user list: ${error}`)
+    throw new Error(`Failed to fetch users: ${error}`)
+  }
+}
+
+export const fetchUser = async (requestConfig: Promise<AxiosRequestConfig>, userId: string) => {
+  try {
+    const config = await requestConfig
+    const { data } = await axiosClient.get(`/api/users/${userId}`, config)
+    return data
+  } catch (error) {
+    console.error(error)
+    throw new Error(`Failed to fetch user: ${error}`)
   }
 }
