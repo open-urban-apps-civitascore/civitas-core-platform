@@ -1,9 +1,0 @@
-{
-  "groupId": "com.civitas",
-  "artifactId": "config-adapter-parent",
-  "version": "1.0.0-SNAPSHOT",
-  "type": "pom",
-  "scope": "",
-  "classifier": "",
-  "optional": "false"
-}
