@@ -14,7 +14,7 @@ include:
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Dependency-Scanning.v2.gitlab-ci.yml
     inputs:
-      stage: report
+      stage: qa
   - template: Jobs/Secret-Detection.gitlab-ci.yml
 
 workflow:
@@ -42,9 +42,9 @@ variables:
 # ============================================
 
 secret_detection:
-  stage: report
+  stage: qa
   needs: []
 
 gitlab-advanced-sast:
-  stage: report
+  stage: qa
   needs: []
