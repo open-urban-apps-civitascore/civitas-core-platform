@@ -211,7 +211,10 @@ deploy-frontend:
     - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/frontend-portal:${IMAGE_TAG}-scan
     - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/frontend-portal:$IMAGE_TAG
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
+
 sbom-frontend-image:
+  rules:
+    - when: never
   extends: .only-frontend-changes
   image: docker:27-dind
   stage: report

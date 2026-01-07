@@ -215,7 +215,10 @@ deploy-backend:
     - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/backend-portal:${IMAGE_TAG}-scan
     - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/backend-portal:$IMAGE_TAG
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
+
 sbom-backend-image:
+  rules:
+    - when: never
   extends: .only-backend-changes
   image: docker:27-dind
   stage: report
