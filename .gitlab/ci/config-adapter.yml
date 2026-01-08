@@ -41,7 +41,8 @@ generate-graph-config-adapter:
   script:
     - cd config-adapter
     # Only generate dependency tree, no compilation needed
-    - mvn -B dependency:tree -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
+    - export REVISION=$(git describe --tags --always)
+    - mvn -B dependency:tree -Drevision=$REVISION -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
   artifacts:
     when: always
     expire_in: 1 week
@@ -64,7 +65,8 @@ lint-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - mvn spotless:check
+    - export REVISION=$(git describe --tags --always)
+    - mvn spotless:check -Drevision=$REVISION
 
 dependency-prune-config-adapter:
   extends: .only-config-adapter-changes
@@ -82,7 +84,8 @@ dependency-prune-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false
+    - export REVISION=$(git describe --tags --always)
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Drevision=$REVISION -DfailOnWarning=true -DignoreNonCompile=false
   allow_failure:
     exit_codes:
       - 1
@@ -110,7 +113,8 @@ test-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - mvn $MAVEN_CLI_OPTS clean test
+    - export REVISION=$(git describe --tags --always)
+    - mvn $MAVEN_CLI_OPTS clean test -Drevision=$REVISION
     # Aggregate coverage from all modules
     - |
       awk -F, \
@@ -148,7 +152,8 @@ build-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - mvn package -DskipTests
+    - export REVISION=$(git describe --tags --always)
+    - mvn package -DskipTests -Drevision=$REVISION
   artifacts:
     when: on_success
     paths:
@@ -176,9 +181,10 @@ publish-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
+    - export REVISION=$(git describe --tags --always)
     # Deploy to GitLab Maven repository
     - |
-      mvn deploy -DskipTests \
+      mvn deploy -DskipTests -Drevision=$REVISION \
         -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
         -s ci_settings.xml
 
