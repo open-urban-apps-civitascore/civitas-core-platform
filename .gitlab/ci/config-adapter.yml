@@ -186,7 +186,7 @@ build-config-adapter-image:
   extends: .only-config-adapter-changes
   image: docker:27-dind
   stage: build
-  needs: ['publish-config-adapter']
+  needs: ['publish-config-adapter', 'build-config-adapter']
   services:
     - docker:27-dind
   variables:
