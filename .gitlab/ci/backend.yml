@@ -124,7 +124,12 @@ build-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: build
-  needs: ['lint-backend', 'dependency-prune-backend', 'test-backend', 'publish-config-adapter']
+  needs:
+    - lint-backend
+    - dependency-prune-backend
+    - test-backend
+    - job: publish-config-adapter
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:

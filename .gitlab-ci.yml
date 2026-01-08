@@ -27,7 +27,18 @@ workflow:
     # Run on tag events
     - if: $CI_COMMIT_TAG
 
-stages: [lint, test, qa, build, container-qa, deploy, report]
+stages: [
+    lint, # Lints all code
+    test-package, # Test only config adpater
+    build-package, # Build only config adpater
+    deploy-package, # Deploy only config adpater (which is required for backend test/build)
+    test, # Test backend & frontend
+    qa, # License sanning, SAST, Secret detection for all code
+    build, # Build backend & frontend
+    container-qa, # Container scanning for built images
+    deploy, # Deploy built images
+    report, # Generate reports (SBOM etc)
+  ]
 
 variables:
   GITLAB_ADVANCED_SAST_ENABLED: 'true'
