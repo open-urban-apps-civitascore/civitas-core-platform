@@ -162,7 +162,7 @@ publish-config-adapter:
   extends: .only-config-adapter-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: qa
-  needs: ['lint-config-adapter', 'test-config-adapter']
+  needs: ['build-config-adapter']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
