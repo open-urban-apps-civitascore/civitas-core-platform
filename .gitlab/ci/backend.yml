@@ -91,7 +91,9 @@ test-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: test
-  needs: []
+  needs: 
+    - job: publish-config-adapter
+    optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:

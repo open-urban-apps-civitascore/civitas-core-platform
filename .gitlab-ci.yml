@@ -29,11 +29,11 @@ workflow:
 
 stages: [
     lint, # Lints all code
+    qa, # License sanning, SAST, Secret detection for all code
     test-package, # Test only config adpater
     build-package, # Build only config adpater
     deploy-package, # Deploy only config adpater (which is required for backend test/build)
     test, # Test backend & frontend
-    qa, # License sanning, SAST, Secret detection for all code
     build, # Build backend & frontend
     container-qa, # Container scanning for built images
     deploy, # Deploy built images
