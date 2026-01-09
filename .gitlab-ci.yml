@@ -17,6 +17,18 @@ include:
       stage: qa
   - template: Jobs/Secret-Detection.gitlab-ci.yml
 
+# Setup job to determine version from git for all jobs
+setup-version:
+  image: alpine/git:latest
+  stage: .pre
+  script:
+    - export REVISION=$(git describe --tags --always)
+    - echo "REVISION=$REVISION" > version.env
+    - echo "Building with version: $REVISION"
+  artifacts:
+    reports:
+      dotenv: version.env
+
 workflow:
   rules:
     # Always run on main and develop branch

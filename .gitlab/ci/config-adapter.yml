@@ -20,7 +20,9 @@
 generate-graph-config-adapter:
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: lint
-  needs: []
+  needs:
+    - job: setup-version
+      artifacts: true
   rules:
     # Always run on tags
     - if: $CI_COMMIT_TAG
@@ -41,7 +43,6 @@ generate-graph-config-adapter:
   script:
     - cd config-adapter
     # Only generate dependency tree, no compilation needed
-    - export REVISION=$(git describe --tags --always)
     - mvn -B dependency:tree -Drevision=$REVISION -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
   artifacts:
     when: always
@@ -53,7 +54,9 @@ lint-config-adapter:
   extends: .only-config-adapter-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: lint
-  needs: []
+  needs:
+    - job: setup-version
+      artifacts: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -65,14 +68,15 @@ lint-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - export REVISION=$(git describe --tags --always)
     - mvn spotless:check -Drevision=$REVISION
 
 dependency-prune-config-adapter:
   extends: .only-config-adapter-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: lint
-  needs: []
+  needs:
+    - job: setup-version
+      artifacts: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -84,7 +88,6 @@ dependency-prune-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - export REVISION=$(git describe --tags --always)
     - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Drevision=$REVISION -DfailOnWarning=true -DignoreNonCompile=false
   allow_failure:
     exit_codes:
@@ -94,7 +97,9 @@ test-config-adapter:
   extends: .only-config-adapter-changes
   image: maven:3.9-eclipse-temurin-21
   stage: test-package
-  needs: []
+  needs:
+    - job: setup-version
+      artifacts: true
   services:
     - name: docker:27-dind
       alias: docker
@@ -113,7 +118,6 @@ test-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - export REVISION=$(git describe --tags --always)
     - mvn $MAVEN_CLI_OPTS clean test -Drevision=$REVISION
     # Aggregate coverage from all modules
     - |
@@ -140,7 +144,12 @@ build-config-adapter:
   extends: .only-config-adapter-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: build-package
-  needs: ['lint-config-adapter', 'dependency-prune-config-adapter', 'test-config-adapter']
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: lint-config-adapter
+    - job: dependency-prune-config-adapter
+    - job: test-config-adapter
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -152,7 +161,6 @@ build-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - export REVISION=$(git describe --tags --always)
     - mvn package -DskipTests -Drevision=$REVISION
   artifacts:
     when: on_success
@@ -168,6 +176,8 @@ publish-config-adapter:
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: deploy-package
   needs:
+    - job: setup-version
+      artifacts: true
     - job: build-config-adapter
       optional: true
   variables:
@@ -181,7 +191,6 @@ publish-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - export REVISION=$(git describe --tags --always)
     # Deploy to GitLab Maven repository
     - |
       mvn deploy -DskipTests -Drevision=$REVISION \
@@ -192,7 +201,11 @@ build-config-adapter-image:
   extends: .only-config-adapter-changes
   image: docker:27-dind
   stage: build
-  needs: ['publish-config-adapter', 'build-config-adapter']
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: publish-config-adapter
+    - job: build-config-adapter
   services:
     - docker:27-dind
   variables:
@@ -208,8 +221,7 @@ build-config-adapter-image:
   script:
     - cd config-adapter
     - |
-      export IMAGE_TAG=$(git describe --tags --always)
-      export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/config-adapter:${IMAGE_TAG}-scan
+      export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/config-adapter:${REVISION}-scan
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
         --tag $SCAN_IMAGE_TAG \
@@ -224,15 +236,17 @@ container-scan-config-adapter:
     name: aquasec/trivy:0.55.1
     entrypoint: ['']
   stage: container-qa
-  needs: ['build-config-adapter-image']
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: build-config-adapter-image
   variables:
     TRIVY_USERNAME: $CI_REGISTRY_USER
     TRIVY_PASSWORD: $CI_REGISTRY_PASSWORD
   script:
     - apk add --no-cache curl >/dev/null
     - curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/gitlab.tpl -o gitlab.tpl
-    - export IMAGE_TAG=$(git describe --tags --always)
-    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/config-adapter:${IMAGE_TAG}-scan
+    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/config-adapter:${REVISION}-scan
     - trivy image --scanners vuln --format template --template "@gitlab.tpl" --output gl-container-scanning-report.json $SCAN_IMAGE_TAG
   artifacts:
     when: always
@@ -244,7 +258,10 @@ deploy-config-adapter:
   extends: .only-config-adapter-changes
   image: docker:27-dind
   stage: deploy
-  needs: ['container-scan-config-adapter']
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: container-scan-config-adapter
   services:
     - docker:27-dind
   variables:
@@ -254,9 +271,8 @@ deploy-config-adapter:
     - docker info
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
-    - export IMAGE_TAG=$(git describe --tags --always)
-    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/config-adapter:${IMAGE_TAG}-scan
-    - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/config-adapter:$IMAGE_TAG
+    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/config-adapter:${REVISION}-scan
+    - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/config-adapter:$REVISION
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
 
 sbom-config-adapter-image:
@@ -265,7 +281,10 @@ sbom-config-adapter-image:
   extends: .only-config-adapter-changes
   image: docker:27-dind
   stage: report
-  needs: ['deploy-config-adapter']
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: deploy-config-adapter
   services:
     - docker:27-dind
   variables:
@@ -279,8 +298,7 @@ sbom-config-adapter-image:
   script:
     - cd config-adapter
     - mkdir -p target
-    - export IMAGE_TAG=$(git describe --tags --always)
-    - syft registry:$CI_REGISTRY_IMAGE/config-adapter:$IMAGE_TAG -o cyclonedx-json > target/config-adapter-image.cdx.json
+    - syft registry:$CI_REGISTRY_IMAGE/config-adapter:$REVISION -o cyclonedx-json > target/config-adapter-image.cdx.json
   artifacts:
     when: always
     expire_in: 1 month
