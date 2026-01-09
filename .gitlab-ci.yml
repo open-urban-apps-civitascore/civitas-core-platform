@@ -22,9 +22,9 @@ setup-version:
   image: alpine/git:latest
   stage: .pre
   script:
-    - export REVISION=$(git describe --tags --always)
+    - REVISION=$(git describe --tags --always)
     - echo "REVISION=$REVISION" > version.env
-    - echo "Building with version: $REVISION"
+    - echo "Building with version=$REVISION"
   artifacts:
     reports:
       dotenv: version.env
