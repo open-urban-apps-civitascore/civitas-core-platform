@@ -19,15 +19,12 @@ include:
 
 # Setup job to determine version from git for all jobs
 setup-version:
-  image: alpine/git:latest
+  image: alpine:latest
   stage: .pre
+  before_script:
+    - apk add --no-cache git
   script:
     - REVISION=$(git describe --tags --always)
-    - echo "REVISION=$REVISION" > version.env
-    - echo "Building with version=$REVISION"
-  artifacts:
-    reports:
-      dotenv: version.env
 
 workflow:
   rules:
