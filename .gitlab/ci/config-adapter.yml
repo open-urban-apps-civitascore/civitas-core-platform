@@ -267,8 +267,6 @@ deploy-config-adapter:
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
 
 sbom-config-adapter-image:
-  # rules:
-  #   - when: never
   extends: .only-config-adapter-changes
   image: docker:27-dind
   stage: report
@@ -294,5 +292,7 @@ sbom-config-adapter-image:
     expire_in: 1 month
     paths:
       - config-adapter/target/config-adapter-image.cdx.json
+    # TODO: https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/728
+    # Fix license name resolution
     # reports:
     #   cyclonedx: config-adapter/target/config-adapter-image.cdx.json
