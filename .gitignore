@@ -2,8 +2,11 @@ gitleaks.sarif
 eslint-report.json
 gl-dependency-scanning.json
 **/target
+**/dependency-reduced-pom.xml
+**/.flattened-pom.xml
 **/.settings
 **/.project
 **/.classpath
+**/maven.graph.json
 
 /.idea/
