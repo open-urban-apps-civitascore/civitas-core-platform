@@ -245,5 +245,7 @@ sbom-frontend-image:
     expire_in: 1 month
     paths:
       - portal-frontend/sbom/portal-frontend-image.cdx.json
+    # TODO: https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/728
+    # Fix license name resolution
     # reports:
     #   cyclonedx: portal-frontend/sbom/portal-frontend-image.cdx.json
