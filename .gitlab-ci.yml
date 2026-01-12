@@ -25,6 +25,13 @@ setup-version:
     - apk add --no-cache git
   script:
     - REVISION=$(git describe --tags --always)
+    - echo "REVISION=$REVISION" > version.env
+    - echo "Setting REVISION=$REVISION"
+  artifacts:
+    reports:
+      # Pass to other jobs
+      # https://docs.gitlab.com/ci/yaml/artifacts_reports/#artifactsreportsdotenv
+      dotenv: version.env
 
 workflow:
   rules:
