@@ -47,7 +47,8 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     // Include body for methods that support it for json-server
     // This can be removed once json-server is not used anymore
     if (['POST', 'PUT', 'PATCH'].includes(method) && url.includes(`${JSON_SERVER_URL}`)) {
-      const body = await request.json()
+      const req = await request.json()
+      const body = req.body ?? req
       fetchOptions.body = JSON.stringify(body)
     }
 
