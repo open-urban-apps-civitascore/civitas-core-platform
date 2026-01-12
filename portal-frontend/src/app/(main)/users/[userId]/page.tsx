@@ -18,9 +18,10 @@ const EditUserPage = async (props: PageProps) => {
   const t = await getTranslations('users')
 
   const getUserData = async (userId: string) => {
+    const config = getServerRequestConfig()
     const [userData, groupsData] = await Promise.all([
-      fetchUser(getServerRequestConfig(), userId) as Promise<UserResponse>,
-      fetchGroups(getServerRequestConfig()) as Promise<Group[]>,
+      fetchUser(config, userId) as Promise<UserResponse>,
+      fetchGroups(config) as Promise<Group[]>,
     ])
 
     const groupsContainingUser = groupsData.filter(group => group.users.find(user => user.id === userData.id))

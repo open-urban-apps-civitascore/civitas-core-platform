@@ -1,12 +1,16 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQuery } from '@tanstack/react-query'
 import { SquarePen } from 'lucide-react'
-import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
+import { fetchAuthorities } from '@/app/services/api/authorities/authoritiesService'
+import { getClientRequestConfig } from '@/app/services/api/client/clientRequestConfig'
+import { createUser, updateUser } from '@/app/services/api/users/userService'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
@@ -14,6 +18,7 @@ import { Select } from '@/components/form/fields/Select'
 import { Switch } from '@/components/form/fields/Switch'
 import { TextArea } from '@/components/form/fields/TextArea'
 import { TextField } from '@/components/form/fields/TextField'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
@@ -21,12 +26,6 @@ import { useQueryParams } from '@/hooks/useQueryParams'
 import { cn } from '@/lib/utils'
 import { Authority, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
 import { mapFormUserToApiData, mapUserToFormData } from '@/utils/users'
-
-import { fetchAuthorities } from '@/app/services/api/authorities/authoritiesService'
-import { getClientRequestConfig } from '@/app/services/api/client/clientRequestConfig'
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
-import { useQuery } from '@tanstack/react-query'
-import { createUser, updateUser } from '../actions'
 
 export type FormUser = Omit<UserResponse, 'authority' | 'department' | 'position' | 'positionDescription' | 'roles'> & {
   authority: string
@@ -54,7 +53,7 @@ export const UserForm = (props: UserFormProps) => {
     error,
   } = useQuery<Authority[]>({
     queryKey: ['authorities'],
-    queryFn: async () => fetchAuthorities(await getClientRequestConfig()),
+    queryFn: () => fetchAuthorities(getClientRequestConfig()),
   })
 
   const titleOptions = [
@@ -127,7 +126,7 @@ export const UserForm = (props: UserFormProps) => {
     const mappedData: UserResponse = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
-    const newUser = await createUser(createUserData)
+    const newUser = await createUser(getClientRequestConfig(), createUserData)
     if (!newUser) {
       throw new Error('An error occurred while creating the user')
     }
@@ -136,7 +135,7 @@ export const UserForm = (props: UserFormProps) => {
 
   const handleUpdateUser = async (formData: UserFormData) => {
     const updateUserData = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
-    await updateUser(updateUserData)
+    await updateUser(getClientRequestConfig(), updateUserData)
     setDefaultUserData(updateUserData)
     router.refresh()
     setIsReadOnly(true)
