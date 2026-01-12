@@ -7,7 +7,7 @@ import { DatasetResponse } from '@/types/datasets'
 export const createDataset = async (datasetData: DatasetResponse) => {
   console.log('creating dataset')
   try {
-    const response = await fetch(`${process.env.NEXT_SERVER_URL}/api/datasets`, {
+    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/datasets`, {
       method: 'POST',
       headers: {
         cookie: (await headers()).get('cookie') || '',
@@ -29,7 +29,7 @@ export const createDataset = async (datasetData: DatasetResponse) => {
 
 export const updateDataset = async (updateDatasetData: Partial<DatasetResponse>) => {
   try {
-    const response = await fetch(`${process.env.NEXT_SERVER_URL}/api/datasets/${updateDatasetData.id}`, {
+    const response = await fetch(`${process.env.NEXTAUTH_URL}/api/datasets/${updateDatasetData.id}`, {
       method: 'PATCH',
       headers: {
         cookie: (await headers()).get('cookie') || '',
