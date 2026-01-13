@@ -36,6 +36,12 @@
 
         <dependency>
             <groupId>com.civitas</groupId>
+            <artifactId>config-adapter-apisix</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.civitas</groupId>
             <artifactId>config-adapter-examples</artifactId>
             <version>${project.version}</version>
         </dependency>

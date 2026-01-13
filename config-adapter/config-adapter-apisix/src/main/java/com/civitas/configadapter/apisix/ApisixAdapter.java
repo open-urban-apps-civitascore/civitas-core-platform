@@ -40,6 +40,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   private String adminApiUrl;
   private String adminApiKey;
 
+  public ApisixAdapter() {}
+
   @Override
   public void initialize(AdapterConfig config) {
     super.initialize(config);
