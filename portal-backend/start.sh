@@ -59,7 +59,6 @@ echo ""
 
 # Build Portal Backend
 echo -e "${BLUE}Building Portal Backend...${NC}"
-cd portal-backend
 mvn clean package -DskipTests
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Portal Backend built successfully${NC}"
@@ -67,13 +66,12 @@ else
     echo -e "${RED}❌ Portal Backend build failed${NC}"
     exit 1
 fi
-cd ..
 
 echo ""
 
 # Build Config Adapter
 echo -e "${BLUE}Building Config Adapter...${NC}"
-cd config-adapter
+cd ../config-adapter
 mvn clean package -DskipTests
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✅ Config Adapter built successfully${NC}"
@@ -81,7 +79,7 @@ else
     echo -e "${RED}❌ Config Adapter build failed${NC}"
     exit 1
 fi
-cd ..
+cd ../portal-backend
 
 echo ""
 echo -e "${GREEN}🎉 All builds completed successfully!${NC}"
