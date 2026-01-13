@@ -46,12 +46,17 @@ if ! command -v docker &> /dev/null; then
 fi
 echo -e "${GREEN}✅ Docker found${NC}"
 
-# Check Docker Compose
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+# Check Docker Compose (prefer V2)
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+    echo -e "${GREEN}✅ Docker Compose V2 found${NC}"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+    echo -e "${YELLOW}⚠️  Docker Compose V1 found (V2 recommended)${NC}"
+else
     echo -e "${RED}❌ Docker Compose is not installed.${NC}"
     exit 1
 fi
-echo -e "${GREEN}✅ Docker Compose found${NC}"
 
 echo ""
 echo -e "${YELLOW}📦 Building backend services...${NC}"
@@ -84,14 +89,43 @@ cd ../portal-backend
 echo ""
 echo -e "${GREEN}🎉 All builds completed successfully!${NC}"
 echo ""
+echo -e "${YELLOW}🧹 Cleaning up old containers and images...${NC}"
+echo ""
+
+# Stop and remove existing containers
+$DOCKER_COMPOSE down -v 2>/dev/null || true
+
+# Force remove specific containers if they still exist
+echo -e "${BLUE}Removing old containers...${NC}"
+docker rm -f civitas-portal-backend 2>/dev/null || true
+docker rm -f civitas-config-adapter 2>/dev/null || true
+
+# Remove old images to force a clean rebuild
+echo -e "${BLUE}Removing old portal-backend image...${NC}"
+docker rmi portal-backend_portal-backend 2>/dev/null || true
+docker rmi civitas-portal-backend 2>/dev/null || true
+docker rmi portal-backend-portal-backend 2>/dev/null || true
+
+echo -e "${BLUE}Removing old config-adapter image...${NC}"
+docker rmi config-adapter_config-adapter 2>/dev/null || true
+docker rmi civitas-config-adapter 2>/dev/null || true
+docker rmi portal-backend_config-adapter 2>/dev/null || true
+
+# Prune dangling images
+echo -e "${BLUE}Pruning dangling images...${NC}"
+docker image prune -f
+
+echo ""
+echo -e "${GREEN}✅ Cleanup completed!${NC}"
+echo ""
 echo -e "${YELLOW}🚀 Starting Docker Compose...${NC}"
 echo ""
 
-# Start Docker Compose
-docker-compose up --build
+# Start Docker Compose with fresh build
+$DOCKER_COMPOSE up --build
 
 # This will only run if user stops docker-compose with Ctrl+C
 echo ""
 echo -e "${YELLOW}👋 Docker Compose stopped.${NC}"
-echo -e "${BLUE}To clean up, run: ${NC}docker-compose down -v"
+echo -e "${BLUE}To clean up, run: ${NC}$DOCKER_COMPOSE down -v"
 
