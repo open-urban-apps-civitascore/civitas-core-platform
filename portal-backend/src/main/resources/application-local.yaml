@@ -25,7 +25,7 @@ spring:
 keycloak:
   realm: "master"
   auth-server-url: http://localhost:8080
-  target-realm: "master"  Target realm for user/group/role management via Config Adapter
+  target-realm: "master"
 
 kafka:
   enabled: true
