@@ -67,7 +67,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
     queryFn: () =>
       apiRequest<RoleResponse[]>({
         method: 'GET',
-        endpoint: '/role',
+        endpoint: '/roles',
         errorMessage: 'An error occurred while fetching roles data.',
       }),
   })
