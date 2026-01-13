@@ -24,8 +24,17 @@
       "atLeast10": "The input must be at least 10 characters.",
       "minChar": "The input has to be at least {amount} characters.",
       "notFound": "No {items} found",
-      "loadingError": "Error while loading {item} data",
+      "loadingError": "Error while loading data",
       "unexpectedError": "An unexpected error occurred. Please try again."
+    },
+    "items": {
+      "users": "Users",
+      "user": "User",
+      "groups": "Groups",
+      "roles": "Roles",
+      "datasets": "Datasets",
+      "dataspaces": "Dataspaces",
+      "permissions": "Permissions"
     }
   },
   "languages": {

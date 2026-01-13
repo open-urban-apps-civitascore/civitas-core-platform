@@ -9,11 +9,11 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 
 const UsersErrorPage = () => {
-  const t = useTranslations()
+  const t = useTranslations('common')
 
   return (
     <PageContainer headerType="onlyTitle" testId="usersErrorPage">
-      <PageHeader title={t('common.loadingItems', { item: t('users.users') })} />
+      <PageHeader title={t('loadingItems', { item: t('items.users') })} />
       <PageBackground>
         <ContentCard className="p-10">
           <LoadingSpinner />

@@ -1,7 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { SquarePen } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -44,6 +44,33 @@ export const UserForm = (props: UserFormProps) => {
   const { getApiRequestParamsByUrl } = useQueryParams()
   const [defaultUserData, setDefaultUserData] = useState(userData)
   const [isReadOnly, setIsReadOnly] = useState(isEditMode)
+
+  const createUserMutation = useMutation({
+    mutationFn: (data: Omit<UserResponse, 'id'>) =>
+      apiRequest<UserResponse>({
+        endpoint: '/users',
+        method: 'POST',
+        data: data,
+        errorMessage: 'An error occurred while creating new user.',
+      }),
+    onSuccess: ({ data }) => {
+      router.push(`/users/${data.id}`)
+    },
+  })
+
+  const updateUserMutation = useMutation({
+    mutationFn: ({ userId, data }: { userId: string; data: Omit<UserResponse, 'id'> }) =>
+      apiRequest<UserResponse>({
+        endpoint: `/users/${userId}`,
+        method: 'PUT',
+        data: data,
+      }),
+    onSuccess: ({ data }) => {
+      setDefaultUserData(data)
+      router.refresh()
+      setIsReadOnly(true)
+    },
+  })
 
   const request = () =>
     apiRequest<Authority[]>({
@@ -130,33 +157,15 @@ export const UserForm = (props: UserFormProps) => {
   }
 
   const handleCreateUser = async (formData: UserFormData) => {
-    const errorMessage = 'An error occurred while creating new user.'
     const mappedData: UserResponse = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
-    const { data: newUser } = await apiRequest<UserResponse>({
-      endpoint: '/users',
-      method: 'POST',
-      data: createUserData,
-      errorMessage,
-    })
-    if (!newUser) {
-      throw new Error(errorMessage)
-    }
-    router.push(`/users/${newUser.id}`)
+    createUserMutation.mutate(createUserData)
   }
 
   const handleUpdateUser = async (formData: UserFormData) => {
     const { id, ...updateUserData } = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
-    await apiRequest<UserResponse>({
-      endpoint: `/users/${id}`,
-      method: 'PUT',
-      data: updateUserData,
-      errorMessage: 'An error occurred while updating the user.',
-    })
-    setDefaultUserData({ ...updateUserData, id })
-    router.refresh()
-    setIsReadOnly(true)
+    updateUserMutation.mutate({ userId: id, data: updateUserData })
   }
 
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
