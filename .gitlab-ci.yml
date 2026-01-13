@@ -24,6 +24,7 @@ setup-version:
   before_script:
     - apk add --no-cache git
   script:
+    - git fetch --tags
     - REVISION=$(git describe --tags --always)
     - echo "REVISION=$REVISION" > version.env
     - echo "Setting REVISION=$REVISION"
