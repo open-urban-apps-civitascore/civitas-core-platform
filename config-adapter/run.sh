@@ -37,4 +37,4 @@ echo "Starting the Keycloak Config Adapter..."
 
 export HEALTHCHECK_PORT=8089
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-java -jar config-adapter-application/target/config-adapter-application-1.0.0-SNAPSHOT.jar
+java -jar config-adapter-application/target/config-adapter-application-1.1.0.jar
