@@ -32,7 +32,6 @@ const GroupsTable = (props: GroupsTableProps) => {
   const locale = useLocale()
   const columnHelper = createColumnHelper<UserGroupsListData>()
 
-  console.log(groups)
   const columns = [
     columnHelper.accessor('id', {
       header: 'id',

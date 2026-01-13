@@ -1,8 +1,7 @@
 import { getTranslations } from 'next-intl/server'
 
-import { getServerRequestConfig } from '@/app/services/api/client/serverRequestConfig'
-import { fetchGroups } from '@/app/services/api/groups/groupsService'
-import { fetchUser } from '@/app/services/api/users/userService'
+import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { getServerRequestHeaders } from '@/app/services/api/request/getServerRequestHeaders'
 import { Group } from '@/types/groups'
 import { UserResponse } from '@/types/users'
 
@@ -18,12 +17,22 @@ const EditUserPage = async (props: PageProps) => {
   const t = await getTranslations('users')
 
   const getUserData = async (userId: string) => {
-    const config = getServerRequestConfig()
-    const [userData, groupsData] = await Promise.all([
-      fetchUser(config, userId) as Promise<UserResponse>,
-      fetchGroups(config) as Promise<Group[]>,
-    ])
-
+    const headers = await getServerRequestHeaders()
+    const userRequest = apiRequest<UserResponse>({
+      method: 'GET',
+      endpoint: `/users/${userId}`,
+      headers,
+      errorMessage: 'An error occurred while fetching user data.',
+    })
+    const groupsRequest = apiRequest<Group[]>({
+      method: 'GET',
+      endpoint: `/groups`,
+      headers,
+      errorMessage: 'An error occurred while fetching groups data.',
+    })
+    const [userResponse, groupsResponse] = await Promise.all([userRequest, groupsRequest])
+    const userData = userResponse.data
+    const groupsData = groupsResponse.data
     const groupsContainingUser = groupsData.filter(group => group.users.find(user => user.id === userData.id))
     const user = { ...userData, groups: groupsContainingUser.map(group => group.id) }
     return user

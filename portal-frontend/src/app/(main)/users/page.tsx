@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server'
 
-import { getServerRequestConfig } from '@/app/services/api/client/serverRequestConfig'
-import { fetchUsers } from '@/app/services/api/users/userService'
+import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { getServerRequestHeaders } from '@/app/services/api/request/getServerRequestHeaders'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -27,10 +27,16 @@ const UsersPage = async ({ searchParams }: Props) => {
 
   const { apiParams, pageSize, sort, pageIndex, search } = getRequestParams(params)
 
-  const data = await fetchUsers(getServerRequestConfig(), apiParams)
+  const { data, totalElements } = await apiRequest<UserResponse[]>({
+    endpoint: '/users',
+    method: 'GET',
+    params: apiParams,
+    headers: await getServerRequestHeaders(),
+    errorMessage: 'An error occurred while fetching users.',
+  })
 
-  const users = mapListUsers(data.content as UserResponse[], [])
-  const totalCount = Number(data.totalElements) || 0
+  const users = mapListUsers(data, [])
+  const totalCount = Number(totalElements) || 0
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 
   // sorting for table as SortingState

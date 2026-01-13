@@ -8,9 +8,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { fetchAuthorities } from '@/app/services/api/authorities/authoritiesService'
-import { getClientRequestConfig } from '@/app/services/api/client/clientRequestConfig'
-import { createUser, updateUser } from '@/app/services/api/users/userService'
+import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
@@ -47,14 +45,23 @@ export const UserForm = (props: UserFormProps) => {
   const [defaultUserData, setDefaultUserData] = useState(userData)
   const [isReadOnly, setIsReadOnly] = useState(isEditMode)
 
+  const request = () =>
+    apiRequest<Authority[]>({
+      endpoint: '/authorities',
+      method: 'GET',
+      errorMessage: 'An error occurred while fetching authorities.',
+    })
+
   const {
-    data: authorities,
+    data: authoritiesData,
     isLoading,
     error,
-  } = useQuery<Authority[]>({
+  } = useQuery<ApiServiceResponse<Authority[]>>({
     queryKey: ['authorities'],
-    queryFn: () => fetchAuthorities(getClientRequestConfig()),
+    queryFn: request,
   })
+
+  const authorities = useMemo(() => authoritiesData?.data || [], [authoritiesData])
 
   const titleOptions = [
     {
@@ -123,20 +130,31 @@ export const UserForm = (props: UserFormProps) => {
   }
 
   const handleCreateUser = async (formData: UserFormData) => {
+    const errorMessage = 'An error occurred while creating new user.'
     const mappedData: UserResponse = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
-    const newUser = await createUser(getClientRequestConfig(), createUserData)
+    const { data: newUser } = await apiRequest<UserResponse>({
+      endpoint: '/users',
+      method: 'POST',
+      data: createUserData,
+      errorMessage,
+    })
     if (!newUser) {
-      throw new Error('An error occurred while creating the user')
+      throw new Error(errorMessage)
     }
     router.push(`/users/${newUser.id}`)
   }
 
   const handleUpdateUser = async (formData: UserFormData) => {
-    const updateUserData = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
-    await updateUser(getClientRequestConfig(), updateUserData)
-    setDefaultUserData(updateUserData)
+    const { id, ...updateUserData } = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
+    await apiRequest<UserResponse>({
+      endpoint: `/users/${id}`,
+      method: 'PUT',
+      data: updateUserData,
+      errorMessage: 'An error occurred while updating the user.',
+    })
+    setDefaultUserData({ ...updateUserData, id })
     router.refresh()
     setIsReadOnly(true)
   }
