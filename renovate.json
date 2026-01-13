@@ -17,21 +17,21 @@
   "packageRules": [
     {
       "description": "Frontend dependencies (Next.js/React)",
-      "matchPaths": ["portal-frontend/**"],
+      "matchFileNames": ["portal-frontend/**"],
       "groupName": "frontend dependencies",
       "commitMessagePrefix": "chore(frontend):",
       "addLabels": ["cop frontend", "team data mgmt"]
     },
     {
       "description": "Backend dependencies (Spring Boot)",
-      "matchPaths": ["portal-backend/**"],
+      "matchFileNames": ["portal-backend/**"],
       "groupName": "backend dependencies",
       "commitMessagePrefix": "chore(backend):",
       "addLabels": ["cop backend", "team data mgmt"]
     },
     {
       "description": "Config Adapter dependencies",
-      "matchPaths": ["config-adapter/**"],
+      "matchFileNames": ["config-adapter/**"],
       "groupName": "config-adapter dependencies",
       "commitMessagePrefix": "chore(config-adapter):",
       "addLabels": ["cop backend", "team interfaces"]
@@ -40,20 +40,20 @@
       "description": "Group Spring Boot dependencies",
       "matchPackagePatterns": ["^org\\.springframework"],
       "groupName": "Spring Boot dependencies",
-      "matchPaths": ["portal-backend/**", "config-adapter/**"]
+      "matchFileNames": ["portal-backend/**", "config-adapter/**"]
     },
     {
       "description": "Group React ecosystem",
       "matchPackagePatterns": ["^react", "^@types/react"],
       "groupName": "React ecosystem",
-      "matchPaths": ["portal-frontend/**"]
+      "matchFileNames": ["portal-frontend/**"]
     },
     {
       "description": "Group Next.js related packages",
       "matchPackageNames": ["next"],
       "matchPackagePatterns": ["^@next/", "^next-"],
       "groupName": "Next.js",
-      "matchPaths": ["portal-frontend/**"]
+      "matchFileNames": ["portal-frontend/**"]
     },
     {
       "description": "Group testing libraries",
@@ -76,6 +76,22 @@
       "matchUpdateTypes": ["major", "minor", "patch"],
       "groupName": "Docker base images",
       "commitMessagePrefix": "chore(docker):"
+    },
+    {
+      "description": "Group GitLab CI container images",
+      "matchDatasources": ["docker"],
+      "matchFileNames": [".gitlab-ci.yml", ".gitlab/ci/**"],
+      "groupName": "GitLab CI images",
+      "commitMessagePrefix": "chore(ci):",
+      "addLabels": ["ci/cd"]
+    },
+    {
+      "description": "Group dev environment containers",
+      "matchDatasources": ["docker"],
+      "matchFileNames": ["dev-environment/**"],
+      "groupName": "dev environment containers",
+      "commitMessagePrefix": "chore(dev-env):",
+      "addLabels": ["dev-environment"]
     }
   ],
   "maven": {
@@ -88,6 +104,9 @@
     "enabled": true
   },
   "docker-compose": {
+    "enabled": true
+  },
+  "gitlabci": {
     "enabled": true
   },
   "postUpdateOptions": [
