@@ -21,10 +21,11 @@ include:
 setup-version:
   image: alpine:latest
   stage: .pre
+  variables:
+    GIT_DEPTH: 0 # Full clone required for git describe to find tags in history
   before_script:
     - apk add --no-cache git
   script:
-    - git fetch --tags
     - REVISION=$(git describe --tags --always)
     - echo "REVISION=$REVISION" > version.env
     - echo "Setting REVISION=$REVISION"
