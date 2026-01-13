@@ -165,7 +165,7 @@ services:
       KEYCLOAK_TARGET_REALM: master
       APP_URL: http://localhost:8089
       SERVER_PORT: 8089
-      SPRING_PROFILES_ACTIVE: local,postgres,debug
+      SPRING_PROFILES_ACTIVE: local,postgres
     depends_on:
       postgres-portal:
         condition: service_healthy
