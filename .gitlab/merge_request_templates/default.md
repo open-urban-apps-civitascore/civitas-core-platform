@@ -11,10 +11,12 @@ Link to GitLab issue:
 ## Security Review
 
 Before requesting review, ensure your changes follow the applicable security guidelines:
+- [ ] [SSDLC Requirements](../../documentation/docs_v2/Development/Development%20Process/SSDLC_Distilled.md)
 - [ ] [Frontend Security Guidelines](../../documentation/docs_v2/Development/Code_Style_Guides/Frontend-Style-Guide.md#security--code-review) (if applicable)
 - [ ] [Backend Security Guidelines](../../documentation/docs_v2/Development/Code_Style_Guides/Backend-Style-Guide.md#security--code-review) (if applicable)
-- [ ] [SSDLC Requirements](../../documentation/docs_v2/Development/Development%20Process/SSDLC_Distilled.md)
 - [ ] CI security checks pass
+
+
 
 ## Testing
 
