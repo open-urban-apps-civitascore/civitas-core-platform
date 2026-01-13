@@ -72,23 +72,22 @@ export const UserForm = (props: UserFormProps) => {
     },
   })
 
-  const request = () =>
-    apiRequest<Authority[]>({
-      endpoint: '/authorities',
-      method: 'GET',
-      errorMessage: 'An error occurred while fetching authorities.',
-    })
-
   const {
     data: authoritiesData,
-    isLoading,
+    isLoading: areAuthoritiesLoading,
     error,
   } = useQuery<ApiServiceResponse<Authority[]>>({
     queryKey: ['authorities'],
-    queryFn: request,
+    queryFn: () =>
+      apiRequest<Authority[]>({
+        endpoint: '/authorities',
+        method: 'GET',
+        errorMessage: 'An error occurred while fetching authorities.',
+      }),
   })
 
   const authorities = useMemo(() => authoritiesData?.data || [], [authoritiesData])
+  const isLoading = areAuthoritiesLoading || createUserMutation.isPending || updateUserMutation.isPending
 
   const titleOptions = [
     {
