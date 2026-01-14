@@ -1,14 +1,28 @@
 services:
   postgres-portal:
-    image: postgres:15
+    image: postgres:16-alpine
+    container_name: civitas-postgres-portal
     environment:
       POSTGRES_DB: portal_backend
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_portal_data:/var/lib/postgresql/data
+    networks:
+      - civitas-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d portal_backend"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+volumes:
+  postgres_portal_data:
+
+networks:
+  civitas-network:
+    name: civitas-network
+    driver: bridge
+

@@ -18,11 +18,12 @@ Spring Boot REST API with OAuth2/Keycloak integration, PostgreSQL database, and 
 ### 1. Start Infrastructure
 
 > **Recommended:**
-> For a consistent and tested local development setup, use Docker Compose.
+> For a consistent and tested local development setup, use the centralized Docker Compose in `dev-environment/backend/`.
 
 **Option A: Automated startup**
 
 ```bash
+cd ../dev-environment/backend
 ./start.sh
 ```
 
@@ -31,7 +32,8 @@ Builds Portal Backend + Config Adapter and starts all required services.
 **Option B: Manual startup**
 
 ```bash
-docker-compose up -d
+cd ../dev-environment/backend
+docker compose up -d
 ```
 
 ### 2. Run Application (local without Docker)
@@ -107,11 +109,14 @@ portal-backend/
 │   │   └── application-debug.yaml
 │   ├── test/java/              # Unit tests
 │   └── testIntegration/        # Integration tests
-├── docker-compose.yml          # Local infrastructure
 ├── Dockerfile                  # Backend container
-├── start.sh                    # Automated startup
 ├── .gitlab-ci.yml              # CI/CD pipeline
 └── pom.xml                     # Maven configuration
+
+dev-environment/backend/        # Infrastructure & startup
+├── docker-compose.yml          # All services
+├── start.sh                    # Automated startup
+└── README.md                   # Setup documentation
 ```
 
 ---
@@ -137,13 +142,14 @@ mvn spotless:check          # Check formatting
 
 ```bash
 # Start all services
-docker-compose up -d
+cd ../dev-environment/backend
+docker compose up -d
 
 # Stop all services
-docker-compose down
+docker compose down
 
 # Reset environment
-docker-compose down -v
+docker compose down -v
 ```
 
 ---
@@ -211,19 +217,18 @@ curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
 lsof -i :8089 :8088 :8080 :5432 :9092
 
 # Database access
-docker-compose exec postgres-portal psql -U admin -d portal_backend -c "\dt"
+cd ../dev-environment/backend
+docker compose exec postgres-portal psql -U admin -d portal_backend -c "\dt"
 
 # Logs
-docker-compose logs -f portal-backend
+docker compose logs -f portal-backend
 ```
 
 ### Development Workflow
 
-1. Start infrastructure: `docker-compose up -d`
+1. Start infrastructure: `cd ../dev-environment/backend && docker compose up -d`
 2. Run application: `mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres`
 3. Make changes
 4. Test: `mvn test` or `mvn verify`
 5. Format: `mvn spotless:apply`
 6. Commit & push
-
----
