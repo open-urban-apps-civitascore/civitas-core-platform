@@ -22,39 +22,39 @@ echo -e "${YELLOW}🔍 Checking prerequisites...${NC}"
 
 # Check Java
 if ! command -v java &> /dev/null; then
-    echo -e "${RED}❌ Java is not installed. Please install Java 21.${NC}"
+    echo -e "${RED} Java is not installed. Please install Java 21.${NC}"
     exit 1
 fi
 JAVA_VERSION=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
 if [ "$JAVA_VERSION" -lt 21 ]; then
-    echo -e "${RED}❌ Java 21 or higher is required. Found: Java $JAVA_VERSION${NC}"
+    echo -e "${RED} Java 21 or higher is required. Found: Java $JAVA_VERSION${NC}"
     exit 1
 fi
-echo -e "${GREEN}✅ Java $JAVA_VERSION found${NC}"
+echo -e "${GREEN} Java $JAVA_VERSION found${NC}"
 
 # Check Maven
 if ! command -v mvn &> /dev/null; then
-    echo -e "${RED}❌ Maven is not installed. Please install Maven 3.6+.${NC}"
+    echo -e "${RED} Maven is not installed. Please install Maven 3.6+.${NC}"
     exit 1
 fi
-echo -e "${GREEN}✅ Maven found${NC}"
+echo -e "${GREEN} Maven found${NC}"
 
 # Check Docker
 if ! command -v docker &> /dev/null; then
-    echo -e "${RED}❌ Docker is not installed. Please install Docker.${NC}"
+    echo -e "${RED} Docker is not installed. Please install Docker.${NC}"
     exit 1
 fi
-echo -e "${GREEN}✅ Docker found${NC}"
+echo -e "${GREEN} Docker found${NC}"
 
 # Check Docker Compose (prefer V2)
 if docker compose version &> /dev/null; then
     DOCKER_COMPOSE="docker compose"
-    echo -e "${GREEN}✅ Docker Compose V2 found${NC}"
+    echo -e "${GREEN} Docker Compose V2 found${NC}"
 elif command -v docker-compose &> /dev/null; then
     DOCKER_COMPOSE="docker-compose"
     echo -e "${YELLOW}⚠️  Docker Compose V1 found (V2 recommended)${NC}"
 else
-    echo -e "${RED}❌ Docker Compose is not installed.${NC}"
+    echo -e "${RED} Docker Compose is not installed.${NC}"
     exit 1
 fi
 
@@ -62,34 +62,34 @@ echo ""
 echo -e "${YELLOW}📦 Building backend services...${NC}"
 echo ""
 
-# Build Portal Backend
-echo -e "${BLUE}Building Portal Backend...${NC}"
-mvn clean package -DskipTests
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ Portal Backend built successfully${NC}"
-else
-    echo -e "${RED}❌ Portal Backend build failed${NC}"
-    exit 1
-fi
-
-echo ""
-
-# Build Config Adapter
+# Build Config Adapter first (dependency for Portal Backend)
 echo -e "${BLUE}Building Config Adapter...${NC}"
 cd ../config-adapter
-mvn clean package -DskipTests
+mvn clean install -DskipTests
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ Config Adapter built successfully${NC}"
+    echo -e "${GREEN} Config Adapter built successfully${NC}"
 else
-    echo -e "${RED}❌ Config Adapter build failed${NC}"
+    echo -e "${RED} Config Adapter build failed${NC}"
     exit 1
 fi
 cd ../portal-backend
 
 echo ""
-echo -e "${GREEN}🎉 All builds completed successfully!${NC}"
+
+# Build Portal Backend
+echo -e "${BLUE}Building Portal Backend...${NC}"
+mvn clean package -DskipTests
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN} Portal Backend built successfully${NC}"
+else
+    echo -e "${RED} Portal Backend build failed${NC}"
+    exit 1
+fi
+
 echo ""
-echo -e "${YELLOW}🧹 Cleaning up old containers and images...${NC}"
+echo -e "${GREEN} All builds completed successfully!${NC}"
+echo ""
+echo -e "${YELLOW} Cleaning up old containers and images...${NC}"
 echo ""
 
 # Stop and remove existing containers
@@ -116,9 +116,9 @@ echo -e "${BLUE}Pruning dangling images...${NC}"
 docker image prune -f
 
 echo ""
-echo -e "${GREEN}✅ Cleanup completed!${NC}"
+echo -e "${GREEN}Cleanup completed!${NC}"
 echo ""
-echo -e "${YELLOW}🚀 Starting Docker Compose...${NC}"
+echo -e "${YELLOW}Starting Docker Compose...${NC}"
 echo ""
 
 # Start Docker Compose with fresh build
@@ -126,6 +126,6 @@ $DOCKER_COMPOSE up --build
 
 # This will only run if user stops docker-compose with Ctrl+C
 echo ""
-echo -e "${YELLOW}👋 Docker Compose stopped.${NC}"
+echo -e "${YELLOW}Docker Compose stopped.${NC}"
 echo -e "${BLUE}To clean up, run: ${NC}$DOCKER_COMPOSE down -v"
 
