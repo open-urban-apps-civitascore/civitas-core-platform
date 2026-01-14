@@ -1,118 +1,121 @@
 'use client'
 
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Group, GroupTabProps } from '@/types/groups'
-import { Authority, GroupListUser, UserResponse } from '@/types/users'
+import { Authority, UserResponse } from '@/types/users'
 import { mapGroupListUsers } from '@/utils/users'
 
-import { patchGroupUsers } from '../../actions'
 import { AssignUsersModal } from './AssignUsersModal'
 import UsersTable from './UsersTable'
-
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 interface UsersTabProps extends GroupTabProps {
   groupData: Group
 }
 export const UsersTab = (props: UsersTabProps) => {
   const { groupData } = props
-  const router = useRouter()
   const originalUsers = groupData.users
   const t = useTranslations('groups')
-  const [users, setUsers] = useState<GroupListUser[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [rowCount, setRowCount] = useState(0)
+  const queryClient = useQueryClient()
   const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false)
-  const [isUpdatingGroupUsers, setIsUpdatingGroupUsers] = useState(false)
 
   const {
     setSortingParams,
     setPaginationParams,
     setSearchParam,
+    setTotalPages,
     getApiRequestParamsByUrl,
     pageIndex,
     pageSize,
     sorting,
     search,
+    totalPages,
   } = useQueryParams()
 
-  const totalPages = Math.ceil(rowCount / pageSize)
+  const updateGroupUsersMutation = useMutation({
+    mutationFn: (updateGroupData: typeof originalUsers) =>
+      apiRequest<Group>({
+        method: 'PATCH',
+        endpoint: `/groups/${groupData.id}`,
+        data: { users: updateGroupData },
+        errorMessage: 'An error occurred while updating the group.',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['group', groupData.id] })
+    },
+    onError: error => {
+      console.error(`An error occurred while updating group users. ${error}`)
+    },
+  })
 
-  const getUserListData = async () => {
-    try {
-      const apiParams = getApiRequestParamsByUrl()
-      const idParams = originalUsers.map(user => `id=${user.id}`).join('&')
-      const [usersResponse, authoritiesResponse] = await Promise.all([
-        fetch(`${URL}/users?${idParams}&${apiParams}`, {
-          cache: 'no-store',
-        }),
-        fetch(`${URL}/authorities`, {
-          cache: 'no-store',
-        }),
-      ])
-      if (!authoritiesResponse || !usersResponse) {
-        throw new Error('An error occurred while loading form data')
-      }
+  const userRequestParams = useMemo(() => {
+    const params = new URLSearchParams(getApiRequestParamsByUrl())
+    originalUsers.forEach(user => {
+      params.append('id', String(user.id))
+    })
+    return params
+  }, [getApiRequestParamsByUrl, originalUsers])
 
-      const [usersData, authoritiesData]: [UserResponse[], Authority[]] = await Promise.all([
-        usersResponse.json(),
-        authoritiesResponse.json(),
-      ])
-      const users = mapGroupListUsers(usersData, authoritiesData, originalUsers)
-      setUsers(users)
+  const { data: usersData, isFetching: isFetchingUsers } = useQuery({
+    queryKey: ['users', userRequestParams.toString()],
+    queryFn: () => {
+      return apiRequest<UserResponse[]>({
+        endpoint: '/users',
+        method: 'GET',
+        params: userRequestParams,
+        errorMessage: 'An error occurred while fetching users.',
+      })
+    },
+    enabled: originalUsers.length > 0,
+    placeholderData: previousData => previousData,
+  })
 
-      const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-      }
-    } catch (error) {
-      console.error('An error occurred while fetching users data:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const { data: authoritiesData, isLoading: areAuthoritiesLoading } = useQuery({
+    queryKey: ['authorities'],
+    queryFn: () => {
+      return apiRequest<Authority[]>({
+        endpoint: '/authorities',
+        method: 'GET',
+        errorMessage: 'An error occurred while fetching authorities.',
+      })
+    },
+    enabled: originalUsers.length > 0,
+  })
+
+  const isLoading = isFetchingUsers || areAuthoritiesLoading || updateGroupUsersMutation.isPending
+  const rowCount = usersData?.totalElements || 0
+
+  useEffect(() => {
+    setTotalPages(Math.ceil(rowCount / pageSize))
+  }, [rowCount, setTotalPages, pageSize])
+
+  const users = useMemo(
+    () => (isLoading ? [] : mapGroupListUsers(usersData?.data || [], authoritiesData?.data || [], originalUsers)),
+    [usersData?.data, authoritiesData?.data, originalUsers, isLoading],
+  )
 
   // closes the user assignment modal after update
   useEffect(() => {
-    if (isUpdatingGroupUsers === false) {
+    if (!updateGroupUsersMutation.isPending) {
       setIsAssignUsersOpen(false)
     }
-  }, [isUpdatingGroupUsers])
-
-  useEffect(() => {
-    if (originalUsers.length > 0) {
-      getUserListData()
-    } else {
-      setIsLoading(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, sorting, search, originalUsers])
+  }, [updateGroupUsersMutation.isPending])
 
   const handleUpdateGroupUsers = async (userSelection: RowSelectionState) => {
-    setIsLoading(true)
-    setIsUpdatingGroupUsers(true)
     const selectedUserIds = Object.keys(userSelection).filter(key => userSelection[key])
     const selectedUserInfo = selectedUserIds.map(userId => ({ id: userId, assignedAt: new Date().toISOString() }))
     const updateUserData = selectedUserInfo.concat(originalUsers)
-    try {
-      await patchGroupUsers(groupData.id, updateUserData)
-      router.refresh()
-    } catch {
-      console.error('An error occurred while updating group users')
-    } finally {
-      setIsLoading(false)
-      setIsUpdatingGroupUsers(false)
-    }
+    updateGroupUsersMutation.mutate(updateUserData)
   }
 
   const CustomElement = (
@@ -132,7 +135,7 @@ export const UsersTab = (props: UsersTabProps) => {
           onButtonClick={() => setIsAssignUsersOpen(true)}
         />
         <AssignUsersModal
-          isUpdating={isUpdatingGroupUsers}
+          isUpdating={updateGroupUsersMutation.isPending}
           originalUsers={originalUsers}
           groupTitle={groupData.title}
           open={isAssignUsersOpen}
@@ -160,7 +163,7 @@ export const UsersTab = (props: UsersTabProps) => {
         />
       </TableContainer>
       <AssignUsersModal
-        isUpdating={isUpdatingGroupUsers}
+        isUpdating={updateGroupUsersMutation.isPending}
         originalUsers={originalUsers}
         groupTitle={groupData.title}
         open={isAssignUsersOpen}

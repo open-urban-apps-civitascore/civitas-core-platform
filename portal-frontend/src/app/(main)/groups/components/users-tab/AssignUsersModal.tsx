@@ -1,4 +1,5 @@
 import { DialogProps } from '@radix-ui/react-dialog'
+import { useQuery } from '@tanstack/react-query'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -9,8 +10,9 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
@@ -26,8 +28,6 @@ import { mapGoupAssignmentUsers } from '@/utils/users'
 
 export type UserSelection = { selectAll: boolean; selectedIds: string[]; excludedIds: string[] }
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
-
 interface AssignUsersModalProps extends DialogProps {
   originalUsers: { id: string; assignedAt: string }[]
   groupTitle: string
@@ -40,45 +40,38 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
   const t = useTranslations('groups')
   const tCommon = useTranslations('common')
   const tUsers = useTranslations('users')
-  const [users, setUsers] = useState<GroupAssignmentUser[]>([])
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
-  const [isLoading, setIsLoading] = useState(true)
   const [sorting, setSorting] = useState<SortingState>([])
-  const [rowCount, setRowCount] = useState(0)
   const [searchString, setSearchString] = useState('')
   const [selection, setSelection] = useState<RowSelectionState>({})
-  const totalPages = Math.ceil(rowCount / pageSize)
   const selectAllCheckbox = useRef<HTMLButtonElement>(null)
   const { getApiRequestParams } = useQueryParams()
 
   // this implementation has to be adjusted when the backend is implemented
   // only unassigned users have to be returned from the backend directly
-  const getUserListData = async () => {
-    const requestParams = getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString })
-    try {
-      const usersResponse = await fetch(`${URL}/users?${requestParams.toString()}`, {
-        cache: 'no-store',
+  const { data: usersData, isLoading: areUsersLoading } = useQuery({
+    queryKey: ['users', getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString })],
+    queryFn: () => {
+      return apiRequest<UserResponse[]>({
+        endpoint: '/users',
+        method: 'GET',
+        params: getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString }),
+        errorMessage: 'An error occurred while fetching users.',
       })
-      if (!usersResponse.ok) {
-        throw new Error('An error occurred while loading form data')
-      }
+    },
+  })
 
-      const usersData: UserResponse[] = await usersResponse.json()
-      const allUsers = mapGoupAssignmentUsers(usersData)
+  const users = useMemo(() => {
+    if (usersData?.data && usersData?.data.length > 0) {
+      const allUsers = mapGoupAssignmentUsers(usersData?.data)
       const unassignedUsers = allUsers.filter(user => !originalUsers.find(original => original.id === user.id))
-      setUsers(unassignedUsers)
+      return unassignedUsers
+    } else return []
+  }, [usersData?.data, originalUsers])
 
-      const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-      }
-    } catch (error) {
-      console.error('An error occurred while fetching users data:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const rowCount = usersData?.totalElements || 0
+  const totalPages = Math.ceil(rowCount / pageSize)
 
   useEffect(() => {
     if (!open) {
@@ -91,12 +84,6 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
       setPageIndex(totalPages - 1)
     }
   }, [pageIndex, totalPages])
-
-  useEffect(() => {
-    setIsLoading(true)
-    getUserListData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, rowCount, sorting, searchString, originalUsers])
 
   const handlePagination = (newPagination: PaginationState) => {
     setPageIndex(newPagination.pageIndex)
@@ -154,7 +141,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
       cell: info => info.getValue(),
     }),
     columnHelper.accessor('isActive', {
-      header: tUsers('info.active'),
+      header: tUsers('info.status.active'),
       cell: info => <StatusLabel isChecked={info.getValue()} />,
     }),
   ]
@@ -203,7 +190,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
               pageIndex={pageIndex}
               pageSize={pageSize}
               totalPages={totalPages}
-              isLoading={isLoading}
+              isLoading={areUsersLoading}
             />
           )}
         </div>
@@ -211,7 +198,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
           confirmButtonType="button"
           onConfirmClick={() => onUpdateUsers(selection)}
           onCancelClick={() => onOpenChange(false)}
-          isConfirmButtonDisabled={isUpdating || isLoading}
+          isConfirmButtonDisabled={isUpdating || areUsersLoading}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.add')}
         />

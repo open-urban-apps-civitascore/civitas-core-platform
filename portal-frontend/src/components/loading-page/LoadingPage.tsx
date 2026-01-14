@@ -8,7 +8,7 @@ interface LoadingPageProps {
   title: string
   testId?: string
 }
-const LoadingPage = async (props: LoadingPageProps) => {
+const LoadingPage = (props: LoadingPageProps) => {
   const { title, testId } = props
   return (
     <PageContainer headerType="onlyTitle" testId={testId}>

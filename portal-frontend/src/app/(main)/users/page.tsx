@@ -23,7 +23,6 @@ type Props = {
 
 const UsersPage = async ({ searchParams }: Props) => {
   const t = await getTranslations('users')
-  const tCommon = await getTranslations('common')
   const params = await searchParams
 
   const { apiParams, pageSize, sort, pageIndex, search } = getRequestParams(params)
@@ -32,7 +31,8 @@ const UsersPage = async ({ searchParams }: Props) => {
     endpoint: '/users',
     method: 'GET',
     params: apiParams,
-    headers: await getServerRequestHeaders(),
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    headers: { ...(await getServerRequestHeaders()), 'x-api-request': 'true' },
     errorMessage: 'An error occurred while fetching users.',
   })
 
