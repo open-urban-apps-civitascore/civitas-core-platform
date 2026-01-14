@@ -1,12 +1,13 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Loader2 } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { FieldErrors, useForm } from 'react-hook-form'
 
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
@@ -25,12 +26,11 @@ import {
   GroupTabProps,
   UpdateGroupData,
 } from '@/types/groups'
-import { UserResponse } from '@/types/users'
+import { Contact, UserResponse } from '@/types/users'
 import { mapGroupToBaseFormData } from '@/utils/groups'
 
-import { createGroup, updateGroup } from '../actions'
+import { mapFormGroupToApiData } from '../utils/mappers'
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 const MIN_LENGTH = 2
 
 const getContactListItems = (contacts: Contact[]) =>
@@ -43,12 +43,6 @@ const getContactListItems = (contacts: Contact[]) =>
       </div>
     ),
   }))
-
-type Contact = {
-  id: string
-  displayName: string
-  email: string
-}
 interface BaseInfoTabProps extends GroupTabProps {
   isEditMode: boolean
 }
@@ -56,68 +50,95 @@ interface BaseInfoTabProps extends GroupTabProps {
 export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const { groupData, isEditMode } = props
   const t = useTranslations('groups')
-  const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
   const router = useRouter()
+  const queryClient = useQueryClient()
+
   const [defaultFormData, setDefaultFormData] = useState(mapGroupToBaseFormData(groupData))
-  const [isLoading, setIsLoading] = useState(false)
   const [isContactListOpen, setIsContactListOpen] = useState(false)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [contacts, setContacts] = useState<Contact[]>([])
   const [contactListItems, setContactListItems] = useState<SelectItem[]>([])
-  const [contactInput, setContactInput] = useState('')
+  const [contactInput, setContactInput] = useState(groupData.contact?.displayName || '')
   const debouncedInput = useDebounce(contactInput, 300)
+
+  const { data: contactsData, isLoading: areContactsLoading } = useQuery({
+    queryKey: ['contacts', debouncedInput],
+    queryFn: () =>
+      apiRequest<UserResponse[]>({
+        method: 'GET',
+        endpoint: `/users`,
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        params: new URLSearchParams({ displayName_like: debouncedInput }),
+        errorMessage: 'An error occurred while fetching contacts data.',
+      }),
+    enabled: debouncedInput.trim().length >= MIN_LENGTH,
+  })
+
+  const createGroupMutation = useMutation({
+    mutationFn: (data: CreateGroupData) =>
+      apiRequest<Group>({
+        method: 'POST',
+        endpoint: '/groups',
+        data: data,
+        errorMessage: 'An error occurred while creating the group.',
+      }),
+    onSuccess: ({ data }) => {
+      queryClient.invalidateQueries({
+        queryKey: ['groups'],
+      })
+      router.push(`/groups/${data.id}`)
+    },
+    onError: error => {
+      console.error('An error occurred while creating the group. ', error)
+    },
+  })
+
+  const updateGroupMutation = useMutation({
+    mutationFn: (data: UpdateGroupData) =>
+      apiRequest<Group>({
+        method: 'PUT',
+        endpoint: `/groups/${data.id}`,
+        data: data,
+        errorMessage: 'An error occurred while updating the group.',
+      }),
+    onSuccess: ({ data }) => {
+      setDefaultFormData(mapGroupToBaseFormData(data))
+      queryClient.invalidateQueries({
+        queryKey: ['groups'],
+      })
+    },
+    onError: error => {
+      console.error('An error occurred while updating the group. ', error)
+    },
+  })
+
+  useEffect(() => {
+    const contacts =
+      contactsData?.data.map(contact => ({
+        id: contact.id,
+        displayName: `${contact.firstName} ${contact.lastName}`,
+        email: contact.email,
+      })) || []
+    setContacts(contacts)
+    setContactListItems(getContactListItems(contacts))
+  }, [contactsData?.data])
 
   const form = useForm<GroupBaseFormData>({
     resolver: zodResolver(GroupBaseFormDataSchema),
     defaultValues: defaultFormData,
   })
 
-  const resetAutocomplete = (contact: Contact | null) => {
-    setContacts(contact ? [contact] : [])
-    setContactListItems(getContactListItems(contact ? [contact] : []))
-    setContactInput(contact?.displayName || '')
-  }
-
   useEffect(() => {
     form.setValue('contact', selectedContact?.id || '')
   }, [selectedContact, form])
 
   useEffect(() => {
-    const getInitialContact = async (id: string) => {
-      try {
-        const usersResponse = await fetch(`${URL}/users/${id}`)
-        if (!usersResponse.ok) {
-          throw new Error('Error fetching contacts data')
-        }
-        const contactData: UserResponse = await usersResponse.json()
-        const contact = {
-          id: contactData.id,
-          displayName: `${contactData.firstName} ${contactData.lastName}`,
-          email: contactData.email,
-        }
-        setSelectedContact(contact)
-        form.reset(defaultFormData)
-        resetAutocomplete(contact)
-      } catch (error) {
-        console.error('Error fetching contact data:', error)
-        throw new Error('Error fetching contact data')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    if (defaultFormData.contact) {
-      getInitialContact(defaultFormData.contact)
-    } else {
-      form.reset(defaultFormData)
-    }
+    form.reset(defaultFormData)
   }, [defaultFormData, form])
 
   useEffect(() => {
-    if (debouncedInput.trim().length >= MIN_LENGTH) {
-      getContacts(debouncedInput)
-    } else {
+    if (debouncedInput.trim().length < MIN_LENGTH) {
       form.setValue('contact', '')
       setSelectedContact(null)
       setContacts([])
@@ -126,74 +147,14 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   }, [debouncedInput, form])
 
   const handleCreateGroup = async (formData: GroupBaseFormData) => {
-    try {
-      setIsLoading(true)
-      // eslint-disable-next-line unused-imports/no-unused-vars
-      const { id, ...groupData } = {
-        ...formData,
-        contact: selectedContact ? { id: selectedContact.id, displayName: selectedContact.displayName } : null,
-      }
-      const createGroupData: CreateGroupData = {
-        ...groupData,
-        description: groupData.description,
-        parent: null,
-        roles: [],
-        subgroups: [],
-        users: [],
-        dataspace: null,
-      }
-      const response = await createGroup(createGroupData)
-      router.push(`/groups/${response.id}`)
-    } catch (error) {
-      console.error('An error occurred while creating the group: ', error)
-    } finally {
-      setIsLoading(false)
-    }
+    // eslint-disable-next-line unused-imports/no-unused-vars
+    const { id, ...createGroupData } = mapFormGroupToApiData(formData, groupData, selectedContact)
+    createGroupMutation.mutate(createGroupData)
   }
 
   const handleUpdateGroup = async (formData: GroupBaseFormData) => {
-    try {
-      setIsLoading(true)
-      const updateGroupData: UpdateGroupData = {
-        ...formData,
-        contact: selectedContact ? { id: selectedContact.id, displayName: selectedContact.displayName } : null,
-        parent: groupData.parent,
-        roles: groupData.roles,
-        subgroups: groupData.subgroups,
-        users: groupData.users,
-        dataspace: null,
-      }
-      await updateGroup(updateGroupData)
-      setDefaultFormData(formData)
-      form.reset({ ...mapGroupToBaseFormData(updateGroupData) })
-    } catch (error) {
-      console.error('An error occurred while updating the group: ', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const getContacts = async (searchString: string) => {
-    try {
-      const queryParam = `displayName_like=${searchString}`
-      const usersResponse = await fetch(`${URL}/users?${queryParam}`)
-      if (!usersResponse.ok) {
-        throw new Error('Error fetching contacts data')
-      }
-      const contactsData: UserResponse[] = await usersResponse.json()
-      const contacts = contactsData.map(contact => ({
-        id: contact.id,
-        displayName: `${contact.firstName} ${contact.lastName}`,
-        email: contact.email,
-      }))
-      setContacts(contacts)
-      setContactListItems(getContactListItems(contacts))
-    } catch (error) {
-      console.error('Error fetching contacts data:', error)
-      throw new Error('Error fetching contacts data')
-    } finally {
-      setIsLoading(false)
-    }
+    const updateGroupData = mapFormGroupToApiData(formData, groupData, selectedContact)
+    updateGroupMutation.mutate(updateGroupData)
   }
 
   const handleContactInputChange = async (value: string) => {
@@ -218,15 +179,6 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   const handleSubmit = isEditMode ? handleUpdateGroup : handleCreateGroup
   const handleValidationErrors = (errors: FieldErrors<Group>) => console.error('Validation errors: ', errors)
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8 h-full">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">{tCommon('loading')}</span>
-      </div>
-    )
-  }
 
   return (
     <Form {...form}>
@@ -271,6 +223,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               onInputChange={handleContactInputChange}
               onSelectItem={handleSelectContact}
               onBlur={handleAutocompleteBlur}
+              isLoading={areContactsLoading}
             />
           </DetailsFieldContainer>
         </ContentCard>

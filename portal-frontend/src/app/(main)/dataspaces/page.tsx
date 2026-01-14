@@ -5,7 +5,7 @@ import { Row, RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { PageBackground } from '@/components/page-background/PageBackground'

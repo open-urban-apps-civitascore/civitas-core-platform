@@ -3,6 +3,12 @@ import { z } from 'zod'
 
 import { Item } from './common'
 
+export type Contact = {
+  id: string
+  displayName: string
+  email: string
+}
+
 export type UserGroup = Item
 
 export type Authority = Item & {

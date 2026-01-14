@@ -27,7 +27,7 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     const searchParams = request.nextUrl.searchParams.toString()
 
     const searchParamsString = searchParams ? `?${searchParams}` : ''
-    const url = `${pathString === 'users' && method === 'GET' ? API_URL : JSON_SERVER_URL}/${pathString}${searchParamsString}`
+    const url = `${pathString === 'users' && method === 'GET' && !searchParams.includes('displayName_like') ? API_URL : JSON_SERVER_URL}/${pathString}${searchParamsString}`
 
     // Forward all original headers from the request
     const headers = new Headers(request.headers)
