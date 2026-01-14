@@ -67,9 +67,9 @@ echo -e "${BLUE}Building Config Adapter...${NC}"
 cd ../config-adapter
 mvn clean install -DskipTests
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN} Config Adapter built successfully${NC}"
+    echo -e "${GREEN}Config Adapter built successfully${NC}"
 else
-    echo -e "${RED} Config Adapter build failed${NC}"
+    echo -e "${RED}Config Adapter build failed${NC}"
     exit 1
 fi
 cd ../portal-backend
@@ -80,16 +80,16 @@ echo ""
 echo -e "${BLUE}Building Portal Backend...${NC}"
 mvn clean package -DskipTests
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN} Portal Backend built successfully${NC}"
+    echo -e "${GREEN}Portal Backend built successfully${NC}"
 else
-    echo -e "${RED} Portal Backend build failed${NC}"
+    echo -e "${RED}Portal Backend build failed${NC}"
     exit 1
 fi
 
 echo ""
-echo -e "${GREEN} All builds completed successfully!${NC}"
+echo -e "${GREEN}All builds completed successfully!${NC}"
 echo ""
-echo -e "${YELLOW} Cleaning up old containers and images...${NC}"
+echo -e "${YELLOW}Cleaning up old containers and images...${NC}"
 echo ""
 
 # Stop and remove existing containers
