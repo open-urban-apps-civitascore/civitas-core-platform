@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Circle, CircleCheckBig, SquarePen, X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -32,6 +32,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const { dataset, dataspaces, isEditMode } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
+  const queryClient = useQueryClient()
 
   const isMobile = useIsMobile()
   const router = useRouter()
@@ -47,6 +48,9 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
         errorMessage: 'An error occurred while creating new dataset.',
       }),
     onSuccess: ({ data }) => {
+      queryClient.invalidateQueries({
+        queryKey: ['datasets'],
+      })
       router.push(`/datasets/${data.id}`)
     },
   })
@@ -63,6 +67,9 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
       form.reset(mapDatasetToFormData(data))
       router.refresh()
       setIsReadOnly(true)
+      queryClient.invalidateQueries({
+        queryKey: ['datasets'],
+      })
     },
   })
 

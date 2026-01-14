@@ -1,9 +1,9 @@
 import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { getServerRequestHeaders } from '@/app/services/api/request/getServerRequestHeaders'
 import { DatasetFormData } from '@/types/datasets'
 import { DataSpace } from '@/types/dataspaces'
 
 import { DatasetOverview } from '../components/overview/DatasetOverview'
-import { getServerRequestHeaders } from '@/app/services/api/request/getServerRequestHeaders'
 
 export const defaultDataset: DatasetFormData = {
   id: '',
