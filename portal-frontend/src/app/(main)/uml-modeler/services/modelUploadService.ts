@@ -4,8 +4,9 @@
  * Client-side service for uploading UML model files to the backend Model Atlas Service.
  */
 
-import type { UMLDiagram } from '../types/diagram'
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 
+import type { UMLDiagram } from '../types/diagram'
 import { exportToXmi, sanitizeName } from './xmiExportService'
 
 export interface UploadResult {
@@ -31,16 +32,12 @@ export const uploadModelToBackend = async (diagram: UMLDiagram): Promise<UploadR
     formData.append('modelFile', blob, filename)
     formData.append('nsUri', nsUri)
 
-    const response = await fetch('/api/models/upload', {
+    await apiRequest({
+      endpoint: '/models/upload',
       method: 'POST',
-      body: formData,
-      credentials: 'include',
+      data: formData,
+      errorMessage: 'Failed to upload model to backend.',
     })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Upload failed with status ${response.status}: ${errorText}`)
-    }
 
     return { success: true, message: 'Model uploaded successfully' }
   } catch (error) {
