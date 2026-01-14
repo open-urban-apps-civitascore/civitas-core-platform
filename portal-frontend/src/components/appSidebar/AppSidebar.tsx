@@ -1,5 +1,5 @@
 import { Sidebar } from '../ui/sidebar'
-import { currentOrganization, expampleOrganizations } from './appSidebarMockItems'
+import { currentOrganization, expampleOrganizations } from './appSidebarItems'
 import { AppSidebarContent } from './components/AppSidebarContent'
 import { AppSidebarFooter } from './components/AppSidebarFooter'
 import { AppSidebarHeader } from './components/AppSidebarHeader'

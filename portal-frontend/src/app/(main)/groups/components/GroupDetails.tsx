@@ -86,7 +86,7 @@ const GroupDetails = (props: GroupDetailsProps) => {
   }
 
   return (
-    <PageContainer headerType="withSubTabs">
+    <PageContainer headerType="withSubTabsOrSubtitle">
       <PageHeader title={title} subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: setSubTabValueParam }} />
       <PageBackground className="flex flex-col">
         {!isEditMode && (

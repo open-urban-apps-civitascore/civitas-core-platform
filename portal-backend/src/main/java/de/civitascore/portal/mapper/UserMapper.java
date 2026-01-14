@@ -36,6 +36,7 @@ public interface UserMapper extends DtoMapper<UserInputDTO, UserOutputDTO, User>
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "groups", ignore = true)
+  @Mapping(target = "externalId", ignore = true)
   @Override
   void updateEntity(@MappingTarget User entity, UserInputDTO input);
 }

@@ -13,7 +13,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '../../ui/sidebar'
-import { appSidebarNavItems } from '../appSidebarMockItems'
+import { appSidebarNavItems } from '../appSidebarItems'
 
 export const AppSidebarContent = async () => {
   const tNav = await getTranslations('sidebar')
@@ -30,7 +30,7 @@ export const AppSidebarContent = async () => {
         <SidebarMenu>
           {appSidebarNavItems.map(item => (
             <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
-              <SidebarMenuItem>
+              <SidebarMenuItem data-testid={`sidebarMenuItem-${item.title}`}>
                 <SidebarMenuButton asChild tooltip={getMenuItemTitle(item)}>
                   <a href={item.url}>
                     <item.icon />
@@ -50,7 +50,10 @@ export const AppSidebarContent = async () => {
                     <CollapsibleContent>
                       <SidebarMenuSub>
                         {item.items?.map(subItem => (
-                          <SidebarMenuSubItem key={getMenuItemTitle(subItem)}>
+                          <SidebarMenuSubItem
+                            key={getMenuItemTitle(subItem)}
+                            data-testid={`sidebarMenuItem-${subItem.title}`}
+                          >
                             <SidebarMenuSubButton asChild>
                               <a href={subItem.url}>
                                 <span>{getMenuItemTitle(subItem)}</span>

@@ -1,3 +1,5 @@
+'use client'
+
 import { HTMLAttributes } from 'react'
 
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -8,17 +10,19 @@ import { TabSectionProps, TabsSection } from './components/TabsSections'
 
 export type PageHeaderProps = Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & {
   title?: string
+  subtitle?: string
   tabs?: TabSectionProps
   subTabs?: TabSectionProps
   badgeTitle?: string
 }
 
 export const PageHeader = (props: PageHeaderProps) => {
-  const { title, className, style, tabs, subTabs, badgeTitle } = props
+  const { title, subtitle, className, style, tabs, subTabs, badgeTitle } = props
   const isMobile = useIsMobile()
   return (
     <div
       id="pageHeader"
+      data-testid="pageHeader"
       className={cn(
         'w-full max-w-full  flex flex-col gap-[var(--layout-padding)] h-[var(--title-height)] py-[var(--layout-padding)] border-b-1',
         className,
@@ -28,10 +32,7 @@ export const PageHeader = (props: PageHeaderProps) => {
       {tabs && (
         <TabsSection testId="primaryTabs" tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} />
       )}
-      <div
-        id="pageHeaderTitle"
-        className={`flex-1 flex w-full min-w-0 ${title ? 'justify-between' : 'justify-end'} items-center px-[var(--layout-padding)]`}
-      >
+      <div id="pageHeaderTitle" className="flex-1 w-full min-w-0 px-[var(--layout-padding)]">
         {title && (
           <div className="flex flex-row items-center gap-4">
             <h1
@@ -50,6 +51,7 @@ export const PageHeader = (props: PageHeaderProps) => {
             )}
           </div>
         )}
+        {subtitle && <p className="mt-6 text-muted-foreground">{subtitle}</p>}
       </div>
       {subTabs && (
         <TabsSection

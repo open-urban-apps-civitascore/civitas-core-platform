@@ -1,7 +1,7 @@
 logging:
   level:
     root: INFO
-    org.hibernate: INFO
+    org.hibernate: WARN
     org.flywaydb: INFO
 
 app:
@@ -14,6 +14,18 @@ spring:
     properties:
       hibernate.format_sql: true
 
+  # Kafka local deployment settings
+  kafka:
+    bootstrap-servers: localhost:9092
+
 keycloak:
   realm: "iot"
   auth-server-url: http://localhost:8080
+  target-realm: "civitas-core"  # Target realm for user/group/role management via Config Adapter
+
+kafka:
+  enabled: true
+  bootstrap-servers: localhost:9092
+  acks: all
+  retries: 3
+  async-publish: true  # true = async (callback), false = sync (blocking)

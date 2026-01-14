@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -21,8 +20,8 @@
     <properties>
         <java.version>21</java.version>
         <springdoc-openapi.version>2.8.14</springdoc-openapi.version>
-        <testcontainers.version>1.21.3</testcontainers.version>
-        <testcontainers-keycloak.version>3.9.0</testcontainers-keycloak.version>
+        <testcontainers.version>2.0.2</testcontainers.version>
+        <testcontainers-keycloak.version>4.0.0</testcontainers-keycloak.version>
         <specification-arg-resolver.version>3.2.2</specification-arg-resolver.version>
         <hibernate-processor.version>7.1.7.Final</hibernate-processor.version>
         <spotless.version>2.46.1</spotless.version>
@@ -36,6 +35,11 @@
         <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
         <tomcat.version>11.0.14</tomcat.version>
         <commons-compress.version>1.27.1</commons-compress.version>
+        <spring-kafka.version>3.3.11</spring-kafka.version>
+        <owasp.encoder.version>1.4.0</owasp.encoder.version>
+        <apache-jena.version>5.6.0</apache-jena.version>
+        <cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
+        <config-adapter.version>1.0.0-SNAPSHOT</config-adapter.version>
     </properties>
 
     <dependencyManagement>
@@ -45,6 +49,12 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-compress</artifactId>
                 <version>${commons-compress.version}</version>
+            </dependency>
+            <!-- Required by commons-compress for Testcontainers -->
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.18.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -80,6 +90,20 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- OWASP Encoder for output encoding -->
+        <dependency>
+            <groupId>org.owasp.encoder</groupId>
+            <artifactId>encoder</artifactId>
+            <version>${owasp.encoder.version}</version>
+        </dependency>
+
+        <!-- Kafka -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+            <version>${spring-kafka.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
@@ -91,6 +115,15 @@
             <artifactId>flyway-database-postgresql</artifactId>
             <version>${flyway.version}</version>
         </dependency>
+
+        <!-- Serialization -->
+        <dependency>
+            <groupId>org.apache.jena</groupId>
+            <artifactId>apache-jena-libs</artifactId>
+            <version>${apache-jena.version}</version>
+            <type>pom</type>
+        </dependency>
+
 
         <!-- Actuator + OpenAPI -->
         <dependency>
@@ -116,7 +149,7 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
             <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
@@ -127,6 +160,17 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>org.keycloak</groupId>
+            <artifactId>keycloak-admin-client</artifactId>
+            <version>26.0.7</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
@@ -134,8 +178,14 @@
 
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
+            <artifactId>testcontainers-postgresql</artifactId>
             <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- Kafka TestContainers for integration testing -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka-test</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -162,10 +212,58 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- Config adapter -->
+        <dependency>
+            <groupId>com.civitas</groupId>
+            <artifactId>config-adapter-api</artifactId>
+            <version>${config-adapter.version}</version>
+        </dependency>
+
+        <!-- Config adapter - Kafka event handler -->
+        <dependency>
+            <groupId>com.civitas</groupId>
+            <artifactId>event-handler-kafka</artifactId>
+            <version>${config-adapter.version}</version>
+        </dependency>
+
+        <!-- Config adapter - Keycloak adapter for integration tests -->
+        <dependency>
+            <groupId>com.civitas</groupId>
+            <artifactId>config-adapter-keycloak</artifactId>
+            <version>${config-adapter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.civitas</groupId>
+            <artifactId>config-adapter-configuration</artifactId>
+            <version>${config-adapter.version}</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
         <plugins>
+            <!-- Maven Dependency Plugin - Generate dependency tree JSON for license scanning -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>generate-dependency-tree</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>tree</goal>
+                        </goals>
+                        <configuration>
+                            <outputType>json</outputType>
+                            <outputFile>${project.basedir}/maven.graph.json</outputFile>
+                            <appendOutput>false</appendOutput>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- MapStruct + Lombok annotation processor -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -198,7 +296,7 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <!-- Build Helper for testIntegration directory - only for integration-test phase -->
+            <!-- Build Helper for testIntegration directory -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
@@ -206,7 +304,7 @@
                 <executions>
                     <execution>
                         <id>add-integration-test-sources</id>
-                        <phase>pre-integration-test</phase>
+                        <phase>generate-test-sources</phase>
                         <goals>
                             <goal>add-test-source</goal>
                         </goals>
@@ -218,7 +316,7 @@
                     </execution>
                     <execution>
                         <id>add-integration-test-resources</id>
-                        <phase>pre-integration-test</phase>
+                        <phase>generate-test-resources</phase>
                         <goals>
                             <goal>add-test-resource</goal>
                         </goals>
@@ -266,11 +364,12 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire.version}</version>
                 <configuration>
-                    <!-- Only run tests from src/test/java -->
-                    <testSourceDirectory>${project.basedir}/src/test/java</testSourceDirectory>
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
+                    <excludes>
+                        <exclude>**/*IntegrationTest.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
 
@@ -314,6 +413,17 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>${cyclonedx-maven-plugin.version}</version>
+                <configuration>
+                    <outputFormat>json</outputFormat>
+                    <schemaVersion>1.5</schemaVersion>
+                    <includeBomSerialNumber>true</includeBomSerialNumber>
+                    <outputName>portal-backend</outputName>
+                </configuration>
             </plugin>
 
             <!-- Spring Boot plugin -->

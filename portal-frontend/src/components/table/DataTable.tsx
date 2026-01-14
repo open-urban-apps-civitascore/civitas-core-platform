@@ -28,17 +28,18 @@ export interface DataTableProps<T> extends ComponentProps<'table'> {
   totalPages: number
   isLoading?: boolean
   hasCard?: boolean
+  testId?: string
   isRowClickable?: (row: Row<T>) => boolean
   onRowClick?: (row: Row<T>) => void
 }
 
 const LoadingSkeleton = () => (
-  <>
+  <div data-testid="loadingSkeleton">
     <Skeleton className="h-10 w-full mb-2.5 mt-2" />
     <Skeleton className="h-10 w-full mb-2.5" />
     <Skeleton className="h-10 w-full mb-2.5" />
     <Skeleton className="h-10 w-full" />
-  </>
+  </div>
 )
 
 export const DataTable = <T,>(props: DataTableProps<T>) => {
@@ -51,15 +52,17 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
     hasCard = true,
     onRowClick,
     isRowClickable = () => true,
+    testId,
     ...tableProps
   } = props
 
   const t = useTranslations('common')
 
   return (
-    <div className="@container h-full w-full">
+    <div className="@container h-full w-full" data-testid={testId}>
       <div className="h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]">
         <ScrollArea
+          data-testid="dataTableScrollArea"
           className={cn('h-[calc(100%-var(--pagination-height))] w-full bg-white', hasCard && 'rounded-md border-1')}
         >
           <ShadCnTable aria-labelledby="subheading" tableContainerProps={{ className: '' }} {...tableProps}>
@@ -93,7 +96,7 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
                   >
                     {row.getVisibleCells().map(cell => (
                       <TableCell
-                        className="whitespace-normal px-3"
+                        className={cn('whitespace-normal px-3 group/cell relative h-16')}
                         key={cell.id}
                         style={cell.column.columnDef.meta?.style}
                       >

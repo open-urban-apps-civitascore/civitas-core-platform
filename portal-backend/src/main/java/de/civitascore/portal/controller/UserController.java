@@ -66,9 +66,9 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
         schema = @Schema(type = "string", example = "ext-123")),
     @Parameter(
         name = "q",
-        description = "Search in firstName, lastName, or email (partial match, case-insensitive).",
+        description = "Search in full name, or email (partial match, case-insensitive).",
         in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "john"))
+        schema = @Schema(type = "string", example = "john doe, john@doe.com"))
   })
   @Override
   public ResponseEntity<Page<UserOutputDTO>> getAll(

@@ -12,6 +12,7 @@ export const SearchHeader = (props: SearchHeaderProps) => {
   const { customElement, className, ...searchFieldProps } = props
   return (
     <div
+      data-testid="searchArea"
       className={cn('flex justify-between items-end h-[calc(var(--search-height))] pb-[calc(--spacing(4))]', className)}
     >
       <SearchField {...searchFieldProps} />

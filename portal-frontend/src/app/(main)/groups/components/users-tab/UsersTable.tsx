@@ -39,7 +39,7 @@ const UsersTable = (props: UsersTableProps) => {
       cell: info => info.getValue(),
       enableHiding: true,
     }),
-    columnHelper.accessor('displayName', {
+    columnHelper.accessor('fullName', {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.displayName')} />,
       cell: info => info.getValue(),
       meta: {
@@ -66,7 +66,7 @@ const UsersTable = (props: UsersTableProps) => {
       cell: info => formatDate(info.getValue(), locale),
     }),
     columnHelper.accessor('isActive', {
-      header: tUsers('info.active'),
+      header: tUsers('info.status.active'),
       cell: info => <StatusLabel isChecked={info.getValue()} />,
     }),
   ]

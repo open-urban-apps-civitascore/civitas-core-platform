@@ -61,9 +61,11 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
             <ShadcnSelect value={field.value} onValueChange={onChange ?? field.onChange}>
               <SelectTrigger
                 id={id}
+                data-testid={`${name}SelectTrigger`}
+                data-test-element="formField"
                 aria-label={label}
                 className={cn(
-                  'w-full disabled:opacity-100 disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0 disabled:pointer-events-none',
+                  'w-full disabled:opacity-100 disabled:text-muted-foreground disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0 disabled:pointer-events-none',
                   selectTriggerProps?.className,
                 )}
                 style={{ height: disabled ? '20px' : '' }}
@@ -71,13 +73,13 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
               >
                 <SelectValue placeholder={placeholder} />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none" disabled={required}>
+              <SelectContent data-testid={`${name}SelectContent`}>
+                <SelectItem data-testid={`${name}SelectItemPlaceholder`} value="none" disabled={required}>
                   {placeholder}
                 </SelectItem>
 
-                {options.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
+                {options.map((option, index) => (
+                  <SelectItem data-testid={`${name}SelectItem${index}`} key={option.value} value={option.value}>
                     <span>{option.label}</span>
                     <Check className="ml-auto h-4 w-4 opacity-0 group-data-[state=checked]:opacity-100" />
                   </SelectItem>

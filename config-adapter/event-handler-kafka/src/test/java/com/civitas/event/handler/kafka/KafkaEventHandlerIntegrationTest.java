@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2012 - 2025 Data In Motion and others. All rights reserved.
+ * This work and the accompanying materials are made available under the terms of the European Union
+ * Public License License (EU-PL) 1.2 which is available at
+ * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
- * <p>This program and the accompanying materials are made available under the terms of the Eclipse
- * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0/
+ * <p>SPDX-License-Identifier: EUPL-1.2
  *
- * <p>SPDX-License-Identifier: EPL-2.0
- *
- * <p>Contributors: Data In Motion - initial API and implementation
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to
+ * all the individual contributors: Copyright (c) 2012-2025 Civitas Connect e. V. and others.
  */
 package com.civitas.event.handler.kafka;
 
@@ -24,6 +24,7 @@ import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
+import com.civitas.configadapter.model.idm.UserConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
@@ -298,12 +299,12 @@ class KafkaEventHandlerIntegrationTest {
             "1.0",
             "result.topic");
 
-    Map<String, Object> userData = new HashMap<>();
-    userData.put("username", "testuser");
-    userData.put("email", "test@example.com");
-    userData.put("enabled", true);
+    UserConfig userConfig = new UserConfig();
+    userConfig.setUsername("testuser");
+    userConfig.setEmail("test@example.com");
+    userConfig.setEnabled(true);
 
-    Config config = new Config("users/" + userId, userData);
+    Config config = new Config("users/" + userId, userConfig);
 
     Payload payload = new Payload("user", "users/" + userId, Operation.CREATE, config);
 

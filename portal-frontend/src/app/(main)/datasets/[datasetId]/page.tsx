@@ -1,7 +1,9 @@
+import { headers } from 'next/headers'
+
 import { DatasetFormData, DatasetResponse } from '@/types/datasets'
 import { DataSpace } from '@/types/dataspaces'
 
-import { DatasetOverview } from '../components/DatasetOverview'
+import { DatasetOverview } from '../components/overview/DatasetOverview'
 
 const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
@@ -27,11 +29,15 @@ interface DatasetPageProps {
 const DatasetPage = async (props: DatasetPageProps) => {
   const { params } = props
   const { datasetId } = await params
+
   const getData = async () => {
     try {
       const [datasetResponse, dataspacesResponse] = await Promise.all([
-        fetch(`${URL}/datasets/${datasetId}`, {
+        fetch(`${process.env.NEXTAUTH_URL}/api/datasets/${datasetId}`, {
           cache: 'no-store',
+          headers: {
+            cookie: (await headers()).get('cookie') || '',
+          },
         }),
         fetch(`${URL}/dataspaces`, {
           cache: 'no-store',
@@ -59,7 +65,19 @@ const DatasetPage = async (props: DatasetPageProps) => {
 
   const { dataset, dataspaces } = await getData()
 
-  return <DatasetOverview dataset={dataset} dataspaces={dataspaces} isEditMode={true} />
+  return (
+    <DatasetOverview
+      testId="datasetPage"
+      dataset={dataset}
+      dataspaces={dataspaces}
+      datasources={['Datasource 1', 'Datasource 2']}
+      groups={[]}
+      apis={['API 1', 'API 2']}
+      hasMetadata
+      persistence={[]}
+      isEditMode={true}
+    />
+  )
 }
 
 export default DatasetPage

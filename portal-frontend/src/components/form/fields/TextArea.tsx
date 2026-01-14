@@ -1,13 +1,13 @@
-import React, { DetailedHTMLProps, HTMLAttributes, InputHTMLAttributes } from 'react'
+import { DetailedHTMLProps, HTMLAttributes } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Textarea } from '@/components/ui/textarea'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
+import { InputPropsWithoutForm } from '@/types/common'
 
-interface TextAreaProps<T extends FieldValues>
-  extends Omit<InputHTMLAttributes<HTMLTextAreaElement>, 'form' | 'onChange'> {
+interface TextAreaProps<T extends FieldValues> extends InputPropsWithoutForm {
   form: UseFormReturn<T>
   name: Path<T>
   placeholder: string
@@ -37,6 +37,8 @@ export const TextArea = <T extends FieldValues>(props: TextAreaProps<T>) => {
           <div>
             <FormControl>
               <Textarea
+                data-testid={`${name}TextArea`}
+                data-test-element="formField"
                 className="disabled:opacity-100 disabled:border-hidden disabled:shadow-none disabled:min-h-4  disabled:py-0 disabled:resize-none disabled:pointer-events-none"
                 placeholder={placeholder}
                 {...field}

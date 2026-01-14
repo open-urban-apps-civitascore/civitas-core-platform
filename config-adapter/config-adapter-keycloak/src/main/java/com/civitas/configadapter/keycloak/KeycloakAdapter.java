@@ -1,12 +1,12 @@
 /**
- * Copyright (c) 2012 - 2025 Data In Motion and others. All rights reserved.
+ * This work and the accompanying materials are made available under the terms of the European Union
+ * Public License License (EU-PL) 1.2 which is available at
+ * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
- * <p>This program and the accompanying materials are made available under the terms of the Eclipse
- * Public License 2.0 which is available at https://www.eclipse.org/legal/epl-2.0/
+ * <p>SPDX-License-Identifier: EUPL-1.2
  *
- * <p>SPDX-License-Identifier: EPL-2.0
- *
- * <p>Contributors: Data In Motion - initial API and implementation
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to
+ * all the individual contributors: Copyright (c) 2012-2025 Civitas Connect e. V. and others.
  */
 package com.civitas.configadapter.keycloak;
 
@@ -15,6 +15,10 @@ import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.idm.ClientConfig;
+import com.civitas.configadapter.model.idm.RealmConfig;
+import com.civitas.configadapter.model.idm.RoleConfig;
+import com.civitas.configadapter.model.idm.UserConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
@@ -24,12 +28,9 @@ import java.util.Map;
 import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
-import org.keycloak.admin.client.resource.GroupResource;
 import org.keycloak.admin.client.resource.RealmResource;
-import org.keycloak.admin.client.resource.RoleMappingResource;
 import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.representations.idm.ClientRepresentation;
-import org.keycloak.representations.idm.GroupRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -51,6 +52,9 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   public KeycloakAdapter() {
     this.objectMapper = new ObjectMapper();
+    // Configure to ignore the "resourceType" field when converting to Keycloak representations
+    this.objectMapper.configure(
+        com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
   }
 
   /*
@@ -61,20 +65,20 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   public void initialize(AdapterConfig config) {
     super.initialize(config);
     this.keycloakClient =
-            KeycloakBuilder.builder()
-                    .serverUrl(getAdapterProperty("url", "http://localhost:8080"))
-                    .realm(getAdapterProperty("realm", "master"))
-                    .username(getAdapterProperty("username", "admin"))
-                    .password(getAdapterProperty("password", "admin"))
-                    .clientId(getAdapterProperty("client.id", "admin-cli"))
-                    .build();
+        KeycloakBuilder.builder()
+            .serverUrl(getAdapterProperty("url", "http://localhost:8080"))
+            .realm(getAdapterProperty("realm", "master"))
+            .username(getAdapterProperty("username", "admin"))
+            .password(getAdapterProperty("password", "admin"))
+            .clientId(getAdapterProperty("client.id", "admin-cli"))
+            .build();
 
     logger.info(
-            "Keycloak adapter '{}' initialized for: {}",
-            getName(),
-            getAdapterProperty("url", "http://localhost:8080"));
+        "Keycloak adapter '{}' initialized for: {}",
+        getName(),
+        getAdapterProperty("url", "http://localhost:8080"));
     logger.info(
-            "Subscribed to {} Kafka topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
+        "Subscribed to {} Kafka topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
   }
 
   /*
@@ -88,20 +92,34 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   @Override
   public void processConfigEvent(String topic, ConfigEvent event) {
+    if (event == null) {
+      logger.warn("Null event send to topic {}", topic);
+      return;
+    }
     Operation operation = event.payload().operation();
     String targetResource = event.payload().targetResource();
     String targetComponent = event.payload().targetComponent();
 
     logger.info(
-            "Processing config event - Topic: {}, Operation: {}, TargetComponent: {}, TargetResource: {}",
-            topic,
-            operation,
-            targetComponent,
-            targetResource);
+        "Processing config event - Topic: {}, Operation: {}, TargetComponent: {}, TargetResource: {}",
+        topic,
+        operation,
+        targetComponent,
+        targetResource);
 
     try {
-      // Parse the target resource to determine resource type and identifiers
-      ResourceInfo resourceInfo = parseTargetResource(targetResource);
+      // Use semantic fields: targetComponent is the resource type, targetResource is the realm
+      String realm = targetResource;
+      String resourceType = targetComponent;
+      String resourceId = extractResourceId(event);
+
+      ResourceInfo resourceInfo = new ResourceInfo(resourceType, realm, resourceId);
+
+      logger.debug(
+          "Resource info - Type: {}, Realm: {}, ID: {}",
+          resourceInfo.type,
+          resourceInfo.realm,
+          resourceInfo.id);
 
       switch (operation) {
         case CREATE -> handleCreate(resourceInfo, event);
@@ -120,50 +138,35 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   }
 
   /**
-   * Parses the targetResource string to extract resource type, realm, and resource ID. Expected
-   * format: "realms/{realm}/users/{userId}" or "realms/{realm}" or "users/{userId}"
+   * Extracts the resource ID from the config value for UPDATE/DELETE operations. For CREATE
+   * operations, the ID may be null and will be assigned by Keycloak.
+   *
+   * <p>Different Keycloak resources use different identifiers:
+   *
+   * <ul>
+   *   <li>Users/Clients: UUID (e.g., "06702f15-1439-4958-b069-2ac5716c7a5c")
+   *   <li>Roles: Name (e.g., "admin") - roles are accessed by name in Keycloak API
+   *   <li>Realms: Realm name (e.g., "civitas-core")
+   * </ul>
+   *
+   * @param event the configuration value containing the resource data
+   * @return the resource ID if present, null otherwise
    */
-  private ResourceInfo parseTargetResource(String targetResource) {
-    String[] parts = targetResource.split("/");
-
-    String realm = null;
-    String resourceType = null;
-    String resourceId = null;
-
-    for (int i = 0; i < parts.length; i++) {
-      if ("realms".equals(parts[i]) && i + 1 < parts.length) {
-        realm = parts[i + 1];
-      } else if ("users".equals(parts[i])) {
-        resourceType = "user";
-        if (i + 1 < parts.length) {
-          resourceId = parts[i + 1];
-        }
-      } else if ("clients".equals(parts[i])) {
-        resourceType = "client";
-        if (i + 1 < parts.length) {
-          resourceId = parts[i + 1];
-        }
-      } else if ("roles".equals(parts[i])) {
-        resourceType = "role";
-        if (i + 1 < parts.length) {
-          resourceId = parts[i + 1];
-        }
-      } else if ("groups".equals(parts[i])) {
-        resourceType = "group";
-        if (i + 1 < parts.length) {
-          resourceId = parts[i + 1];
-        }
+  private String extractResourceId(ConfigEvent event) {
+    // Extract ID from IDM config values (UserConfig, ClientConfig, RoleConfig, RealmConfig)
+    return switch (event.payload().config().value()) {
+      case null -> null;
+      case UserConfig userConfig -> userConfig.getId(); // UUID for users
+      case ClientConfig clientConfig -> clientConfig.getId(); // UUID for clients
+      case RoleConfig roleConfig -> roleConfig.getName(); // Name for roles
+      case RealmConfig realmConfig -> realmConfig.getRealm(); // Realm name
+      default -> {
+        logger.warn("Unknown ConfigValue class: {}", event.getClass());
+        publishErrorResult(
+            event, "UNKNOWN_RESOURCE_TYPE", "Unknown ConfigValue class: " + event.getClass());
+        yield null;
       }
-    }
-
-    // If only "realms/{realm}" then it's a realm operation
-    if (resourceType == null && realm != null) {
-      resourceType = "realm";
-      resourceId = realm;
-    }
-
-    logger.debug("Parsed resource - Type: {}, Realm: {}, ID: {}", resourceType, realm, resourceId);
-    return new ResourceInfo(resourceType, realm, resourceId);
+    };
   }
 
   private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event) {
@@ -172,11 +175,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       case "client" -> createClient(resourceInfo.realm, event);
       case "user" -> createUser(resourceInfo.realm, event);
       case "role" -> createRole(resourceInfo.realm, event);
-      case "group" -> createGroup(resourceInfo.realm, event);
       default -> {
         logger.warn("Unknown resource type for create: {}", resourceInfo.type);
         publishErrorResult(
-                event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
+            event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
       }
     }
   }
@@ -187,11 +189,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       case "client" -> updateClient(resourceInfo.realm, resourceInfo.id, event);
       case "user" -> updateUser(resourceInfo.realm, resourceInfo.id, event);
       case "role" -> updateRole(resourceInfo.realm, resourceInfo.id, event);
-      case "group" -> updateGroup(resourceInfo.realm, resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for update: {}", resourceInfo.type);
         publishErrorResult(
-                event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
+            event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
       }
     }
   }
@@ -202,22 +203,33 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       case "client" -> deleteClient(resourceInfo.realm, resourceInfo.id, event);
       case "user" -> deleteUser(resourceInfo.realm, resourceInfo.id, event);
       case "role" -> deleteRole(resourceInfo.realm, resourceInfo.id, event);
-      case "group" -> deleteGroup(resourceInfo.realm, resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for delete: {}", resourceInfo.type);
         publishErrorResult(
-                event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
+            event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
       }
     }
   }
 
   // ============== REALM OPERATIONS ==============
 
+  /**
+   * Extracts the configuration data from a ConfigValue for ObjectMapper conversion.
+   *
+   * @param configValue the typed configuration value
+   * @return the config value object for ObjectMapper conversion
+   */
+  private Object extractConfigData(com.civitas.configadapter.model.ConfigValue configValue) {
+    // With concrete POJOs, we can pass them directly to ObjectMapper
+    // which will map the fields to Keycloak representations
+    return configValue;
+  }
+
   private void createRealm(ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
+      Object configData = extractConfigData(event.payload().config().value());
       RealmRepresentation realmRep =
-              objectMapper.convertValue(configValue, RealmRepresentation.class);
+          objectMapper.convertValue(configData, RealmRepresentation.class);
 
       keycloakClient.realms().create(realmRep);
 
@@ -234,9 +246,9 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void updateRealm(String realmName, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
+      Object configData = extractConfigData(event.payload().config().value());
       RealmRepresentation realmRep =
-              objectMapper.convertValue(configValue, RealmRepresentation.class);
+          objectMapper.convertValue(configData, RealmRepresentation.class);
 
       RealmResource realmResource = keycloakClient.realm(realmName);
       realmResource.update(realmRep);
@@ -266,9 +278,9 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void createClient(String realm, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
+      Object configData = extractConfigData(event.payload().config().value());
       ClientRepresentation clientRep =
-              objectMapper.convertValue(configValue, ClientRepresentation.class);
+          objectMapper.convertValue(configData, ClientRepresentation.class);
 
       RealmResource realmResource = keycloakClient.realm(realm);
 
@@ -285,40 +297,34 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void updateClient(String realm, String clientPublicId, ConfigEvent event) { // Variable umbenannt
+  private void updateClient(String realm, String clientId, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
+      Object configData = extractConfigData(event.payload().config().value());
       ClientRepresentation clientRep =
-              objectMapper.convertValue(configValue, ClientRepresentation.class);
+          objectMapper.convertValue(configData, ClientRepresentation.class);
 
       RealmResource realmResource = keycloakClient.realm(realm);
+      realmResource.clients().get(clientId).update(clientRep);
 
-      String internalId = getClientUuidByName(realmResource, clientPublicId);
-
-      realmResource.clients().get(internalId).update(clientRep);
-
-      logger.info("Updated client: {} (UUID: {}) in realm: {}", clientPublicId, internalId, realm);
-      publishSuccessResult(event, "Client updated successfully", clientPublicId);
+      logger.info("Updated client: {} in realm: {}", clientId, realm);
+      publishSuccessResult(event, "Client updated successfully", clientId);
 
     } catch (Exception e) {
-      logger.error("Failed to update client: {} in realm: {}", clientPublicId, realm, e);
+      logger.error("Failed to update client: {} in realm: {}", clientId, realm, e);
       publishErrorResult(event, "CLIENT_UPDATE_FAILED", e.getMessage());
     }
   }
 
-  private void deleteClient(String realm, String clientPublicId, ConfigEvent event) {
+  private void deleteClient(String realm, String clientId, ConfigEvent event) {
     try {
       RealmResource realmResource = keycloakClient.realm(realm);
+      realmResource.clients().get(clientId).remove();
 
-      String internalId = getClientUuidByName(realmResource, clientPublicId);
-
-      realmResource.clients().get(internalId).remove();
-
-      logger.info("Deleted client: {} from realm: {}", clientPublicId, realm);
-      publishSuccessResult(event, "Client deleted successfully", clientPublicId);
+      logger.info("Deleted client: {} from realm: {}", clientId, realm);
+      publishSuccessResult(event, "Client deleted successfully", clientId);
 
     } catch (Exception e) {
-      logger.error("Failed to delete client: {} from realm: {}", clientPublicId, realm, e);
+      logger.error("Failed to delete client: {} from realm: {}", clientId, realm, e);
       publishErrorResult(event, "CLIENT_DELETE_FAILED", e.getMessage());
     }
   }
@@ -354,8 +360,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void createUser(String realm, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
-      UserRepresentation userRep = objectMapper.convertValue(configValue, UserRepresentation.class);
+      Object configData = extractConfigData(event.payload().config().value());
+      UserRepresentation userRep = objectMapper.convertValue(configData, UserRepresentation.class);
 
       List<String> rolesToAssignNames = userRep.getRealmRoles();
       userRep.setRealmRoles(null);
@@ -371,12 +377,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         userId = CreatedResponseUtil.getCreatedId(response);
       }
 
-      RoleMappingResource roleMapping = realmResource.users().get(userId).roles();
-      syncRealmRoles(rolesToAssignNames, roleMapping, realmResource);
-      syncClientRoles(clientRolesMap, roleMapping, realmResource);
+      AssignRealmRolesToUser(rolesToAssignNames, realmResource, userId);
+      AssignClientRolesToUser(clientRolesMap, realmResource, userId);
 
-      logger.info("Created user: {} in realm: {}", userRep.getUsername(), realm);
-      publishSuccessResult(event, "User created successfully", userRep.getUsername());
+      logger.info("Created user: {} (ID: {}) in realm: {}", userRep.getUsername(), userId, realm);
+      publishSuccessResult(event, "User created successfully", userId);
 
     } catch (Exception e) {
       logger.error("Failed to create user in realm: {}", realm, e);
@@ -384,15 +389,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void updateUser(String realm, String username, ConfigEvent event) { // Variable umbenannt: userId -> username
+  private void updateUser(String realm, String userId, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
-      UserRepresentation userRep = objectMapper.convertValue(configValue, UserRepresentation.class);
-
-      RealmResource realmResource = keycloakClient.realm(realm);
-
-      String userId = getUserIdByName(realmResource, username);
-      userRep.setId(userId);
+      Object configData = extractConfigData(event.payload().config().value());
+      UserRepresentation userRep = objectMapper.convertValue(configData, UserRepresentation.class);
 
       List<String> rolesToAssignNames = userRep.getRealmRoles();
       userRep.setRealmRoles(null);
@@ -400,34 +400,90 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       Map<String, List<String>> clientRolesMap = userRep.getClientRoles();
       userRep.setClientRoles(null);
 
+      RealmResource realmResource = keycloakClient.realm(realm);
       realmResource.users().get(userId).update(userRep);
 
-      RoleMappingResource roleMapping = realmResource.users().get(userId).roles();
-      syncRealmRoles(rolesToAssignNames, roleMapping, realmResource);
-      syncClientRoles(clientRolesMap, roleMapping, realmResource);
+      AssignRealmRolesToUser(rolesToAssignNames, realmResource, userId);
+      AssignClientRolesToUser(clientRolesMap, realmResource, userId);
 
-      logger.info("Updated user: {} (ID: {}) in realm: {}", username, userId, realm);
+      logger.info("Updated user: {} in realm: {}", userId, realm);
       publishSuccessResult(event, "User updated successfully", userId);
 
     } catch (Exception e) {
-      logger.error("Failed to update user: {} in realm: {}", username, realm, e);
+      logger.error("Failed to update user: {} in realm: {}", userId, realm, e);
       publishErrorResult(event, "USER_UPDATE_FAILED", e.getMessage());
     }
   }
 
-  private void deleteUser(String realm, String username, ConfigEvent event) {
+  private static void AssignClientRolesToUser(
+      Map<String, List<String>> clientRolesMap, RealmResource realmResource, String userId) {
+    if (clientRolesMap != null && !clientRolesMap.isEmpty()) {
+      UserResource userResource = realmResource.users().get(userId);
+
+      for (Map.Entry<String, List<String>> entry : clientRolesMap.entrySet()) {
+        String clientId = entry.getKey();
+        List<String> roleNames = entry.getValue();
+
+        try {
+          List<ClientRepresentation> clients = realmResource.clients().findByClientId(clientId);
+          if (clients.isEmpty()) {
+            logger.warn("Client '{}' not found, skipping roles.", clientId);
+            continue;
+          }
+          String clientUuid = clients.getFirst().getId();
+
+          List<RoleRepresentation> rolesToAdd = new ArrayList<>();
+          for (String roleName : roleNames) {
+            try {
+              RoleRepresentation role =
+                  realmResource.clients().get(clientUuid).roles().get(roleName).toRepresentation();
+              rolesToAdd.add(role);
+            } catch (NotFoundException nfe) {
+              logger.warn("Role '{}' not found for client '{}'", roleName, clientId);
+            }
+          }
+
+          if (!rolesToAdd.isEmpty()) {
+            userResource.roles().clientLevel(clientUuid).add(rolesToAdd);
+          }
+
+        } catch (Exception e) {
+          logger.error("Failed to assign client roles for client '{}'", clientId, e);
+        }
+      }
+    }
+  }
+
+  private static void AssignRealmRolesToUser(
+      List<String> rolesToAssignNames, RealmResource realmResource, String userId) {
+    if (rolesToAssignNames != null && !rolesToAssignNames.isEmpty()) {
+
+      List<RoleRepresentation> rolesToAdd = new ArrayList<>();
+      for (String roleName : rolesToAssignNames) {
+        try {
+          RoleRepresentation role = realmResource.roles().get(roleName).toRepresentation();
+          rolesToAdd.add(role);
+        } catch (NotFoundException nfe) {
+          logger.warn("Role '{}' not found, cannot assign.", roleName);
+        }
+      }
+
+      if (!rolesToAdd.isEmpty()) {
+        realmResource.users().get(userId).roles().realmLevel().add(rolesToAdd);
+      }
+    }
+  }
+
+  private void deleteUser(String realm, String userId, ConfigEvent event) {
     try {
       RealmResource realmResource = keycloakClient.realm(realm);
-
-      String userId = getUserIdByName(realmResource, username);
-
       realmResource.users().get(userId).remove();
 
-      logger.info("Deleted user: {} from realm: {}", username, realm);
+      logger.info("Deleted user: {} from realm: {}", userId, realm);
       publishSuccessResult(event, "User deleted successfully", userId);
 
     } catch (Exception e) {
-      logger.error("Failed to delete user: {} from realm: {}", username, realm, e);
+      logger.error("Failed to delete user: {} from realm: {}", userId, realm, e);
       publishErrorResult(event, "USER_DELETE_FAILED", e.getMessage());
     }
   }
@@ -436,8 +492,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void createRole(String realm, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
-      RoleRepresentation roleRep = objectMapper.convertValue(configValue, RoleRepresentation.class);
+      Object configData = extractConfigData(event.payload().config().value());
+      RoleRepresentation roleRep = convertToRoleRepresentation(configData);
 
       RealmResource realmResource = keycloakClient.realm(realm);
       realmResource.roles().create(roleRep);
@@ -453,8 +509,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void updateRole(String realm, String roleId, ConfigEvent event) {
     try {
-      Object configValue = event.payload().config().value();
-      RoleRepresentation roleRep = objectMapper.convertValue(configValue, RoleRepresentation.class);
+      Object configData = extractConfigData(event.payload().config().value());
+      RoleRepresentation roleRep = convertToRoleRepresentation(configData);
 
       RealmResource realmResource = keycloakClient.realm(realm);
       realmResource.roles().get(roleId).update(roleRep);
@@ -466,6 +522,27 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       logger.error("Failed to update role: {} in realm: {}", roleId, realm, e);
       publishErrorResult(event, "ROLE_UPDATE_FAILED", e.getMessage());
     }
+  }
+
+  /**
+   * Converts RoleConfig to RoleRepresentation with special handling for composite roles. This
+   * method handles the conversion from our simple Set&lt;String&gt; compositeRoles to Keycloak's
+   * complex Composites structure.
+   */
+  private RoleRepresentation convertToRoleRepresentation(Object configData) {
+    RoleRepresentation roleRep = objectMapper.convertValue(configData, RoleRepresentation.class);
+
+    // Handle composite roles conversion if present
+    if (configData instanceof com.civitas.configadapter.model.idm.RoleConfig roleConfig) {
+      if (roleConfig.getCompositeRoles() != null && !roleConfig.getCompositeRoles().isEmpty()) {
+        // Create Keycloak's Composites structure from our simple Set<String>
+        RoleRepresentation.Composites composites = new RoleRepresentation.Composites();
+        composites.setRealm(roleConfig.getCompositeRoles());
+        roleRep.setComposites(composites);
+      }
+    }
+
+    return roleRep;
   }
 
   private void deleteRole(String realm, String roleId, ConfigEvent event) {
@@ -482,215 +559,12 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-
-  // ============== GROUP OPERATIONS ==============
-
-  private void createGroup(String realm, ConfigEvent event) {
-    try {
-      Object configValue = event.payload().config().value();
-      GroupRepresentation groupRep =
-              objectMapper.convertValue(configValue, GroupRepresentation.class);
-
-      List<String> realmRolesToAssign = groupRep.getRealmRoles();
-      Map<String, List<String>> clientRolesToAssign = groupRep.getClientRoles();
-
-      RealmResource realmResource = keycloakClient.realm(realm);
-      String groupId;
-
-      if (groupRep.getParentId() != null && !groupRep.getParentId().isEmpty()) {
-        try (Response response =
-                     realmResource.groups().group(groupRep.getParentId()).subGroup(groupRep)) {
-          validateResponse("Group creation", 201, response);
-          groupId = CreatedResponseUtil.getCreatedId(response);
-        }
-      } else {
-        try (Response response = realmResource.groups().add(groupRep)) {
-          validateResponse("Group creation", 201, response);
-          groupId = CreatedResponseUtil.getCreatedId(response);
-        }
-      }
-
-      RoleMappingResource roleMapping = realmResource.groups().group(groupId).roles();
-      syncRealmRoles(realmRolesToAssign, roleMapping, realmResource);
-      syncClientRoles(clientRolesToAssign, roleMapping, realmResource);
-
-      logger.info("Created group: {} (ID: {}) in realm: {}", groupRep.getName(), groupId, realm);
-      publishSuccessResult(event, "Group created successfully", groupId);
-
-    } catch (Exception e) {
-      logger.error("Failed to create group in realm: {}", realm, e);
-      publishErrorResult(event, "GROUP_CREATE_FAILED", e.getMessage());
-    }
-  }
-
-  private void updateGroup(String realm, String groupName, ConfigEvent event) {
-    try {
-      Object configValue = event.payload().config().value();
-      GroupRepresentation groupRep =
-              objectMapper.convertValue(configValue, GroupRepresentation.class);
-
-      RealmResource realmResource = keycloakClient.realm(realm);
-
-      String groupId = getGroupIdByName(realmResource, groupName);
-      groupRep.setId(groupId);
-
-      List<String> realmRolesToAssign = groupRep.getRealmRoles();
-      Map<String, List<String>> clientRolesToAssign = groupRep.getClientRoles();
-
-      realmResource.groups().group(groupId).update(groupRep);
-
-      RoleMappingResource roleMapping = realmResource.groups().group(groupId).roles();
-      syncRealmRoles(realmRolesToAssign, roleMapping, realmResource);
-      syncClientRoles(clientRolesToAssign, roleMapping, realmResource);
-
-      logger.info("Updated group: {} in realm: {}", groupId, realm);
-      publishSuccessResult(event, "Group updated successfully", groupId);
-
-    } catch (Exception e) {
-      logger.error("Failed to update group: {} in realm: {}", groupName, realm, e);
-      publishErrorResult(event, "GROUP_UPDATE_FAILED", e.getMessage());
-    }
-  }
-
-  private void deleteGroup(String realm, String groupName, ConfigEvent event) {
-    try {
-      RealmResource realmResource = keycloakClient.realm(realm);
-      String groupId = getGroupIdByName(realmResource, groupName);
-
-      realmResource.groups().group(groupId).remove();
-
-      logger.info("Deleted group: {} from realm: {}", groupId, realm);
-      publishSuccessResult(event, "Group deleted successfully", groupId);
-
-    } catch (Exception e) {
-      logger.error("Failed to delete group: {} from realm: {}", groupName, realm, e);
-      publishErrorResult(event, "GROUP_DELETE_FAILED", e.getMessage());
-    }
-  }
-
-  // ============== HELPER METHODS FOR SYNC ==============
-
-  private String getClientUuidByName(RealmResource realmResource, String publicClientId) {
-    List<ClientRepresentation> clients = realmResource.clients().findByClientId(publicClientId);
-
-    if (clients.isEmpty()) {
-      throw new jakarta.ws.rs.NotFoundException("Client not found with clientId: " + publicClientId);
-    }
-
-    return clients.getFirst().getId();
-  }
-
-  private String getUserIdByName(RealmResource realmResource, String username) {
-    // search(username, exact=true)
-    List<UserRepresentation> users = realmResource.users().search(username, true);
-
-    if (users.isEmpty()) {
-      throw new jakarta.ws.rs.NotFoundException("User not found with username: " + username);
-    }
-    return users.getFirst().getId();
-  }
-
-  private String getGroupIdByName(RealmResource realmResource, String groupName) {
-    List<GroupRepresentation> foundGroups = realmResource.groups()
-            .groups(groupName, true, 0, 1, true);
-
-    if (foundGroups.isEmpty()) {
-      throw new jakarta.ws.rs.NotFoundException("Group not found with name: " + groupName);
-    }
-    return foundGroups.getFirst().getId();
-  }
-
-  private void syncRealmRoles(List<String> desiredRoleNames, RoleMappingResource roleMappingResource, RealmResource realmResource) {
-    List<String> desired = desiredRoleNames != null ? desiredRoleNames : java.util.Collections.emptyList();
-    var roleScope = roleMappingResource.realmLevel();
-
-    List<RoleRepresentation> currentRoles = roleScope.listAll();
-
-    List<RoleRepresentation> toRemove = currentRoles.stream()
-            .filter(current -> !desired.contains(current.getName()))
-            .toList();
-
-    List<RoleRepresentation> toAdd = new java.util.ArrayList<>();
-    for (String desiredName : desired) {
-      boolean alreadyHas = currentRoles.stream().anyMatch(c -> c.getName().equals(desiredName));
-      if (!alreadyHas) {
-        try {
-          toAdd.add(realmResource.roles().get(desiredName).toRepresentation());
-        } catch (jakarta.ws.rs.NotFoundException e) {
-          logger.warn("Realm Role '{}' not found, skipping assignment.", desiredName);
-        }
-      }
-    }
-
-    if (!toRemove.isEmpty()) {
-      roleScope.remove(toRemove);
-      logger.info("Removed realm roles: {}", toRemove.stream().map(RoleRepresentation::getName).toList());
-    }
-    if (!toAdd.isEmpty()) {
-      roleScope.add(toAdd);
-      logger.info("Added realm roles: {}", toAdd.stream().map(RoleRepresentation::getName).toList());
-    }
-  }
-
-  private void syncClientRoles(Map<String, List<String>> clientRolesMap, RoleMappingResource roleMappingResource, RealmResource realmResource) {
-    if (clientRolesMap == null || clientRolesMap.isEmpty()) {
-      return;
-    }
-
-    for (Map.Entry<String, List<String>> entry : clientRolesMap.entrySet()) {
-      String clientId = entry.getKey();
-      List<String> desiredRoles = entry.getValue();
-
-      List<ClientRepresentation> clients = realmResource.clients().findByClientId(clientId);
-      if (clients.isEmpty()) {
-        logger.warn("Client '{}' not found, skipping role sync.", clientId);
-        continue;
-      }
-      String clientUuid = clients.getFirst().getId();
-      var clientRoleScope = roleMappingResource.clientLevel(clientUuid);
-
-      List<RoleRepresentation> currentRoles = clientRoleScope.listAll();
-
-      List<RoleRepresentation> toRemove = currentRoles.stream()
-              .filter(r -> !desiredRoles.contains(r.getName()))
-              .toList();
-
-      List<RoleRepresentation> toAdd = new java.util.ArrayList<>();
-      for (String desiredName : desiredRoles) {
-        boolean alreadyHas = currentRoles.stream().anyMatch(c -> c.getName().equals(desiredName));
-        if (!alreadyHas) {
-          try {
-            toAdd.add(realmResource.clients().get(clientUuid).roles().get(desiredName).toRepresentation());
-          } catch (jakarta.ws.rs.NotFoundException e) {
-            logger.warn("Role '{}' not found for client '{}'", desiredName, clientId);
-          }
-        }
-      }
-
-      if (!toRemove.isEmpty()) {
-        clientRoleScope.remove(toRemove);
-        logger.info("Removed roles for client {}: {}", clientId, toRemove.stream().map(RoleRepresentation::getName).toList());
-      }
-      if (!toAdd.isEmpty()) {
-        clientRoleScope.add(toAdd);
-        logger.info("Added roles for client {}: {}", clientId, toAdd.stream().map(RoleRepresentation::getName).toList());
-      }
-    }
-  }
-
   private void validateResponse(String operationDescription, int expectedStatus, Response response)
-          throws KeycloakOperationException {
+      throws Exception {
     if (response.getStatus() != expectedStatus) {
       String errorBody = response.readEntity(String.class);
-      throw new KeycloakOperationException(
-              operationDescription + " failed with status " + response.getStatus() + ": " + errorBody);
-    }
-  }
-
-  /** Exception thrown when a Keycloak operation fails. */
-  public static class KeycloakOperationException extends Exception {
-    public KeycloakOperationException(String message) {
-      super(message);
+      throw new Exception(
+          operationDescription + " failed with status " + response.getStatus() + ": " + errorBody);
     }
   }
 
@@ -703,14 +577,14 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
     try {
       ConfigResultEvent resultEvent =
-              ConfigResultEvent.success(
-                      originalEvent.metadata().correlationId(),
-                      originalEvent.metadata().messageId(),
-                      message,
-                      resourceId,
-                      originalEvent.payload().operation(),
-                      originalEvent.payload().targetResource(),
-                      "civitas.config-adapter.keycloak");
+          ConfigResultEvent.success(
+              originalEvent.metadata().correlationId(),
+              originalEvent.metadata().messageId(),
+              message,
+              resourceId,
+              originalEvent.payload().operation(),
+              originalEvent.payload().targetResource(),
+              "civitas.config-adapter.keycloak");
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
@@ -721,21 +595,21 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   }
 
   private void publishErrorResult(
-          ConfigEvent originalEvent, String errorCode, String errorMessage) {
+      ConfigEvent originalEvent, String errorCode, String errorMessage) {
     if (getEventPublisher() == null || originalEvent.metadata().resultTopic() == null) {
       return;
     }
 
     try {
       ConfigResultEvent resultEvent =
-              ConfigResultEvent.failure(
-                      originalEvent.metadata().correlationId(),
-                      originalEvent.metadata().messageId(),
-                      errorCode,
-                      errorMessage,
-                      originalEvent.payload().operation(),
-                      originalEvent.payload().targetResource(),
-                      "civitas.config-adapter.keycloak");
+          ConfigResultEvent.failure(
+              originalEvent.metadata().correlationId(),
+              originalEvent.metadata().messageId(),
+              errorCode,
+              errorMessage,
+              originalEvent.payload().operation(),
+              originalEvent.payload().targetResource(),
+              "civitas.config-adapter.keycloak");
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published FAILURE result to topic: {}", originalEvent.metadata().resultTopic());
