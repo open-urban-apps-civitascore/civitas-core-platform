@@ -15,6 +15,7 @@ import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.messaging.EventConsumer;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.ConfigResultEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
 import io.cloudevents.kafka.CloudEventDeserializer;
@@ -243,38 +244,55 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
    * @return a CloudEvent representation
    */
   private CloudEvent convertToCloudEvent(ConfigResultEvent resultEvent) {
-    CloudEventBuilder builder =
-        CloudEventBuilder.v1()
-            .withId(UUID.randomUUID().toString())
-            .withSource(URI.create(resultEvent.source()))
-            .withType("core.civitas.idm.processing.result")
-            .withTime(resultEvent.timestamp())
-            .withData("application/json", "{}".getBytes())
-            .withExtension("correlationid", resultEvent.correlationId())
-            .withExtension("originalmessageid", resultEvent.originalMessageId())
-            .withExtension("status", resultEvent.status().name())
-            .withExtension("operation", resultEvent.operation().name())
-            .withExtension("targetresource", resultEvent.targetResource());
+    try {
+      ObjectMapper objectMapper = ObjectMapperFactory.createObjectMapper();
+      byte[] jsonData = objectMapper.writeValueAsBytes(resultEvent);
 
-    if (resultEvent.message() != null) {
-      builder.withExtension("message", resultEvent.message());
+      CloudEventBuilder builder =
+          CloudEventBuilder.v1()
+              .withId(UUID.randomUUID().toString())
+              .withSource(URI.create(resultEvent.source()))
+              .withType("core.civitas.idm.processing.result")
+              .withTime(resultEvent.timestamp())
+              .withDataContentType("application/json")
+              .withData(jsonData)
+              .withExtension("correlationid", resultEvent.correlationId())
+              .withExtension("originalmessageid", resultEvent.originalMessageId())
+              .withExtension("status", resultEvent.status().name())
+              .withExtension("operation", resultEvent.operation().name())
+              .withExtension("targetresource", resultEvent.targetResource());
+
+      if (resultEvent.message() != null) {
+        builder.withExtension("message", resultEvent.message());
+      }
+
+      if (resultEvent.status() == ConfigResultEvent.Status.SUCCESS
+          && resultEvent.resourceId() != null) {
+        builder.withExtension("resourceid", resultEvent.resourceId());
+      }
+
+      if (resultEvent.status() == ConfigResultEvent.Status.FAILURE) {
+        if (resultEvent.errorCode() != null) {
+          builder.withExtension("errorcode", resultEvent.errorCode());
+        }
+        if (resultEvent.message() != null) {
+          builder.withExtension("errormessage", resultEvent.message());
+        }
+      }
+
+      return builder.build();
+
+    } catch (Exception e) {
+      logger.error("Failed to serialize ConfigResultEvent to JSON", e);
+
+      return CloudEventBuilder.v1()
+          .withId(UUID.randomUUID().toString())
+          .withSource(URI.create("urn:civitas:config-adapter"))
+          .withType("core.civitas.idm.processing.result")
+          .withDataContentType("application/json")
+          .withData("{}".getBytes())
+          .build();
     }
-
-    if (resultEvent.status() == ConfigResultEvent.Status.SUCCESS
-        && resultEvent.resourceId() != null) {
-      builder.withExtension("resourceid", resultEvent.resourceId());
-    }
-
-    if (resultEvent.status() == ConfigResultEvent.Status.FAILURE
-        && resultEvent.errorCode() != null) {
-      builder.withExtension("errorcode", resultEvent.errorCode());
-    }
-
-    if (resultEvent.status() == ConfigResultEvent.Status.FAILURE && resultEvent.message() != null) {
-      builder.withExtension("errormessage", resultEvent.message());
-    }
-
-    return builder.build();
   }
 
   @Override
