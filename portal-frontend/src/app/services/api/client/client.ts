@@ -12,7 +12,7 @@ axiosClient.interceptors.response.use(res => {
       ...res,
       data: {
         content: res.data,
-        totalElements: Array.isArray(res.data) ? res.data.length : undefined,
+        totalElements: Array.isArray(res.data) ? Number(res.headers['x-total-count']) || 0 : undefined,
       },
     }
   }
