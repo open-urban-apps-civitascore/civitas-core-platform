@@ -20,7 +20,9 @@ export interface DownloadResult {
 const formatToAcceptHeader: Record<ModelFormat, string> = {
   json: 'application/json',
   xml: 'application/xml',
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   'ecore+xml': 'application/ecore+xml',
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   'schema+json': 'application/schema+json',
 }
 
