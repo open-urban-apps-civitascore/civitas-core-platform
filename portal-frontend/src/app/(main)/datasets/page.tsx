@@ -1,11 +1,12 @@
 'use client'
 
-import { Row } from '@tanstack/react-table'
+import { useQuery } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -13,43 +14,13 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { DatasetResponse, DatasetTableData } from '@/types/datasets'
+import { DatasetResponse } from '@/types/datasets'
 
 import DatasetsTable from './components/DatasetsTable'
-
-export const mapDatasetsToListData = (datasets: DatasetResponse[]): DatasetTableData[] => {
-  const datasetsMap = datasets.flatMap(dataset => {
-    try {
-      const data = {
-        id: dataset.id,
-        name: dataset.name,
-        dataspace: dataset.dataspace?.title || '',
-        department: dataset.department?.title || '',
-        creator: dataset.creator.map(creator => `${creator.firstName} ${creator.lastName}`),
-        lastUpdated: dataset.lastUpdated,
-        status: dataset.status,
-        releaseProcess: null,
-        distribution: dataset.distribution
-          ? {
-              format: dataset.distribution?.format,
-              title: dataset.distribution?.title,
-              url: dataset.distribution?.url,
-            }
-          : null,
-      }
-      return data
-    } catch (error) {
-      console.error(dataset, error)
-      return []
-    }
-  })
-  return datasetsMap
-}
 
 const DatasetsPage = () => {
   const t = useTranslations('datasets')
   const router = useRouter()
-  const [datasets, setDatasets] = useState<DatasetTableData[]>([])
   const [rowCount, setRowCount] = useState(0)
 
   const {
@@ -65,39 +36,34 @@ const DatasetsPage = () => {
     totalPages,
   } = useQueryParams()
 
-  const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+  const params = useMemo(
+    () => getApiRequestParamsByUrl().toString(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pageIndex, pageSize, URL, sorting, search, getApiRequestParamsByUrl],
+  )
+
+  const {
+    data: datasetsData,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['datasets', params],
+    queryFn: () =>
+      apiRequest<DatasetResponse[]>({
+        method: 'GET',
+        endpoint: '/datasets',
+        params: getApiRequestParamsByUrl(),
+        errorMessage: 'An error occurred while fetching datasets.',
+      }),
+  })
 
   useEffect(() => {
-    const params = getApiRequestParamsByUrl()
-
-    const getDatasets = async () => {
-      try {
-        const datasetsResponse = await fetch(`/api/datasets?${params.toString()}`)
-        if (!datasetsResponse.ok) {
-          throw new Error('An error occurred while loading data')
-        }
-        const datasetsData: DatasetResponse[] = await datasetsResponse.json()
-        const datasets = mapDatasetsToListData(datasetsData)
-        setDatasets(datasets)
-        const totalCount = Number(datasetsResponse.headers.get('X-Total-Count')) || 0
-        if (rowCount !== totalCount) {
-          setRowCount(totalCount)
-        }
-        setTotalPages(Math.ceil(totalCount / pageSize))
-      } catch (error) {
-        console.error(error)
-      }
+    if (datasetsData) {
+      const totalCount = datasetsData.totalElements || 0
+      setRowCount(totalCount)
+      setTotalPages(Math.ceil(totalCount / pageSize))
     }
-    getDatasets()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
-
-  const handleRowClick = (row: Row<DatasetTableData>) => {
-    if (row.id) {
-      const params = getApiRequestParamsByUrl()
-      router.push(`datasets/${row.id}?${params.toString()}`)
-    }
-  }
+  }, [datasetsData, pageSize, setTotalPages])
 
   const CustomElement = (
     <Button onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}>
@@ -110,25 +76,29 @@ const DatasetsPage = () => {
     <PageContainer testId="datasetsPage" headerType="onlyTitle">
       <PageHeader title={t('title')} />
       <PageBackground>
-        <SearchHeader
-          searchString={search}
-          onChangeSearchString={setSearchParam}
-          aria-label={t('searchDatasets')}
-          customElement={CustomElement}
-        />
-        <TableContainer>
-          <DatasetsTable
-            datasets={datasets}
-            rowCount={rowCount}
-            pageIndex={pageIndex}
-            pageSize={pageSize}
-            sorting={sorting}
-            totalPages={totalPages}
-            onPaginationChange={setPaginationParams}
-            onSortingChange={setSortingParams}
-            onRowClick={handleRowClick}
-          />
-        </TableContainer>
+        {!error && !isLoading && (
+          <>
+            <SearchHeader
+              searchString={search}
+              onChangeSearchString={setSearchParam}
+              aria-label={t('searchDatasets')}
+              customElement={CustomElement}
+            />
+            <TableContainer>
+              <DatasetsTable
+                datasets={datasetsData?.data || []}
+                rowCount={rowCount}
+                pageIndex={pageIndex}
+                pageSize={pageSize}
+                sorting={sorting}
+                totalPages={totalPages}
+                onPaginationChange={setPaginationParams}
+                onSortingChange={setSortingParams}
+                isLoading={isLoading}
+              />
+            </TableContainer>
+          </>
+        )}
       </PageBackground>
     </PageContainer>
   )

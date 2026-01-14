@@ -5,6 +5,7 @@
     "noResults": "No results found.",
     "noData": "No Data",
     "loading": "Loading...",
+    "loadingItems": "Loading {item} ...",
     "form": "Form",
     "actions": {
       "submit": "Save",
@@ -22,7 +23,18 @@
       "atLeast2": "The input must be at least 2 characters.",
       "atLeast10": "The input must be at least 10 characters.",
       "minChar": "The input has to be at least {amount} characters.",
-      "notFound": "No {items} found"
+      "notFound": "No {items} found",
+      "loadingError": "Error while loading data",
+      "unexpectedError": "An unexpected error occurred. Please try again."
+    },
+    "items": {
+      "users": "Users",
+      "user": "User",
+      "groups": "Groups",
+      "roles": "Roles",
+      "datasets": "Datasets",
+      "dataspaces": "Dataspaces",
+      "permissions": "Permissions"
     }
   },
   "languages": {
@@ -62,11 +74,10 @@
       "name": "Name",
       "dataSpace": "Data Space",
       "department": "Department",
-      "creator": "Contact Person",
+      "contact": "Contact Person",
       "lastUpdated": "Last Updated",
-      "status": "Access Status",
-      "releaseProcess": "Release Process",
-      "distribution": "Distribution"
+      "access": "Access",
+      "status": "Status"
     },
     "tableValues": {
       "status": {
@@ -120,6 +131,8 @@
     }
   },
   "users": {
+    "users": "Users",
+    "user": "User",
     "title": "Overview: Users",
     "newUser": "Create User",
     "createUser": "Create User",

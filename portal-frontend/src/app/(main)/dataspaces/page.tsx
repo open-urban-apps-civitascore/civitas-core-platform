@@ -1,11 +1,13 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
 import { Row, RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -13,20 +15,14 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { isPageIndexHigherThanTotalPages } from '@/utils/table'
 
 import { DataSpace } from '../../../../types/dataspaces'
 import { DataSpacesTable } from './components/DataSpacesTable'
-
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 const DataSpacesPage = () => {
   const t = useTranslations('dataspaces')
   const router = useRouter()
 
-  const [listDataSpaces, setListDataSpaces] = useState<DataSpace[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const {
@@ -40,43 +36,19 @@ const DataSpacesPage = () => {
     search,
   } = useQueryParams()
 
+  const { data, isLoading } = useQuery({
+    queryKey: ['dataspaces', pageIndex, pageSize, sorting, search],
+    queryFn: () =>
+      apiRequest<DataSpace[]>({
+        endpoint: '/dataspaces',
+        method: 'GET',
+        params: getApiRequestParamsByUrl(),
+        errorMessage: 'An error occurred while fetching dataspaces.',
+      }),
+  })
+
+  const rowCount = data?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)
-
-  useEffect(() => {
-    if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
-      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalPages, pageIndex, pageSize])
-
-  const getDataSpaces = useCallback(async () => {
-    const params = getApiRequestParamsByUrl()
-
-    try {
-      setIsLoading(true)
-
-      const dataSpacesResponse = await fetch(`${URL}/dataspaces?${params.toString()}`, {
-        cache: 'no-store',
-      })
-
-      const dataSpacesData: DataSpace[] = await dataSpacesResponse.json()
-      setListDataSpaces(dataSpacesData)
-
-      const totalCount = Number(dataSpacesResponse.headers.get('X-Total-Count')) || 0
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-      }
-
-      setIsLoading(false)
-    } catch (error) {
-      console.error(error)
-      setIsLoading(false)
-    }
-  }, [getApiRequestParamsByUrl, rowCount])
-
-  useEffect(() => {
-    getDataSpaces()
-  }, [getDataSpaces, sorting, rowCount, pageIndex, pageSize])
 
   const handleRowClick = (row: Row<DataSpace>) => {
     if (row.id) {
@@ -99,7 +71,7 @@ const DataSpacesPage = () => {
         <SearchHeader searchString={search} onChangeSearchString={setSearchParam} customElement={CustomElement} />
         <TableContainer>
           <DataSpacesTable
-            dataspaces={listDataSpaces}
+            dataspaces={data?.data || []}
             isLoading={isLoading}
             rowCount={rowCount}
             pageIndex={pageIndex}

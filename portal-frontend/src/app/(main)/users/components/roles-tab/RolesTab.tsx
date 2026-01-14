@@ -1,12 +1,16 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
+import { cn } from '@/lib/utils'
 import { Group } from '@/types/groups'
-import { BaseRole, ROLE_TYPES, UserRolesTableData } from '@/types/roles'
+import { BaseRole, ROLE_TYPES } from '@/types/roles'
 
 import { RoleCategory } from './RoleCategory'
 
@@ -14,14 +18,41 @@ interface RolesTabProps {
   groupIds: string[]
 }
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
-
 export const RolesTab = (props: RolesTabProps) => {
   const { groupIds } = props
-  const t = useTranslations('users')
-  const tRoles = useTranslations('roles')
-  const [roles, setRoles] = useState<UserRolesTableData[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const t = useTranslations()
+
+  const {
+    data: groupsData,
+    isLoading: areGroupsLoading,
+    error: groupsError,
+  } = useQuery({
+    queryKey: ['groups', groupIds],
+    queryFn: () =>
+      apiRequest<Group[]>({
+        method: 'GET',
+        endpoint: `/groups?${groupIds.map(id => `id=${id}`).join('&')}`,
+        errorMessage: 'An error occurred while fetching groups data.',
+      }),
+    enabled: groupIds.length > 0,
+  })
+
+  const roleIds = useMemo(() => new Set(groupsData?.data.flatMap(group => group.roles)), [groupsData])
+
+  const {
+    data: rolesData,
+    isLoading: areRolesLoading,
+    error: rolesError,
+  } = useQuery({
+    queryKey: ['roles', groupIds],
+    queryFn: () =>
+      apiRequest<BaseRole[]>({
+        method: 'GET',
+        endpoint: `/roles?${[...roleIds].map(role => `id=${role}`).join('&')}`,
+        errorMessage: 'An error occurred while fetching roles data.',
+      }),
+    enabled: roleIds.size > 0,
+  })
 
   const mapRolesData = (roles: BaseRole[], groupData: Group[]) => {
     const allRoles = groupData.flatMap(group =>
@@ -29,7 +60,7 @@ export const RolesTab = (props: RolesTabProps) => {
         const currentRole = roles.find(role => role.id === groupRole)
         if (!currentRole) return []
         return {
-          id: currentRole.id,
+          id: `${group.id}-${currentRole.id}`,
           name: currentRole.name,
           inherited: false,
           group: group?.title || null,
@@ -41,64 +72,46 @@ export const RolesTab = (props: RolesTabProps) => {
     return allRoles
   }
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const groupIdParams = groupIds.map(id => `id=${id}`).join('&')
-        const groupsResponse = await fetch(`${URL}/groups?${groupIdParams}`)
+  const roles = useMemo(
+    () => (rolesData && groupsData ? mapRolesData(rolesData.data, groupsData.data) : []),
+    [rolesData, groupsData],
+  )
 
-        if (!groupsResponse.ok) {
-          throw new Error('Failed to fetch data')
-        }
-
-        const groupsData: Group[] = await groupsResponse.json()
-
-        const roleIds = new Set(groupsData.flatMap(group => group.roles))
-        if (roleIds.size > 0) {
-          const roleIdParams = [...roleIds].map(role => `id=${role}`).join('&')
-          const rolesResponse = await fetch(`${URL}/roles?${roleIdParams}`)
-          if (!rolesResponse.ok) {
-            throw new Error('Failed to fetch data')
-          }
-          const rolesData = mapRolesData(await rolesResponse.json(), groupsData)
-          setRoles(rolesData)
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    if (groupIds.length > 0) fetchData()
-    else setIsLoading(false)
-  }, [groupIds])
+  const error = groupsError || rolesError
+  const isLoading = areGroupsLoading || areRolesLoading
 
   return (
-    <ContentCard>
-      <DetailsFieldContainer isTitleField>
-        <h2>{t('roles.title')}</h2>
-      </DetailsFieldContainer>
-      <RoleCategory
-        title={tRoles('systemRoles')}
-        rolesType={ROLE_TYPES.SYSTEM}
-        roles={roles.filter(role => role.type === ROLE_TYPES.SYSTEM)}
-        isLoading={isLoading}
-      />
+    <ContentCard className={cn((error || isLoading) && 'h-50')}>
+      {!error && !isLoading && (
+        <>
+          <DetailsFieldContainer isTitleField>
+            <h2>{t('users.roles.title')}</h2>
+          </DetailsFieldContainer>
+          <RoleCategory
+            title={t('roles.systemRoles')}
+            rolesType={ROLE_TYPES.SYSTEM}
+            roles={roles.filter(role => role.type === ROLE_TYPES.SYSTEM)}
+            isLoading={isLoading}
+          />
 
-      <RoleCategory
-        title={tRoles('dataRoles')}
-        rolesType={ROLE_TYPES.DATA}
-        roles={roles.filter(role => role.type === ROLE_TYPES.DATA)}
-        isLoading={isLoading}
-      />
+          <RoleCategory
+            title={t('roles.dataRoles')}
+            rolesType={ROLE_TYPES.DATA}
+            roles={roles.filter(role => role.type === ROLE_TYPES.DATA)}
+            isLoading={isLoading}
+          />
 
-      <RoleCategory
-        title={tRoles('governanceRoles')}
-        rolesType={ROLE_TYPES.GOVERNANCE}
-        roles={roles.filter(role => role.type === ROLE_TYPES.GOVERNANCE)}
-        isLoading={isLoading}
-        className="border-b-0"
-      />
+          <RoleCategory
+            title={t('roles.governanceRoles')}
+            rolesType={ROLE_TYPES.GOVERNANCE}
+            roles={roles.filter(role => role.type === ROLE_TYPES.GOVERNANCE)}
+            isLoading={isLoading}
+            className="border-b-0"
+          />
+        </>
+      )}
+      {isLoading && <LoadingSpinner className="h-full" />}
+      {error && <p className="h-full flex items-center justify-center">{t('common.errors.loadingError')}</p>}
     </ContentCard>
   )
 }

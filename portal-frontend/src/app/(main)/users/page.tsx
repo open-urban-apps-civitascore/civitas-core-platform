@@ -1,6 +1,7 @@
-import { headers } from 'next/headers'
 import { getTranslations } from 'next-intl/server'
 
+import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { getServerRequestHeaders } from '@/app/services/api/request/getServerRequestHeaders'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -20,38 +21,22 @@ type Props = {
   searchParams: Promise<RequestParams>
 }
 
-const getUserListData = async (params: URLSearchParams) => {
-  try {
-    const usersResponse = await fetch(`${process.env.NEXTAUTH_URL}/api/users?${params.toString()}`, {
-      headers: {
-        cookie: (await headers()).get('cookie') || '',
-      },
-      cache: 'no-store',
-    })
-
-    if (!usersResponse.ok) {
-      throw new Error('An error occurred while loading user list data')
-    }
-
-    const usersData = await usersResponse.json()
-
-    const users = mapListUsers(usersData.content as UserResponse[], [])
-    const totalCount = Number(usersData.totalElements) || 0
-
-    return { users, totalCount }
-  } catch (error) {
-    console.error(error)
-    return { users: [], totalCount: 0 }
-  }
-}
-
 const UsersPage = async ({ searchParams }: Props) => {
   const t = await getTranslations('users')
   const params = await searchParams
 
   const { apiParams, pageSize, sort, pageIndex, search } = getRequestParams(params)
 
-  const { users, totalCount } = await getUserListData(apiParams)
+  const { data, totalElements } = await apiRequest<UserResponse[]>({
+    endpoint: '/users',
+    method: 'GET',
+    params: apiParams,
+    headers: await getServerRequestHeaders(),
+    errorMessage: 'An error occurred while fetching users.',
+  })
+
+  const users = mapListUsers(data, [])
+  const totalCount = Number(totalElements) || 0
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 
   // sorting for table as SortingState

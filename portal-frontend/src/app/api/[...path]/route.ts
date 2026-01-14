@@ -27,8 +27,7 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     const searchParams = request.nextUrl.searchParams.toString()
 
     const searchParamsString = searchParams ? `?${searchParams}` : ''
-    const useApiUrl = pathString === 'users' || pathString.startsWith('models')
-    const url = `${useApiUrl ? API_URL : JSON_SERVER_URL}/${pathString}${searchParamsString}`
+    const url = `${pathString === 'users' && method === 'GET' ? API_URL : JSON_SERVER_URL}/${pathString}${searchParamsString}`
 
     // Forward all original headers from the request
     const headers = new Headers(request.headers)
@@ -41,8 +40,16 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     const fetchOptions: RequestInit = { method, headers }
 
     // Include body for methods that support it
-    if (['POST', 'PUT', 'PATCH'].includes(method)) {
+    if (['POST', 'PUT', 'PATCH'].includes(method) && url.includes(`${API_URL}`)) {
       fetchOptions.body = await request.arrayBuffer()
+    }
+
+    // Include body for methods that support it for json-server
+    // This can be removed once json-server is not used anymore
+    if (['POST', 'PUT', 'PATCH'].includes(method) && url.includes(`${JSON_SERVER_URL}`)) {
+      const req = await request.json()
+      const body = req.body ?? req
+      fetchOptions.body = JSON.stringify(body)
     }
 
     const response = await fetch(url, fetchOptions)
@@ -51,7 +58,7 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     const responseHeaders = new Headers(response.headers)
 
     // Non-JSON responses, stream the body directly
-    const contentType = response.headers.get('content-type')
+    const contentType = response.headers.get('Content-Type')
     if (!contentType || !contentType.includes('application/json')) {
       return new NextResponse(response.body, {
         status: response.status,
