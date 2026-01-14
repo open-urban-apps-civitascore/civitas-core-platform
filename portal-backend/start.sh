@@ -1,131 +1,102 @@
 #!/bin/bash
-
 # CIVITAS CORE Platform - Easy Start Script
-# This script builds and starts the complete platform
 
-set -e  # Exit on any error
+set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+echo "CIVITAS CORE Platform Backend - Easy Start"
+echo "========================================"
+echo
 
-echo -e "${BLUE}╔══════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║       CIVITAS CORE Platform Backend - Easy Start                 ║${NC}"
-echo -e "${BLUE}╚══════════════════════════════════════════════════════════════════╝${NC}"
-echo ""
+# ---- Prerequisites -------------------------------------------------
 
-# Check prerequisites
-echo -e "${YELLOW}🔍 Checking prerequisites...${NC}"
+echo "Checking prerequisites..."
 
-# Check Java
-if ! command -v java &> /dev/null; then
-    echo -e "${RED} Java is not installed. Please install Java 21.${NC}"
+# Java
+if ! command -v java >/dev/null 2>&1; then
+    echo "ERROR: Java is not installed. Please install Java 21."
     exit 1
 fi
+
 JAVA_VERSION=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
 if [ "$JAVA_VERSION" -lt 21 ]; then
-    echo -e "${RED} Java 21 or higher is required. Found: Java $JAVA_VERSION${NC}"
+    echo "ERROR: Java 21 or higher is required. Found Java $JAVA_VERSION."
     exit 1
 fi
-echo -e "${GREEN} Java $JAVA_VERSION found${NC}"
+echo "Java $JAVA_VERSION found"
 
-# Check Maven
-if ! command -v mvn &> /dev/null; then
-    echo -e "${RED} Maven is not installed. Please install Maven 3.6+.${NC}"
+# Maven
+if ! command -v mvn >/dev/null 2>&1; then
+    echo "ERROR: Maven is not installed. Please install Maven 3.6+."
     exit 1
 fi
-echo -e "${GREEN} Maven found${NC}"
+echo "Maven found"
 
-# Check Docker
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED} Docker is not installed. Please install Docker.${NC}"
+# Docker
+if ! command -v docker >/dev/null 2>&1; then
+    echo "ERROR: Docker is not installed."
     exit 1
 fi
-echo -e "${GREEN} Docker found${NC}"
+echo "Docker found"
 
-# Check Docker Compose (prefer V2)
-if docker compose version &> /dev/null; then
+# Docker Compose (v2 only)
+if docker compose version >/dev/null 2>&1; then
     DOCKER_COMPOSE="docker compose"
-    echo -e "${GREEN} Docker Compose V2 found${NC}"
-elif command -v docker-compose &> /dev/null; then
-    DOCKER_COMPOSE="docker-compose"
-    echo -e "${YELLOW}⚠️  Docker Compose V1 found (V2 recommended)${NC}"
+    echo "Docker Compose v2 found"
 else
-    echo -e "${RED} Docker Compose is not installed.${NC}"
+    echo "ERROR: Docker Compose v2 is required (docker compose)."
     exit 1
 fi
 
-echo ""
-echo -e "${YELLOW}📦 Building backend services...${NC}"
-echo ""
+echo
+echo "Building backend services..."
+echo
 
-# Build Config Adapter first (dependency for Portal Backend)
-echo -e "${BLUE}Building Config Adapter...${NC}"
+# ---- Build ---------------------------------------------------------
+
+echo "Building Config Adapter..."
 cd ../config-adapter
 mvn clean install -DskipTests
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}Config Adapter built successfully${NC}"
-else
-    echo -e "${RED}Config Adapter build failed${NC}"
-    exit 1
-fi
 cd ../portal-backend
 
-echo ""
-
-# Build Portal Backend
-echo -e "${BLUE}Building Portal Backend...${NC}"
+echo "Building Portal Backend..."
 mvn clean package -DskipTests
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}Portal Backend built successfully${NC}"
-else
-    echo -e "${RED}Portal Backend build failed${NC}"
-    exit 1
-fi
 
-echo ""
-echo -e "${GREEN}All builds completed successfully!${NC}"
-echo ""
-echo -e "${YELLOW}Cleaning up old containers and images...${NC}"
-echo ""
+echo
+echo "Build completed successfully."
+echo
 
-# Stop and remove existing containers
-$DOCKER_COMPOSE down -v 2>/dev/null || true
+# ---- Cleanup -------------------------------------------------------
 
-# Force remove specific containers if they still exist
-echo -e "${BLUE}Removing old containers...${NC}"
-docker rm -f civitas-portal-backend 2>/dev/null || true
-docker rm -f civitas-config-adapter 2>/dev/null || true
+echo "Cleaning up old containers and images..."
 
-# Remove old images to force a clean rebuild
-echo -e "${BLUE}Removing old portal-backend image...${NC}"
-docker rmi portal-backend_portal-backend 2>/dev/null || true
-docker rmi civitas-portal-backend 2>/dev/null || true
-docker rmi portal-backend-portal-backend 2>/dev/null || true
+$DOCKER_COMPOSE down -v >/dev/null 2>&1 || true
 
-echo -e "${BLUE}Removing old config-adapter image...${NC}"
-docker rmi config-adapter_config-adapter 2>/dev/null || true
-docker rmi civitas-config-adapter 2>/dev/null || true
-docker rmi portal-backend_config-adapter 2>/dev/null || true
+docker rm -f \
+    civitas-portal-backend \
+    civitas-config-adapter \
+    >/dev/null 2>&1 || true
 
-# Prune dangling images
-echo -e "${BLUE}Pruning dangling images...${NC}"
+docker rmi \
+    portal-backend_portal-backend \
+    portal-backend-portal-backend \
+    civitas-portal-backend \
+    config-adapter_config-adapter \
+    portal-backend_config-adapter \
+    civitas-config-adapter \
+    >/dev/null 2>&1 || true
+
 docker image prune -f
 
-echo ""
-echo -e "${GREEN}Cleanup completed!${NC}"
-echo ""
-echo -e "${YELLOW}Starting Docker Compose...${NC}"
-echo ""
+echo "Cleanup completed."
+echo
 
-# Start Docker Compose with fresh build
+# ---- Start ---------------------------------------------------------
+
+echo "Starting Docker Compose..."
+echo
+
 $DOCKER_COMPOSE up --build
 
-# This will only run if user stops docker-compose with Ctrl+C
-echo ""
-echo -e "${YELLOW}Docker Compose stopped.${NC}"
-echo -e "${BLUE}To clean up, run: ${NC}$DOCKER_COMPOSE down -v"
-
+echo
+echo "Docker Compose stopped."
+echo "To clean up, run: $DOCKER_COMPOSE down -v"
