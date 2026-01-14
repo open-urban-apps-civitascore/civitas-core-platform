@@ -23,6 +23,7 @@ type Props = {
 
 const UsersPage = async ({ searchParams }: Props) => {
   const t = await getTranslations('users')
+  const tCommon = await getTranslations('common')
   const params = await searchParams
 
   const { apiParams, pageSize, sort, pageIndex, search } = getRequestParams(params)

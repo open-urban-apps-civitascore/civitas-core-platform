@@ -1,26 +1,11 @@
-'use client'
+import { getTranslations } from 'next-intl/server'
 
-import { useTranslations } from 'next-intl'
+import LoadingPage from '@/components/loading-page/LoadingPage'
 
-import { ContentCard } from '@/components/content-card/ContentCard'
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
-import { PageBackground } from '@/components/page-background/PageBackground'
-import { PageContainer } from '@/components/page-container/PageContainer'
-import { PageHeader } from '@/components/page-header/PageHeader'
+const UsersErrorPage = async () => {
+  const t = await getTranslations('common')
 
-const UsersErrorPage = () => {
-  const t = useTranslations('common')
-
-  return (
-    <PageContainer headerType="onlyTitle" testId="usersErrorPage">
-      <PageHeader title={t('loadingItems', { item: t('items.users') })} />
-      <PageBackground>
-        <ContentCard className="p-10">
-          <LoadingSpinner />
-        </ContentCard>
-      </PageBackground>
-    </PageContainer>
-  )
+  return <LoadingPage testId="editUserLoadingPage" title={t('loadingItems', { item: t('items.users') })} />
 }
 
 export default UsersErrorPage
