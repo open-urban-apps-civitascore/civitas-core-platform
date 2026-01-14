@@ -88,7 +88,7 @@ spring:
     password: admin
 ```
 
-### Active Spring Profiles
+### Spring Profiles
 
 * **local** – local development
 * **postgres** – PostgreSQL datasource
@@ -113,10 +113,6 @@ portal-backend/
 ├── .gitlab-ci.yml              # CI/CD pipeline
 └── pom.xml                     # Maven configuration
 
-dev-environment/backend/        # Infrastructure & startup
-├── docker-compose.yml          # All services
-├── start.sh                    # Automated startup
-└── README.md                   # Setup documentation
 ```
 
 ---
