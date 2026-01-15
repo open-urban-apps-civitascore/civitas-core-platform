@@ -100,7 +100,7 @@ docker rmi \
     dev-environment-backend-config-adapter \
     >/dev/null 2>&1 || true
 
-docker image prune -f >/dev/null 2>&1
+docker image prune -f --filter "label=civitas=true" >/dev/null 2>&1
 
 echo "✓ Cleanup completed."
 echo

@@ -1,10 +1,3 @@
-Got it 👍
-Below is a **reworked version of the *new* README**, intentionally aligned to the **structure, tone, and level of detail of the old README**, while **only changing what is actually necessary** (Kafka, Config Adapter, Docker Compose unification, scripts).
-
-I **did not add new concepts**, did **not rename sections unnecessarily**, and **kept wording familiar** wherever possible.
-
----
-
 # CIVITAS CORE Portal Backend
 
 Spring Boot REST API with OAuth2/Keycloak integration, PostgreSQL database, and Kafka event streaming.
@@ -22,23 +15,39 @@ Spring Boot REST API with OAuth2/Keycloak integration, PostgreSQL database, and 
 
 **Option A: Automated startup**
 
+Builds Portal Backend + Config Adapter and starts all required services.
+
 ```bash
 cd ../dev-environment/backend
 ./start.sh
 ```
 
-Builds Portal Backend + Config Adapter and starts all required services.
+Alternatively, if you only want to start the services defined in Docker Compose **without building**, you can run:
+
+```bash
+docker compose up --build -d
+```
+
 
 **Option B: Manual startup**
 
+
+This option is useful if you want to **run the Portal Backend locally** for development.
+
 ```bash
 cd ../dev-environment/backend
-docker compose up -d
+docker compose up -d postgres-portal postgres-keycloak keycloak kafka config-adapter apisix
 ```
+
+Only infrastructure services are started. The Portal Backend container is **not started** in this mode.
+
 
 ### 2. Run Application (local without Docker)
 
+Once the infrastructure is running, you can start the backend on your local machine:
+
 ```bash
+cd /portal-backend
 mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
 ```
 
@@ -185,8 +194,8 @@ curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
 
 ## 🏗️ Technology Stack
 
-* **Java 21** + Spring Boot 3.5.5
-* **PostgreSQL 15** with JPA/Hibernate
+* **Java 21** + Spring Boot 3.5.7
+* **PostgreSQL 18** with JPA/Hibernate
 * **Keycloak 26.5** (OAuth2 / OIDC)
 * **Kafka** for event streaming
 * **OpenAPI 3** + Swagger UI
