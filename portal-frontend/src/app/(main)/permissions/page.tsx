@@ -1,9 +1,11 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
 import { Row, RowSelectionState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -15,16 +17,11 @@ import { ROLE_TYPES } from '@/types/roles'
 
 import { PermissionsTable } from './components/PermissionsTable'
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
-
 export const DEFAULT_TAB = ROLE_TYPES.SYSTEM
 
 const PermissionsPage = () => {
   const t = useTranslations('permissions')
 
-  const [permissions, setPermissions] = useState<Permission[] | []>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const tabsValues = {
@@ -51,39 +48,22 @@ const PermissionsPage = () => {
 
   const [permissionType, setPermissionsType] = useState<string>(tabValue || DEFAULT_TAB)
 
-  const getPermissions = async () => {
-    const params = getApiRequestParamsByUrl()
+  const requestParams = `type=${permissionType}&${getApiRequestParamsByUrl()}`
+  const { data: permissionsData, isLoading } = useQuery({
+    queryKey: ['permissions', requestParams.toString()],
+    queryFn: () =>
+      apiRequest<Permission[]>({
+        endpoint: '/permissions',
+        method: 'GET',
+        errorMessage: 'An error occurred while loading permissions data',
+      }),
+  })
 
-    try {
-      setIsLoading(true)
-      const permissionResponse = await fetch(`${URL}/permissions?type=${permissionType}&${params.toString()}`, {
-        cache: 'no-store',
-      })
-      if (!permissionResponse.ok) {
-        throw new Error('An error occurred while loading permissions data')
-      }
-
-      const permissionsData: Permission[] = await permissionResponse.json()
-
-      setPermissions(permissionsData)
-      setIsLoading(false)
-
-      const totalCount = Number(permissionResponse.headers.get('X-Total-Count')) || 0
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-        setTotalPages(Math.ceil(totalCount / pageSize) || 1)
-      }
-    } catch (error) {
-      console.error(error)
-      setIsLoading(false)
-      throw new Error('An error occurred while loading permissions data')
-    }
-  }
+  const rowCount = permissionsData?.totalElements || 0
 
   useEffect(() => {
-    getPermissions()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sorting, rowCount, pageIndex, pageSize, permissionType, search])
+    setTotalPages(rowCount)
+  }, [rowCount, setTotalPages])
 
   const handleOpenButtonClick = (row: Row<Permission>) => {
     console.log(`/permissions/${row.original.id}?_tab=${permissionType}`)
@@ -106,7 +86,7 @@ const PermissionsPage = () => {
         <SearchHeader searchString={search} onChangeSearchString={setSearchParam} />
         <TableContainer>
           <PermissionsTable
-            permissions={permissions}
+            permissions={permissionsData?.data || []}
             isLoading={isLoading}
             rowCount={rowCount}
             pageIndex={pageIndex}
