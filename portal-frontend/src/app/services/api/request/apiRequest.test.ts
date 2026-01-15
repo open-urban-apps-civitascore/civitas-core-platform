@@ -1,7 +1,8 @@
 // apiRequest.test.ts
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { apiRequest } from './apiRequest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
 import { axiosClient } from '../client/client'
+import { apiRequest } from './apiRequest'
 
 vi.mock('../client/client', () => ({
   axiosClient: {

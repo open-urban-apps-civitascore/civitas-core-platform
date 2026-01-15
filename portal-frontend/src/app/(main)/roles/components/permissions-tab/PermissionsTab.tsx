@@ -56,7 +56,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     `type=${tabValue}&${getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput })}`,
   )
 
-  const { data: rolesData, isFetching: isFetchingRoles } = useQuery({
+  const { data: rolesData } = useQuery({
     queryKey: ['roles', rolesRequestParams.toString()],
     queryFn: () =>
       apiRequest<RoleResponse[]>({
