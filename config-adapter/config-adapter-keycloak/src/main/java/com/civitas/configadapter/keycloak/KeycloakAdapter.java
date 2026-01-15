@@ -375,7 +375,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       }
 
       RoleMappingResource roleMapping = realmResource.users().get(userId).roles();
-      syncRealmRoles(new HashSet<>(rolesToAssignNames), roleMapping, realmResource);
+      Set<String> realmRolesSet = rolesToAssignNames != null
+              ? new HashSet<>(rolesToAssignNames)
+              : Collections.emptySet();
+      syncRealmRoles(realmRolesSet, roleMapping, realmResource);
       syncClientRoles(clientRolesMap, roleMapping, realmResource);
 
       logger.info("Created user: {} (ID: {}) in realm: {}", userRep.getUsername(), userId, realm);
@@ -402,7 +405,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       realmResource.users().get(userId).update(userRep);
 
       RoleMappingResource roleMapping = realmResource.users().get(userId).roles();
-      syncRealmRoles(new HashSet<>(rolesToAssignNames), roleMapping, realmResource);
+      Set<String> realmRolesSet = rolesToAssignNames != null
+              ? new HashSet<>(rolesToAssignNames)
+              : Collections.emptySet();
+      syncRealmRoles(realmRolesSet, roleMapping, realmResource);
       syncClientRoles(clientRolesMap, roleMapping, realmResource);
 
       logger.info("Updated user: {} in realm: {}", userId, realm);
