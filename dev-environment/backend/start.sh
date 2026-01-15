@@ -56,12 +56,12 @@ echo
 
 echo "Building Config Adapter..."
 cd ../../config-adapter
-mvn clean install -DskipTests
+mvn clean install -DskipTests -Drevision=1.0.1
 cd ../dev-environment/backend
 
 echo "Building Portal Backend..."
 cd ../../portal-backend
-mvn clean package -DskipTests
+mvn clean package -DskipTests -Dconfig-adapter.version=1.0.1
 cd ../dev-environment/backend
 
 echo
