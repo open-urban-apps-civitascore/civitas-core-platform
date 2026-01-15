@@ -83,8 +83,6 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   const allRoles = useMemo(() => rolesData?.data || [], [rolesData?.data])
   const permissions = useMemo(() => mapPermissions(permissionsData?.data || []), [permissionsData?.data])
 
-  const isLoading = isFetchingRoles || isFetchingPermissions
-
   const getUniqueCategories = (): Item[] => {
     const seenIds = new Set()
     const uniqueCategories: Item[] = []
@@ -142,7 +140,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     setHasPermissionsTabBeenSaved(false)
   }, [checkedPermissionItems, setHasPermissionsTabBeenSaved])
 
-  if (isLoading) {
+  if (isFetchingPermissions) {
     return <LoadingSpinner />
   }
 
@@ -177,8 +175,8 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
               confirmButtonType="button"
               onConfirmClick={() => onPermissionUpdate(checkedPermissionItems.map(item => item.value))}
               onCancelClick={() => router.push(`/roles?_tab=${roleType || ROLE_TYPES.SYSTEM}`)}
-              isConfirmButtonDisabled={isLoading || !arePermissionsTouched || hasPermissionsTabBeenSaved}
-              isCancelButtonDisabled={isLoading}
+              isConfirmButtonDisabled={isFetchingPermissions || !arePermissionsTouched || hasPermissionsTabBeenSaved}
+              isCancelButtonDisabled={isFetchingPermissions}
             />
           )}
         </>
