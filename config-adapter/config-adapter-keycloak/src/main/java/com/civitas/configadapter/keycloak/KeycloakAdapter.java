@@ -375,9 +375,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       }
 
       RoleMappingResource roleMapping = realmResource.users().get(userId).roles();
-      Set<String> realmRolesSet = rolesToAssignNames != null
-              ? new HashSet<>(rolesToAssignNames)
-              : Collections.emptySet();
+      Set<String> realmRolesSet =
+          rolesToAssignNames != null ? new HashSet<>(rolesToAssignNames) : Collections.emptySet();
       syncRealmRoles(realmRolesSet, roleMapping, realmResource);
       syncClientRoles(clientRolesMap, roleMapping, realmResource);
 
@@ -405,9 +404,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       realmResource.users().get(userId).update(userRep);
 
       RoleMappingResource roleMapping = realmResource.users().get(userId).roles();
-      Set<String> realmRolesSet = rolesToAssignNames != null
-              ? new HashSet<>(rolesToAssignNames)
-              : Collections.emptySet();
+      Set<String> realmRolesSet =
+          rolesToAssignNames != null ? new HashSet<>(rolesToAssignNames) : Collections.emptySet();
       syncRealmRoles(realmRolesSet, roleMapping, realmResource);
       syncClientRoles(clientRolesMap, roleMapping, realmResource);
 
