@@ -301,7 +301,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
               resourceId,
               originalEvent.payload().operation(),
               originalEvent.payload().targetResource(),
-              "civitas.config-adapter.apisix");
+              "civitas.config-adapter.apisix",
+              "core.civitas.api.processing.result");
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
@@ -326,7 +327,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
               errorMessage,
               originalEvent.payload().operation(),
               originalEvent.payload().targetResource(),
-              "civitas.config-adapter.apisix");
+              "civitas.config-adapter.apisix",
+              "core.civitas.api.processing.result");
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published FAILURE result to topic: {}", originalEvent.metadata().resultTopic());

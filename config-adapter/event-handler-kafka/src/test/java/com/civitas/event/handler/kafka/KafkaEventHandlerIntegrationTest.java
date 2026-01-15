@@ -163,7 +163,8 @@ class KafkaEventHandlerIntegrationTest {
                     null,
                     event.payload().operation(),
                     event.payload().targetResource(),
-                    "test.adapter");
+                    "test.adapter",
+                    "core.civitas.test.processing.result");
             testAdapter.eventPublisher.publish(event.metadata().resultTopic(), resultEvent);
             publishedEvents.add(resultEvent);
             publishLatch.countDown();

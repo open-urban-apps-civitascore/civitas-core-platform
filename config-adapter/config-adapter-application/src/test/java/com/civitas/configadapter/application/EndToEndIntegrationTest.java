@@ -240,6 +240,9 @@ class EndToEndIntegrationTest {
     assertEquals("SUCCESS", resultEvent.getExtension("status"));
     assertEquals("e2e-test-realm", resultEvent.getExtension("resourceid"));
 
+    // Verify CloudEvent type is set from resultType
+    assertEquals("core.civitas.idm.processing.result", resultEvent.getType());
+
     // Verify CloudEvent data contains the serialized ConfigResultEvent
     assertNotNull(resultEvent.getData(), "CloudEvent data should not be null");
     ConfigResultEvent resultData =
@@ -248,6 +251,7 @@ class EndToEndIntegrationTest {
     assertEquals(ConfigResultEvent.Status.SUCCESS, resultData.status());
     assertEquals(Operation.CREATE, resultData.operation());
     assertEquals("e2e-test-realm", resultData.resourceId());
+    assertEquals("core.civitas.idm.processing.result", resultData.resultType());
 
     // Verify realm was actually created in Keycloak
     RealmRepresentation createdRealm = keycloakClient.realm("e2e-test-realm").toRepresentation();
@@ -326,6 +330,9 @@ class EndToEndIntegrationTest {
     assertNotNull(resultEvent.getExtension("errorcode"));
     assertNotNull(resultEvent.getExtension("errormessage"));
 
+    // Verify CloudEvent type is set from resultType
+    assertEquals("core.civitas.idm.processing.result", resultEvent.getType());
+
     // Verify CloudEvent data contains the serialized ConfigResultEvent with error details
     assertNotNull(resultEvent.getData(), "CloudEvent data should not be null");
     ConfigResultEvent resultData =
@@ -335,6 +342,7 @@ class EndToEndIntegrationTest {
     assertEquals(Operation.UPDATE, resultData.operation());
     assertNotNull(resultData.errorCode());
     assertNotNull(resultData.message());
+    assertEquals("core.civitas.idm.processing.result", resultData.resultType());
   }
 
   @Test

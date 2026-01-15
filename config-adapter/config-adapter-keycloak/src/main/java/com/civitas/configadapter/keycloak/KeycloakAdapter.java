@@ -584,7 +584,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
               resourceId,
               originalEvent.payload().operation(),
               originalEvent.payload().targetResource(),
-              "civitas.config-adapter.keycloak");
+              "civitas.config-adapter.keycloak",
+              "core.civitas.idm.processing.result");
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
@@ -609,7 +610,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
               errorMessage,
               originalEvent.payload().operation(),
               originalEvent.payload().targetResource(),
-              "civitas.config-adapter.keycloak");
+              "civitas.config-adapter.keycloak",
+              "core.civitas.idm.processing.result");
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published FAILURE result to topic: {}", originalEvent.metadata().resultTopic());

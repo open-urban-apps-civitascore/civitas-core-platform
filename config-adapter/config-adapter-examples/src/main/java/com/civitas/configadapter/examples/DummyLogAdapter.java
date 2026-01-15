@@ -77,7 +77,8 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
                 null,
                 event.payload().operation(),
                 event.payload().targetResource(),
-                "civitas.config-adapter.dummy-log");
+                "civitas.config-adapter.dummy-log",
+                "core.civitas.processing.result");
 
         getEventPublisher().publish(resultTopic, resultEvent);
         logger.debug(

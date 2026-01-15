@@ -218,6 +218,7 @@ class CloudEventSerializationTest {
     String source = "civitas.config-adapter.test";
     OffsetDateTime timestamp = OffsetDateTime.now();
 
+    String resultType = "core.civitas.idm.processing.result";
     ConfigResultEvent resultEvent =
         new ConfigResultEvent(
             correlationId,
@@ -229,7 +230,8 @@ class CloudEventSerializationTest {
             targetResource,
             null,
             timestamp,
-            source);
+            source,
+            resultType);
 
     byte[] jsonData = objectMapper.writeValueAsBytes(resultEvent);
 
@@ -278,6 +280,7 @@ class CloudEventSerializationTest {
     String errorCode = "USER_NOT_FOUND";
     String errorMessage = "User with ID user-99999 not found";
 
+    String resultType = "core.civitas.idm.processing.result";
     ConfigResultEvent resultEvent =
         ConfigResultEvent.failure(
             correlationId,
@@ -286,7 +289,8 @@ class CloudEventSerializationTest {
             errorMessage,
             com.civitas.configadapter.model.Operation.DELETE,
             targetResource,
-            source);
+            source,
+            resultType);
 
     byte[] jsonData = objectMapper.writeValueAsBytes(resultEvent);
 

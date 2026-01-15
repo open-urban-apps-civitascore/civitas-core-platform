@@ -252,7 +252,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
           CloudEventBuilder.v1()
               .withId(UUID.randomUUID().toString())
               .withSource(URI.create(resultEvent.source()))
-              .withType("core.civitas.idm.processing.result")
+              .withType(resultEvent.resultType())
               .withTime(resultEvent.timestamp())
               .withDataContentType("application/json")
               .withData(jsonData)
@@ -287,8 +287,8 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
       return CloudEventBuilder.v1()
           .withId(UUID.randomUUID().toString())
-          .withSource(URI.create("urn:civitas:config-adapter"))
-          .withType("core.civitas.idm.processing.result")
+          .withSource(URI.create(resultEvent.source()))
+          .withType(resultEvent.resultType())
           .withDataContentType("application/json")
           .withData("{}".getBytes())
           .build();
