@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -15,25 +15,17 @@ import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
-import com.civitas.configadapter.model.idm.ClientConfig;
-import com.civitas.configadapter.model.idm.RealmConfig;
-import com.civitas.configadapter.model.idm.RoleConfig;
-import com.civitas.configadapter.model.idm.UserConfig;
+import com.civitas.configadapter.model.idm.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.admin.client.resource.RealmResource;
-import org.keycloak.admin.client.resource.UserResource;
-import org.keycloak.representations.idm.ClientRepresentation;
-import org.keycloak.representations.idm.RealmRepresentation;
-import org.keycloak.representations.idm.RoleRepresentation;
-import org.keycloak.representations.idm.UserRepresentation;
+import org.keycloak.admin.client.resource.RoleMappingResource;
+import org.keycloak.representations.idm.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,7 +103,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       // Use semantic fields: targetComponent is the resource type, targetResource is the realm
       String realm = targetResource;
       String resourceType = targetComponent;
-      String resourceId = extractResourceId(event);
+      String resourceId = extractResourceId(event, realm);
 
       ResourceInfo resourceInfo = new ResourceInfo(resourceType, realm, resourceId);
 
@@ -152,14 +144,16 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
    * @param event the configuration value containing the resource data
    * @return the resource ID if present, null otherwise
    */
-  private String extractResourceId(ConfigEvent event) {
-    // Extract ID from IDM config values (UserConfig, ClientConfig, RoleConfig, RealmConfig)
+  private String extractResourceId(ConfigEvent event, String realm) {
+    // Extract ID from IDM config values (UserConfig, ClientConfig, RoleConfig, RealmConfig,
+    // GroupConfig)
     return switch (event.payload().config().value()) {
       case null -> null;
-      case UserConfig userConfig -> userConfig.getId(); // UUID for users
+      case UserConfig userConfig -> userConfig.getId(); // UUID for user
       case ClientConfig clientConfig -> clientConfig.getId(); // UUID for clients
       case RoleConfig roleConfig -> roleConfig.getName(); // Name for roles
       case RealmConfig realmConfig -> realmConfig.getRealm(); // Realm name
+      case GroupConfig groupConfig -> groupConfig.getId(); // UUID for groups
       default -> {
         logger.warn("Unknown ConfigValue class: {}", event.getClass());
         publishErrorResult(
@@ -175,6 +169,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       case "client" -> createClient(resourceInfo.realm, event);
       case "user" -> createUser(resourceInfo.realm, event);
       case "role" -> createRole(resourceInfo.realm, event);
+      case "group" -> createGroup(resourceInfo.realm, event);
       default -> {
         logger.warn("Unknown resource type for create: {}", resourceInfo.type);
         publishErrorResult(
@@ -189,6 +184,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       case "client" -> updateClient(resourceInfo.realm, resourceInfo.id, event);
       case "user" -> updateUser(resourceInfo.realm, resourceInfo.id, event);
       case "role" -> updateRole(resourceInfo.realm, resourceInfo.id, event);
+      case "group" -> updateGroup(resourceInfo.realm, resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for update: {}", resourceInfo.type);
         publishErrorResult(
@@ -203,6 +199,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       case "client" -> deleteClient(resourceInfo.realm, resourceInfo.id, event);
       case "user" -> deleteUser(resourceInfo.realm, resourceInfo.id, event);
       case "role" -> deleteRole(resourceInfo.realm, resourceInfo.id, event);
+      case "group" -> deleteGroup(resourceInfo.realm, resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for delete: {}", resourceInfo.type);
         publishErrorResult(
@@ -377,8 +374,9 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         userId = CreatedResponseUtil.getCreatedId(response);
       }
 
-      AssignRealmRolesToUser(rolesToAssignNames, realmResource, userId);
-      AssignClientRolesToUser(clientRolesMap, realmResource, userId);
+      RoleMappingResource roleMapping = realmResource.users().get(userId).roles();
+      syncRealmRoles(new HashSet<>(rolesToAssignNames), roleMapping, realmResource);
+      syncClientRoles(clientRolesMap, roleMapping, realmResource);
 
       logger.info("Created user: {} (ID: {}) in realm: {}", userRep.getUsername(), userId, realm);
       publishSuccessResult(event, "User created successfully", userId);
@@ -403,8 +401,9 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       RealmResource realmResource = keycloakClient.realm(realm);
       realmResource.users().get(userId).update(userRep);
 
-      AssignRealmRolesToUser(rolesToAssignNames, realmResource, userId);
-      AssignClientRolesToUser(clientRolesMap, realmResource, userId);
+      RoleMappingResource roleMapping = realmResource.users().get(userId).roles();
+      syncRealmRoles(new HashSet<>(rolesToAssignNames), roleMapping, realmResource);
+      syncClientRoles(clientRolesMap, roleMapping, realmResource);
 
       logger.info("Updated user: {} in realm: {}", userId, realm);
       publishSuccessResult(event, "User updated successfully", userId);
@@ -412,65 +411,6 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     } catch (Exception e) {
       logger.error("Failed to update user: {} in realm: {}", userId, realm, e);
       publishErrorResult(event, "USER_UPDATE_FAILED", e.getMessage());
-    }
-  }
-
-  private static void AssignClientRolesToUser(
-      Map<String, List<String>> clientRolesMap, RealmResource realmResource, String userId) {
-    if (clientRolesMap != null && !clientRolesMap.isEmpty()) {
-      UserResource userResource = realmResource.users().get(userId);
-
-      for (Map.Entry<String, List<String>> entry : clientRolesMap.entrySet()) {
-        String clientId = entry.getKey();
-        List<String> roleNames = entry.getValue();
-
-        try {
-          List<ClientRepresentation> clients = realmResource.clients().findByClientId(clientId);
-          if (clients.isEmpty()) {
-            logger.warn("Client '{}' not found, skipping roles.", clientId);
-            continue;
-          }
-          String clientUuid = clients.getFirst().getId();
-
-          List<RoleRepresentation> rolesToAdd = new ArrayList<>();
-          for (String roleName : roleNames) {
-            try {
-              RoleRepresentation role =
-                  realmResource.clients().get(clientUuid).roles().get(roleName).toRepresentation();
-              rolesToAdd.add(role);
-            } catch (NotFoundException nfe) {
-              logger.warn("Role '{}' not found for client '{}'", roleName, clientId);
-            }
-          }
-
-          if (!rolesToAdd.isEmpty()) {
-            userResource.roles().clientLevel(clientUuid).add(rolesToAdd);
-          }
-
-        } catch (Exception e) {
-          logger.error("Failed to assign client roles for client '{}'", clientId, e);
-        }
-      }
-    }
-  }
-
-  private static void AssignRealmRolesToUser(
-      List<String> rolesToAssignNames, RealmResource realmResource, String userId) {
-    if (rolesToAssignNames != null && !rolesToAssignNames.isEmpty()) {
-
-      List<RoleRepresentation> rolesToAdd = new ArrayList<>();
-      for (String roleName : rolesToAssignNames) {
-        try {
-          RoleRepresentation role = realmResource.roles().get(roleName).toRepresentation();
-          rolesToAdd.add(role);
-        } catch (NotFoundException nfe) {
-          logger.warn("Role '{}' not found, cannot assign.", roleName);
-        }
-      }
-
-      if (!rolesToAdd.isEmpty()) {
-        realmResource.users().get(userId).roles().realmLevel().add(rolesToAdd);
-      }
     }
   }
 
@@ -559,12 +499,214 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
+  // ============== GROUP OPERATIONS ==============
+
+  private void createGroup(String realm, ConfigEvent event) {
+    try {
+      Object configData = extractConfigData(event.payload().config().value());
+      GroupRepresentation groupRep =
+          objectMapper.convertValue(configData, GroupRepresentation.class);
+
+      // Extract roles to assign after group creation
+      GroupConfig groupConfig = (GroupConfig) event.payload().config().value();
+      Set<String> realmRolesToAssign = groupConfig.getRealmRoles();
+      Map<String, List<String>> clientRolesToAssign = groupConfig.getClientRoles();
+
+      RealmResource realmResource = keycloakClient.realm(realm);
+
+      String groupId;
+      // Check if this is a subgroup (has parentId)
+      if (groupConfig.getParentId() != null && !groupConfig.getParentId().isEmpty()) {
+        // Create as subgroup under parent
+        try (Response response =
+            realmResource.groups().group(groupConfig.getParentId()).subGroup(groupRep)) {
+          validateResponse("Group creation", 201, response);
+          groupId = CreatedResponseUtil.getCreatedId(response);
+        }
+      } else {
+        // Create as top-level group
+        try (Response response = realmResource.groups().add(groupRep)) {
+          validateResponse("Group creation", 201, response);
+          groupId = CreatedResponseUtil.getCreatedId(response);
+        }
+      }
+
+      RoleMappingResource roleMapping = realmResource.groups().group(groupId).roles();
+
+      // Assign realm roles to the group
+      syncRealmRoles(realmRolesToAssign, roleMapping, realmResource);
+
+      // Assign client roles to the group
+      syncClientRoles(clientRolesToAssign, roleMapping, realmResource);
+
+      logger.info("Created group: {} (ID: {}) in realm: {}", groupRep.getName(), groupId, realm);
+      publishSuccessResult(event, "Group created successfully", groupId);
+
+    } catch (Exception e) {
+      logger.error("Failed to create group in realm: {}", realm, e);
+      publishErrorResult(event, "GROUP_CREATE_FAILED", e.getMessage());
+    }
+  }
+
+  private void updateGroup(String realm, String groupId, ConfigEvent event) {
+    try {
+      Object configData = extractConfigData(event.payload().config().value());
+      GroupRepresentation groupRep =
+          objectMapper.convertValue(configData, GroupRepresentation.class);
+
+      // Extract roles to assign after group update
+      GroupConfig groupConfig = (GroupConfig) event.payload().config().value();
+      Set<String> realmRolesToAssign = groupConfig.getRealmRoles();
+      Map<String, List<String>> clientRolesToAssign = groupConfig.getClientRoles();
+
+      RealmResource realmResource = keycloakClient.realm(realm);
+      realmResource.groups().group(groupId).update(groupRep);
+      RoleMappingResource roleMapping = realmResource.groups().group(groupId).roles();
+
+      // Update realm roles for the group
+      syncRealmRoles(realmRolesToAssign, roleMapping, realmResource);
+
+      // Update client roles for the group
+      syncClientRoles(clientRolesToAssign, roleMapping, realmResource);
+
+      logger.info("Updated group: {} in realm: {}", groupId, realm);
+      publishSuccessResult(event, "Group updated successfully", groupId);
+
+    } catch (Exception e) {
+      logger.error("Failed to update group: {} in realm: {}", groupId, realm, e);
+      publishErrorResult(event, "GROUP_UPDATE_FAILED", e.getMessage());
+    }
+  }
+
+  private void deleteGroup(String realm, String groupId, ConfigEvent event) {
+    try {
+      RealmResource realmResource = keycloakClient.realm(realm);
+      realmResource.groups().group(groupId).remove();
+
+      logger.info("Deleted group: {} from realm: {}", groupId, realm);
+      publishSuccessResult(event, "Group deleted successfully", groupId);
+
+    } catch (Exception e) {
+      logger.error("Failed to delete group: {} from realm: {}", groupId, realm, e);
+      publishErrorResult(event, "GROUP_DELETE_FAILED", e.getMessage());
+    }
+  }
+
+  private void syncRealmRoles(
+      Set<String> desiredRoleNames,
+      RoleMappingResource roleMappingResource,
+      RealmResource realmResource) {
+    Set<String> desired =
+        desiredRoleNames != null ? desiredRoleNames : java.util.Collections.emptySet();
+    var roleScope = roleMappingResource.realmLevel();
+
+    List<RoleRepresentation> currentRoles = roleScope.listAll();
+
+    Set<String> currentRoleNames =
+        currentRoles.stream().map(RoleRepresentation::getName).collect(Collectors.toSet());
+
+    List<RoleRepresentation> toRemove =
+        currentRoles.stream().filter(current -> !desired.contains(current.getName())).toList();
+
+    List<RoleRepresentation> toAdd = new ArrayList<>();
+    for (String desiredName : desired) {
+      if (!currentRoleNames.contains(desiredName)) {
+        try {
+          toAdd.add(realmResource.roles().get(desiredName).toRepresentation());
+        } catch (jakarta.ws.rs.NotFoundException e) {
+          logger.warn("Realm Role '{}' not found, skipping assignment.", desiredName);
+        }
+      }
+    }
+
+    if (!toRemove.isEmpty()) {
+      roleScope.remove(toRemove);
+      logger.info(
+          "Removed realm roles: {}", toRemove.stream().map(RoleRepresentation::getName).toList());
+    }
+    if (!toAdd.isEmpty()) {
+      roleScope.add(toAdd);
+      logger.info(
+          "Added realm roles: {}", toAdd.stream().map(RoleRepresentation::getName).toList());
+    }
+  }
+
+  private void syncClientRoles(
+      Map<String, List<String>> clientRolesMap,
+      RoleMappingResource roleMappingResource,
+      RealmResource realmResource) {
+    if (clientRolesMap == null || clientRolesMap.isEmpty()) {
+      return;
+    }
+
+    for (Map.Entry<String, List<String>> entry : clientRolesMap.entrySet()) {
+      String clientId = entry.getKey();
+      Set<String> desiredRolesSet = new java.util.HashSet<>(entry.getValue());
+
+      List<ClientRepresentation> clients = realmResource.clients().findByClientId(clientId);
+      if (clients.isEmpty()) {
+        logger.warn("Client '{}' not found, skipping role sync.", clientId);
+        continue;
+      }
+      String clientUuid = clients.getFirst().getId();
+      var clientRoleScope = roleMappingResource.clientLevel(clientUuid);
+
+      List<RoleRepresentation> currentRoles = clientRoleScope.listAll();
+
+      Set<String> currentRoleNames =
+          currentRoles.stream()
+              .map(RoleRepresentation::getName)
+              .collect(java.util.stream.Collectors.toSet());
+
+      List<RoleRepresentation> toRemove =
+          currentRoles.stream().filter(r -> !desiredRolesSet.contains(r.getName())).toList();
+
+      List<RoleRepresentation> toAdd = new java.util.ArrayList<>();
+      for (String desiredName : desiredRolesSet) {
+        if (!currentRoleNames.contains(desiredName)) {
+          try {
+            toAdd.add(
+                realmResource
+                    .clients()
+                    .get(clientUuid)
+                    .roles()
+                    .get(desiredName)
+                    .toRepresentation());
+          } catch (jakarta.ws.rs.NotFoundException e) {
+            logger.warn("Role '{}' not found for client '{}'", desiredName, clientId);
+          }
+        }
+      }
+
+      if (!toRemove.isEmpty()) {
+        clientRoleScope.remove(toRemove);
+        logger.info(
+            "Removed roles for client {}: {}",
+            clientId,
+            toRemove.stream().map(RoleRepresentation::getName).toList());
+      }
+      if (!toAdd.isEmpty()) {
+        clientRoleScope.add(toAdd);
+        logger.info(
+            "Added roles for client {}: {}",
+            clientId,
+            toAdd.stream().map(RoleRepresentation::getName).toList());
+      }
+    }
+  }
+
   private void validateResponse(String operationDescription, int expectedStatus, Response response)
-      throws Exception {
+      throws KeycloakOperationException {
     if (response.getStatus() != expectedStatus) {
       String errorBody = response.readEntity(String.class);
-      throw new Exception(
+      throw new KeycloakOperationException(
           operationDescription + " failed with status " + response.getStatus() + ": " + errorBody);
+    }
+  }
+
+  public static class KeycloakOperationException extends Exception {
+    public KeycloakOperationException(String message) {
+      super(message);
     }
   }
 
