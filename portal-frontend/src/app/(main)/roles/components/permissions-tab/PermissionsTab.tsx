@@ -1,9 +1,11 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
+import { type JSX, useEffect, useMemo, useState } from 'react'
 
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
@@ -14,8 +16,6 @@ import { ROLE_ORIGINS, ROLE_TYPES, RoleResponse } from '@/types/roles'
 
 import { CategoryList } from './CategoryList'
 import { RoleTemplateSelect } from './RoleTemplateSelect'
-
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 type PermissionsTabProps = {
   onPermissionUpdate: (permissionIds: string[]) => void
@@ -47,62 +47,43 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   const t = useTranslations('common')
   const tRoles = useTranslations('roles')
   const { getApiRequestParams, tabValue } = useQueryParams()
-  const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [allPermissionsResponse, setAllPermissionsResponse] = useState<Permission[]>([])
-  const [allRoles, setAllRoles] = useState<RoleResponse[]>([])
   const [roleTemplate, setRoleTemplate] = useState<string | null>(null)
   const [checkedPermissionItems, setCheckedPermissionItems] = useState<PermissionItem[]>([])
   const [searchInput, setSearchInput] = useState<string>('')
 
-  const getRoles = useCallback(async () => {
-    try {
-      const rolesResponse = await fetch(`${URL}/roles?type=${tabValue}&roleOrigin=${ROLE_ORIGINS.DEFAULT}`, {
-        cache: 'no-store',
-      })
+  const rolesRequestParams = new URLSearchParams(`type=${tabValue}&roleOrigin=${ROLE_ORIGINS.DEFAULT}`)
+  const permissionsRequestParams = new URLSearchParams(
+    `type=${tabValue}&${getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput })}`,
+  )
 
-      if (!rolesResponse.ok) {
-        throw new Error('An error occurred while loading roles data')
-      }
+  const { data: rolesData, isFetching: isFetchingRoles } = useQuery({
+    queryKey: ['roles', rolesRequestParams.toString()],
+    queryFn: () =>
+      apiRequest<RoleResponse[]>({
+        endpoint: '/roles',
+        method: 'GET',
+        params: rolesRequestParams,
+        errorMessage: 'An error occurred while fetching roles.',
+      }),
+    placeholderData: previousData => previousData,
+  })
 
-      const rolesData: RoleResponse[] = await rolesResponse.json()
-      setAllRoles(rolesData)
-    } catch (error) {
-      console.error(error)
-    }
-  }, [tabValue])
+  const { data: permissionsData, isFetching: isFetchingPermissions } = useQuery({
+    queryKey: ['permissions', permissionsRequestParams.toString()],
+    queryFn: () =>
+      apiRequest<Permission[]>({
+        endpoint: '/permissions',
+        method: 'GET',
+        params: permissionsRequestParams,
+        errorMessage: 'An error occurred while fetching permissions.',
+      }),
+    placeholderData: previousData => previousData,
+  })
 
-  useEffect(() => {
-    getRoles()
-  }, [getRoles])
+  const allRoles = useMemo(() => rolesData?.data || [], [rolesData?.data])
+  const permissions = useMemo(() => mapPermissions(permissionsData?.data || []), [permissionsData?.data])
 
-  const getPermissions = useCallback(async () => {
-    const requestParams = getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput })
-
-    try {
-      setIsLoading(true)
-      const permissionResponse = await fetch(`${URL}/permissions?type=${tabValue}&${requestParams.toString()}`, {
-        cache: 'no-store',
-      })
-      if (!permissionResponse.ok) {
-        throw new Error('An error occurred while loading permissions data')
-      }
-
-      const permissionsData: Permission[] = await permissionResponse.json()
-
-      setAllPermissionsResponse(permissionsData)
-      setIsLoading(false)
-    } catch (error) {
-      console.error(error)
-      setIsLoading(false)
-      throw new Error('An error occurred while loading permissions data')
-    }
-  }, [searchInput, getApiRequestParams, tabValue])
-
-  useEffect(() => {
-    getPermissions()
-  }, [getPermissions])
-
-  const permissions = useMemo(() => mapPermissions(allPermissionsResponse), [allPermissionsResponse])
+  const isLoading = isFetchingRoles || isFetchingPermissions
 
   const getUniqueCategories = (): Item[] => {
     const seenIds = new Set()

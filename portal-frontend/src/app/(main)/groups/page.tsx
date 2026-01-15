@@ -47,7 +47,7 @@ const GroupsPage = () => {
     totalPages,
   } = useQueryParams()
 
-  const { data: groupsdata, isFetching } = useQuery({
+  const { data: groupsData, isFetching } = useQuery({
     queryKey: ['groups', pageIndex, pageSize, sorting, search],
     queryFn: () =>
       apiRequest<Group[]>({
@@ -59,7 +59,7 @@ const GroupsPage = () => {
     placeholderData: previousData => previousData,
   })
 
-  const rowCount = groupsdata?.totalElements || 0
+  const rowCount = groupsData?.totalElements || 0
   useEffect(() => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, pageSize, setTotalPages])
@@ -93,7 +93,7 @@ const GroupsPage = () => {
         />
         <TableContainer>
           <GroupsTable
-            groups={isFetching ? [] : groupsdata?.data || []}
+            groups={groupsData?.data && !isFetching ? groupsData?.data : []}
             rowCount={rowCount}
             pageIndex={pageIndex}
             pageSize={pageSize}

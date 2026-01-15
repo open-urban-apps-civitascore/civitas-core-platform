@@ -48,22 +48,24 @@ const PermissionsPage = () => {
 
   const [permissionType, setPermissionsType] = useState<string>(tabValue || DEFAULT_TAB)
 
-  const requestParams = `type=${permissionType}&${getApiRequestParamsByUrl()}`
-  const { data: permissionsData, isLoading } = useQuery({
+  const requestParams = new URLSearchParams(`type=${permissionType}&${getApiRequestParamsByUrl()}`)
+  const { data: permissionsData, isFetching } = useQuery({
     queryKey: ['permissions', requestParams.toString()],
     queryFn: () =>
       apiRequest<Permission[]>({
         endpoint: '/permissions',
         method: 'GET',
+        params: requestParams,
         errorMessage: 'An error occurred while loading permissions data',
       }),
+    placeholderData: previousData => previousData,
   })
 
   const rowCount = permissionsData?.totalElements || 0
 
   useEffect(() => {
-    setTotalPages(rowCount)
-  }, [rowCount, setTotalPages])
+    setTotalPages(Math.ceil(rowCount / pageSize))
+  }, [rowCount, setTotalPages, pageSize])
 
   const handleOpenButtonClick = (row: Row<Permission>) => {
     console.log(`/permissions/${row.original.id}?_tab=${permissionType}`)
@@ -86,8 +88,8 @@ const PermissionsPage = () => {
         <SearchHeader searchString={search} onChangeSearchString={setSearchParam} />
         <TableContainer>
           <PermissionsTable
-            permissions={permissionsData?.data || []}
-            isLoading={isLoading}
+            permissions={permissionsData?.data && !isFetching ? permissionsData?.data : []}
+            isLoading={isFetching}
             rowCount={rowCount}
             pageIndex={pageIndex}
             pageSize={pageSize}
