@@ -21,6 +21,7 @@ import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.keycloak.KeycloakAdapter;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
+import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
@@ -239,6 +240,15 @@ class EndToEndIntegrationTest {
     assertEquals("SUCCESS", resultEvent.getExtension("status"));
     assertEquals("e2e-test-realm", resultEvent.getExtension("resourceid"));
 
+    // Verify CloudEvent data contains the serialized ConfigResultEvent
+    assertNotNull(resultEvent.getData(), "CloudEvent data should not be null");
+    ConfigResultEvent resultData =
+        objectMapper.readValue(resultEvent.getData().toBytes(), ConfigResultEvent.class);
+    assertEquals("correlation123", resultData.correlationId());
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultData.status());
+    assertEquals(Operation.CREATE, resultData.operation());
+    assertEquals("e2e-test-realm", resultData.resourceId());
+
     // Verify realm was actually created in Keycloak
     RealmRepresentation createdRealm = keycloakClient.realm("e2e-test-realm").toRepresentation();
     assertNotNull(createdRealm);
@@ -315,6 +325,16 @@ class EndToEndIntegrationTest {
     assertEquals("FAILURE", resultEvent.getExtension("status"));
     assertNotNull(resultEvent.getExtension("errorcode"));
     assertNotNull(resultEvent.getExtension("errormessage"));
+
+    // Verify CloudEvent data contains the serialized ConfigResultEvent with error details
+    assertNotNull(resultEvent.getData(), "CloudEvent data should not be null");
+    ConfigResultEvent resultData =
+        objectMapper.readValue(resultEvent.getData().toBytes(), ConfigResultEvent.class);
+    assertEquals("correlationerror123", resultData.correlationId());
+    assertEquals(ConfigResultEvent.Status.FAILURE, resultData.status());
+    assertEquals(Operation.UPDATE, resultData.operation());
+    assertNotNull(resultData.errorCode());
+    assertNotNull(resultData.message());
   }
 
   @Test
