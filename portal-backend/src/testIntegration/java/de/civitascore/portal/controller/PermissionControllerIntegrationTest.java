@@ -42,6 +42,7 @@ class PermissionControllerIntegrationTest
     input.setName("Test Permission " + System.currentTimeMillis());
     input.setDescription("A test permission for integration testing");
     input.setPermissionType(PermissionType.DATA);
+    input.setCategory("category");
     return input;
   }
 
@@ -59,6 +60,7 @@ class PermissionControllerIntegrationTest
     input.setName("Updated Permission");
     input.setDescription("Updated description");
     input.setPermissionType(PermissionType.SYSTEM);
+    input.setCategory("updated_category");
     return input;
   }
 
@@ -100,6 +102,9 @@ class PermissionControllerIntegrationTest
       assertThat(output.getPermissionType())
           .as("Permission type should match input")
           .isEqualTo(input.getPermissionType());
+      assertThat(output.getCategory())
+          .as("Category should match input")
+          .isEqualTo(input.getCategory());
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -518,6 +523,17 @@ class PermissionControllerIntegrationTest
     void shouldHandleEmptyTName() {
       PermissionInputDTO input = createValidInput();
       input.setName("");
+
+      ResponseEntity<PermissionOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should handle empty Category as invalid")
+    void shouldHandleEmptyCategory() {
+      PermissionInputDTO input = createValidInput();
+      input.setCategory("");
 
       ResponseEntity<PermissionOutputDTO> response = performCreate(input);
 
