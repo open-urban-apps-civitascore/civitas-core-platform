@@ -46,12 +46,21 @@ export const BreadcrumbNavigation = () => {
         baseBreadCrumbs.map(async crumb => {
           if (!crumb.isDynamic) return crumb
 
-          const res = await fetch(`/api${crumb.href}`)
-          const data = await res.json()
+          try {
+            const res = await fetch(`/api${crumb.href}`)
+            const data = await res.json()
 
-          return {
-            ...crumb,
-            title: data.name || getName(data.firstName, data.lastName) || data.title || crumb.title,
+            if (!res.ok) {
+              throw new Error('Failed to load data.')
+            }
+
+            return {
+              ...crumb,
+              title: data.name || getName(data.firstName, data.lastName) || data.title || crumb.title,
+            }
+          } catch (error) {
+            console.error('An error occurred while fetching data for breadcrumbs.', error)
+            return crumb
           }
         }),
       )

@@ -25,48 +25,46 @@ export const AppSidebarContent = async () => {
 
   return (
     <SidebarContent>
-      <SidebarContent>
-        <SidebarGroup>
-          {appSidebarNavItems.map(item =>
-            item.items ? (
-              <Collapsible key={item.title} defaultOpen={item.isActive} className="group/collapsible">
-                <CollapsibleTrigger>
-                  <SidebarMenuButton className="cursor-pointer">
-                    <item.icon />
-                    <span>{getMenuItemTitle(item)}</span>
-                    <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180 " />
-                  </SidebarMenuButton>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <SidebarMenuSub>
-                    {item.items?.map(subItem => (
-                      <SidebarMenuSubItem
-                        key={getMenuItemTitle(subItem)}
-                        data-testid={`sidebarMenuItem-${subItem.title}`}
-                      >
-                        <SidebarMenuSubButton asChild>
-                          <Link href={subItem.url}>
-                            <span>{getMenuItemTitle(subItem)}</span>
-                          </Link>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
-                </CollapsibleContent>
-              </Collapsible>
-            ) : (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild>
-                  <Link href={item.url}>
-                    <item.icon />
-                    <span>{getMenuItemTitle(item)}</span>
-                  </Link>
+      <SidebarGroup>
+        {appSidebarNavItems.map(item =>
+          item.items ? (
+            <Collapsible key={item.title} defaultOpen={item.isActive} className="group/collapsible">
+              <CollapsibleTrigger>
+                <SidebarMenuButton className="cursor-pointer">
+                  <item.icon />
+                  <span>{getMenuItemTitle(item)}</span>
+                  <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180 " />
                 </SidebarMenuButton>
-              </SidebarMenuItem>
-            ),
-          )}
-        </SidebarGroup>
-      </SidebarContent>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {item.items?.map(subItem => (
+                    <SidebarMenuSubItem
+                      key={getMenuItemTitle(subItem)}
+                      data-testid={`sidebarMenuItem-${subItem.title}`}
+                    >
+                      <SidebarMenuSubButton asChild>
+                        <Link href={subItem.url}>
+                          <span>{getMenuItemTitle(subItem)}</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </Collapsible>
+          ) : (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton asChild>
+                <Link href={item.url}>
+                  <item.icon />
+                  <span>{getMenuItemTitle(item)}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ),
+        )}
+      </SidebarGroup>
     </SidebarContent>
   )
 }
