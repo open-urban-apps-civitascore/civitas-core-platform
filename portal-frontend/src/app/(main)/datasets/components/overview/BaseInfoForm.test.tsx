@@ -202,8 +202,8 @@ describe('BaseInfoForm', () => {
     fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Name' } })
 
     fireEvent.click(screen.getByRole('button', { name: CONFIRM_BUTTON }))
-    // eslint-disable-next-line unused-imports/no-unused-vars
-    const { id, ...responseData } = {
+
+    const responseData = {
       ...datasetMock,
       dataspace: { id: '1', name: 'Dataspace 1' },
       name: 'New Name',
