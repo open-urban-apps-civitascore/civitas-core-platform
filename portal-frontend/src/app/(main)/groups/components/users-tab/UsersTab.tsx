@@ -1,19 +1,18 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { usePatchGroup } from '@/app/services/api/groups/clientRequests'
+import { useGetAuthorities, useGetUsers } from '@/app/services/api/users/clientRequests'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Group, GroupTabProps } from '@/types/groups'
-import { Authority, UserResponse } from '@/types/users'
 import { mapGroupListUsers } from '@/utils/users'
 
 import { AssignUsersModal } from './AssignUsersModal'
@@ -26,7 +25,8 @@ export const UsersTab = (props: UsersTabProps) => {
   const { groupData } = props
   const originalUsers = groupData.users
   const t = useTranslations('groups')
-  const queryClient = useQueryClient()
+  const updateGroup = usePatchGroup()
+
   const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false)
 
   const {
@@ -42,22 +42,6 @@ export const UsersTab = (props: UsersTabProps) => {
     totalPages,
   } = useQueryParams()
 
-  const updateGroupUsersMutation = useMutation({
-    mutationFn: (updateGroupData: typeof originalUsers) =>
-      apiRequest<Group>({
-        method: 'PATCH',
-        endpoint: `/groups/${groupData.id}`,
-        data: { users: updateGroupData },
-        errorMessage: 'An error occurred while updating the group.',
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['group', groupData.id] })
-    },
-    onError: error => {
-      console.error(`An error occurred while updating group users. ${error}`)
-    },
-  })
-
   const userRequestParams = useMemo(() => {
     const params = new URLSearchParams(getApiRequestParamsByUrl())
     originalUsers.forEach(user => {
@@ -66,33 +50,16 @@ export const UsersTab = (props: UsersTabProps) => {
     return params
   }, [getApiRequestParamsByUrl, originalUsers])
 
-  const { data: usersData, isFetching: isFetchingUsers } = useQuery({
-    queryKey: ['users', userRequestParams.toString()],
-    queryFn: () => {
-      return apiRequest<UserResponse[]>({
-        endpoint: '/users',
-        method: 'GET',
-        params: userRequestParams,
-        errorMessage: 'An error occurred while fetching users.',
-      })
-    },
-    enabled: originalUsers.length > 0,
-    placeholderData: previousData => previousData,
+  const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
+    params: userRequestParams,
+    isEnabled: originalUsers.length > 0,
   })
 
-  const { data: authoritiesData, isLoading: areAuthoritiesLoading } = useQuery({
-    queryKey: ['authorities'],
-    queryFn: () => {
-      return apiRequest<Authority[]>({
-        endpoint: '/authorities',
-        method: 'GET',
-        errorMessage: 'An error occurred while fetching authorities.',
-      })
-    },
-    enabled: originalUsers.length > 0,
+  const { data: authoritiesData, isLoading: areAuthoritiesLoading } = useGetAuthorities({
+    isEnabled: originalUsers.length > 0,
   })
 
-  const isLoading = isFetchingUsers || areAuthoritiesLoading || updateGroupUsersMutation.isPending
+  const isLoading = isFetchingUsers || areAuthoritiesLoading || updateGroup.isPending
   const rowCount = usersData?.totalElements || 0
 
   useEffect(() => {
@@ -106,16 +73,16 @@ export const UsersTab = (props: UsersTabProps) => {
 
   // closes the user assignment modal after update
   useEffect(() => {
-    if (!updateGroupUsersMutation.isPending) {
+    if (!updateGroup.isPending) {
       setIsAssignUsersOpen(false)
     }
-  }, [updateGroupUsersMutation.isPending])
+  }, [updateGroup.isPending])
 
   const handleUpdateGroupUsers = async (userSelection: RowSelectionState) => {
     const selectedUserIds = Object.keys(userSelection).filter(key => userSelection[key])
     const selectedUserInfo = selectedUserIds.map(userId => ({ id: userId, assignedAt: new Date().toISOString() }))
     const updateUserData = selectedUserInfo.concat(originalUsers)
-    updateGroupUsersMutation.mutate(updateUserData)
+    updateGroup.mutate({ id: groupData.id, users: updateUserData })
   }
 
   const CustomElement = (
@@ -135,7 +102,7 @@ export const UsersTab = (props: UsersTabProps) => {
           onButtonClick={() => setIsAssignUsersOpen(true)}
         />
         <AssignUsersModal
-          isUpdating={updateGroupUsersMutation.isPending}
+          isUpdating={updateGroup.isPending}
           originalUsers={originalUsers}
           groupTitle={groupData.title}
           open={isAssignUsersOpen}
@@ -163,7 +130,7 @@ export const UsersTab = (props: UsersTabProps) => {
         />
       </TableContainer>
       <AssignUsersModal
-        isUpdating={updateGroupUsersMutation.isPending}
+        isUpdating={updateGroup.isPending}
         originalUsers={originalUsers}
         groupTitle={groupData.title}
         open={isAssignUsersOpen}

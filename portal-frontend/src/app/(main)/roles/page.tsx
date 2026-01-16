@@ -1,13 +1,12 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { Row, RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -52,17 +51,7 @@ const RolesPage = () => {
 
   const requestParams = new URLSearchParams(`type=${selectedRoleType}&${getApiRequestParamsByUrl()}`)
 
-  const { data: rolesData, isFetching } = useQuery({
-    queryKey: ['roles', requestParams.toString()],
-    queryFn: () =>
-      apiRequest<RoleResponse[]>({
-        endpoint: '/roles',
-        method: 'GET',
-        params: requestParams,
-        errorMessage: 'An error occurred while loading roles data',
-      }),
-    placeholderData: previousData => previousData,
-  })
+  const { data: rolesData, isFetching } = useGetRoles({ params: requestParams })
 
   const rowCount = rolesData?.totalElements || 0
   useEffect(() => {

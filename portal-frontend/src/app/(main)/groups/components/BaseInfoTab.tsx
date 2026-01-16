@@ -1,13 +1,13 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { FieldErrors, useForm } from 'react-hook-form'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useCreateGroup, useUpdateGroup } from '@/app/services/api/groups/clientRequests'
+import { useGetUsers } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
@@ -18,15 +18,8 @@ import { Form } from '@/components/ui/form'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useDebounce } from '@/hooks/useDebounce'
 import { cn } from '@/lib/utils'
-import {
-  CreateGroupData,
-  Group,
-  GroupBaseFormData,
-  GroupBaseFormDataSchema,
-  GroupTabProps,
-  UpdateGroupData,
-} from '@/types/groups'
-import { Contact, UserResponse } from '@/types/users'
+import { Group, GroupBaseFormData, GroupBaseFormDataSchema, GroupTabProps } from '@/types/groups'
+import { Contact } from '@/types/users'
 import { mapGroupToBaseFormData } from '@/utils/groups'
 
 import { mapFormGroupToApiData } from '../utils/mappers'
@@ -52,7 +45,8 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const t = useTranslations('groups')
   const isMobile = useIsMobile()
   const router = useRouter()
-  const queryClient = useQueryClient()
+  const createGroup = useCreateGroup()
+  const updateGroup = useUpdateGroup()
 
   const [defaultFormData, setDefaultFormData] = useState(mapGroupToBaseFormData(groupData))
   const [isContactListOpen, setIsContactListOpen] = useState(false)
@@ -61,56 +55,12 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const [contactListItems, setContactListItems] = useState<SelectItem[]>([])
   const [contactInput, setContactInput] = useState(groupData.contact?.displayName || '')
   const debouncedInput = useDebounce(contactInput, 300)
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  const getUsersParams = new URLSearchParams({ displayName_like: debouncedInput })
 
-  const { data: contactsData, isLoading: areContactsLoading } = useQuery({
-    queryKey: ['contacts', debouncedInput],
-    queryFn: () =>
-      apiRequest<UserResponse[]>({
-        method: 'GET',
-        endpoint: `/users`,
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        params: new URLSearchParams({ displayName_like: debouncedInput }),
-        errorMessage: 'An error occurred while fetching contacts data.',
-      }),
-    enabled: debouncedInput.trim().length >= MIN_LENGTH,
-  })
-
-  const createGroupMutation = useMutation({
-    mutationFn: (data: CreateGroupData) =>
-      apiRequest<Group>({
-        method: 'POST',
-        endpoint: '/groups',
-        data: data,
-        errorMessage: 'An error occurred while creating the group.',
-      }),
-    onSuccess: ({ data }) => {
-      queryClient.invalidateQueries({
-        queryKey: ['groups'],
-      })
-      router.push(`/groups/${data.id}`)
-    },
-    onError: error => {
-      console.error('An error occurred while creating the group. ', error)
-    },
-  })
-
-  const updateGroupMutation = useMutation({
-    mutationFn: (data: UpdateGroupData) =>
-      apiRequest<Group>({
-        method: 'PUT',
-        endpoint: `/groups/${data.id}`,
-        data: data,
-        errorMessage: 'An error occurred while updating the group.',
-      }),
-    onSuccess: ({ data }) => {
-      setDefaultFormData(mapGroupToBaseFormData(data))
-      queryClient.invalidateQueries({
-        queryKey: ['groups'],
-      })
-    },
-    onError: error => {
-      console.error('An error occurred while updating the group. ', error)
-    },
+  const { data: contactsData, isLoading: isLoadingContacts } = useGetUsers({
+    params: getUsersParams,
+    isEnabled: debouncedInput.trim().length >= MIN_LENGTH,
   })
 
   useEffect(() => {
@@ -149,12 +99,12 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const handleCreateGroup = async (formData: GroupBaseFormData) => {
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createGroupData } = mapFormGroupToApiData(formData, groupData, selectedContact)
-    createGroupMutation.mutate(createGroupData)
+    createGroup.mutate(createGroupData, { onSuccess: ({ data }) => router.push(`/groups/${data.id}`) })
   }
 
   const handleUpdateGroup = async (formData: GroupBaseFormData) => {
     const updateGroupData = mapFormGroupToApiData(formData, groupData, selectedContact)
-    updateGroupMutation.mutate(updateGroupData)
+    updateGroup.mutate(updateGroupData, { onSuccess: ({ data }) => setDefaultFormData(mapGroupToBaseFormData(data)) })
   }
 
   const handleContactInputChange = async (value: string) => {
@@ -223,7 +173,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               onInputChange={handleContactInputChange}
               onSelectItem={handleSelectContact}
               onBlur={handleAutocompleteBlur}
-              isLoading={areContactsLoading}
+              isLoading={isLoadingContacts}
             />
           </DetailsFieldContainer>
         </ContentCard>

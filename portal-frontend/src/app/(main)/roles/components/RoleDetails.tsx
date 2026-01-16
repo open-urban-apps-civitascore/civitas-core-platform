@@ -1,20 +1,19 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { JSX, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useCreateRole, useDeleteRole, useGetRole, useUpdateRole } from '@/app/services/api/roles/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
 
-import { FormRole, ROLE_ORIGINS, RoleInput, RoleResponse, roleSchema, RoleUpdate } from '../../../../../types/roles'
+import { FormRole, ROLE_ORIGINS, RoleResponse, roleSchema } from '../../../../../types/roles'
 import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
@@ -43,81 +42,24 @@ export const RoleDetails = (props: Props): JSX.Element => {
   const { roleId, isEditMode = false } = props
   const tRoles = useTranslations('roles')
   const router = useRouter()
-  const queryClient = useQueryClient()
   const { setSubTabValueParam, subTabValue, tabValue } = useQueryParams()
   const [hasPermissionsTabBeenSaved, setHasPermissionsTabBeenSaved] = useState<boolean>(false)
 
-  const { data: roleData, isLoading: isLoadingRole } = useQuery({
-    queryKey: ['role', roleId],
-    queryFn: () =>
-      apiRequest<RoleResponse>({
-        endpoint: `/roles/${roleId}`,
-        method: 'GET',
-        errorMessage: 'An error occurred while loading role data',
-      }),
-    enabled: !!roleId,
-  })
+  const { data: roleData, isFetching: isLoadingRole } = useGetRole({ id: roleId || '', isEnabled: !!roleId })
 
   const initialRole = roleData?.data || defaultRole
 
-  const createRoleMutation = useMutation({
-    mutationFn: (data: RoleInput) =>
-      apiRequest<RoleResponse>({
-        endpoint: '/roles',
-        method: 'POST',
-        data: data,
-      }),
-    onSuccess: ({ data }) => {
-      console.log('Successfully created role')
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
-      router.push(`/roles/${data.id}?_tab=${tabValue}`)
-    },
-    onError: error => {
-      console.error(`An error occurred while creating the role. ${error}`)
-    },
-  })
+  const createRole = useCreateRole()
+  const updateRole = useUpdateRole()
+  const deleteRole = useDeleteRole(roleId || '')
 
-  const updateRoleMutation = useMutation({
-    mutationFn: (data: RoleUpdate) =>
-      apiRequest<RoleResponse>({
-        endpoint: `/roles/${roleId}`,
-        method: 'PUT',
-        data: data,
-      }),
-    onSuccess: () => {
-      setHasPermissionsTabBeenSaved(true)
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
-      queryClient.invalidateQueries({ queryKey: ['role', roleId] })
-    },
-    onError: error => {
-      console.error(`An error occurred while updating the role. ${error}`)
-    },
-  })
-
-  const deleteRoleMutation = useMutation({
-    mutationFn: () =>
-      apiRequest({
-        endpoint: `/roles/${roleId}`,
-        method: 'DELETE',
-      }),
-    onSuccess: () => {
-      console.log('Successfully deleted role.')
-      queryClient.invalidateQueries({ queryKey: ['roles'] })
-      router.push('/roles')
-    },
-    onError: error => {
-      console.error(`An error occurred while deleting the role. ${error}`)
-    },
-  })
-
-  const isLoading =
-    isLoadingRole || createRoleMutation.isPending || updateRoleMutation.isPending || deleteRoleMutation.isPending
+  const isLoading = isLoadingRole || createRole.isPending || updateRole.isPending || deleteRole.isPending
 
   const form = useForm<FormRole>({
     resolver: zodResolver(roleSchema),
     defaultValues: {
-      name: '',
-      description: '',
+      name: initialRole.name,
+      description: initialRole.description,
     },
   })
 
@@ -128,30 +70,57 @@ export const RoleDetails = (props: Props): JSX.Element => {
     }
   }, [initialRole, form])
 
-  const deleteRole = () => {
-    deleteRoleMutation.mutate()
+  const handleDeleteRole = () => {
+    deleteRole.mutate(undefined, {
+      onSuccess: () => router.push('/roles'),
+    })
   }
 
   const onSubmit = (values: FormRole): void => {
     if (roleId && initialRole) {
-      updateRoleMutation.mutate({ ...initialRole, ...values })
+      updateRole.mutate(
+        { ...initialRole, ...values },
+        {
+          onSuccess: () => {
+            setHasPermissionsTabBeenSaved(true)
+          },
+        },
+      )
     } else {
       // eslint-disable-next-line unused-imports/no-unused-vars
       const { id, ...creadteRoleData } = { ...initialRole, ...values }
-      createRoleMutation.mutate(creadteRoleData)
+      createRole.mutate(creadteRoleData, {
+        onSuccess: ({ data }) => {
+          router.push(`/roles/${data.id}?_tab=${tabValue}`)
+        },
+      })
     }
   }
 
   const handlePermissionUpdate = (permissionIds: string[]): void => {
     if (!initialRole || !roleId) return
 
-    updateRoleMutation.mutate({ ...initialRole, permissions: permissionIds })
+    updateRole.mutate(
+      { ...initialRole, permissions: permissionIds },
+      {
+        onSuccess: () => {
+          setHasPermissionsTabBeenSaved(true)
+        },
+      },
+    )
   }
 
   const handleGroupAssigmentUpdate = (newGroupIds: string[]): void => {
     if (!initialRole || !roleId) return
 
-    updateRoleMutation.mutate({ ...initialRole, groups: newGroupIds })
+    updateRole.mutate(
+      { ...initialRole, groups: newGroupIds },
+      {
+        onSuccess: () => {
+          setHasPermissionsTabBeenSaved(true)
+        },
+      },
+    )
   }
 
   const subTabValues: Record<'basicInformation' | 'permissions' | 'groupAssignment', Tab> = {
@@ -206,7 +175,7 @@ export const RoleDetails = (props: Props): JSX.Element => {
             roleType={tabValue}
             isDefaultRole={isDefaultRole}
             isEditMode={isEditMode}
-            deleteRole={() => roleId && deleteRole()}
+            deleteRole={() => roleId && handleDeleteRole()}
           />
         )}
 

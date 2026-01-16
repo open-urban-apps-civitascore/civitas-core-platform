@@ -1,13 +1,12 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { Row, RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useGetDataspaces } from '@/app/services/api/dataspaces/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -36,16 +35,7 @@ const DataSpacesPage = () => {
     search,
   } = useQueryParams()
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['dataspaces', pageIndex, pageSize, sorting, search],
-    queryFn: () =>
-      apiRequest<DataSpace[]>({
-        endpoint: '/dataspaces',
-        method: 'GET',
-        params: getApiRequestParamsByUrl(),
-        errorMessage: 'An error occurred while fetching dataspaces.',
-      }),
-  })
+  const { data, isLoading } = useGetDataspaces({ params: getApiRequestParamsByUrl() })
 
   const rowCount = data?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)

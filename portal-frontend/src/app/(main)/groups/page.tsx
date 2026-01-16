@@ -1,13 +1,12 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -47,17 +46,7 @@ const GroupsPage = () => {
     totalPages,
   } = useQueryParams()
 
-  const { data: groupsData, isFetching } = useQuery({
-    queryKey: ['groups', pageIndex, pageSize, sorting, search],
-    queryFn: () =>
-      apiRequest<Group[]>({
-        endpoint: '/groups',
-        method: 'GET',
-        params: getApiRequestParamsByUrl(),
-        errorMessage: 'An error occurred while fetching groups.',
-      }),
-    placeholderData: previousData => previousData,
-  })
+  const { data: groupsData, isFetching } = useGetGroups({ params: getApiRequestParamsByUrl() })
 
   const rowCount = groupsData?.totalElements || 0
   useEffect(() => {

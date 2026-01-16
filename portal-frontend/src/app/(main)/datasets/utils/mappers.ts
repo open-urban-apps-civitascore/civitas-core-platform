@@ -1,6 +1,6 @@
-import { DatasetResponse } from '@/types/datasets'
+import { Dataset } from '@/types/datasets'
 
-export const mapDatasetToFormData = (dataset: DatasetResponse) => {
+export const mapDatasetToFormData = (dataset: Dataset) => {
   return {
     id: dataset.id,
     name: dataset.name,

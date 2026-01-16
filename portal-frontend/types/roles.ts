@@ -1,9 +1,9 @@
 import z from 'zod'
 
-import { Item } from './common'
+import { Item, WithId } from './common'
 import { Group } from './groups'
 import { Permission } from './permissions'
-import { UserResponse } from './users'
+import { User } from './users'
 
 export const ROLE_TYPES = {
   SYSTEM: 'system',
@@ -30,13 +30,17 @@ export type RoleOrigin = (typeof ROLE_ORIGINS)[keyof typeof ROLE_ORIGINS]
 export type RoleResponse = BaseRole & {
   tenant: string
   permissions: Permission['id'][]
-  users: UserResponse['id'][]
+  users: User['id'][]
   createdAt: string
   lastUpdated: string | null
   updatedBy: string | null
   groups: Group['id'][]
   roleOrigin: RoleOrigin
 }
+
+export type CreateRoleData = Omit<RoleResponse, 'id'>
+export type UpdateRoleData = RoleResponse
+export type PatchRoleData = Partial<CreateRoleData> & WithId
 
 export type UserRolesTableData = {
   id: string

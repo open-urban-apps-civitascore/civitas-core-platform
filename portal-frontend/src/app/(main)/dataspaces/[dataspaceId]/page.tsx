@@ -1,17 +1,16 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useDeleteDataSpace, useGetDataspace, useUpdateDataspace } from '@/app/services/api/dataspaces/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 
-import { DataSpace, DataSpaceFormData, dataSpaceSchema } from '../../../../../types/dataspaces'
+import { DataSpaceFormData, dataSpaceSchema } from '../../../../../types/dataspaces'
 import { DataSpaceForm } from '../components/DataSpaceForm'
 import { mapDataspacesToFormData } from '../utils/mappers'
 
@@ -21,70 +20,14 @@ const defaultDataspace = {
   protected: false,
 }
 const EditDataSpacePage = () => {
-  const router = useRouter()
   const params = useParams<{ dataspaceId: string }>()
-  const queryClient = useQueryClient()
-
   const { dataspaceId } = params
+  const router = useRouter()
 
-  const { data: dataspace } = useQuery({
-    queryKey: ['dataspace', dataspaceId],
-    queryFn: () =>
-      apiRequest<DataSpace>({
-        method: 'GET',
-        endpoint: `/dataspaces/${dataspaceId}`,
-        errorMessage: 'An error occurred while fetching dataspace.',
-      }),
-  })
+  const updateDataspace = useUpdateDataspace()
+  const deleteDataspace = useDeleteDataSpace(dataspaceId)
 
-  const updateDataSpaceMutation = useMutation({
-    mutationFn: ({
-      dataspaceId,
-      updatedDataSpaceData,
-    }: {
-      dataspaceId: DataSpace['id']
-      updatedDataSpaceData: DataSpace
-    }) =>
-      apiRequest<DataSpace>({
-        method: 'PUT',
-        endpoint: `/dataspaces/${dataspaceId}`,
-        data: updatedDataSpaceData,
-        errorMessage: 'An error occurred while updating the data space.',
-      }),
-    onSuccess: ({ data }) => {
-      form.reset(mapDataspacesToFormData(data))
-      queryClient.invalidateQueries({
-        queryKey: ['dataspace', data.id],
-      })
-      queryClient.invalidateQueries({
-        queryKey: ['dataspaces'],
-      })
-    },
-    onError: error => {
-      console.error('Failed to update dataspace.', error)
-    },
-  })
-
-  const deleteDataSpaceMutation = useMutation({
-    mutationFn: (dataspaceId: DataSpace['id']) =>
-      apiRequest<DataSpace>({
-        method: 'DELETE',
-        endpoint: `/dataspaces/${dataspaceId}`,
-        errorMessage: 'An error occurred while deleting the data space.',
-      }),
-    onSuccess: (_, id) => {
-      queryClient.setQueriesData<{ data: DataSpace[] }>({ queryKey: ['dataspaces'] }, old =>
-        old ? { ...old, data: old.data.filter((d: DataSpace) => d.id !== id) } : old,
-      )
-      queryClient.invalidateQueries({
-        queryKey: ['dataspaces'],
-      })
-      router.push('/dataspaces')
-    },
-    onError: error => {
-      console.error('Error deleting dataspace.', error)
-    },
-  })
+  const { data: dataspace } = useGetDataspace({ id: dataspaceId })
 
   const form = useForm<DataSpaceFormData>({
     resolver: zodResolver(dataSpaceSchema),
@@ -97,21 +40,21 @@ const EditDataSpacePage = () => {
     }
   }, [dataspace?.data, form])
 
+  const handleDeleteDataspace = () => deleteDataspace.mutate(undefined, { onSuccess: () => router.push('/dataspaces') })
+
   const onSubmit = async (values: DataSpaceFormData) => {
     if (!dataspace?.data) return
-    updateDataSpaceMutation.mutate({ dataspaceId, updatedDataSpaceData: { ...dataspace.data, ...values } })
+    updateDataspace.mutate(
+      { ...dataspace.data, ...values },
+      { onSuccess: ({ data }) => form.reset(mapDataspacesToFormData(data)) },
+    )
   }
 
   return (
     <PageContainer testId="dataspaceDetailsPage" headerType="onlyTitle">
       <PageHeader title={dataspace?.data?.name} />
       <PageBackground>
-        <DataSpaceForm
-          form={form}
-          onSubmit={onSubmit}
-          isEdit={true}
-          deleteDataSpace={() => deleteDataSpaceMutation.mutate(dataspaceId)}
-        />
+        <DataSpaceForm form={form} onSubmit={onSubmit} isEdit={true} deleteDataSpace={handleDeleteDataspace} />
       </PageBackground>
     </PageContainer>
   )

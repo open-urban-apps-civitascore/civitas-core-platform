@@ -1,11 +1,10 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { Row, RowSelectionState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useGetPermissions } from '@/app/services/api/permissions/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -49,17 +48,7 @@ const PermissionsPage = () => {
   const [permissionType, setPermissionsType] = useState<string>(tabValue || DEFAULT_TAB)
 
   const requestParams = new URLSearchParams(`type=${permissionType}&${getApiRequestParamsByUrl()}`)
-  const { data: permissionsData, isFetching } = useQuery({
-    queryKey: ['permissions', requestParams.toString()],
-    queryFn: () =>
-      apiRequest<Permission[]>({
-        endpoint: '/permissions',
-        method: 'GET',
-        params: requestParams,
-        errorMessage: 'An error occurred while loading permissions data',
-      }),
-    placeholderData: previousData => previousData,
-  })
+  const { data: permissionsData, isFetching } = useGetPermissions({ params: requestParams })
 
   const rowCount = permissionsData?.totalElements || 0
 

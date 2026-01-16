@@ -1,14 +1,13 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQuery } from '@tanstack/react-query'
 import { SquarePen } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
+import { useCreateUser, useGetAuthorities, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
@@ -22,17 +21,17 @@ import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { cn } from '@/lib/utils'
-import { Authority, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+import { User, UserFormData, UserFormSchema } from '@/types/users'
 import { mapFormUserToApiData, mapUserToFormData } from '@/utils/users'
 
-export type FormUser = Omit<UserResponse, 'authority' | 'department' | 'position' | 'positionDescription' | 'roles'> & {
+export type FormUser = Omit<User, 'authority' | 'department' | 'position' | 'positionDescription' | 'roles'> & {
   authority: string
   department: string
   positionDescription: string
 }
 
 interface UserFormProps {
-  userData: UserResponse
+  userData: User
   isEditMode?: boolean
 }
 
@@ -41,53 +40,18 @@ export const UserForm = (props: UserFormProps) => {
   const router = useRouter()
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
+
+  const createUser = useCreateUser()
+  const updateUser = useUpdateUser()
+
   const { getApiRequestParamsByUrl } = useQueryParams()
   const [defaultUserData, setDefaultUserData] = useState(userData)
   const [isReadOnly, setIsReadOnly] = useState(isEditMode)
 
-  const createUserMutation = useMutation({
-    mutationFn: (data: Omit<UserResponse, 'id'>) =>
-      apiRequest<UserResponse>({
-        endpoint: '/users',
-        method: 'POST',
-        data: data,
-        errorMessage: 'An error occurred while creating new user.',
-      }),
-    onSuccess: ({ data }) => {
-      router.push(`/users/${data.id}`)
-    },
-  })
-
-  const updateUserMutation = useMutation({
-    mutationFn: ({ userId, data }: { userId: string; data: Omit<UserResponse, 'id'> }) =>
-      apiRequest<UserResponse>({
-        endpoint: `/users/${userId}`,
-        method: 'PUT',
-        data: data,
-      }),
-    onSuccess: ({ data }) => {
-      setDefaultUserData(data)
-      router.refresh()
-      setIsReadOnly(true)
-    },
-  })
-
-  const {
-    data: authoritiesData,
-    isLoading: areAuthoritiesLoading,
-    error,
-  } = useQuery<ApiServiceResponse<Authority[]>>({
-    queryKey: ['authorities'],
-    queryFn: () =>
-      apiRequest<Authority[]>({
-        endpoint: '/authorities',
-        method: 'GET',
-        errorMessage: 'An error occurred while fetching authorities.',
-      }),
-  })
-
+  const { data: authoritiesData, isFetching: areAuthoritiesLoading, error } = useGetAuthorities()
   const authorities = useMemo(() => authoritiesData?.data || [], [authoritiesData])
-  const isLoading = areAuthoritiesLoading || createUserMutation.isPending || updateUserMutation.isPending
+
+  const isLoading = areAuthoritiesLoading || createUser.isPending || updateUser.isPending
 
   const titleOptions = [
     {
@@ -156,15 +120,24 @@ export const UserForm = (props: UserFormProps) => {
   }
 
   const handleCreateUser = async (formData: UserFormData) => {
-    const mappedData: UserResponse = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
+    const mappedData: User = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
-    createUserMutation.mutate(createUserData)
+    createUser.mutate(createUserData, {
+      onSuccess: ({ data }) => {
+        router.push(`/users/${data.id}`)
+      },
+    })
   }
 
   const handleUpdateUser = async (formData: UserFormData) => {
-    const { id, ...updateUserData } = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
-    updateUserMutation.mutate({ userId: id, data: updateUserData })
+    const updateUserData = { ...mapFormUserToApiData(formData), groups: defaultUserData.groups }
+    updateUser.mutate(updateUserData, {
+      onSuccess: ({ data }) => {
+        setDefaultUserData(data)
+        setIsReadOnly(true)
+      },
+    })
   }
 
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)

@@ -1,5 +1,4 @@
 import { DialogProps } from '@radix-ui/react-dialog'
-import { useQuery } from '@tanstack/react-query'
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -12,7 +11,7 @@ import {
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useGetUsers } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
@@ -22,7 +21,7 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { GroupAssignmentUser, UserResponse } from '@/types/users'
+import { GroupAssignmentUser } from '@/types/users'
 import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
 import { mapGoupAssignmentUsers } from '@/utils/users'
 
@@ -50,16 +49,8 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
 
   // this implementation has to be adjusted when the backend is implemented
   // only unassigned users have to be returned from the backend directly
-  const { data: usersData, isLoading: areUsersLoading } = useQuery({
-    queryKey: ['users', getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString })],
-    queryFn: () => {
-      return apiRequest<UserResponse[]>({
-        endpoint: '/users',
-        method: 'GET',
-        params: getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString }),
-        errorMessage: 'An error occurred while fetching users.',
-      })
-    },
+  const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
+    params: getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString }),
   })
 
   const users = useMemo(() => {
@@ -190,7 +181,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
               pageIndex={pageIndex}
               pageSize={pageSize}
               totalPages={totalPages}
-              isLoading={areUsersLoading}
+              isLoading={isFetchingUsers}
             />
           )}
         </div>
@@ -198,7 +189,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
           confirmButtonType="button"
           onConfirmClick={() => onUpdateUsers(selection)}
           onCancelClick={() => onOpenChange(false)}
-          isConfirmButtonDisabled={isUpdating || areUsersLoading}
+          isConfirmButtonDisabled={isUpdating || isFetchingUsers}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.add')}
         />

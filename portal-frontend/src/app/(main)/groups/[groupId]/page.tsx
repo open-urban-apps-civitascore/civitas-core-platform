@@ -1,13 +1,11 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useGetGroup } from '@/app/services/api/groups/clientRequests'
 import { ErrorPage } from '@/components/error-page/ErrorPage'
 import LoadingPage from '@/components/loading-page/LoadingPage'
-import { Group } from '@/types/groups'
 
 import GroupDetails from '../components/GroupDetails'
 
@@ -16,19 +14,7 @@ const UpdateGroupPage = () => {
   const { groupId } = params
   const t = useTranslations('common')
 
-  const {
-    data: groupData,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ['group', groupId],
-    queryFn: () =>
-      apiRequest<Group>({
-        method: 'GET',
-        endpoint: `/groups/${groupId}`,
-        errorMessage: 'An error occurred while fetching groups data.',
-      }),
-  })
+  const { data: groupData, isLoading, error } = useGetGroup({ id: groupId })
 
   if (isLoading) {
     return <LoadingPage testId="editGroupLoadingPage" title={t('loadingItems', { item: t('items.groups') })} />

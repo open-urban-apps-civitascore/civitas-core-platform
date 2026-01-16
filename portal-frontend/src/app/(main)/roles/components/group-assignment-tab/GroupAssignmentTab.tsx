@@ -1,13 +1,12 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { PaginationState, Row, RowSelectionState, SortingState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
@@ -42,17 +41,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const originalGroupSelection = getGroupSelection(assignedGroupIds)
 
   const requestParams = new URLSearchParams(`_limit=${pageSize}&_page=${pageIndex + 1}`)
-  const { data: groupsData, isFetching } = useQuery({
-    queryKey: ['groups', requestParams.toString()],
-    queryFn: () =>
-      apiRequest<Group[]>({
-        endpoint: '/groups',
-        method: 'GET',
-        params: requestParams,
-        errorMessage: 'An error occurred while fetching groups.',
-      }),
-    placeholderData: previousData => previousData,
-  })
+  const { data: groupsData, isFetching } = useGetGroups({ params: requestParams })
 
   const groups = useMemo(() => {
     if (!groupsData?.data) {

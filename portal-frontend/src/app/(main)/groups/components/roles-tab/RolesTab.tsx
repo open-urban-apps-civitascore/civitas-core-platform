@@ -1,17 +1,17 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useUpdateGroup } from '@/app/services/api/groups/clientRequests'
+import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { Group, GroupTabProps } from '@/types/groups'
-import { BaseRole, ROLE_TYPES } from '@/types/roles'
+import { ROLE_TYPES } from '@/types/roles'
 
 import { RoleCategory } from './RoleCategory'
 
@@ -20,39 +20,12 @@ export const RolesTab = (props: GroupTabProps) => {
   const t = useTranslations('groups')
   const tRoles = useTranslations('roles')
   const router = useRouter()
-  const queryClient = useQueryClient()
+  const updateGroup = useUpdateGroup()
 
   const [originalRoles, setOriginalRoles] = useState(groupData.roles)
   const [group, setGroup] = useState<Group>(groupData)
 
-  const { data: rolesdata, isLoading: areRolesLoading } = useQuery({
-    queryKey: ['roles'],
-    queryFn: () =>
-      apiRequest<BaseRole[]>({
-        endpoint: '/roles',
-        method: 'GET',
-        errorMessage: 'An error occurred while fetching roles.',
-      }),
-  })
-
-  const updateGroupMutation = useMutation({
-    mutationFn: (data: Group) =>
-      apiRequest<Group>({
-        method: 'PUT',
-        endpoint: `/groups/${data.id}`,
-        data: data,
-        errorMessage: 'An error occurred while updating the group.',
-      }),
-    onSuccess: ({ data }) => {
-      setOriginalRoles(data.roles)
-      queryClient.invalidateQueries({
-        queryKey: ['groups', data.id],
-      })
-    },
-    onError: error => {
-      console.error('An error occurred while updating the group. ', error)
-    },
-  })
+  const { data: rolesdata, isLoading: isLoadingRoles } = useGetRoles()
 
   const hasChanges = useMemo(
     () => JSON.stringify(group.roles.sort()) !== JSON.stringify(originalRoles.sort()),
@@ -70,10 +43,10 @@ export const RolesTab = (props: GroupTabProps) => {
   }
 
   const handleUpdateGroup = async () => {
-    updateGroupMutation.mutate(group)
+    updateGroup.mutate(group, { onSuccess: ({ data }) => setOriginalRoles(data.roles) })
   }
 
-  if (areRolesLoading || updateGroupMutation.isPending) {
+  if (isLoadingRoles || updateGroup.isPending) {
     return <LoadingSpinner className="h-full" />
   }
 

@@ -1,12 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Circle, CircleCheckBig, SquarePen, X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { KeyboardEvent, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useCreateDataset, usePatchDataset } from '@/app/services/api/datasets/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { Select } from '@/components/form/fields/Select'
@@ -19,7 +18,7 @@ import { Form, FormItem, FormLabel } from '@/components/ui/form'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
-import { DatasetFormData, DatasetFormSchema, DatasetResponse } from '@/types/datasets'
+import { DatasetFormData, DatasetFormSchema } from '@/types/datasets'
 
 import { mapDatasetToFormData } from '../../utils/mappers'
 
@@ -32,48 +31,16 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const { dataset, dataspaces, isEditMode } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
-  const queryClient = useQueryClient()
 
   const isMobile = useIsMobile()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isReadOnly, setIsReadOnly] = useState(isEditMode)
 
-  const createDatasetMutation = useMutation({
-    mutationFn: (data: DatasetResponse) =>
-      apiRequest<DatasetResponse>({
-        endpoint: '/datasets',
-        method: 'POST',
-        data: data,
-        errorMessage: 'An error occurred while creating new dataset.',
-      }),
-    onSuccess: ({ data }) => {
-      queryClient.invalidateQueries({
-        queryKey: ['datasets'],
-      })
-      router.push(`/datasets/${data.id}`)
-    },
-  })
+  const createDataset = useCreateDataset()
+  const updateDataset = usePatchDataset()
 
-  const updateDatasetMutation = useMutation({
-    mutationFn: ({ datasetId, data }: { datasetId: string; data: Partial<DatasetResponse> }) =>
-      apiRequest<DatasetResponse>({
-        endpoint: `/datasets/${datasetId}`,
-        method: 'PATCH',
-        data: data,
-        errorMessage: 'An error occurred while creating new dataset.',
-      }),
-    onSuccess: ({ data }) => {
-      form.reset(mapDatasetToFormData(data))
-      router.refresh()
-      setIsReadOnly(true)
-      queryClient.invalidateQueries({
-        queryKey: ['datasets'],
-      })
-    },
-  })
-
-  const isLoading = createDatasetMutation.isPending || updateDatasetMutation.isPending
+  const isLoading = createDataset.isPending || updateDataset.isPending
 
   const form = useForm<DatasetFormData>({
     resolver: zodResolver(DatasetFormSchema),
@@ -106,28 +73,40 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
 
   const handleCreateDataset = async (formData: DatasetFormData) => {
     const selectedDataspace = dataspaces.find(dataspace => dataspace.value === formData.dataspace)
-    createDatasetMutation.mutate({
-      ...formData,
-      // the contact implementation has to be adjusted once the API is implemented
-      contact: null,
-      issued: new Date().toISOString(),
-      lastUpdated: new Date().toISOString(),
-      dataspace: selectedDataspace ? { id: selectedDataspace?.value, name: selectedDataspace?.label } : null,
-      access: true,
-      status: 'draft',
-    })
+    createDataset.mutate(
+      {
+        ...formData,
+        // the contact implementation has to be adjusted once the API is implemented
+        contact: null,
+        issued: new Date().toISOString(),
+        lastUpdated: new Date().toISOString(),
+        dataspace: selectedDataspace ? { id: selectedDataspace?.value, name: selectedDataspace?.label } : null,
+        access: true,
+        status: 'draft',
+      },
+      {
+        onSuccess: ({ data }) => {
+          router.push(`/datasets/${data.id}`)
+        },
+      },
+    )
   }
   const handleUpdateDataset = async (formData: DatasetFormData) => {
     const selectedDataspace = dataspaces.find(dataspace => dataspace.value === formData.dataspace)
-    const { id, ...updateDatasetData } = formData
-    updateDatasetMutation.mutate({
-      datasetId: id,
-      data: {
-        ...updateDatasetData,
+    updateDataset.mutate(
+      {
+        ...formData,
         dataspace: selectedDataspace ? { id: selectedDataspace?.value, name: selectedDataspace?.label } : null,
         lastUpdated: new Date().toISOString(),
       },
-    })
+      {
+        onSuccess: ({ data }) => {
+          form.reset(mapDatasetToFormData(data))
+          router.refresh()
+          setIsReadOnly(true)
+        },
+      },
+    )
   }
 
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateDataset) : form.handleSubmit(handleCreateDataset)

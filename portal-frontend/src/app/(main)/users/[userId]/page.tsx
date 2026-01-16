@@ -1,9 +1,7 @@
 import { getTranslations } from 'next-intl/server'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
-import { getServerRequestHeaders } from '@/app/services/api/request/getServerRequestHeaders'
-import { Group } from '@/types/groups'
-import { UserResponse } from '@/types/users'
+import { getGroups } from '@/app/services/api/groups/serverRequests'
+import { getUser } from '@/app/services/api/users/serverRequests'
 
 import { UserDetails } from '../components/UserDetails'
 
@@ -17,19 +15,8 @@ const EditUserPage = async (props: PageProps) => {
   const t = await getTranslations('users')
 
   const getUserData = async (userId: string) => {
-    const headers = await getServerRequestHeaders()
-    const userRequest = apiRequest<UserResponse>({
-      method: 'GET',
-      endpoint: `/users/${userId}`,
-      headers,
-      errorMessage: 'An error occurred while fetching user data.',
-    })
-    const groupsRequest = apiRequest<Group[]>({
-      method: 'GET',
-      endpoint: `/groups`,
-      headers,
-      errorMessage: 'An error occurred while fetching groups data.',
-    })
+    const userRequest = getUser(userId)
+    const groupsRequest = getGroups()
     const [userResponse, groupsResponse] = await Promise.all([userRequest, groupsRequest])
     const userData = userResponse.data
     const groupsData = groupsResponse.data

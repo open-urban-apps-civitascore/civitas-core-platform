@@ -1,13 +1,11 @@
 import { getTranslations } from 'next-intl/server'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
-import { getServerRequestHeaders } from '@/app/services/api/request/getServerRequestHeaders'
+import { getUsers } from '@/app/services/api/users/serverRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Item } from '@/types/common'
-import { UserResponse } from '@/types/users'
 import { getRequestParams, RequestParams } from '@/utils/getRequestParams'
 import { mapListUsers } from '@/utils/users'
 
@@ -27,14 +25,7 @@ const UsersPage = async ({ searchParams }: Props) => {
 
   const { apiParams, pageSize, sort, pageIndex, search } = getRequestParams(params)
 
-  const { data, totalElements } = await apiRequest<UserResponse[]>({
-    endpoint: '/users',
-    method: 'GET',
-    params: apiParams,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    headers: { ...(await getServerRequestHeaders()), 'x-api-request': 'true' },
-    errorMessage: 'An error occurred while fetching users.',
-  })
+  const { data, totalElements } = await getUsers(apiParams)
 
   const users = mapListUsers(data, [])
   const totalCount = Number(totalElements) || 0
