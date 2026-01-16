@@ -10,6 +10,7 @@ include:
   - path: ../kafka/docker-compose.yml
   - path: ../postgres/docker-compose.yml
   - path: ../keycloak/docker-compose.yml
+  - path: ../modelatlas/docker-compose.yml
   - path: ../apisix/docker-compose.yml
 
 services:
