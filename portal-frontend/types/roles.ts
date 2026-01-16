@@ -49,6 +49,7 @@ export type UserRolesTableData = {
   dataspace: Item | null
   inherited: boolean
   type: RoleType
+  roleId: string
 }
 export type RoleInput = Omit<RoleResponse, 'id' | 'lastUpdated' | 'updatedBy'>
 

@@ -1,10 +1,10 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useMemo } from 'react'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useGetGroups } from '@/app/services/api/groups/clientRequests'
+import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
@@ -22,37 +22,20 @@ export const RolesTab = (props: RolesTabProps) => {
   const { groupIds } = props
   const t = useTranslations()
 
+  const groupsRequestparams = new URLSearchParams(groupIds.map(id => `id=${id}`).join('&'))
   const {
     data: groupsData,
-    isLoading: areGroupsLoading,
+    isFetching: isLoadingGroups,
     error: groupsError,
-  } = useQuery({
-    queryKey: ['groups', groupIds],
-    queryFn: () =>
-      apiRequest<Group[]>({
-        method: 'GET',
-        endpoint: `/groups?${groupIds.map(id => `id=${id}`).join('&')}`,
-        errorMessage: 'An error occurred while fetching groups data.',
-      }),
-    enabled: groupIds.length > 0,
-  })
+  } = useGetGroups({ params: groupsRequestparams, isEnabled: groupIds.length > 0 })
 
   const roleIds = useMemo(() => new Set(groupsData?.data.flatMap(group => group.roles)), [groupsData])
-
+  const rolesRequestparams = new URLSearchParams([...roleIds].map(role => `id=${role}`).join('&'))
   const {
     data: rolesData,
     isLoading: areRolesLoading,
     error: rolesError,
-  } = useQuery({
-    queryKey: ['roles', groupIds],
-    queryFn: () =>
-      apiRequest<BaseRole[]>({
-        method: 'GET',
-        endpoint: `/roles?${[...roleIds].map(role => `id=${role}`).join('&')}`,
-        errorMessage: 'An error occurred while fetching roles data.',
-      }),
-    enabled: roleIds.size > 0,
-  })
+  } = useGetRoles({ params: rolesRequestparams, isEnabled: roleIds.size > 0 })
 
   const mapRolesData = (roles: BaseRole[], groupData: Group[]) => {
     const allRoles = groupData.flatMap(group =>
@@ -66,6 +49,7 @@ export const RolesTab = (props: RolesTabProps) => {
           group: group?.title || null,
           dataspace: group?.dataspace || null,
           type: currentRole.type,
+          roleId: currentRole.id,
         }
       }),
     )
@@ -78,7 +62,7 @@ export const RolesTab = (props: RolesTabProps) => {
   )
 
   const error = groupsError || rolesError
-  const isLoading = areGroupsLoading || areRolesLoading
+  const isLoading = isLoadingGroups || areRolesLoading
 
   return (
     <ContentCard className={cn((error || isLoading) && 'h-50')}>
