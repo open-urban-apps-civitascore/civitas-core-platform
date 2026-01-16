@@ -10,6 +10,7 @@
  */
 package com.civitas.event.handler.kafka;
 
+import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.messaging.EventConsumer;
@@ -254,7 +255,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
               .withSource(URI.create(resultEvent.source()))
               .withType(resultEvent.resultType())
               .withTime(resultEvent.timestamp())
-              .withDataContentType("application/json")
+              .withDataContentType(Constants.CONTENT_TYPE_JSON)
               .withData(jsonData)
               .withExtension("correlationid", resultEvent.correlationId())
               .withExtension("originalmessageid", resultEvent.originalMessageId())
@@ -289,7 +290,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
           .withId(UUID.randomUUID().toString())
           .withSource(URI.create(resultEvent.source()))
           .withType(resultEvent.resultType())
-          .withDataContentType("application/json")
+          .withDataContentType(Constants.CONTENT_TYPE_JSON)
           .withData("{}".getBytes())
           .build();
     }

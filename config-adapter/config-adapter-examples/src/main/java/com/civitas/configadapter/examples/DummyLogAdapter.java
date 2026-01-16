@@ -26,6 +26,9 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(DummyLogAdapter.class);
 
+  private static final String DUMMY_LOG_RESULT_TYPE = "core.civitas.processing.result";
+  private static final String DUMMY_LOG_SOURCE = "civitas.config-adapter.dummy-log";
+
   public static final String ADAPTER_NAME = "dummylog";
 
   public DummyLogAdapter() {}
@@ -77,8 +80,8 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
                 null,
                 event.payload().operation(),
                 event.payload().targetResource(),
-                "civitas.config-adapter.dummy-log",
-                "core.civitas.processing.result");
+                DUMMY_LOG_SOURCE,
+                DUMMY_LOG_RESULT_TYPE);
 
         getEventPublisher().publish(resultTopic, resultEvent);
         logger.debug(

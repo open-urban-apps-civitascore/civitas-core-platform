@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.messaging.EventPublisher;
@@ -319,7 +320,7 @@ class KafkaEventHandlerIntegrationTest {
         .withId(UUID.randomUUID().toString())
         .withSource(URI.create("test.producer"))
         .withType("user.created")
-        .withDataContentType("application/json")
+        .withDataContentType(Constants.CONTENT_TYPE_JSON)
         .withData(jsonData.getBytes())
         .build();
   }
