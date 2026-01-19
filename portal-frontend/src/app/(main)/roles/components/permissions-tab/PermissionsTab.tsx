@@ -1,18 +1,18 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { type JSX, useEffect, useMemo, useState } from 'react'
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
+import { useGetPermissions } from '@/app/services/api/permissions/clientRequests'
+import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Item } from '@/types/common'
 import { Permission, PermissionItem } from '@/types/permissions'
-import { ROLE_ORIGINS, ROLE_TYPES, RoleResponse } from '@/types/roles'
+import { ROLE_ORIGINS, ROLE_TYPES } from '@/types/roles'
 
 import { CategoryList } from './CategoryList'
 import { RoleTemplateSelect } from './RoleTemplateSelect'
@@ -56,28 +56,10 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     `type=${tabValue}&${getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput })}`,
   )
 
-  const { data: rolesData } = useQuery({
-    queryKey: ['roles', rolesRequestParams.toString()],
-    queryFn: () =>
-      apiRequest<RoleResponse[]>({
-        endpoint: '/roles',
-        method: 'GET',
-        params: rolesRequestParams,
-        errorMessage: 'An error occurred while fetching roles.',
-      }),
-    placeholderData: previousData => previousData,
-  })
+  const { data: rolesData } = useGetRoles({ params: rolesRequestParams })
 
-  const { data: permissionsData, isFetching: isFetchingPermissions } = useQuery({
-    queryKey: ['permissions', permissionsRequestParams.toString()],
-    queryFn: () =>
-      apiRequest<Permission[]>({
-        endpoint: '/permissions',
-        method: 'GET',
-        params: permissionsRequestParams,
-        errorMessage: 'An error occurred while fetching permissions.',
-      }),
-    placeholderData: previousData => previousData,
+  const { data: permissionsData, isFetching: isFetchingPermissions } = useGetPermissions({
+    params: permissionsRequestParams,
   })
 
   const allRoles = useMemo(() => rolesData?.data || [], [rolesData?.data])

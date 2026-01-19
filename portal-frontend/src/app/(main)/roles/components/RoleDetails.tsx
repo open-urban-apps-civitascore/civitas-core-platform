@@ -12,14 +12,14 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
+import { FormRole, Role, ROLE_ORIGINS, roleSchema } from '@/types/roles'
 
-import { FormRole, ROLE_ORIGINS, RoleResponse, roleSchema } from '../../../../../types/roles'
 import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
 import { PermissionsTab } from './permissions-tab/PermissionsTab'
 
-const defaultRole: RoleResponse = {
+const defaultRole: Role = {
   id: '',
   name: '',
   type: DEFAULT_TAB,

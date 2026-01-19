@@ -1,4 +1,4 @@
-import { useCreateMutation } from '@/hooks/use-create-mutation copy'
+import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
 import { useDeleteMutation } from '@/hooks/use-delete-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
@@ -12,7 +12,7 @@ export const useGetDataspaces = ({ params, isEnabled }: GetListInput = {}) =>
     key,
     params,
     isEnabled,
-    errorMessage: 'An error occurred while fetching groups.',
+    errorMessage: 'An error occurred while fetching data spaces.',
   })
 
 export const useGetDataspace = ({ id, isEnabled }: GetItemInput) =>
@@ -20,7 +20,7 @@ export const useGetDataspace = ({ id, isEnabled }: GetItemInput) =>
     id,
     key,
     isEnabled,
-    errorMessage: 'An error occurred while fetching groups.',
+    errorMessage: 'An error occurred while fetching the data space.',
   })
 
 export const useCreateDataspace = () =>

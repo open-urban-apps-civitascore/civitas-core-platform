@@ -9,9 +9,9 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { cn } from '@/lib/utils'
-import { Group } from '@/types/groups'
-import { BaseRole, ROLE_TYPES } from '@/types/roles'
+import { ROLE_TYPES } from '@/types/roles'
 
+import { mapRolesData } from '../../utils/mappers'
 import { RoleCategory } from './RoleCategory'
 
 interface RolesTabProps {
@@ -36,25 +36,6 @@ export const RolesTab = (props: RolesTabProps) => {
     isLoading: areRolesLoading,
     error: rolesError,
   } = useGetRoles({ params: rolesRequestparams, isEnabled: roleIds.size > 0 })
-
-  const mapRolesData = (roles: BaseRole[], groupData: Group[]) => {
-    const allRoles = groupData.flatMap(group =>
-      group.roles.flatMap(groupRole => {
-        const currentRole = roles.find(role => role.id === groupRole)
-        if (!currentRole) return []
-        return {
-          id: `${group.id}-${currentRole.id}`,
-          name: currentRole.name,
-          inherited: false,
-          group: group?.title || null,
-          dataspace: group?.dataspace || null,
-          type: currentRole.type,
-          roleId: currentRole.id,
-        }
-      }),
-    )
-    return allRoles
-  }
 
   const roles = useMemo(
     () => (rolesData && groupsData ? mapRolesData(rolesData.data, groupsData.data) : []),

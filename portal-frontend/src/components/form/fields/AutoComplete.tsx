@@ -54,7 +54,7 @@ export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>)
     isLoading,
   } = props
   const t = useTranslations('common')
-  const contactsError =
+  const error =
     inputValue.trim().length < minLength
       ? t('errors.minChar', { amount: minLength.toString() })
       : t('errors.notFound', { items: label })
@@ -99,7 +99,7 @@ export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>)
             >
               <div>
                 <CommandList>
-                  <CommandEmpty>{isLoading ? <LoadingSpinner /> : contactsError}</CommandEmpty>
+                  <CommandEmpty>{isLoading ? <LoadingSpinner /> : error}</CommandEmpty>
                   <CommandGroup className="p-0 w-full">
                     {listItems.map(item => (
                       <CommandItem

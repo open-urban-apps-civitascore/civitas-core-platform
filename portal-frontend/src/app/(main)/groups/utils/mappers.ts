@@ -9,7 +9,7 @@ export const mapFormGroupToApiData = (formData: GroupBaseFormData, groupData: Gr
     roles: groupData.roles,
     subgroups: groupData.subgroups,
     users: groupData.users,
-    dataspace: null,
+    dataspace: groupData.dataspace,
   }
   return group
 }

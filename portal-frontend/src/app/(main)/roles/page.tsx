@@ -14,7 +14,7 @@ import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { ROLE_TYPES, RoleResponse, RoleType } from '@/types/roles'
+import { Role, ROLE_TYPES, RoleType } from '@/types/roles'
 
 import { RolesTable } from './components/RolesTable'
 
@@ -58,7 +58,7 @@ const RolesPage = () => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, setTotalPages, pageSize])
 
-  const handleRowClick = (row: Row<RoleResponse>) => {
+  const handleRowClick = (row: Row<Role>) => {
     router.push(`/roles/${row.original.id}?_tab=${selectedRoleType}`)
   }
 

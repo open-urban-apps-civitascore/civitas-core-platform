@@ -27,7 +27,7 @@ export const ROLE_ORIGINS = {
 
 export type RoleOrigin = (typeof ROLE_ORIGINS)[keyof typeof ROLE_ORIGINS]
 
-export type RoleResponse = BaseRole & {
+export type Role = BaseRole & {
   tenant: string
   permissions: Permission['id'][]
   users: User['id'][]
@@ -38,8 +38,8 @@ export type RoleResponse = BaseRole & {
   roleOrigin: RoleOrigin
 }
 
-export type CreateRoleData = Omit<RoleResponse, 'id'>
-export type UpdateRoleData = RoleResponse
+export type CreateRoleData = Omit<Role, 'id'>
+export type UpdateRoleData = Role
 export type PatchRoleData = Partial<CreateRoleData> & WithId
 
 export type UserRolesTableData = {
@@ -51,20 +51,9 @@ export type UserRolesTableData = {
   type: RoleType
   roleId: string
 }
-export type RoleInput = Omit<RoleResponse, 'id' | 'lastUpdated' | 'updatedBy'>
+export type RoleInput = Omit<Role, 'id' | 'lastUpdated' | 'updatedBy'>
 
-export type RoleUpdate = RoleResponse
-
-export type Role = {
-  id: string
-  name: string
-  description: string
-  tenant: string
-  type: string
-  permissions: string[]
-  user: string[]
-  createdAt: string
-}
+export type RoleUpdate = Role
 
 export const roleSchema = z.object({
   name: z.string().trim().min(2, {

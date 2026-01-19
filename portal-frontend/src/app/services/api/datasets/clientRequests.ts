@@ -1,4 +1,4 @@
-import { useCreateMutation } from '@/hooks/use-create-mutation copy'
+import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
 import { GetListInput } from '@/types/common'
