@@ -22,12 +22,12 @@ export const RolesTab = (props: RolesTabProps) => {
   const { groupIds } = props
   const t = useTranslations()
 
-  const groupsRequestparams = new URLSearchParams(groupIds.map(id => `id=${id}`).join('&'))
+  const groupsRequestParams = new URLSearchParams(groupIds.map(id => `id=${id}`).join('&'))
   const {
     data: groupsData,
     isFetching: isLoadingGroups,
     error: groupsError,
-  } = useGetGroups({ params: groupsRequestparams, isEnabled: groupIds.length > 0 })
+  } = useGetGroups({ params: groupsRequestParams, isEnabled: groupIds.length > 0 })
 
   const roleIds = useMemo(() => new Set(groupsData?.data.flatMap(group => group.roles)), [groupsData])
   const rolesRequestparams = new URLSearchParams([...roleIds].map(role => `id=${role}`).join('&'))
