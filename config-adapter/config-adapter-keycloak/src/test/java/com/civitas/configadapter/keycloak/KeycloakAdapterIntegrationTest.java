@@ -29,7 +29,13 @@ import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
-import com.civitas.configadapter.model.idm.*;
+import com.civitas.configadapter.model.idm.ClientConfig;
+import com.civitas.configadapter.model.idm.GroupConfig;
+import com.civitas.configadapter.model.idm.IdmConfigValue;
+import com.civitas.configadapter.model.idm.RealmConfig;
+import com.civitas.configadapter.model.idm.RoleConfig;
+import com.civitas.configadapter.model.idm.UserConfig;
+import jakarta.ws.rs.core.Response;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,14 +48,18 @@ import org.apache.commons.configuration2.MapConfiguration;
 import org.awaitility.core.ThrowingRunnable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.RoleResource;
-import org.keycloak.representations.idm.*;
+import org.keycloak.admin.client.resource.RolesResource;
+import org.keycloak.admin.client.resource.UsersResource;
+import org.keycloak.representations.idm.ClientRepresentation;
+import org.keycloak.representations.idm.GroupRepresentation;
+import org.keycloak.representations.idm.RealmRepresentation;
+import org.keycloak.representations.idm.RoleRepresentation;
+import org.keycloak.representations.idm.UserRepresentation;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -60,7 +70,6 @@ import org.testcontainers.utility.DockerImageName;
  * realm, client, and user management.
  */
 @Testcontainers
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class KeycloakAdapterIntegrationTest {
 
   @SuppressWarnings("resource") // suppress false positive warning
@@ -133,7 +142,6 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(1)
   void shouldCreateRealm() {
     // Given - Create RealmConfig directly (as a developer would)
     RealmConfig realmConfig = new RealmConfig();
@@ -161,13 +169,9 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(2)
   void shouldUpdateRealm() {
     // Given - create realm first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("update-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("update-realm");
 
     // Create update configuration using our ConfigValue
     RealmConfig updateConfig = new RealmConfig();
@@ -191,14 +195,17 @@ class KeycloakAdapterIntegrationTest {
         ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
   }
 
-  @Test
-  @Order(3)
-  void shouldCreateUser() {
-    // Given - create test realm first
+  private void createRealm(String realm) {
     RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("user-realm");
+    realmRep.setRealm(realm);
     realmRep.setEnabled(true);
     keycloakClient.realms().create(realmRep);
+  }
+
+  @Test
+  void shouldCreateUser() {
+    // Given - create test realm first
+    createRealm("user-realm");
 
     RoleRepresentation initialRoleRep = new RoleRepresentation();
     initialRoleRep.setName("testrole");
@@ -240,13 +247,9 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(4)
   void shouldCreateClient() {
     // Given - create test realm first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("client-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("client-realm");
 
     // Create ClientConfig directly
     ClientConfig clientConfig = new ClientConfig();
@@ -275,13 +278,9 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(5)
   void shouldDeleteRealm() {
     // Given - create realm first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("delete-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("delete-realm");
 
     RealmConfig realmConfig = new RealmConfig();
     realmConfig.setRealm("delete-realm");
@@ -302,13 +301,9 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(6)
   void shouldCreateRole() {
     // Given - create test realm first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("role-create-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("role-create-realm");
 
     // Create RoleConfig directly
     RoleConfig roleConfig = new RoleConfig();
@@ -333,13 +328,9 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(7)
   void shouldCreateRoleWithNestedRole() {
     // Given - create test realm first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("role-nested-create-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("role-nested-create-realm");
 
     RoleRepresentation nestedRoleRep = new RoleRepresentation();
     nestedRoleRep.setName("nestedtestrole");
@@ -383,13 +374,9 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(8)
   void shouldUpdateRole() {
     // Given - create test realm first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("role-update-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("role-update-realm");
 
     RoleRepresentation initialRoleRep = new RoleRepresentation();
     initialRoleRep.setName("testrole");
@@ -426,13 +413,9 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(9)
   void shouldDeleteRole() {
     // Given - create test realm first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("role-delete-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("role-delete-realm");
 
     RoleRepresentation initialRoleRep = new RoleRepresentation();
     initialRoleRep.setName("testrole");
@@ -464,13 +447,9 @@ class KeycloakAdapterIntegrationTest {
   // ============== GROUP TESTS ==============
 
   @Test
-  @Order(10)
   void createGroup_whenValidConfig_shouldCreateGroupInRealm() {
     // Given - create test realm first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("group-create-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("group-create-realm");
 
     // Create GroupConfig directly
     GroupConfig groupConfig = new GroupConfig();
@@ -496,17 +475,14 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(11)
   void createGroup_whenConfigHasRealmRoles_shouldAssignRolesToGroup() {
     // Given - create test realm and role first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("group-roles-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("group-roles-realm");
 
     RoleRepresentation roleRep = new RoleRepresentation();
     roleRep.setName("grouprole");
-    keycloakClient.realm("group-roles-realm").roles().create(roleRep);
+    RealmResource realmResource = keycloakClient.realm("group-roles-realm");
+    realmResource.roles().create(roleRep);
 
     // Create GroupConfig with realm roles
     GroupConfig groupConfig = new GroupConfig();
@@ -520,7 +496,7 @@ class KeycloakAdapterIntegrationTest {
     adapter.processConfigEvent(Topics.GROUP_CREATED.toString(), event);
 
     // Then
-    List<GroupRepresentation> groups = keycloakClient.realm("group-roles-realm").groups().groups();
+    List<GroupRepresentation> groups = realmResource.groups().groups();
 
     GroupRepresentation addedGroup =
         groups.stream()
@@ -530,13 +506,7 @@ class KeycloakAdapterIntegrationTest {
 
     // Verify roles are assigned
     var groupRoles =
-        keycloakClient
-            .realm("group-roles-realm")
-            .groups()
-            .group(addedGroup.getId())
-            .roles()
-            .realmLevel()
-            .listAll();
+        realmResource.groups().group(addedGroup.getId()).roles().realmLevel().listAll();
 
     assertTrue(
         groupRoles.stream().anyMatch(role -> role.getName().equals("grouprole")),
@@ -549,18 +519,15 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(12)
   void createGroup_whenConfigHasParentId_shouldCreateAsSubgroup() {
     // Given - create test realm and parent group first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("subgroup-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("subgroup-realm");
 
     GroupRepresentation parentGroupRep = new GroupRepresentation();
     parentGroupRep.setName("parent-group");
     String parentGroupId;
-    try (var response = keycloakClient.realm("subgroup-realm").groups().add(parentGroupRep)) {
+    RealmResource realmResource = keycloakClient.realm("subgroup-realm");
+    try (Response response = realmResource.groups().add(parentGroupRep)) {
       assertEquals(201, response.getStatus(), "Creation of parent group failed");
       parentGroupId = CreatedResponseUtil.getCreatedId(response);
     }
@@ -579,11 +546,7 @@ class KeycloakAdapterIntegrationTest {
     // Then - verify subgroup was created under parent
     // Note: toRepresentation() doesn't load subGroups, need to query them explicitly
     List<GroupRepresentation> subGroups =
-        keycloakClient
-            .realm("subgroup-realm")
-            .groups()
-            .group(parentGroupId)
-            .getSubGroups(0, 100, false);
+        realmResource.groups().group(parentGroupId).getSubGroups(0, 100, false);
 
     assertTrue(
         subGroups.stream().anyMatch(g -> g.getName().equals("child-group")),
@@ -596,18 +559,15 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(13)
   void updateGroup_whenValidConfig_shouldUpdateGroupAndAssignRoles() {
     // Given - create test realm and group first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("group-update-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("group-update-realm");
 
     GroupRepresentation initialGroupRep = new GroupRepresentation();
     initialGroupRep.setName("update-group");
+    RealmResource realmResource = keycloakClient.realm("group-update-realm");
     String groupId;
-    try (var response = keycloakClient.realm("group-update-realm").groups().add(initialGroupRep)) {
+    try (Response response = realmResource.groups().add(initialGroupRep)) {
       assertEquals(201, response.getStatus(), "Group creation failed");
       groupId = CreatedResponseUtil.getCreatedId(response);
     }
@@ -615,7 +575,7 @@ class KeycloakAdapterIntegrationTest {
     // Create role to assign
     RoleRepresentation roleRep = new RoleRepresentation();
     roleRep.setName("updatedrole");
-    keycloakClient.realm("group-update-realm").roles().create(roleRep);
+    realmResource.roles().create(roleRep);
 
     // Create update config
     GroupConfig updateConfig = new GroupConfig();
@@ -630,14 +590,7 @@ class KeycloakAdapterIntegrationTest {
     adapter.processConfigEvent(Topics.GROUP_UPDATED.toString(), event);
 
     // Then - verify roles are assigned
-    var groupRoles =
-        keycloakClient
-            .realm("group-update-realm")
-            .groups()
-            .group(groupId)
-            .roles()
-            .realmLevel()
-            .listAll();
+    var groupRoles = realmResource.groups().group(groupId).roles().realmLevel().listAll();
 
     assertTrue(
         groupRoles.stream().anyMatch(role -> role.getName().equals("updatedrole")),
@@ -650,13 +603,9 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(14)
   void deleteGroup_whenValidConfig_shouldRemoveGroupFromRealm() {
     // Given - create test realm and group first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("group-delete-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("group-delete-realm");
 
     GroupRepresentation initialGroupRep = new GroupRepresentation();
     initialGroupRep.setName("delete-group");
@@ -692,7 +641,6 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(15)
   void shouldPublishErrorResultOnFailure() {
     // Given - try to update non-existent realm
     RealmConfig realmConfig = new RealmConfig();
@@ -735,14 +683,9 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(20)
-  // Hohe Order-Nummer, damit es am Ende läuft
   void updateUser_whenRoleMissingInConfig_shouldRemoveRoleFromUser() {
     // Given - Realm, 2 roles and User with both roles
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("user-sync-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("user-sync-realm");
 
     RoleRepresentation roleA = new RoleRepresentation();
     roleA.setName("role-a");
@@ -754,20 +697,15 @@ class KeycloakAdapterIntegrationTest {
     UserRepresentation userRep = new UserRepresentation();
     userRep.setUsername("sync-user");
     userRep.setEnabled(true);
+    RealmResource realmResource = keycloakClient.realm("user-sync-realm");
+    UsersResource users = realmResource.users();
+    RolesResource roles = realmResource.roles();
     String userId;
-    try (var response = keycloakClient.realm("user-sync-realm").users().create(userRep)) {
+    try (Response response = realmResource.users().create(userRep)) {
       userId = CreatedResponseUtil.getCreatedId(response);
-      var roleARep =
-          keycloakClient.realm("user-sync-realm").roles().get("role-a").toRepresentation();
-      var roleBRep =
-          keycloakClient.realm("user-sync-realm").roles().get("role-b").toRepresentation();
-      keycloakClient
-          .realm("user-sync-realm")
-          .users()
-          .get(userId)
-          .roles()
-          .realmLevel()
-          .add(List.of(roleARep, roleBRep));
+      var roleARep = roles.get("role-a").toRepresentation();
+      var roleBRep = roles.get("role-b").toRepresentation();
+      users.get(userId).roles().realmLevel().add(List.of(roleARep, roleBRep));
     }
 
     UserConfig userUpdateConfig = new UserConfig();
@@ -782,10 +720,8 @@ class KeycloakAdapterIntegrationTest {
     adapter.processConfigEvent(Topics.USER_UPDATED.toString(), event);
 
     // Then
-    String userId2 =
-        keycloakClient.realm("user-sync-realm").users().search("sync-user").getFirst().getId();
-    List<RoleRepresentation> currentRoles =
-        keycloakClient.realm("user-sync-realm").users().get(userId2).roles().realmLevel().listAll();
+    String userId2 = users.search("sync-user").getFirst().getId();
+    List<RoleRepresentation> currentRoles = users.get(userId2).roles().realmLevel().listAll();
 
     assertTrue(
         currentRoles.stream().anyMatch(r -> r.getName().equals("role-a")),
@@ -797,37 +733,27 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(21)
   void updateGroup_whenRoleMissingInConfig_shouldRemoveRoleFromGroup() {
     // Given - Realm, 2 roles and group with both roles
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("group-sync-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("group-sync-realm");
 
     RoleRepresentation roleX = new RoleRepresentation();
     roleX.setName("role-x");
     RoleRepresentation roleY = new RoleRepresentation();
     roleY.setName("role-y");
-    keycloakClient.realm("group-sync-realm").roles().create(roleX);
-    keycloakClient.realm("group-sync-realm").roles().create(roleY);
+    RealmResource realmResource = keycloakClient.realm("group-sync-realm");
+    RolesResource rolesResource = realmResource.roles();
+    rolesResource.create(roleX);
+    rolesResource.create(roleY);
 
     GroupRepresentation groupRep = new GroupRepresentation();
     groupRep.setName("sync-group");
     String groupId;
-    try (var response = keycloakClient.realm("group-sync-realm").groups().add(groupRep)) {
+    try (Response response = keycloakClient.realm("group-sync-realm").groups().add(groupRep)) {
       groupId = CreatedResponseUtil.getCreatedId(response);
-      var roleXRep =
-          keycloakClient.realm("group-sync-realm").roles().get("role-x").toRepresentation();
-      var roleYRep =
-          keycloakClient.realm("group-sync-realm").roles().get("role-y").toRepresentation();
-      keycloakClient
-          .realm("group-sync-realm")
-          .groups()
-          .group(groupId)
-          .roles()
-          .realmLevel()
-          .add(List.of(roleXRep, roleYRep));
+      RoleRepresentation roleXRep = rolesResource.get("role-x").toRepresentation();
+      RoleRepresentation roleYRep = rolesResource.get("role-y").toRepresentation();
+      realmResource.groups().group(groupId).roles().realmLevel().add(List.of(roleXRep, roleYRep));
     }
 
     // Config für Update: only "role-x" ("role-y" missing)
@@ -844,13 +770,7 @@ class KeycloakAdapterIntegrationTest {
 
     // Then
     List<RoleRepresentation> currentRoles =
-        keycloakClient
-            .realm("group-sync-realm")
-            .groups()
-            .group(groupId)
-            .roles()
-            .realmLevel()
-            .listAll();
+        realmResource.groups().group(groupId).roles().realmLevel().listAll();
 
     assertTrue(
         currentRoles.stream().anyMatch(r -> r.getName().equals("role-x")),
@@ -861,13 +781,9 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(22)
   void updateClient_whenValidConfig_shouldUpdateClientAttributes() {
     // Given - create test realm and client first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("client-update-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("client-update-realm");
 
     ClientRepresentation initialClient = new ClientRepresentation();
     initialClient.setClientId("my-app-client");
@@ -910,21 +826,17 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  @Order(23)
   void deleteClient_whenValidConfig_shouldRemoveClientFromRealm() {
     // Given - create test realm and client first
-    RealmRepresentation realmRep = new RealmRepresentation();
-    realmRep.setRealm("client-delete-realm");
-    realmRep.setEnabled(true);
-    keycloakClient.realms().create(realmRep);
+    createRealm("client-delete-realm");
 
     ClientRepresentation initialClient = new ClientRepresentation();
     initialClient.setClientId("delete-me-client");
     initialClient.setEnabled(true);
     String clientId;
 
-    try (var response =
-        keycloakClient.realm("client-delete-realm").clients().create(initialClient)) {
+    RealmResource realmResource = keycloakClient.realm("client-delete-realm");
+    try (Response response = realmResource.clients().create(initialClient)) {
       clientId = CreatedResponseUtil.getCreatedId(response);
       assertEquals(201, response.getStatus());
     }
@@ -939,8 +851,7 @@ class KeycloakAdapterIntegrationTest {
     adapter.processConfigEvent(Topics.CLIENT_DELETED.toString(), event);
 
     // Then
-    List<ClientRepresentation> clients =
-        keycloakClient.realm("client-delete-realm").clients().findByClientId("delete-me-client");
+    List<ClientRepresentation> clients = realmResource.clients().findByClientId("delete-me-client");
     assertTrue(clients.isEmpty(), "Client should be deleted");
 
     // Verify success result
