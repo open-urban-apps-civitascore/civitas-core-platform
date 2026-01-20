@@ -12,6 +12,8 @@ package com.civitas.event.handler.kafka;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.civitas.configadapter.model.ConfigResultEvent;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
 import io.cloudevents.kafka.CloudEventDeserializer;
@@ -204,5 +206,123 @@ class CloudEventSerializationTest {
     assertEquals(originalEvent.getId(), deserializedEvent.getId());
     assertNotNull(deserializedEvent.getData());
     assertEquals(jsonData, new String(deserializedEvent.getData().toBytes()));
+  }
+
+  @Test
+  void testSerializeDeserializeCloudEventWithConfigResultEventData() throws Exception {
+    ObjectMapper objectMapper = ObjectMapperFactory.createObjectMapper();
+    String correlationId = UUID.randomUUID().toString();
+    String originalMessageId = UUID.randomUUID().toString();
+    String resourceId = "user-12345";
+    String targetResource = "users/user-12345";
+    String source = "civitas.config-adapter.test";
+    OffsetDateTime timestamp = OffsetDateTime.now();
+
+    ConfigResultEvent resultEvent =
+        new ConfigResultEvent(
+            correlationId,
+            originalMessageId,
+            ConfigResultEvent.Status.SUCCESS,
+            "User created successfully",
+            resourceId,
+            com.civitas.configadapter.model.Operation.CREATE,
+            targetResource,
+            null,
+            timestamp,
+            source);
+
+    byte[] jsonData = objectMapper.writeValueAsBytes(resultEvent);
+
+    CloudEvent originalEvent =
+        CloudEventBuilder.v1()
+            .withId(UUID.randomUUID().toString())
+            .withSource(URI.create(source))
+            .withType("core.civitas.idm.processing.result")
+            .withDataContentType("application/json")
+            .withData(jsonData)
+            .withExtension("correlationid", correlationId)
+            .withExtension("status", resultEvent.status().name())
+            .build();
+
+    Headers headers = new RecordHeaders();
+    byte[] serializedValue = serializer.serialize("test-topic", headers, originalEvent);
+
+    CloudEvent deserializedEvent = deserializer.deserialize("test-topic", headers, serializedValue);
+
+    assertNotNull(deserializedEvent);
+    assertEquals(originalEvent.getId(), deserializedEvent.getId());
+    assertNotNull(deserializedEvent.getData());
+
+    ConfigResultEvent deserializedResultEvent =
+        objectMapper.readValue(deserializedEvent.getData().toBytes(), ConfigResultEvent.class);
+
+    assertEquals(correlationId, deserializedResultEvent.correlationId());
+    assertEquals(originalMessageId, deserializedResultEvent.originalMessageId());
+    assertEquals(ConfigResultEvent.Status.SUCCESS, deserializedResultEvent.status());
+    assertEquals("User created successfully", deserializedResultEvent.message());
+    assertEquals(resourceId, deserializedResultEvent.resourceId());
+    assertEquals(
+        com.civitas.configadapter.model.Operation.CREATE, deserializedResultEvent.operation());
+    assertEquals(targetResource, deserializedResultEvent.targetResource());
+    assertEquals(source, deserializedResultEvent.source());
+    assertNull(deserializedResultEvent.errorCode());
+  }
+
+  @Test
+  void testSerializeDeserializeCloudEventWithFailureConfigResultEventData() throws Exception {
+    ObjectMapper objectMapper = ObjectMapperFactory.createObjectMapper();
+    String correlationId = UUID.randomUUID().toString();
+    String originalMessageId = UUID.randomUUID().toString();
+    String targetResource = "users/user-99999";
+    String source = "civitas.config-adapter.test";
+    String errorCode = "USER_NOT_FOUND";
+    String errorMessage = "User with ID user-99999 not found";
+
+    ConfigResultEvent resultEvent =
+        ConfigResultEvent.failure(
+            correlationId,
+            originalMessageId,
+            errorCode,
+            errorMessage,
+            com.civitas.configadapter.model.Operation.DELETE,
+            targetResource,
+            source);
+
+    byte[] jsonData = objectMapper.writeValueAsBytes(resultEvent);
+
+    CloudEvent originalEvent =
+        CloudEventBuilder.v1()
+            .withId(UUID.randomUUID().toString())
+            .withSource(URI.create(source))
+            .withType("core.civitas.idm.processing.result")
+            .withDataContentType("application/json")
+            .withData(jsonData)
+            .withExtension("correlationid", correlationId)
+            .withExtension("status", resultEvent.status().name())
+            .withExtension("errorcode", errorCode)
+            .withExtension("errormessage", errorMessage)
+            .build();
+
+    Headers headers = new RecordHeaders();
+    byte[] serializedValue = serializer.serialize("test-topic", headers, originalEvent);
+
+    CloudEvent deserializedEvent = deserializer.deserialize("test-topic", headers, serializedValue);
+
+    assertNotNull(deserializedEvent);
+    assertNotNull(deserializedEvent.getData());
+
+    ConfigResultEvent deserializedResultEvent =
+        objectMapper.readValue(deserializedEvent.getData().toBytes(), ConfigResultEvent.class);
+
+    assertEquals(correlationId, deserializedResultEvent.correlationId());
+    assertEquals(originalMessageId, deserializedResultEvent.originalMessageId());
+    assertEquals(ConfigResultEvent.Status.FAILURE, deserializedResultEvent.status());
+    assertEquals(errorMessage, deserializedResultEvent.message());
+    assertNull(deserializedResultEvent.resourceId());
+    assertEquals(
+        com.civitas.configadapter.model.Operation.DELETE, deserializedResultEvent.operation());
+    assertEquals(targetResource, deserializedResultEvent.targetResource());
+    assertEquals(errorCode, deserializedResultEvent.errorCode());
+    assertEquals(source, deserializedResultEvent.source());
   }
 }

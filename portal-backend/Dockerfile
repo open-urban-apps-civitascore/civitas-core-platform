@@ -3,6 +3,7 @@ FROM eclipse-temurin:21-jre-alpine
 
 LABEL maintainer="CIVITAS/CORE Team"
 LABEL description="CIVITAS/CORE Portal Backend - IoT Schema Service"
+LABEL civitas=true
 
 WORKDIR /app
 

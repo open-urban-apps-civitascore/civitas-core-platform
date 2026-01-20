@@ -4,6 +4,7 @@ import com.civitas.configadapter.model.ConfigResultEvent;
 import de.civitascore.portal.messaging.CloudEventPublisher;
 import io.cloudevents.CloudEvent;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -76,16 +77,18 @@ public class KafkaCloudEventPublisher implements CloudEventPublisher {
    */
   public void handleResult(ConfigResultEvent resultEvent) {
     String originalMessageId = resultEvent.originalMessageId();
-    CompletableFuture<ConfigResultEvent> future = pendingRequests.remove(originalMessageId);
+    if (Objects.nonNull(originalMessageId)) {
+      CompletableFuture<ConfigResultEvent> future = pendingRequests.remove(originalMessageId);
 
-    if (future != null) {
-      if (resultEvent.status() == ConfigResultEvent.Status.SUCCESS) {
-        log.info(
-            "Config Adapter SUCCESS: messageId={}, operation={}, resourceId={}",
-            originalMessageId,
-            resultEvent.operation(),
-            resultEvent.resourceId());
-        future.complete(resultEvent);
+      if (future != null) {
+        if (resultEvent.status() == ConfigResultEvent.Status.SUCCESS) {
+          log.info(
+              "Config Adapter SUCCESS: messageId={}, operation={}, resourceId={}",
+              originalMessageId,
+              resultEvent.operation(),
+              resultEvent.resourceId());
+          future.complete(resultEvent);
+        }
       } else {
         log.error(
             "Config Adapter FAILURE: messageId={}, operation={}, error={}, message={}",

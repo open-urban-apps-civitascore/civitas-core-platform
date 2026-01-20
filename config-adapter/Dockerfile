@@ -2,6 +2,7 @@ FROM eclipse-temurin:21-jre-alpine
 
 LABEL maintainer="CIVITAS/Interfaces Team"
 LABEL description="CIVITAS/CORE Configuration Adapter"
+LABEL civitas=true
 
 WORKDIR /civitas
 

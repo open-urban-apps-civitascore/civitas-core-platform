@@ -68,6 +68,10 @@ public class PermissionService extends BaseService<Permission, PermissionInputDT
         throw new InvalidInputException(
             "permissionType", existingEntity.getId(), "Permission type cannot be null");
       }
+      if (jsonNode.has("category") && StringUtils.isBlank(jsonNode.get("category").asText())) {
+        throw new InvalidInputException(
+            "category", existingEntity.getId(), "Category cannot be null or blank");
+      }
     } catch (InvalidInputException e) {
       throw e;
     } catch (Exception e) {

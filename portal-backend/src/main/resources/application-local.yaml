@@ -17,11 +17,15 @@ spring:
   # Kafka local deployment settings
   kafka:
     bootstrap-servers: localhost:9092
+    producer:
+      bootstrap-servers: localhost:9092
+    consumer:
+      bootstrap-servers: localhost:9092
 
 keycloak:
-  realm: "iot"
-  auth-server-url: http://localhost:8080
-  target-realm: "civitas-core"  # Target realm for user/group/role management via Config Adapter
+  realm: "master"
+  auth-server-url: http://keycloak:8080
+  target-realm: "master"
 
 kafka:
   enabled: true
