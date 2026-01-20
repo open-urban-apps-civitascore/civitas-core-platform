@@ -4,12 +4,14 @@ import { useLocale, useTranslations } from 'next-intl'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Badge } from '@/components/ui/badge'
-import { Datasource } from '@/types/datasources'
+import { Datasource, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
 import { Row } from '@tanstack/react-table'
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
+import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/BadgesWithTooltip'
+import { CircleCheckBig, CircleDashed } from 'lucide-react'
 
 interface DatasourcesTableProps extends TableProps<Datasource> {
   datasources: Datasource[]
@@ -95,7 +97,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     }),
     columnHelper.accessor('tags', {
       header: t('tableHeaders.tags'),
-      cell: info => info.getValue().map(value => <Badge key={value}>{value}</Badge>),
+      cell: info => <BadgesWithTooltip items={info.getValue()} minVisibleBadges={2} />,
       meta: {
         style: {
           width: '15%',
@@ -105,11 +107,19 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     }),
     columnHelper.accessor('status', {
       header: t('tableHeaders.status'),
-      cell: info => t(`status.${info.getValue()}`),
+      cell: info => {
+        const status = info.getValue()
+        return (
+          <div className="flex items-center gap-2">
+            {status === DATASOURCE_STATUS_TYPES.DRAFT ? <CircleDashed size={16} /> : <CircleCheckBig size={16} />}
+            {t(`status.${info.getValue()}`)}
+          </div>
+        )
+      },
       meta: {
         style: {
           width: '10%',
-          minWidth: '100px',
+          minWidth: '120px',
         },
       },
     }),
