@@ -1,5 +1,9 @@
 'use client'
 
+import { Plus } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import { useEffect } from 'react'
+
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -8,11 +12,8 @@ import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Datasource } from '@/types/datasources'
-import { Plus } from 'lucide-react'
-import { useTranslations } from 'next-intl'
-import { useRouter } from 'next/navigation'
+
 import { DatasourcesTable } from './DatasourcesTable'
-import { useEffect } from 'react'
 
 interface DatasourcesListProps {
   datasources: Datasource[]
@@ -22,7 +23,6 @@ interface DatasourcesListProps {
 export const DatasourcesList = (props: DatasourcesListProps) => {
   const { datasources, rowCount } = props
   const t = useTranslations('datasources')
-  const router = useRouter()
   const {
     pageIndex,
     pageSize,
@@ -35,10 +35,10 @@ export const DatasourcesList = (props: DatasourcesListProps) => {
     setTotalPages,
   } = useQueryParams()
 
-  useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount])
+  useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
   const CustomElement = (
-    <Button data-testid="addUserButton" onClick={() => router.push('/datasources/create')}>
+    <Button data-testid="addUserButton" onClick={() => console.log('/datasources/create')}>
       <Plus />
       {t('newDatasource')}
     </Button>

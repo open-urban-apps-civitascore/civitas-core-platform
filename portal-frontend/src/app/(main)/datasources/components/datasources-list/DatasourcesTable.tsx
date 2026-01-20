@@ -1,17 +1,17 @@
-import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
+import { createColumnHelper, getCoreRowModel, getSortedRowModel, Row, useReactTable } from '@tanstack/react-table'
+import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
+import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/BadgesWithTooltip'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Badge } from '@/components/ui/badge'
-import { Datasource, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
+import { cn } from '@/lib/utils'
+import { CONNECTION_TYPES, Datasource, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
-import { Row } from '@tanstack/react-table'
-import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
-import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/BadgesWithTooltip'
-import { CircleCheckBig, CircleDashed } from 'lucide-react'
 
 interface DatasourcesTableProps extends TableProps<Datasource> {
   datasources: Datasource[]
@@ -77,7 +77,28 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     }),
     columnHelper.accessor('connection', {
       header: t('tableHeaders.connection'),
-      cell: info => info.getValue(),
+      cell: info => {
+        let bgColor = 'bg-green-600/10'
+        let textColor = 'text-green-800'
+        const connection = info.getValue()
+        switch (connection) {
+          case CONNECTION_TYPES.INACTIVE:
+            bgColor = 'bg-red-600/10'
+            textColor = 'text-red-700'
+            break
+          case CONNECTION_TYPES.STATIC:
+            bgColor = 'bg-secondary'
+            textColor = 'text-foreground'
+            break
+          case CONNECTION_TYPES.ACTIVE:
+            break
+        }
+        return (
+          <Badge className={cn(bgColor, textColor)} variant="secondary">
+            {connection}
+          </Badge>
+        )
+      },
       meta: {
         style: {
           width: '10%',
@@ -111,7 +132,11 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
         const status = info.getValue()
         return (
           <div className="flex items-center gap-2">
-            {status === DATASOURCE_STATUS_TYPES.DRAFT ? <CircleDashed size={16} /> : <CircleCheckBig size={16} />}
+            {status === DATASOURCE_STATUS_TYPES.DRAFT ? (
+              <CircleDashed className="text-muted-foreground" size={16} />
+            ) : (
+              <CircleCheckBig className="text-muted-foreground" size={16} />
+            )}
             {t(`status.${info.getValue()}`)}
           </div>
         )

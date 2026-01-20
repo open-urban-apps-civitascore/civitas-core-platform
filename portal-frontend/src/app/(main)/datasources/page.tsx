@@ -1,10 +1,12 @@
 import { headers } from 'next/headers'
 
-import { getRequestParams, RequestParams } from '@/utils/getRequestParams'
+import { Datasource } from '@/types/datasources'
+import { getJsonServerRequestParams, JsonServerRequestParams } from '@/utils/requestParams'
+
 import { DatasourcesList } from './components/datasources-list/DatasourcesList'
 
 type Props = {
-  searchParams: Promise<RequestParams>
+  searchParams: Promise<JsonServerRequestParams>
 }
 
 const getDatasourcesListData = async (params: URLSearchParams) => {
@@ -18,26 +20,26 @@ const getDatasourcesListData = async (params: URLSearchParams) => {
 
     if (!response.ok) {
       console.error('An error occurred while loading datasources list data')
-      return { datasources: [], totalElements: 0 }
+      return { datasources: [], totalCount: 0 }
     }
 
-    const datasourcesData = await response.json()
+    const datasourcesData: Datasource[] = await response.json()
 
-    const totalElements = Number(datasourcesData.totalElements) || 0
+    const totalCount = Number(response.headers.get('X-Total-Count')) || 0
 
-    return { datasources: datasourcesData || [], totalElements }
+    return { datasources: datasourcesData || [], totalCount }
   } catch (error) {
     console.error(error)
-    return { datasources: [], totalElements: 0 }
+    return { datasources: [], totalCount: 0 }
   }
 }
 
 const Datasources = async ({ searchParams }: Props) => {
   const params = await searchParams
-  const { apiParams } = getRequestParams(params)
-  const { datasources, totalElements } = await getDatasourcesListData(apiParams)
+  const { jsonServerParams } = getJsonServerRequestParams(params)
+  const { datasources, totalCount } = await getDatasourcesListData(jsonServerParams)
 
-  return <DatasourcesList datasources={datasources} rowCount={totalElements} />
+  return <DatasourcesList datasources={datasources} rowCount={totalCount} />
 }
 
 export default Datasources

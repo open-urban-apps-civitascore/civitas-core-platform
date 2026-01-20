@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Item } from '@/types/common'
 import { UserResponse } from '@/types/users'
-import { getRequestParams, RequestParams } from '@/utils/getRequestParams'
+import { ApiRequestParams, getApiRequestParams } from '@/utils/requestParams'
 import { mapListUsers } from '@/utils/users'
 
 import { UsersListContent } from './components/users-list/UsersListContent'
@@ -17,7 +17,7 @@ export type UserAuthority = Item & {
 }
 
 type Props = {
-  searchParams: Promise<RequestParams>
+  searchParams: Promise<ApiRequestParams>
 }
 
 const getUserListData = async (params: URLSearchParams) => {
@@ -50,7 +50,7 @@ const UsersPage = async ({ searchParams }: Props) => {
   const t = await getTranslations('users')
   const params = await searchParams
 
-  const { apiParams, pageSize, sort, pageIndex, search } = getRequestParams(params)
+  const { apiParams, pageSize, sort, pageIndex, search } = getApiRequestParams(params)
 
   const { users, totalCount } = await getUserListData(apiParams)
   const totalPages = Math.ceil(totalCount / pageSize) || 1

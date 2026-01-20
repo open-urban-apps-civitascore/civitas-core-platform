@@ -1,6 +1,6 @@
 'use client'
 
-import { MoreHorizontalIcon, MoreVerticalIcon } from 'lucide-react'
+import { MoreVerticalIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -25,7 +25,7 @@ export const TableDropdownMenu = (props: TableDropdownMenuProps) => {
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" aria-label="Open menu" size="sm">
+        <Button className="h-9 w-9" variant="outline" aria-label="Open menu" size="sm">
           <MoreVerticalIcon />
         </Button>
       </DropdownMenuTrigger>

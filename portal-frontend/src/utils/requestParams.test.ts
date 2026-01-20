@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
-import { getRequestParams, RequestParams } from './getRequestParams'
+import { ApiRequestParams, getApiRequestParams } from './requestParams'
 
 describe('getRequestParams', () => {
   it('should return the correct request params when all URL params are set', () => {
-    const mockParams: RequestParams = {
+    const mockParams: ApiRequestParams = {
       page: '1',
       pageSize: '20',
       sort: ['fullName,ASC'],
       q: 'firstName lastName',
     }
-    const result = getRequestParams(mockParams)
+    const result = getApiRequestParams(mockParams)
     expect(result.sort).toEqual(['fullName,ASC'])
     expect(result.pageIndex).toBe(1)
     expect(result.pageSize).toBe(20)
@@ -22,8 +22,8 @@ describe('getRequestParams', () => {
   })
 
   it('should return the correct request params when no URL params are set', () => {
-    const mockParams: RequestParams = {}
-    const result = getRequestParams(mockParams)
+    const mockParams: ApiRequestParams = {}
+    const result = getApiRequestParams(mockParams)
     expect(result.sort).toEqual([])
     expect(result.pageIndex).toBe(0)
     expect(result.pageSize).toBe(10)
