@@ -16,6 +16,7 @@ import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.idm.ClientConfig;
+import com.civitas.configadapter.model.idm.IdmConfigValue;
 import com.civitas.configadapter.model.idm.RealmConfig;
 import com.civitas.configadapter.model.idm.RoleConfig;
 import com.civitas.configadapter.model.idm.UserConfig;
@@ -43,6 +44,51 @@ import org.slf4j.LoggerFactory;
  */
 public class KeycloakAdapter extends AbstractConfigAdapter {
 
+  private static final String ROLE_DELETE_FAILED = "ROLE_DELETE_FAILED";
+  private static final String ROLE_DELETED_SUCCESSFULLY = "Role deleted successfully";
+  private static final String ROLE_UPDATE_FAILED = "ROLE_UPDATE_FAILED";
+  private static final String ROLE_UPDATED_SUCCESSFULLY = "Role updated successfully";
+  private static final String ROLE_CREATE_FAILED = "ROLE_CREATE_FAILED";
+  private static final String ROLE_CREATED_SUCCESSFULLY = "Role created successfully";
+
+  private static final String USER_DELETE_FAILED = "USER_DELETE_FAILED";
+  private static final String USER_DELETED_SUCCESSFULLY = "User deleted successfully";
+  private static final String USER_UPDATE_FAILED = "USER_UPDATE_FAILED";
+  private static final String USER_UPDATED_SUCCESSFULLY = "User updated successfully";
+  private static final String USER_CREATE_FAILED = "USER_CREATE_FAILED";
+  private static final String USER_CREATED_SUCCESSFULLY = "User created successfully";
+  private static final String USER_CREATION = "User creation";
+
+  private static final String CLIENT_DELETE_FAILED = "CLIENT_DELETE_FAILED";
+  private static final String CLIENT_DELETED_SUCCESSFULLY = "Client deleted successfully";
+  private static final String CLIENT_UPDATE_FAILED = "CLIENT_UPDATE_FAILED";
+  private static final String CLIENT_UPDATED_SUCCESSFULLY = "Client updated successfully";
+  private static final String CLIENT_CREATE_FAILED = "CLIENT_CREATE_FAILED";
+  private static final String CLIENT_CREATED_SUCCESSFULLY = "Client created successfully";
+  private static final String CLIENT_CREATION = "Client creation";
+
+  private static final String REALM_DELETE_FAILED = "REALM_DELETE_FAILED";
+  private static final String REALM_DELETED_SUCCESSFULLY = "Realm deleted successfully";
+  private static final String REALM_UPDATE_FAILED = "REALM_UPDATE_FAILED";
+  private static final String REALM_UPDATED_SUCCESSFULLY = "Realm updated successfully";
+  private static final String REALM_CREATE_FAILED = "REALM_CREATE_FAILED";
+  private static final String REALM_CREATED_SUCCESSFULLY = "Realm created successfully";
+
+  private static final String PROCESSING_ERROR_CODE = "PROCESSING_ERROR";
+  private static final String KEYCLOAK_SOURCE = "civitas.config-adapter.keycloak";
+
+  private static final String DEFAULT_SERVER_URL = "http://localhost:8080";
+
+  private static final String CLIENT_ID_PROPERTY_KEY = "client.id";
+  private static final String PASSWORD_PROPERTY_KEY = "password";
+  private static final String USERNAME_PROPERTY_KEY = "username";
+
+  private static final String ROLE = "role";
+  private static final String USER = "user";
+  private static final String CLIENT = "client";
+  private static final String REALM = "realm";
+  private static final String URL_PROPERTY = "url";
+
   private static final Logger logger = LoggerFactory.getLogger(KeycloakAdapter.class);
 
   public static final String ADAPTER_NAME = "keycloak";
@@ -66,17 +112,17 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     super.initialize(config);
     this.keycloakClient =
         KeycloakBuilder.builder()
-            .serverUrl(getAdapterProperty("url", "http://localhost:8080"))
-            .realm(getAdapterProperty("realm", "master"))
-            .username(getAdapterProperty("username", "admin"))
-            .password(getAdapterProperty("password", "admin"))
-            .clientId(getAdapterProperty("client.id", "admin-cli"))
+            .serverUrl(getAdapterProperty(URL_PROPERTY, DEFAULT_SERVER_URL))
+            .realm(getAdapterProperty(REALM, "master"))
+            .username(getAdapterProperty(USERNAME_PROPERTY_KEY, "admin"))
+            .password(getAdapterProperty(PASSWORD_PROPERTY_KEY, "admin"))
+            .clientId(getAdapterProperty(CLIENT_ID_PROPERTY_KEY, "admin-cli"))
             .build();
 
     logger.info(
         "Keycloak adapter '{}' initialized for: {}",
         getName(),
-        getAdapterProperty("url", "http://localhost:8080"));
+        getAdapterProperty(URL_PROPERTY, DEFAULT_SERVER_URL));
     logger.info(
         "Subscribed to {} Kafka topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
   }
@@ -127,13 +173,14 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         case DELETE -> handleDelete(resourceInfo, event);
         default -> {
           logger.warn("Unknown operation: {}", operation);
-          publishErrorResult(event, "UNSUPPORTED_OPERATION", "Unknown operation: " + operation);
+          publishErrorResult(
+              event, UNSUPPORTED_OPERATION_CODE, UNSUPPORTED_OPERATION_MSG + operation);
         }
       }
 
     } catch (Exception e) {
       logger.error("Failed to process config event", e);
-      publishErrorResult(event, "PROCESSING_ERROR", e.getMessage());
+      publishErrorResult(event, PROCESSING_ERROR_CODE, e.getMessage());
     }
   }
 
@@ -163,7 +210,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       default -> {
         logger.warn("Unknown ConfigValue class: {}", event.getClass());
         publishErrorResult(
-            event, "UNKNOWN_RESOURCE_TYPE", "Unknown ConfigValue class: " + event.getClass());
+            event, UNKNOWN_RESOURCE_TYPE_CODE, UNKNOWN_RESOURCE_TYPE_MSG + event.getClass());
         yield null;
       }
     };
@@ -171,42 +218,42 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "realm" -> createRealm(event);
-      case "client" -> createClient(resourceInfo.realm, event);
-      case "user" -> createUser(resourceInfo.realm, event);
-      case "role" -> createRole(resourceInfo.realm, event);
+      case REALM -> createRealm(event);
+      case CLIENT -> createClient(resourceInfo.realm, event);
+      case USER -> createUser(resourceInfo.realm, event);
+      case ROLE -> createRole(resourceInfo.realm, event);
       default -> {
         logger.warn("Unknown resource type for create: {}", resourceInfo.type);
         publishErrorResult(
-            event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
+            event, UNKNOWN_RESOURCE_TYPE_CODE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
       }
     }
   }
 
   private void handleUpdate(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "realm" -> updateRealm(resourceInfo.id, event);
-      case "client" -> updateClient(resourceInfo.realm, resourceInfo.id, event);
-      case "user" -> updateUser(resourceInfo.realm, resourceInfo.id, event);
-      case "role" -> updateRole(resourceInfo.realm, resourceInfo.id, event);
+      case REALM -> updateRealm(resourceInfo.id, event);
+      case CLIENT -> updateClient(resourceInfo.realm, resourceInfo.id, event);
+      case USER -> updateUser(resourceInfo.realm, resourceInfo.id, event);
+      case ROLE -> updateRole(resourceInfo.realm, resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for update: {}", resourceInfo.type);
         publishErrorResult(
-            event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
+            event, UNKNOWN_RESOURCE_TYPE_CODE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
       }
     }
   }
 
   private void handleDelete(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "realm" -> deleteRealm(resourceInfo.id, event);
-      case "client" -> deleteClient(resourceInfo.realm, resourceInfo.id, event);
-      case "user" -> deleteUser(resourceInfo.realm, resourceInfo.id, event);
-      case "role" -> deleteRole(resourceInfo.realm, resourceInfo.id, event);
+      case REALM -> deleteRealm(resourceInfo.id, event);
+      case CLIENT -> deleteClient(resourceInfo.realm, resourceInfo.id, event);
+      case USER -> deleteUser(resourceInfo.realm, resourceInfo.id, event);
+      case ROLE -> deleteRole(resourceInfo.realm, resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for delete: {}", resourceInfo.type);
         publishErrorResult(
-            event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
+            event, UNKNOWN_RESOURCE_TYPE_CODE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
       }
     }
   }
@@ -236,11 +283,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       String realmName = realmRep.getRealm();
       logger.info("Created realm: {}", realmName);
 
-      publishSuccessResult(event, "Realm created successfully", realmName);
+      publishSuccessResult(event, REALM_CREATED_SUCCESSFULLY, realmName);
 
     } catch (Exception e) {
       logger.error("Failed to create realm", e);
-      publishErrorResult(event, "REALM_CREATE_FAILED", e.getMessage());
+      publishErrorResult(event, REALM_CREATE_FAILED, e.getMessage());
     }
   }
 
@@ -254,11 +301,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       realmResource.update(realmRep);
 
       logger.info("Updated realm: {}", realmName);
-      publishSuccessResult(event, "Realm updated successfully", realmName);
+      publishSuccessResult(event, REALM_UPDATED_SUCCESSFULLY, realmName);
 
     } catch (Exception e) {
       logger.error("Failed to update realm: {}", realmName, e);
-      publishErrorResult(event, "REALM_UPDATE_FAILED", e.getMessage());
+      publishErrorResult(event, REALM_UPDATE_FAILED, e.getMessage());
     }
   }
 
@@ -266,11 +313,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     try {
       keycloakClient.realm(realmName).remove();
       logger.info("Deleted realm: {}", realmName);
-      publishSuccessResult(event, "Realm deleted successfully", realmName);
+      publishSuccessResult(event, REALM_DELETED_SUCCESSFULLY, realmName);
 
     } catch (Exception e) {
       logger.error("Failed to delete realm: {}", realmName, e);
-      publishErrorResult(event, "REALM_DELETE_FAILED", e.getMessage());
+      publishErrorResult(event, REALM_DELETE_FAILED, e.getMessage());
     }
   }
 
@@ -285,15 +332,15 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       RealmResource realmResource = keycloakClient.realm(realm);
 
       try (Response response = realmResource.clients().create(clientRep)) {
-        validateResponse("Client creation", 201, response);
+        validateResponse(CLIENT_CREATION, 201, response);
       }
 
       logger.info("Created client: {} in realm: {}", clientRep.getClientId(), realm);
-      publishSuccessResult(event, "Client created successfully", clientRep.getClientId());
+      publishSuccessResult(event, CLIENT_CREATED_SUCCESSFULLY, clientRep.getClientId());
 
     } catch (Exception e) {
       logger.error("Failed to create client in realm: {}", realm, e);
-      publishErrorResult(event, "CLIENT_CREATE_FAILED", e.getMessage());
+      publishErrorResult(event, CLIENT_CREATE_FAILED, e.getMessage());
     }
   }
 
@@ -307,11 +354,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       realmResource.clients().get(clientId).update(clientRep);
 
       logger.info("Updated client: {} in realm: {}", clientId, realm);
-      publishSuccessResult(event, "Client updated successfully", clientId);
+      publishSuccessResult(event, CLIENT_UPDATED_SUCCESSFULLY, clientId);
 
     } catch (Exception e) {
       logger.error("Failed to update client: {} in realm: {}", clientId, realm, e);
-      publishErrorResult(event, "CLIENT_UPDATE_FAILED", e.getMessage());
+      publishErrorResult(event, CLIENT_UPDATE_FAILED, e.getMessage());
     }
   }
 
@@ -321,11 +368,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       realmResource.clients().get(clientId).remove();
 
       logger.info("Deleted client: {} from realm: {}", clientId, realm);
-      publishSuccessResult(event, "Client deleted successfully", clientId);
+      publishSuccessResult(event, CLIENT_DELETED_SUCCESSFULLY, clientId);
 
     } catch (Exception e) {
       logger.error("Failed to delete client: {} from realm: {}", clientId, realm, e);
-      publishErrorResult(event, "CLIENT_DELETE_FAILED", e.getMessage());
+      publishErrorResult(event, CLIENT_DELETE_FAILED, e.getMessage());
     }
   }
 
@@ -373,7 +420,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
       String userId;
       try (Response response = realmResource.users().create(userRep)) {
-        validateResponse("User creation", 201, response);
+        validateResponse(USER_CREATION, 201, response);
         userId = CreatedResponseUtil.getCreatedId(response);
       }
 
@@ -381,11 +428,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       AssignClientRolesToUser(clientRolesMap, realmResource, userId);
 
       logger.info("Created user: {} (ID: {}) in realm: {}", userRep.getUsername(), userId, realm);
-      publishSuccessResult(event, "User created successfully", userId);
+      publishSuccessResult(event, USER_CREATED_SUCCESSFULLY, userId);
 
     } catch (Exception e) {
       logger.error("Failed to create user in realm: {}", realm, e);
-      publishErrorResult(event, "USER_CREATE_FAILED", e.getMessage());
+      publishErrorResult(event, USER_CREATE_FAILED, e.getMessage());
     }
   }
 
@@ -407,11 +454,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       AssignClientRolesToUser(clientRolesMap, realmResource, userId);
 
       logger.info("Updated user: {} in realm: {}", userId, realm);
-      publishSuccessResult(event, "User updated successfully", userId);
+      publishSuccessResult(event, USER_UPDATED_SUCCESSFULLY, userId);
 
     } catch (Exception e) {
       logger.error("Failed to update user: {} in realm: {}", userId, realm, e);
-      publishErrorResult(event, "USER_UPDATE_FAILED", e.getMessage());
+      publishErrorResult(event, USER_UPDATE_FAILED, e.getMessage());
     }
   }
 
@@ -480,11 +527,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       realmResource.users().get(userId).remove();
 
       logger.info("Deleted user: {} from realm: {}", userId, realm);
-      publishSuccessResult(event, "User deleted successfully", userId);
+      publishSuccessResult(event, USER_DELETED_SUCCESSFULLY, userId);
 
     } catch (Exception e) {
       logger.error("Failed to delete user: {} from realm: {}", userId, realm, e);
-      publishErrorResult(event, "USER_DELETE_FAILED", e.getMessage());
+      publishErrorResult(event, USER_DELETE_FAILED, e.getMessage());
     }
   }
 
@@ -499,11 +546,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       realmResource.roles().create(roleRep);
 
       logger.info("Created role: {} in realm: {}", roleRep.getName(), realm);
-      publishSuccessResult(event, "Role created successfully", roleRep.getName());
+      publishSuccessResult(event, ROLE_CREATED_SUCCESSFULLY, roleRep.getName());
 
     } catch (Exception e) {
       logger.error("Failed to create role in realm: {}", realm, e);
-      publishErrorResult(event, "ROLE_CREATE_FAILED", e.getMessage());
+      publishErrorResult(event, ROLE_CREATE_FAILED, e.getMessage());
     }
   }
 
@@ -516,11 +563,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       realmResource.roles().get(roleId).update(roleRep);
 
       logger.info("Updated role: {} in realm: {}", roleId, realm);
-      publishSuccessResult(event, "User updated successfully", roleId);
+      publishSuccessResult(event, ROLE_UPDATED_SUCCESSFULLY, roleId);
 
     } catch (Exception e) {
       logger.error("Failed to update role: {} in realm: {}", roleId, realm, e);
-      publishErrorResult(event, "ROLE_UPDATE_FAILED", e.getMessage());
+      publishErrorResult(event, ROLE_UPDATE_FAILED, e.getMessage());
     }
   }
 
@@ -551,11 +598,11 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       realmResource.roles().get(roleId).remove();
 
       logger.info("Deleted role: {} from realm: {}", roleId, realm);
-      publishSuccessResult(event, "Role deleted successfully", roleId);
+      publishSuccessResult(event, ROLE_DELETED_SUCCESSFULLY, roleId);
 
     } catch (Exception e) {
       logger.error("Failed to delete role: {} from realm: {}", roleId, realm, e);
-      publishErrorResult(event, "ROLE_DELETE_FAILED", e.getMessage());
+      publishErrorResult(event, ROLE_DELETE_FAILED, e.getMessage());
     }
   }
 
@@ -584,7 +631,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
               resourceId,
               originalEvent.payload().operation(),
               originalEvent.payload().targetResource(),
-              "civitas.config-adapter.keycloak");
+              KEYCLOAK_SOURCE,
+              IdmConfigValue.IDM_RESULT_TYPE);
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
@@ -609,7 +657,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
               errorMessage,
               originalEvent.payload().operation(),
               originalEvent.payload().targetResource(),
-              "civitas.config-adapter.keycloak");
+              KEYCLOAK_SOURCE,
+              IdmConfigValue.IDM_RESULT_TYPE);
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published FAILURE result to topic: {}", originalEvent.metadata().resultTopic());
