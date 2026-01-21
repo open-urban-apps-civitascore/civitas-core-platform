@@ -1,13 +1,13 @@
 import { request } from '@playwright/test'
 
-import { DatasetResponse } from '@/types/datasets'
+import { Dataset } from '@/types/datasets'
 
 import { getMockDatasetData } from './datasetFactory'
 
 const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
-export const createTestDataset = async (dataset?: DatasetResponse) => {
-  const datasetData: DatasetResponse = dataset || getMockDatasetData()
+export const createTestDataset = async (dataset?: Dataset) => {
+  const datasetData: Dataset = dataset || getMockDatasetData()
   console.log('creating test DATASET: ', datasetData)
   const api = await request.newContext({
     baseURL: URL,

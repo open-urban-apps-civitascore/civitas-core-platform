@@ -12,7 +12,9 @@ package com.civitas.event.handler.kafka;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.idm.IdmConfigValue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
@@ -119,7 +121,7 @@ class CloudEventSerializationTest {
             .withSource(URI.create("test.source"))
             .withType("test.type")
             .withTime(OffsetDateTime.now())
-            .withData("application/json", "{}".getBytes())
+            .withData(Constants.CONTENT_TYPE_JSON, "{}".getBytes())
             .withExtension("correlationid", "test-correlation-456")
             .withExtension("status", "SUCCESS")
             .build();
@@ -178,7 +180,7 @@ class CloudEventSerializationTest {
             .withSource(URI.create("test.source"))
             .withType("test.type")
             .withTime(OffsetDateTime.now())
-            .withData("application/json", jsonData.getBytes())
+            .withData(Constants.CONTENT_TYPE_JSON, jsonData.getBytes())
             .withExtension("correlationid", "test-correlation-789")
             .build();
 
@@ -218,6 +220,7 @@ class CloudEventSerializationTest {
     String source = "civitas.config-adapter.test";
     OffsetDateTime timestamp = OffsetDateTime.now();
 
+    String resultType = IdmConfigValue.IDM_RESULT_TYPE;
     ConfigResultEvent resultEvent =
         new ConfigResultEvent(
             correlationId,
@@ -229,7 +232,8 @@ class CloudEventSerializationTest {
             targetResource,
             null,
             timestamp,
-            source);
+            source,
+            resultType);
 
     byte[] jsonData = objectMapper.writeValueAsBytes(resultEvent);
 
@@ -237,8 +241,8 @@ class CloudEventSerializationTest {
         CloudEventBuilder.v1()
             .withId(UUID.randomUUID().toString())
             .withSource(URI.create(source))
-            .withType("core.civitas.idm.processing.result")
-            .withDataContentType("application/json")
+            .withType(IdmConfigValue.IDM_RESULT_TYPE)
+            .withDataContentType(Constants.CONTENT_TYPE_JSON)
             .withData(jsonData)
             .withExtension("correlationid", correlationId)
             .withExtension("status", resultEvent.status().name())
@@ -286,7 +290,8 @@ class CloudEventSerializationTest {
             errorMessage,
             com.civitas.configadapter.model.Operation.DELETE,
             targetResource,
-            source);
+            source,
+            IdmConfigValue.IDM_RESULT_TYPE);
 
     byte[] jsonData = objectMapper.writeValueAsBytes(resultEvent);
 
@@ -294,8 +299,8 @@ class CloudEventSerializationTest {
         CloudEventBuilder.v1()
             .withId(UUID.randomUUID().toString())
             .withSource(URI.create(source))
-            .withType("core.civitas.idm.processing.result")
-            .withDataContentType("application/json")
+            .withType(IdmConfigValue.IDM_RESULT_TYPE)
+            .withDataContentType(Constants.CONTENT_TYPE_JSON)
             .withData(jsonData)
             .withExtension("correlationid", correlationId)
             .withExtension("status", resultEvent.status().name())

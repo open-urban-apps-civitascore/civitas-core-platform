@@ -2,20 +2,20 @@
 
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
+import { type JSX, useEffect, useMemo, useState } from 'react'
 
+import { useGetPermissions } from '@/app/services/api/permissions/clientRequests'
+import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-field-area/SearchArea'
 import { useQueryParams } from '@/hooks/useQueryParams'
 import { Item } from '@/types/common'
 import { Permission, PermissionItem } from '@/types/permissions'
-import { ROLE_ORIGINS, ROLE_TYPES, RoleResponse } from '@/types/roles'
+import { ROLE_ORIGINS, ROLE_TYPES } from '@/types/roles'
 
 import { CategoryList } from './CategoryList'
 import { RoleTemplateSelect } from './RoleTemplateSelect'
-
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 type PermissionsTabProps = {
   onPermissionUpdate: (permissionIds: string[]) => void
@@ -47,62 +47,23 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   const t = useTranslations('common')
   const tRoles = useTranslations('roles')
   const { getApiRequestParams, tabValue } = useQueryParams()
-  const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [allPermissionsResponse, setAllPermissionsResponse] = useState<Permission[]>([])
-  const [allRoles, setAllRoles] = useState<RoleResponse[]>([])
   const [roleTemplate, setRoleTemplate] = useState<string | null>(null)
   const [checkedPermissionItems, setCheckedPermissionItems] = useState<PermissionItem[]>([])
   const [searchInput, setSearchInput] = useState<string>('')
 
-  const getRoles = useCallback(async () => {
-    try {
-      const rolesResponse = await fetch(`${URL}/roles?type=${tabValue}&roleOrigin=${ROLE_ORIGINS.DEFAULT}`, {
-        cache: 'no-store',
-      })
+  const rolesRequestParams = new URLSearchParams(`type=${tabValue}&roleOrigin=${ROLE_ORIGINS.DEFAULT}`)
+  const permissionsRequestParams = new URLSearchParams(
+    `type=${tabValue}&${getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput })}`,
+  )
 
-      if (!rolesResponse.ok) {
-        throw new Error('An error occurred while loading roles data')
-      }
+  const { data: rolesData } = useGetRoles({ params: rolesRequestParams })
 
-      const rolesData: RoleResponse[] = await rolesResponse.json()
-      setAllRoles(rolesData)
-    } catch (error) {
-      console.error(error)
-    }
-  }, [tabValue])
+  const { data: permissionsData, isFetching: isFetchingPermissions } = useGetPermissions({
+    params: permissionsRequestParams,
+  })
 
-  useEffect(() => {
-    getRoles()
-  }, [getRoles])
-
-  const getPermissions = useCallback(async () => {
-    const requestParams = getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput })
-
-    try {
-      setIsLoading(true)
-      const permissionResponse = await fetch(`${URL}/permissions?type=${tabValue}&${requestParams.toString()}`, {
-        cache: 'no-store',
-      })
-      if (!permissionResponse.ok) {
-        throw new Error('An error occurred while loading permissions data')
-      }
-
-      const permissionsData: Permission[] = await permissionResponse.json()
-
-      setAllPermissionsResponse(permissionsData)
-      setIsLoading(false)
-    } catch (error) {
-      console.error(error)
-      setIsLoading(false)
-      throw new Error('An error occurred while loading permissions data')
-    }
-  }, [searchInput, getApiRequestParams, tabValue])
-
-  useEffect(() => {
-    getPermissions()
-  }, [getPermissions])
-
-  const permissions = useMemo(() => mapPermissions(allPermissionsResponse), [allPermissionsResponse])
+  const allRoles = useMemo(() => rolesData?.data || [], [rolesData?.data])
+  const permissions = useMemo(() => mapPermissions(permissionsData?.data || []), [permissionsData?.data])
 
   const getUniqueCategories = (): Item[] => {
     const seenIds = new Set()
@@ -161,7 +122,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     setHasPermissionsTabBeenSaved(false)
   }, [checkedPermissionItems, setHasPermissionsTabBeenSaved])
 
-  if (isLoading) {
+  if (isFetchingPermissions) {
     return <LoadingSpinner />
   }
 
@@ -196,8 +157,8 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
               confirmButtonType="button"
               onConfirmClick={() => onPermissionUpdate(checkedPermissionItems.map(item => item.value))}
               onCancelClick={() => router.push(`/roles?_tab=${roleType || ROLE_TYPES.SYSTEM}`)}
-              isConfirmButtonDisabled={isLoading || !arePermissionsTouched || hasPermissionsTabBeenSaved}
-              isCancelButtonDisabled={isLoading}
+              isConfirmButtonDisabled={isFetchingPermissions || !arePermissionsTouched || hasPermissionsTabBeenSaved}
+              isCancelButtonDisabled={isFetchingPermissions}
             />
           )}
         </>

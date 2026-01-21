@@ -28,6 +28,11 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(AbstractConfigAdapter.class);
 
+  protected static final String UNKNOWN_RESOURCE_TYPE_CODE = "UNKNOWN_RESOURCE_TYPE";
+  protected static final String UNKNOWN_RESOURCE_TYPE_MSG = "Unknown resource type: ";
+  protected static final String UNSUPPORTED_OPERATION_CODE = "UNSUPPORTED_OPERATION";
+  protected static final String UNSUPPORTED_OPERATION_MSG = "Unknown operation: ";
+
   protected AdapterConfig config;
   protected EventPublisher eventPublisher;
   private String adapterName;

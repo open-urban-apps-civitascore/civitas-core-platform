@@ -3,12 +3,12 @@ import {
   GroupAssignmentUser,
   GroupListUser,
   ListUser,
+  User,
   UserFormData,
   UserFormSchema,
-  UserResponse,
 } from '@/types/users'
 
-export const mapListUsers = (users: UserResponse[], authorities: Authority[]): ListUser[] =>
+export const mapListUsers = (users: User[], authorities: Authority[]): ListUser[] =>
   users.map(user => {
     const authority = authorities.find(authority => user.authority?.id === authority.id)
     const department = authority?.departments.find(department => department.id === user.authority?.department?.id)
@@ -23,7 +23,7 @@ export const mapListUsers = (users: UserResponse[], authorities: Authority[]): L
   })
 
 export const mapGroupListUsers = (
-  users: UserResponse[],
+  users: User[],
   authorities: Authority[],
   userAssignments: { id: string; assignedAt: string }[],
 ): GroupListUser[] =>
@@ -41,7 +41,7 @@ export const mapGroupListUsers = (
     }
   })
 
-export const mapGoupAssignmentUsers = (users: UserResponse[]): GroupAssignmentUser[] =>
+export const mapGoupAssignmentUsers = (users: User[]): GroupAssignmentUser[] =>
   users.map(user => {
     return {
       id: user.id,
@@ -65,7 +65,7 @@ export const mapFormUserToApiData = (formData: UserFormData) => {
   return userData
 }
 
-export const mapUserToFormData = (userResponse: UserResponse | null): UserFormData => ({
+export const mapUserToFormData = (userResponse: User | null): UserFormData => ({
   id: userResponse?.id || '',
   firstName: userResponse?.firstName || '',
   lastName: userResponse?.lastName || '',

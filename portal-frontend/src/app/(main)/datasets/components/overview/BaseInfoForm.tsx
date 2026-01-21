@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { KeyboardEvent, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
+import { useCreateDataset, usePatchDataset } from '@/app/services/api/datasets/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { Select } from '@/components/form/fields/Select'
@@ -19,7 +20,7 @@ import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { DatasetFormData, DatasetFormSchema } from '@/types/datasets'
 
-import { createDataset, updateDataset } from '../../actions'
+import { mapDatasetToFormData } from '../../utils/mappers'
 
 interface BaseInfoFormProps {
   dataset: DatasetFormData
@@ -35,7 +36,11 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isReadOnly, setIsReadOnly] = useState(isEditMode)
-  const [isLoading, setIsLoading] = useState(false)
+
+  const createDataset = useCreateDataset()
+  const updateDataset = usePatchDataset()
+
+  const isLoading = createDataset.isPending || updateDataset.isPending
 
   const form = useForm<DatasetFormData>({
     resolver: zodResolver(DatasetFormSchema),
@@ -67,10 +72,9 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   }
 
   const handleCreateDataset = async (formData: DatasetFormData) => {
-    setIsLoading(true)
     const selectedDataspace = dataspaces.find(dataspace => dataspace.value === formData.dataspace)
-    try {
-      const response = await createDataset({
+    createDataset.mutate(
+      {
         ...formData,
         // the contact implementation has to be adjusted once the API is implemented
         contact: null,
@@ -79,34 +83,32 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
         dataspace: selectedDataspace ? { id: selectedDataspace?.value, name: selectedDataspace?.label } : null,
         access: true,
         status: 'draft',
-      })
-
-      router.push(`/datasets/${response.id}`)
-    } catch {
-      console.error('An error occurred while updating dataset')
-    } finally {
-      setIsLoading(false)
-    }
+      },
+      {
+        onSuccess: ({ data }) => {
+          router.push(`/datasets/${data.id}`)
+        },
+      },
+    )
   }
   const handleUpdateDataset = async (formData: DatasetFormData) => {
-    setIsLoading(true)
     const selectedDataspace = dataspaces.find(dataspace => dataspace.value === formData.dataspace)
-    const updateDatasetData = {
-      ...formData,
-      dataspace: selectedDataspace ? { id: selectedDataspace?.value, name: selectedDataspace?.label } : null,
-      lastUpdated: new Date().toISOString(),
-    }
-    try {
-      await updateDataset(updateDatasetData)
-      form.reset(formData)
-      router.refresh()
-      setIsReadOnly(true)
-    } catch {
-      console.error('An error occurred while updating dataset')
-    } finally {
-      setIsLoading(false)
-    }
+    updateDataset.mutate(
+      {
+        ...formData,
+        dataspace: selectedDataspace ? { id: selectedDataspace?.value, name: selectedDataspace?.label } : null,
+        lastUpdated: new Date().toISOString(),
+      },
+      {
+        onSuccess: ({ data }) => {
+          form.reset(mapDatasetToFormData(data))
+          router.refresh()
+          setIsReadOnly(true)
+        },
+      },
+    )
   }
+
   const handleSubmit = isEditMode ? form.handleSubmit(handleUpdateDataset) : form.handleSubmit(handleCreateDataset)
 
   const EditButton = (

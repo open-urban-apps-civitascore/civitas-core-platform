@@ -1,7 +1,9 @@
 // BaseInfoForm.test.tsx
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { DatasetFormData } from '@/types/datasets'
 
 import { BaseInfoForm } from './BaseInfoForm'
@@ -26,13 +28,11 @@ vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => false,
 }))
 
-const mockCreateDataset = vi.fn().mockResolvedValue({ id: '123' })
-const mockUpdateDataset = vi.fn().mockResolvedValue({})
-
-vi.mock('../../actions', () => ({
-  createDataset: (data: DatasetFormData) => mockCreateDataset(data),
-  updateDataset: (data: DatasetFormData) => mockUpdateDataset(data),
+vi.mock('@/app/services/api/request/apiRequest', () => ({
+  apiRequest: vi.fn(),
 }))
+
+const mockApiRequest = vi.mocked(apiRequest)
 
 const datasetMock: DatasetFormData = {
   id: '1',
@@ -56,12 +56,15 @@ const dataspaces = [
 ]
 
 const setup = (isEditMode = true) => {
+  const client = new QueryClient()
   return render(
-    <BaseInfoForm
-      dataset={isEditMode ? datasetMock : emptyDatasetMock}
-      dataspaces={dataspaces}
-      isEditMode={isEditMode}
-    />,
+    <QueryClientProvider client={client}>
+      <BaseInfoForm
+        dataset={isEditMode ? datasetMock : emptyDatasetMock}
+        dataspaces={dataspaces}
+        isEditMode={isEditMode}
+      />
+    </QueryClientProvider>,
   )
 }
 
@@ -171,16 +174,28 @@ describe('BaseInfoForm', () => {
   })
 
   test('submits createDataset when not edit mode', async () => {
+    mockApiRequest.mockResolvedValueOnce({
+      data: { id: '1' },
+    })
     setup(false)
     fireEvent.change(screen.getByTestId('nameTextField'), { target: { value: 'New Name' } })
     fireEvent.click(screen.getByRole('button', { name: CONFIRM_BUTTON }))
 
     await waitFor(() => {
-      expect(mockCreateDataset).toHaveBeenCalled()
+      expect(mockApiRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: '/datasets',
+          method: 'POST',
+        }),
+      )
     })
   })
 
   test('submits updateDataset when edit mode', async () => {
+    mockApiRequest.mockResolvedValueOnce({
+      data: { datasetMock },
+    })
+
     setup()
 
     fireEvent.click(screen.getByRole('button', { name: EDIT_BUTTON }))
@@ -188,8 +203,21 @@ describe('BaseInfoForm', () => {
 
     fireEvent.click(screen.getByRole('button', { name: CONFIRM_BUTTON }))
 
+    const responseData = {
+      ...datasetMock,
+      dataspace: { id: '1', name: 'Dataspace 1' },
+      name: 'New Name',
+      lastUpdated: expect.any(String),
+    }
+
     await waitFor(() => {
-      expect(mockUpdateDataset).toHaveBeenCalled()
+      expect(mockApiRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: '/datasets/1',
+          method: 'PATCH',
+          data: responseData,
+        }),
+      )
     })
   })
 })

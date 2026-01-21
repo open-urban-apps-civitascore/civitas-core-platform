@@ -2,128 +2,59 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useParams, useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 
+import { useDeleteDataSpace, useGetDataspace, useUpdateDataspace } from '@/app/services/api/dataspaces/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 
-import { DataSpace, DataSpaceFormData, dataSpaceSchema } from '../../../../../types/dataspaces'
+import { DataSpaceFormData, dataSpaceSchema } from '../../../../../types/dataspaces'
 import { DataSpaceForm } from '../components/DataSpaceForm'
+import { mapDataspacesToFormData } from '../utils/mappers'
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
-
+const defaultDataspace = {
+  name: '',
+  description: '',
+  protected: false,
+}
 const EditDataSpacePage = () => {
-  const router = useRouter()
   const params = useParams<{ dataspaceId: string }>()
   const { dataspaceId } = params
+  const router = useRouter()
 
-  const [selectedDataSpace, setSelectedDataSpace] = useState<DataSpace | undefined>(undefined)
+  const updateDataspace = useUpdateDataspace()
+  const deleteDataspace = useDeleteDataSpace(dataspaceId)
+
+  const { data: dataspace } = useGetDataspace({ id: dataspaceId })
 
   const form = useForm<DataSpaceFormData>({
     resolver: zodResolver(dataSpaceSchema),
-    defaultValues: {
-      name: '',
-      description: '',
-      protected: false,
-    },
+    defaultValues: defaultDataspace,
   })
 
-  const getDataSpace = useCallback(async (dataspaceId: DataSpace['id']) => {
-    try {
-      const response = await fetch(`${URL}/dataspaces/${dataspaceId}`, {
-        method: 'GET',
-        headers: {
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`)
-      }
-
-      const data = await response.json()
-      setSelectedDataSpace(data)
-    } catch (error) {
-      console.error('Error fetching dataspace:', error)
-    }
-  }, [])
-
   useEffect(() => {
-    if (dataspaceId) {
-      getDataSpace(dataspaceId)
+    if (dataspace?.data) {
+      form.reset(mapDataspacesToFormData(dataspace.data))
     }
-  }, [dataspaceId, getDataSpace])
+  }, [dataspace?.data, form])
 
-  useEffect(() => {
-    if (selectedDataSpace) {
-      form.reset({
-        name: selectedDataSpace.name,
-        description: selectedDataSpace.description || '',
-        protected: selectedDataSpace.protected || false,
-      })
-    }
-  }, [selectedDataSpace, form])
-
-  const updateDataSpace = async (dataspaceId: DataSpace['id'], updatedDataSpaceData: DataSpace) => {
-    try {
-      const response = await fetch(`${URL}/dataspaces/${dataspaceId}`, {
-        method: 'PUT',
-        headers: {
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedDataSpaceData),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`)
-      }
-    } catch (error) {
-      console.error('Error updating dataspace:', error)
-    }
-  }
-
-  const deleteDataSpace = async (dataspaceId: DataSpace['id']) => {
-    try {
-      const response = await fetch(`${URL}/dataspaces/${dataspaceId}`, {
-        method: 'DELETE',
-        headers: {
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`)
-      }
-
-      router.push('/dataspaces')
-    } catch (error) {
-      console.error('Error deleting dataspace:', error)
-    }
-  }
+  const handleDeleteDataspace = () => deleteDataspace.mutate(undefined, { onSuccess: () => router.push('/dataspaces') })
 
   const onSubmit = async (values: DataSpaceFormData) => {
-    if (!selectedDataSpace) return
-
-    await updateDataSpace(dataspaceId, { ...selectedDataSpace, ...values })
-    form.reset(values)
-    router.refresh()
+    if (!dataspace?.data) return
+    updateDataspace.mutate(
+      { ...dataspace.data, ...values },
+      { onSuccess: ({ data }) => form.reset(mapDataspacesToFormData(data)) },
+    )
   }
 
   return (
     <PageContainer testId="dataspaceDetailsPage" headerType="onlyTitle">
-      <PageHeader title={selectedDataSpace?.name} />
+      <PageHeader title={dataspace?.data?.name} />
       <PageBackground>
-        <DataSpaceForm
-          form={form}
-          onSubmit={onSubmit}
-          isEdit={true}
-          deleteDataSpace={() => deleteDataSpace(dataspaceId)}
-        />
+        <DataSpaceForm form={form} onSubmit={onSubmit} isEdit={true} deleteDataSpace={handleDeleteDataspace} />
       </PageBackground>
     </PageContainer>
   )
