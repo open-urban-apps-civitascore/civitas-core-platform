@@ -1,7 +1,6 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { useLocale, useTranslations } from 'next-intl'
 
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
@@ -92,10 +91,6 @@ const UsersTable = (props: UsersTableProps) => {
     onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
   })
 
-  if (isLoading) {
-    return <LoadingSpinner className="h-full" />
-  }
-
   return (
     <DataTable
       table={table}
@@ -103,6 +98,7 @@ const UsersTable = (props: UsersTableProps) => {
       pageSize={pageSize}
       totalPages={totalPages}
       onRowClick={onRowClick}
+      isLoading={isLoading}
     />
   )
 }

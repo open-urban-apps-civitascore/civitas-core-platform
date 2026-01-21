@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { Item } from './common'
+import { Item, WithId } from './common'
 
 export type Group = {
   id: string
@@ -23,8 +23,9 @@ export type UserGroupsListData = {
   contact: { id: string; displayName: string } | null
 }
 
-export type UpdateGroupData = Group
 export type CreateGroupData = Omit<Group, 'id'>
+export type UpdateGroupData = Group
+export type PatchGroupData = Partial<CreateGroupData> & WithId
 
 export interface GroupTabProps {
   groupData: Group

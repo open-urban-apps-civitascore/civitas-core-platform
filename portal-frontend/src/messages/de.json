@@ -5,6 +5,7 @@
     "noResults": "Es gibt leider keine Ergebnisse.",
     "noData": "Keine Daten",
     "loading": "Lädt...",
+    "loadingItems": "Lädt {item} ...",
     "form": "Formular",
     "actions": {
       "submit": "Speichern",
@@ -22,7 +23,18 @@
       "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
       "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
-      "notFound": "Keine {items} gefunden"
+      "notFound": "Keine {items} gefunden",
+      "loadingError": "Fehler beim Laden der Daten",
+      "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+    },
+    "items": {
+      "users": "Users",
+      "user": "User",
+      "groups": "Gruppen",
+      "roles": "Rollen",
+      "datasets": "Datensätze",
+      "dataspaces": "Datenräume",
+      "permissions": "Berechtigungen" 
     }
   },
   "languages": {
