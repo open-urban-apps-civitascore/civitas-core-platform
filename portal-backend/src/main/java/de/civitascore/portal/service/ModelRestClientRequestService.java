@@ -27,7 +27,8 @@ public class ModelRestClientRequestService {
    */
   public String uploadModelFile(MultipartFile modelFile, String nsUri) {
     String baseUrl =
-        String.format("%s:%d/atlas/rest", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
+        String.format(
+            "%s:%d/atlas/rest", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
 
     // Param `overwrite` is set to true to allow updating existing models
     String endpoint =
@@ -61,7 +62,8 @@ public class ModelRestClientRequestService {
    */
   public String downloadModelFile(String nsUri, String acceptHeader) {
     String baseUrl =
-        String.format("%s:%d/atlas/rest", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
+        String.format(
+            "%s:%d/atlas/rest", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
 
     String endpoint =
         String.format(
