@@ -11,7 +11,12 @@
 package com.civitas.configadapter.model;
 
 import com.civitas.configadapter.model.apisix.ApisixConfigValue;
-import com.civitas.configadapter.model.idm.*;
+import com.civitas.configadapter.model.apisix.RouteConfigValue;
+import com.civitas.configadapter.model.idm.ClientConfig;
+import com.civitas.configadapter.model.idm.GroupConfig;
+import com.civitas.configadapter.model.idm.RealmConfig;
+import com.civitas.configadapter.model.idm.RoleConfig;
+import com.civitas.configadapter.model.idm.UserConfig;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
@@ -33,5 +38,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
   @JsonSubTypes.Type(value = RoleConfig.class, name = "role"),
   @JsonSubTypes.Type(value = GroupConfig.class, name = "group"),
   @JsonSubTypes.Type(value = ApisixConfigValue.class, name = "apisix-upstream"),
+  @JsonSubTypes.Type(value = RouteConfigValue.class, name = "apisix-route"),
 })
 public interface ConfigValue {}

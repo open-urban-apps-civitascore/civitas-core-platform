@@ -17,6 +17,7 @@ import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.ConfigValue;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.apisix.ApisixConfigValue;
+import com.civitas.configadapter.model.apisix.RouteConfigValue;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
@@ -27,8 +28,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * APISIX adapter that processes configuration messages and manages APISIX upstream resources.
- * Supports CREATE, UPDATE, and DELETE operations for APISIX upstreams.
+ * APISIX adapter that processes configuration messages and manages APISIX resources. Supports
+ * CREATE, UPDATE, and DELETE operations for APISIX upstreams and routes.
+ *
+ * <p>Supported route events:
+ *
+ * <ul>
+ *   <li>core.civitas.api.route.created - Create a new route
+ *   <li>core.civitas.api.route.updated - Update an existing route
+ *   <li>core.civitas.api.route.deleted - Delete a route
+ * </ul>
+ *
+ * <p>Routes support the following plugins (as per CIVITAS/CORE V1):
+ *
+ * <ul>
+ *   <li>openid-connect - OpenID Connect authentication
+ *   <li>serverless-post-function - Post-request serverless function
+ *   <li>serverless-pre-function - Pre-request serverless function
+ *   <li>response-rewrite - Response header/body rewriting
+ *   <li>proxy-rewrite - Request URI/header rewriting
+ *   <li>prometheus - Prometheus metrics collection
+ *   <li>loki - Loki logging integration
+ * </ul>
  */
 public class ApisixAdapter extends AbstractConfigAdapter {
 
@@ -36,7 +57,6 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   private static final String ADMIN_URL_PROPERTY_KEY = "admin.url";
   private static final String ADMIN_KEY_PROPERTY_KEY = "admin.key";
 
-  private static final String API_KEY_KEY = "X-API-KEY";
   private static final String APISIX_RESULT_TYPE = "core.civitas.api.processing.result";
   private static final String APISIX_SOURCE = "civitas.config-adapter.apisix";
 
@@ -50,6 +70,16 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   private static final Logger logger = LoggerFactory.getLogger(ApisixAdapter.class);
 
   public static final String ADAPTER_NAME = "apisix";
+  public static final String X_API_KEY = "X-API-KEY";
+  public static final String APISIX_ADMIN_ROUTES = "/apisix/admin/routes";
+  public static final String APISIX_ADMIN_ROUTES_ID = "/apisix/admin/routes/{id}";
+  public static final String ID = "id";
+  public static final String APISIX_ADMIN_UPSTREAMS_ID = "/apisix/admin/upstreams/{id}";
+  public static final String APISIX_ADMIN_UPSTREAMS = "/apisix/admin/upstreams";
+  public static final String UPSTREAM = "upstream";
+  public static final String ROUTE = "route";
+  public static final String UPSTREAMS = "upstreams";
+  public static final String ROUTES = "routes";
 
   private Client client;
   private String adminApiUrl;
@@ -136,8 +166,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   }
 
   /**
-   * Parses the targetResource string to extract resource type and resource ID. Expected format:
-   * "upstreams/{upstreamId}" or "upstreams"
+   * Parses the targetResource string to extract resource type and resource ID. Expected formats:
+   * "upstreams/{upstreamId}" or "upstreams" "routes/{routeId}" or "routes"
    */
   private ResourceInfo parseTargetResource(String targetResource) {
     String[] parts = targetResource.split("/");
@@ -146,11 +176,18 @@ public class ApisixAdapter extends AbstractConfigAdapter {
     String resourceId = null;
 
     for (int i = 0; i < parts.length; i++) {
-      if ("upstreams".equals(parts[i])) {
-        resourceType = "upstream";
+      if (UPSTREAMS.equals(parts[i])) {
+        resourceType = UPSTREAM;
         if (i + 1 < parts.length) {
           resourceId = parts[i + 1];
         }
+        break;
+      } else if (ROUTES.equals(parts[i])) {
+        resourceType = ROUTE;
+        if (i + 1 < parts.length) {
+          resourceId = parts[i + 1];
+        }
+        break;
       }
     }
 
@@ -160,8 +197,9 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "upstream" -> createUpstream(event);
-      default -> {
+      case UPSTREAM -> createUpstream(event);
+      case ROUTE -> createRoute(event);
+      case null, default -> {
         logger.warn("Unknown resource type for create: {}", resourceInfo.type);
         publishErrorResult(
             event, UNKNOWN_RESOURCE_TYPE_CODE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
@@ -171,7 +209,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   private void handleUpdate(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "upstream" -> updateUpstream(resourceInfo.id, event);
+      case UPSTREAM -> updateUpstream(resourceInfo.id, event);
+      case ROUTE -> updateRoute(resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for update: {}", resourceInfo.type);
         publishErrorResult(
@@ -182,7 +221,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   private void handleDelete(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "upstream" -> deleteUpstream(resourceInfo.id, event);
+      case UPSTREAM -> deleteUpstream(resourceInfo.id, event);
+      case ROUTE -> deleteRoute(resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for delete: {}", resourceInfo.type);
         publishErrorResult(
@@ -206,9 +246,9 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       Response response =
           client
               .target(adminApiUrl)
-              .path("/apisix/admin/upstreams")
+              .path(APISIX_ADMIN_UPSTREAMS)
               .request(MediaType.APPLICATION_JSON)
-              .header(API_KEY_KEY, adminApiKey)
+              .header(X_API_KEY, adminApiKey)
               .post(Entity.json(upstreamConfig));
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
@@ -244,10 +284,10 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       Response response =
           client
               .target(adminApiUrl)
-              .path("/apisix/admin/upstreams/{id}")
-              .resolveTemplate("id", upstreamId)
+              .path(APISIX_ADMIN_UPSTREAMS_ID)
+              .resolveTemplate(ID, upstreamId)
               .request(MediaType.APPLICATION_JSON)
-              .header(API_KEY_KEY, adminApiKey)
+              .header(X_API_KEY, adminApiKey)
               .put(Entity.json(upstreamConfig));
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
@@ -275,10 +315,10 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       Response response =
           client
               .target(adminApiUrl)
-              .path("/apisix/admin/upstreams/{id}")
-              .resolveTemplate("id", upstreamId)
+              .path(APISIX_ADMIN_UPSTREAMS_ID)
+              .resolveTemplate(ID, upstreamId)
               .request(MediaType.APPLICATION_JSON)
-              .header(API_KEY_KEY, adminApiKey)
+              .header(X_API_KEY, adminApiKey)
               .delete();
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
@@ -299,6 +339,122 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       logger.error("Failed to delete APISIX upstream: {}", upstreamId, e);
       publishErrorResult(event, UPSTREAM_DELETE_FAILED_CODE, e.getMessage());
     }
+  }
+
+  // ============== ROUTE OPERATIONS ==============
+
+  private void createRoute(ConfigEvent event) {
+    try {
+      ConfigValue configValue = event.payload().config().value();
+      Object routeConfig = extractRouteConfig(configValue);
+
+      Response response =
+          client
+              .target(adminApiUrl)
+              .path(APISIX_ADMIN_ROUTES)
+              .request(MediaType.APPLICATION_JSON)
+              .header(X_API_KEY, adminApiKey)
+              .post(Entity.json(routeConfig));
+
+      if (response.getStatus() >= 200 && response.getStatus() < 300) {
+        logger.info("Created APISIX route successfully");
+        publishSuccessResult(event, "APISIX route created successfully", null);
+      } else {
+        String errorMsg =
+            "Failed to create APISIX route. Status: "
+                + response.getStatus()
+                + ", Body: "
+                + response.readEntity(String.class);
+        logger.error(errorMsg);
+        publishErrorResult(event, "ROUTE_CREATE_FAILED", errorMsg);
+      }
+      response.close();
+
+    } catch (Exception e) {
+      logger.error("Failed to create APISIX route", e);
+      publishErrorResult(event, "ROUTE_CREATE_FAILED", e.getMessage());
+    }
+  }
+
+  private void updateRoute(String routeId, ConfigEvent event) {
+    try {
+      ConfigValue configValue = event.payload().config().value();
+      Object routeConfig = extractRouteConfig(configValue);
+
+      Response response =
+          client
+              .target(adminApiUrl)
+              .path(APISIX_ADMIN_ROUTES_ID)
+              .resolveTemplate(ID, routeId)
+              .request(MediaType.APPLICATION_JSON)
+              .header(X_API_KEY, adminApiKey)
+              .put(Entity.json(routeConfig));
+
+      if (response.getStatus() >= 200 && response.getStatus() < 300) {
+        logger.info("Updated APISIX route: {}", routeId);
+        publishSuccessResult(event, "APISIX route updated successfully", routeId);
+      } else {
+        String errorMsg =
+            "Failed to update APISIX route. Status: "
+                + response.getStatus()
+                + ", Body: "
+                + response.readEntity(String.class);
+        logger.error(errorMsg);
+        publishErrorResult(event, "ROUTE_UPDATE_FAILED", errorMsg);
+      }
+      response.close();
+
+    } catch (Exception e) {
+      logger.error("Failed to update APISIX route: {}", routeId, e);
+      publishErrorResult(event, "ROUTE_UPDATE_FAILED", e.getMessage());
+    }
+  }
+
+  private void deleteRoute(String routeId, ConfigEvent event) {
+    try {
+      Response response =
+          client
+              .target(adminApiUrl)
+              .path(APISIX_ADMIN_ROUTES_ID)
+              .resolveTemplate(ID, routeId)
+              .request(MediaType.APPLICATION_JSON)
+              .header(X_API_KEY, adminApiKey)
+              .delete();
+
+      if (response.getStatus() >= 200 && response.getStatus() < 300) {
+        logger.info("Deleted APISIX route: {}", routeId);
+        publishSuccessResult(event, "APISIX route deleted successfully", routeId);
+      } else {
+        String errorMsg =
+            "Failed to delete APISIX route. Status: "
+                + response.getStatus()
+                + ", Body: "
+                + response.readEntity(String.class);
+        logger.error(errorMsg);
+        publishErrorResult(event, "ROUTE_DELETE_FAILED", errorMsg);
+      }
+      response.close();
+
+    } catch (Exception e) {
+      logger.error("Failed to delete APISIX route: {}", routeId, e);
+      publishErrorResult(event, "ROUTE_DELETE_FAILED", e.getMessage());
+    }
+  }
+
+  /**
+   * Extracts route configuration from the ConfigValue. Supports both RouteConfigValue and
+   * ApisixConfigValue for flexibility.
+   *
+   * @param configValue the configuration value from the event
+   * @return the route configuration data to send to APISIX
+   */
+  private Object extractRouteConfig(ConfigValue configValue) {
+    if (configValue instanceof RouteConfigValue routeValue) {
+      return routeValue.data();
+    } else if (configValue instanceof ApisixConfigValue apisixValue) {
+      return apisixValue.data();
+    }
+    return configValue;
   }
 
   // ============== RESULT PUBLISHING ==============

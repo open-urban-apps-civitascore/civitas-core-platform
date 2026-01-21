@@ -46,7 +46,12 @@ public enum Topics {
   // --- Backend Events ---
   BACKEND_CREATED("core.civitas.api.backend.created"),
   BACKEND_UPDATED("core.civitas.api.backend.updated"),
-  BACKEND_DELETED("core.civitas.api.backend.deleted");
+  BACKEND_DELETED("core.civitas.api.backend.deleted"),
+
+  // --- Route Events ---
+  ROUTE_CREATED("core.civitas.api.route.created"),
+  ROUTE_UPDATED("core.civitas.api.route.updated"),
+  ROUTE_DELETED("core.civitas.api.route.deleted");
 
   private final String value;
 
