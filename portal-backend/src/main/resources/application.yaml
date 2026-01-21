@@ -125,7 +125,7 @@ kafka:
   
 model-atlas:
   baseUrl: "http://model-atlas"
-  port: 8086
+  port: 8080
   scope: default
   stage: draft
 
