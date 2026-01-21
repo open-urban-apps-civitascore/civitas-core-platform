@@ -31,6 +31,9 @@ public class Permission extends NamedEntity implements GrantedAuthority {
   @Column(name = "permission_type", nullable = false)
   private PermissionType permissionType;
 
+  @Column(name = "category", nullable = false)
+  private String category;
+
   @Override
   public String getAuthority() {
     return getName();

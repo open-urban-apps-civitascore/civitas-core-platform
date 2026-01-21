@@ -33,4 +33,7 @@ import com.civitas.configadapter.model.ConfigValue;
  * property in JSON.
  */
 public sealed interface IdmConfigValue extends ConfigValue
-    permits RealmConfig, UserConfig, ClientConfig, RoleConfig {}
+    permits RealmConfig, UserConfig, ClientConfig, RoleConfig {
+
+  static final String IDM_RESULT_TYPE = "core.civitas.idm.processing.result";
+}
