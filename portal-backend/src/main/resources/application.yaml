@@ -124,7 +124,7 @@ kafka:
   topic-prefix: ${KAFKA_TOPIC_PREFIX:""}
   
 model-atlas:
-  baseUrl: "http://localhost"
+  baseUrl: "http://model-atlas"
   port: 8086
   scope: default
   stage: draft

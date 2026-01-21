@@ -1,6 +1,7 @@
 services:
   model-atlas:
-    image:     eclipsefennec/model.atlas:snapshot
+    container_name: model-atlas
+    image: eclipsefennec/model.atlas:snapshot
     ports:
       - "8086:8080"
     networks:

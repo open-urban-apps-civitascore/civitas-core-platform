@@ -29,9 +29,10 @@ public class ModelRestClientRequestService {
     String baseUrl =
         String.format("%s:%d/atlas/rest", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
 
+    // Param `overwrite` is set to true to allow updating existing models
     String endpoint =
         String.format(
-            "/%s/schema/stages/%s?nsUri=%s",
+            "/%s/schema/stages/%s?nsUri=%s&overwrite=true",
             modelAtlasConfig.getScope(), modelAtlasConfig.getStage(), encode(nsUri, UTF_8));
 
     try {
