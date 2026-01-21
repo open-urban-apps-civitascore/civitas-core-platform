@@ -29,6 +29,7 @@ import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
 import com.civitas.configadapter.model.apisix.ApisixConfigValue;
+import com.civitas.configadapter.model.apisix.RouteConfigValue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -118,7 +119,10 @@ class ApisixAdapterIntegrationTest {
             ",",
             Topics.BACKEND_CREATED.toString(),
             Topics.BACKEND_UPDATED.toString(),
-            Topics.BACKEND_DELETED.toString()));
+            Topics.BACKEND_DELETED.toString(),
+            Topics.ROUTE_CREATED.toString(),
+            Topics.ROUTE_UPDATED.toString(),
+            Topics.ROUTE_DELETED.toString()));
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
     adapter = new ApisixAdapter();
@@ -257,6 +261,249 @@ class ApisixAdapterIntegrationTest {
             });
   }
 
+  // ============== ROUTE INTEGRATION TESTS ==============
+
+  @Test
+  void createRoute() throws Exception {
+    // First create an upstream that the route will reference
+    String upstreamId = "test-upstream-for-route";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with plugins
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/test/*");
+    routeConfig.put("methods", List.of("GET", "POST"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put("plugins", Map.of("prometheus", Map.of()));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+  }
+
+  @Test
+  void updateRoute() throws Exception {
+    String routeId = "test-route-update";
+
+    // First create an upstream
+    String upstreamId = "test-upstream-for-route-update";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create the initial route directly
+    Map<String, Object> initialRouteConfig = new HashMap<>();
+    initialRouteConfig.put("uri", "/api/v1/initial/*");
+    initialRouteConfig.put("methods", List.of("GET"));
+    initialRouteConfig.put("upstream_id", upstreamId);
+    createRouteDirectly(routeId, initialRouteConfig);
+
+    // Now update the route via the adapter
+    Map<String, Object> updatedRouteConfig = new HashMap<>();
+    updatedRouteConfig.put("uri", "/api/v1/updated/*");
+    updatedRouteConfig.put("methods", List.of("GET", "POST", "PUT", "DELETE"));
+    updatedRouteConfig.put("upstream_id", upstreamId);
+    updatedRouteConfig.put(
+        "plugins", Map.of("prometheus", Map.of(), "proxy-rewrite", Map.of("uri", "/updated")));
+
+    ConfigEvent event =
+        createRouteConfigEvent("routes/" + routeId, Operation.UPDATE, updatedRouteConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_UPDATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              JsonNode route = getRouteFromApisix(routeId);
+              assertNotNull(route);
+              String uri = route.get("value").get("uri").asText();
+              assertEquals("/api/v1/updated/*", uri);
+            });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+  }
+
+  @Test
+  void deleteRoute() throws Exception {
+    String routeId = "test-route-delete";
+
+    // First create an upstream
+    String upstreamId = "test-upstream-for-route-delete";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route directly
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/to-delete/*");
+    routeConfig.put("upstream_id", upstreamId);
+    createRouteDirectly(routeId, routeConfig);
+
+    // Verify route exists
+    JsonNode route = getRouteFromApisix(routeId);
+    assertNotNull(route, "Route should exist before delete");
+
+    // Delete the route via the adapter
+    ConfigEvent event = createRouteConfigEvent("routes/" + routeId, Operation.DELETE, null);
+
+    adapter.processConfigEvent(Topics.ROUTE_DELETED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              try {
+                getRouteFromApisix(routeId);
+              } catch (Exception e) {
+                assertTrue(e.getMessage().contains("404") || e.getMessage().contains("not found"));
+              }
+            });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+  }
+
+  @Test
+  void createRouteWithAllPlugins() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-for-full-route";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with all CIVITAS/CORE V1 plugins
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/full-plugins/*");
+    routeConfig.put("methods", List.of("GET", "POST", "PUT", "DELETE"));
+    routeConfig.put("upstream_id", upstreamId);
+
+    Map<String, Object> plugins = new HashMap<>();
+    plugins.put("prometheus", Map.of());
+    plugins.put("proxy-rewrite", Map.of("uri", "/rewritten"));
+    plugins.put(
+        "response-rewrite",
+        Map.of("headers", Map.of("set", Map.of("X-Custom-Header", "custom-value"))));
+    routeConfig.put("plugins", plugins);
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+  }
+
+  @Test
+  void handleInvalidRouteConfiguration() {
+    // Create a route without required fields (no uri, no upstream)
+    Map<String, Object> invalidConfig = Map.of("methods", List.of("GET"));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, invalidConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.FAILURE, resultEvent.status());
+              assertNotNull(resultEvent.errorCode());
+              assertEquals("ROUTE_CREATE_FAILED", resultEvent.errorCode());
+            });
+  }
+
+  // ============== HELPER METHODS ==============
+
+  private void createRouteDirectly(String routeId, Map<String, Object> config) throws Exception {
+    String url = adminApiUrl + "/apisix/admin/routes/" + routeId;
+    String json = objectMapper.writeValueAsString(config);
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Content-Type", "application/json")
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .PUT(HttpRequest.BodyPublishers.ofString(json))
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+      throw new RuntimeException(
+          "Failed to create route directly. Status: "
+              + response.statusCode()
+              + ", Body: "
+              + response.body());
+    }
+
+    await()
+        .atMost(5, SECONDS)
+        .pollInterval(500, java.util.concurrent.TimeUnit.MILLISECONDS)
+        .untilAsserted(
+            () -> {
+              JsonNode route = getRouteFromApisix(routeId);
+              assertNotNull(route, "Route should be created");
+            });
+  }
+
+  private JsonNode getRouteFromApisix(String routeId) throws Exception {
+    String url = adminApiUrl + "/apisix/admin/routes/" + routeId;
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .GET()
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() == 404) {
+      throw new RuntimeException("Route not found: " + routeId);
+    }
+
+    if (response.statusCode() < 200 || response.statusCode() >= 300) {
+      throw new RuntimeException(
+          "Failed to get route. Status: " + response.statusCode() + ", Body: " + response.body());
+    }
+
+    return objectMapper.readTree(response.body());
+  }
+
   private void waitForApisixReady(String adminApiUrl) {
     await()
         .atMost(60, SECONDS)
@@ -354,6 +601,23 @@ class ApisixAdapterIntegrationTest {
 
     ApisixConfigValue apisixValue = new ApisixConfigValue(value);
     Config config = new Config(targetResource, apisixValue);
+    Payload payload = new Payload("apisix", targetResource, operation, config);
+    return new ConfigEvent(metadata, payload);
+  }
+
+  private ConfigEvent createRouteConfigEvent(
+      String targetResource, Operation operation, Map<String, Object> value) {
+    Metadata metadata =
+        new Metadata(
+            UUID.randomUUID().toString(),
+            OffsetDateTime.now(),
+            "test.source",
+            UUID.randomUUID().toString(),
+            "1.0",
+            "result.topic");
+
+    RouteConfigValue routeValue = new RouteConfigValue(value);
+    Config config = new Config(targetResource, routeValue);
     Payload payload = new Payload("apisix", targetResource, operation, config);
     return new ConfigEvent(metadata, payload);
   }
