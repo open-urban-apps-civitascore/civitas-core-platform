@@ -10,7 +10,7 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/useQueryParams'
-import { UserResponse } from '@/types/users'
+import { User } from '@/types/users'
 
 import { GroupsTab } from './groups-tab/GroupsTab'
 import { RolesTab } from './roles-tab/RolesTab'
@@ -18,7 +18,7 @@ import { UserForm } from './UserForm'
 
 interface UserDetailsProps {
   title: string
-  userData: UserResponse | null
+  userData: User | null
   isEditMode?: boolean
   testId?: string
 }

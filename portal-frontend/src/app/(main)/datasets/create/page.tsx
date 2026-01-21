@@ -1,9 +1,7 @@
+import { getDataspaces as getDataspacesRequest } from '@/app/services/api/dataspaces/serverRequests'
 import { DatasetFormData } from '@/types/datasets'
-import { DataSpace } from '@/types/dataspaces'
 
 import { DatasetOverview } from '../components/overview/DatasetOverview'
-
-const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 
 export const defaultDataset: DatasetFormData = {
   id: '',
@@ -16,14 +14,8 @@ export const defaultDataset: DatasetFormData = {
 const CreateDatasetPage = async () => {
   const getDataspaces = async () => {
     try {
-      const dataspacesResponse = await fetch(`${URL}/dataspaces`, {
-        cache: 'no-store',
-      })
-      if (!dataspacesResponse) {
-        throw new Error('An error occurred while loading data')
-      }
-      const dataspacesData: DataSpace[] = await dataspacesResponse.json()
-      return dataspacesData.map(dataspace => ({ value: dataspace.id, label: dataspace.name }))
+      const { data } = await getDataspacesRequest()
+      return data.map(dataspace => ({ value: dataspace.id, label: dataspace.name }))
     } catch (error) {
       throw new Error(`An error occurred while loading data: ${error}`)
     }

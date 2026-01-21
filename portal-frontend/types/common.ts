@@ -16,3 +16,47 @@ export type SelectOption = {
 }
 
 export type InputPropsWithoutForm = Omit<InputHTMLAttributes<HTMLInputElement>, 'form' | 'onChange'>
+
+export type GetListInput = {
+  params?: URLSearchParams
+  isEnabled?: boolean
+}
+
+export type GetItemInput = {
+  id: string
+  isEnabled?: boolean
+}
+
+export type DataQueryInput = {
+  key: string
+  errorMessage: string
+  id?: string
+  params?: URLSearchParams
+  isEnabled?: boolean
+}
+
+export type WithId = { id: string }
+
+export type MutationData<TData extends WithId> = TData
+
+export type UpdateMutationMethod = 'PUT' | 'PATCH'
+
+export type UpdateInput = {
+  id: string
+  method: UpdateMutationMethod
+}
+
+export type BaseMutationInput = {
+  key: string
+  errorMessage: string
+}
+
+export type CreateMutationInput = BaseMutationInput
+
+export type UpdateMutationInput = BaseMutationInput & {
+  method: UpdateMutationMethod
+}
+
+export type DeleteMutationInput = BaseMutationInput & {
+  id: string
+}

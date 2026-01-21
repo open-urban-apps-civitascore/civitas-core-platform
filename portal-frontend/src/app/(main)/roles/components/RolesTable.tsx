@@ -6,11 +6,11 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
 
-import { ROLE_ORIGINS, RoleResponse } from '../../../../../types/roles'
+import { Role, ROLE_ORIGINS } from '../../../../../types/roles'
 import { TableProps } from '../../../../../types/table'
 
-interface RolesTableProps extends TableProps<RoleResponse> {
-  roles: RoleResponse[]
+interface RolesTableProps extends TableProps<Role> {
+  roles: Role[]
 }
 
 export const RolesTable = (props: RolesTableProps) => {
@@ -30,7 +30,7 @@ export const RolesTable = (props: RolesTableProps) => {
   const t = useTranslations('roles')
   const locale = useLocale()
 
-  const columnHelper = createColumnHelper<RoleResponse>()
+  const columnHelper = createColumnHelper<Role>()
 
   const columns = [
     columnHelper.accessor('id', {

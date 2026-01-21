@@ -1,10 +1,17 @@
 import { z } from 'zod'
+
+import { WithId } from './common'
+
 export interface DataSpace {
   id: string
   name: string
   description: string
   protected: boolean
 }
+
+export type CreateDataspaceData = Omit<DataSpace, 'id'>
+export type UpdateDataspaceData = DataSpace
+export type PatchDataspaceData = Partial<CreateDataspaceData> & WithId
 
 export type DataSpaceFormData = Omit<DataSpace, 'id'>
 

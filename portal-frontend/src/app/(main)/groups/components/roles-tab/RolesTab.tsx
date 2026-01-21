@@ -2,57 +2,35 @@
 
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
+import { useUpdateGroup } from '@/app/services/api/groups/clientRequests'
+import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { Group, GroupTabProps } from '@/types/groups'
-import { BaseRole, ROLE_TYPES } from '@/types/roles'
+import { ROLE_TYPES } from '@/types/roles'
 
-import { updateGroup } from '../../actions'
 import { RoleCategory } from './RoleCategory'
-
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 export const RolesTab = (props: GroupTabProps) => {
   const { groupData } = props
   const t = useTranslations('groups')
   const tRoles = useTranslations('roles')
-  const [originalRoles, setOriginalRoles] = useState(groupData.roles)
   const router = useRouter()
+  const updateGroup = useUpdateGroup()
+
+  const [originalRoles, setOriginalRoles] = useState(groupData.roles)
   const [group, setGroup] = useState<Group>(groupData)
 
-  const [allRoles, setAllRoles] = useState<BaseRole[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: rolesdata, isLoading: isLoadingRoles } = useGetRoles()
 
   const hasChanges = useMemo(
     () => JSON.stringify(group.roles.sort()) !== JSON.stringify(originalRoles.sort()),
     [group, originalRoles],
   )
-
-  // Fetch all roles
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const rolesResponse = await fetch(`${URL}/roles`)
-
-        if (!rolesResponse.ok) {
-          throw new Error('Failed to fetch data')
-        }
-
-        const rolesData = await rolesResponse.json()
-
-        setAllRoles(rolesData)
-      } catch (error) {
-        console.error('Error fetching data:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-    fetchData()
-  }, [])
 
   const handleAddRole = (roleId: string) => {
     const updatedRoles = [...group.roles, roleId]
@@ -65,18 +43,10 @@ export const RolesTab = (props: GroupTabProps) => {
   }
 
   const handleUpdateGroup = async () => {
-    try {
-      setIsLoading(true)
-      await updateGroup(group)
-      setOriginalRoles(group.roles)
-    } catch (error) {
-      console.error('An error occurred while updating the group: ', error)
-    } finally {
-      setIsLoading(false)
-    }
+    updateGroup.mutate(group, { onSuccess: ({ data }) => setOriginalRoles(data.roles) })
   }
 
-  if (isLoading) {
+  if (isLoadingRoles || updateGroup.isPending) {
     return <LoadingSpinner className="h-full" />
   }
 
@@ -100,7 +70,7 @@ export const RolesTab = (props: GroupTabProps) => {
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
-          allRoles={allRoles}
+          allRoles={rolesdata?.data || []}
         />
 
         <RoleCategory
@@ -109,7 +79,7 @@ export const RolesTab = (props: GroupTabProps) => {
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
-          allRoles={allRoles}
+          allRoles={rolesdata?.data || []}
         />
 
         <RoleCategory
@@ -118,7 +88,7 @@ export const RolesTab = (props: GroupTabProps) => {
           onAddRole={handleAddRole}
           onRemoveRole={handleRemoveRole}
           groupRoles={group.roles}
-          allRoles={allRoles}
+          allRoles={rolesdata?.data || []}
           className="border-0"
         />
       </ContentCard>

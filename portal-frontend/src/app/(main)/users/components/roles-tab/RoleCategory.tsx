@@ -55,7 +55,7 @@ export const RoleCategory = (props: RolesCategoryProps) => {
             {info.getValue()}
           </Badge>
           <Button
-            onClick={() => router.push(`/roles/${info.row.id}`)}
+            onClick={() => router.push(`/roles/${info.row.original.roleId}`)}
             className="hidden group-hover:block group/button"
             variant="outline"
           >

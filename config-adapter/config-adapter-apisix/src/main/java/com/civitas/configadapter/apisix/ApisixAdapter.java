@@ -32,6 +32,21 @@ import org.slf4j.LoggerFactory;
  */
 public class ApisixAdapter extends AbstractConfigAdapter {
 
+  private static final String ADMIN_URL_DEFAULT = "http://localhost:9180";
+  private static final String ADMIN_URL_PROPERTY_KEY = "admin.url";
+  private static final String ADMIN_KEY_PROPERTY_KEY = "admin.key";
+
+  private static final String API_KEY_KEY = "X-API-KEY";
+  private static final String APISIX_RESULT_TYPE = "core.civitas.api.processing.result";
+  private static final String APISIX_SOURCE = "civitas.config-adapter.apisix";
+
+  private static final String UPSTREAM_CREATE_FAILED_CODE = "UPSTREAM_CREATE_FAILED";
+  private static final String UPSTREAM_UPDATE_FAILED_CODE = "UPSTREAM_UPDATE_FAILED";
+  private static final String UPSTREAM_DELETED_SUCCESSFULLY =
+      "APISIX upstream deleted successfully";
+  private static final String UPSTREAM_DELETE_FAILED_CODE = "UPSTREAM_DELETE_FAILED";
+  private static final String SUCCESS_UPDATE_MSG = "APISIX upstream updated successfully";
+
   private static final Logger logger = LoggerFactory.getLogger(ApisixAdapter.class);
 
   public static final String ADAPTER_NAME = "apisix";
@@ -40,12 +55,14 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   private String adminApiUrl;
   private String adminApiKey;
 
+  public ApisixAdapter() {}
+
   @Override
   public void initialize(AdapterConfig config) {
     super.initialize(config);
 
-    this.adminApiUrl = getAdapterProperty("admin.url", "http://localhost:9180");
-    this.adminApiKey = getAdapterProperty("admin.key");
+    this.adminApiUrl = getAdapterProperty(ADMIN_URL_PROPERTY_KEY, ADMIN_URL_DEFAULT);
+    this.adminApiKey = getAdapterProperty(ADMIN_KEY_PROPERTY_KEY);
     if (adminApiKey == null || adminApiKey.isBlank()) {
       throw new IllegalArgumentException("The APISIX admin key cannot be null or blank.");
     }
@@ -107,7 +124,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
         case DELETE -> handleDelete(resourceInfo, event);
         default -> {
           logger.warn("Unknown operation: {}", operation);
-          publishErrorResult(event, "UNSUPPORTED_OPERATION", "Unknown operation: " + operation);
+          publishErrorResult(
+              event, UNSUPPORTED_OPERATION_CODE, UNSUPPORTED_OPERATION_MSG + operation);
         }
       }
 
@@ -146,7 +164,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       default -> {
         logger.warn("Unknown resource type for create: {}", resourceInfo.type);
         publishErrorResult(
-            event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
+            event, UNKNOWN_RESOURCE_TYPE_CODE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
       }
     }
   }
@@ -157,7 +175,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       default -> {
         logger.warn("Unknown resource type for update: {}", resourceInfo.type);
         publishErrorResult(
-            event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
+            event, UNKNOWN_RESOURCE_TYPE_CODE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
       }
     }
   }
@@ -168,7 +186,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       default -> {
         logger.warn("Unknown resource type for delete: {}", resourceInfo.type);
         publishErrorResult(
-            event, "UNKNOWN_RESOURCE_TYPE", "Unknown resource type: " + resourceInfo.type);
+            event, UNKNOWN_RESOURCE_TYPE_CODE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
       }
     }
   }
@@ -190,7 +208,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
               .target(adminApiUrl)
               .path("/apisix/admin/upstreams")
               .request(MediaType.APPLICATION_JSON)
-              .header("X-API-KEY", adminApiKey)
+              .header(API_KEY_KEY, adminApiKey)
               .post(Entity.json(upstreamConfig));
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
@@ -203,13 +221,13 @@ public class ApisixAdapter extends AbstractConfigAdapter {
                 + ", Body: "
                 + response.readEntity(String.class);
         logger.error(errorMsg);
-        publishErrorResult(event, "UPSTREAM_CREATE_FAILED", errorMsg);
+        publishErrorResult(event, UPSTREAM_CREATE_FAILED_CODE, errorMsg);
       }
       response.close();
 
     } catch (Exception e) {
       logger.error("Failed to create APISIX upstream", e);
-      publishErrorResult(event, "UPSTREAM_CREATE_FAILED", e.getMessage());
+      publishErrorResult(event, UPSTREAM_CREATE_FAILED_CODE, e.getMessage());
     }
   }
 
@@ -229,12 +247,12 @@ public class ApisixAdapter extends AbstractConfigAdapter {
               .path("/apisix/admin/upstreams/{id}")
               .resolveTemplate("id", upstreamId)
               .request(MediaType.APPLICATION_JSON)
-              .header("X-API-KEY", adminApiKey)
+              .header(API_KEY_KEY, adminApiKey)
               .put(Entity.json(upstreamConfig));
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
         logger.info("Updated APISIX upstream: {}", upstreamId);
-        publishSuccessResult(event, "APISIX upstream updated successfully", upstreamId);
+        publishSuccessResult(event, SUCCESS_UPDATE_MSG, upstreamId);
       } else {
         String errorMsg =
             "Failed to update APISIX upstream. Status: "
@@ -242,13 +260,13 @@ public class ApisixAdapter extends AbstractConfigAdapter {
                 + ", Body: "
                 + response.readEntity(String.class);
         logger.error(errorMsg);
-        publishErrorResult(event, "UPSTREAM_UPDATE_FAILED", errorMsg);
+        publishErrorResult(event, UPSTREAM_UPDATE_FAILED_CODE, errorMsg);
       }
       response.close();
 
     } catch (Exception e) {
       logger.error("Failed to update APISIX upstream: {}", upstreamId, e);
-      publishErrorResult(event, "UPSTREAM_UPDATE_FAILED", e.getMessage());
+      publishErrorResult(event, UPSTREAM_UPDATE_FAILED_CODE, e.getMessage());
     }
   }
 
@@ -260,12 +278,12 @@ public class ApisixAdapter extends AbstractConfigAdapter {
               .path("/apisix/admin/upstreams/{id}")
               .resolveTemplate("id", upstreamId)
               .request(MediaType.APPLICATION_JSON)
-              .header("X-API-KEY", adminApiKey)
+              .header(API_KEY_KEY, adminApiKey)
               .delete();
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
         logger.info("Deleted APISIX upstream: {}", upstreamId);
-        publishSuccessResult(event, "APISIX upstream deleted successfully", upstreamId);
+        publishSuccessResult(event, UPSTREAM_DELETED_SUCCESSFULLY, upstreamId);
       } else {
         String errorMsg =
             "Failed to delete APISIX upstream. Status: "
@@ -273,13 +291,13 @@ public class ApisixAdapter extends AbstractConfigAdapter {
                 + ", Body: "
                 + response.readEntity(String.class);
         logger.error(errorMsg);
-        publishErrorResult(event, "UPSTREAM_DELETE_FAILED", errorMsg);
+        publishErrorResult(event, UPSTREAM_DELETE_FAILED_CODE, errorMsg);
       }
       response.close();
 
     } catch (Exception e) {
       logger.error("Failed to delete APISIX upstream: {}", upstreamId, e);
-      publishErrorResult(event, "UPSTREAM_DELETE_FAILED", e.getMessage());
+      publishErrorResult(event, UPSTREAM_DELETE_FAILED_CODE, e.getMessage());
     }
   }
 
@@ -299,7 +317,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
               resourceId,
               originalEvent.payload().operation(),
               originalEvent.payload().targetResource(),
-              "civitas.config-adapter.apisix");
+              APISIX_SOURCE,
+              APISIX_RESULT_TYPE);
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
@@ -324,7 +343,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
               errorMessage,
               originalEvent.payload().operation(),
               originalEvent.payload().targetResource(),
-              "civitas.config-adapter.apisix");
+              APISIX_SOURCE,
+              APISIX_RESULT_TYPE);
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published FAILURE result to topic: {}", originalEvent.metadata().resultTopic());

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { UserResponse } from '@/types/users'
+import { User } from '@/types/users'
 
 import { createTestUser } from '../../playwright/createTestUser'
 import { removeTestUser } from '../../playwright/removeTestUser'
@@ -8,7 +8,7 @@ import { removeTestUser } from '../../playwright/removeTestUser'
 // users tests are skipped because list view uses API and create and edit user use json-server
 
 test.describe.skip('User List', async () => {
-  let user: UserResponse
+  let user: User
 
   test.beforeEach(async ({ page }) => {
     user = await createTestUser()

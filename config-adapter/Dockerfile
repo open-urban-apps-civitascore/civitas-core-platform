@@ -2,13 +2,14 @@ FROM eclipse-temurin:21-jre-alpine
 
 LABEL maintainer="CIVITAS/Interfaces Team"
 LABEL description="CIVITAS/CORE Configuration Adapter"
+LABEL civitas=true
 
 WORKDIR /civitas
 
 ENV TZ=Europe/Berlin
 RUN apk add --no-cache curl tzdata
 
-COPY config-adapter-application/target/*.jar ./config-adapter.jar
+COPY config-adapter-application/target/config-adapter-application-*.jar ./config-adapter.jar
 
 RUN addgroup -g 1001 -S civitas && \
     adduser -u 1001 -S civitas -G civitas && \

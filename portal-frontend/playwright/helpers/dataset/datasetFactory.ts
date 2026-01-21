@@ -1,8 +1,8 @@
-import { DatasetResponse } from '@/types/datasets'
+import { Dataset } from '@/types/datasets'
 
 import { TEST_ENV } from '../../../playwright.config'
 
-export const getMockDatasetData = (overrides: Partial<DatasetResponse> = {}): DatasetResponse => {
+export const getMockDatasetData = (overrides: Partial<Dataset> = {}): Dataset => {
   const id = crypto.randomUUID()
   const name = `E2EDatasetName-${TEST_ENV}-${id}`
   return {
