@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -13,6 +13,7 @@ package com.civitas.configadapter.model;
 import com.civitas.configadapter.model.apisix.ApisixConfigValue;
 import com.civitas.configadapter.model.apisix.RouteConfigValue;
 import com.civitas.configadapter.model.idm.ClientConfig;
+import com.civitas.configadapter.model.idm.GroupConfig;
 import com.civitas.configadapter.model.idm.RealmConfig;
 import com.civitas.configadapter.model.idm.RoleConfig;
 import com.civitas.configadapter.model.idm.UserConfig;
@@ -35,6 +36,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
   @JsonSubTypes.Type(value = UserConfig.class, name = "user"),
   @JsonSubTypes.Type(value = ClientConfig.class, name = "client"),
   @JsonSubTypes.Type(value = RoleConfig.class, name = "role"),
+  @JsonSubTypes.Type(value = GroupConfig.class, name = "group"),
   @JsonSubTypes.Type(value = ApisixConfigValue.class, name = "apisix-upstream"),
   @JsonSubTypes.Type(value = RouteConfigValue.class, name = "apisix-route"),
 })
