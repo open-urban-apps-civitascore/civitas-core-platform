@@ -3,7 +3,7 @@ import '@testing-library/jest-dom'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 
-import { RoleResponse } from '@/types/roles'
+import { Role } from '@/types/roles'
 
 import { RoleTemplateSelect } from './RoleTemplateSelect'
 
@@ -16,7 +16,7 @@ vi.mock('next-intl', () => ({
 
 describe('RoleTemplateSelect', () => {
   const setRoleTemplate = vi.fn()
-  const allRoles: RoleResponse[] = [
+  const allRoles: Role[] = [
     { id: '1', name: 'Admin', type: 'data', tenant: 'ExampleTenant', permissions: [], user: [], createdAt: '' },
     { id: '2', name: 'User', type: 'data', tenant: 'ExampleTenant', permissions: [], user: [], createdAt: '' },
   ]

@@ -1,10 +1,10 @@
 import { getTranslations } from 'next-intl/server'
 
-import { TitleType, UserResponse } from '@/types/users'
+import { TitleType, User } from '@/types/users'
 
 import { UserDetails } from '../components/UserDetails'
 
-export const defaultFormUser: UserResponse = {
+export const defaultFormUser: User = {
   id: '',
   firstName: '',
   lastName: '',
