@@ -20,12 +20,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Unit tests for ApisixConfigValue */
 class ApisixConfigValueTest {
 
-  private final ObjectMapper objectMapper = new ObjectMapper();
+  private ObjectMapper objectMapper;
+
+  @BeforeEach
+  void setUp() {
+    this.objectMapper = new ObjectMapper();
+  }
 
   @Test
   void constructor_whenNoArgs_shouldCreateEmptyData() {

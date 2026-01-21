@@ -56,6 +56,16 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   private static final Logger logger = LoggerFactory.getLogger(ApisixAdapter.class);
 
   public static final String ADAPTER_NAME = "apisix";
+  public static final String X_API_KEY = "X-API-KEY";
+  public static final String APISIX_ADMIN_ROUTES = "/apisix/admin/routes";
+  public static final String APISIX_ADMIN_ROUTES_ID = "/apisix/admin/routes/{id}";
+  public static final String ID = "id";
+  public static final String APISIX_ADMIN_UPSTREAMS_ID = "/apisix/admin/upstreams/{id}";
+  public static final String APISIX_ADMIN_UPSTREAMS = "/apisix/admin/upstreams";
+  public static final String UPSTREAM = "upstream";
+  public static final String ROUTE = "route";
+  public static final String UPSTREAMS = "upstreams";
+  public static final String ROUTES = "routes";
 
   private Client client;
   private String adminApiUrl;
@@ -151,14 +161,14 @@ public class ApisixAdapter extends AbstractConfigAdapter {
     String resourceId = null;
 
     for (int i = 0; i < parts.length; i++) {
-      if ("upstreams".equals(parts[i])) {
-        resourceType = "upstream";
+      if (UPSTREAMS.equals(parts[i])) {
+        resourceType = UPSTREAM;
         if (i + 1 < parts.length) {
           resourceId = parts[i + 1];
         }
         break;
-      } else if ("routes".equals(parts[i])) {
-        resourceType = "route";
+      } else if (ROUTES.equals(parts[i])) {
+        resourceType = ROUTE;
         if (i + 1 < parts.length) {
           resourceId = parts[i + 1];
         }
@@ -172,8 +182,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "upstream" -> createUpstream(event);
-      case "route" -> createRoute(event);
+      case UPSTREAM -> createUpstream(event);
+      case ROUTE -> createRoute(event);
       case null, default -> {
         logger.warn("Unknown resource type for create: {}", resourceInfo.type);
         publishErrorResult(
@@ -184,8 +194,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   private void handleUpdate(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "upstream" -> updateUpstream(resourceInfo.id, event);
-      case "route" -> updateRoute(resourceInfo.id, event);
+      case UPSTREAM -> updateUpstream(resourceInfo.id, event);
+      case ROUTE -> updateRoute(resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for update: {}", resourceInfo.type);
         publishErrorResult(
@@ -196,8 +206,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   private void handleDelete(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "upstream" -> deleteUpstream(resourceInfo.id, event);
-      case "route" -> deleteRoute(resourceInfo.id, event);
+      case UPSTREAM -> deleteUpstream(resourceInfo.id, event);
+      case ROUTE -> deleteRoute(resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for delete: {}", resourceInfo.type);
         publishErrorResult(
@@ -221,9 +231,9 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       Response response =
           client
               .target(adminApiUrl)
-              .path("/apisix/admin/upstreams")
+              .path(APISIX_ADMIN_UPSTREAMS)
               .request(MediaType.APPLICATION_JSON)
-              .header("X-API-KEY", adminApiKey)
+              .header(X_API_KEY, adminApiKey)
               .post(Entity.json(upstreamConfig));
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
@@ -259,10 +269,10 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       Response response =
           client
               .target(adminApiUrl)
-              .path("/apisix/admin/upstreams/{id}")
-              .resolveTemplate("id", upstreamId)
+              .path(APISIX_ADMIN_UPSTREAMS_ID)
+              .resolveTemplate(ID, upstreamId)
               .request(MediaType.APPLICATION_JSON)
-              .header("X-API-KEY", adminApiKey)
+              .header(X_API_KEY, adminApiKey)
               .put(Entity.json(upstreamConfig));
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
@@ -290,10 +300,10 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       Response response =
           client
               .target(adminApiUrl)
-              .path("/apisix/admin/upstreams/{id}")
-              .resolveTemplate("id", upstreamId)
+              .path(APISIX_ADMIN_UPSTREAMS_ID)
+              .resolveTemplate(ID, upstreamId)
               .request(MediaType.APPLICATION_JSON)
-              .header("X-API-KEY", adminApiKey)
+              .header(X_API_KEY, adminApiKey)
               .delete();
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
@@ -326,9 +336,9 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       Response response =
           client
               .target(adminApiUrl)
-              .path("/apisix/admin/routes")
+              .path(APISIX_ADMIN_ROUTES)
               .request(MediaType.APPLICATION_JSON)
-              .header("X-API-KEY", adminApiKey)
+              .header(X_API_KEY, adminApiKey)
               .post(Entity.json(routeConfig));
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
@@ -359,10 +369,10 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       Response response =
           client
               .target(adminApiUrl)
-              .path("/apisix/admin/routes/{id}")
-              .resolveTemplate("id", routeId)
+              .path(APISIX_ADMIN_ROUTES_ID)
+              .resolveTemplate(ID, routeId)
               .request(MediaType.APPLICATION_JSON)
-              .header("X-API-KEY", adminApiKey)
+              .header(X_API_KEY, adminApiKey)
               .put(Entity.json(routeConfig));
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
@@ -390,10 +400,10 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       Response response =
           client
               .target(adminApiUrl)
-              .path("/apisix/admin/routes/{id}")
-              .resolveTemplate("id", routeId)
+              .path(APISIX_ADMIN_ROUTES_ID)
+              .resolveTemplate(ID, routeId)
               .request(MediaType.APPLICATION_JSON)
-              .header("X-API-KEY", adminApiKey)
+              .header(X_API_KEY, adminApiKey)
               .delete();
 
       if (response.getStatus() >= 200 && response.getStatus() < 300) {
