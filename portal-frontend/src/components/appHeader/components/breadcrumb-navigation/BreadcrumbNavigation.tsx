@@ -3,8 +3,9 @@
 import { Slash } from 'lucide-react'
 import { useParams, usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import React, { useEffect } from 'react'
+import React from 'react'
 
+import { useGetBredcrumbs } from '@/app/services/api/breadcrumbs/clientRequests'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,72 +14,53 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 
-const getName = (firstName?: string, lastName?: string) => (firstName && lastName ? `${firstName} ${lastName}` : null)
-
-type Crumb = {
+export type Breadcrumb = {
   title: string
   href: string
   isLast: boolean
   isDynamic: boolean
 }
 
+export type BreadcrumbApiResponse = {
+  name?: string
+  firstName?: string
+  lastName?: string
+  title?: string
+}
+
+const getName = (firstName?: string, lastName?: string) => (firstName && lastName ? `${firstName} ${lastName}` : null)
+
 export const BreadcrumbNavigation = () => {
   const pathname = usePathname()
   const params = useParams()
   const t = useTranslations('sidebar')
-  const [breadcrumbs, setBreadcrumbs] = React.useState<Crumb[]>([])
 
-  useEffect(() => {
-    if (!pathname) return
+  const segments = pathname?.split('/').filter(Boolean) ?? []
 
-    const segments = pathname.split('/').filter(Boolean)
+  const breadcrumbs: Breadcrumb[] = segments.map((segment, index) => ({
+    title: segment,
+    href: `/${segments.slice(0, index + 1).join('/')}`,
+    isLast: index === segments.length - 1,
+    isDynamic: Object.values(params).includes(segment),
+  }))
 
-    const baseBreadCrumbs = segments.map((segment, index) => ({
-      title: segment,
-      value: segment,
-      href: `/${segments.slice(0, index + 1).join('/')}`,
-      isLast: index === segments.length - 1,
-      isDynamic: Object.values(params).includes(segment),
-    }))
+  const results = useGetBredcrumbs(breadcrumbs)
 
-    const loadTitles = async () => {
-      const updated = await Promise.all(
-        baseBreadCrumbs.map(async crumb => {
-          if (!crumb.isDynamic) return crumb
-
-          try {
-            const res = await fetch(`/api${crumb.href}`)
-            const data = await res.json()
-
-            if (!res.ok) {
-              throw new Error('Failed to load data.')
-            }
-
-            return {
-              ...crumb,
-              title: data.name || getName(data.firstName, data.lastName) || data.title || crumb.title,
-            }
-          } catch (error) {
-            console.error('An error occurred while fetching data for breadcrumbs.', error)
-            return crumb
-          }
-        }),
-      )
-      setBreadcrumbs(updated)
-    }
-
-    if (baseBreadCrumbs.some(c => c.isDynamic)) {
-      loadTitles()
-    } else {
-      setBreadcrumbs(baseBreadCrumbs)
-    }
-  }, [pathname, params])
+  const updatedBreadcrumbs = breadcrumbs.map((crumb, index) => {
+    const data = results[index]?.data?.data
+    const title = crumb.isDynamic
+      ? data?.name || getName(data?.firstName, data?.lastName) || data?.title || crumb.title
+      : t(crumb.title)
+    return { ...crumb, title }
+  })
 
   const CustomBreadcrumbSeparator = () => (
     <BreadcrumbSeparator aria-hidden className="hidden md:block">
       <Slash />
     </BreadcrumbSeparator>
   )
+
+  if (!pathname) return null
 
   return (
     <Breadcrumb>
@@ -87,20 +69,17 @@ export const BreadcrumbNavigation = () => {
           <BreadcrumbLink href="/">Home</BreadcrumbLink>
         </BreadcrumbItem>
 
-        {breadcrumbs.length > 0 && <CustomBreadcrumbSeparator />}
+        {updatedBreadcrumbs.length > 0 && <CustomBreadcrumbSeparator />}
 
-        {breadcrumbs.map(segment => {
-          const isLast = segment.isLast
-          const displayTitle = segment.isDynamic ? segment.title : t(segment.title)
-
+        {updatedBreadcrumbs.map(crumb => {
           return (
-            <React.Fragment key={`${segment.href}`}>
-              <BreadcrumbItem className={!isLast ? 'hidden md:block' : undefined}>
-                <BreadcrumbLink href={segment.href} aria-current={isLast ? 'page' : undefined}>
-                  {displayTitle}
+            <React.Fragment key={crumb.href}>
+              <BreadcrumbItem className={!crumb.isLast ? 'hidden md:block' : undefined}>
+                <BreadcrumbLink href={crumb.href} aria-current={crumb.isLast ? 'page' : undefined}>
+                  {crumb.title}
                 </BreadcrumbLink>
               </BreadcrumbItem>
-              {!isLast && <CustomBreadcrumbSeparator />}
+              {!crumb.isLast && <CustomBreadcrumbSeparator />}
             </React.Fragment>
           )
         })}
