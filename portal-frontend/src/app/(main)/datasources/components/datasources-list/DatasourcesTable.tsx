@@ -93,10 +93,12 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
           case CONNECTION_TYPES.ACTIVE:
             break
         }
-        return (
+        return connection ? (
           <Badge className={cn(bgColor, textColor)} variant="secondary">
             {connection}
           </Badge>
+        ) : (
+          '-'
         )
       },
       meta: {

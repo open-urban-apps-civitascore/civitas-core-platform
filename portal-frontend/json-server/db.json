@@ -6031,7 +6031,7 @@
       "name": "Datasource 1",
       "description": "Description of Datasource",
       "connector": "REST",
-      "connectino": "inactive",
+      "connection": "inactive",
       "lastActive": "2026-01-01T00:00:00",
       "tags": [],
       "status": "draft",
@@ -6041,7 +6041,7 @@
       "name": "Datasource 2",
       "description": "Description of Datasource",
       "connector": "MQTT",
-      "connectino": "active",
+      "connection": "active",
       "lastActive": "2026-01-01T00:00:00",
       "tags": [
         "Tag1",
@@ -6054,7 +6054,7 @@
       "name": "Datasource 3",
       "description": "Description of Datasource",
       "connector": "CSV",
-      "connectino": "static",
+      "connection": "static",
       "lastActive": "2026-01-01T00:00:00",
       "tags": [
         "Tag1",
@@ -6068,7 +6068,7 @@
       "name": "Datasource 4",
       "description": "Description of Datasource",
       "connector": "SQL",
-      "connectino": "active",
+      "connection": "active",
       "lastActive": "2026-01-01T00:00:00",
       "tags": [
         "Tag1",
@@ -6083,7 +6083,7 @@
       "name": "Datasource 5",
       "description": "Description of Datasource",
       "connector": "S3",
-      "connectino": "inactive",
+      "connection": "inactive",
       "lastActive": "2026-01-01T00:00:00",
       "tags": [
         "Tag1",
@@ -6098,7 +6098,7 @@
       "name": "Datasource 6",
       "description": "Description of Datasource",
       "connector": "MQTT",
-      "connectino": "inactive",
+      "connection": "inactive",
       "lastActive": "2026-01-01T00:00:00",
       "tags": [
         "Tag1",
