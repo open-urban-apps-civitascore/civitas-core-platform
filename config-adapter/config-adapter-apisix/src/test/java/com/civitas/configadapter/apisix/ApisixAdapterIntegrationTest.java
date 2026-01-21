@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
@@ -286,7 +287,7 @@ class ApisixAdapterIntegrationTest {
     HttpRequest request =
         HttpRequest.newBuilder()
             .uri(URI.create(url))
-            .header("Content-Type", "application/json")
+            .header("Content-Type", Constants.CONTENT_TYPE_JSON)
             .header("X-API-KEY", ADMIN_API_KEY)
             .PUT(HttpRequest.BodyPublishers.ofString(json))
             .timeout(Duration.ofSeconds(30))

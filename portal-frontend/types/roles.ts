@@ -1,9 +1,9 @@
 import z from 'zod'
 
-import { Item } from './common'
+import { Item, WithId } from './common'
 import { Group } from './groups'
 import { Permission } from './permissions'
-import { UserResponse } from './users'
+import { User } from './users'
 
 export const ROLE_TYPES = {
   SYSTEM: 'system',
@@ -27,16 +27,20 @@ export const ROLE_ORIGINS = {
 
 export type RoleOrigin = (typeof ROLE_ORIGINS)[keyof typeof ROLE_ORIGINS]
 
-export type RoleResponse = BaseRole & {
+export type Role = BaseRole & {
   tenant: string
   permissions: Permission['id'][]
-  users: UserResponse['id'][]
+  users: User['id'][]
   createdAt: string
   lastUpdated: string | null
   updatedBy: string | null
   groups: Group['id'][]
   roleOrigin: RoleOrigin
 }
+
+export type CreateRoleData = Omit<Role, 'id'>
+export type UpdateRoleData = Role
+export type PatchRoleData = Partial<CreateRoleData> & WithId
 
 export type UserRolesTableData = {
   id: string
@@ -45,21 +49,11 @@ export type UserRolesTableData = {
   dataspace: Item | null
   inherited: boolean
   type: RoleType
+  roleId: string
 }
-export type RoleInput = Omit<RoleResponse, 'id' | 'lastUpdated' | 'updatedBy'>
+export type RoleInput = Omit<Role, 'id' | 'lastUpdated' | 'updatedBy'>
 
-export type RoleUpdate = RoleResponse
-
-export type Role = {
-  id: string
-  name: string
-  description: string
-  tenant: string
-  type: string
-  permissions: string[]
-  user: string[]
-  createdAt: string
-}
+export type RoleUpdate = Role
 
 export const roleSchema = z.object({
   name: z.string().trim().min(2, {

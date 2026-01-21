@@ -10,6 +10,7 @@
  */
 package com.civitas.event.handler.kafka;
 
+import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.messaging.EventConsumer;
@@ -252,9 +253,9 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
           CloudEventBuilder.v1()
               .withId(UUID.randomUUID().toString())
               .withSource(URI.create(resultEvent.source()))
-              .withType("core.civitas.idm.processing.result")
+              .withType(resultEvent.resultType())
               .withTime(resultEvent.timestamp())
-              .withDataContentType("application/json")
+              .withDataContentType(Constants.CONTENT_TYPE_JSON)
               .withData(jsonData)
               .withExtension("correlationid", resultEvent.correlationId())
               .withExtension("originalmessageid", resultEvent.originalMessageId())
@@ -287,9 +288,9 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
       return CloudEventBuilder.v1()
           .withId(UUID.randomUUID().toString())
-          .withSource(URI.create("urn:civitas:config-adapter"))
-          .withType("core.civitas.idm.processing.result")
-          .withDataContentType("application/json")
+          .withSource(URI.create(resultEvent.source()))
+          .withType(resultEvent.resultType())
+          .withDataContentType(Constants.CONTENT_TYPE_JSON)
           .withData("{}".getBytes())
           .build();
     }

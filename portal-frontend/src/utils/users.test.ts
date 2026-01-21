@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { Authority, TitleType, UserFormData, UserFormSchema, UserResponse } from '@/types/users'
+import { Authority, TitleType, User, UserFormData, UserFormSchema } from '@/types/users'
 
 import { mapFormUserToApiData, mapListUsers, mapUserToFormData } from './users'
 
@@ -17,7 +17,7 @@ const baseFormData: UserFormData = {
   positionDescription: 'Bauingenieur für Kanalisationsbau',
 }
 
-const baseUserResponse: UserResponse = {
+const baseUserResponse: User = {
   id: '12345',
   firstName: 'Max',
   title: 'MR' as TitleType,
@@ -58,7 +58,7 @@ describe('MapListUsers', () => {
   // TODO Fix and enable
   // Disabled for pipeline development, to not have failing tests and a blocked MR
   it.skip('should map users correctly with matching authority and department', () => {
-    const users: UserResponse[] = [baseUserResponse]
+    const users: User[] = [baseUserResponse]
 
     const result = mapListUsers(users, authorities)
 
@@ -72,13 +72,13 @@ describe('MapListUsers', () => {
   })
 
   it('should return empty strings if authority or department are null', () => {
-    const users: UserResponse[] = [{ ...baseUserResponse, authority: null }]
+    const users: User[] = [{ ...baseUserResponse, authority: null }]
     const result = mapListUsers(users, authorities)
 
     expect(result[0].authority).toBe('-')
     expect(result[0].department).toBe('-')
 
-    const users2: UserResponse[] = [{ ...baseUserResponse, authority: { id: 'auth-1', department: null } }]
+    const users2: User[] = [{ ...baseUserResponse, authority: { id: 'auth-1', department: null } }]
     const result2 = mapListUsers(users2, authorities)
     expect(result2[0].authority).toBe(authorities[0].title)
     expect(result2[0].department).toBe('-')
@@ -111,7 +111,7 @@ describe('mapFormUserToApiData', () => {
 
 describe('mapUserToFormData', () => {
   it('should map API response correctly to form data', () => {
-    const userResponse: UserResponse = {
+    const userResponse: User = {
       ...baseUserResponse,
       authority: { id: 'auth-2', department: { id: 'dep-1' } },
     }
@@ -141,7 +141,7 @@ describe('mapUserToFormData', () => {
   })
 
   it('should set the form field value to "" if the DB value is null', () => {
-    const userResponse: UserResponse = {
+    const userResponse: User = {
       ...baseUserResponse,
       authority: null,
     }

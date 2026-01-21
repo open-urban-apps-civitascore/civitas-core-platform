@@ -476,27 +476,30 @@ All available topic constants are defined in `com.civitas.configadapter.model.To
 
 ```json
 {
-  "specversion": "1.0",
-  "type": "core.civitas.idm.user.created",
-  "source": "civitas.idm.provisioning",
-  "id": "unique-event-id",
-  "datacontenttype": "application/json",
+  "ce_specversion": "1.0",
+  "ce_type": "core.civitas.idm.user.created",
+  "ce_source": "manual.test",
+  "ce_id": "msg-123",
+  "ce_time": "2026-01-15T10:35:00+00:00",
+  "content-type": "application/json"
   "data": {
     "metadata": {
       "messageId": "msg-123",
-      "timestamp": "2025-01-15T10:00:00Z",
+      "timestamp": "2026-01-15T10:35:00+00:00",
       "source": "idm.service",
       "correlationId": "corr-456",
       "configVersion": "1.0",
-      "resultTopic": "idm.results"
+      "resultTopic": "core.civitas.idm.processing.result"
     },
     "payload": {
       "targetComponent": "user",
-      "targetResource": "realms/my-realm/users/user-789",
+      "targetResource": "civitas-core",
       "operation": "CREATE",
       "config": {
-        "path": "realms/my-realm/users/user-789",
+        "path": "realms/civitas-core/users/user-789",
         "value": {
+          "resourceType": "user",
+          "realmId": "civitas-core",
           "username": "john.doe",
           "email": "john@example.com",
           "enabled": true

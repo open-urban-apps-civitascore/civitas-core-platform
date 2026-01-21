@@ -17,6 +17,7 @@ import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.idm.ClientConfig;
 import com.civitas.configadapter.model.idm.GroupConfig;
+import com.civitas.configadapter.model.idm.IdmConfigValue;
 import com.civitas.configadapter.model.idm.RealmConfig;
 import com.civitas.configadapter.model.idm.RoleConfig;
 import com.civitas.configadapter.model.idm.UserConfig;
@@ -50,6 +51,21 @@ import org.slf4j.LoggerFactory;
  */
 public class KeycloakAdapter extends AbstractConfigAdapter {
 
+  private static final String USER_CREATION = "User creation";
+
+  private static final String CLIENT_CREATION = "Client creation";
+
+  private static final String KEYCLOAK_SOURCE = "civitas.config-adapter.keycloak";
+
+  private static final String DEFAULT_SERVER_URL = "http://localhost:8080";
+
+  private static final String CLIENT_ID_PROPERTY_KEY = "client.id";
+  private static final String PASSWORD_PROPERTY_KEY = "password";
+  private static final String USERNAME_PROPERTY_KEY = "username";
+
+  private static final String REALM = "realm";
+  private static final String URL_PROPERTY = "url";
+
   private static final Logger logger = LoggerFactory.getLogger(KeycloakAdapter.class);
 
   public static final String ADAPTER_NAME = "keycloak";
@@ -73,17 +89,17 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     super.initialize(config);
     this.keycloakClient =
         KeycloakBuilder.builder()
-            .serverUrl(getAdapterProperty("url", "http://localhost:8080"))
-            .realm(getAdapterProperty("realm", "master"))
-            .username(getAdapterProperty("username", "admin"))
-            .password(getAdapterProperty("password", "admin"))
-            .clientId(getAdapterProperty("client.id", "admin-cli"))
+            .serverUrl(getAdapterProperty(URL_PROPERTY, DEFAULT_SERVER_URL))
+            .realm(getAdapterProperty(REALM, "master"))
+            .username(getAdapterProperty(USERNAME_PROPERTY_KEY, "admin"))
+            .password(getAdapterProperty(PASSWORD_PROPERTY_KEY, "admin"))
+            .clientId(getAdapterProperty(CLIENT_ID_PROPERTY_KEY, "admin-cli"))
             .build();
 
     logger.info(
         "Keycloak adapter '{}' initialized for: {}",
         getName(),
-        getAdapterProperty("url", "http://localhost:8080"));
+        getAdapterProperty(URL_PROPERTY, DEFAULT_SERVER_URL));
     logger.info(
         "Subscribed to {} Kafka topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
   }
@@ -116,11 +132,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
     try {
       // Use semantic fields: targetComponent is the resource type, targetResource is the realm
-      String realm = targetResource;
-      String resourceType = targetComponent;
       String resourceId = extractResourceId(event);
 
-      ResourceInfo resourceInfo = new ResourceInfo(resourceType, realm, resourceId);
+      ResourceInfo resourceInfo =
+          new ResourceInfo(ResourceType.fromString(targetComponent), targetResource, resourceId);
 
       logger.debug(
           "Resource info - Type: {}, Realm: {}, ID: {}",
@@ -135,7 +150,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         default -> {
           logger.warn("Unknown operation: {}", operation);
           publishErrorResult(
-              event, ErrorCode.UNSUPPORTED_OPERATION, "Unknown operation: " + operation);
+              event, ErrorCode.UNSUPPORTED_OPERATION, UNSUPPORTED_OPERATION_MSG + operation);
         }
       }
 
@@ -173,9 +188,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       default -> {
         logger.warn("Unknown ConfigValue class: {}", event.getClass());
         publishErrorResult(
-            event,
-            ErrorCode.UNKNOWN_RESOURCE_TYPE,
-            "Unknown ConfigValue class: " + event.getClass());
+            event, ErrorCode.UNKNOWN_RESOURCE_TYPE, UNKNOWN_RESOURCE_TYPE_MSG + event.getClass());
         yield null;
       }
     };
@@ -183,45 +196,45 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "realm" -> createRealm(event);
-      case "client" -> createClient(resourceInfo.realm, event);
-      case "user" -> createUser(resourceInfo.realm, event);
-      case "role" -> createRole(resourceInfo.realm, event);
-      case "group" -> createGroup(resourceInfo.realm, event);
+      case REALM -> createRealm(event);
+      case CLIENT -> createClient(resourceInfo.realm, event);
+      case USER -> createUser(resourceInfo.realm, event);
+      case ROLE -> createRole(resourceInfo.realm, event);
+      case GROUP -> createGroup(resourceInfo.realm, event);
       default -> {
         logger.warn("Unknown resource type for create: {}", resourceInfo.type);
         publishErrorResult(
-            event, ErrorCode.UNKNOWN_RESOURCE_TYPE, "Unknown resource type: " + resourceInfo.type);
+            event, ErrorCode.UNKNOWN_RESOURCE_TYPE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
       }
     }
   }
 
   private void handleUpdate(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "realm" -> updateRealm(resourceInfo.id, event);
-      case "client" -> updateClient(resourceInfo.realm, resourceInfo.id, event);
-      case "user" -> updateUser(resourceInfo.realm, resourceInfo.id, event);
-      case "role" -> updateRole(resourceInfo.realm, resourceInfo.id, event);
-      case "group" -> updateGroup(resourceInfo.realm, resourceInfo.id, event);
+      case REALM -> updateRealm(resourceInfo.id, event);
+      case CLIENT -> updateClient(resourceInfo.realm, resourceInfo.id, event);
+      case USER -> updateUser(resourceInfo.realm, resourceInfo.id, event);
+      case ROLE -> updateRole(resourceInfo.realm, resourceInfo.id, event);
+      case GROUP -> updateGroup(resourceInfo.realm, resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for update: {}", resourceInfo.type);
         publishErrorResult(
-            event, ErrorCode.UNKNOWN_RESOURCE_TYPE, "Unknown resource type: " + resourceInfo.type);
+            event, ErrorCode.UNKNOWN_RESOURCE_TYPE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
       }
     }
   }
 
   private void handleDelete(ResourceInfo resourceInfo, ConfigEvent event) {
     switch (resourceInfo.type) {
-      case "realm" -> deleteRealm(resourceInfo.id, event);
-      case "client" -> deleteClient(resourceInfo.realm, resourceInfo.id, event);
-      case "user" -> deleteUser(resourceInfo.realm, resourceInfo.id, event);
-      case "role" -> deleteRole(resourceInfo.realm, resourceInfo.id, event);
-      case "group" -> deleteGroup(resourceInfo.realm, resourceInfo.id, event);
+      case REALM -> deleteRealm(resourceInfo.id, event);
+      case CLIENT -> deleteClient(resourceInfo.realm, resourceInfo.id, event);
+      case USER -> deleteUser(resourceInfo.realm, resourceInfo.id, event);
+      case ROLE -> deleteRole(resourceInfo.realm, resourceInfo.id, event);
+      case GROUP -> deleteGroup(resourceInfo.realm, resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for delete: {}", resourceInfo.type);
         publishErrorResult(
-            event, ErrorCode.UNKNOWN_RESOURCE_TYPE, "Unknown resource type: " + resourceInfo.type);
+            event, ErrorCode.UNKNOWN_RESOURCE_TYPE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
       }
     }
   }
@@ -300,7 +313,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       RealmResource realmResource = keycloakClient.realm(realm);
 
       try (Response response = realmResource.clients().create(clientRep)) {
-        validateResponse("Client creation", 201, response);
+        validateResponse(CLIENT_CREATION, 201, response);
       }
 
       logger.info("Created client: {} in realm: {}", clientRep.getClientId(), realm);
@@ -381,7 +394,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         ErrorCode.USER_CREATE_FAILED,
         (realmResource, userRep) -> {
           try (Response response = realmResource.users().create(userRep)) {
-            validateResponse("User creation", 201, response);
+            validateResponse(USER_CREATION, 201, response);
             return CreatedResponseUtil.getCreatedId(response);
           }
         });
@@ -744,7 +757,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
               resourceId,
               originalEvent.payload().operation(),
               originalEvent.payload().targetResource(),
-              "civitas.config-adapter.keycloak");
+              KEYCLOAK_SOURCE,
+              IdmConfigValue.IDM_RESULT_TYPE);
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
@@ -769,7 +783,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
               errorMessage,
               originalEvent.payload().operation(),
               originalEvent.payload().targetResource(),
-              "civitas.config-adapter.keycloak");
+              KEYCLOAK_SOURCE,
+              IdmConfigValue.IDM_RESULT_TYPE);
 
       getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
       logger.debug("Published FAILURE result to topic: {}", originalEvent.metadata().resultTopic());
@@ -788,7 +803,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   }
 
   /** Helper record to hold parsed resource information */
-  private record ResourceInfo(String type, String realm, String id) {}
+  private record ResourceInfo(ResourceType type, String realm, String id) {}
 }
 
 @FunctionalInterface

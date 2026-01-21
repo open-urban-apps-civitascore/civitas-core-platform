@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.keycloak.KeycloakAdapter;
@@ -240,6 +241,9 @@ class EndToEndIntegrationTest {
     assertEquals("SUCCESS", resultEvent.getExtension("status"));
     assertEquals("e2e-test-realm", resultEvent.getExtension("resourceid"));
 
+    // Verify CloudEvent type is set from resultType
+    assertEquals(IdmConfigValue.IDM_RESULT_TYPE, resultEvent.getType());
+
     // Verify CloudEvent data contains the serialized ConfigResultEvent
     assertNotNull(resultEvent.getData(), "CloudEvent data should not be null");
     ConfigResultEvent resultData =
@@ -248,6 +252,7 @@ class EndToEndIntegrationTest {
     assertEquals(ConfigResultEvent.Status.SUCCESS, resultData.status());
     assertEquals(Operation.CREATE, resultData.operation());
     assertEquals("e2e-test-realm", resultData.resourceId());
+    assertEquals(IdmConfigValue.IDM_RESULT_TYPE, resultData.resultType());
 
     // Verify realm was actually created in Keycloak
     RealmRepresentation createdRealm = keycloakClient.realm("e2e-test-realm").toRepresentation();
@@ -326,6 +331,9 @@ class EndToEndIntegrationTest {
     assertNotNull(resultEvent.getExtension("errorcode"));
     assertNotNull(resultEvent.getExtension("errormessage"));
 
+    // Verify CloudEvent type is set from resultType
+    assertEquals(IdmConfigValue.IDM_RESULT_TYPE, resultEvent.getType());
+
     // Verify CloudEvent data contains the serialized ConfigResultEvent with error details
     assertNotNull(resultEvent.getData(), "CloudEvent data should not be null");
     ConfigResultEvent resultData =
@@ -335,6 +343,7 @@ class EndToEndIntegrationTest {
     assertEquals(Operation.UPDATE, resultData.operation());
     assertNotNull(resultData.errorCode());
     assertNotNull(resultData.message());
+    assertEquals(IdmConfigValue.IDM_RESULT_TYPE, resultData.resultType());
   }
 
   @Test
@@ -475,7 +484,7 @@ class EndToEndIntegrationTest {
         .withId(UUID.randomUUID().toString())
         .withSource(URI.create("e2e.test.producer"))
         .withType(type)
-        .withDataContentType("application/json")
+        .withDataContentType(Constants.CONTENT_TYPE_JSON)
         .withData(jsonData.getBytes())
         .build();
   }

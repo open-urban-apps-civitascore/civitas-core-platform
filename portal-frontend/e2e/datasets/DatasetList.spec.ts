@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test'
 
-import { DatasetResponse } from '@/types/datasets'
+import { Dataset } from '@/types/datasets'
 
 import { createTestDataset } from '../../playwright/helpers/dataset/createTestDataset'
 import { removeTestDataset } from '../../playwright/helpers/dataset/removeTestDataset'
 
 test.describe('Dataset List', async () => {
-  let dataset: DatasetResponse
+  let dataset: Dataset
 
   test.beforeEach(async ({ page }) => {
     dataset = await createTestDataset()

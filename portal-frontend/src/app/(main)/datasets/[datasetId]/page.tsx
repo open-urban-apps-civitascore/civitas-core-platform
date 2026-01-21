@@ -1,27 +1,8 @@
-import { headers } from 'next/headers'
-
-import { DatasetFormData, DatasetResponse } from '@/types/datasets'
-import { DataSpace } from '@/types/dataspaces'
+import { getDataset } from '@/app/services/api/datasets/serverRequests'
+import { getDataspaces } from '@/app/services/api/dataspaces/serverRequests'
 
 import { DatasetOverview } from '../components/overview/DatasetOverview'
-
-const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
-
-export const transformDatasetToFormData = (dataset: DatasetResponse): DatasetFormData | null => {
-  try {
-    const data = {
-      id: dataset.id,
-      name: dataset.name,
-      dataspace: dataset.dataspace?.id || '',
-      description: dataset.description,
-      tags: dataset.tags,
-    }
-    return data
-  } catch (error) {
-    console.error(dataset, error)
-    return null
-  }
-}
+import { mapDatasetToFormData } from '../utils/mappers'
 interface DatasetPageProps {
   params: Promise<{ datasetId: string }>
 }
@@ -32,30 +13,12 @@ const DatasetPage = async (props: DatasetPageProps) => {
 
   const getData = async () => {
     try {
-      const [datasetResponse, dataspacesResponse] = await Promise.all([
-        fetch(`${process.env.NEXTAUTH_URL}/api/datasets/${datasetId}`, {
-          cache: 'no-store',
-          headers: {
-            cookie: (await headers()).get('cookie') || '',
-          },
-        }),
-        fetch(`${URL}/dataspaces`, {
-          cache: 'no-store',
-        }),
+      const [{ data: datasetData }, { data: dataspacesData }] = await Promise.all([
+        getDataset(datasetId),
+        getDataspaces(),
       ])
-      if (!datasetResponse.ok || !dataspacesResponse.ok) {
-        throw new Error('An error occurred while loading data')
-      }
-      const datasetData: DatasetResponse = await datasetResponse.json()
-      const dataspacesData: DataSpace[] = await dataspacesResponse.json()
       return {
-        dataset: {
-          id: datasetData.id,
-          name: datasetData.name,
-          dataspace: datasetData.dataspace?.id || '',
-          description: datasetData.description,
-          tags: datasetData.tags,
-        },
+        dataset: mapDatasetToFormData(datasetData),
         dataspaces: dataspacesData.map(dataspace => ({ value: dataspace.id, label: dataspace.name })),
       }
     } catch (error) {
