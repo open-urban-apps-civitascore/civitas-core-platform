@@ -12,6 +12,10 @@ import { CONNECTION_TYPES, Datasource, DATASOURCE_STATUS_TYPES } from '@/types/d
 import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
+import { formatDistanceStrict } from 'date-fns'
+import { de, en } from 'date-fns/locale'
+import { LOCALES } from '@/const/locales'
+import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
 
 interface DatasourcesTableProps extends TableProps<Datasource> {
   datasources: Datasource[]
@@ -34,7 +38,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
   } = props
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
-  const locale = useLocale()
+  const locale = useLocale() as AppLocale
   const columnHelper = createColumnHelper<Datasource>()
 
   const columns = [
@@ -110,7 +114,10 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     }),
     columnHelper.accessor('lastActive', {
       header: t('tableHeaders.lastActive'),
-      cell: info => formatDate(info.getValue(), locale),
+      cell: info => {
+        const interval = formatDistanceStrict(new Date(), new Date(info.getValue()), { locale: DATE_LOCALES[locale] })
+        return interval
+      },
       meta: {
         style: {
           width: '10%',
