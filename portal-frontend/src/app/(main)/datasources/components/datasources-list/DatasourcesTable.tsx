@@ -1,4 +1,5 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, Row, useReactTable } from '@tanstack/react-table'
+import { formatDistanceStrict } from 'date-fns'
 import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
@@ -7,15 +8,11 @@ import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/Badges
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Badge } from '@/components/ui/badge'
+import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
 import { cn } from '@/lib/utils'
 import { CONNECTION_TYPES, Datasource, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 import { TableProps } from '@/types/table'
-import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
-import { formatDistanceStrict } from 'date-fns'
-import { de, en } from 'date-fns/locale'
-import { LOCALES } from '@/const/locales'
-import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
 
 interface DatasourcesTableProps extends TableProps<Datasource> {
   datasources: Datasource[]
