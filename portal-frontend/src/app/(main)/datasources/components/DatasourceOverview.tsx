@@ -70,12 +70,12 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   // Check which tabs are completed
   const completedTabs = useMemo((): DatasourceTab[] => {
     const completed: DatasourceTab[] = []
-    if (descriptionWatch.length > 0) {
+    if (nameWatch.length > 0 && descriptionWatch.length > 0) {
       completed.push('basicInfo')
     }
     // Other tabs would have their completion logic here
     return completed
-  }, [descriptionWatch])
+  }, [nameWatch, descriptionWatch])
 
   // Tabs that are disabled (for future implementation)
   const disabledTabs: DatasourceTab[] = ['connector', 'dataStructure', 'accessPermissions', 'dataspaces']
