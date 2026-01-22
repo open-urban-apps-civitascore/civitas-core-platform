@@ -83,7 +83,7 @@ class KafkaEventHandlerRetryIntegrationTest {
       new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.3"))
           .withReuse(false);
 
-    private KafkaEventHandler handler;
+  private KafkaEventHandler handler;
   private RetryTestAdapter testAdapter;
   private KafkaProducer<String, CloudEvent> testProducer;
   private KafkaConsumer<String, CloudEvent> dlqConsumer;
