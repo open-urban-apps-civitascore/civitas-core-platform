@@ -1,7 +1,5 @@
 import z from 'zod'
 
-import { WithId } from './common'
-
 export const CONNECTOR_TYPES = {
   MQTT: 'mqtt',
   SQL: 'sql',
@@ -38,38 +36,33 @@ export const DatasourceStatusSchema = enumFromConst(DATASOURCE_STATUS_TYPES)
 /* schema */
 export const DatasourceSchema = z.object({
   id: z.number(),
-  name: z.string(),
-  description: z.string(),
+  name: z.string().min(1, 'datasources.form.errors.nameRequired'),
+  description: z
+    .string()
+    .min(1, 'datasources.form.errors.descriptionRequired')
+    .max(150, 'datasources.form.errors.descriptionMaxLength'),
   connector: ConnectorTypeSchema,
   connection: ConnectionTypeSchema,
   lastActive: z.string(),
-  tags: z.array(z.string()),
+  tags: z.array(z.string()).default([]),
   status: DatasourceStatusSchema,
 })
 
 export type Datasource = z.infer<typeof DatasourceSchema>
 
 /* Form schemas for create/edit */
-export const DatasourceCreateFormSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-})
-
+export const DatasourceCreateFormSchema = DatasourceSchema.pick({ name: true })
 export type DatasourceCreateFormData = z.infer<typeof DatasourceCreateFormSchema>
 
-export const DatasourceFormSchema = z.object({
-  id: z.number(),
-  name: z.string().min(1, 'datasources.form.errors.nameRequired'),
-  description: z
-    .string()
-    .min(1, 'datasources.form.errors.descriptionRequired')
-    .max(150, 'datasources.form.errors.descriptionMaxLength'),
-  tags: z.array(z.string()),
-  status: DatasourceStatusSchema,
-})
-
+export const DatasourceFormSchema = DatasourceSchema.pick({
+  id: true,
+  name: true,
+  description: true,
+  tags: true,
+  status: true,
+}).required({ tags: true })
 export type DatasourceFormData = z.infer<typeof DatasourceFormSchema>
 
 /* API request types */
 export type CreateDatasourceData = Omit<Datasource, 'id'>
-
-export type UpdateDatasourceData = Partial<CreateDatasourceData> & WithId
+export type UpdateDatasourceData = Partial<CreateDatasourceData> & { id: number }

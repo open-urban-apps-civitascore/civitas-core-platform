@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { MutationData, UpdateMutationInput, WithId } from '@/types/common'
 
-export const useUpdateMutation = <TResponse, TData extends WithId>({
+export const useUpdateMutation = <TResponse, TData extends WithId<string | number>>({
   method,
   key: mutationKey,
   errorMessage,
