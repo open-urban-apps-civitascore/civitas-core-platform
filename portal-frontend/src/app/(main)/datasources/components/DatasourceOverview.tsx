@@ -14,7 +14,13 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
-import { Datasource, DatasourceFormData, DatasourceFormSchema, DatasourceStatusType } from '@/types/datasources'
+import {
+  Datasource,
+  DATASOURCE_STATUS_TYPES,
+  DatasourceFormData,
+  DatasourceFormSchema,
+  DatasourceStatusType,
+} from '@/types/datasources'
 
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ExitWarningModal } from './ExitWarningModal'
@@ -62,8 +68,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   // Auto-revert status to draft when required fields become empty
   useEffect(() => {
-    if (statusWatch === 'available' && !canSetAvailable) {
-      form.setValue('status', 'draft', { shouldDirty: true })
+    if (statusWatch === DATASOURCE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+      form.setValue('status', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
     }
   }, [canSetAvailable, statusWatch, form])
 

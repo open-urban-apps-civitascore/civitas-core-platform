@@ -16,7 +16,7 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
-import { DatasourceCreateFormData, DatasourceCreateFormSchema } from '@/types/datasources'
+import { DATASOURCE_STATUS_TYPES, DatasourceCreateFormData, DatasourceCreateFormSchema } from '@/types/datasources'
 
 export const DatasourceCreateForm = () => {
   const t = useTranslations('datasources')
@@ -41,7 +41,7 @@ export const DatasourceCreateForm = () => {
         name: formData.name,
         description: '',
         tags: [],
-        status: 'draft',
+        status: DATASOURCE_STATUS_TYPES.DRAFT,
         connector: 'rest',
         connection: 'inactive',
         lastActive: new Date().toISOString(),
