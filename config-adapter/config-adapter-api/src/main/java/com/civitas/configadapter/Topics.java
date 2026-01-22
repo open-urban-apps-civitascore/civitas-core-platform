@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -46,7 +46,12 @@ public enum Topics {
   // --- Backend Events ---
   BACKEND_CREATED("core.civitas.api.backend.created"),
   BACKEND_UPDATED("core.civitas.api.backend.updated"),
-  BACKEND_DELETED("core.civitas.api.backend.deleted");
+  BACKEND_DELETED("core.civitas.api.backend.deleted"),
+
+  // --- Route Events ---
+  ROUTE_CREATED("core.civitas.api.route.created"),
+  ROUTE_UPDATED("core.civitas.api.route.updated"),
+  ROUTE_DELETED("core.civitas.api.route.deleted");
 
   private final String value;
 
