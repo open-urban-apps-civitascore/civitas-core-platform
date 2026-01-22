@@ -410,7 +410,12 @@
       "tagsOptional": "(optional)",
       "tagsPlaceholder": "Tag hinzufügen...",
       "tagsSearch": "Tag suchen ...",
-      "noTagsFound": "Keine Tags gefunden"
+      "noTagsFound": "Keine Tags gefunden",
+      "errors": {
+        "nameRequired": "Name ist erforderlich",
+        "descriptionRequired": "Beschreibung ist erforderlich",
+        "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein"
+      }
     },
     "actions": {
       "saveAndContinue": "Erstellen und weiter",

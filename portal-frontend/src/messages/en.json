@@ -416,7 +416,12 @@
       "tagsOptional": "(optional)",
       "tagsPlaceholder": "Add tag...",
       "tagsSearch": "Search tag...",
-      "noTagsFound": "No tags found"
+      "noTagsFound": "No tags found",
+      "errors": {
+        "nameRequired": "Name is required",
+        "descriptionRequired": "Description is required",
+        "descriptionMaxLength": "Description must be 150 characters or less"
+      }
     },
     "actions": {
       "saveAndContinue": "Save and continue",

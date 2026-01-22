@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
@@ -41,6 +41,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const form = useForm<DatasourceFormData>({
     resolver: zodResolver(DatasourceFormSchema),
+    mode: 'onChange',
     defaultValues: {
       id: datasource.id,
       name: datasource.name,
@@ -51,12 +52,20 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   })
 
   const statusWatch = form.watch('status')
+  const nameWatch = form.watch('name')
   const descriptionWatch = form.watch('description')
 
   // Check if all mandatory fields are filled to enable "Available" status
   const canSetAvailable = useMemo(() => {
-    return descriptionWatch.length > 0
-  }, [descriptionWatch])
+    return nameWatch.length > 0 && descriptionWatch.length > 0
+  }, [nameWatch, descriptionWatch])
+
+  // Auto-revert status to draft when required fields become empty
+  useEffect(() => {
+    if (statusWatch === 'available' && !canSetAvailable) {
+      form.setValue('status', 'draft', { shouldDirty: true })
+    }
+  }, [canSetAvailable, statusWatch, form])
 
   // Check which tabs are completed
   const completedTabs = useMemo((): DatasourceTab[] => {
@@ -75,19 +84,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
 
-  const getFormDataForUpdate = () => {
-    const formData = form.getValues()
-    return {
+  const handleSaveSubmit = (formData: DatasourceFormData) => {
+    const data = {
       id: formData.id,
       name: formData.name,
       description: formData.description,
       tags: formData.tags,
       status: formData.status,
     }
-  }
-
-  const handleSave = async () => {
-    const data = getFormDataForUpdate()
     updateDatasource.mutate(data, {
       onSuccess: () => {
         form.reset(data)
@@ -95,6 +99,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       },
     })
   }
+
+  const handleSave = form.handleSubmit(handleSaveSubmit)
 
   const handleExit = () => {
     if (form.formState.isDirty) {
@@ -109,14 +115,23 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     router.push(`/datasources?${searchParams.toString()}`)
   }
 
-  const handleSaveAndExit = async () => {
-    updateDatasource.mutate(getFormDataForUpdate(), {
+  const handleSaveAndExitSubmit = (formData: DatasourceFormData) => {
+    const data = {
+      id: formData.id,
+      name: formData.name,
+      description: formData.description,
+      tags: formData.tags,
+      status: formData.status,
+    }
+    updateDatasource.mutate(data, {
       onSuccess: () => {
         setIsExitModalOpen(false)
         router.push(`/datasources?${searchParams.toString()}`)
       },
     })
   }
+
+  const handleSaveAndExit = form.handleSubmit(handleSaveAndExitSubmit)
 
   const renderTabContent = () => {
     switch (selectedTab) {
@@ -155,7 +170,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
               data-testid="saveButton"
               type="button"
               onClick={handleSave}
-              disabled={!form.formState.isDirty || isLoading}
+              disabled={!form.formState.isDirty || Object.keys(form.formState.errors).length > 0 || isLoading}
             >
               {tCommon('actions.submit')}
             </Button>

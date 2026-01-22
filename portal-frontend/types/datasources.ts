@@ -35,7 +35,7 @@ export const DatasourceStatusSchema = enumFromConst(DATASOURCE_STATUS_TYPES)
 
 /* schema */
 export const DatasourceSchema = z.object({
-  id: z.string(),
+  id: z.number(),
   name: z.string(),
   description: z.string(),
   connector: ConnectorTypeSchema,
@@ -55,9 +55,12 @@ export const DatasourceCreateFormSchema = z.object({
 export type DatasourceCreateFormData = z.infer<typeof DatasourceCreateFormSchema>
 
 export const DatasourceFormSchema = z.object({
-  id: z.string(),
-  name: z.string().min(1, 'Name is required'),
-  description: z.string().min(1, 'Description is required').max(150, 'Description must be 150 characters or less'),
+  id: z.number(),
+  name: z.string().min(1, 'datasources.form.errors.nameRequired'),
+  description: z
+    .string()
+    .min(1, 'datasources.form.errors.descriptionRequired')
+    .max(150, 'datasources.form.errors.descriptionMaxLength'),
   tags: z.array(z.string()),
   status: DatasourceStatusSchema,
 })
@@ -76,5 +79,5 @@ export type CreateDatasourceData = {
 }
 
 export type UpdateDatasourceData = Partial<CreateDatasourceData> & {
-  id: string
+  id: number
 }
