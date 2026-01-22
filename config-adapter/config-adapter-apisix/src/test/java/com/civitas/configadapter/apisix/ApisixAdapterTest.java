@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -30,6 +30,7 @@ import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
 import com.civitas.configadapter.model.apisix.ApisixConfigValue;
+import com.civitas.configadapter.model.apisix.RouteConfigValue;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
@@ -259,11 +260,247 @@ class ApisixAdapterTest {
     @Test
     void testUnknownResourceType() {
       Map<String, Object> config = Map.of("key", "value");
-      ConfigEvent event = createConfigEvent(Operation.CREATE, "routes/test-route", config);
+      ConfigEvent event = createConfigEvent(Operation.CREATE, "services/test-service", config);
 
       adapter.processConfigEvent("core.civitas.api.backend.created", event);
 
-      verify(mockPublisher).publish(eq("test-result-topic"), any(ConfigResultEvent.class));
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
+      assertEquals("UNKNOWN_RESOURCE_TYPE", result.errorCode());
+    }
+
+    // ============== ROUTE OPERATION TESTS ==============
+
+    @Test
+    void testRouteCreateSuccess() {
+      when(mockResponse.getStatus()).thenReturn(201);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/1\"}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      Map<String, Object> routeConfig =
+          Map.of(
+              "uri",
+              "/api/v1/users/*",
+              "methods",
+              List.of("GET", "POST"),
+              "upstream_id",
+              "backend-users",
+              "plugins",
+              Map.of("prometheus", Map.of(), "openid-connect", Map.of("client_id", "api-gateway")));
+
+      ConfigEvent event = createRouteConfigEvent(Operation.CREATE, "routes", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+      assertEquals("APISIX route created successfully", result.message());
+    }
+
+    @Test
+    void testRouteCreateFailure() {
+      when(mockResponse.getStatus()).thenReturn(400);
+      when(mockResponse.readEntity(String.class))
+          .thenReturn("{\"error\":\"Invalid route config\"}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      Map<String, Object> routeConfig = Map.of("uri", "/api/v1/invalid");
+
+      ConfigEvent event = createRouteConfigEvent(Operation.CREATE, "routes", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
+      assertEquals("ROUTE_CREATE_FAILED", result.errorCode());
+    }
+
+    @Test
+    void testRouteUpdateSuccess() {
+      when(mockResponse.getStatus()).thenReturn(200);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/test-route-id\"}");
+      when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+
+      Map<String, Object> routeConfig =
+          Map.of(
+              "uri",
+              "/api/v1/users/*",
+              "methods",
+              List.of("GET", "POST", "PUT", "DELETE"),
+              "upstream_id",
+              "backend-users-updated",
+              "plugins",
+              Map.of("prometheus", Map.of(), "proxy-rewrite", Map.of("uri", "/users")));
+
+      ConfigEvent event =
+          createRouteConfigEvent(Operation.UPDATE, "routes/test-route-id", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.updated", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+      assertEquals("APISIX route updated successfully", result.message());
+      assertEquals("test-route-id", result.resourceId());
+    }
+
+    @Test
+    void testRouteUpdateFailure() {
+      when(mockResponse.getStatus()).thenReturn(404);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"error\":\"Route not found\"}");
+      when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+
+      Map<String, Object> routeConfig = Map.of("uri", "/api/v1/users/*");
+
+      ConfigEvent event =
+          createRouteConfigEvent(Operation.UPDATE, "routes/nonexistent-route", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.updated", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
+      assertEquals("ROUTE_UPDATE_FAILED", result.errorCode());
+    }
+
+    @Test
+    void testRouteDeleteSuccess() {
+      when(mockResponse.getStatus()).thenReturn(200);
+      when(mockResponse.readEntity(String.class))
+          .thenReturn("{\"deleted\":\"routes/test-route-id\"}");
+      when(mockBuilder.delete()).thenReturn(mockResponse);
+
+      ConfigEvent event = createRouteConfigEvent(Operation.DELETE, "routes/test-route-id", null);
+
+      adapter.processConfigEvent("core.civitas.api.route.deleted", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+      assertEquals("APISIX route deleted successfully", result.message());
+      assertEquals("test-route-id", result.resourceId());
+    }
+
+    @Test
+    void testRouteDeleteFailure() {
+      when(mockResponse.getStatus()).thenReturn(404);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"error\":\"Route not found\"}");
+      when(mockBuilder.delete()).thenReturn(mockResponse);
+
+      ConfigEvent event =
+          createRouteConfigEvent(Operation.DELETE, "routes/nonexistent-route", null);
+
+      adapter.processConfigEvent("core.civitas.api.route.deleted", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
+      assertEquals("ROUTE_DELETE_FAILED", result.errorCode());
+    }
+
+    @Test
+    void testRouteWithFullPluginConfiguration() {
+      when(mockResponse.getStatus()).thenReturn(201);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/1\"}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      // Create a route with all CIVITAS/CORE V1 plugins
+      Map<String, Object> routeConfig =
+          Map.of(
+              "uri",
+              "/api/v1/data/*",
+              "methods",
+              List.of("GET", "POST", "PUT", "DELETE"),
+              "upstream_id",
+              "data-service",
+              "plugins",
+              Map.of(
+                  "openid-connect",
+                  Map.of(
+                      "discovery", "https://keycloak.example.com/.well-known/openid-configuration",
+                      "client_id", "api-gateway",
+                      "client_secret", "secret"),
+                  "serverless-pre-function",
+                  Map.of("phase", "rewrite", "functions", List.of("return function() end")),
+                  "serverless-post-function",
+                  Map.of("phase", "log", "functions", List.of("return function() end")),
+                  "response-rewrite",
+                  Map.of("headers", Map.of("X-Custom-Header", "value")),
+                  "proxy-rewrite",
+                  Map.of("regex_uri", List.of("/api/v1/(.*)", "/$1")),
+                  "prometheus",
+                  Map.of(),
+                  "loki",
+                  Map.of("endpoint", "http://loki:3100")));
+
+      ConfigEvent event = createRouteConfigEvent(Operation.CREATE, "routes", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+    }
+
+    @Test
+    void testRouteCreateWithConnectionException() {
+      when(mockBuilder.post(any(Entity.class)))
+          .thenThrow(new ProcessingException("Connection refused"));
+
+      Map<String, Object> routeConfig = Map.of("uri", "/api/v1/test");
+
+      ConfigEvent event = createRouteConfigEvent(Operation.CREATE, "routes", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
+      assertEquals("ROUTE_CREATE_FAILED", result.errorCode());
+      assertTrue(result.message().contains("Connection refused"));
+    }
+
+    @Test
+    void testRouteWithApisixConfigValue() {
+      when(mockResponse.getStatus()).thenReturn(201);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/1\"}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      // Test that routes also work with ApisixConfigValue (backward compatibility)
+      Map<String, Object> routeConfig =
+          Map.of("uri", "/api/v1/legacy/*", "upstream_id", "legacy-backend");
+
+      ConfigEvent event = createConfigEvent(Operation.CREATE, "routes", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+      assertEquals("APISIX route created successfully", result.message());
     }
 
     @Test
@@ -311,6 +548,24 @@ class ApisixAdapterTest {
 
     Payload payload =
         new Payload("apisix", targetResource, operation, new Config(null, apisixValue));
+    return new ConfigEvent(metadata, payload);
+  }
+
+  private ConfigEvent createRouteConfigEvent(
+      Operation operation, String targetResource, Map<String, Object> configValue) {
+    Metadata metadata =
+        new Metadata(
+            "msg-123",
+            OffsetDateTime.now(),
+            "test-source",
+            "corr-123",
+            "v1.0.0",
+            "test-result-topic");
+
+    RouteConfigValue routeValue = new RouteConfigValue(configValue);
+
+    Payload payload =
+        new Payload("apisix", targetResource, operation, new Config(null, routeValue));
     return new ConfigEvent(metadata, payload);
   }
 }

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -40,7 +39,7 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
-        <config-adapter.version>1.0.0-SNAPSHOT</config-adapter.version>
+        <config-adapter.version>0.0.0-671-ge1279f8</config-adapter.version>
     </properties>
 
     <dependencyManagement>
@@ -245,6 +244,26 @@
 
     <build>
         <plugins>
+            <!-- Maven Dependency Plugin - Generate dependency tree JSON for license scanning -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>generate-dependency-tree</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>tree</goal>
+                        </goals>
+                        <configuration>
+                            <outputType>json</outputType>
+                            <outputFile>${project.basedir}/maven.graph.json</outputFile>
+                            <appendOutput>false</appendOutput>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <!-- MapStruct + Lombok annotation processor -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

@@ -4,8 +4,9 @@ import { PaginationState, Row, RowSelectionState, SortingState } from '@tanstack
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
+import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
@@ -17,92 +18,59 @@ import { flattenGroups } from '@/utils/groups'
 import { GroupAssignmentModal } from './GroupAssignmentModal'
 import { GroupTable } from './GroupTable'
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
-
 interface GroupAssignmentTabProps {
-  groupIds: Group['id'][]
+  assignedGroupIds: Group['id'][]
   onGroupAssignmentUpdate: (newGroupIds: string[]) => void
   roleName: Role['name']
 }
 
+const getGroupSelection = (groupIds: Group['id'][]) =>
+  groupIds.reduce((acc, groupId) => ({ ...acc, [groupId]: true }), {})
+
 export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
-  const { groupIds, onGroupAssignmentUpdate, roleName } = props
+  const { assignedGroupIds, onGroupAssignmentUpdate, roleName } = props
   const t = useTranslations('roles.groupAssignmentTab')
   const router = useRouter()
-  const [groups, setGroups] = useState<Group[]>([])
-  const [filteredGroups, setFilteredGroups] = useState<Group[]>([])
-  const [assignedGroupIds, setAssignedGroupIds] = useState<Group['id'][]>([])
-  const [isLoading, setIsLoading] = useState<boolean>(true)
   const [searchInput, setSearchInput] = useState<string>('')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
   const [sorting, setSorting] = useState<SortingState>([{ id: 'title', desc: false }])
   const [totalPages, setTotalPages] = useState<number>(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [groupSelection, setGroupSelection] = useState<RowSelectionState>({})
-  const [originalGroupSelection, setOriginalGroupSelection] = useState<RowSelectionState>({})
+  const [groupSelection, setGroupSelection] = useState<RowSelectionState>(getGroupSelection(assignedGroupIds))
+  const originalGroupSelection = getGroupSelection(assignedGroupIds)
+
+  const requestParams = new URLSearchParams(`_limit=${pageSize}&_page=${pageIndex + 1}`)
+  const { data: groupsData, isFetching } = useGetGroups({ params: requestParams })
+
+  const groups = useMemo(() => {
+    if (!groupsData?.data) {
+      return []
+    }
+    // currently there is no API endpoint to get groups and subgroups by Ids, so we need to filter and flatten them on the client side
+    // that's why pagination is not working correctly when there are subgroups assigned to the role
+    const flattenedGroups = flattenGroups(groupsData?.data)
+    const filteredGroups = flattenedGroups.filter(group => assignedGroupIds.includes(group.id))
+    return filteredGroups
+  }, [groupsData?.data, assignedGroupIds])
+
+  const filteredGroups = useMemo(() => {
+    if (!searchInput) {
+      return groups
+    }
+    return groups.filter(
+      group =>
+        group.title.toLowerCase().includes(searchInput.toLowerCase()) ||
+        group.contact?.displayName.toLowerCase().includes(searchInput.toLowerCase()) ||
+        group.description.toLowerCase().includes(searchInput.toLowerCase()),
+    )
+  }, [searchInput, groups])
+
   const rowCount = groups.length
 
-  // currently there is no API endpoint to get groups and subgroups by Ids, so we need to filter and flatten them on the client side
-  // that's why pagination is not working correctly when there are subgroups assigned to the role
-  const getGroups = useCallback(async () => {
-    try {
-      const response = await fetch(`${URL}/groups?_limit=${pageSize}&_page=${pageIndex + 1}`, {
-        cache: 'no-store',
-      })
-
-      if (!response.ok) {
-        throw new Error('An error occurred while loading group data')
-      }
-
-      const data: Group[] = await response.json()
-
-      const flattenedData = flattenGroups(data)
-
-      const filteredGroups = flattenedData.filter(group => assignedGroupIds.includes(group.id))
-      setGroups(filteredGroups)
-
-      const totalFilteredItems = assignedGroupIds.length
-      setTotalPages(Math.ceil(totalFilteredItems / pageSize))
-    } catch (error) {
-      console.error('Error fetching groups:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [pageIndex, pageSize, assignedGroupIds])
-
   useEffect(() => {
-    setAssignedGroupIds(groupIds)
-  }, [groupIds])
-
-  useEffect(() => {
-    if (assignedGroupIds.length > 0) {
-      getGroups()
-    } else {
-      setIsLoading(false)
-    }
-  }, [getGroups, assignedGroupIds])
-
-  useEffect(() => {
-    const originalGroupSelection = assignedGroupIds.reduce((acc, groupId) => ({ ...acc, [groupId]: true }), {})
-    setGroupSelection(originalGroupSelection)
-    setOriginalGroupSelection(originalGroupSelection)
-  }, [assignedGroupIds])
-
-  useEffect(() => {
-    if (searchInput) {
-      setFilteredGroups(
-        groups.filter(
-          group =>
-            group.title.toLowerCase().includes(searchInput.toLowerCase()) ||
-            group.contact?.displayName.toLowerCase().includes(searchInput.toLowerCase()) ||
-            group.description.toLowerCase().includes(searchInput.toLowerCase()),
-        ),
-      )
-    } else {
-      setFilteredGroups(groups)
-    }
-  }, [searchInput, groups])
+    setTotalPages(Math.ceil(rowCount / pageSize))
+  }, [rowCount, pageSize, setTotalPages])
 
   const handlePagination = (newPagination: PaginationState) => {
     setPageIndex(newPagination.pageIndex)
@@ -123,11 +91,11 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     Object.keys(groupSelection).every(key => assignedGroupIds.includes(key)) === false ||
     assignedGroupIds.every(id => Object.keys(groupSelection).includes(id)) === false
 
-  if (isLoading) {
+  if (isFetching) {
     return <LoadingSpinner />
   }
 
-  if (!isLoading && assignedGroupIds.length === 0 && filteredGroups.length === 0) {
+  if (!isFetching && assignedGroupIds.length === 0 && filteredGroups.length === 0) {
     return (
       <>
         <NoDataPage
@@ -155,7 +123,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
       <SearchHeader searchString={searchInput} onChangeSearchString={setSearchInput} customElement={customElement} />
       <GroupTable
         groups={filteredGroups}
-        isLoading={isLoading}
+        isLoading={isFetching}
         rowCount={rowCount}
         pageIndex={pageIndex}
         pageSize={pageSize}

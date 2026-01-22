@@ -1,7 +1,13 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { z } from 'zod'
 
-import { Item } from './common'
+import { Item, WithId } from './common'
+
+export type Contact = {
+  id: string
+  displayName: string
+  email: string
+}
 
 export type UserGroup = Item
 
@@ -16,7 +22,7 @@ export type UserAuthority = {
   } | null
 } | null
 
-export type UserResponse = {
+export type User = {
   id: string
   firstName: string
   lastName: string
@@ -29,8 +35,9 @@ export type UserResponse = {
   positionDescription: string | null
 }
 
-export type UpdateUserData = UserResponse
-export type CreateUserData = Omit<UpdateUserData, 'id'>
+export type CreateUserData = Omit<User, 'id'>
+export type UpdateUserData = User
+export type PatchUserData = Partial<CreateUserData> & WithId
 
 export type ListUser = {
   id: string

@@ -14,6 +14,7 @@ import {
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 
+import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { DataTable } from '@/components/table/DataTable'
@@ -25,8 +26,6 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
 import { resolveUpdater } from '@/utils/table'
-
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 interface GroupAssignmentModalProps extends DialogProps {
   selection: RowSelectionState
@@ -50,51 +49,23 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
   } = props
   const tRoles = useTranslations('roles')
   const tCommon = useTranslations('common')
-  const [groups, setGroups] = useState<Group[]>([])
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
-  const [isLoading, setIsLoading] = useState(false)
   const [sorting, setSorting] = useState<SortingState>([])
-  const [rowCount, setRowCount] = useState(0)
   const [searchString, setSearchString] = useState('')
-  const [totalPages, setTotalPages] = useState(Math.ceil(rowCount / pageSize))
+  const [totalPages, setTotalPages] = useState(0)
   const selectAllCheckbox = useRef<HTMLButtonElement>(null)
   const { getApiRequestParams } = useQueryParams()
 
-  const getGroupsData = async () => {
-    const requestParams = getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString })
-    setIsLoading(true)
+  const requestParams = getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString })
+  const { data: groupsData, isFetching } = useGetGroups({ params: requestParams })
 
-    try {
-      const groupsResponse = await fetch(`${URL}/groups?${requestParams.toString()}`, {
-        cache: 'no-store',
-      })
-
-      if (!groupsResponse) {
-        throw new Error('An error occurred while loading group data')
-      }
-
-      const groupData: Group[] = await groupsResponse.json()
-      setGroups(groupData)
-
-      const totalCount = Number(groupsResponse.headers.get('X-Total-Count')) || 0
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-      }
-      setTotalPages(Math.ceil(totalCount / pageSize))
-    } catch (error) {
-      console.error(error)
-
-      throw new Error('An error occurred while loading group data')
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const groups = groupsData?.data || []
+  const rowCount = groupsData?.totalElements || 0
 
   useEffect(() => {
-    getGroupsData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, rowCount, sorting, searchString])
+    setTotalPages(Math.ceil(rowCount / pageSize))
+  }, [rowCount, pageSize])
 
   const handlePagination = (newPagination: PaginationState) => {
     setPageIndex(newPagination.pageIndex)
@@ -236,7 +207,7 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
             pageIndex={pageIndex}
             pageSize={pageSize}
             totalPages={totalPages}
-            isLoading={isLoading}
+            isLoading={isFetching}
           />
         </div>
         <ActionButtons

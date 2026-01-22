@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -14,11 +15,8 @@ import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
-import { isPageIndexHigherThanTotalPages } from '@/utils/table'
 
 import { GroupsTable } from './components/GroupsTable'
-
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {
@@ -33,10 +31,7 @@ export const getSortParam = (sorting: SortingState) => {
 const GroupsPage = () => {
   const t = useTranslations('groups')
   const router = useRouter()
-  const [groups, setGroups] = useState<Group[]>([])
-  const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [isLoading, setIsLoading] = useState(true)
 
   const {
     setSortingParams,
@@ -51,46 +46,12 @@ const GroupsPage = () => {
     totalPages,
   } = useQueryParams()
 
+  const { data: groupsData, isFetching } = useGetGroups({ params: getApiRequestParamsByUrl() })
+
+  const rowCount = groupsData?.totalElements || 0
   useEffect(() => {
-    if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
-      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalPages, pageIndex, pageSize])
-
-  const getGroupsData = async () => {
-    const params = getApiRequestParamsByUrl()
-
-    try {
-      setIsLoading(true)
-      const groupsResponse = await fetch(`${URL}/groups?${params.toString()}`, {
-        cache: 'no-store',
-      })
-
-      if (!groupsResponse) {
-        throw new Error('An error occurred while loading user groups data')
-      }
-
-      const groupsData: Group[] = await groupsResponse.json()
-      setGroups(groupsData)
-      setIsLoading(false)
-
-      const totalCount = Number(groupsResponse.headers.get('X-Total-Count')) || 0
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-      }
-      setTotalPages(Math.ceil(totalCount / pageSize))
-    } catch (error) {
-      console.error(error)
-      setIsLoading(false)
-      throw new Error('An error occurred while loading groups data')
-    }
-  }
-
-  useEffect(() => {
-    getGroupsData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
+    setTotalPages(Math.ceil(rowCount / pageSize))
+  }, [rowCount, pageSize, setTotalPages])
 
   const handleRowClick = (row: Row<Group>) => {
     if (row.id && !row.original.parent) {
@@ -121,7 +82,7 @@ const GroupsPage = () => {
         />
         <TableContainer>
           <GroupsTable
-            groups={groups}
+            groups={groupsData?.data && !isFetching ? groupsData?.data : []}
             rowCount={rowCount}
             pageIndex={pageIndex}
             pageSize={pageSize}
@@ -132,7 +93,7 @@ const GroupsPage = () => {
             onRowClick={handleRowClick}
             onSortingChange={setSortingParams}
             onPaginationChange={setPaginationParams}
-            isLoading={isLoading}
+            isLoading={isFetching}
           />
         </TableContainer>
       </PageBackground>

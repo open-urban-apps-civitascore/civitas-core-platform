@@ -10,4 +10,5 @@ public class PermissionOutputDTO extends BaseOutputDTO {
   private String name;
   private String description;
   private PermissionType permissionType;
+  private String category;
 }

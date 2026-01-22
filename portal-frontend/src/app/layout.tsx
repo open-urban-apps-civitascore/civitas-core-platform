@@ -8,6 +8,8 @@ import { getLocale } from 'next-intl/server'
 
 import { SessionManager } from '@/components/session-manager'
 
+import QueryProvider from './providers/queryClient'
+
 const ibmPlexSans = IBM_Plex_Sans({
   variable: '--font-ibm-plex-sans',
   subsets: ['latin'],
@@ -37,7 +39,9 @@ const RootLayout = async ({ children }: RootLayoutProps) => {
       <body className={`${ibmPlexSans.variable}  ${ibmPlexMono.variable} antialiased`}>
         <SessionProvider refetchInterval={240}>
           <SessionManager />
-          <NextIntlClientProvider locale={locale}>{children}</NextIntlClientProvider>
+          <NextIntlClientProvider locale={locale}>
+            <QueryProvider>{children}</QueryProvider>
+          </NextIntlClientProvider>
         </SessionProvider>
       </body>
     </html>

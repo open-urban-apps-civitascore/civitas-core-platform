@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
+import { useGetDatasets } from '@/app/services/api/datasets/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -12,16 +13,13 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { DatasetResponse, DatasetTableData } from '@/types/datasets'
 
 import { DatasetsTable } from './components/DatasetsTable'
 
 const DatasetsPage = () => {
   const t = useTranslations('datasets')
   const router = useRouter()
-  const [datasets, setDatasets] = useState<DatasetTableData[]>([])
   const [rowCount, setRowCount] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
 
   const {
     setSortingParams,
@@ -36,34 +34,15 @@ const DatasetsPage = () => {
     totalPages,
   } = useQueryParams()
 
-  const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+  const { data: datasetsData, isFetching } = useGetDatasets({ params: getApiRequestParamsByUrl() })
 
   useEffect(() => {
-    const params = getApiRequestParamsByUrl()
-
-    const getDatasets = async () => {
-      setIsLoading(true)
-      try {
-        const datasetsResponse = await fetch(`/api/datasets?${params.toString()}`)
-        if (!datasetsResponse.ok) {
-          throw new Error('An error occurred while loading data')
-        }
-        const datasetsData: DatasetResponse[] = await datasetsResponse.json()
-        setDatasets(datasetsData)
-        const totalCount = Number(datasetsResponse.headers.get('X-Total-Count')) || 0
-        if (rowCount !== totalCount) {
-          setRowCount(totalCount)
-        }
-        setTotalPages(Math.ceil(totalCount / pageSize))
-      } catch (error) {
-        console.error(error)
-      } finally {
-        setIsLoading(false)
-      }
+    if (datasetsData) {
+      const totalCount = datasetsData.totalElements || 0
+      setRowCount(totalCount)
+      setTotalPages(Math.ceil(totalCount / pageSize))
     }
-    getDatasets()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, URL, rowCount, sorting, search, getApiRequestParamsByUrl])
+  }, [datasetsData, pageSize, setTotalPages])
 
   const CustomElement = (
     <Button onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}>
@@ -84,7 +63,7 @@ const DatasetsPage = () => {
         />
         <TableContainer>
           <DatasetsTable
-            datasets={datasets}
+            datasets={datasetsData?.data && !isFetching ? datasetsData.data : []}
             rowCount={rowCount}
             pageIndex={pageIndex}
             pageSize={pageSize}
@@ -92,7 +71,7 @@ const DatasetsPage = () => {
             totalPages={totalPages}
             onPaginationChange={setPaginationParams}
             onSortingChange={setSortingParams}
-            isLoading={isLoading}
+            isLoading={isFetching}
           />
         </TableContainer>
       </PageBackground>

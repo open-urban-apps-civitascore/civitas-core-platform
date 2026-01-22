@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -10,6 +10,7 @@
  */
 package com.civitas.configadapter.application;
 
+import com.civitas.configadapter.Constants;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -109,7 +110,7 @@ public class HealthCheckServer implements AutoCloseable {
 
   private void sendJsonResponse(HttpExchange exchange, int statusCode, String response)
       throws IOException {
-    exchange.getResponseHeaders().set("Content-Type", "application/json");
+    exchange.getResponseHeaders().set("Content-Type", Constants.CONTENT_TYPE_JSON);
     sendResponse(exchange, statusCode, response);
   }
 

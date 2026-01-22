@@ -2,117 +2,87 @@
 
 import { RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
+import { usePatchGroup } from '@/app/services/api/groups/clientRequests'
+import { useGetAuthorities, useGetUsers } from '@/app/services/api/users/clientRequests'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Group, GroupTabProps } from '@/types/groups'
-import { Authority, GroupListUser, UserResponse } from '@/types/users'
 import { mapGroupListUsers } from '@/utils/users'
 
-import { patchGroupUsers } from '../../actions'
 import { AssignUsersModal } from './AssignUsersModal'
 import { UsersTable } from './UsersTable'
-
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
 
 interface UsersTabProps extends GroupTabProps {
   groupData: Group
 }
 export const UsersTab = (props: UsersTabProps) => {
   const { groupData } = props
-  const router = useRouter()
   const originalUsers = groupData.users
   const t = useTranslations('groups')
-  const [users, setUsers] = useState<GroupListUser[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [rowCount, setRowCount] = useState(0)
+  const updateGroup = usePatchGroup()
+
   const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false)
-  const [isUpdatingGroupUsers, setIsUpdatingGroupUsers] = useState(false)
 
   const {
     setSortingParams,
     setPaginationParams,
     setSearchParam,
+    setTotalPages,
     getApiRequestParamsByUrl,
     pageIndex,
     pageSize,
     sorting,
     search,
+    totalPages,
   } = useQueryParams()
 
-  const totalPages = Math.ceil(rowCount / pageSize)
+  const userRequestParams = useMemo(() => {
+    const params = new URLSearchParams(getApiRequestParamsByUrl())
+    originalUsers.forEach(user => {
+      params.append('id', String(user.id))
+    })
+    return params
+  }, [getApiRequestParamsByUrl, originalUsers])
 
-  const getUserListData = async () => {
-    try {
-      const apiParams = getApiRequestParamsByUrl()
-      const idParams = originalUsers.map(user => `id=${user.id}`).join('&')
-      const [usersResponse, authoritiesResponse] = await Promise.all([
-        fetch(`${URL}/users?${idParams}&${apiParams}`, {
-          cache: 'no-store',
-        }),
-        fetch(`${URL}/authorities`, {
-          cache: 'no-store',
-        }),
-      ])
-      if (!authoritiesResponse || !usersResponse) {
-        throw new Error('An error occurred while loading form data')
-      }
+  const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
+    params: userRequestParams,
+    isEnabled: originalUsers.length > 0,
+  })
 
-      const [usersData, authoritiesData]: [UserResponse[], Authority[]] = await Promise.all([
-        usersResponse.json(),
-        authoritiesResponse.json(),
-      ])
-      const users = mapGroupListUsers(usersData, authoritiesData, originalUsers)
-      setUsers(users)
+  const { data: authoritiesData, isLoading: areAuthoritiesLoading } = useGetAuthorities({
+    isEnabled: originalUsers.length > 0,
+  })
 
-      const totalCount = Number(usersResponse.headers.get('X-Total-Count')) || 0
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-      }
-    } catch (error) {
-      console.error('An error occurred while fetching users data:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const isLoading = isFetchingUsers || areAuthoritiesLoading || updateGroup.isPending
+  const rowCount = usersData?.totalElements || 0
+
+  useEffect(() => {
+    setTotalPages(Math.ceil(rowCount / pageSize))
+  }, [rowCount, setTotalPages, pageSize])
+
+  const users = useMemo(
+    () => (isLoading ? [] : mapGroupListUsers(usersData?.data || [], authoritiesData?.data || [], originalUsers)),
+    [usersData?.data, authoritiesData?.data, originalUsers, isLoading],
+  )
 
   // closes the user assignment modal after update
   useEffect(() => {
-    if (isUpdatingGroupUsers === false) {
+    if (!updateGroup.isPending) {
       setIsAssignUsersOpen(false)
     }
-  }, [isUpdatingGroupUsers])
-
-  useEffect(() => {
-    if (originalUsers.length > 0) {
-      getUserListData()
-    } else {
-      setIsLoading(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageIndex, pageSize, sorting, search, originalUsers])
+  }, [updateGroup.isPending])
 
   const handleUpdateGroupUsers = async (userSelection: RowSelectionState) => {
-    setIsLoading(true)
-    setIsUpdatingGroupUsers(true)
     const selectedUserIds = Object.keys(userSelection).filter(key => userSelection[key])
     const selectedUserInfo = selectedUserIds.map(userId => ({ id: userId, assignedAt: new Date().toISOString() }))
     const updateUserData = selectedUserInfo.concat(originalUsers)
-    try {
-      await patchGroupUsers(groupData.id, updateUserData)
-      router.refresh()
-    } catch {
-      console.error('An error occurred while updating group users')
-    } finally {
-      setIsLoading(false)
-      setIsUpdatingGroupUsers(false)
-    }
+    updateGroup.mutate({ id: groupData.id, users: updateUserData })
   }
 
   const CustomElement = (
@@ -132,7 +102,7 @@ export const UsersTab = (props: UsersTabProps) => {
           onButtonClick={() => setIsAssignUsersOpen(true)}
         />
         <AssignUsersModal
-          isUpdating={isUpdatingGroupUsers}
+          isUpdating={updateGroup.isPending}
           originalUsers={originalUsers}
           groupTitle={groupData.title}
           open={isAssignUsersOpen}
@@ -160,7 +130,7 @@ export const UsersTab = (props: UsersTabProps) => {
         />
       </TableContainer>
       <AssignUsersModal
-        isUpdating={isUpdatingGroupUsers}
+        isUpdating={updateGroup.isPending}
         originalUsers={originalUsers}
         groupTitle={groupData.title}
         open={isAssignUsersOpen}

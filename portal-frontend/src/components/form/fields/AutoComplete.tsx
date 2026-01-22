@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl'
 import { JSX } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { FormField, FormLabel, FormMessage } from '@/components/ui/form'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -30,6 +31,7 @@ interface AutoCompleteProps<T extends FieldValues> {
   onInputChange: (input: string) => void
   onSelectItem: (newSelection: SelectItem) => void
   onBlur?: () => void
+  isLoading?: boolean
 }
 export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>) => {
   const {
@@ -49,8 +51,13 @@ export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>)
     onSelectItem,
     onBlur,
     popoverContentProps,
+    isLoading,
   } = props
   const t = useTranslations('common')
+  const error =
+    inputValue.trim().length < minLength
+      ? t('errors.minChar', { amount: minLength.toString() })
+      : t('errors.notFound', { items: label })
 
   return (
     <FormField
@@ -92,11 +99,7 @@ export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>)
             >
               <div>
                 <CommandList>
-                  <CommandEmpty>
-                    {inputValue.trim().length < minLength
-                      ? t('errors.minChar', { amount: minLength.toString() })
-                      : t('errors.notFound', { items: label })}
-                  </CommandEmpty>
+                  <CommandEmpty>{isLoading ? <LoadingSpinner /> : error}</CommandEmpty>
                   <CommandGroup className="p-0 w-full">
                     {listItems.map(item => (
                       <CommandItem

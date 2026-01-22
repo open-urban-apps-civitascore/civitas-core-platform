@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -27,6 +27,11 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractConfigAdapter implements ConfigAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(AbstractConfigAdapter.class);
+
+  protected static final String UNKNOWN_RESOURCE_TYPE_CODE = "UNKNOWN_RESOURCE_TYPE";
+  protected static final String UNKNOWN_RESOURCE_TYPE_MSG = "Unknown resource type: ";
+  protected static final String UNSUPPORTED_OPERATION_CODE = "UNSUPPORTED_OPERATION";
+  protected static final String UNSUPPORTED_OPERATION_MSG = "Unknown operation: ";
 
   protected AdapterConfig config;
   protected EventPublisher eventPublisher;

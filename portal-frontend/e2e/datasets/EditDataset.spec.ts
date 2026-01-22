@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { DatasetResponse } from '@/types/datasets'
+import { Dataset } from '@/types/datasets'
 
 import { createTestDataset } from '../../playwright/helpers/dataset/createTestDataset'
 import { removeTestDataset } from '../../playwright/helpers/dataset/removeTestDataset'
@@ -17,7 +17,7 @@ const COMPLETION_STEPS = [
 ]
 
 test.describe('Edit Dataset Page', async () => {
-  let dataset: DatasetResponse
+  let dataset: Dataset
   test.beforeEach(async ({ page }) => {
     dataset = await createTestDataset()
     await page.goto(`/datasets/${dataset.id}`)
@@ -125,7 +125,7 @@ test.describe('Edit Dataset Page', async () => {
 test.describe('Edit Dataset Page completion steps', () => {
   test.describe.configure({ mode: 'serial' })
 
-  let dataset: DatasetResponse
+  let dataset: Dataset
   test.beforeEach(async ({ page }) => {
     dataset = await createTestDataset()
     await page.goto(`/datasets/${dataset.id}`)

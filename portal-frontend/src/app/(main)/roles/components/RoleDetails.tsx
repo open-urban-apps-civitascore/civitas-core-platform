@@ -3,30 +3,35 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { JSX, useCallback, useEffect, useState } from 'react'
+import { JSX, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
+import { useCreateRole, useDeleteRole, useGetRole, useUpdateRole } from '@/app/services/api/roles/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { FormRole, Role, ROLE_ORIGINS, roleSchema } from '@/types/roles'
 
-import {
-  FormRole,
-  ROLE_ORIGINS,
-  RoleInput,
-  RoleResponse,
-  roleSchema,
-  RoleType,
-  RoleUpdate,
-} from '../../../../../types/roles'
 import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
 import { PermissionsTab } from './permissions-tab/PermissionsTab'
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
+const defaultRole: Role = {
+  id: '',
+  name: '',
+  type: DEFAULT_TAB,
+  tenant: '',
+  users: [],
+  permissions: [],
+  groups: [],
+  createdAt: new Date().toISOString(), // Placeholder createdAt, later set by backend
+  lastUpdated: null,
+  updatedBy: null,
+  roleOrigin: ROLE_ORIGINS.CUSTOM,
+}
 
 interface RoleDetailsProps {
   roleId?: string
@@ -38,153 +43,84 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const tRoles = useTranslations('roles')
   const router = useRouter()
   const { setSubTabValueParam, subTabValue, tabValue } = useQueryParams()
-  const [selectedRole, setSelectedRole] = useState<RoleResponse | undefined>(undefined)
-  const [isLoading, setIsLoading] = useState<boolean>(false)
   const [hasPermissionsTabBeenSaved, setHasPermissionsTabBeenSaved] = useState<boolean>(false)
+
+  const { data: roleData, isFetching: isLoadingRole } = useGetRole({ id: roleId || '', isEnabled: !!roleId })
+
+  const initialRole = roleData?.data || defaultRole
+
+  const createRole = useCreateRole()
+  const updateRole = useUpdateRole()
+  const deleteRole = useDeleteRole(roleId || '')
+
+  const isLoading = isLoadingRole || createRole.isPending || updateRole.isPending || deleteRole.isPending
 
   const form = useForm<FormRole>({
     resolver: zodResolver(roleSchema),
     defaultValues: {
-      name: '',
-      description: '',
+      name: initialRole.name,
+      description: initialRole.description,
     },
   })
 
-  const getRole = useCallback(async (roleId: RoleResponse['id']) => {
-    setIsLoading(true)
-
-    try {
-      const response = await fetch(`${URL}/roles/${roleId}`, {
-        method: 'GET',
-        headers: {
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          'Content-Type': 'application/json',
-        },
-      })
-      const data = await response.json()
-      setSelectedRole(data)
-
-      setIsLoading(false)
-    } catch (error) {
-      console.error('Error fetching role:', error)
-    }
-  }, [])
-
   useEffect(() => {
-    if (roleId) {
-      getRole(roleId)
+    if (initialRole) {
+      form.setValue('name', initialRole.name)
+      form.setValue('description', initialRole.description || '')
     }
-  }, [roleId, getRole])
+  }, [initialRole, form])
 
-  useEffect(() => {
-    if (selectedRole) {
-      form.setValue('name', selectedRole.name)
-      form.setValue('description', selectedRole.description || '')
-    }
-  }, [selectedRole, form])
-
-  const updateRole = async (roleId: RoleResponse['id'], updatedRoleData: RoleUpdate) => {
-    setIsLoading(true)
-
-    try {
-      const response = await fetch(`${URL}/roles/${roleId}`, {
-        method: 'PUT',
-        headers: {
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedRoleData),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`)
-      }
-
-      const data = await response.json()
-      console.log('Erfolgreich aktualisiert:', data)
-      setHasPermissionsTabBeenSaved(true)
-      setSelectedRole(data)
-
-      setIsLoading(false)
-    } catch (error) {
-      console.error('Fehler:', error)
-    }
-  }
-
-  const postRole = async (roleInput: RoleInput): Promise<void> => {
-    try {
-      const response = await fetch(`${URL}/roles`, {
-        method: 'POST',
-        headers: {
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(roleInput),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`)
-      }
-
-      const data = await response.json()
-      console.log('Erfolgreich erstellt:', data)
-
-      router.push(`/roles/${data.id}?_tab=${tabValue}`)
-    } catch (error) {
-      console.error('Fehler:', error)
-    }
-  }
-
-  const createRole = (values: FormRole) => {
-    postRole({
-      type: (tabValue as RoleType) || (DEFAULT_TAB as RoleType),
-      tenant: 'ExampleCorp', // Placeholder tenant
-      users: [],
-      permissions: [],
-      groups: [],
-      createdAt: new Date().toISOString(), // Placeholder createdAt, later set by backend
-      ...values,
+  const handleDeleteRole = () => {
+    deleteRole.mutate(undefined, {
+      onSuccess: () => router.push('/roles'),
     })
   }
 
-  const deleteRole = async (roleId: RoleResponse['id']) => {
-    try {
-      const response = await fetch(`${URL}/roles/${roleId}`, {
-        method: 'DELETE',
-        headers: {
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          'Content-Type': 'application/json',
+  const onSubmit = (values: FormRole): void => {
+    if (roleId && initialRole) {
+      updateRole.mutate(
+        { ...initialRole, ...values },
+        {
+          onSuccess: () => {
+            setHasPermissionsTabBeenSaved(true)
+          },
+        },
+      )
+    } else {
+      // eslint-disable-next-line unused-imports/no-unused-vars
+      const { id, ...creadteRoleData } = { ...initialRole, ...values }
+      createRole.mutate(creadteRoleData, {
+        onSuccess: ({ data }) => {
+          router.push(`/roles/${data.id}?_tab=${tabValue}`)
         },
       })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`)
-      }
-
-      router.push('/roles')
-    } catch (error) {
-      console.error('Error deleting role:', error)
-    }
-  }
-
-  const onSubmit = (values: FormRole): void => {
-    if (roleId && selectedRole) {
-      updateRole(roleId, { ...selectedRole, ...values })
-    } else {
-      createRole(values)
     }
   }
 
   const handlePermissionUpdate = (permissionIds: string[]): void => {
-    if (!selectedRole || !roleId) return
+    if (!initialRole || !roleId) return
 
-    updateRole(roleId, { ...selectedRole, permissions: permissionIds })
+    updateRole.mutate(
+      { ...initialRole, permissions: permissionIds },
+      {
+        onSuccess: () => {
+          setHasPermissionsTabBeenSaved(true)
+        },
+      },
+    )
   }
 
   const handleGroupAssigmentUpdate = (newGroupIds: string[]): void => {
-    if (!selectedRole || !roleId) return
+    if (!initialRole || !roleId) return
 
-    updateRole(roleId, { ...selectedRole, groups: newGroupIds })
+    updateRole.mutate(
+      { ...initialRole, groups: newGroupIds },
+      {
+        onSuccess: () => {
+          setHasPermissionsTabBeenSaved(true)
+        },
+      },
+    )
   }
 
   const subTabValues: Record<'basicInformation' | 'permissions' | 'groupAssignment', Tab> = {
@@ -207,7 +143,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const subTabs: Tab[] = [subTabValues.basicInformation, subTabValues.permissions, subTabValues.groupAssignment]
   const defaultSubTab = subTabValues.basicInformation.value
-  const isDefaultRole = selectedRole?.roleOrigin === ROLE_ORIGINS.DEFAULT
+  const isDefaultRole = initialRole?.roleOrigin === ROLE_ORIGINS.DEFAULT
 
   useEffect(() => {
     if (!subTabValue) {
@@ -215,13 +151,13 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     }
   }, [subTabValue, setSubTabValueParam, defaultSubTab])
 
-  const roleType = selectedRole?.type || tabValue
+  const roleType = initialRole?.type || tabValue
   const badgeTitle = roleType ? tRoles(`${roleType}Roles`).slice(0, -1) : undefined
 
   return (
     <PageContainer headerType="withSubTabsOrSubtitle">
       <PageHeader
-        title={roleId ? selectedRole?.name : tRoles('newRole')}
+        title={roleId ? initialRole?.name : tRoles('newRole')}
         badgeTitle={badgeTitle}
         subTabs={{
           tabs: subTabs,
@@ -239,14 +175,14 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
             roleType={tabValue}
             isDefaultRole={isDefaultRole}
             isEditMode={isEditMode}
-            deleteRole={() => roleId && deleteRole(roleId)}
+            deleteRole={() => roleId && handleDeleteRole()}
           />
         )}
 
         {subTabValue === subTabValues.permissions.value && (
           <PermissionsTab
             onPermissionUpdate={handlePermissionUpdate}
-            currentSelectedPermissionIds={selectedRole?.permissions || []}
+            currentSelectedPermissionIds={initialRole?.permissions || []}
             roleType={tabValue}
             hasPermissionsTabBeenSaved={hasPermissionsTabBeenSaved}
             setHasPermissionsTabBeenSaved={setHasPermissionsTabBeenSaved}
@@ -256,9 +192,9 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
         {subTabValue === subTabValues.groupAssignment.value && (
           <GroupAssignmentTab
-            groupIds={selectedRole?.groups || []}
+            assignedGroupIds={initialRole?.groups || []}
             onGroupAssignmentUpdate={handleGroupAssigmentUpdate}
-            roleName={selectedRole?.name || ''}
+            roleName={initialRole?.name || ''}
           />
         )}
       </PageBackground>

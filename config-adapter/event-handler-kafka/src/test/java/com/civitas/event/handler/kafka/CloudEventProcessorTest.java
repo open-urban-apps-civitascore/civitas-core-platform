@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -20,6 +20,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.model.ConfigEvent;
 import io.cloudevents.CloudEvent;
@@ -62,7 +63,7 @@ class CloudEventProcessorTest {
             .withId("test-id")
             .withType("com.civitas.config.v1")
             .withSource(URI.create("/test"))
-            .withData("application/json", validJson.getBytes())
+            .withData(Constants.CONTENT_TYPE_JSON, validJson.getBytes())
             .build();
 
     processor.handleEvent("test.topic", cloudEvent);
@@ -99,7 +100,7 @@ class CloudEventProcessorTest {
             .withId("test-id")
             .withType("com.civitas.config.v1")
             .withSource(URI.create("/test"))
-            .withData("application/json", invalidJson.getBytes())
+            .withData(Constants.CONTENT_TYPE_JSON, invalidJson.getBytes())
             .build();
 
     assertThrows(Exception.class, () -> processor.handleEvent("test.topic", cloudEvent));
@@ -117,7 +118,7 @@ class CloudEventProcessorTest {
             .withId("test-id")
             .withType("com.civitas.config.v1")
             .withSource(URI.create("/test"))
-            .withData("application/json", "".getBytes())
+            .withData(Constants.CONTENT_TYPE_JSON, "".getBytes())
             .build();
 
     assertThrows(Exception.class, () -> processor.handleEvent("test.topic", cloudEvent));
@@ -176,7 +177,7 @@ class CloudEventProcessorTest {
             .withId("test-id")
             .withType("com.civitas.config.v1")
             .withSource(URI.create("/test"))
-            .withData("application/json", validJson.getBytes())
+            .withData(Constants.CONTENT_TYPE_JSON, validJson.getBytes())
             .build();
 
     doThrow(new RuntimeException("Processing error"))

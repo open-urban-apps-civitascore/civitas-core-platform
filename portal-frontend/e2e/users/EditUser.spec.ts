@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { Authority, UserResponse } from '@/types/users'
+import { Authority, User } from '@/types/users'
 
 import { JSON_SERVER_HOST, JSON_SERVER_PORT } from '../../playwright.config'
 import { createTestUser } from '../../playwright/createTestUser'
@@ -25,7 +25,7 @@ const MOCK_AUTHORITIES = [
 // users tests are skipped because list view uses API and create and edit user use json-server
 
 test.describe.skip('Edit User Page', async () => {
-  let user: UserResponse
+  let user: User
   test.beforeEach(async ({ page }) => {
     user = await createTestUser()
     await page.route(`${URL}/authorities`, async route => {
