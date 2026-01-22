@@ -29,7 +29,7 @@ export const AppSidebarContent = async () => {
         {appSidebarNavItems.map(item =>
           item.items ? (
             <Collapsible key={item.title} defaultOpen={item.isActive} className="group/collapsible">
-              <CollapsibleTrigger>
+              <CollapsibleTrigger asChild>
                 <SidebarMenuButton className="cursor-pointer">
                   <item.icon />
                   <span>{getMenuItemTitle(item)}</span>
