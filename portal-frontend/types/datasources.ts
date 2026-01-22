@@ -68,15 +68,7 @@ export const DatasourceFormSchema = z.object({
 export type DatasourceFormData = z.infer<typeof DatasourceFormSchema>
 
 /* API request types */
-export type CreateDatasourceData = {
-  name: string
-  description: string
-  tags: string[]
-  status: DatasourceStatusType
-  connector: ConnectorType
-  connection: ConnectionType
-  lastActive: string
-}
+export type CreateDatasourceData = Omit<Datasource, 'id'>
 
 export type UpdateDatasourceData = Partial<CreateDatasourceData> & {
   id: number
