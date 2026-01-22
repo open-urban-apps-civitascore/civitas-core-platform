@@ -63,7 +63,9 @@
     "uml-modeler": "UML Modeler",
     "data": "Data",
     "table-editor": "Table Editor",
-    "pipeline-editor": "Pipeline Editor"
+    "pipeline-editor": "Pipeline Editor",
+    "data-management": "Data-Management",
+    "datasources": "Datasources"
   },
   "datasets": {
     "title": "Datasets",
@@ -359,6 +361,30 @@
           "description": "Description"
         }
       }
+    }
+  },
+    "datasources": {
+    "title": "Overview: Data Sources",
+    "subtitle": "All data sources available in our tenant.",
+    "newDatasource": "Create Data Source",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Description",
+      "connector": "Connector",
+      "connection": "Connection",
+      "lastActive": "Last active",
+      "tags": "Tags",
+      "status": "Status",
+      "action": "Action"
+    },
+    "status": {
+      "draft": "Draft",
+      "available": "Available"
+    },
+    "connection": {
+      "active": "active",
+      "inactive": "inactive",
+      "static": "static"
     }
   }
 }

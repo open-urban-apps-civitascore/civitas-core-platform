@@ -6025,5 +6025,89 @@
       "roleOrigin": "custom",
       "id": "_8UNR6J"
     }
+  ],
+  "datasources": [
+    {
+      "name": "Datasource 1",
+      "description": "Description of Datasource",
+      "connector": "REST",
+      "connection": "inactive",
+      "lastActive": "2025-01-01T00:00:00",
+      "tags": [],
+      "status": "draft",
+      "id": 1
+    },
+    {
+      "name": "Datasource 2",
+      "description": "Description of Datasource",
+      "connector": "MQTT",
+      "connection": "active",
+      "lastActive": "2025-05-01T00:00:00",
+      "tags": [
+        "Tag1",
+        "Tag2"
+      ],
+      "status": "draft",
+      "id": 2
+    },
+    {
+      "name": "Datasource 3",
+      "description": "Description of Datasource",
+      "connector": "CSV",
+      "connection": "static",
+      "lastActive": "2026-01-15T00:00:00",
+      "tags": [
+        "Tag1",
+        "Tag2",
+        "Tag3"
+      ],
+      "status": "available",
+      "id": 3
+    },
+    {
+      "name": "Datasource 4",
+      "description": "Description of Datasource",
+      "connector": "SQL",
+      "connection": "active",
+      "lastActive": "2025-12-14T00:00:00",
+      "tags": [
+        "Tag1",
+        "Tag2",
+        "Tag3",
+        "Tag4"
+      ],
+      "status": "available",
+      "id": 4
+    },
+    {
+      "name": "Datasource 5",
+      "description": "Description of Datasource",
+      "connector": "S3",
+      "connection": "inactive",
+      "lastActive": "2026-01-21T00:00:00",
+      "tags": [
+        "Tag1",
+        "Tag2",
+        "Tag3",
+        "Tag4"
+      ],
+      "status": "draft",
+      "id": 5
+    },
+    {
+      "name": "Datasource 6",
+      "description": "Description of Datasource",
+      "connector": "MQTT",
+      "connection": "inactive",
+      "lastActive": "2025-01-25T00:00:00",
+      "tags": [
+        "Tag1",
+        "Tag2",
+        "Tag3",
+        "Tag4"
+      ],
+      "status": "available",
+      "id": 6
+    }
   ]
 }

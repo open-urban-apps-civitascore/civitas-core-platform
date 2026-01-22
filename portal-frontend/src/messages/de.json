@@ -63,7 +63,9 @@
     "uml-modeler": "UML Modeler",
     "data": "Daten",
     "table-editor": "Table Editor",
-    "pipeline-editor": "Pipeline Editor"
+    "pipeline-editor": "Pipeline Editor",
+    "data-management": "Daten-Management",
+    "datasources": "Datenquellen"
   },
   "datasets": {
     "title": "Datensätze",
@@ -360,6 +362,30 @@
           "description": "Beschreibung"
         }
       }
+    }
+  },
+  "datasources": {
+    "title": "Übersicht: Datenquellen",
+    "subtitle": "Alle Datenquellen, die in unserem Mandanten verfügbar sind.",
+    "newDatasource": "Datenquelle erstellen",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "connector": "Konnektor",
+      "connection": "Verbindung",
+      "lastActive": "Aktivität vor",
+      "tags": "Tags",
+      "status": "Status",
+      "action": "Aktion"
+    },
+    "status": {
+      "draft": "Entwurf",
+      "available": "Verfügbar"
+    },
+    "connection": {
+      "active": "aktiv",
+      "inactive": "inaktiv",
+      "static": "statisch"
     }
   }
 }
