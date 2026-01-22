@@ -25,7 +25,10 @@
       "minChar": "The input has to be at least {amount} characters.",
       "notFound": "No {items} found",
       "loadingError": "Error while loading data",
-      "unexpectedError": "An unexpected error occurred. Please try again."
+      "unexpectedError": "An unexpected error occurred. Please try again.",
+      "nameRequired": "Name is required",
+      "descriptionRequired": "Description is required",
+      "descriptionMaxLength": "Description must be 150 characters or less"
     },
     "items": {
       "users": "Users",
@@ -416,12 +419,7 @@
       "tagsOptional": "(optional)",
       "tagsPlaceholder": "Add tag...",
       "tagsSearch": "Search tag...",
-      "noTagsFound": "No tags found",
-      "errors": {
-        "nameRequired": "Name is required",
-        "descriptionRequired": "Description is required",
-        "descriptionMaxLength": "Description must be 150 characters or less"
-      }
+      "noTagsFound": "No tags found"
     },
     "actions": {
       "saveAndContinue": "Save and continue",

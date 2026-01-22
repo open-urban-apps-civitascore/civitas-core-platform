@@ -36,11 +36,8 @@ export const DatasourceStatusSchema = enumFromConst(DATASOURCE_STATUS_TYPES)
 /* schema */
 export const DatasourceSchema = z.object({
   id: z.number(),
-  name: z.string().min(1, 'datasources.form.errors.nameRequired'),
-  description: z
-    .string()
-    .min(1, 'datasources.form.errors.descriptionRequired')
-    .max(150, 'datasources.form.errors.descriptionMaxLength'),
+  name: z.string().min(1, 'common.errors.nameRequired'),
+  description: z.string().min(1, 'common.errors.descriptionRequired').max(150, 'common.errors.descriptionMaxLength'),
   connector: ConnectorTypeSchema,
   connection: ConnectionTypeSchema,
   lastActive: z.string(),

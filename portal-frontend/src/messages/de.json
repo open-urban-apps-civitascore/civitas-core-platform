@@ -25,7 +25,10 @@
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
       "notFound": "Keine {items} gefunden",
       "loadingError": "Fehler beim Laden der Daten",
-      "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+      "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+      "nameRequired": "Name ist erforderlich",
+      "descriptionRequired": "Beschreibung ist erforderlich",
+      "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein"
     },
     "items": {
       "users": "Users",
@@ -410,12 +413,7 @@
       "tagsOptional": "(optional)",
       "tagsPlaceholder": "Tag hinzufügen...",
       "tagsSearch": "Tag suchen ...",
-      "noTagsFound": "Keine Tags gefunden",
-      "errors": {
-        "nameRequired": "Name ist erforderlich",
-        "descriptionRequired": "Beschreibung ist erforderlich",
-        "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein"
-      }
+      "noTagsFound": "Keine Tags gefunden"
     },
     "actions": {
       "saveAndContinue": "Erstellen und weiter",
