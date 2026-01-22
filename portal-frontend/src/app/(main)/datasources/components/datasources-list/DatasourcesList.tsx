@@ -38,7 +38,7 @@ export const DatasourcesList = (props: DatasourcesListProps) => {
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
   const CustomElement = (
-    <Button data-testid="addUserButton" onClick={() => console.log('/datasources/create')}>
+    <Button data-testid="addDatasourcesButton" onClick={() => console.log('/datasources/create')}>
       <Plus />
       {t('newDatasource')}
     </Button>
