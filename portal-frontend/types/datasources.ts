@@ -1,5 +1,7 @@
 import z from 'zod'
 
+import { WithId } from './common'
+
 export const CONNECTOR_TYPES = {
   MQTT: 'mqtt',
   SQL: 'sql',
@@ -70,6 +72,4 @@ export type DatasourceFormData = z.infer<typeof DatasourceFormSchema>
 /* API request types */
 export type CreateDatasourceData = Omit<Datasource, 'id'>
 
-export type UpdateDatasourceData = Partial<CreateDatasourceData> & {
-  id: number
-}
+export type UpdateDatasourceData = Partial<CreateDatasourceData> & WithId
