@@ -16,7 +16,7 @@ import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
 import { Datasource, DatasourceFormData, DatasourceFormSchema, DatasourceStatusType } from '@/types/datasources'
 
-import { BasicInfoTab } from './BasicInfoTab'
+import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ExitWarningModal } from './ExitWarningModal'
 import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'
 import { StatusDropdown } from './StatusDropdown'

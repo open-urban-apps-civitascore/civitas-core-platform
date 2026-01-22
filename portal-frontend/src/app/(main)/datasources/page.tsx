@@ -1,7 +1,7 @@
 import { getDatasources } from '@/app/services/api/datasources/serverRequests'
 import { getJsonServerRequestParams, JsonServerRequestParams } from '@/utils/requestParams'
 
-import { DatasourcesList } from './components/DatasourcesList'
+import { DatasourcesList } from './components/list/DatasourcesList'
 
 type Props = {
   searchParams: Promise<JsonServerRequestParams>
