@@ -46,3 +46,35 @@ export const DatasourceSchema = z.object({
 })
 
 export type Datasource = z.infer<typeof DatasourceSchema>
+
+/* Form schemas for create/edit */
+export const DatasourceCreateFormSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+})
+
+export type DatasourceCreateFormData = z.infer<typeof DatasourceCreateFormSchema>
+
+export const DatasourceFormSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().min(1, 'Description is required').max(150, 'Description must be 150 characters or less'),
+  tags: z.array(z.string()),
+  status: DatasourceStatusSchema,
+})
+
+export type DatasourceFormData = z.infer<typeof DatasourceFormSchema>
+
+/* API request types */
+export type CreateDatasourceData = {
+  name: string
+  description: string
+  tags: string[]
+  status: DatasourceStatusType
+  connector: ConnectorType
+  connection: ConnectionType
+  lastActive: string
+}
+
+export type UpdateDatasourceData = Partial<CreateDatasourceData> & {
+  id: string
+}
