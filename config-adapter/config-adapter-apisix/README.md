@@ -195,10 +195,55 @@ APISIX upstreams support various load balancing algorithms and health check conf
 
 #### Load Balancing Algorithms
 
-- `roundrobin` - Round-robin (default)
-- `chash` - Consistent hashing
-- `ewma` - Exponentially weighted moving average
-- `least_conn` - Least connections
+| Algorithm | Description | Use Case |
+|-----------|-------------|----------|
+| `roundrobin` | Distributes requests sequentially to each backend in turn (default) | General purpose, evenly distributed backends |
+| `chash` | Consistent hashing based on specified key (e.g., client IP, header) | Session affinity, cache optimization |
+| `ewma` | Exponentially Weighted Moving Average - routes to lowest latency backend | Latency-sensitive applications |
+| `least_conn` | Routes to backend with fewest active connections | Long-lived connections, varying request durations |
+
+**Algorithm Configuration Examples:**
+
+```json
+// Round-robin with weights
+{
+  "type": "roundrobin",
+  "nodes": {
+    "backend1:8080": 3,
+    "backend2:8080": 2,
+    "backend3:8080": 1
+  }
+}
+
+// Consistent hashing by client IP
+{
+  "type": "chash",
+  "hash_on": "vars",
+  "key": "remote_addr",
+  "nodes": {
+    "backend1:8080": 1,
+    "backend2:8080": 1
+  }
+}
+
+// EWMA for latency optimization
+{
+  "type": "ewma",
+  "nodes": {
+    "backend1:8080": 1,
+    "backend2:8080": 1
+  }
+}
+
+// Least connections
+{
+  "type": "least_conn",
+  "nodes": {
+    "backend1:8080": 1,
+    "backend2:8080": 1
+  }
+}
+```
 
 #### Example: Weighted Round-Robin
 

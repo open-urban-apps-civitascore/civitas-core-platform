@@ -12,6 +12,9 @@ package com.civitas.configadapter.examples;
 
 import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.configuration.AdapterConfig;
+import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
+import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import org.slf4j.Logger;
@@ -21,6 +24,16 @@ import org.slf4j.LoggerFactory;
  * Simple example adapter that logs received events and publishes result events. Useful for testing,
  * debugging, and as a reference implementation. Demonstrates how to use EventPublisher to send
  * result/error events.
+ *
+ * <p>This adapter also demonstrates the exception handling pattern using topic-based triggers:
+ *
+ * <ul>
+ *   <li>Topics containing "fatal" - Throws FatalAdapterException (goes directly to DLQ)
+ *   <li>Topics containing "retry" - Throws RetryableAdapterException (triggers retry loop)
+ *   <li>Other topics - Normal processing, no exceptions thrown
+ * </ul>
+ *
+ * <p>Example: {@code processConfigEvent("test.fatal.error", event)} throws FatalAdapterException
  */
 public class DummyLogAdapter extends AbstractConfigAdapter {
 
@@ -33,10 +46,6 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
 
   public DummyLogAdapter() {}
 
-  /*
-   * (non-Javadoc)
-   * @see com.civitas.configadapter.adapter.AbstractConfigAdapter#initialize(com.civitas.configadapter.config.AppConfig)
-   */
   @Override
   public void initialize(AdapterConfig config) {
     super.initialize(config);
@@ -44,10 +53,6 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
     logger.info("Subscribed to {} topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
   }
 
-  /*
-   * (non-Javadoc)
-   * @see com.civitas.configadapter.adapter.ConfigAdapter#getName()
-   */
   @Override
   public String getName() {
     return ADAPTER_NAME;
@@ -64,6 +69,19 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
     logger.info("Data:         	{}", event.payload().config());
     logger.info("ResultTopic:  	{}", event.metadata().resultTopic());
     logger.info("===============================================================");
+
+    // Topic-based exception handling for testing/demonstration
+    if (topic != null && topic.contains("fatal")) {
+      logger.warn("Topic contains 'fatal' - throwing FatalAdapterException");
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD, null, "Simulated fatal error for topic: " + topic);
+    }
+
+    if (topic != null && topic.contains("retry")) {
+      logger.warn("Topic contains 'retry' - throwing RetryableAdapterException");
+      throw new RetryableAdapterException(
+          AdapterErrorCode.SERVICE_UNAVAILABLE, null, ADAPTER_NAME, 503);
+    }
 
     // Publish a result event if resultTopic is specified
     String resultTopic = event.metadata().resultTopic();
@@ -88,6 +106,8 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
             "Published result event to topic {} for {}", resultTopic, event.metadata().messageId());
       } catch (Exception e) {
         logger.error("Failed to publish result event", e);
+        throw new FatalAdapterException(
+            AdapterErrorCode.UNKNOWN_ERROR, e, "Event processing failed: unable to publish result");
       }
     }
   }

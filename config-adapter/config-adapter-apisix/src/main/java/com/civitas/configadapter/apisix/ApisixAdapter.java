@@ -12,12 +12,17 @@ package com.civitas.configadapter.apisix;
 
 import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.configuration.AdapterConfig;
+import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
+import com.civitas.configadapter.model.AdapterErrorCode;
+import com.civitas.configadapter.model.AdapterOperation;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.ConfigValue;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.apisix.ApisixConfigValue;
 import com.civitas.configadapter.model.apisix.RouteConfigValue;
+import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
@@ -50,6 +55,15 @@ import org.slf4j.LoggerFactory;
  *   <li>prometheus - Prometheus metrics collection
  *   <li>loki - Loki logging integration
  * </ul>
+ *
+ * <p>Error handling:
+ *
+ * <ul>
+ *   <li>Network errors (ProcessingException) → RetryableAdapterException (NETWORK_ERROR)
+ *   <li>HTTP 5xx errors → RetryableAdapterException (SERVICE_UNAVAILABLE)
+ *   <li>HTTP 4xx errors → FatalAdapterException (APISIX_ROUTE_ERROR/APISIX_UPSTREAM_ERROR)
+ *   <li>Unknown exceptions → FatalAdapterException (UNKNOWN_ERROR)
+ * </ul>
  */
 public class ApisixAdapter extends AbstractConfigAdapter {
 
@@ -60,12 +74,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   private static final String APISIX_RESULT_TYPE = "core.civitas.api.processing.result";
   private static final String APISIX_SOURCE = "civitas.config-adapter.apisix";
 
-  private static final String UPSTREAM_CREATE_FAILED_CODE = "UPSTREAM_CREATE_FAILED";
-  private static final String UPSTREAM_UPDATE_FAILED_CODE = "UPSTREAM_UPDATE_FAILED";
-  private static final String UPSTREAM_DELETED_SUCCESSFULLY =
-      "APISIX upstream deleted successfully";
-  private static final String UPSTREAM_DELETE_FAILED_CODE = "UPSTREAM_DELETE_FAILED";
-  private static final String SUCCESS_UPDATE_MSG = "APISIX upstream updated successfully";
+  // Constants for exception messages
+  private static final String HTTP_STATUS_PREFIX = "HTTP ";
 
   private static final Logger logger = LoggerFactory.getLogger(ApisixAdapter.class);
 
@@ -145,23 +155,16 @@ public class ApisixAdapter extends AbstractConfigAdapter {
         targetComponent,
         targetResource);
 
-    try {
-      ResourceInfo resourceInfo = parseTargetResource(targetResource);
+    ResourceInfo resourceInfo = parseTargetResource(targetResource);
 
-      switch (operation) {
-        case CREATE -> handleCreate(resourceInfo, event);
-        case UPDATE -> handleUpdate(resourceInfo, event);
-        case DELETE -> handleDelete(resourceInfo, event);
-        default -> {
-          logger.warn("Unknown operation: {}", operation);
-          publishErrorResult(
-              event, UNSUPPORTED_OPERATION_CODE, UNSUPPORTED_OPERATION_MSG + operation);
-        }
+    switch (operation) {
+      case CREATE -> handleCreate(resourceInfo, event);
+      case UPDATE -> handleUpdate(resourceInfo, event);
+      case DELETE -> handleDelete(resourceInfo, event);
+      default -> {
+        logger.warn("Unknown operation: {}", operation);
+        throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
       }
-
-    } catch (Exception e) {
-      logger.error("Failed to process config event", e);
-      publishErrorResult(event, "PROCESSING_ERROR", e.getMessage());
     }
   }
 
@@ -201,8 +204,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       case ROUTE -> createRoute(event);
       case null, default -> {
         logger.warn("Unknown resource type for create: {}", resourceInfo.type);
-        publishErrorResult(
-            event, UNKNOWN_RESOURCE_TYPE_CODE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
+        throw new FatalAdapterException(AdapterErrorCode.INVALID_RESOURCE_TYPE, resourceInfo.type);
       }
     }
   }
@@ -213,8 +215,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       case ROUTE -> updateRoute(resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for update: {}", resourceInfo.type);
-        publishErrorResult(
-            event, UNKNOWN_RESOURCE_TYPE_CODE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
+        throw new FatalAdapterException(AdapterErrorCode.INVALID_RESOURCE_TYPE, resourceInfo.type);
       }
     }
   }
@@ -225,220 +226,173 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       case ROUTE -> deleteRoute(resourceInfo.id, event);
       default -> {
         logger.warn("Unknown resource type for delete: {}", resourceInfo.type);
-        publishErrorResult(
-            event, UNKNOWN_RESOURCE_TYPE_CODE, UNKNOWN_RESOURCE_TYPE_MSG + resourceInfo.type);
+        throw new FatalAdapterException(AdapterErrorCode.INVALID_RESOURCE_TYPE, resourceInfo.type);
       }
     }
+  }
+
+  // ============== EXCEPTION WRAPPING ==============
+
+  /**
+   * Wraps network/processing exceptions as RetryableAdapterException.
+   *
+   * @param e the ProcessingException (network error)
+   * @param operation the operation being performed
+   * @return RetryableAdapterException
+   */
+  private RetryableAdapterException wrapNetworkException(
+      ProcessingException e, AdapterOperation operation) {
+    logger.warn("Network error during {}: {}", operation.getDescription(), e.getMessage());
+    return new RetryableAdapterException(
+        AdapterErrorCode.NETWORK_ERROR, e, ADAPTER_NAME, e.getMessage());
+  }
+
+  /**
+   * Handles HTTP response and throws appropriate exceptions for error status codes.
+   *
+   * @param response the HTTP response
+   * @param errorCode the error code to use for 4xx errors
+   * @param operation the operation being performed
+   * @throws RetryableAdapterException for HTTP 5xx errors
+   * @throws FatalAdapterException for HTTP 4xx errors
+   */
+  private void handleHttpResponse(
+      Response response, AdapterErrorCode errorCode, AdapterOperation operation) {
+    int status = response.getStatus();
+
+    // Success - nothing to throw
+    if (status >= 200 && status < 300) {
+      return;
+    }
+
+    String body = response.readEntity(String.class);
+
+    // HTTP 5xx - Server errors are retryable
+    if (status >= 500) {
+      logger.warn("APISIX server error during {}: {} {}", operation.getDescription(), status, body);
+      throw new RetryableAdapterException(
+          AdapterErrorCode.SERVICE_UNAVAILABLE, null, ADAPTER_NAME, status);
+    }
+
+    // HTTP 4xx - Client errors are fatal
+    logger.error("APISIX client error during {}: {} {}", operation.getDescription(), status, body);
+    throw new FatalAdapterException(errorCode, null, HTTP_STATUS_PREFIX + status + ": " + body);
   }
 
   // ============== UPSTREAM OPERATIONS ==============
 
   private void createUpstream(ConfigEvent event) {
-    try {
-      ConfigValue configValue = event.payload().config().value();
-      Object upstreamConfig;
-      if (configValue instanceof ApisixConfigValue apisixValue) {
-        upstreamConfig = apisixValue.data();
-      } else {
-        upstreamConfig = configValue;
-      }
-
-      Response response =
-          client
-              .target(adminApiUrl)
-              .path(APISIX_ADMIN_UPSTREAMS)
-              .request(MediaType.APPLICATION_JSON)
-              .header(X_API_KEY, adminApiKey)
-              .post(Entity.json(upstreamConfig));
-
-      if (response.getStatus() >= 200 && response.getStatus() < 300) {
-        logger.info("Created APISIX upstream successfully");
-        publishSuccessResult(event, "APISIX upstream created successfully", null);
-      } else {
-        String errorMsg =
-            "Failed to create APISIX upstream. Status: "
-                + response.getStatus()
-                + ", Body: "
-                + response.readEntity(String.class);
-        logger.error(errorMsg);
-        publishErrorResult(event, UPSTREAM_CREATE_FAILED_CODE, errorMsg);
-      }
-      response.close();
-
-    } catch (Exception e) {
-      logger.error("Failed to create APISIX upstream", e);
-      publishErrorResult(event, UPSTREAM_CREATE_FAILED_CODE, e.getMessage());
-    }
+    Object upstreamConfig = extractUpstreamConfig(event);
+    executeApisixOperation(
+        AdapterOperation.UPSTREAM_CREATE,
+        AdapterErrorCode.APISIX_UPSTREAM_ERROR,
+        event,
+        "APISIX upstream created successfully",
+        null,
+        () ->
+            client
+                .target(adminApiUrl)
+                .path(APISIX_ADMIN_UPSTREAMS)
+                .request(MediaType.APPLICATION_JSON)
+                .header(X_API_KEY, adminApiKey)
+                .post(Entity.json(upstreamConfig)));
   }
 
   private void updateUpstream(String upstreamId, ConfigEvent event) {
-    try {
-      ConfigValue configValue = event.payload().config().value();
-      Object upstreamConfig;
-      if (configValue instanceof ApisixConfigValue apisixValue) {
-        upstreamConfig = apisixValue.data();
-      } else {
-        upstreamConfig = configValue;
-      }
-
-      Response response =
-          client
-              .target(adminApiUrl)
-              .path(APISIX_ADMIN_UPSTREAMS_ID)
-              .resolveTemplate(ID, upstreamId)
-              .request(MediaType.APPLICATION_JSON)
-              .header(X_API_KEY, adminApiKey)
-              .put(Entity.json(upstreamConfig));
-
-      if (response.getStatus() >= 200 && response.getStatus() < 300) {
-        logger.info("Updated APISIX upstream: {}", upstreamId);
-        publishSuccessResult(event, SUCCESS_UPDATE_MSG, upstreamId);
-      } else {
-        String errorMsg =
-            "Failed to update APISIX upstream. Status: "
-                + response.getStatus()
-                + ", Body: "
-                + response.readEntity(String.class);
-        logger.error(errorMsg);
-        publishErrorResult(event, UPSTREAM_UPDATE_FAILED_CODE, errorMsg);
-      }
-      response.close();
-
-    } catch (Exception e) {
-      logger.error("Failed to update APISIX upstream: {}", upstreamId, e);
-      publishErrorResult(event, UPSTREAM_UPDATE_FAILED_CODE, e.getMessage());
-    }
+    Object upstreamConfig = extractUpstreamConfig(event);
+    executeApisixOperation(
+        AdapterOperation.UPSTREAM_UPDATE,
+        AdapterErrorCode.APISIX_UPSTREAM_ERROR,
+        event,
+        "APISIX upstream updated successfully",
+        upstreamId,
+        () ->
+            client
+                .target(adminApiUrl)
+                .path(APISIX_ADMIN_UPSTREAMS_ID)
+                .resolveTemplate(ID, upstreamId)
+                .request(MediaType.APPLICATION_JSON)
+                .header(X_API_KEY, adminApiKey)
+                .put(Entity.json(upstreamConfig)));
   }
 
   private void deleteUpstream(String upstreamId, ConfigEvent event) {
-    try {
-      Response response =
-          client
-              .target(adminApiUrl)
-              .path(APISIX_ADMIN_UPSTREAMS_ID)
-              .resolveTemplate(ID, upstreamId)
-              .request(MediaType.APPLICATION_JSON)
-              .header(X_API_KEY, adminApiKey)
-              .delete();
+    executeApisixOperation(
+        AdapterOperation.UPSTREAM_DELETE,
+        AdapterErrorCode.APISIX_UPSTREAM_ERROR,
+        event,
+        "APISIX upstream deleted successfully",
+        upstreamId,
+        () ->
+            client
+                .target(adminApiUrl)
+                .path(APISIX_ADMIN_UPSTREAMS_ID)
+                .resolveTemplate(ID, upstreamId)
+                .request(MediaType.APPLICATION_JSON)
+                .header(X_API_KEY, adminApiKey)
+                .delete());
+  }
 
-      if (response.getStatus() >= 200 && response.getStatus() < 300) {
-        logger.info("Deleted APISIX upstream: {}", upstreamId);
-        publishSuccessResult(event, UPSTREAM_DELETED_SUCCESSFULLY, upstreamId);
-      } else {
-        String errorMsg =
-            "Failed to delete APISIX upstream. Status: "
-                + response.getStatus()
-                + ", Body: "
-                + response.readEntity(String.class);
-        logger.error(errorMsg);
-        publishErrorResult(event, UPSTREAM_DELETE_FAILED_CODE, errorMsg);
-      }
-      response.close();
-
-    } catch (Exception e) {
-      logger.error("Failed to delete APISIX upstream: {}", upstreamId, e);
-      publishErrorResult(event, UPSTREAM_DELETE_FAILED_CODE, e.getMessage());
+  private Object extractUpstreamConfig(ConfigEvent event) {
+    ConfigValue configValue = event.payload().config().value();
+    if (configValue instanceof ApisixConfigValue apisixValue) {
+      return apisixValue.data();
     }
+    return configValue;
   }
 
   // ============== ROUTE OPERATIONS ==============
 
   private void createRoute(ConfigEvent event) {
-    try {
-      ConfigValue configValue = event.payload().config().value();
-      Object routeConfig = extractRouteConfig(configValue);
-
-      Response response =
-          client
-              .target(adminApiUrl)
-              .path(APISIX_ADMIN_ROUTES)
-              .request(MediaType.APPLICATION_JSON)
-              .header(X_API_KEY, adminApiKey)
-              .post(Entity.json(routeConfig));
-
-      if (response.getStatus() >= 200 && response.getStatus() < 300) {
-        logger.info("Created APISIX route successfully");
-        publishSuccessResult(event, "APISIX route created successfully", null);
-      } else {
-        String errorMsg =
-            "Failed to create APISIX route. Status: "
-                + response.getStatus()
-                + ", Body: "
-                + response.readEntity(String.class);
-        logger.error(errorMsg);
-        publishErrorResult(event, "ROUTE_CREATE_FAILED", errorMsg);
-      }
-      response.close();
-
-    } catch (Exception e) {
-      logger.error("Failed to create APISIX route", e);
-      publishErrorResult(event, "ROUTE_CREATE_FAILED", e.getMessage());
-    }
+    Object routeConfig = extractRouteConfig(event.payload().config().value());
+    executeApisixOperation(
+        AdapterOperation.ROUTE_CREATE,
+        AdapterErrorCode.APISIX_ROUTE_ERROR,
+        event,
+        "APISIX route created successfully",
+        null,
+        () ->
+            client
+                .target(adminApiUrl)
+                .path(APISIX_ADMIN_ROUTES)
+                .request(MediaType.APPLICATION_JSON)
+                .header(X_API_KEY, adminApiKey)
+                .post(Entity.json(routeConfig)));
   }
 
   private void updateRoute(String routeId, ConfigEvent event) {
-    try {
-      ConfigValue configValue = event.payload().config().value();
-      Object routeConfig = extractRouteConfig(configValue);
-
-      Response response =
-          client
-              .target(adminApiUrl)
-              .path(APISIX_ADMIN_ROUTES_ID)
-              .resolveTemplate(ID, routeId)
-              .request(MediaType.APPLICATION_JSON)
-              .header(X_API_KEY, adminApiKey)
-              .put(Entity.json(routeConfig));
-
-      if (response.getStatus() >= 200 && response.getStatus() < 300) {
-        logger.info("Updated APISIX route: {}", routeId);
-        publishSuccessResult(event, "APISIX route updated successfully", routeId);
-      } else {
-        String errorMsg =
-            "Failed to update APISIX route. Status: "
-                + response.getStatus()
-                + ", Body: "
-                + response.readEntity(String.class);
-        logger.error(errorMsg);
-        publishErrorResult(event, "ROUTE_UPDATE_FAILED", errorMsg);
-      }
-      response.close();
-
-    } catch (Exception e) {
-      logger.error("Failed to update APISIX route: {}", routeId, e);
-      publishErrorResult(event, "ROUTE_UPDATE_FAILED", e.getMessage());
-    }
+    Object routeConfig = extractRouteConfig(event.payload().config().value());
+    executeApisixOperation(
+        AdapterOperation.ROUTE_UPDATE,
+        AdapterErrorCode.APISIX_ROUTE_ERROR,
+        event,
+        "APISIX route updated successfully",
+        routeId,
+        () ->
+            client
+                .target(adminApiUrl)
+                .path(APISIX_ADMIN_ROUTES_ID)
+                .resolveTemplate(ID, routeId)
+                .request(MediaType.APPLICATION_JSON)
+                .header(X_API_KEY, adminApiKey)
+                .put(Entity.json(routeConfig)));
   }
 
   private void deleteRoute(String routeId, ConfigEvent event) {
-    try {
-      Response response =
-          client
-              .target(adminApiUrl)
-              .path(APISIX_ADMIN_ROUTES_ID)
-              .resolveTemplate(ID, routeId)
-              .request(MediaType.APPLICATION_JSON)
-              .header(X_API_KEY, adminApiKey)
-              .delete();
-
-      if (response.getStatus() >= 200 && response.getStatus() < 300) {
-        logger.info("Deleted APISIX route: {}", routeId);
-        publishSuccessResult(event, "APISIX route deleted successfully", routeId);
-      } else {
-        String errorMsg =
-            "Failed to delete APISIX route. Status: "
-                + response.getStatus()
-                + ", Body: "
-                + response.readEntity(String.class);
-        logger.error(errorMsg);
-        publishErrorResult(event, "ROUTE_DELETE_FAILED", errorMsg);
-      }
-      response.close();
-
-    } catch (Exception e) {
-      logger.error("Failed to delete APISIX route: {}", routeId, e);
-      publishErrorResult(event, "ROUTE_DELETE_FAILED", e.getMessage());
-    }
+    executeApisixOperation(
+        AdapterOperation.ROUTE_DELETE,
+        AdapterErrorCode.APISIX_ROUTE_ERROR,
+        event,
+        "APISIX route deleted successfully",
+        routeId,
+        () ->
+            client
+                .target(adminApiUrl)
+                .path(APISIX_ADMIN_ROUTES_ID)
+                .resolveTemplate(ID, routeId)
+                .request(MediaType.APPLICATION_JSON)
+                .header(X_API_KEY, adminApiKey)
+                .delete());
   }
 
   /**
@@ -459,55 +413,33 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   // ============== RESULT PUBLISHING ==============
 
+  /**
+   * Publishes a success result event to the result topic. Exceptions from the publisher are
+   * propagated to be handled by the KafkaEventHandler's retry/DLQ logic.
+   *
+   * @param originalEvent the original config event
+   * @param message the success message
+   * @param resourceId the created/updated resource ID (may be null)
+   */
   private void publishSuccessResult(ConfigEvent originalEvent, String message, String resourceId) {
     if (getEventPublisher() == null || originalEvent.metadata().resultTopic() == null) {
       return;
     }
 
-    try {
-      ConfigResultEvent resultEvent =
-          ConfigResultEvent.success(
-              originalEvent.metadata().correlationId(),
-              originalEvent.metadata().messageId(),
-              message,
-              resourceId,
-              originalEvent.payload().operation(),
-              originalEvent.payload().targetResource(),
-              APISIX_SOURCE,
-              APISIX_RESULT_TYPE);
+    ConfigResultEvent resultEvent =
+        ConfigResultEvent.success(
+            originalEvent.metadata().correlationId(),
+            originalEvent.metadata().messageId(),
+            message,
+            resourceId,
+            originalEvent.payload().operation(),
+            originalEvent.payload().targetResource(),
+            APISIX_SOURCE,
+            APISIX_RESULT_TYPE);
 
-      getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
-      logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
-
-    } catch (Exception e) {
-      logger.error("Failed to publish success result", e);
-    }
-  }
-
-  private void publishErrorResult(
-      ConfigEvent originalEvent, String errorCode, String errorMessage) {
-    if (getEventPublisher() == null || originalEvent.metadata().resultTopic() == null) {
-      return;
-    }
-
-    try {
-      ConfigResultEvent resultEvent =
-          ConfigResultEvent.failure(
-              originalEvent.metadata().correlationId(),
-              originalEvent.metadata().messageId(),
-              errorCode,
-              errorMessage,
-              originalEvent.payload().operation(),
-              originalEvent.payload().targetResource(),
-              APISIX_SOURCE,
-              APISIX_RESULT_TYPE);
-
-      getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
-      logger.debug("Published FAILURE result to topic: {}", originalEvent.metadata().resultTopic());
-
-    } catch (Exception e) {
-      logger.error("Failed to publish error result", e);
-    }
+    // Exceptions propagate to KafkaEventHandler for retry/DLQ handling
+    getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
+    logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
   }
 
   @Override
@@ -520,4 +452,52 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   /** Helper record to hold parsed resource information */
   private record ResourceInfo(String type, String id) {}
+
+  /** Functional interface for HTTP request operations. */
+  @FunctionalInterface
+  private interface HttpRequestOperation {
+    Response execute() throws Exception;
+  }
+
+  /**
+   * Template method for executing APISIX operations with standardized error handling.
+   *
+   * @param operation the adapter operation being performed
+   * @param errorCode the error code for fatal errors
+   * @param event the original config event
+   * @param successMessage the message to log/publish on success
+   * @param resourceId the resource ID (may be null for create operations)
+   * @param requestOperation the HTTP request to execute
+   */
+  private void executeApisixOperation(
+      AdapterOperation operation,
+      AdapterErrorCode errorCode,
+      ConfigEvent event,
+      String successMessage,
+      String resourceId,
+      HttpRequestOperation requestOperation) {
+    Response response = null;
+    try {
+      response = requestOperation.execute();
+      handleHttpResponse(response, errorCode, operation);
+      logger.info(successMessage);
+      publishSuccessResult(event, successMessage, resourceId);
+    } catch (ProcessingException e) {
+      throw wrapNetworkException(e, operation);
+    } catch (FatalAdapterException | RetryableAdapterException e) {
+      throw e;
+    } catch (Exception e) {
+      logger.error("Failed to execute {}", operation.getDescription(), e);
+      throw new FatalAdapterException(
+          errorCode, e, operation.getDescription() + " failed: " + e.getMessage());
+    } finally {
+      closeResponse(response);
+    }
+  }
+
+  private void closeResponse(Response response) {
+    if (response != null) {
+      response.close();
+    }
+  }
 }
