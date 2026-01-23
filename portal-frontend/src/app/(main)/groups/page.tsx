@@ -10,13 +10,13 @@ import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
-import { useQueryParams } from '@/hooks/useQueryParams'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
 
-import GroupsTable from './components/GroupsTable'
+import { GroupsTable } from './components/GroupsTable'
 
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {

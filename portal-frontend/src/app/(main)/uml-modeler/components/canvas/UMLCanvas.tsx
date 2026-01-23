@@ -13,7 +13,7 @@ import {
 } from '@xyflow/react'
 import { useCallback, useMemo } from 'react'
 
-import { useActiveDiagram } from '../../hooks/useActiveDiagram'
+import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import type { UMLElementType } from '../../types/uml'
 import { edgeTypes as umlEdgeTypes } from '../edges/edgeTypes'
 import { UMLMarkers } from '../edges/UMLMarkers'

@@ -11,7 +11,7 @@ import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { useQueryParams } from '@/hooks/useQueryParams'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { FormRole, Role, ROLE_ORIGINS, roleSchema } from '@/types/roles'
 
 import { DEFAULT_TAB } from '../page'
@@ -33,12 +33,12 @@ const defaultRole: Role = {
   roleOrigin: ROLE_ORIGINS.CUSTOM,
 }
 
-type Props = {
+interface RoleDetailsProps {
   roleId?: string
   isEditMode?: boolean
 }
 
-export const RoleDetails = (props: Props): JSX.Element => {
+export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const { roleId, isEditMode = false } = props
   const tRoles = useTranslations('roles')
   const router = useRouter()

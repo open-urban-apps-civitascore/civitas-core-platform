@@ -3,7 +3,7 @@
 import { ChangeEvent, useCallback } from 'react'
 
 import { MULTIPLICITY_VALUES } from '../../constants/umlTypes'
-import { useActiveDiagram } from '../../hooks/useActiveDiagram'
+import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import type { UMLEdge } from '../../types/diagram'
 import type { UMLRelationshipType } from '../../types/uml'
 

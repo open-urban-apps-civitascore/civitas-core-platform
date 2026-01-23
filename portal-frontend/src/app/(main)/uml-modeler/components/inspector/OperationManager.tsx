@@ -4,7 +4,7 @@ import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useState } from 'react'
 
 import { UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
-import { useActiveDiagram } from '../../hooks/useActiveDiagram'
+import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import type { UMLElement, UMLOperation, UMLParameter, UMLPrimitiveType, Visibility } from '../../types/uml'
 
 interface OperationManagerProps {

@@ -5,7 +5,7 @@ import { type JSX } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { PermissionItem } from '@/types/permissions'
 
-type CategoryListProps = {
+interface CategoryListProps {
   permissionList: PermissionItem[]
   checkedItems: PermissionItem[]
   setCheckedItems: (items: PermissionItem[]) => void

@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { Button } from '@/components/ui/button'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
@@ -18,7 +18,7 @@ import { flattenGroups } from '@/utils/groups'
 import { GroupAssignmentModal } from './GroupAssignmentModal'
 import { GroupTable } from './GroupTable'
 
-type GroupAssignmentTabProps = {
+interface GroupAssignmentTabProps {
   assignedGroupIds: Group['id'][]
   onGroupAssignmentUpdate: (newGroupIds: string[]) => void
   roleName: Role['name']

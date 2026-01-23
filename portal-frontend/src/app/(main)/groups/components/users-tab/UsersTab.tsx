@@ -8,15 +8,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { usePatchGroup } from '@/app/services/api/groups/clientRequests'
 import { useGetAuthorities, useGetUsers } from '@/app/services/api/users/clientRequests'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
-import { useQueryParams } from '@/hooks/useQueryParams'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { Group, GroupTabProps } from '@/types/groups'
 import { mapGroupListUsers } from '@/utils/users'
 
 import { AssignUsersModal } from './AssignUsersModal'
-import UsersTable from './UsersTable'
+import { UsersTable } from './UsersTable'
 
 interface UsersTabProps extends GroupTabProps {
   groupData: Group

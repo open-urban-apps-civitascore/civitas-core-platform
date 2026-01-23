@@ -8,8 +8,8 @@ import { useGetPermissions } from '@/app/services/api/permissions/clientRequests
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
-import { useQueryParams } from '@/hooks/useQueryParams'
+import { SearchHeader } from '@/components/search-area/SearchArea'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { Item } from '@/types/common'
 import { Permission, PermissionItem } from '@/types/permissions'
 import { ROLE_ORIGINS, ROLE_TYPES } from '@/types/roles'
@@ -17,7 +17,7 @@ import { ROLE_ORIGINS, ROLE_TYPES } from '@/types/roles'
 import { CategoryList } from './CategoryList'
 import { RoleTemplateSelect } from './RoleTemplateSelect'
 
-type PermissionsTabProps = {
+interface PermissionsTabProps {
   onPermissionUpdate: (permissionIds: string[]) => void
   currentSelectedPermissionIds?: Permission['id'][]
   roleType: string

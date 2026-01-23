@@ -9,7 +9,7 @@ import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { useQueryParams } from '@/hooks/useQueryParams'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
 
 import Icon from '../../../../../public/svg/info.svg'
@@ -22,7 +22,7 @@ interface GroupDetailsProps {
   groupData: Group
   isEditMode?: boolean
 }
-const GroupDetails = (props: GroupDetailsProps) => {
+export const GroupDetails = (props: GroupDetailsProps) => {
   const { title, groupData, isEditMode = false } = props
   const { subTabValue, setSubTabValueParam } = useQueryParams()
 
@@ -95,5 +95,3 @@ const GroupDetails = (props: GroupDetailsProps) => {
     </PageContainer>
   )
 }
-
-export default GroupDetails

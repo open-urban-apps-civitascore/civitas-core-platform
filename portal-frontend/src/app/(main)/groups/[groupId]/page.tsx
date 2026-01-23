@@ -7,9 +7,9 @@ import { useGetGroup } from '@/app/services/api/groups/clientRequests'
 import { ErrorPage } from '@/components/error-page/ErrorPage'
 import LoadingPage from '@/components/loading-page/LoadingPage'
 
-import GroupDetails from '../components/GroupDetails'
+import { GroupDetails } from '../components/GroupDetails'
 
-const UpdateGroupPage = () => {
+const EditGroupPage = () => {
   const params = useParams<{ groupId: string }>()
   const { groupId } = params
   const t = useTranslations('common')
@@ -27,4 +27,4 @@ const UpdateGroupPage = () => {
   return <GroupDetails title={groupData?.data.title || ''} groupData={groupData?.data} isEditMode />
 }
 
-export default UpdateGroupPage
+export default EditGroupPage

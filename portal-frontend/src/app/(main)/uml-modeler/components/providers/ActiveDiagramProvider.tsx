@@ -4,7 +4,7 @@ import type { Connection } from '@xyflow/react'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
 
 import { createUMLNode } from '../../constants/elementTemplates'
-import { ActiveDiagramProvider } from '../../hooks/useActiveDiagram'
+import { ActiveDiagramProvider } from '../../hooks/use-active-diagram'
 import {
   createEmptyDiagram,
   diagramReducer,

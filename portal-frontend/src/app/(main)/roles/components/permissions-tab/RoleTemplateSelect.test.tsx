@@ -17,8 +17,32 @@ vi.mock('next-intl', () => ({
 describe('RoleTemplateSelect', () => {
   const setRoleTemplate = vi.fn()
   const allRoles: Role[] = [
-    { id: '1', name: 'Admin', type: 'data', tenant: 'ExampleTenant', permissions: [], user: [], createdAt: '' },
-    { id: '2', name: 'User', type: 'data', tenant: 'ExampleTenant', permissions: [], user: [], createdAt: '' },
+    {
+      id: '1',
+      name: 'Admin',
+      type: 'data',
+      tenant: 'ExampleTenant',
+      permissions: [],
+      users: [],
+      createdAt: '',
+      lastUpdated: null,
+      updatedBy: null,
+      groups: [],
+      roleOrigin: 'default',
+    },
+    {
+      id: '2',
+      name: 'User',
+      type: 'data',
+      tenant: 'ExampleTenant',
+      permissions: [],
+      users: [],
+      createdAt: '',
+      lastUpdated: null,
+      updatedBy: null,
+      groups: [],
+      roleOrigin: 'default',
+    },
   ]
 
   it('renders the component with correct options', () => {

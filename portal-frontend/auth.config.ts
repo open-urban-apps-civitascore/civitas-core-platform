@@ -2,7 +2,7 @@
 import { JWT } from '@auth/core/jwt'
 import type { NextAuthConfig } from 'next-auth'
 
-import { isTokenExpired, refreshAccessToken } from './src/lib/token-utils'
+import { isTokenExpired, refreshAccessToken } from './src/lib/tokenUtils'
 
 export const authConfig = {
   session: {

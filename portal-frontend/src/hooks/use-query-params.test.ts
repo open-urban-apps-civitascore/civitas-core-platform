@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { QUERY_PARAMS } from '@/const/searchParams'
 
-import { useQueryParams } from './useQueryParams'
+import { useQueryParams } from './use-query-params'
 
 const push = vi.fn()
 let mockSearchParams: URLSearchParams
