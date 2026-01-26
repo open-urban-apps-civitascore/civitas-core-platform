@@ -11,13 +11,11 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class RoleInputDTO extends BaseInputDTO {
-  @NotBlank(message = "Name is required")
-  private String name;
+  @NotBlank(message = "Name is required") private String name;
 
   private String description;
 
-  @NotNull(message = "Role type is required")
-  private RoleType roleType;
+  @NotNull(message = "Role type is required") private RoleType roleType;
 
   private List<UUID> permissionIds;
 
