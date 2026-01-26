@@ -47,5 +47,5 @@ public class Role extends NamedEntity {
   private Set<Permission> permissions = new HashSet<>();
 
   @Column(name = "readonly", nullable = false, updatable = false)
-  private Boolean readonly = false;
+  private boolean readonly = false;
 }

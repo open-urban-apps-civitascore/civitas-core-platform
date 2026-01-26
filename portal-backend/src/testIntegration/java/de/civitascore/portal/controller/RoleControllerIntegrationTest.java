@@ -583,7 +583,7 @@ class RoleControllerIntegrationTest
     @DisplayName("Should fail to update protected role")
     void shouldFailToUpdateProtectedRole() {
       RoleInputDTO input = createValidInput();
-      input.setIsReadonly(true);
+      input.setReadonly(true);
 
       ResponseEntity<RoleOutputDTO> createResponse = performCreate(input);
 
@@ -648,7 +648,7 @@ class RoleControllerIntegrationTest
     @DisplayName("Should fail to delete protected role")
     void shouldFailToDeleteProtectedRole() {
       RoleInputDTO input = createValidInput();
-      input.setIsReadonly(true);
+      input.setReadonly(true);
 
       ResponseEntity<RoleOutputDTO> createResponse = performCreate(input);
 
