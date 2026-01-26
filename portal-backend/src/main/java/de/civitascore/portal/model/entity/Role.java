@@ -45,4 +45,7 @@ public class Role extends NamedEntity {
       joinColumns = @JoinColumn(name = "role_id"),
       inverseJoinColumns = @JoinColumn(name = "permission_id"))
   private Set<Permission> permissions = new HashSet<>();
+
+  @Column(name = "readonly", nullable = false, updatable = false)
+  private boolean readonly = false;
 }

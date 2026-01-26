@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -31,7 +32,7 @@ public class CustomJwtAuthenticationConverter
 
   @Override
   public AbstractAuthenticationToken convert(Jwt jwt) {
-    String userId = jwt.getClaimAsString(CLAIM_SUB);
+    UUID userId = UUID.fromString(jwt.getClaimAsString(CLAIM_SUB));
     String username = jwt.getClaimAsString(CLAIM_PREFERRED_USERNAME);
     String email = jwt.getClaimAsString(CLAIM_EMAIL);
     String tenant = extractTenantId(jwt);

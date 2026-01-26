@@ -2,6 +2,7 @@ package de.civitascore.portal.security.dto;
 
 import de.civitascore.portal.model.embedded.UserTitleType;
 import java.util.Collection;
+import java.util.UUID;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Getter;
@@ -15,7 +16,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 @Data
 public class PrincipalUserDetails implements UserDetails {
   @Builder.Default private final UserTitleType title = UserTitleType.OTHER;
-  private final String userId;
+  private final UUID userId;
   private final String username;
   private final String email;
   private final String tenantId;

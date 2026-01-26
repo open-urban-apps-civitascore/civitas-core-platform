@@ -7,7 +7,8 @@ import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceNotFoundException;
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -42,19 +43,19 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   protected Assignment postConvertToEntity(Assignment entity, AssignmentInputDTO input) {
 
     if (input.getGroupId() != null) {
-      entity.setGroup(groupService.findById(input.getGroupId()));
+      entity.setGroup(groupService.findByIdOrThrow(input.getGroupId()));
     } else {
       entity.setGroup(null);
     }
 
     if (input.getRoleId() != null) {
-      entity.setRole(roleService.findById(input.getRoleId()));
+      entity.setRole(roleService.findByIdOrThrow(input.getRoleId()));
     } else {
       entity.setRole(null);
     }
 
     if (input.getParentAssignmentId() != null) {
-      entity.setParentAssignment(findById(input.getParentAssignmentId()));
+      entity.setParentAssignment(findByIdOrThrow(input.getParentAssignmentId()));
     } else {
       entity.setParentAssignment(null);
     }
@@ -68,12 +69,8 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
    * query problems that would occur with lazy loading.
    */
   @Override
-  public Assignment findById(UUID id) {
-    preProcessLoad(id);
-    Assignment entity =
-        assignmentRepository
-            .findByIdWithRelations(id)
-            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+  public Optional<Assignment> findById(UUID id) {
+    Optional<Assignment> entity = assignmentRepository.findByIdWithRelations(id);
     return postLoad(entity);
   }
 
@@ -102,5 +99,9 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
       throw new RuntimeException("Failed to process update input", e);
     }
     return super.preProcessUpdateInput(input, existingEntity);
+  }
+
+  public List<Assignment> findAllByRoleId(UUID roleId) {
+    return getRepository().findAllByRoleId(roleId);
   }
 }

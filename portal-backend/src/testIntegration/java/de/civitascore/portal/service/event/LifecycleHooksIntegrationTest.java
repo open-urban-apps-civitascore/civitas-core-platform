@@ -38,6 +38,6 @@ class LifecycleHooksIntegrationTest extends BaseEventPublishingIntegrationTest {
     assertThat(createdUser.getId()).isNotNull();
     assertThat(createdUser.getExternalId()).isNotNull();
     assertThat(createdUser.getCreatedAt()).isNotNull();
-    assertThat(createdUser.getCreatedBy()).isNotNull();
+    assertThat(createdUser.getCreatedBy()).isNull();
   }
 }

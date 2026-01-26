@@ -12,7 +12,6 @@ import de.civitascore.portal.repository.DataSetSeriesRepository;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Optional;
@@ -75,19 +74,15 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
    * that would occur with lazy loading.
    */
   @Override
-  public DataSet findById(UUID id) {
-    preProcessLoad(id);
-    DataSet entity =
-        dataSetRepository
-            .findByIdWithRelations(id)
-            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+  public Optional<DataSet> findById(UUID id) {
+    Optional<DataSet> entity = dataSetRepository.findByIdWithRelations(id);
     return postLoad(entity);
   }
 
   @Override
   protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
     Optional.ofNullable(input.getOwnerUserId())
-        .map(userService::findById)
+        .map(userService::findByIdOrThrow)
         .ifPresentOrElse(entity::setOwner, () -> entity.setOwner(null));
 
     // Set dataSetSeries

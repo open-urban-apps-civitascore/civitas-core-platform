@@ -41,12 +41,12 @@ public abstract class BaseEntity implements Serializable {
   protected LocalDateTime modifiedAt;
 
   @CreatedBy
-  @Column(name = "created_by", updatable = false, length = 255)
-  protected String createdBy;
+  @Column(name = "created_by", updatable = false)
+  protected UUID createdBy;
 
   @LastModifiedBy
-  @Column(name = "modified_by", length = 255)
-  protected String modifiedBy;
+  @Column(name = "modified_by")
+  protected UUID modifiedBy;
 
   @Override
   public boolean equals(Object o) {

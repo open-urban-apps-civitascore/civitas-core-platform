@@ -1,6 +1,7 @@
 package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.entity.Assignment;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -22,4 +23,15 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
   @EntityGraph(attributePaths = {"group", "role", "parentAssignment"})
   @Query("SELECT a FROM Assignment a WHERE a.id = :id")
   Optional<Assignment> findByIdWithRelations(@Param("id") UUID id);
+
+  /**
+   * Find all assignments for the given role ID with groups eagerly fetched. This prevents N+1 query
+   * problems when loading assignments with their roles.
+   *
+   * @param roleId the role ID
+   * @return the assignments with eagerly fetched roles
+   */
+  @EntityGraph(attributePaths = {"group"})
+  @Query("SELECT a FROM Assignment a WHERE a.role.id = :roleId")
+  List<Assignment> findAllByRoleId(@Param("roleId") UUID roleId);
 }

@@ -27,7 +27,7 @@ public class CatalogDcatController extends DcatController {
 
   @GetMapping("/{id}")
   public ResponseEntity<String> getById(@PathVariable UUID id) {
-    Catalog catalog = catalogService.findById(id);
+    Catalog catalog = catalogService.findByIdOrThrow(id);
     CatalogOutputDTO catalogOutputDTO = catalogMapper.toOutput(catalog);
     Model model = catalogDcatMapper.toModel(catalogOutputDTO);
     return ResponseEntity.ok().body(toJsonLd(model));
