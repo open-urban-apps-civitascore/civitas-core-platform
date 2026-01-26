@@ -90,23 +90,34 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
 
-  const handleSaveSubmit = (formData: DatasourceFormData) => {
-    const data = {
-      id: formData.id,
-      name: formData.name,
-      description: formData.description,
-      tags: formData.tags,
-      status: formData.status,
+  const submitDatasource = (onSuccess: (data: DatasourceFormData) => void) => {
+    const submitHandler = (formData: DatasourceFormData) => {
+      const data = {
+        id: formData.id,
+        name: formData.name,
+        description: formData.description,
+        tags: formData.tags,
+        status: formData.status,
+      }
+      updateDatasource.mutate(data, { onSuccess: () => onSuccess(data) })
     }
-    updateDatasource.mutate(data, {
-      onSuccess: () => {
-        form.reset(data)
-        router.refresh()
-      },
-    })
+
+    if (statusWatch === DATASOURCE_STATUS_TYPES.DRAFT) {
+      // In draft mode, only validate name (always required) and bypass other validation
+      if (nameWatch.length > 0) {
+        submitHandler(form.getValues())
+      }
+    } else {
+      form.handleSubmit(submitHandler)()
+    }
   }
 
-  const handleSave = form.handleSubmit(handleSaveSubmit)
+  const handleSave = () => {
+    submitDatasource(data => {
+      form.reset(data)
+      router.refresh()
+    })
+  }
 
   const handleExit = () => {
     if (form.formState.isDirty) {
@@ -121,28 +132,17 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     router.push(`/datasources?${searchParams.toString()}`)
   }
 
-  const handleSaveAndExitSubmit = (formData: DatasourceFormData) => {
-    const data = {
-      id: formData.id,
-      name: formData.name,
-      description: formData.description,
-      tags: formData.tags,
-      status: formData.status,
-    }
-    updateDatasource.mutate(data, {
-      onSuccess: () => {
-        setIsExitModalOpen(false)
-        router.push(`/datasources?${searchParams.toString()}`)
-      },
+  const handleSaveAndExit = () => {
+    submitDatasource(() => {
+      setIsExitModalOpen(false)
+      router.push(`/datasources?${searchParams.toString()}`)
     })
   }
-
-  const handleSaveAndExit = form.handleSubmit(handleSaveAndExitSubmit)
 
   const renderTabContent = () => {
     switch (selectedTab) {
       case 'basicInfo':
-        return <BasicInfoTab form={form} />
+        return <BasicInfoTab form={form} isDraftMode={statusWatch === DATASOURCE_STATUS_TYPES.DRAFT} />
       case 'connector':
       case 'dataStructure':
       case 'accessPermissions':
@@ -176,7 +176,12 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
               data-testid="saveButton"
               type="button"
               onClick={handleSave}
-              disabled={!form.formState.isDirty || Object.keys(form.formState.errors).length > 0 || isLoading}
+              disabled={
+                !form.formState.isDirty ||
+                !!form.formState.errors.name ||
+                (statusWatch !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
+                isLoading
+              }
             >
               {tCommon('actions.submit')}
             </Button>
