@@ -19,8 +19,8 @@ spring:
       resourceserver:
         jwt:
           jwk-set-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}/protocol/openid-connect/certs"
-          # Token issuer validation
-          issuer-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}"
+          # Token issuer validation - uses external URL that matches token issuer
+          issuer-uri: "${keycloak.issuer-uri}/realms/${keycloak.realm}"
 
   # Kafka Configuration
   kafka:
