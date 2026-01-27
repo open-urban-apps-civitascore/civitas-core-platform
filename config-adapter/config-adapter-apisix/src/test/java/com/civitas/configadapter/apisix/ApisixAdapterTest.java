@@ -12,6 +12,7 @@ package com.civitas.configadapter.apisix;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,7 +23,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.civitas.configadapter.configuration.AdapterConfig;
+import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
+import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
@@ -188,14 +192,13 @@ class ApisixAdapterTest {
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "upstreams", upstreamConfig);
 
-      adapter.processConfigEvent("core.civitas.api.backend.created", event);
+      FatalAdapterException exception =
+          assertThrows(
+              FatalAdapterException.class,
+              () -> adapter.processConfigEvent("core.civitas.api.backend.created", event));
 
-      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
-      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
-
-      ConfigResultEvent result = captor.getValue();
-      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
-      assertEquals("UPSTREAM_CREATE_FAILED", result.errorCode());
+      assertEquals(AdapterErrorCode.APISIX_UPSTREAM_ERROR, exception.getErrorCode());
+      assertTrue(exception.getMessage().contains("HTTP 400"));
     }
 
     @Test
@@ -207,14 +210,12 @@ class ApisixAdapterTest {
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "upstreams", upstreamConfig);
 
-      adapter.processConfigEvent("core.civitas.api.backend.created", event);
+      RetryableAdapterException exception =
+          assertThrows(
+              RetryableAdapterException.class,
+              () -> adapter.processConfigEvent("core.civitas.api.backend.created", event));
 
-      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
-      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
-
-      ConfigResultEvent result = captor.getValue();
-      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
-      assertEquals("UPSTREAM_CREATE_FAILED", result.errorCode());
+      assertEquals(AdapterErrorCode.NETWORK_ERROR, exception.getErrorCode());
     }
 
     @Test
@@ -262,14 +263,12 @@ class ApisixAdapterTest {
       Map<String, Object> config = Map.of("key", "value");
       ConfigEvent event = createConfigEvent(Operation.CREATE, "services/test-service", config);
 
-      adapter.processConfigEvent("core.civitas.api.backend.created", event);
+      FatalAdapterException exception =
+          assertThrows(
+              FatalAdapterException.class,
+              () -> adapter.processConfigEvent("core.civitas.api.backend.created", event));
 
-      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
-      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
-
-      ConfigResultEvent result = captor.getValue();
-      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
-      assertEquals("UNKNOWN_RESOURCE_TYPE", result.errorCode());
+      assertEquals(AdapterErrorCode.INVALID_RESOURCE_TYPE, exception.getErrorCode());
     }
 
     // ============== ROUTE OPERATION TESTS ==============
@@ -314,14 +313,13 @@ class ApisixAdapterTest {
 
       ConfigEvent event = createRouteConfigEvent(Operation.CREATE, "routes", routeConfig);
 
-      adapter.processConfigEvent("core.civitas.api.route.created", event);
+      FatalAdapterException exception =
+          assertThrows(
+              FatalAdapterException.class,
+              () -> adapter.processConfigEvent("core.civitas.api.route.created", event));
 
-      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
-      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
-
-      ConfigResultEvent result = captor.getValue();
-      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
-      assertEquals("ROUTE_CREATE_FAILED", result.errorCode());
+      assertEquals(AdapterErrorCode.APISIX_ROUTE_ERROR, exception.getErrorCode());
+      assertTrue(exception.getMessage().contains("HTTP 400"));
     }
 
     @Test
@@ -366,14 +364,13 @@ class ApisixAdapterTest {
       ConfigEvent event =
           createRouteConfigEvent(Operation.UPDATE, "routes/nonexistent-route", routeConfig);
 
-      adapter.processConfigEvent("core.civitas.api.route.updated", event);
+      FatalAdapterException exception =
+          assertThrows(
+              FatalAdapterException.class,
+              () -> adapter.processConfigEvent("core.civitas.api.route.updated", event));
 
-      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
-      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
-
-      ConfigResultEvent result = captor.getValue();
-      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
-      assertEquals("ROUTE_UPDATE_FAILED", result.errorCode());
+      assertEquals(AdapterErrorCode.APISIX_ROUTE_ERROR, exception.getErrorCode());
+      assertTrue(exception.getMessage().contains("HTTP 404"));
     }
 
     @Test
@@ -405,14 +402,13 @@ class ApisixAdapterTest {
       ConfigEvent event =
           createRouteConfigEvent(Operation.DELETE, "routes/nonexistent-route", null);
 
-      adapter.processConfigEvent("core.civitas.api.route.deleted", event);
+      FatalAdapterException exception =
+          assertThrows(
+              FatalAdapterException.class,
+              () -> adapter.processConfigEvent("core.civitas.api.route.deleted", event));
 
-      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
-      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
-
-      ConfigResultEvent result = captor.getValue();
-      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
-      assertEquals("ROUTE_DELETE_FAILED", result.errorCode());
+      assertEquals(AdapterErrorCode.APISIX_ROUTE_ERROR, exception.getErrorCode());
+      assertTrue(exception.getMessage().contains("HTTP 404"));
     }
 
     @Test
@@ -470,15 +466,13 @@ class ApisixAdapterTest {
 
       ConfigEvent event = createRouteConfigEvent(Operation.CREATE, "routes", routeConfig);
 
-      adapter.processConfigEvent("core.civitas.api.route.created", event);
+      RetryableAdapterException exception =
+          assertThrows(
+              RetryableAdapterException.class,
+              () -> adapter.processConfigEvent("core.civitas.api.route.created", event));
 
-      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
-      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
-
-      ConfigResultEvent result = captor.getValue();
-      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
-      assertEquals("ROUTE_CREATE_FAILED", result.errorCode());
-      assertTrue(result.message().contains("Connection refused"));
+      assertEquals(AdapterErrorCode.NETWORK_ERROR, exception.getErrorCode());
+      assertTrue(exception.isRetryable());
     }
 
     @Test
@@ -507,14 +501,23 @@ class ApisixAdapterTest {
     void testWithoutEventPublisher() {
       adapter.setEventPublisher(null);
 
+      when(mockResponse.getStatus()).thenReturn(200);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"success\":true}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
       Map<String, Object> upstreamConfig = Map.of("type", "roundrobin");
       ConfigEvent event = createConfigEvent(Operation.CREATE, "upstreams", upstreamConfig);
 
+      // Should not throw even without publisher
       adapter.processConfigEvent("core.civitas.api.backend.created", event);
     }
 
     @Test
     void testWithNullResultTopic() {
+      when(mockResponse.getStatus()).thenReturn(200);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"success\":true}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
       Map<String, Object> upstreamConfig = Map.of("type", "roundrobin");
 
       Metadata metadata =

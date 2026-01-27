@@ -13,9 +13,15 @@ package com.civitas.event.handler.kafka;
 import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.ApplicationConfig;
+import com.civitas.configadapter.exception.AdapterException;
+import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventConsumer;
 import com.civitas.configadapter.messaging.EventPublisher;
+import com.civitas.configadapter.model.AdapterErrorCode;
+import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.idm.IdmConfigValue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
@@ -23,12 +29,17 @@ import io.cloudevents.kafka.CloudEventDeserializer;
 import io.cloudevents.kafka.CloudEventSerializer;
 import java.net.URI;
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -37,7 +48,18 @@ import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
+/**
+ * Kafka event handler with robust error handling including:
+ *
+ * <ul>
+ *   <li>Blocking retries with exponential backoff for transient errors
+ *   <li>Dead Letter Queue (DLQ) for non-recoverable errors
+ *   <li>MDC-based correlation for structured logging
+ *   <li>Safe external messages (no PII, no stack traces)
+ * </ul>
+ */
 public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
   public static final String HANDLER_NAME = "kafka";
@@ -45,6 +67,23 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
   private static final String KAFKA_GROUP_ID = "kafka.group.id";
   private static final String KAFKA_BOOTSTRAP_SERVERS = "kafka.bootstrap.servers";
+
+  // Retry configuration keys
+  private static final String KAFKA_RETRY_MAX_ATTEMPTS = "kafka.retry.max.attempts";
+  private static final String KAFKA_RETRY_INITIAL_BACKOFF_MS = "kafka.retry.initial.backoff.ms";
+  private static final String KAFKA_DLQ_TOPIC = "kafka.dlq.topic";
+  private static final String KAFKA_PUBLISH_TIMEOUT_MS = "kafka.publish.timeout.ms";
+
+  // Default values
+  private static final int DEFAULT_MAX_RETRIES = 3;
+  private static final long DEFAULT_INITIAL_BACKOFF_MS = 1000L;
+  private static final String DEFAULT_DLQ_TOPIC = "core.civitas.idm.dlq";
+  private static final long DEFAULT_PUBLISH_TIMEOUT_MS = 5000L;
+
+  // MDC keys
+  private static final String MDC_CORRELATION_ID = "correlationId";
+  private static final String MDC_EVENT_ID = "eventId";
+  private static final String MDC_TOPIC = "topic";
 
   private KafkaConsumer<String, CloudEvent> kafkaConsumer;
   private KafkaProducer<String, CloudEvent> kafkaProducer;
@@ -54,33 +93,76 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   private Thread consumerThread;
   private boolean ready;
 
+  // Retry configuration
+  private int maxRetries;
+  private long initialBackoffMs;
+  private String dlqTopic;
+  private long publishTimeoutMs;
+
   public KafkaEventHandler() {}
 
-  /*
-   * (non-Javadoc)
-   * @see com.civitas.configadapter.messaging.EventConsumer#initialize(com.civitas.configadapter.configuration.ApplicationConfig, com.civitas.configadapter.adapter.ConfigAdapter)
-   */
   @Override
   public void initialize(ApplicationConfig config, ConfigAdapter adapter) {
     this.adapter = adapter;
     this.processor = new CloudEventProcessor(adapter);
 
+    loadRetryConfiguration(config);
+
+    String bootstrapServers = config.getProperty(KAFKA_BOOTSTRAP_SERVERS, "localhost:9092");
+    String groupId = config.getProperty(KAFKA_GROUP_ID, "config-adapter-group");
+
+    this.kafkaConsumer = new KafkaConsumer<>(createConsumerProperties(bootstrapServers, groupId));
+
+    List<String> topicList = new ArrayList<>(adapter.getSubscribedTopics());
+    subscribeToTopics(topicList);
+
+    this.kafkaProducer = new KafkaProducer<>(createProducerProperties(bootstrapServers));
+
+    adapter.setEventPublisher(this);
+
+    logInitialization(bootstrapServers, topicList);
+  }
+
+  private void loadRetryConfiguration(ApplicationConfig config) {
+    this.maxRetries =
+        Integer.parseInt(
+            config.getProperty(KAFKA_RETRY_MAX_ATTEMPTS, String.valueOf(DEFAULT_MAX_RETRIES)));
+    this.initialBackoffMs =
+        Long.parseLong(
+            config.getProperty(
+                KAFKA_RETRY_INITIAL_BACKOFF_MS, String.valueOf(DEFAULT_INITIAL_BACKOFF_MS)));
+    this.dlqTopic = config.getProperty(KAFKA_DLQ_TOPIC, DEFAULT_DLQ_TOPIC);
+    this.publishTimeoutMs =
+        Long.parseLong(
+            config.getProperty(
+                KAFKA_PUBLISH_TIMEOUT_MS, String.valueOf(DEFAULT_PUBLISH_TIMEOUT_MS)));
+  }
+
+  private Properties createConsumerProperties(String bootstrapServers, String groupId) {
     Properties props = new Properties();
-    String kafkaServerUrl = config.getProperty(KAFKA_BOOTSTRAP_SERVERS, "localhost:9092");
-    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServerUrl);
-    props.put(
-        ConsumerConfig.GROUP_ID_CONFIG, config.getProperty(KAFKA_GROUP_ID, "config-adapter-group"));
+    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
     props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
     props.put(
         ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, CloudEventDeserializer.class.getName());
     props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+    return props;
+  }
 
-    this.kafkaConsumer = new KafkaConsumer<>(props);
+  private Properties createProducerProperties(String bootstrapServers) {
+    Properties props = new Properties();
+    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    props.put(
+        ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+        org.apache.kafka.common.serialization.StringSerializer.class.getName());
+    props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CloudEventSerializer.class.getName());
+    props.put(ProducerConfig.ACKS_CONFIG, "all");
+    props.put(ProducerConfig.RETRIES_CONFIG, 3);
+    return props;
+  }
 
-    List<String> topicList = new ArrayList<>(adapter.getSubscribedTopics());
-    kafkaConsumer.subscribe(topicList);
-
+  private void subscribeToTopics(List<String> topicList) {
     kafkaConsumer.subscribe(
         topicList,
         new org.apache.kafka.clients.consumer.ConsumerRebalanceListener() {
@@ -98,41 +180,27 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
             logger.info("Partitions assigned: {} - Consumer ready", partitions);
           }
         });
+  }
 
-    // Initialize producer for publishing events
-    Properties producerProps = new Properties();
-    producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServerUrl);
-    producerProps.put(
-        ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
-        org.apache.kafka.common.serialization.StringSerializer.class.getName());
-    producerProps.put(
-        ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CloudEventSerializer.class.getName());
-    producerProps.put(ProducerConfig.ACKS_CONFIG, "all");
-    producerProps.put(ProducerConfig.RETRIES_CONFIG, 3);
-    // Don't set encoding - let CloudEventSerializer use its default behavior
-    // The serializer will choose binary or structured mode based on the CloudEvent
-
-    this.kafkaProducer = new KafkaProducer<>(producerProps);
-
-    // Inject this publisher into the adapter
-    adapter.setEventPublisher(this);
-
+  private void logInitialization(String bootstrapServers, List<String> topicList) {
     logger.info(
         "Kafka {} event consumer initialized for adapter {} with {} topic(s): {}",
-        kafkaServerUrl,
+        bootstrapServers,
         adapter.getClass().getSimpleName(),
         topicList.size(),
         topicList);
+    logger.info(
+        "Retry configuration: maxRetries={}, initialBackoffMs={}, dlqTopic={}, publishTimeoutMs={}",
+        maxRetries,
+        initialBackoffMs,
+        dlqTopic,
+        publishTimeoutMs);
   }
 
   public boolean isReady() {
     return ready;
   }
 
-  /*
-   * (non-Javadoc)
-   * @see com.civitas.configadapter.messaging.EventConsumer#getName()
-   */
   @Override
   public String getName() {
     return HANDLER_NAME;
@@ -157,31 +225,18 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
             continue;
           }
 
-          boolean batchSuccess = true;
           for (var record : records) {
+            setupMDC(record);
             try {
-              processor.handleEvent(record.topic(), record.value());
-            } catch (Exception e) {
-              logger.error(
-                  "Critical error processing event ID {}. Stopping consumer to prevent data loss.",
-                  record.value().getId(),
-                  e);
-              batchSuccess = false;
-              running.set(false);
-              break;
-            }
-          }
-
-          if (batchSuccess && running.get()) {
-            try {
+              processWithRetry(record);
+              // Commit after each successful processing to maintain event ordering
               kafkaConsumer.commitSync();
-            } catch (Exception commitException) {
-              logger.error("Failed to commit offsets", commitException);
-              running.set(false);
+            } finally {
+              clearMDC();
             }
           }
         } catch (Exception e) {
-          logger.error("Error consuming messages", e);
+          logger.error("Error in consumption loop", e);
           if (!running.get()) {
             break;
           }
@@ -192,6 +247,206 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
     } finally {
       ready = false;
       logger.info("Consumption loop ended");
+    }
+  }
+
+  /**
+   * Sets up MDC context for structured logging.
+   *
+   * @param record the Kafka record being processed
+   */
+  private void setupMDC(ConsumerRecord<String, CloudEvent> record) {
+    CloudEvent event = record.value();
+    if (event != null) {
+      MDC.put(MDC_EVENT_ID, event.getId());
+      MDC.put(MDC_TOPIC, record.topic());
+
+      // Extract correlation ID from CloudEvent extension
+      Object correlationId = event.getExtension("correlationid");
+      if (correlationId != null) {
+        MDC.put(MDC_CORRELATION_ID, correlationId.toString());
+      } else {
+        // Fallback to event ID if no correlation ID
+        MDC.put(MDC_CORRELATION_ID, event.getId());
+      }
+    }
+  }
+
+  /** Clears MDC context after processing. */
+  private void clearMDC() {
+    MDC.remove(MDC_CORRELATION_ID);
+    MDC.remove(MDC_EVENT_ID);
+    MDC.remove(MDC_TOPIC);
+  }
+
+  /**
+   * Processes a record with blocking retry for transient errors.
+   *
+   * @param record the Kafka record to process
+   */
+  private void processWithRetry(ConsumerRecord<String, CloudEvent> record) {
+    int attempts = 0;
+
+    while (true) {
+      try {
+        processor.handleEvent(record.topic(), record.value());
+        logger.debug(
+            "Successfully processed event {} on attempt {}", record.value().getId(), attempts + 1);
+        return; // Success - exit retry loop
+      } catch (RetryableAdapterException e) {
+        attempts++;
+        if (attempts > maxRetries) {
+          logger.error(
+              "Max retries ({}) exceeded for event {}. Sending to DLQ. Error: {}",
+              maxRetries,
+              record.value().getId(),
+              e.getInternalMessage());
+          sendToDLQ(record, e);
+          return;
+        }
+
+        long backoff = calculateBackoff(attempts);
+        logger.warn(
+            "Retryable error processing event {} (attempt {}/{}). Retrying in {}ms. Error: {}",
+            record.value().getId(),
+            attempts,
+            maxRetries,
+            backoff,
+            e.getInternalMessage());
+
+        try {
+          Thread.sleep(backoff);
+        } catch (InterruptedException ie) {
+          Thread.currentThread().interrupt();
+          logger.warn("Retry sleep interrupted for event {}", record.value().getId());
+          sendToDLQ(record, e);
+          return;
+        }
+      } catch (FatalAdapterException e) {
+        logger.error(
+            "Fatal error processing event {}. Sending to DLQ immediately. Error: {}",
+            record.value().getId(),
+            e.getInternalMessage());
+        sendToDLQ(record, e);
+        return;
+      } catch (Exception e) {
+        // Wrap unknown exceptions as fatal and send to DLQ
+        logger.error(
+            "Unexpected error processing event {}. Wrapping as fatal and sending to DLQ.",
+            record.value().getId(),
+            e);
+        FatalAdapterException wrapped =
+            new FatalAdapterException(AdapterErrorCode.UNKNOWN_ERROR, e, e.getMessage());
+        sendToDLQ(record, wrapped);
+        return;
+      }
+    }
+  }
+
+  /**
+   * Calculates exponential backoff delay.
+   *
+   * @param attempt the current attempt number (1-based)
+   * @return the backoff delay in milliseconds
+   */
+  private long calculateBackoff(int attempt) {
+    // Exponential backoff: initialBackoff * 2^(attempt-1)
+    // Cap at 30 seconds
+    long backoff = initialBackoffMs * (long) Math.pow(2, attempt - 1);
+    return Math.min(backoff, 30000L);
+  }
+
+  /**
+   * Sends a failed event to the Dead Letter Queue (DLQ) and publishes a failure result event. This
+   * method is synchronous to ensure data safety - if DLQ send fails, an exception is thrown so the
+   * event will be reprocessed on the next poll.
+   *
+   * @param record the original Kafka record
+   * @param exception the adapter exception that caused the failure
+   * @throws RuntimeException if DLQ send fails, causing the event to be reprocessed
+   */
+  private void sendToDLQ(ConsumerRecord<String, CloudEvent> record, AdapterException exception) {
+    CloudEvent originalEvent = record.value();
+
+    try {
+      // Build DLQ event with safe metadata (no stack traces, no PII)
+      CloudEvent dlqEvent =
+          CloudEventBuilder.from(originalEvent)
+              .withId(UUID.randomUUID().toString())
+              .withExtension("dlqerrorcode", String.valueOf(exception.getNumericCode()))
+              .withExtension("dlqerrormsg", exception.getSafeExternalMessage())
+              .withExtension("dlqoriginaltopic", record.topic())
+              .withExtension("dlqtimestamp", OffsetDateTime.now().toString())
+              .withExtension("dlqretrycount", String.valueOf(maxRetries))
+              .build();
+
+      // Synchronous send - critical for data safety
+      kafkaProducer
+          .send(new ProducerRecord<>(dlqTopic, dlqEvent))
+          .get(publishTimeoutMs, TimeUnit.MILLISECONDS);
+
+      logger.info("Sent event {} to DLQ topic {}", originalEvent.getId(), dlqTopic);
+
+      // Also publish failure result event if we can extract the original ConfigEvent
+      publishFailureResult(originalEvent, record.topic(), exception);
+
+    } catch (Exception e) {
+      logger.error(
+          "CRITICAL: Failed to send event {} to DLQ. Event will be reprocessed. Error: {}",
+          originalEvent.getId(),
+          e.getMessage(),
+          e);
+      // Throw exception so event is not committed and will be reprocessed
+      throw new RuntimeException("DLQ send failed - event will be reprocessed", e);
+    }
+  }
+
+  /**
+   * Publishes a failure result event for the failed original event.
+   *
+   * @param originalEvent the original CloudEvent that failed
+   * @param topic the original topic
+   * @param exception the adapter exception that caused the failure
+   */
+  private void publishFailureResult(
+      CloudEvent originalEvent, String topic, AdapterException exception) {
+    try {
+      if (originalEvent.getData() == null) {
+        logger.debug("Cannot publish failure result: original event has no data");
+        return;
+      }
+
+      ObjectMapper objectMapper = ObjectMapperFactory.createObjectMapper();
+      ConfigEvent configEvent =
+          objectMapper.readValue(originalEvent.getData().toBytes(), ConfigEvent.class);
+
+      if (configEvent.metadata() == null || configEvent.metadata().resultTopic() == null) {
+        logger.debug("Cannot publish failure result: no result topic in metadata");
+        return;
+      }
+
+      ConfigResultEvent failureResult =
+          ConfigResultEvent.failure(
+              configEvent.metadata().correlationId(),
+              configEvent.metadata().messageId(),
+              exception.getFullErrorIdentifier(),
+              exception.getSafeExternalMessage(),
+              configEvent.payload() != null ? configEvent.payload().operation() : null,
+              configEvent.payload() != null ? configEvent.payload().targetResource() : null,
+              adapter != null ? adapter.getName() : "unknown",
+              IdmConfigValue.IDM_RESULT_TYPE);
+
+      publish(configEvent.metadata().resultTopic(), failureResult);
+      logger.debug(
+          "Published failure result for event {} to topic {}",
+          originalEvent.getId(),
+          configEvent.metadata().resultTopic());
+
+    } catch (Exception e) {
+      logger.warn(
+          "Failed to publish failure result for event {}: {}",
+          originalEvent.getId(),
+          e.getMessage());
     }
   }
 
@@ -211,31 +466,46 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   @Override
   public void publish(String topic, ConfigResultEvent resultEvent) {
     CloudEvent cloudEvent = convertToCloudEvent(resultEvent);
-    try {
-      ProducerRecord<String, CloudEvent> record =
-          new ProducerRecord<>(topic, cloudEvent.getId(), cloudEvent);
+    ProducerRecord<String, CloudEvent> record =
+        new ProducerRecord<>(topic, cloudEvent.getId(), cloudEvent);
 
-      kafkaProducer.send(
-          record,
-          (metadata, exception) -> {
-            if (exception != null) {
-              logger.error(
-                  "Failed to publish result event {} to topic {}",
-                  cloudEvent.getId(),
-                  topic,
-                  exception);
-            } else {
-              logger.debug(
-                  "Published result event {} to topic {} partition {} offset {}",
-                  cloudEvent.getId(),
-                  metadata.topic(),
-                  metadata.partition(),
-                  metadata.offset());
-            }
-          });
-    } catch (Exception e) {
-      logger.error("Error publishing result event {} to topic {}", cloudEvent.getId(), topic, e);
+    try {
+      // Synchronous send with timeout
+      kafkaProducer.send(record).get(publishTimeoutMs, TimeUnit.MILLISECONDS);
+      logger.debug("Published result event {} to topic {}", cloudEvent.getId(), topic);
+
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      logger.error(
+          "Failed to publish event {} to {}: {}", cloudEvent.getId(), topic, cause.getMessage());
+
+      if (isRetryableKafkaError(cause)) {
+        throw new RetryableAdapterException(
+            AdapterErrorCode.PUBLISH_ERROR, cause, topic, cause.getMessage());
+      } else {
+        throw new FatalAdapterException(
+            AdapterErrorCode.PUBLISH_ERROR,
+            cause,
+            String.format("Failed to publish to %s: %s", topic, cause.getMessage()));
+      }
+    } catch (TimeoutException e) {
+      logger.error("Publish timeout for event {} to {}", cloudEvent.getId(), topic);
+      throw new RetryableAdapterException(
+          AdapterErrorCode.PUBLISH_TIMEOUT, e, topic, publishTimeoutMs);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RetryableAdapterException(AdapterErrorCode.PUBLISH_ERROR, e, topic, "interrupted");
     }
+  }
+
+  /**
+   * Determines if a Kafka error is retryable (transient) or permanent.
+   *
+   * @param cause the exception cause from Kafka
+   * @return true if the error is retryable, false otherwise
+   */
+  private boolean isRetryableKafkaError(Throwable cause) {
+    return cause instanceof org.apache.kafka.common.errors.RetriableException;
   }
 
   /**
@@ -299,6 +569,12 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   @Override
   public void close() {
     stop();
+    flushAndCloseProducer();
+    closeQuietly(kafkaConsumer, "Kafka consumer");
+    closeQuietly(adapter, "Adapter");
+  }
+
+  private void flushAndCloseProducer() {
     try {
       kafkaProducer.flush();
       kafkaProducer.close();
@@ -306,17 +582,34 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
     } catch (Exception e) {
       logger.error("Error closing Kafka producer", e);
     }
-    try {
-      kafkaConsumer.close();
-      logger.info("Kafka consumer closed");
-    } catch (Exception e) {
-      logger.error("Error closing Kafka consumer", e);
+  }
+
+  private void closeQuietly(AutoCloseable resource, String resourceName) {
+    if (resource == null) {
+      return;
     }
     try {
-      adapter.close();
-      logger.info("Adapter closed");
+      resource.close();
+      logger.info("{} closed", resourceName);
     } catch (Exception e) {
-      logger.error("Error closing adapter", e);
+      logger.error("Error closing {}", resourceName, e);
     }
+  }
+
+  // Getter methods for testing
+  int getMaxRetries() {
+    return maxRetries;
+  }
+
+  long getInitialBackoffMs() {
+    return initialBackoffMs;
+  }
+
+  String getDlqTopic() {
+    return dlqTopic;
+  }
+
+  long getPublishTimeoutMs() {
+    return publishTimeoutMs;
   }
 }

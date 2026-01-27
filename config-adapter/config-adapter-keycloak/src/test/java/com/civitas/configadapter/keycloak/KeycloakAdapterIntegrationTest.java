@@ -22,7 +22,9 @@ import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.configuration.ApplicationConfig;
+import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
+import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
@@ -641,7 +643,7 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldPublishErrorResultOnFailure() {
+  void shouldThrowFatalExceptionOnFailure() {
     // Given - try to update non-existent realm
     RealmConfig realmConfig = new RealmConfig();
     realmConfig.setRealm("non-existent-realm");
@@ -649,15 +651,15 @@ class KeycloakAdapterIntegrationTest {
     ConfigEvent event =
         createConfigEvent("non-existent-realm", "realm", Operation.UPDATE, realmConfig);
 
-    // When
-    adapter.processConfigEvent(Topics.REALM_UPDATED.toString(), event);
+    // When/Then - verify FatalAdapterException is thrown with correct error code
+    FatalAdapterException exception =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> adapter.processConfigEvent(Topics.REALM_UPDATED.toString(), event));
 
-    // Then - verify error result was published
-    assertEquals(1, eventPublisher.getPublishedEvents().size());
-    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals(ConfigResultEvent.Status.FAILURE, resultEvent.status());
-    assertNotNull(resultEvent.errorCode());
-    assertNotNull(resultEvent.message());
+    assertEquals(AdapterErrorCode.RESOURCE_NOT_FOUND, exception.getErrorCode());
+    assertNotNull(exception.getSafeExternalMessage());
+    assertFalse(exception.isRetryable());
   }
 
   @Test

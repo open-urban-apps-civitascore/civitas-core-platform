@@ -470,7 +470,39 @@ Examples (from `Topics` constants):
 - `core.civitas.idm.realm.created`
 - `core.civitas.idm.client.updated`
 
-All available topic constants are defined in `com.civitas.configadapter.model.Topics`.
+All available topic constants are defined in `com.civitas.configadapter.Topics`.
+
+### Configuration Split Pattern
+
+The framework supports two configuration patterns for event handling:
+
+#### Combined Handler Pattern (Recommended)
+
+Use a single handler that implements both `EventConsumer` and `EventPublisher`:
+
+```properties
+eventhandler.name=kafka
+```
+
+This is the recommended approach when both consumer and publisher use the same technology (e.g., Kafka).
+
+#### Separate Consumer/Publisher Pattern
+
+Use different implementations for consuming and publishing:
+
+```properties
+eventconsumer.name=kafka
+eventpublisher.name=rabbitmq
+```
+
+This pattern is useful when:
+- Events are consumed from one broker but results published to another
+- Different configurations are needed for consuming vs. publishing
+- Testing scenarios with mock publishers
+
+**Conflict Detection:**
+- If `eventhandler.name` is set, `eventconsumer.name` and `eventpublisher.name` are ignored
+- If both patterns are partially set, the application logs a warning
 
 ### Event Structure
 
@@ -506,6 +538,86 @@ All available topic constants are defined in `com.civitas.configadapter.model.To
         }
       }
     }
+  }
+}
+```
+
+### CloudEvent Result Format
+
+Result events are published as CloudEvents with extension attributes for correlation and status tracking.
+
+#### Result Event Extension Attributes
+
+| Extension Attribute | Description | Example |
+|---------------------|-------------|---------|
+| `correlationid` | Correlation ID from original event | `"corr-456"` |
+| `originalmessageid` | Message ID from original event | `"msg-123"` |
+| `status` | Processing status | `"SUCCESS"` or `"FAILURE"` |
+| `operation` | Operation performed | `"CREATE"`, `"UPDATE"`, `"DELETE"` |
+| `targetresource` | Target resource path | `"civitas-core"` |
+| `message` | Status message | `"User created successfully"` |
+| `resourceid` | Created/updated resource ID (SUCCESS only) | `"user-789"` |
+| `errorcode` | Error code identifier (FAILURE only) | `"KEYCLOAK_USER_ERROR(3004)"` |
+| `errormessage` | Error description (FAILURE only) | `"User operation failed"` |
+
+#### Success Result CloudEvent Example
+
+```json
+{
+  "specversion": "1.0",
+  "id": "result-uuid-123",
+  "type": "core.civitas.idm.processing.result",
+  "source": "civitas.config-adapter.keycloak",
+  "time": "2026-01-15T10:35:01+00:00",
+  "datacontenttype": "application/json",
+  "correlationid": "corr-456",
+  "originalmessageid": "msg-123",
+  "status": "SUCCESS",
+  "operation": "CREATE",
+  "targetresource": "civitas-core",
+  "resourceid": "user-789",
+  "message": "USER_CREATE_SUCCESS",
+  "data": {
+    "correlationId": "corr-456",
+    "originalMessageId": "msg-123",
+    "status": "SUCCESS",
+    "message": "USER_CREATE_SUCCESS",
+    "resourceId": "user-789",
+    "operation": "CREATE",
+    "targetResource": "civitas-core",
+    "timestamp": "2026-01-15T10:35:01+00:00",
+    "source": "civitas.config-adapter.keycloak"
+  }
+}
+```
+
+#### Failure Result CloudEvent Example
+
+```json
+{
+  "specversion": "1.0",
+  "id": "result-uuid-456",
+  "type": "core.civitas.idm.processing.result",
+  "source": "civitas.config-adapter.keycloak",
+  "time": "2026-01-15T10:35:01+00:00",
+  "datacontenttype": "application/json",
+  "correlationid": "corr-456",
+  "originalmessageid": "msg-123",
+  "status": "FAILURE",
+  "operation": "CREATE",
+  "targetresource": "civitas-core",
+  "errorcode": "KEYCLOAK_USER_ERROR(3004)",
+  "errormessage": "User operation failed",
+  "data": {
+    "correlationId": "corr-456",
+    "originalMessageId": "msg-123",
+    "status": "FAILURE",
+    "message": "User operation failed",
+    "operation": "CREATE",
+    "targetResource": "civitas-core",
+    "errorCode": "KEYCLOAK_USER_ERROR(3004)",
+    "timestamp": "2026-01-15T10:35:01+00:00",
+    "source": "civitas.config-adapter.keycloak"
   }
 }
 ```
@@ -632,6 +744,10 @@ Configuration is powered by **Apache Commons Configuration2**, providing robust 
 | `eventhandler.name` | `EVENTHANDLER_NAME` |
 | `eventconsumer.name` | `EVENTCONSUMER_NAME` |
 | `eventpublisher.name` | `EVENTPUBLISHER_NAME` |
+| `kafka.publish.timeout.ms` | `KAFKA_PUBLISH_TIMEOUT_MS` |
+| `kafka.retry.max.attempts` | `KAFKA_RETRY_MAX_ATTEMPTS` |
+| `kafka.retry.initial.backoff.ms` | `KAFKA_RETRY_INITIAL_BACKOFF_MS` |
+| `kafka.dlq.topic` | `KAFKA_DLQ_TOPIC` |
 
 ### Health Check Endpoints
 
@@ -757,9 +873,199 @@ spec:
 ```properties
 kafka.bootstrap.servers=localhost:9092
 kafka.group.id=config-adapter-group
+
+# Optional: Retry and publish configuration
+kafka.publish.timeout.ms=5000              # Timeout for synchronous publish (default: 5000ms)
+kafka.retry.max.attempts=3                 # Max retry attempts before DLQ (default: 3)
+kafka.retry.initial.backoff.ms=1000        # Initial backoff between retries (default: 1000ms)
+kafka.dlq.topic=core.civitas.idm.dlq       # Dead Letter Queue topic (default: core.civitas.idm.dlq)
 ```
 
 Note: Individual topics are not configured in properties. Each adapter declares its own topics via `getSubscribedTopics()`.
+
+### Error Handling & Retry Behavior
+
+The Kafka event handler implements robust error handling with blocking retries and Dead Letter Queue (DLQ) support.
+
+#### Exception Types
+
+| Exception Type | Behavior | Examples |
+|----------------|----------|----------|
+| `RetryableAdapterException` | Blocking retry with exponential backoff | Network timeouts, HTTP 5xx, rate limiting |
+| `FatalAdapterException` | Sent directly to DLQ | Validation errors, HTTP 4xx, resource not found |
+
+#### Retry Algorithm
+
+```
+backoff = initialBackoffMs × 2^(attempt-1)
+```
+
+- **Initial backoff:** Configurable via `kafka.retry.initial.backoff.ms` (default: 1000ms)
+- **Maximum backoff:** Capped at 30 seconds
+- **Max attempts:** Configurable via `kafka.retry.max.attempts` (default: 3)
+
+Example retry sequence with defaults:
+1. Attempt 1 fails → wait 1000ms
+2. Attempt 2 fails → wait 2000ms
+3. Attempt 3 fails → wait 4000ms (capped at 30s)
+4. Max retries exceeded → send to DLQ
+
+#### Dead Letter Queue (DLQ) Event Format
+
+When an event fails all retry attempts or encounters a fatal error, it is sent to the DLQ topic with additional metadata:
+
+| Extension Attribute | Description |
+|---------------------|-------------|
+| `dlqerrorcode` | Numeric error code (e.g., "1001", "2001") |
+| `dlqerrormsg` | Safe external error message (no PII, no stack traces) |
+| `dlqoriginaltopic` | Original Kafka topic the event came from |
+| `dlqtimestamp` | ISO 8601 timestamp when sent to DLQ |
+| `dlqretrycount` | Number of retry attempts made before DLQ |
+
+**Important:** DLQ publishing is synchronous to ensure no message loss. If DLQ send fails, the original event will be reprocessed on the next poll.
+
+#### Failure Result Event
+
+In addition to DLQ, a failure result event is published to the `resultTopic` (if specified in the original event metadata):
+
+```json
+{
+  "correlationId": "corr-456",
+  "originalMessageId": "msg-123",
+  "status": "FAILURE",
+  "errorCode": "KEYCLOAK_USER_ERROR(3004)",
+  "message": "User operation failed",
+  "operation": "CREATE",
+  "targetResource": "civitas-core",
+  "timestamp": "2026-01-15T10:35:00+00:00",
+  "source": "civitas.config-adapter.keycloak"
+}
+```
+
+### Error Codes Reference
+
+Error codes are categorized by type and severity:
+
+#### 1xxx - Validation/Fatal Errors (→ DLQ immediately)
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 1001 | `INVALID_PAYLOAD` | No | Invalid payload: %s | Validation failed |
+| 1002 | `RESOURCE_NOT_FOUND` | No | Resource not found: %s | Resource not found |
+| 1003 | `MISSING_CONFIG` | No | Missing config: %s | Configuration error |
+| 1004 | `UNSUPPORTED_OPERATION` | No | Operation %s not supported | Operation not supported |
+| 1005 | `INVALID_RESOURCE_TYPE` | No | Invalid resource type: %s | Invalid resource type |
+
+#### 2xxx - Connectivity/Retryable Errors (→ Blocking retry loop)
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 2001 | `CONNECTION_TIMEOUT` | Yes | Connection timeout to %s | Service temporarily unavailable |
+| 2002 | `SERVICE_UNAVAILABLE` | Yes | Service %s unavailable: HTTP %d | Service temporarily unavailable |
+| 2003 | `NETWORK_ERROR` | Yes | Network error to %s: %s | Service temporarily unavailable |
+| 2004 | `RATE_LIMITED` | Yes | Rate limited by %s | Service temporarily unavailable |
+| 2005 | `PUBLISH_ERROR` | Yes | Failed to publish event to %s: %s | Message delivery failed |
+| 2006 | `PUBLISH_TIMEOUT` | Yes | Publish timeout to %s after %d ms | Message delivery timeout |
+
+#### 3xxx - Adapter-Specific Errors
+
+**Keycloak Adapter (3001-3007):**
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 3001 | `KEYCLOAK_ERROR` | No | Keycloak error: %s | Identity provider error |
+| 3002 | `KEYCLOAK_CONFLICT` | No | Keycloak conflict: %s | Resource already exists |
+| 3003 | `KEYCLOAK_REALM_ERROR` | No | Keycloak realm error: %s | Realm operation failed |
+| 3004 | `KEYCLOAK_USER_ERROR` | No | Keycloak user error: %s | User operation failed |
+| 3005 | `KEYCLOAK_CLIENT_ERROR` | No | Keycloak client error: %s | Client operation failed |
+| 3006 | `KEYCLOAK_ROLE_ERROR` | No | Keycloak role error: %s | Role operation failed |
+| 3007 | `KEYCLOAK_GROUP_ERROR` | No | Keycloak group error: %s | Group operation failed |
+
+**APISIX Adapter (3101-3103):**
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 3101 | `APISIX_ERROR` | No | APISIX error: %s | Gateway error |
+| 3102 | `APISIX_ROUTE_ERROR` | No | APISIX route error: %s | Route operation failed |
+| 3103 | `APISIX_UPSTREAM_ERROR` | No | APISIX upstream error: %s | Upstream operation failed |
+
+#### 9xxx - Unknown/Unexpected Errors
+
+| Code | Name | Retryable | Internal Log Template | External Message |
+|------|------|-----------|----------------------|------------------|
+| 9001 | `UNKNOWN_ERROR` | No | Unexpected error: %s | Internal error |
+| 9002 | `SERIALIZATION_ERROR` | No | Serialization error: %s | Data processing error |
+| 9003 | `DESERIALIZATION_ERROR` | No | Deserialization error: %s | Data processing error |
+
+### Valid Kafka Topics
+
+All topics are defined in `com.civitas.configadapter.Topics` and validated at startup.
+
+#### User Events
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `USER_CREATED` | `core.civitas.idm.user.created` |
+| `USER_UPDATED` | `core.civitas.idm.user.updated` |
+| `USER_DELETED` | `core.civitas.idm.user.deleted` |
+| `USER_LOCKED` | `core.civitas.idm.user.locked` |
+| `USER_UNLOCKED` | `core.civitas.idm.user.unlocked` |
+| `USER_PASSWORD_CHANGED` | `core.civitas.idm.user.password.changed` |
+| `USER_PASSWORD_RESET` | `core.civitas.idm.user.password.reset` |
+
+#### Realm Events
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `REALM_CREATED` | `core.civitas.idm.realm.created` |
+| `REALM_UPDATED` | `core.civitas.idm.realm.updated` |
+| `REALM_DELETED` | `core.civitas.idm.realm.deleted` |
+
+#### Client Events
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `CLIENT_CREATED` | `core.civitas.idm.client.created` |
+| `CLIENT_UPDATED` | `core.civitas.idm.client.updated` |
+| `CLIENT_DELETED` | `core.civitas.idm.client.deleted` |
+
+#### Group Events
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `GROUP_CREATED` | `core.civitas.idm.group.created` |
+| `GROUP_UPDATED` | `core.civitas.idm.group.updated` |
+| `GROUP_DELETED` | `core.civitas.idm.group.deleted` |
+
+#### Role Events
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `ROLE_CREATED` | `core.civitas.idm.role.created` |
+| `ROLE_UPDATED` | `core.civitas.idm.role.updated` |
+| `ROLE_DELETED` | `core.civitas.idm.role.deleted` |
+
+#### Backend Events (APISIX)
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `BACKEND_CREATED` | `core.civitas.api.backend.created` |
+| `BACKEND_UPDATED` | `core.civitas.api.backend.updated` |
+| `BACKEND_DELETED` | `core.civitas.api.backend.deleted` |
+
+#### Route Events (APISIX)
+
+| Topic Constant | Topic Value |
+|----------------|-------------|
+| `ROUTE_CREATED` | `core.civitas.api.route.created` |
+| `ROUTE_UPDATED` | `core.civitas.api.route.updated` |
+| `ROUTE_DELETED` | `core.civitas.api.route.deleted` |
+
+**Topic Validation:**
+- Topics are validated using `Topics.isValidTopic(String)` method
+- Whitespace is trimmed automatically
+- Invalid topics throw `IllegalArgumentException` at startup
+- Use `Topics.ALL_TOPICS` for a list of all valid topic values
 
 ### Example: Single Adapter Configuration
 

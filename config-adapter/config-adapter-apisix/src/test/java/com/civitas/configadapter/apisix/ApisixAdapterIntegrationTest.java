@@ -14,6 +14,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.civitas.configadapter.Constants;
@@ -21,6 +22,7 @@ import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.configuration.ApplicationConfig;
+import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
@@ -247,18 +249,12 @@ class ApisixAdapterIntegrationTest {
 
     ConfigEvent event = createConfigEvent("upstreams", Operation.CREATE, invalidConfig);
 
-    adapter.processConfigEvent(Topics.BACKEND_CREATED.toString(), event);
+    FatalAdapterException exception =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> adapter.processConfigEvent(Topics.BACKEND_CREATED.toString(), event));
 
-    await()
-        .atMost(10, SECONDS)
-        .pollInterval(1, SECONDS)
-        .untilAsserted(
-            () -> {
-              assertEquals(1, eventPublisher.getPublishedEvents().size());
-              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-              assertEquals(ConfigResultEvent.Status.FAILURE, resultEvent.status());
-              assertNotNull(resultEvent.errorCode());
-            });
+    assertNotNull(exception.getErrorCode());
   }
 
   // ============== ROUTE INTEGRATION TESTS ==============
@@ -429,19 +425,12 @@ class ApisixAdapterIntegrationTest {
 
     ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, invalidConfig);
 
-    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+    FatalAdapterException exception =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event));
 
-    await()
-        .atMost(10, SECONDS)
-        .pollInterval(1, SECONDS)
-        .untilAsserted(
-            () -> {
-              assertEquals(1, eventPublisher.getPublishedEvents().size());
-              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-              assertEquals(ConfigResultEvent.Status.FAILURE, resultEvent.status());
-              assertNotNull(resultEvent.errorCode());
-              assertEquals("ROUTE_CREATE_FAILED", resultEvent.errorCode());
-            });
+    assertNotNull(exception.getErrorCode());
   }
 
   // ============== HELPER METHODS ==============
