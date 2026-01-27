@@ -43,6 +43,8 @@ export const TEST_ENV = process.env.E2E_TEST_ENV
  */
 export default defineConfig({
   testDir: './e2e',
+  /* Save test artifacts (screenshots, traces) to repo-root test-results/ */
+  outputDir: path.resolve(dirname, '..', 'test-results'),
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
@@ -58,8 +60,11 @@ export default defineConfig({
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: 'http://localhost:3000',
 
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    /* Collect trace with per-step screenshots. See https://playwright.dev/docs/trace-viewer */
+    trace: 'on',
+
+    /* Capture screenshot after each test. See https://playwright.dev/docs/screenshots */
+    screenshot: 'on',
   },
   /* Configure projects for major browsers */
   projects: [
@@ -70,29 +75,19 @@ export default defineConfig({
     },
     {
       name: 'chromium',
+      testIgnore: /smoke-unauth\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         storageState: './playwright/.auth/user.json',
       },
       dependencies: ['authSetup'],
     },
-
     {
-      name: 'firefox',
+      name: 'noAuth',
+      testMatch: /smoke-unauth\.spec\.ts/,
       use: {
-        ...devices['Desktop Firefox'],
-        storageState: './playwright/.auth/user.json',
+        ...devices['Desktop Chrome'],
       },
-      dependencies: ['authSetup'],
-    },
-
-    {
-      name: 'webkit',
-      use: {
-        ...devices['Desktop Safari'],
-        storageState: './playwright/.auth/user.json',
-      },
-      dependencies: ['authSetup'],
     },
 
     /* Test against mobile viewports. */

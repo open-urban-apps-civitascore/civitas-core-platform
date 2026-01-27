@@ -1,0 +1,7 @@
+routes:
+  - uri: /v2/*
+    upstream:
+      type: roundrobin
+      nodes:
+        "host.docker.internal:8089": 1
+#END
