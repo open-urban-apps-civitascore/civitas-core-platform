@@ -26,7 +26,6 @@ class CustomJwtAuthenticationConverterTest {
             .claim("email", "test@example.com")
             .claim("given_name", "Test")
             .claim("family_name", "User")
-            .claim("tenantId", "test-tenant")
             .claim("realm_access", Map.of("roles", List.of("USER", "ADMIN")))
             .issuedAt(Instant.now())
             .expiresAt(Instant.now().plusSeconds(3600))
@@ -39,7 +38,6 @@ class CustomJwtAuthenticationConverterTest {
     PrincipalUserDetails principal = result.getPrincipal();
     assertThat(principal.getUsername()).isEqualTo("testuser");
     assertThat(principal.getEmail()).isEqualTo("test@example.com");
-    assertThat(principal.getTenantId()).isEqualTo("test-tenant");
     assertThat(principal.getGivenName()).isEqualTo("Test");
     assertThat(principal.getFamilyName()).isEqualTo("User");
 
