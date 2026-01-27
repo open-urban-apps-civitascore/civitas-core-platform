@@ -75,13 +75,12 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
     if (topic != null && topic.contains("fatal")) {
       logger.warn("Topic contains 'fatal' - throwing FatalAdapterException");
       throw new FatalAdapterException(
-          AdapterErrorCode.INVALID_PAYLOAD, null, "Simulated fatal error for topic: " + topic);
+          AdapterErrorCode.INVALID_PAYLOAD, "Simulated fatal error for topic: " + topic);
     }
 
     if (topic != null && topic.contains("retry")) {
       logger.warn("Topic contains 'retry' - throwing RetryableAdapterException");
-      throw new RetryableAdapterException(
-          AdapterErrorCode.SERVICE_UNAVAILABLE, null, ADAPTER_NAME, 503);
+      throw new RetryableAdapterException(AdapterErrorCode.SERVICE_UNAVAILABLE, ADAPTER_NAME, 503);
     }
 
     // Publish a result event if resultTopic is specified

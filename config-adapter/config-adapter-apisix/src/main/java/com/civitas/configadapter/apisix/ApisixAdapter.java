@@ -276,12 +276,12 @@ public class ApisixAdapter extends AbstractConfigAdapter {
     if (status >= 500) {
       logger.warn("APISIX server error during {}: {} {}", operation.getDescription(), status, body);
       throw new RetryableAdapterException(
-          AdapterErrorCode.SERVICE_UNAVAILABLE, null, ADAPTER_NAME, status);
+          AdapterErrorCode.SERVICE_UNAVAILABLE, ADAPTER_NAME, status);
     }
 
     // HTTP 4xx - Client errors are fatal
     logger.error("APISIX client error during {}: {} {}", operation.getDescription(), status, body);
-    throw new FatalAdapterException(errorCode, null, HTTP_STATUS_PREFIX + status + ": " + body);
+    throw new FatalAdapterException(errorCode, HTTP_STATUS_PREFIX + status + ": " + body);
   }
 
   // ============== UPSTREAM OPERATIONS ==============

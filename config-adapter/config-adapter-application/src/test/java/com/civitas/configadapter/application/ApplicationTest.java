@@ -61,13 +61,11 @@ class ApplicationTest {
             },
             "Application should throw FatalAdapterException when adapter 'okta' does not exist");
 
-    // Then the exception should indicate the failure to create the consumer
-    Throwable cause = exception.getCause();
-    String causeMessage = cause != null ? cause.getMessage() : "";
+    // Then the exception should indicate the adapter was not found
+    String message = exception.getMessage();
     assertTrue(
-        causeMessage.contains("Adapter 'okta' not found via ServiceLoader"),
-        "Exception message should mention failure not found adapter 'okta', but was: "
-            + causeMessage);
+        message.contains("Adapter 'okta' not found via ServiceLoader"),
+        "Exception message should mention failure not found adapter 'okta', but was: " + message);
   }
 
   @Test
@@ -200,13 +198,11 @@ class ApplicationTest {
             },
             "Application should throw FatalAdapterException when event consumer 'rabbitmq' does not exist");
 
-    // Then the exception or its cause should indicate the failure
-    // The inner exception is wrapped by the catch block in createConsumers
-    Throwable cause = exception.getCause();
-    String causeMessage = cause != null ? cause.getMessage() : "";
+    // Then the exception should indicate the event consumer was not found
+    String message = exception.getMessage();
     assertTrue(
-        causeMessage.contains("Event consumer 'rabbitmq' not found"),
-        "Exception cause should mention event consumer not found, but was: " + causeMessage);
+        message.contains("Event consumer 'rabbitmq' not found"),
+        "Exception message should mention event consumer not found, but was: " + message);
   }
 
   @Test

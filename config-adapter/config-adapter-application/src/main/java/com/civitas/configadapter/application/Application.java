@@ -216,7 +216,7 @@ public class Application {
       if (adapter == null) {
         throw new FatalAdapterException(
             AdapterErrorCode.CONFIGURATION_ERROR,
-            new Throwable("Adapter '" + adapterName + "' not found via ServiceLoader"));
+            "Adapter '" + adapterName + "' not found via ServiceLoader");
       }
 
       List<String> topics = adapter.getSubscribedTopics();
@@ -237,10 +237,7 @@ public class Application {
       if (isNull(consumer)) {
         throw new FatalAdapterException(
             AdapterErrorCode.CONFIGURATION_ERROR,
-            new Throwable(
-                "Event consumer '"
-                    + handlerNames.consumerName()
-                    + "' not found via ServiceLoader"));
+            "Event consumer '" + handlerNames.consumerName() + "' not found via ServiceLoader");
       }
 
       logger.info("Successfully created consumer for adapter: {}", adapterName);
@@ -251,8 +248,8 @@ public class Application {
       logger.error("Failed to create consumer for adapter: {}", adapterName, e);
       throw new FatalAdapterException(
           AdapterErrorCode.CONFIGURATION_ERROR,
-          new Throwable("Failed to create consumer for adapter: " + adapterName),
-          e);
+          e,
+          "Failed to create consumer for adapter: " + adapterName);
     }
   }
 
