@@ -125,7 +125,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   }
 
   @Override
-  public void processConfigEvent(String topic, ConfigEvent event) {
+  public void processConfigEvent(String topic, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     if (event == null) {
       logger.warn("Null event send to topic {}", topic);
       return;
@@ -188,7 +189,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
    * @param event the configuration value containing the resource data
    * @return the resource ID if present, null otherwise
    */
-  private String extractResourceId(ConfigEvent event) {
+  private String extractResourceId(ConfigEvent event) throws FatalAdapterException {
     // Extract ID from IDM config values (UserConfig, ClientConfig, RoleConfig, RealmConfig,
     // GroupConfig)
     return switch (event.payload().config().value()) {
@@ -206,7 +207,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     };
   }
 
-  private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event) {
+  private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     switch (resourceInfo.type) {
       case REALM -> createRealm(event);
       case CLIENT -> createClient(resourceInfo.realm, event);
@@ -220,7 +222,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void handleUpdate(ResourceInfo resourceInfo, ConfigEvent event) {
+  private void handleUpdate(ResourceInfo resourceInfo, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     switch (resourceInfo.type) {
       case REALM -> updateRealm(resourceInfo.id, event);
       case CLIENT -> updateClient(resourceInfo.realm, resourceInfo.id, event);
@@ -234,7 +237,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void handleDelete(ResourceInfo resourceInfo, ConfigEvent event) {
+  private void handleDelete(ResourceInfo resourceInfo, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     switch (resourceInfo.type) {
       case REALM -> deleteRealm(resourceInfo.id, event);
       case CLIENT -> deleteClient(resourceInfo.realm, resourceInfo.id, event);
@@ -262,7 +266,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     return configValue;
   }
 
-  private void createRealm(ConfigEvent event) {
+  private void createRealm(ConfigEvent event)
+      throws RetryableAdapterException, FatalAdapterException {
     try {
       Object configData = extractConfigData(event.payload().config().value());
       RealmRepresentation realmRep =
@@ -282,7 +287,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void updateRealm(String realmName, ConfigEvent event) {
+  private void updateRealm(String realmName, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     try {
       Object configData = extractConfigData(event.payload().config().value());
       RealmRepresentation realmRep =
@@ -303,7 +309,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void deleteRealm(String realmName, ConfigEvent event) {
+  private void deleteRealm(String realmName, ConfigEvent event)
+      throws RetryableAdapterException, FatalAdapterException {
     try {
       keycloakClient.realm(realmName).remove();
       logger.info("Deleted realm: {}", realmName);
@@ -320,7 +327,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   // ============== CLIENT OPERATIONS ==============
 
-  private void createClient(String realm, ConfigEvent event) {
+  private void createClient(String realm, ConfigEvent event)
+      throws RetryableAdapterException, FatalAdapterException {
     try {
       Object configData = extractConfigData(event.payload().config().value());
       ClientRepresentation clientRep =
@@ -345,7 +353,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void updateClient(String realm, String clientId, ConfigEvent event) {
+  private void updateClient(String realm, String clientId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     try {
       Object configData = extractConfigData(event.payload().config().value());
       ClientRepresentation clientRep =
@@ -367,7 +376,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void deleteClient(String realm, String clientId, ConfigEvent event) {
+  private void deleteClient(String realm, String clientId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     try {
       RealmResource realmResource = keycloakClient.realm(realm);
       realmResource.clients().get(clientId).remove();
@@ -415,7 +425,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   */
 
-  private void createUser(String realm, ConfigEvent event) {
+  private void createUser(String realm, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     executeUserFlow(
         realm,
         event,
@@ -430,7 +441,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         });
   }
 
-  private void updateUser(String realm, String userId, ConfigEvent event) {
+  private void updateUser(String realm, String userId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     executeUserFlow(
         realm,
         event,
@@ -449,7 +461,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       KeycloakOperation operation,
       SuccessCode successCode,
       AdapterErrorCode errorCode,
-      UserAction action) {
+      UserAction action)
+      throws FatalAdapterException, RetryableAdapterException {
     try {
       Object configData = extractConfigData(event.payload().config().value());
       UserRepresentation userRep = objectMapper.convertValue(configData, UserRepresentation.class);
@@ -490,7 +503,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void deleteUser(String realm, String userId, ConfigEvent event) {
+  private void deleteUser(String realm, String userId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     try {
       RealmResource realmResource = keycloakClient.realm(realm);
       realmResource.users().get(userId).remove();
@@ -510,7 +524,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   // ============== ROLE OPERATIONS ==============
 
-  private void createRole(String realm, ConfigEvent event) {
+  private void createRole(String realm, ConfigEvent event)
+      throws RetryableAdapterException, FatalAdapterException {
     try {
       Object configData = extractConfigData(event.payload().config().value());
       RoleRepresentation roleRep = convertToRoleRepresentation(configData);
@@ -528,7 +543,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void updateRole(String realm, String roleId, ConfigEvent event) {
+  private void updateRole(String realm, String roleId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     try {
       Object configData = extractConfigData(event.payload().config().value());
       RoleRepresentation roleRep = convertToRoleRepresentation(configData);
@@ -569,7 +585,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     return roleRep;
   }
 
-  private void deleteRole(String realm, String roleId, ConfigEvent event) {
+  private void deleteRole(String realm, String roleId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     try {
       RealmResource realmResource = keycloakClient.realm(realm);
       realmResource.roles().get(roleId).remove();
@@ -588,7 +605,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   // ============== GROUP OPERATIONS ==============
 
-  private void createGroup(String realm, ConfigEvent event) {
+  private void createGroup(String realm, ConfigEvent event)
+      throws RetryableAdapterException, FatalAdapterException {
     try {
       GroupConfig groupConfig = (GroupConfig) event.payload().config().value();
       GroupRepresentation groupRep =
@@ -640,7 +658,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     syncClientRoles(clientRoles, roleMapping, realmResource);
   }
 
-  private void updateGroup(String realm, String groupId, ConfigEvent event) {
+  private void updateGroup(String realm, String groupId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     try {
       GroupConfig groupConfig = (GroupConfig) event.payload().config().value();
       GroupRepresentation groupRep =
@@ -665,7 +684,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void deleteGroup(String realm, String groupId, ConfigEvent event) {
+  private void deleteGroup(String realm, String groupId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     try {
       RealmResource realmResource = keycloakClient.realm(realm);
       realmResource.groups().group(groupId).remove();
@@ -837,7 +857,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
    * @throws FatalAdapterException for HTTP 4xx errors
    */
   private void wrapWebException(
-      WebApplicationException e, KeycloakOperation operation, AdapterErrorCode defaultErrorCode) {
+      WebApplicationException e, KeycloakOperation operation, AdapterErrorCode defaultErrorCode)
+      throws RetryableAdapterException, FatalAdapterException {
     int status = e.getResponse().getStatus();
 
     // HTTP 5xx - Server errors are retryable
@@ -929,7 +950,8 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
    * @param resourceId the created/updated resource ID (may be null)
    */
   private void publishSuccessResult(
-      ConfigEvent originalEvent, SuccessCode successCode, String resourceId) {
+      ConfigEvent originalEvent, SuccessCode successCode, String resourceId)
+      throws FatalAdapterException, RetryableAdapterException {
     if (getEventPublisher() == null || originalEvent.metadata().resultTopic() == null) {
       return;
     }

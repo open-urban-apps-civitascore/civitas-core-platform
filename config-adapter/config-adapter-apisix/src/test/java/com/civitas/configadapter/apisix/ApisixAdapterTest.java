@@ -161,7 +161,7 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testCreateSuccess() {
+    void testCreateSuccess() throws FatalAdapterException, RetryableAdapterException {
       when(mockResponse.getStatus()).thenReturn(200);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"success\":true}");
       when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
@@ -219,7 +219,7 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testUpdateSuccess() {
+    void testUpdateSuccess() throws FatalAdapterException, RetryableAdapterException {
       when(mockResponse.getStatus()).thenReturn(200);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"success\":true}");
       when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
@@ -241,7 +241,7 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testDeleteSuccess() {
+    void testDeleteSuccess() throws FatalAdapterException, RetryableAdapterException {
       when(mockResponse.getStatus()).thenReturn(200);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"success\":true}");
       when(mockBuilder.delete()).thenReturn(mockResponse);
@@ -274,7 +274,7 @@ class ApisixAdapterTest {
     // ============== ROUTE OPERATION TESTS ==============
 
     @Test
-    void testRouteCreateSuccess() {
+    void testRouteCreateSuccess() throws FatalAdapterException, RetryableAdapterException {
       when(mockResponse.getStatus()).thenReturn(201);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/1\"}");
       when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
@@ -323,7 +323,7 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testRouteUpdateSuccess() {
+    void testRouteUpdateSuccess() throws FatalAdapterException, RetryableAdapterException {
       when(mockResponse.getStatus()).thenReturn(200);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/test-route-id\"}");
       when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
@@ -374,7 +374,7 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testRouteDeleteSuccess() {
+    void testRouteDeleteSuccess() throws FatalAdapterException, RetryableAdapterException {
       when(mockResponse.getStatus()).thenReturn(200);
       when(mockResponse.readEntity(String.class))
           .thenReturn("{\"deleted\":\"routes/test-route-id\"}");
@@ -412,7 +412,8 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testRouteWithFullPluginConfiguration() {
+    void testRouteWithFullPluginConfiguration()
+        throws FatalAdapterException, RetryableAdapterException {
       when(mockResponse.getStatus()).thenReturn(201);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/1\"}");
       when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
@@ -476,7 +477,7 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testRouteWithApisixConfigValue() {
+    void testRouteWithApisixConfigValue() throws FatalAdapterException, RetryableAdapterException {
       when(mockResponse.getStatus()).thenReturn(201);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/1\"}");
       when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
@@ -498,7 +499,7 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testWithoutEventPublisher() {
+    void testWithoutEventPublisher() throws FatalAdapterException, RetryableAdapterException {
       adapter.setEventPublisher(null);
 
       when(mockResponse.getStatus()).thenReturn(200);
@@ -513,7 +514,7 @@ class ApisixAdapterTest {
     }
 
     @Test
-    void testWithNullResultTopic() {
+    void testWithNullResultTopic() throws FatalAdapterException, RetryableAdapterException {
       when(mockResponse.getStatus()).thenReturn(200);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"success\":true}");
       when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);

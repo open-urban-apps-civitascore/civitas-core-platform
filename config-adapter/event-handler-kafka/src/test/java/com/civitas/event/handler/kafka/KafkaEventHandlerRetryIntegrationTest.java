@@ -428,7 +428,8 @@ class KafkaEventHandlerRetryIntegrationTest {
     }
 
     @Override
-    public void processConfigEvent(String topic, ConfigEvent event) {
+    public void processConfigEvent(String topic, ConfigEvent event)
+        throws FatalAdapterException, RetryableAdapterException {
       int currentAttempt = attemptCount.incrementAndGet();
 
       if (throwFatalError) {

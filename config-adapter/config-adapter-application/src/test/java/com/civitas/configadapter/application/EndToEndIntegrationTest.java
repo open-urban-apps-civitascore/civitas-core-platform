@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.configuration.AppConfig;
+import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.keycloak.KeycloakAdapter;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
@@ -103,7 +104,7 @@ class EndToEndIntegrationTest {
   private ObjectMapper objectMapper;
 
   @BeforeEach
-  void setUp() throws InterruptedException {
+  void setUp() throws InterruptedException, FatalAdapterException {
     objectMapper = ObjectMapperFactory.createObjectMapper();
 
     String keycloakUrl = "http://" + keycloak.getHost() + ":" + keycloak.getMappedPort(8080);

@@ -23,6 +23,7 @@ import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
@@ -150,7 +151,7 @@ class ApisixAdapterIntegrationTest {
   }
 
   @Test
-  void createUpstream() {
+  void createUpstream() throws FatalAdapterException, RetryableAdapterException {
     Map<String, Object> upstreamConfig =
         Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1, "backend2:8080", 1));
 

@@ -143,7 +143,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   }
 
   @Override
-  public void processConfigEvent(String topic, ConfigEvent event) {
+  public void processConfigEvent(String topic, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     Operation operation = event.payload().operation();
     String targetResource = event.payload().targetResource();
     String targetComponent = event.payload().targetComponent();
@@ -198,7 +199,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
     return new ResourceInfo(resourceType, resourceId);
   }
 
-  private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event) {
+  private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     switch (resourceInfo.type) {
       case UPSTREAM -> createUpstream(event);
       case ROUTE -> createRoute(event);
@@ -209,7 +211,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void handleUpdate(ResourceInfo resourceInfo, ConfigEvent event) {
+  private void handleUpdate(ResourceInfo resourceInfo, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     switch (resourceInfo.type) {
       case UPSTREAM -> updateUpstream(resourceInfo.id, event);
       case ROUTE -> updateRoute(resourceInfo.id, event);
@@ -220,7 +223,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
     }
   }
 
-  private void handleDelete(ResourceInfo resourceInfo, ConfigEvent event) {
+  private void handleDelete(ResourceInfo resourceInfo, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     switch (resourceInfo.type) {
       case UPSTREAM -> deleteUpstream(resourceInfo.id, event);
       case ROUTE -> deleteRoute(resourceInfo.id, event);
@@ -257,7 +261,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
    * @throws FatalAdapterException for HTTP 4xx errors
    */
   private void handleHttpResponse(
-      Response response, AdapterErrorCode errorCode, AdapterOperation operation) {
+      Response response, AdapterErrorCode errorCode, AdapterOperation operation)
+      throws RetryableAdapterException, FatalAdapterException {
     int status = response.getStatus();
 
     // Success - nothing to throw
@@ -281,7 +286,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   // ============== UPSTREAM OPERATIONS ==============
 
-  private void createUpstream(ConfigEvent event) {
+  private void createUpstream(ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     Object upstreamConfig = extractUpstreamConfig(event);
     executeApisixOperation(
         AdapterOperation.UPSTREAM_CREATE,
@@ -298,7 +304,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
                 .post(Entity.json(upstreamConfig)));
   }
 
-  private void updateUpstream(String upstreamId, ConfigEvent event) {
+  private void updateUpstream(String upstreamId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     Object upstreamConfig = extractUpstreamConfig(event);
     executeApisixOperation(
         AdapterOperation.UPSTREAM_UPDATE,
@@ -316,7 +323,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
                 .put(Entity.json(upstreamConfig)));
   }
 
-  private void deleteUpstream(String upstreamId, ConfigEvent event) {
+  private void deleteUpstream(String upstreamId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     executeApisixOperation(
         AdapterOperation.UPSTREAM_DELETE,
         AdapterErrorCode.APISIX_UPSTREAM_ERROR,
@@ -343,7 +351,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   // ============== ROUTE OPERATIONS ==============
 
-  private void createRoute(ConfigEvent event) {
+  private void createRoute(ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     Object routeConfig = extractRouteConfig(event.payload().config().value());
     executeApisixOperation(
         AdapterOperation.ROUTE_CREATE,
@@ -360,7 +369,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
                 .post(Entity.json(routeConfig)));
   }
 
-  private void updateRoute(String routeId, ConfigEvent event) {
+  private void updateRoute(String routeId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     Object routeConfig = extractRouteConfig(event.payload().config().value());
     executeApisixOperation(
         AdapterOperation.ROUTE_UPDATE,
@@ -378,7 +388,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
                 .put(Entity.json(routeConfig)));
   }
 
-  private void deleteRoute(String routeId, ConfigEvent event) {
+  private void deleteRoute(String routeId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     executeApisixOperation(
         AdapterOperation.ROUTE_DELETE,
         AdapterErrorCode.APISIX_ROUTE_ERROR,
@@ -421,7 +432,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
    * @param message the success message
    * @param resourceId the created/updated resource ID (may be null)
    */
-  private void publishSuccessResult(ConfigEvent originalEvent, String message, String resourceId) {
+  private void publishSuccessResult(ConfigEvent originalEvent, String message, String resourceId)
+      throws FatalAdapterException, RetryableAdapterException {
     if (getEventPublisher() == null || originalEvent.metadata().resultTopic() == null) {
       return;
     }
@@ -475,7 +487,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       ConfigEvent event,
       String successMessage,
       String resourceId,
-      HttpRequestOperation requestOperation) {
+      HttpRequestOperation requestOperation)
+      throws FatalAdapterException, RetryableAdapterException {
     Response response = null;
     try {
       response = requestOperation.execute();

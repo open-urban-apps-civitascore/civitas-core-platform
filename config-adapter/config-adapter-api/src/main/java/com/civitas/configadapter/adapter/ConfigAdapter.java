@@ -11,13 +11,16 @@
 package com.civitas.configadapter.adapter;
 
 import com.civitas.configadapter.ConfigBase;
+import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.ConfigEvent;
 import java.util.List;
 
 public interface ConfigAdapter extends ConfigBase {
 
-  void processConfigEvent(String topic, ConfigEvent event);
+  void processConfigEvent(String topic, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException;
 
   List<String> getSubscribedTopics();
 

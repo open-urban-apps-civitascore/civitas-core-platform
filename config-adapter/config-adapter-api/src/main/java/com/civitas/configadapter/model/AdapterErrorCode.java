@@ -63,7 +63,9 @@ public enum AdapterErrorCode {
   // 9xxx: Unknown/unexpected errors
   UNKNOWN_ERROR(9001, false, "Unexpected error: %s", "Internal error"),
   SERIALIZATION_ERROR(9002, false, "Serialization error: %s", "Data processing error"),
-  DESERIALIZATION_ERROR(9003, false, "Deserialization error: %s", "Data processing error");
+  DESERIALIZATION_ERROR(9003, false, "Deserialization error: %s", "Data processing error"),
+  CONFIGURATION_ERROR(9004, false, "Configuration error: %s", "Configuration error"),
+  ;
 
   private final int code;
   private final boolean retryable;

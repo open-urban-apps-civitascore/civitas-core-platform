@@ -73,6 +73,8 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   private static final String KAFKA_RETRY_INITIAL_BACKOFF_MS = "kafka.retry.initial.backoff.ms";
   private static final String KAFKA_DLQ_TOPIC = "kafka.dlq.topic";
   private static final String KAFKA_PUBLISH_TIMEOUT_MS = "kafka.publish.timeout.ms";
+  private static final String KAFKA_MAX_POLL_INTERVAL_MS =
+      "kafka." + ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG;
 
   // Default values
   private static final int DEFAULT_MAX_RETRIES = 3;
@@ -98,15 +100,21 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   private long initialBackoffMs;
   private String dlqTopic;
   private long publishTimeoutMs;
+  private BackoffCalculator backoffCalculator;
 
   public KafkaEventHandler() {}
 
   @Override
-  public void initialize(ApplicationConfig config, ConfigAdapter adapter) {
+  public void initialize(ApplicationConfig config, ConfigAdapter adapter)
+      throws FatalAdapterException {
     this.adapter = adapter;
     this.processor = new CloudEventProcessor(adapter);
 
     loadRetryConfiguration(config);
+
+    this.backoffCalculator = new BackoffCalculator(this.initialBackoffMs, 30000L);
+
+    validateRetryConfiguration(config);
 
     String bootstrapServers = config.getProperty(KAFKA_BOOTSTRAP_SERVERS, "localhost:9092");
     String groupId = config.getProperty(KAFKA_GROUP_ID, "config-adapter-group");
@@ -120,7 +128,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
     adapter.setEventPublisher(this);
 
-    logInitialization(bootstrapServers, topicList);
+    logInitialization(topicList);
   }
 
   private void loadRetryConfiguration(ApplicationConfig config) {
@@ -136,6 +144,33 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
         Long.parseLong(
             config.getProperty(
                 KAFKA_PUBLISH_TIMEOUT_MS, String.valueOf(DEFAULT_PUBLISH_TIMEOUT_MS)));
+  }
+
+  private void validateRetryConfiguration(ApplicationConfig config) throws FatalAdapterException {
+    String pollIntervalStr = config.getProperty(KAFKA_MAX_POLL_INTERVAL_MS, "300000");
+    long maxPollIntervalMs = Long.parseLong(pollIntervalStr);
+
+    long totalPotentialWaitTime = 0;
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      totalPotentialWaitTime += backoffCalculator.calculate(attempt);
+    }
+
+    // use 80% as margin
+    long safeLimit = (long) (maxPollIntervalMs * 0.8);
+
+    if (totalPotentialWaitTime > safeLimit) {
+      String msg =
+          String.format(
+              "Dangerous configuration detected! Total retry backoff (%d ms) exceeds 80%% of %s (%d ms). "
+                  + "Please decrease '%s' or increase '%s'.",
+              totalPotentialWaitTime,
+              KAFKA_MAX_POLL_INTERVAL_MS,
+              maxPollIntervalMs,
+              KAFKA_RETRY_MAX_ATTEMPTS,
+              KAFKA_MAX_POLL_INTERVAL_MS);
+
+      throw new FatalAdapterException(AdapterErrorCode.CONFIGURATION_ERROR, msg);
+    }
   }
 
   private Properties createConsumerProperties(String bootstrapServers, String groupId) {
@@ -182,10 +217,9 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
         });
   }
 
-  private void logInitialization(String bootstrapServers, List<String> topicList) {
+  private void logInitialization(List<String> topicList) {
     logger.info(
-        "Kafka {} event consumer initialized for adapter {} with {} topic(s): {}",
-        bootstrapServers,
+        "Kafka event consumer initialized for adapter {} with {} topic(s): {}",
         adapter.getClass().getSimpleName(),
         topicList.size(),
         topicList);
@@ -287,7 +321,8 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   private void processWithRetry(ConsumerRecord<String, CloudEvent> record) {
     int attempts = 0;
 
-    while (true) {
+    // maxRetries + 1, because first attempt + maxRetries
+    for (int attempt = 0; attempt <= maxRetries + 1; attempt++) {
       try {
         processor.handleEvent(record.topic(), record.value());
         logger.debug(
@@ -305,7 +340,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
           return;
         }
 
-        long backoff = calculateBackoff(attempts);
+        long backoff = backoffCalculator.calculate(attempt);
         logger.warn(
             "Retryable error processing event {} (attempt {}/{}). Retrying in {}ms. Error: {}",
             record.value().getId(),
@@ -341,19 +376,6 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
         return;
       }
     }
-  }
-
-  /**
-   * Calculates exponential backoff delay.
-   *
-   * @param attempt the current attempt number (1-based)
-   * @return the backoff delay in milliseconds
-   */
-  private long calculateBackoff(int attempt) {
-    // Exponential backoff: initialBackoff * 2^(attempt-1)
-    // Cap at 30 seconds
-    long backoff = initialBackoffMs * (long) Math.pow(2, attempt - 1);
-    return Math.min(backoff, 30000L);
   }
 
   /**
@@ -464,7 +486,8 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   }
 
   @Override
-  public void publish(String topic, ConfigResultEvent resultEvent) {
+  public void publish(String topic, ConfigResultEvent resultEvent)
+      throws RetryableAdapterException, FatalAdapterException {
     CloudEvent cloudEvent = convertToCloudEvent(resultEvent);
     ProducerRecord<String, CloudEvent> record =
         new ProducerRecord<>(topic, cloudEvent.getId(), cloudEvent);

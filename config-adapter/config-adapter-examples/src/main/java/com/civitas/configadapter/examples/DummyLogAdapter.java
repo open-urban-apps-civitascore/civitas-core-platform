@@ -59,7 +59,8 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
   }
 
   @Override
-  public void processConfigEvent(String topic, ConfigEvent event) {
+  public void processConfigEvent(String topic, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     logger.info("==================== DummyLogAdapter Event ====================");
     logger.info("Operation:     {}", event.payload().operation());
     logger.info("ResourceType: 	{}", event.payload().targetComponent());
