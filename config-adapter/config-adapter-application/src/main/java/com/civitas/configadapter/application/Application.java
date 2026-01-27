@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -189,7 +190,7 @@ public class Application {
     }
 
     if (nonNull(eventHandlerName)) {
-      logger.info("Using combined event handler: {}", eventHandlerName);
+      logger.info("Using combined event handler: {}", Encode.forJava(eventHandlerName));
       return new EventHandlerNames(eventHandlerName, eventHandlerName);
     }
 
@@ -201,8 +202,8 @@ public class Application {
 
     logger.info(
         "Using separate consumer: {} and publisher: {}",
-        eventConsumerName,
-        eventPublisherName != null ? eventPublisherName : "none");
+        Encode.forJava(eventConsumerName),
+        eventPublisherName != null ? Encode.forJava(eventPublisherName) : "none");
     return new EventHandlerNames(eventConsumerName, eventPublisherName);
   }
 
@@ -210,7 +211,7 @@ public class Application {
       AppConfig config, String adapterName, EventHandlerNames handlerNames)
       throws FatalAdapterException {
     try {
-      logger.info("Loading adapter: {}", adapterName);
+      logger.info("Loading adapter: {}", Encode.forJava(adapterName));
 
       ConfigAdapter adapter = createAdapter(config, adapterName);
       if (adapter == null) {
@@ -221,7 +222,7 @@ public class Application {
 
       List<String> topics = adapter.getSubscribedTopics();
       if (topics.isEmpty()) {
-        logger.warn("Adapter {} has no subscribed topics, skipping", adapterName);
+        logger.warn("Adapter {} has no subscribed topics, skipping", Encode.forJava(adapterName));
         return null;
       }
 
@@ -229,7 +230,7 @@ public class Application {
           "Adapter {} subscribes to {} topic(s): {}",
           adapter.getClass().getSimpleName(),
           topics.size(),
-          topics);
+          Encode.forJava(String.valueOf(topics)));
 
       configurePublisher(config, adapter, handlerNames.publisherName());
 
@@ -240,12 +241,12 @@ public class Application {
             "Event consumer '" + handlerNames.consumerName() + "' not found via ServiceLoader");
       }
 
-      logger.info("Successfully created consumer for adapter: {}", adapterName);
+      logger.info("Successfully created consumer for adapter: {}", Encode.forJava(adapterName));
       return consumer;
     } catch (FatalAdapterException e) {
       throw e;
     } catch (Exception e) {
-      logger.error("Failed to create consumer for adapter: {}", adapterName, e);
+      logger.error("Failed to create consumer for adapter: {}", Encode.forJava(adapterName), e);
       throw new FatalAdapterException(
           AdapterErrorCode.CONFIGURATION_ERROR,
           e,
@@ -265,7 +266,7 @@ public class Application {
     } else {
       logger.warn(
           "Event publisher '{}' not found via ServiceLoader, continuing without publisher",
-          publisherName);
+          Encode.forJava(publisherName));
     }
   }
 

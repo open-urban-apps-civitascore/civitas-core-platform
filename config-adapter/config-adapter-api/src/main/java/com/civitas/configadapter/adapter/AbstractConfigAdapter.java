@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -90,7 +91,7 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
     String topicsProperty = config.getProperty(configKey);
 
     if (topicsProperty == null || topicsProperty.trim().isEmpty()) {
-      logger.warn("No topics configured for key: {}", configKey);
+      logger.warn("No topics configured for key: {}", Encode.forJava(configKey));
       return List.of();
     }
 
@@ -113,8 +114,8 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
     logger.info(
         "Parsed and validated {} topic(s) from configuration key '{}': {}",
         topics.size(),
-        configKey,
-        topics);
+        Encode.forJava(configKey),
+        Encode.forJava(String.valueOf(topics)));
 
     return List.copyOf(topics);
   }
@@ -223,12 +224,13 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
               getResultType());
 
       getEventPublisher().publish(event.metadata().resultTopic(), failureResult);
-      logger.debug("Published FAILURE result to topic: {}", event.metadata().resultTopic());
+      logger.debug(
+          "Published FAILURE result to topic: {}", Encode.forJava(event.metadata().resultTopic()));
     } catch (Exception e) {
       logger.warn(
           "Failed to publish failure result for event {}: {}",
-          event.metadata().messageId(),
-          e.getMessage());
+          Encode.forJava(event.metadata().messageId()),
+          Encode.forJava(String.valueOf(e.getMessage())));
     }
   }
 }

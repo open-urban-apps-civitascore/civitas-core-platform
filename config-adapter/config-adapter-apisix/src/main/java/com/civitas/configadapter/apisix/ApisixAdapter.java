@@ -29,6 +29,7 @@ import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.concurrent.TimeUnit;
+import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,9 +112,14 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       this.client = createClient();
     }
 
-    logger.info("APISIX adapter '{}' initialized for: {}", getName(), adminApiUrl);
     logger.info(
-        "Subscribed to {} Kafka topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
+        "APISIX adapter '{}' initialized for: {}",
+        Encode.forJava(getName()),
+        Encode.forJava(adminApiUrl));
+    logger.info(
+        "Subscribed to {} Kafka topics: {}",
+        getSubscribedTopics().size(),
+        Encode.forJava(String.valueOf(getSubscribedTopics())));
   }
 
   /**
@@ -151,10 +157,10 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
     logger.info(
         "Processing config event - Topic: {}, Operation: {}, TargetComponent: {}, TargetResource: {}",
-        topic,
+        Encode.forJava(topic),
         operation,
-        targetComponent,
-        targetResource);
+        Encode.forJava(String.valueOf(targetComponent)),
+        Encode.forJava(String.valueOf(targetResource)));
 
     ResourceInfo resourceInfo = parseTargetResource(targetResource);
 
@@ -200,7 +206,10 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       }
     }
 
-    logger.debug("Parsed resource - Type: {}, ID: {}", resourceType, resourceId);
+    logger.debug(
+        "Parsed resource - Type: {}, ID: {}",
+        Encode.forJava(String.valueOf(resourceType)),
+        Encode.forJava(String.valueOf(resourceId)));
     return new ResourceInfo(resourceType, resourceId);
   }
 
@@ -210,7 +219,9 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       case UPSTREAM -> createUpstream(event);
       case ROUTE -> createRoute(event);
       case null, default -> {
-        logger.warn("Unknown resource type for create: {}", resourceInfo.type);
+        logger.warn(
+            "Unknown resource type for create: {}",
+            Encode.forJava(String.valueOf(resourceInfo.type)));
         throw new FatalAdapterException(AdapterErrorCode.INVALID_RESOURCE_TYPE, resourceInfo.type);
       }
     }
@@ -222,7 +233,9 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       case UPSTREAM -> updateUpstream(resourceInfo.id, event);
       case ROUTE -> updateRoute(resourceInfo.id, event);
       default -> {
-        logger.warn("Unknown resource type for update: {}", resourceInfo.type);
+        logger.warn(
+            "Unknown resource type for update: {}",
+            Encode.forJava(String.valueOf(resourceInfo.type)));
         throw new FatalAdapterException(AdapterErrorCode.INVALID_RESOURCE_TYPE, resourceInfo.type);
       }
     }
@@ -234,7 +247,9 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       case UPSTREAM -> deleteUpstream(resourceInfo.id, event);
       case ROUTE -> deleteRoute(resourceInfo.id, event);
       default -> {
-        logger.warn("Unknown resource type for delete: {}", resourceInfo.type);
+        logger.warn(
+            "Unknown resource type for delete: {}",
+            Encode.forJava(String.valueOf(resourceInfo.type)));
         throw new FatalAdapterException(AdapterErrorCode.INVALID_RESOURCE_TYPE, resourceInfo.type);
       }
     }
@@ -251,7 +266,10 @@ public class ApisixAdapter extends AbstractConfigAdapter {
    */
   private RetryableAdapterException wrapNetworkException(
       ProcessingException e, AdapterOperation operation) {
-    logger.warn("Network error during {}: {}", operation.getDescription(), e.getMessage());
+    logger.warn(
+        "Network error during {}: {}",
+        operation.getDescription(),
+        Encode.forJava(String.valueOf(e.getMessage())));
     return new RetryableAdapterException(
         AdapterErrorCode.NETWORK_ERROR, e, ADAPTER_NAME, e.getMessage());
   }
@@ -279,13 +297,21 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
     // HTTP 5xx - Server errors are retryable
     if (status >= 500) {
-      logger.warn("APISIX server error during {}: {} {}", operation.getDescription(), status, body);
+      logger.warn(
+          "APISIX server error during {}: {} {}",
+          operation.getDescription(),
+          status,
+          Encode.forJava(body));
       throw new RetryableAdapterException(
           AdapterErrorCode.SERVICE_UNAVAILABLE, ADAPTER_NAME, status);
     }
 
     // HTTP 4xx - Client errors are fatal
-    logger.error("APISIX client error during {}: {} {}", operation.getDescription(), status, body);
+    logger.error(
+        "APISIX client error during {}: {} {}",
+        operation.getDescription(),
+        status,
+        Encode.forJava(body));
     throw new FatalAdapterException(errorCode, HTTP_STATUS_PREFIX + status + ": " + body);
   }
 
@@ -456,7 +482,9 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
     // Exceptions propagate to KafkaEventHandler for retry/DLQ handling
     getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
-    logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
+    logger.debug(
+        "Published SUCCESS result to topic: {}",
+        Encode.forJava(originalEvent.metadata().resultTopic()));
   }
 
   @Override
