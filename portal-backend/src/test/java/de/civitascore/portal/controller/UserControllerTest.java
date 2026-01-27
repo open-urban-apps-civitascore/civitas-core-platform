@@ -44,7 +44,6 @@ class UserControllerTest {
         PrincipalUserDetails.builder()
             .username("testuser")
             .email("test@example.com")
-            .tenantId("test-tenant")
             .givenName("Test")
             .familyName("User")
             .authorities(
@@ -63,7 +62,6 @@ class UserControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.username").value("testuser"))
         .andExpect(jsonPath("$.email").value("test@example.com"))
-        .andExpect(jsonPath("$.tenantId").value("test-tenant"))
         .andExpect(jsonPath("$.firstName").value("Test"))
         .andExpect(jsonPath("$.lastName").value("User"))
         .andExpect(jsonPath("$.roles").isArray())
@@ -80,7 +78,6 @@ class UserControllerTest {
         PrincipalUserDetails.builder()
             .username("admin")
             .email("admin@example.com")
-            .tenantId("tenant-1")
             .givenName("Admin")
             .familyName("User")
             .authorities(
@@ -113,7 +110,6 @@ class UserControllerTest {
         PrincipalUserDetails.builder()
             .username("noroles")
             .email("noroles@example.com")
-            .tenantId("tenant-2")
             .givenName("No")
             .familyName("Roles")
             .authorities(List.of())
@@ -150,7 +146,6 @@ class UserControllerTest {
             .title(UserTitleType.MS)
             .username("factorytest")
             .email("factory@test.com")
-            .tenantId("factory-tenant")
             .givenName("Factory")
             .familyName("Test")
             .authorities(List.of(new SimpleGrantedAuthority("ROLE_TESTER")))
@@ -162,7 +157,6 @@ class UserControllerTest {
     // then
     assertThat(output.username()).isEqualTo("factorytest");
     assertThat(output.email()).isEqualTo("factory@test.com");
-    assertThat(output.tenantId()).isEqualTo("factory-tenant");
     assertThat(output.firstName()).isEqualTo("Factory");
     assertThat(output.lastName()).isEqualTo("Test");
     assertThat(output.roles()).containsExactly("TESTER");

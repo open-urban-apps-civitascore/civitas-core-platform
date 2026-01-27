@@ -34,8 +34,9 @@ services:
       SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KEYCLOAK_AUTH_SERVER_URL: http://keycloak:8080
-      KEYCLOAK_REALM: master
-      KEYCLOAK_TARGET_REALM: master
+      KEYCLOAK_ISSUER_URI: http://localhost:8080
+      KEYCLOAK_REALM: civitas-core
+      KEYCLOAK_TARGET_REALM: civitas-core
       APP_URL: http://localhost:8089
       SERVER_PORT: 8089
       SPRING_PROFILES_ACTIVE: local,postgres

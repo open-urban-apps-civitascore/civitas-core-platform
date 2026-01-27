@@ -23,9 +23,10 @@ spring:
       bootstrap-servers: localhost:9092
 
 keycloak:
-  realm: "master"
+  realm: "civitas-core"
   auth-server-url: http://keycloak:8080
-  target-realm: "master"
+  issuer-uri: http://localhost:8080
+  target-realm: "civitas-core"
 
 kafka:
   enabled: true
