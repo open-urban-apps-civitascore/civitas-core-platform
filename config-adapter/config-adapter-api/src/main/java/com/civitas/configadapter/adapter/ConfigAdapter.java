@@ -11,6 +11,7 @@
 package com.civitas.configadapter.adapter;
 
 import com.civitas.configadapter.ConfigBase;
+import com.civitas.configadapter.exception.AdapterException;
 import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
@@ -25,4 +26,13 @@ public interface ConfigAdapter extends ConfigBase {
   List<String> getSubscribedTopics();
 
   void setEventPublisher(EventPublisher publisher);
+
+  /**
+   * Publishes a failure result event for the given config event and exception. This is a
+   * best-effort operation — exceptions during publishing are caught and logged.
+   *
+   * @param event the original config event (may be null)
+   * @param exception the adapter exception that caused the failure
+   */
+  void publishFailureResult(ConfigEvent event, AdapterException exception);
 }

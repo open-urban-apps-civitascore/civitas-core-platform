@@ -21,7 +21,6 @@ import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
-import com.civitas.configadapter.model.idm.IdmConfigValue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
@@ -336,7 +335,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
               maxRetries,
               record.value().getId(),
               e.getInternalMessage());
-          sendToDLQ(record, e);
+          sendToDLQ(record, e, true);
           return;
         }
 
@@ -354,40 +353,47 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
         } catch (InterruptedException ie) {
           Thread.currentThread().interrupt();
           logger.warn("Retry sleep interrupted for event {}", record.value().getId());
-          sendToDLQ(record, e);
+          sendToDLQ(record, e, true);
           return;
         }
       } catch (FatalAdapterException e) {
+        // Failure result already published by AbstractConfigAdapter template method
         logger.error(
             "Fatal error processing event {}. Sending to DLQ immediately. Error: {}",
             record.value().getId(),
             e.getInternalMessage());
-        sendToDLQ(record, e);
+        sendToDLQ(record, e, false);
         return;
       } catch (Exception e) {
         // Wrap unknown exceptions as fatal and send to DLQ
+        // These originate from CloudEventProcessor (e.g., deserialization), not the adapter
         logger.error(
             "Unexpected error processing event {}. Wrapping as fatal and sending to DLQ.",
             record.value().getId(),
             e);
         FatalAdapterException wrapped =
             new FatalAdapterException(AdapterErrorCode.UNKNOWN_ERROR, e, e.getMessage());
-        sendToDLQ(record, wrapped);
+        sendToDLQ(record, wrapped, true);
         return;
       }
     }
   }
 
   /**
-   * Sends a failed event to the Dead Letter Queue (DLQ) and publishes a failure result event. This
-   * method is synchronous to ensure data safety - if DLQ send fails, an exception is thrown so the
-   * event will be reprocessed on the next poll.
+   * Sends a failed event to the Dead Letter Queue (DLQ). Optionally delegates failure result
+   * publishing to the adapter. This method is synchronous to ensure data safety - if DLQ send
+   * fails, an exception is thrown so the event will be reprocessed on the next poll.
    *
    * @param record the original Kafka record
    * @param exception the adapter exception that caused the failure
+   * @param publishFailure if true, delegates failure result publishing to the adapter (for cases
+   *     where the adapter's template method has not yet published a failure result)
    * @throws RuntimeException if DLQ send fails, causing the event to be reprocessed
    */
-  private void sendToDLQ(ConsumerRecord<String, CloudEvent> record, AdapterException exception) {
+  private void sendToDLQ(
+      ConsumerRecord<String, CloudEvent> record,
+      AdapterException exception,
+      boolean publishFailure) {
     CloudEvent originalEvent = record.value();
 
     try {
@@ -409,8 +415,9 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
 
       logger.info("Sent event {} to DLQ topic {}", originalEvent.getId(), dlqTopic);
 
-      // Also publish failure result event if we can extract the original ConfigEvent
-      publishFailureResult(originalEvent, record.topic(), exception);
+      if (publishFailure) {
+        delegateFailureResultToAdapter(originalEvent, exception);
+      }
 
     } catch (Exception e) {
       logger.error(
@@ -424,14 +431,14 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   }
 
   /**
-   * Publishes a failure result event for the failed original event.
+   * Delegates failure result publishing to the adapter by deserializing the original CloudEvent
+   * data into a ConfigEvent and calling the adapter's publishFailureResult method.
    *
    * @param originalEvent the original CloudEvent that failed
-   * @param topic the original topic
    * @param exception the adapter exception that caused the failure
    */
-  private void publishFailureResult(
-      CloudEvent originalEvent, String topic, AdapterException exception) {
+  private void delegateFailureResultToAdapter(
+      CloudEvent originalEvent, AdapterException exception) {
     try {
       if (originalEvent.getData() == null) {
         logger.debug("Cannot publish failure result: original event has no data");
@@ -442,27 +449,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
       ConfigEvent configEvent =
           objectMapper.readValue(originalEvent.getData().toBytes(), ConfigEvent.class);
 
-      if (configEvent.metadata() == null || configEvent.metadata().resultTopic() == null) {
-        logger.debug("Cannot publish failure result: no result topic in metadata");
-        return;
-      }
-
-      ConfigResultEvent failureResult =
-          ConfigResultEvent.failure(
-              configEvent.metadata().correlationId(),
-              configEvent.metadata().messageId(),
-              exception.getFullErrorIdentifier(),
-              exception.getSafeExternalMessage(),
-              configEvent.payload() != null ? configEvent.payload().operation() : null,
-              configEvent.payload() != null ? configEvent.payload().targetResource() : null,
-              adapter != null ? adapter.getName() : "unknown",
-              IdmConfigValue.IDM_RESULT_TYPE);
-
-      publish(configEvent.metadata().resultTopic(), failureResult);
-      logger.debug(
-          "Published failure result for event {} to topic {}",
-          originalEvent.getId(),
-          configEvent.metadata().resultTopic());
+      adapter.publishFailureResult(configEvent, exception);
 
     } catch (Exception e) {
       logger.warn(

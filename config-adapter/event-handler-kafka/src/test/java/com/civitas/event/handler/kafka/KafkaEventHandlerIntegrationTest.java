@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
+import com.civitas.configadapter.exception.AdapterException;
 import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
@@ -380,6 +381,11 @@ class KafkaEventHandlerIntegrationTest {
     public void setProcessCallback(ProcessCallback callback) {
       processedEvents.clear();
       this.processCallback = callback;
+    }
+
+    @Override
+    public void publishFailureResult(ConfigEvent event, AdapterException exception) {
+      // Not needed for this test
     }
 
     @Override

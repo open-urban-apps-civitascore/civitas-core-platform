@@ -143,7 +143,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   }
 
   @Override
-  public void processConfigEvent(String topic, ConfigEvent event)
+  protected void doProcessConfigEvent(String topic, ConfigEvent event)
       throws FatalAdapterException, RetryableAdapterException {
     Operation operation = event.payload().operation();
     String targetResource = event.payload().targetResource();
@@ -167,6 +167,11 @@ public class ApisixAdapter extends AbstractConfigAdapter {
         throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
       }
     }
+  }
+
+  @Override
+  protected String getResultType() {
+    return APISIX_RESULT_TYPE;
   }
 
   /**

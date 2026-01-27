@@ -125,7 +125,7 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
   }
 
   @Override
-  public void processConfigEvent(String topic, ConfigEvent event)
+  protected void doProcessConfigEvent(String topic, ConfigEvent event)
       throws FatalAdapterException, RetryableAdapterException {
     if (event == null) {
       logger.warn("Null event send to topic {}", topic);
@@ -142,36 +142,32 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         targetComponent,
         targetResource);
 
-    try {
-      // Use semantic fields: targetComponent is the resource type, targetResource is the realm
-      String resourceId = extractResourceId(event);
+    // Use semantic fields: targetComponent is the resource type, targetResource is the realm
+    String resourceId = extractResourceId(event);
 
-      ResourceInfo resourceInfo =
-          new ResourceInfo(ResourceType.fromString(targetComponent), targetResource, resourceId);
+    ResourceInfo resourceInfo =
+        new ResourceInfo(ResourceType.fromString(targetComponent), targetResource, resourceId);
 
-      logger.debug(
-          "Resource info - Type: {}, Realm: {}, ID: {}",
-          resourceInfo.type,
-          resourceInfo.realm,
-          resourceInfo.id);
+    logger.debug(
+        "Resource info - Type: {}, Realm: {}, ID: {}",
+        resourceInfo.type,
+        resourceInfo.realm,
+        resourceInfo.id);
 
-      switch (operation) {
-        case CREATE -> handleCreate(resourceInfo, event);
-        case UPDATE -> handleUpdate(resourceInfo, event);
-        case DELETE -> handleDelete(resourceInfo, event);
-        default -> {
-          logger.warn("Unknown operation: {}", operation);
-          throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
-        }
+    switch (operation) {
+      case CREATE -> handleCreate(resourceInfo, event);
+      case UPDATE -> handleUpdate(resourceInfo, event);
+      case DELETE -> handleDelete(resourceInfo, event);
+      default -> {
+        logger.warn("Unknown operation: {}", operation);
+        throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
       }
-
-    } catch (FatalAdapterException | RetryableAdapterException e) {
-      // Re-throw adapter exceptions for the Kafka handler to process
-      throw e;
-    } catch (Exception e) {
-      logger.error("Failed to process config event", e);
-      throw new FatalAdapterException(AdapterErrorCode.UNKNOWN_ERROR, e, maskPII(e.getMessage()));
     }
+  }
+
+  @Override
+  protected String getResultType() {
+    return IdmConfigValue.IDM_RESULT_TYPE;
   }
 
   /**

@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
+import com.civitas.configadapter.exception.AdapterException;
 import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
@@ -462,6 +463,11 @@ class KafkaEventHandlerRetryIntegrationTest {
 
     @Override
     public void setEventPublisher(EventPublisher publisher) {
+      // Not needed for this test
+    }
+
+    @Override
+    public void publishFailureResult(ConfigEvent event, AdapterException exception) {
       // Not needed for this test
     }
 
