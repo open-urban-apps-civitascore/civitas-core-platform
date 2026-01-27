@@ -1,6 +1,7 @@
 'use client'
 
 import { Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 
@@ -23,6 +24,7 @@ interface DatasourcesListProps {
 export const DatasourcesList = (props: DatasourcesListProps) => {
   const { datasources, rowCount } = props
   const t = useTranslations('datasources')
+  const router = useRouter()
   const {
     pageIndex,
     pageSize,
@@ -38,7 +40,7 @@ export const DatasourcesList = (props: DatasourcesListProps) => {
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
   const CustomElement = (
-    <Button data-testid="addDatasourcesButton" onClick={() => console.log('/datasources/create')}>
+    <Button data-testid="addDatasourceButton" onClick={() => router.push('/datasources/create')}>
       <Plus />
       {t('newDatasource')}
     </Button>
@@ -59,6 +61,7 @@ export const DatasourcesList = (props: DatasourcesListProps) => {
             totalPages={totalPages}
             onPaginationChange={setPaginationParams}
             onSortingChange={setSortingParams}
+            onRowClick={datasource => router.push(`/datasources/${datasource.id}`)}
           />
         </TableContainer>
       </PageBackground>

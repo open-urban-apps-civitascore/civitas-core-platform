@@ -25,7 +25,10 @@
       "minChar": "The input has to be at least {amount} characters.",
       "notFound": "No {items} found",
       "loadingError": "Error while loading data",
-      "unexpectedError": "An unexpected error occurred. Please try again."
+      "unexpectedError": "An unexpected error occurred. Please try again.",
+      "nameRequired": "Name is required",
+      "descriptionRequired": "Description is required",
+      "descriptionMaxLength": "Description must be 150 characters or less"
     },
     "items": {
       "users": "Users",
@@ -363,7 +366,7 @@
       }
     }
   },
-    "datasources": {
+  "datasources": {
     "title": "Overview: Data Sources",
     "subtitle": "All data sources available in our tenant.",
     "newDatasource": "Create Data Source",
@@ -385,6 +388,47 @@
       "active": "active",
       "inactive": "inactive",
       "static": "static"
+    },
+    "create": {
+      "title": "New Data Source",
+      "subtitle": "New data sources are only visible internally.",
+      "basicInfo": {
+        "title": "Base Information",
+        "subtitle": "The name can be changed later."
+      }
+    },
+    "edit": {
+      "basicInfo": {
+        "title": "Base Information",
+        "subtitle": "Base information can be changed later."
+      }
+    },
+    "tabs": {
+      "basicInfo": "Base Information",
+      "connector": "Connector",
+      "dataStructure": "Data Structure",
+      "accessPermissions": "Access Permissions",
+      "dataspaces": "Data Spaces"
+    },
+    "form": {
+      "name": "Name",
+      "namePlaceholder": "Name of the data source",
+      "description": "Description",
+      "descriptionHint": "max. 150 characters",
+      "tags": "Tags",
+      "tagsOptional": "(optional)",
+      "tagsPlaceholder": "Add tag...",
+      "tagsSearch": "Search tag...",
+      "noTagsFound": "No tags found"
+    },
+    "actions": {
+      "saveAndContinue": "Save and continue",
+      "exit": "Exit"
+    },
+    "exitModal": {
+      "title": "Save before exiting?",
+      "description": "There are unsaved changes. \"Discard\" cannot be undone.",
+      "discard": "Discard"
     }
   }
 }

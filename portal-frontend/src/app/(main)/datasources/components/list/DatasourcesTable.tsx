@@ -16,7 +16,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface DatasourcesTableProps extends TableProps<Datasource> {
   datasources: Datasource[]
-  onDelete?: (id: string) => void
+  onDelete?: (id: number) => void
 }
 
 export const DatasourcesTable = (props: DatasourcesTableProps) => {
@@ -165,7 +165,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
   ]
 
   const table = useReactTable({
-    getRowId: row => row.id,
+    getRowId: row => String(row.id),
     columns: columns,
     data: datasources,
     rowCount,
