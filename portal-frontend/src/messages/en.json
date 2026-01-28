@@ -429,6 +429,13 @@
       "title": "Save before exiting?",
       "description": "There are unsaved changes. \"Discard\" cannot be undone.",
       "discard": "Discard"
+    },
+    "connectorTab": {
+      "title1": "Connector",
+      "title2": "Configuration",
+      "type": "Type",
+      "connection": "Connection",
+      "establishConnection": "Establish Connection"
     }
   }
 }

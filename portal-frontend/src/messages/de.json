@@ -430,6 +430,13 @@
       "title": "Vor dem Beenden speichern?",
       "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
       "discard": "Verwerfen"
+    },
+    "connectorTab": {
+      "title1": "Konnektor",
+      "title2": "Konfiguration",
+      "type": "Typ",
+      "connection": "Verbindung",
+      "establishConnection": "Verbindung herstellen"
     }
   }
 }

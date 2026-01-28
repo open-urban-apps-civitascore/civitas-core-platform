@@ -3,8 +3,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Resolver, useForm } from 'react-hook-form'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
@@ -15,20 +15,26 @@ import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
 import {
-  Datasource,
+  BaseDatasource,
+  buildConnectorDefaultConfig,
+  buildDatasourceFormSchema,
+  ConnectorConfig,
+  ConnectorType,
   DATASOURCE_STATUS_TYPES,
+  DatasourceBaseFormData,
   DatasourceFormData,
-  DatasourceFormSchema,
   DatasourceStatusType,
 } from '@/types/datasources'
 
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
+import { NODE_DEFS } from './connector-tab/connector_sources'
 import { ExitWarningModal } from './ExitWarningModal'
 import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'
 import { StatusDropdown } from './StatusDropdown'
+import { ConnectorTab } from './connector-tab/ConnectorTab'
 
 interface DatasourceOverviewProps {
-  datasource: Datasource
+  datasource: BaseDatasource
 }
 
 export const DatasourceOverview = (props: DatasourceOverviewProps) => {
@@ -45,8 +51,22 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const updateDatasource = useUpdateDatasource()
   const isLoading = updateDatasource.isPending
 
+  const resolver: Resolver<DatasourceFormData> = useCallback(
+    async values => {
+      const schema = buildDatasourceFormSchema(
+        values.connector?.type
+          ? (NODE_DEFS[values.connector.type as ConnectorType].properties as ConnectorConfig[])
+          : [],
+        datasource.status,
+      )
+
+      return zodResolver(schema)(values, {}, {})
+    },
+    [datasource.status],
+  )
+
   const form = useForm<DatasourceFormData>({
-    resolver: zodResolver(DatasourceFormSchema),
+    resolver,
     mode: 'onChange',
     defaultValues: {
       id: datasource.id,
@@ -54,12 +74,38 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       description: datasource.description,
       tags: datasource.tags,
       status: datasource.status,
+      connector: {
+        type: datasource.connector.type,
+        config: null,
+      },
     },
   })
+
+  const connectorTypeWatch = form.watch('connector.type')
+
+  const connectorConfig = useMemo(
+    () => (connectorTypeWatch ? (NODE_DEFS[connectorTypeWatch].properties as ConnectorConfig[]) : []),
+    [connectorTypeWatch],
+  )
+
+  const schema = useMemo(() => {
+    return buildDatasourceFormSchema(connectorConfig, datasource.status)
+  }, [connectorConfig, datasource.status])
+
+  useEffect(() => {
+    const defaults = buildConnectorDefaultConfig(connectorConfig)
+    form.reset(form.getValues(), {
+      keepValues: true,
+      keepDirty: true,
+    })
+    form.setValue('connector.config', defaults)
+  }, [schema, connectorConfig, form])
 
   const statusWatch = form.watch('status')
   const nameWatch = form.watch('name')
   const descriptionWatch = form.watch('description')
+
+  const isDraftMode = statusWatch === DATASOURCE_STATUS_TYPES.DRAFT
 
   // Check if all mandatory fields are filled to enable "Available" status
   const canSetAvailable = useMemo(() => {
@@ -84,14 +130,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }, [nameWatch, descriptionWatch])
 
   // Tabs that are disabled (for future implementation)
-  const disabledTabs: DatasourceTab[] = ['connector', 'dataStructure', 'accessPermissions', 'dataspaces']
+  const disabledTabs: DatasourceTab[] = ['dataStructure', 'accessPermissions', 'dataspaces']
 
   const handleStatusChange = (newStatus: DatasourceStatusType) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
 
-  const submitDatasource = (onSuccess: (data: DatasourceFormData) => void) => {
-    const submitHandler = (formData: DatasourceFormData) => {
+  const submitDatasource = (onSuccess: (data: DatasourceBaseFormData) => void) => {
+    const submitHandler = (formData: DatasourceBaseFormData) => {
       const data = {
         id: formData.id,
         name: formData.name,
@@ -102,7 +148,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       updateDatasource.mutate(data, { onSuccess: () => onSuccess(data) })
     }
 
-    if (statusWatch === DATASOURCE_STATUS_TYPES.DRAFT) {
+    if (isDraftMode) {
       // In draft mode, only validate name (always required) and bypass other validation
       if (nameWatch.length > 0) {
         submitHandler(form.getValues())
@@ -142,8 +188,9 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const renderTabContent = () => {
     switch (selectedTab) {
       case 'basicInfo':
-        return <BasicInfoTab form={form} isDraftMode={statusWatch === DATASOURCE_STATUS_TYPES.DRAFT} />
+        return <BasicInfoTab form={form} isDraftMode={isDraftMode} />
       case 'connector':
+        return <ConnectorTab form={form} isDraftMode={isDraftMode} config={connectorConfig}/>
       case 'dataStructure':
       case 'accessPermissions':
       case 'dataspaces':

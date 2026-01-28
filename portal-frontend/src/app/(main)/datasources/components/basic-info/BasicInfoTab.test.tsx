@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
-import { DatasourceFormData, DatasourceFormSchema } from '@/types/datasources'
+import { DatasourceBaseFormData, DatasourceBaseFormSchema } from '@/types/datasources'
 
 import { BasicInfoTab } from './BasicInfoTab'
 
@@ -35,7 +35,7 @@ vi.mock('./TagsMultiSelect', () => ({
   ),
 }))
 
-const defaultFormValues: DatasourceFormData = {
+const defaultFormValues: DatasourceBaseFormData = {
   id: 1,
   name: '',
   description: '',
@@ -46,12 +46,12 @@ const defaultFormValues: DatasourceFormData = {
 interface WrapperProps {
   isReadOnly?: boolean
   isDraftMode?: boolean
-  initialValues?: Partial<DatasourceFormData>
+  initialValues?: Partial<DatasourceBaseFormData>
 }
 
 const TestWrapper = ({ isReadOnly = false, isDraftMode = false, initialValues = {} }: WrapperProps) => {
-  const form = useForm<DatasourceFormData>({
-    resolver: zodResolver(DatasourceFormSchema),
+  const form = useForm<DatasourceBaseFormData>({
+    resolver: zodResolver(DatasourceBaseFormSchema),
     defaultValues: { ...defaultFormValues, ...initialValues },
   })
 

@@ -10,12 +10,12 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { Badge } from '@/components/ui/badge'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
 import { cn } from '@/lib/utils'
-import { CONNECTION_TYPES, Datasource, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
+import { BaseDatasource, CONNECTION_TYPES, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
-interface DatasourcesTableProps extends TableProps<Datasource> {
-  datasources: Datasource[]
+interface DatasourcesTableProps extends TableProps<BaseDatasource> {
+  datasources: BaseDatasource[]
   onDelete?: (id: number) => void
 }
 
@@ -36,7 +36,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
   const locale = useLocale() as AppLocale
-  const columnHelper = createColumnHelper<Datasource>()
+  const columnHelper = createColumnHelper<BaseDatasource>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -156,7 +156,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     }),
     {
       id: 'actions',
-      cell: ({ row }: { row: Row<Datasource> }) => (
+      cell: ({ row }: { row: Row<BaseDatasource> }) => (
         <TableDropdownMenu
           menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDelete?.(row.original.id) }]}
         />
