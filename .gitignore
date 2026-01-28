@@ -13,3 +13,4 @@ gl-dependency-scanning.json
 /.idea/
 /test-results/
 **/.DS_Store
+errorlogs.txt

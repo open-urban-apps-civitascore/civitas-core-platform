@@ -13,13 +13,13 @@ It's crunch time for the v2.0 release. The v2.0 release is already three months 
 | Team 1 | Configuration Adapters | Own the Kafka-based Config Adapter for APISIX. May own FROST server integration later. |
 | Team 2 | Portal Frontend & Backend | We hand them our Next.js proxy changes. They owe us HTTP-to-permission operation mappings. |
 | Team 3 | Deployment / DevOps / Kubernetes | We hand them our docker-compose and config. They produce Helm charts and manage prod deployment. Not operations — we build a product. |
-| Us (infosec) | AuthZ implementation | Not a standing platform team. Helping out with engineering during crunch. Building APISIX + OPA + AuthZ Adapter + Rego + frontend proxy changes. |
+| Us (infosec) | AuthZ implementation | Not a standing platform team. Helping out with engineering during crunch. Building APISIX + OPA + AuthZ Repository + Rego + frontend proxy changes. |
 
 ## What We Own vs. Hand Off
 
 | Artifact | We Build | We Hand To |
 |----------|----------|------------|
-| AuthZ Adapter (Java) | Production-ready code + tests + Dockerfile | Team 3 (deployment) |
+| AuthZ Repository (Java) | Production-ready code + tests + Dockerfile | Team 3 (deployment) |
 | Rego policies + tests | Production-ready | Team 3 (deployment) |
 | APISIX config | Dev docker-compose | Team 3 (adapts for k8s) |
 | OPA deployment config | Dev docker-compose | Team 3 (adapts for k8s) |
@@ -50,7 +50,7 @@ It's crunch time for the v2.0 release. The v2.0 release is already three months 
 - **Portal Backend**: Spring Boot 3.5.7. Builds and runs. 8 REST controllers with standard CRUD (assignments, datasets, dataspaces, groups, permissions, roles, users, catalogs). API completeness unverified.
 - **Portal Frontend**: Next.js 15 + React 19. Builds. CSP fix applied (unsafe-eval for dev). BFF proxy exists at `src/app/api/[...path]/route.ts` — this is the single point we change for APISIX routing.
 - **Frontend ↔ Backend integration**: Unverified, assumed broken.
-- **APISIX / OPA / AuthZ Adapter**: Not yet deployed. This is what we're building.
+- **APISIX / OPA / AuthZ Repository**: Not yet deployed. This is what we're building.
 
 ## Security Posture Notes
 

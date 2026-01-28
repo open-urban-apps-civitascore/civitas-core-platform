@@ -2,6 +2,33 @@
 
 Running log of changes made to the codebase by Claude Code.
 
+## 2026-01-30
+
+### Handoff: portal-model Extraktion
+- Created handoff document for Team 2: `docs/claude/handoff/TEAM2-PORTAL-MODEL-EXTRAKTION.md`
+- Proposal to extract shared JPA entities into separate `portal-model` module
+- Enables authz-repository to use shared entities without code duplication
+- Blocked on Team 2 completing the extraction
+
+### Code Review Processing
+- **R-001/R-002**: Simplified APISIX openid-connect config
+  - Replaced client_id/client_secret with "unused" (required by plugin syntax but not used)
+  - Removed public_key fallback (trust network reliability)
+- **R-003**: Moved E2E smoke tests to `portal-frontend/e2e/authz/` to avoid Team 2 territory
+- **R-004**: Clarified APISIX gateway routing
+  - Added comments in `.env.local.template` explaining gateway URL config for Team 3
+  - Added comments in `route.ts` explaining the BFF → APISIX → Backend flow
+  - Verified traffic flows through APISIX (confirmed via access logs)
+- **R-005**: Renamed `authz/adapter` → `authz/repository`
+  - Package: `de.civitascore.authz.adapter` → `de.civitascore.authz.repository`
+  - Inner package: `.repository` → `.data` (avoid double "repository")
+  - Application: `AuthzAdapterApplication` → `AuthzRepositoryApplication`
+  - All 19 tests passing
+- **R-006**: Decided to keep persistence separate from portal-backend (security boundary)
+- **R-007**: Kept Lombok (no security concerns, compile-time only)
+- **R-008**: Kept @Setter on entities (needed for JPA/tests), read-only enforced at DB level
+- **R-009**: Added table names list in application.yaml comment
+
 ## 2026-01-28
 
 ### M2: APISIX JWT Validation — COMPLETE
@@ -13,6 +40,23 @@ Running log of changes made to the codebase by Claude Code.
 - Added `groups` protocol mapper to portal-frontend client in Keycloak
 - Created `test-users` group and added testuser to it
 - Verified: JWT now contains `"groups": ["test-users"]`
+
+### M3: AuthZ Adapter Service — COMPLETE
+- Created `/authz/adapter/` Spring Boot project (Java 21, Spring Boot 3.5.0, Spring Data JPA)
+- Implemented JPA entities: User, Group, Assignment, Role, Permission (matching portal-backend schema)
+- Implemented `GET /api/v1/user-context/{externalId}` endpoint
+  - Single query with JOIN FETCH for users → groups → assignments → roles → permissions
+  - Returns nested JSON with groups, assignments (role + scope), and permissions
+- Created Dockerfile: multi-stage build, non-root user, healthcheck on `/actuator/health`
+- Integration tests with Testcontainers (9 tests, ~8s)
+  - Core: single group, multiple groups, no groups, unknown user (404), health endpoint
+  - Edge cases: group with no assignments, role with no permissions, 10+ permissions sorted, same role at different scopes
+- Unit tests for UserContextService (10 tests): mapping logic, null handling, sorting
+- Fixed Docker 29+ compatibility: added `docker-java.properties` with `api.version=1.44`
+
+### M3 Scope Update
+- Removed hierarchical groups and inherited assignments from M3 requirements (out of scope for this release)
+- Updated MILESTONES.md to reflect flat group membership and direct assignments only
 
 ### B-002: BFF Cookie Forwarding Causes 400 Errors
 - **Root Cause**: BFF proxy route forwarded ALL headers including the huge NextAuth session cookie to backend

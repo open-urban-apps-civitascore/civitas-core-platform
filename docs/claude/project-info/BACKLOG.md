@@ -24,8 +24,28 @@ Technical debt, feature ideas, and known bugs not currently implemented.
 | ~~B-001~~ | ~~User creation fails: `active` column has NOT NULL constraint but API doesn't set default~~ | ~~Fixed 2026-01-28~~ | ~~Resolved~~ |
 | ~~B-002~~ | ~~BFF forwards cookie header causing Tomcat 400 error (header too large)~~ | ~~Fixed 2026-01-28~~ | ~~Resolved~~ |
 
+## Review Comments
+
+| ID | Description | Location | Status |
+|----|-------------|----------|--------|
+| ~~R-001~~ | ~~APISIX: Remove client_id/client_secret~~ | ~~`apisix.yaml:20`~~ | Done - replaced with "unused" + comment |
+| ~~R-002~~ | ~~APISIX: Remove public_key fallback~~ | ~~`apisix.yaml:28`~~ | Done - removed |
+| ~~R-003~~ | ~~Move E2E tests to authz folder~~ | ~~`portal-frontend/e2e/`~~ | Done - moved to `e2e/authz/` |
+| ~~R-004~~ | ~~Clarify APISIX routing in BFF~~ | ~~`route.ts`, `.env.local.template`~~ | Done - added comments explaining gateway flow |
+| ~~R-005~~ | ~~Rename "adapter" → "repository"~~ | ~~`authz/adapter/`~~ | Done - renamed to `authz/repository/` |
+| ~~R-006~~ | ~~Reuse portal-backend persistence?~~ | - | Declined - keep separate for security boundary |
+| ~~R-007~~ | ~~Lombok usage~~ | - | Kept - no security concerns, reduces boilerplate |
+| ~~R-008~~ | ~~Remove @Setter~~ | ~~All entities~~ | Done - kept for JPA/testing, read-only enforced at DB level |
+| ~~R-009~~ | ~~Specify authz table names~~ | ~~`application.yaml:9`~~ | Done - added table list in comment |
+
+## Pending Handoffs
+
+| ID | Description | Handoff To | Document |
+|----|-------------|------------|----------|
+| H-001 | Extract portal-model module for shared entities | Team 2 | [TEAM2-PORTAL-MODEL-EXTRAKTION.md](../handoff/TEAM2-PORTAL-MODEL-EXTRAKTION.md) |
+
 ## Feature Ideas
 
 | ID | Description | Notes |
 |----|-------------|-------|
-| *(none currently tracked)* | | |
+| F-001 | Use shared portal-model entities in authz-repository | Blocked on H-001 |

@@ -1,0 +1,15 @@
+# APISIX Configuration for Authorization PoC
+# M1.2: Basic passthrough proxy (no auth yet)
+
+apisix:
+  node_listen: 9080              # APISIX HTTP port
+  enable_ipv6: false
+
+deployment:
+  role: data_plane
+  role_data_plane:
+    config_provider: yaml
+
+nginx_config:
+  error_log: /dev/stderr
+  error_log_level: warn

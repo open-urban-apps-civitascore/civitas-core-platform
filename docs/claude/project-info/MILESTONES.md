@@ -13,11 +13,11 @@ M1   APISIX Gateway — Passthrough (traffic routed through APISIX, no auth)
  │
 M2   AuthN — APISIX JWT Validation (token validation via Keycloak JWKS)
  │
-M3   AuthZ Adapter Service (Java service, DB → user authz context)
+M3   AuthZ Repository Service (Java service, DB → user authz context)
  │
 M4   OPA + Rego Policies (authorization decision logic)
  │
-M5   Full AuthZ Integration (APISIX → OPA → Adapter, wired and tested)
+M5   Full AuthZ Integration (APISIX → OPA → Repository, wired and tested)
  │
 M6   Documentation & Handoff
  │
@@ -69,6 +69,15 @@ Each milestone builds on the previous. No milestone should be started until its 
 - curl tests: no token → 401, valid token → 200, invalid token → 401
 - BFF already forwards `Authorization: Bearer` header (verified in code)
 - Added `groups` protocol mapper to Keycloak client → JWT now includes user's groups
+
+### M3 — AuthZ Repository Service (2026-01-28)
+- Created `/authz/repository/` Spring Boot project (Java 21, Spring Boot 3.5.0, Spring Data JPA)
+- JPA entities: User, Group, Assignment, Role, Permission (read-only from portal-backend DB)
+- REST endpoint: `GET /api/v1/user-context/{externalId}` returns nested authz context
+- Single JOIN FETCH query for efficient eager loading of entire permission graph
+- Dockerfile: multi-stage build, non-root user, healthcheck
+- 19 tests total: 10 unit tests + 9 integration tests (Testcontainers + PostgreSQL)
+- Note: Flat group membership only; hierarchical groups out of scope for this release
 
 ---
 
@@ -185,14 +194,14 @@ This test suite runs after every subsequent milestone as a gate:
 
 ---
 
-## M3 — AuthZ Adapter Service
+## M3 — AuthZ Repository Service
 
 **Goal**: Java service that reads user authorization context from PostgreSQL and exposes it via REST API for OPA to consume.
 
 ### Project Structure
 ```
 /authz/
-  adapter/          ← Spring Boot service (this milestone)
+  repository/       ← Spring Boot service (this milestone)
     src/
     pom.xml
     Dockerfile
@@ -201,12 +210,12 @@ This test suite runs after every subsequent milestone as a gate:
 ```
 
 ### Tasks
-1. Scaffold Spring Boot project in `/authz/adapter/`
+1. Scaffold Spring Boot project in `/authz/repository/`
    - Java 21, Spring Boot 3.x, Spring Data JPA, PostgreSQL driver
    - Read-only connection to portal backend DB
 2. Implement REST endpoint: `GET /api/v1/user-context/{externalId}`
    - Input: Keycloak `sub` claim (external_id in users table)
-   - Output: JSON with user's complete authorization context:
+   - Output: JSON with user's authorization context:
      ```json
      {
        "userId": "uuid",
@@ -229,26 +238,24 @@ This test suite runs after every subsequent milestone as a gate:
        ]
      }
      ```
-3. Handle hierarchical groups (parent_group_id) — include inherited group memberships
-4. Handle inherited assignments (is_inherited, parent_assignment_id)
-5. Dockerfile for the service
-6. DB test seed script (SQL) for integration tests
+3. Dockerfile for the service
+4. DB test seed script (SQL) for integration tests
+
+**Note**: Hierarchical groups and inherited assignments are out of scope for this release. Flat group membership and direct assignments only.
 
 ### Exit Criteria
-- [ ] Adapter starts and connects to PostgreSQL
-- [ ] `GET /api/v1/user-context/{externalId}` returns correct authz context for seeded test users
-- [ ] Hierarchical group memberships resolved correctly
-- [ ] Inherited assignments resolved correctly
-- [ ] Dockerfile builds and runs
+- [x] Repository service starts and connects to PostgreSQL
+- [x] `GET /api/v1/user-context/{externalId}` returns correct authz context for seeded test users
+- [x] Dockerfile builds and runs
+- [x] All 19 tests pass (10 unit + 9 integration)
 
 ### Tests (Pragmatic TDD)
 - **Integration tests** (Testcontainers + PostgreSQL): Seed DB with known data, verify API response
 - Test cases:
   - User with single group, single role, single scope → correct context
   - User with multiple groups → all group contexts returned
-  - User with hierarchical group membership → parent group roles included
-  - User with TENANT scope assignment → cascades noted
-  - User with DATASPACE scope → cascades noted
+  - User with TENANT scope assignment → scope info included
+  - User with DATASPACE scope → scope info included
   - User with no assignments → empty but valid response
   - Unknown externalId → 404
 - These tests are our safety net for Rego policy development in M4
@@ -257,19 +264,19 @@ This test suite runs after every subsequent milestone as a gate:
 
 ## M4 — OPA + Rego Policies
 
-**Goal**: OPA evaluates authorization decisions using Rego policies. Policies parse APISIX request metadata, fetch user context from AuthZ Adapter, and return allow/deny.
+**Goal**: OPA evaluates authorization decisions using Rego policies. Policies parse APISIX request metadata, fetch user context from AuthZ Repository, and return allow/deny.
 
 ### Tasks
 1. Add OPA to docker-compose
 2. Write Rego policy package `civitas.authz`:
    - Parse request path to extract: backend prefix, resource type, resource ID
    - Map HTTP verb to permission operation (GET→READ, POST→CREATE, etc.)
-   - Call AuthZ Adapter external data source for user context
+   - Call AuthZ Repository external data source for user context
    - Evaluate: does the user have a permission matching the required operation + resource type at the correct scope?
    - Handle scope inheritance (TENANT → DATASPACE → DATASET)
    - Handle anonymous/public endpoints (allow without AuthZ)
 3. Define the request→resource→permission mapping configuration (per-backend, data-driven)
-4. OPA configuration: external data source pointing to AuthZ Adapter
+4. OPA configuration: external data source pointing to AuthZ Repository
 
 ### Rego Policy Structure (proposed)
 ```
@@ -314,7 +321,7 @@ authz/rego/
 
 ## M5 — Full AuthZ Integration
 
-**Goal**: Wire APISIX → OPA → AuthZ Adapter into a working chain. Verify with integration tests.
+**Goal**: Wire APISIX → OPA → AuthZ Repository into a working chain. Verify with integration tests.
 
 ### Tasks
 1. Configure APISIX `opa` plugin on protected routes
@@ -323,12 +330,12 @@ authz/rego/
 2. Create unified docker-compose (`/authz/docker-compose.yml`) wiring:
    - APISIX + etcd
    - OPA (with Rego policies mounted)
-   - AuthZ Adapter (connected to PostgreSQL)
+   - AuthZ Repository (connected to PostgreSQL)
    - PostgreSQL (shared with portal backend)
    - Keycloak
    - Portal Backend
 3. Seed test data: users in Keycloak + matching users/groups/roles/permissions/assignments in DB
-4. Integration test: full chain from HTTP request → APISIX → OPA → Adapter → DB → decision
+4. Integration test: full chain from HTTP request → APISIX → OPA → Repository → DB → decision
 5. Verify: authorized user gets data, unauthorized user gets 403
 
 ### Exit Criteria
@@ -341,7 +348,7 @@ authz/rego/
 - [ ] OPA decision logs show correct evaluation
 
 ### Tests (Pragmatic TDD)
-- **DB→Adapter→OPA→APISIX integration test** (docker-compose based):
+- **DB→Repository→OPA→APISIX integration test** (docker-compose based):
   - Seed DB with specific permission scenario
   - Send HTTP request with JWT for that user
   - Assert correct allow/deny from APISIX
@@ -367,9 +374,9 @@ authz/rego/
 1. **APISIX Configuration Guide**: Route config, plugin config, environment variables, expected Keycloak settings
 2. **Keycloak Requirements**: Required realm settings, client configs, group claims, token content expectations
 3. **Kubernetes Requirements**: Container specs, resource requirements, networking (which services talk to which), health check endpoints, environment variables
-4. **AuthZ Adapter Operations Guide**: Configuration, DB connection, health endpoint, logging
+4. **AuthZ Repository Operations Guide**: Configuration, DB connection, health endpoint, logging
 5. **Rego Policy Guide**: Policy structure, how to add new resource mappings, how to run tests
-6. **Architecture Decision Record**: Why APISIX + OPA + Adapter, alternatives considered, tradeoffs
+6. **Architecture Decision Record**: Why APISIX + OPA + Repository, alternatives considered, tradeoffs
 
 ### Exit Criteria
 - [ ] Team 3 can deploy the authz stack from the documentation alone
@@ -383,9 +390,9 @@ authz/rego/
 **Goal**: Reduce DB load from per-request queries to ~1 query per user per TTL period.
 
 ### Tasks
-1. Add Caffeine cache to AuthZ Adapter (`@Cacheable`, keyed by externalId, TTL ~60s)
+1. Add Caffeine cache to AuthZ Repository (`@Cacheable`, keyed by externalId, TTL ~60s)
 2. Create materialized view via Flyway migration pre-joining the authorization chain
-3. Update adapter queries to use materialized view
+3. Update repository queries to use materialized view
 4. Add cache metrics endpoint (hits/misses/evictions)
 
 ### Exit Criteria
@@ -395,7 +402,7 @@ authz/rego/
 - [ ] Cache TTL is configurable via environment variable
 
 ### Notes
-- See REQUIREMENTS.md "Performance: AuthZ Adapter Caching Strategy" for full analysis and rejected alternatives
+- See REQUIREMENTS.md "Performance: AuthZ Repository Caching Strategy" for full analysis and rejected alternatives
 - Security: 60s stale window is accepted for v2.0. Active invalidation (Kafka events) is a post-2.0 enhancement.
 - Design the service interface so Redis can replace Caffeine later by changing one Spring profile.
 

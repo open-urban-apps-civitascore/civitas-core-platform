@@ -1,0 +1,40 @@
+spring:
+  application:
+    name: authz-repository
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/portal_backend}
+    # Production: use read-only account with SELECT on these tables only:
+    # users, groups, group_members, assignments, roles, role_permissions, permissions
+    username: ${DATABASE_USERNAME:admin}
+    password: ${DATABASE_PASSWORD:admin}
+    hikari:
+      maximum-pool-size: 5
+      read-only: true
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: public
+
+server:
+  port: ${SERVER_PORT:8090}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    de.civitascore.authz: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: ${SQL_LOGGING:INFO}
