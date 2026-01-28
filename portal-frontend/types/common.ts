@@ -35,9 +35,9 @@ export type DataQueryInput = {
   isEnabled?: boolean
 }
 
-export type WithId = { id: string }
+export type WithId<T = string> = { id: T }
 
-export type MutationData<TData extends WithId> = TData
+export type MutationData<TData extends WithId<string | number>> = TData
 
 export type UpdateMutationMethod = 'PUT' | 'PATCH'
 
