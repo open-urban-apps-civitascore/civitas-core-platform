@@ -22,7 +22,7 @@
       "@/*": ["./src/*"],
       "@/auth": ["./auth.ts"],
       "@/auth-config": ["./auth.config.ts"],
-      "@/types/*": ["./types/*"]
+      "@/types/*": ["./src/types/*"]
     },
     "types": ["vitest/globals"]
   },
@@ -34,7 +34,7 @@
     ".next/types/**/*.ts",
     "playwright/**/*.ts",
     "e2e/**/*.ts",
-    "types"
+    "src/types"
   ],
   "exclude": ["node_modules"]
 }

@@ -14,8 +14,8 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { DataSpace } from '@/types/dataspaces'
 
-import { DataSpace } from '../../../../types/dataspaces'
 import { DataSpacesTable } from './components/DataSpacesTable'
 
 const DataSpacesPage = () => {
