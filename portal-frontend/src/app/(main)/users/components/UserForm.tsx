@@ -11,9 +11,9 @@ import { useCreateUser, useGetAuthorities, useUpdateUser } from '@/app/services/
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { Select } from '@/components/form/fields/Select'
+import { FormSelect } from '@/components/form/fields/FormSelect'
+import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { Switch } from '@/components/form/fields/Switch'
-import { TextArea } from '@/components/form/fields/TextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
@@ -178,7 +178,7 @@ export const UserForm = (props: UserFormProps) => {
                     />
                   </DetailsFieldContainer>
                   <DetailsFieldContainer>
-                    <Select
+                    <FormSelect
                       id="title-select"
                       label={t('info.title.title')}
                       options={titleOptions}
@@ -229,7 +229,7 @@ export const UserForm = (props: UserFormProps) => {
                     />
                   </DetailsFieldContainer>
                   <DetailsFieldContainer>
-                    <Select
+                    <FormSelect
                       id="authority-select"
                       label={t('info.authority')}
                       options={authorities?.map(authority => ({ value: authority.id, label: authority.title })) || []}
@@ -240,7 +240,7 @@ export const UserForm = (props: UserFormProps) => {
                     />
                   </DetailsFieldContainer>
                   <DetailsFieldContainer>
-                    <Select
+                    <FormSelect
                       id="department-select"
                       label={t('info.department')}
                       options={departmentOptions}
@@ -251,7 +251,7 @@ export const UserForm = (props: UserFormProps) => {
                     />
                   </DetailsFieldContainer>
                   <DetailsFieldContainer>
-                    <TextArea
+                    <FormTextArea
                       className="max-w-lg my-12"
                       form={form}
                       label={t('info.description')}

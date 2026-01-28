@@ -7,7 +7,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { InputPropsWithoutForm } from '@/types/common'
 
-interface TextAreaProps<T extends FieldValues> extends InputPropsWithoutForm {
+interface FormTextAreaProps<T extends FieldValues> extends InputPropsWithoutForm {
   form: UseFormReturn<T>
   name: Path<T>
   placeholder: string
@@ -15,7 +15,7 @@ interface TextAreaProps<T extends FieldValues> extends InputPropsWithoutForm {
   formItemProps?: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>
 }
 
-export const TextArea = <T extends FieldValues>(props: TextAreaProps<T>) => {
+export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>) => {
   const { form, name, placeholder, label, required, disabled, formItemProps } = props
   const isMobile = useIsMobile()
 

@@ -25,7 +25,7 @@ export interface AccessibleSelectProps<T extends FieldValues> {
   onChange?: (value: string) => void
 }
 
-export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) => {
+export const FormSelect = <T extends FieldValues>(props: AccessibleSelectProps<T>) => {
   const {
     id,
     label,
@@ -74,9 +74,11 @@ export const Select = <T extends FieldValues>(props: AccessibleSelectProps<T>) =
                 <SelectValue placeholder={placeholder} />
               </SelectTrigger>
               <SelectContent data-testid={`${name}SelectContent`}>
-                <SelectItem data-testid={`${name}SelectItemPlaceholder`} value="none" disabled={required}>
-                  {placeholder}
-                </SelectItem>
+                {placeholder && (
+                  <SelectItem data-testid={`${name}SelectItemPlaceholder`} value="none" disabled={required}>
+                    {placeholder}
+                  </SelectItem>
+                )}
 
                 {options.map((option, index) => (
                   <SelectItem data-testid={`${name}SelectItem${index}`} key={option.value} value={option.value}>
