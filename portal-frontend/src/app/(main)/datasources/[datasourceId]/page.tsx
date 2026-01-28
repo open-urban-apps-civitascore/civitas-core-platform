@@ -1,6 +1,6 @@
 import { getDatasource } from '@/app/services/api/datasources/serverRequests'
 
-import { DatasourceOverview } from '../components/DatasourceOverview'
+import { DatasourceOverview } from './components/DatasourceOverview'
 
 type Props = {
   params: Promise<{ datasourceId: string }>
