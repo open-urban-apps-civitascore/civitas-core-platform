@@ -22,6 +22,7 @@ Technical debt, feature ideas, and known bugs not currently implemented.
 | ID | Description | Location | Priority |
 |----|-------------|----------|----------|
 | ~~B-001~~ | ~~User creation fails: `active` column has NOT NULL constraint but API doesn't set default~~ | ~~Fixed 2026-01-28~~ | ~~Resolved~~ |
+| ~~B-002~~ | ~~BFF forwards cookie header causing Tomcat 400 error (header too large)~~ | ~~Fixed 2026-01-28~~ | ~~Resolved~~ |
 
 ## Feature Ideas
 

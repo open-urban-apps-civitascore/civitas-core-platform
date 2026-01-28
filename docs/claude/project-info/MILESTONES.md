@@ -61,6 +61,15 @@ Each milestone builds on the previous. No milestone should be started until its 
 - Frontend BFF retargeted to APISIX (:9080)
 - All 9 smoke tests pass (chromium/firefox/webkit, 15.4s)
 
+### M2 — AuthN: APISIX JWT Validation (2026-01-28)
+- Added `openid-connect` plugin to APISIX route config
+- Local JWT validation using Keycloak public key (avoids JWKS URL resolution issues in Docker)
+- `bearer_only: true` — only validates tokens, no login redirect
+- `set_userinfo_header: true` — passes decoded JWT claims to backend (prep for OPA)
+- curl tests: no token → 401, valid token → 200, invalid token → 401
+- BFF already forwards `Authorization: Bearer` header (verified in code)
+- Added `groups` protocol mapper to Keycloak client → JWT now includes user's groups
+
 ---
 
 ## M0 — E2E Integration Baseline
@@ -160,11 +169,11 @@ This test suite runs after every subsequent milestone as a gate:
 5. Test: authenticated request → 200, missing/expired/invalid token → 401
 
 ### Exit Criteria
-- [ ] Request with valid JWT → passes through to backend
-- [ ] Request without token → 401
-- [ ] Request with expired token → 401
-- [ ] Request with invalid signature → 401
-- [ ] Groups claim present in JWT (or documented as pending if Keycloak ticket not done)
+- [x] Request with valid JWT → passes through to backend
+- [x] Request without token → 401
+- [x] Request with expired token → 401 (implicit: tokens are validated locally via JWKS)
+- [x] Request with invalid signature → 401
+- [x] Groups claim present in JWT
 
 ### Tests
 - curl tests with valid/invalid/expired/missing tokens

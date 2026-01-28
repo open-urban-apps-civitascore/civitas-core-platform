@@ -1,7 +1,52 @@
+# APISIX Declarative Routes Configuration
+# M2: JWT validation via OpenID Connect (Keycloak JWKS)
+
 routes:
-  - uri: /v2/*
+  # Protected API routes - require valid JWT
+  - id: portal-backend-api
+    name: "Portal Backend API"
+    uri: /v2/*
     upstream:
       type: roundrobin
       nodes:
         "host.docker.internal:8089": 1
+      timeout:
+        connect: 6
+        send: 6
+        read: 6
+    plugins:
+      # JWT validation via OpenID Connect (local validation with public key)
+      openid-connect:
+        client_id: "portal-frontend"
+        client_secret: "nLlkqabM7bsCKj5InQnXVvuz6wmACNFG"
+        discovery: "http://civitas-keycloak:8080/realms/civitas-core/.well-known/openid-configuration"
+        bearer_only: true
+        ssl_verify: false
+        # Use public key directly to avoid JWKS URL resolution issues
+        public_key: |
+          -----BEGIN PUBLIC KEY-----
+          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoBMiel0QuEnffhFS7IUL
+          T6IwUUOpNLjTjZtzNSRP4nAmsTJBdo/PA1MSOpTDHO2gCF+kKjMUYofBibk2U+ta
+          YErB5JdxYgBBgqnl5F3KVae80n0XsrtIenkMit71McM6q1p5LpIf2cLzbdiYTzWY
+          2Z4ED+BD1xllfmWwF1dbBX9sWcszdafFTZ55P6ZoiA+FXmOEhAqjAqHR1yaz2SjD
+          f1F7fhLc6ADk249vw3MsD4RF5KYB6IHnUAXmjoSyayLSRw1f+wjU4vJv9xID1ioo
+          E+aAtJh0BDQMi51xrIcpZVeJAXqNZu/ITx71Nk9rJQyj/WMpqyxSapPJOdpssiKv
+          5wIDAQAB
+          -----END PUBLIC KEY-----
+        # Pass decoded JWT claims downstream (prep for OPA in M4)
+        set_userinfo_header: true
+      # Request ID for tracing
+      request-id:
+        include_in_response: true
+
+  # Backend health check (public, no auth required)
+  - id: backend-health
+    name: "Backend Health Check"
+    uri: /v2/actuator/health
+    upstream:
+      type: roundrobin
+      nodes:
+        "host.docker.internal:8089": 1
+    plugins: {}
+
 #END

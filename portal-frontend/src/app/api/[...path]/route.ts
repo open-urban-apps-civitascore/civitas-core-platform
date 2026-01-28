@@ -61,8 +61,9 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     // Attach authorization token
     headers.set('Authorization', `Bearer ${token.access_token}`)
 
-    // Remove host header to avoid conflicts with backend
+    // Remove headers that shouldn't be forwarded to the backend
     headers.delete('host')
+    headers.delete('cookie') // Session cookies are only for NextAuth, not the backend
 
     const fetchOptions: RequestInit = { method, headers }
 

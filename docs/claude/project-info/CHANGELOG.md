@@ -4,6 +4,23 @@ Running log of changes made to the codebase by Claude Code.
 
 ## 2026-01-28
 
+### M2: APISIX JWT Validation — COMPLETE
+- Added `openid-connect` plugin to `dev-environment/apisix/apisix_conf/apisix.yaml`
+- Configured local JWT validation with Keycloak public key (extracted from JWKS)
+- Settings: `bearer_only: true`, `set_userinfo_header: true` (for OPA in M4)
+- Public health endpoint `/v2/actuator/health` remains unauthenticated
+- Verified: no token → 401, valid token → 200, invalid token → 401
+- Added `groups` protocol mapper to portal-frontend client in Keycloak
+- Created `test-users` group and added testuser to it
+- Verified: JWT now contains `"groups": ["test-users"]`
+
+### B-002: BFF Cookie Forwarding Causes 400 Errors
+- **Root Cause**: BFF proxy route forwarded ALL headers including the huge NextAuth session cookie to backend
+- Large cookie header (several KB) exceeded Tomcat's default max header size, causing HTTP 400
+- **Fix**: Added `headers.delete('cookie')` in `src/app/api/[...path]/route.ts` after extracting session token
+- The cookie is only needed for NextAuth session extraction; backend only needs the Bearer token
+- All 5 smoke tests now pass
+
 ### Spring Clean
 - Deleted `.DS_Store` files from repo root and `test-results/`
 - Added `**/.DS_Store` to `.gitignore` to prevent future tracking
