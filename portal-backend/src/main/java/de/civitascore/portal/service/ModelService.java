@@ -1,7 +1,9 @@
 package de.civitascore.portal.service;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,7 +21,7 @@ public class ModelService {
    * @return response from the external service
    */
   public String uploadModel(MultipartFile modelFile, String nsUri) {
-    log.info("Processing model file upload: {}", modelFile.getOriginalFilename());
+    log.info("Processing model file upload: {}", Encode.forJava(nsUri));
     return modelRestClientRequestService.uploadModelFile(modelFile, nsUri);
   }
 
@@ -30,9 +32,11 @@ public class ModelService {
    * @param acceptHeader the desired response format
    * @return response from the external service in the requested format
    */
-  public String downloadModel(String nsUri, String acceptHeader) {
+  public String downloadModel(@NotNull String nsUri, String acceptHeader) {
     log.debug(
-        "Processing model file download for nsUri: {} with accept header: {}", nsUri, acceptHeader);
+        "Processing model file download for nsUri: {} with accept header: {}",
+        Encode.forJava(nsUri),
+        acceptHeader);
     return modelRestClientRequestService.downloadModelFile(nsUri, acceptHeader);
   }
 }
