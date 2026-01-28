@@ -3,13 +3,13 @@ package de.civitascore.portal.mapper.dcat;
 import de.civitascore.portal.model.annotations.JsonLDProperty;
 import de.civitascore.portal.model.annotations.JsonLDResource;
 import de.civitascore.portal.model.output.BaseOutputDTO;
+import de.civitascore.portal.model.output.summary.BaseSummaryDTO;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Stream;
-
 import org.apache.jena.rdf.model.Literal;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.Property;
@@ -67,13 +67,13 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
     Field[] fields = clazz.getDeclaredFields();
 
     Stream.of(fields)
-      .filter(field -> !field.getName().equals("id"))
-      .forEach(field -> processField(model, resource, dto, field));
+        .filter(field -> !field.getName().equals("id"))
+        .forEach(field -> processField(model, resource, dto, field));
   }
 
   private void processField(Model model, Resource resource, Object dto, Field field) {
     JsonLDProperty propertyAnnotation = field.getAnnotation(JsonLDProperty.class);
-        String propertyUri;
+    String propertyUri;
 
     if (propertyAnnotation != null) {
       propertyUri = propertyAnnotation.nameSpace() + propertyAnnotation.localName();
@@ -97,7 +97,10 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
         case Collection<?> objects ->
             handleCollection(model, resource, property, objects, propertyAnnotation);
         case BaseOutputDTO baseOutputDTO ->
-            handleNestedResource(model, resource, property, baseOutputDTO);
+            handleNestedResource(
+                model, resource, property, baseOutputDTO.getId().toString(), baseOutputDTO);
+        case BaseSummaryDTO baseSummaryDTO ->
+            handleNestedResource(model, resource, property, baseSummaryDTO.getId(), baseSummaryDTO);
         default -> handleLiteralValue(model, resource, property, value, propertyAnnotation);
       }
 
@@ -113,21 +116,23 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
       Collection<?> collection,
       @Nullable JsonLDProperty propertyAnnotation) {
     for (Object item : collection) {
-      if (item == null) {
-        continue;
-      }
-
-      if (item instanceof BaseOutputDTO) {
-        handleNestedResource(model, resource, property, (BaseOutputDTO) item);
-      } else {
-        handleLiteralValue(model, resource, property, item, propertyAnnotation);
+      switch (item) {
+        case null -> {
+          // Skip null values
+        }
+        case BaseOutputDTO baseOutputDTO ->
+            handleNestedResource(
+                model, resource, property, baseOutputDTO.getId().toString(), baseOutputDTO);
+        case BaseSummaryDTO baseSummaryDTO ->
+            handleNestedResource(model, resource, property, baseSummaryDTO.getId(), baseSummaryDTO);
+        default -> handleLiteralValue(model, resource, property, item, propertyAnnotation);
       }
     }
   }
 
   private void handleNestedResource(
-      Model model, Resource parentResource, Property property, BaseOutputDTO nestedDto) {
-    Resource nestedResource = model.createResource(nestedDto.getId().toString());
+      Model model, Resource parentResource, Property property, String id, Object nestedDto) {
+    Resource nestedResource = model.createResource(id);
     parentResource.addProperty(property, nestedResource);
 
     Class<?> nestedClass = nestedDto.getClass();
@@ -135,9 +140,8 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
       JsonLDResource nestedResourceAnnotation = nestedClass.getAnnotation(JsonLDResource.class);
       Resource nestedRdfType = model.createResource(nestedResourceAnnotation.value());
       nestedResource.addProperty(RDF.type, nestedRdfType);
-
-      processFieldsRecursively(model, nestedResource, nestedDto, nestedClass);
     }
+    processFieldsRecursively(model, nestedResource, nestedDto, nestedClass);
   }
 
   private void handleLiteralValue(
@@ -148,7 +152,9 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
       @Nullable JsonLDProperty propertyAnnotation) {
     Literal literal;
 
-    if (propertyAnnotation != null && !propertyAnnotation.language().isEmpty() && value instanceof String) {
+    if (propertyAnnotation != null
+        && !propertyAnnotation.language().isEmpty()
+        && value instanceof String) {
       literal = model.createLiteral((String) value, propertyAnnotation.language());
     } else {
       literal = model.createTypedLiteral(value);
@@ -165,12 +171,19 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
 
   @Override
   public boolean canRead(@NonNull Class<?> clazz, @Nullable MediaType mediaType) {
-    return clazz.isAnnotationPresent(JsonLDResource.class);
+    return false;
   }
 
   @Override
   public boolean canWrite(@NonNull Class<?> clazz, @Nullable MediaType mediaType) {
-    return false;
+    // Check if the media type is application/ld+json and the class has JsonLDResource annotation
+    boolean isJsonLd =
+        mediaType != null
+            && mediaType.isCompatibleWith(MediaType.parseMediaType("application/ld+json"));
+    boolean hasAnnotation = clazz.isAnnotationPresent(JsonLDResource.class);
+    boolean isBaseOutputDTO = BaseOutputDTO.class.isAssignableFrom(clazz);
+
+    return isJsonLd && hasAnnotation && isBaseOutputDTO;
   }
 
   @Override

@@ -19,7 +19,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 @SpringBootTest(classes = {GenericDcatMapper.class})
 public class GenericDcatMapperTest {
 
-  String expectedSerializedModel = """
+  String expectedSerializedModel =
+      """
           {
               "@graph": [
                   {

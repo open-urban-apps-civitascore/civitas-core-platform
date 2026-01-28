@@ -19,15 +19,13 @@ public class CatalogAssembler implements BaseAssembler<Catalog, CatalogOutputDTO
   public CatalogOutputDTO mapToBaseDto(Catalog entity) {
     CatalogOutputDTO output = catalogMapper.toOutput(entity);
 
-    entity.getChildCatalogs().stream()
-        .map(catalogMapper::toSummary)
-        .forEach(output.getChildCatalogs()::add);
+    output.setChildCatalogs(
+        entity.getChildCatalogs().stream().map(catalogMapper::toSummary).toList());
 
-    entity.getParentCatalogs().stream()
-        .map(catalogMapper::toSummary)
-        .forEach(output.getParentCatalogs()::add);
+    output.setParentCatalogs(
+        entity.getParentCatalogs().stream().map(catalogMapper::toSummary).toList());
 
-    entity.getDataSets().stream().map(dataSetMapper::toSummary).forEach(output.getDataSets()::add);
+    output.setDataSets(entity.getDataSets().stream().map(dataSetMapper::toSummary).toList());
 
     return output;
   }
