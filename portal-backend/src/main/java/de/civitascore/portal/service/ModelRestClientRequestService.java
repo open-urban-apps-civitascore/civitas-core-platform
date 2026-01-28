@@ -1,8 +1,5 @@
 package de.civitascore.portal.service;
 
-import static java.net.URLEncoder.encode;
-import static java.nio.charset.StandardCharsets.UTF_8;
-
 import de.civitascore.portal.configuration.ModelAtlasConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,15 +23,13 @@ public class ModelRestClientRequestService {
    * @return response from the external service
    */
   public String uploadModelFile(MultipartFile modelFile, String nsUri) {
-    String baseUrl =
-        String.format(
-            "%s:%d/atlas/rest", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
+    String baseUrl = String.format("%s/atlas/rest", modelAtlasConfig.getBaseUrl());
 
     // Param `overwrite` is set to true to allow updating existing models
     String endpoint =
         String.format(
             "/%s/schema/stages/%s?nsUri=%s&overwrite=true",
-            modelAtlasConfig.getScope(), modelAtlasConfig.getStage(), encode(nsUri, UTF_8));
+            modelAtlasConfig.getScope(), modelAtlasConfig.getStage(), nsUri);
 
     try {
       RestClient restClient = restClientBuilder.baseUrl(baseUrl).build();
@@ -61,14 +56,12 @@ public class ModelRestClientRequestService {
    * @return response from the external service in the requested format
    */
   public String downloadModelFile(String nsUri, String acceptHeader) {
-    String baseUrl =
-        String.format(
-            "%s:%d/atlas/rest", modelAtlasConfig.getBaseUrl(), modelAtlasConfig.getPort());
+    String baseUrl = String.format("%s/atlas/rest", modelAtlasConfig.getBaseUrl());
 
     String endpoint =
         String.format(
             "/%s/schema/stages/%s/content?nsUri=%s",
-            modelAtlasConfig.getScope(), modelAtlasConfig.getStage(), encode(nsUri, UTF_8));
+            modelAtlasConfig.getScope(), modelAtlasConfig.getStage(), nsUri);
 
     try {
       RestClient restClient = restClientBuilder.baseUrl(baseUrl).build();

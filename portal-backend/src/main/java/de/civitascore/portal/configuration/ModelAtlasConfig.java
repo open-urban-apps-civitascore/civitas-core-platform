@@ -17,9 +17,6 @@ public class ModelAtlasConfig {
   /** Base URL of the Model Atlas service */
   private String baseUrl;
 
-  /** Port of the Model Atlas service */
-  private int port;
-
   /** Scope of the model atlas to be used for requests */
   private String scope;
 
