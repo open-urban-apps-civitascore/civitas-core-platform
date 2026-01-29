@@ -60,6 +60,8 @@ public enum AdapterErrorCode {
   APISIX_ROUTE_ERROR(3102, false, "APISIX route error: %s", "Route operation failed"),
   APISIX_UPSTREAM_ERROR(3103, false, "APISIX upstream error: %s", "Upstream operation failed"),
 
+  FROST_ENTITY_ERROR(3201, false, "FROST entity error: %s", "Entity operation failed"),
+
   // 9xxx: Unknown/unexpected errors
   UNKNOWN_ERROR(9001, false, "Unexpected error: %s", "Internal error"),
   SERIALIZATION_ERROR(9002, false, "Serialization error: %s", "Data processing error"),

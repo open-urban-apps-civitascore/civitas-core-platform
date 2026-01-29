@@ -51,7 +51,29 @@ public enum Topics {
   // --- Route Events ---
   ROUTE_CREATED("core.civitas.api.route.created"),
   ROUTE_UPDATED("core.civitas.api.route.updated"),
-  ROUTE_DELETED("core.civitas.api.route.deleted");
+  ROUTE_DELETED("core.civitas.api.route.deleted"),
+
+  // --- FROST SensorThings API Events ---
+  THING_CREATED("core.civitas.data.thing.created"),
+  THING_UPDATED("core.civitas.data.thing.updated"),
+  THING_DELETED("core.civitas.data.thing.deleted"),
+  LOCATION_CREATED("core.civitas.data.location.created"),
+  LOCATION_UPDATED("core.civitas.data.location.updated"),
+  LOCATION_DELETED("core.civitas.data.location.deleted"),
+  SENSOR_CREATED("core.civitas.data.sensor.created"),
+  SENSOR_UPDATED("core.civitas.data.sensor.updated"),
+  SENSOR_DELETED("core.civitas.data.sensor.deleted"),
+  OBSERVED_PROPERTY_CREATED("core.civitas.data.observedproperty.created"),
+  OBSERVED_PROPERTY_UPDATED("core.civitas.data.observedproperty.updated"),
+  OBSERVED_PROPERTY_DELETED("core.civitas.data.observedproperty.deleted"),
+  DATASTREAM_CREATED("core.civitas.data.datastream.created"),
+  DATASTREAM_UPDATED("core.civitas.data.datastream.updated"),
+  DATASTREAM_DELETED("core.civitas.data.datastream.deleted"),
+
+  // --- FROST Projects Events ---
+  FROST_PROJECT_CREATED("core.civitas.data.project.created"),
+  FROST_PROJECT_UPDATED("core.civitas.data.project.updated"),
+  FROST_PROJECT_DELETED("core.civitas.data.project.deleted");
 
   private final String value;
 
