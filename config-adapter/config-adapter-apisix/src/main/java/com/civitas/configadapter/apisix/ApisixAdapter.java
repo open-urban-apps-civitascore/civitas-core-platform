@@ -29,6 +29,7 @@ import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.concurrent.TimeUnit;
+import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,9 +112,14 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       this.client = createClient();
     }
 
-    logger.info("APISIX adapter '{}' initialized for: {}", getName(), adminApiUrl);
     logger.info(
-        "Subscribed to {} Kafka topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
+        "APISIX adapter '{}' initialized for: {}",
+        Encode.forJava(getName()),
+        Encode.forJava(adminApiUrl));
+    logger.info(
+        "Subscribed to {} Kafka topics: {}",
+        getSubscribedTopics().size(),
+        Encode.forJava(String.valueOf(getSubscribedTopics())));
   }
 
   /**
@@ -143,17 +149,18 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   }
 
   @Override
-  public void processConfigEvent(String topic, ConfigEvent event) {
+  protected void doProcessConfigEvent(String topic, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     Operation operation = event.payload().operation();
     String targetResource = event.payload().targetResource();
     String targetComponent = event.payload().targetComponent();
 
     logger.info(
         "Processing config event - Topic: {}, Operation: {}, TargetComponent: {}, TargetResource: {}",
-        topic,
+        Encode.forJava(topic),
         operation,
-        targetComponent,
-        targetResource);
+        Encode.forJava(String.valueOf(targetComponent)),
+        Encode.forJava(String.valueOf(targetResource)));
 
     ResourceInfo resourceInfo = parseTargetResource(targetResource);
 
@@ -166,6 +173,11 @@ public class ApisixAdapter extends AbstractConfigAdapter {
         throw new FatalAdapterException(AdapterErrorCode.UNSUPPORTED_OPERATION, operation);
       }
     }
+  }
+
+  @Override
+  protected String getResultType() {
+    return APISIX_RESULT_TYPE;
   }
 
   /**
@@ -194,38 +206,50 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       }
     }
 
-    logger.debug("Parsed resource - Type: {}, ID: {}", resourceType, resourceId);
+    logger.debug(
+        "Parsed resource - Type: {}, ID: {}",
+        Encode.forJava(String.valueOf(resourceType)),
+        Encode.forJava(String.valueOf(resourceId)));
     return new ResourceInfo(resourceType, resourceId);
   }
 
-  private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event) {
+  private void handleCreate(ResourceInfo resourceInfo, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     switch (resourceInfo.type) {
       case UPSTREAM -> createUpstream(event);
       case ROUTE -> createRoute(event);
       case null, default -> {
-        logger.warn("Unknown resource type for create: {}", resourceInfo.type);
+        logger.warn(
+            "Unknown resource type for create: {}",
+            Encode.forJava(String.valueOf(resourceInfo.type)));
         throw new FatalAdapterException(AdapterErrorCode.INVALID_RESOURCE_TYPE, resourceInfo.type);
       }
     }
   }
 
-  private void handleUpdate(ResourceInfo resourceInfo, ConfigEvent event) {
+  private void handleUpdate(ResourceInfo resourceInfo, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     switch (resourceInfo.type) {
       case UPSTREAM -> updateUpstream(resourceInfo.id, event);
       case ROUTE -> updateRoute(resourceInfo.id, event);
       default -> {
-        logger.warn("Unknown resource type for update: {}", resourceInfo.type);
+        logger.warn(
+            "Unknown resource type for update: {}",
+            Encode.forJava(String.valueOf(resourceInfo.type)));
         throw new FatalAdapterException(AdapterErrorCode.INVALID_RESOURCE_TYPE, resourceInfo.type);
       }
     }
   }
 
-  private void handleDelete(ResourceInfo resourceInfo, ConfigEvent event) {
+  private void handleDelete(ResourceInfo resourceInfo, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     switch (resourceInfo.type) {
       case UPSTREAM -> deleteUpstream(resourceInfo.id, event);
       case ROUTE -> deleteRoute(resourceInfo.id, event);
       default -> {
-        logger.warn("Unknown resource type for delete: {}", resourceInfo.type);
+        logger.warn(
+            "Unknown resource type for delete: {}",
+            Encode.forJava(String.valueOf(resourceInfo.type)));
         throw new FatalAdapterException(AdapterErrorCode.INVALID_RESOURCE_TYPE, resourceInfo.type);
       }
     }
@@ -242,7 +266,10 @@ public class ApisixAdapter extends AbstractConfigAdapter {
    */
   private RetryableAdapterException wrapNetworkException(
       ProcessingException e, AdapterOperation operation) {
-    logger.warn("Network error during {}: {}", operation.getDescription(), e.getMessage());
+    logger.warn(
+        "Network error during {}: {}",
+        operation.getDescription(),
+        Encode.forJava(String.valueOf(e.getMessage())));
     return new RetryableAdapterException(
         AdapterErrorCode.NETWORK_ERROR, e, ADAPTER_NAME, e.getMessage());
   }
@@ -257,7 +284,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
    * @throws FatalAdapterException for HTTP 4xx errors
    */
   private void handleHttpResponse(
-      Response response, AdapterErrorCode errorCode, AdapterOperation operation) {
+      Response response, AdapterErrorCode errorCode, AdapterOperation operation)
+      throws RetryableAdapterException, FatalAdapterException {
     int status = response.getStatus();
 
     // Success - nothing to throw
@@ -269,19 +297,28 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
     // HTTP 5xx - Server errors are retryable
     if (status >= 500) {
-      logger.warn("APISIX server error during {}: {} {}", operation.getDescription(), status, body);
+      logger.warn(
+          "APISIX server error during {}: {} {}",
+          operation.getDescription(),
+          status,
+          Encode.forJava(body));
       throw new RetryableAdapterException(
-          AdapterErrorCode.SERVICE_UNAVAILABLE, null, ADAPTER_NAME, status);
+          AdapterErrorCode.SERVICE_UNAVAILABLE, ADAPTER_NAME, status);
     }
 
     // HTTP 4xx - Client errors are fatal
-    logger.error("APISIX client error during {}: {} {}", operation.getDescription(), status, body);
-    throw new FatalAdapterException(errorCode, null, HTTP_STATUS_PREFIX + status + ": " + body);
+    logger.error(
+        "APISIX client error during {}: {} {}",
+        operation.getDescription(),
+        status,
+        Encode.forJava(body));
+    throw new FatalAdapterException(errorCode, HTTP_STATUS_PREFIX + status + ": " + body);
   }
 
   // ============== UPSTREAM OPERATIONS ==============
 
-  private void createUpstream(ConfigEvent event) {
+  private void createUpstream(ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     Object upstreamConfig = extractUpstreamConfig(event);
     executeApisixOperation(
         AdapterOperation.UPSTREAM_CREATE,
@@ -298,7 +335,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
                 .post(Entity.json(upstreamConfig)));
   }
 
-  private void updateUpstream(String upstreamId, ConfigEvent event) {
+  private void updateUpstream(String upstreamId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     Object upstreamConfig = extractUpstreamConfig(event);
     executeApisixOperation(
         AdapterOperation.UPSTREAM_UPDATE,
@@ -316,7 +354,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
                 .put(Entity.json(upstreamConfig)));
   }
 
-  private void deleteUpstream(String upstreamId, ConfigEvent event) {
+  private void deleteUpstream(String upstreamId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     executeApisixOperation(
         AdapterOperation.UPSTREAM_DELETE,
         AdapterErrorCode.APISIX_UPSTREAM_ERROR,
@@ -343,7 +382,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
   // ============== ROUTE OPERATIONS ==============
 
-  private void createRoute(ConfigEvent event) {
+  private void createRoute(ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     Object routeConfig = extractRouteConfig(event.payload().config().value());
     executeApisixOperation(
         AdapterOperation.ROUTE_CREATE,
@@ -360,7 +400,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
                 .post(Entity.json(routeConfig)));
   }
 
-  private void updateRoute(String routeId, ConfigEvent event) {
+  private void updateRoute(String routeId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     Object routeConfig = extractRouteConfig(event.payload().config().value());
     executeApisixOperation(
         AdapterOperation.ROUTE_UPDATE,
@@ -378,7 +419,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
                 .put(Entity.json(routeConfig)));
   }
 
-  private void deleteRoute(String routeId, ConfigEvent event) {
+  private void deleteRoute(String routeId, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     executeApisixOperation(
         AdapterOperation.ROUTE_DELETE,
         AdapterErrorCode.APISIX_ROUTE_ERROR,
@@ -421,7 +463,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
    * @param message the success message
    * @param resourceId the created/updated resource ID (may be null)
    */
-  private void publishSuccessResult(ConfigEvent originalEvent, String message, String resourceId) {
+  private void publishSuccessResult(ConfigEvent originalEvent, String message, String resourceId)
+      throws FatalAdapterException, RetryableAdapterException {
     if (getEventPublisher() == null || originalEvent.metadata().resultTopic() == null) {
       return;
     }
@@ -439,7 +482,9 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
     // Exceptions propagate to KafkaEventHandler for retry/DLQ handling
     getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
-    logger.debug("Published SUCCESS result to topic: {}", originalEvent.metadata().resultTopic());
+    logger.debug(
+        "Published SUCCESS result to topic: {}",
+        Encode.forJava(originalEvent.metadata().resultTopic()));
   }
 
   @Override
@@ -475,7 +520,8 @@ public class ApisixAdapter extends AbstractConfigAdapter {
       ConfigEvent event,
       String successMessage,
       String resourceId,
-      HttpRequestOperation requestOperation) {
+      HttpRequestOperation requestOperation)
+      throws FatalAdapterException, RetryableAdapterException {
     Response response = null;
     try {
       response = requestOperation.execute();

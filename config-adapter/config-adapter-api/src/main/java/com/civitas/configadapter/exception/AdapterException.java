@@ -32,7 +32,7 @@ import com.civitas.configadapter.model.AdapterErrorCode;
  * <p>This is an unchecked exception (extends RuntimeException) to allow propagation through the
  * adapter layer without requiring explicit throws declarations.
  */
-public abstract class AdapterException extends RuntimeException {
+public abstract class AdapterException extends Exception {
 
   private final AdapterErrorCode errorCode;
   private final String internalMessage;

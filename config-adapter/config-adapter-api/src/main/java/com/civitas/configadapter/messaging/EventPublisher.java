@@ -10,6 +10,8 @@
  */
 package com.civitas.configadapter.messaging;
 
+import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.model.ConfigResultEvent;
 
 /**
@@ -25,5 +27,6 @@ public interface EventPublisher extends EventBase {
    * @param topic the topic to publish to
    * @param resultEvent the configuration result event to publish
    */
-  void publish(String topic, ConfigResultEvent resultEvent);
+  void publish(String topic, ConfigResultEvent resultEvent)
+      throws RetryableAdapterException, FatalAdapterException;
 }

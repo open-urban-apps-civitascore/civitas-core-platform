@@ -15,20 +15,38 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.configuration.AdapterConfig;
+import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
+import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.ConfigEvent;
+import com.civitas.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.Metadata;
+import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.Payload;
+import java.time.OffsetDateTime;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class AbstractConfigAdapterTest {
 
+  private static final String TEST_RESULT_TYPE = "core.civitas.test.processing.result";
+
   private static class TestAdapter extends AbstractConfigAdapter {
     private String adapterName;
+    private FatalAdapterException fatalToThrow;
+    private RetryableAdapterException retryableToThrow;
+    private RuntimeException runtimeToThrow;
 
     private TestAdapter(AdapterConfig config, String adapterName) {
       this.adapterName = adapterName;
@@ -36,8 +54,22 @@ class AbstractConfigAdapterTest {
     }
 
     @Override
-    public void processConfigEvent(String topic, ConfigEvent event) {
-      // Test implementation
+    protected void doProcessConfigEvent(String topic, ConfigEvent event)
+        throws FatalAdapterException, RetryableAdapterException {
+      if (fatalToThrow != null) {
+        throw fatalToThrow;
+      }
+      if (retryableToThrow != null) {
+        throw retryableToThrow;
+      }
+      if (runtimeToThrow != null) {
+        throw runtimeToThrow;
+      }
+    }
+
+    @Override
+    protected String getResultType() {
+      return TEST_RESULT_TYPE;
     }
 
     @Override
@@ -237,5 +269,160 @@ class AbstractConfigAdapterTest {
     assertNotNull(topics);
     assertThrows(UnsupportedOperationException.class, () -> topics.add("new-topic"));
     adapter.close();
+  }
+
+  @Test
+  void templateMethodShouldCatchFatalExceptionAndPublishFailureResult()
+      throws FatalAdapterException, RetryableAdapterException {
+    AdapterConfig mockConfig = mock(AdapterConfig.class);
+    when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
+    EventPublisher mockPublisher = mock(EventPublisher.class);
+
+    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
+    adapter.setEventPublisher(mockPublisher);
+    adapter.fatalToThrow =
+        new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, "test error");
+
+    ConfigEvent event = createTestConfigEvent();
+
+    FatalAdapterException thrown =
+        assertThrows(
+            FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
+
+    assertEquals(AdapterErrorCode.INVALID_PAYLOAD, thrown.getErrorCode());
+
+    ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+    verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+    ConfigResultEvent result = captor.getValue();
+    assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
+    assertEquals("civitas.config-adapter.test-adapter", result.source());
+    assertEquals(TEST_RESULT_TYPE, result.resultType());
+  }
+
+  @Test
+  void templateMethodShouldLetRetryableExceptionPassThrough() {
+    AdapterConfig mockConfig = mock(AdapterConfig.class);
+    when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
+    EventPublisher mockPublisher = mock(EventPublisher.class);
+
+    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
+    adapter.setEventPublisher(mockPublisher);
+    adapter.retryableToThrow =
+        new RetryableAdapterException(AdapterErrorCode.CONNECTION_TIMEOUT, "test-service");
+
+    ConfigEvent event = createTestConfigEvent();
+
+    RetryableAdapterException thrown =
+        assertThrows(
+            RetryableAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
+
+    assertEquals(AdapterErrorCode.CONNECTION_TIMEOUT, thrown.getErrorCode());
+    assertTrue(thrown.isRetryable());
+  }
+
+  @Test
+  void templateMethodShouldWrapUnexpectedExceptionAsFatalAndPublishFailure()
+      throws FatalAdapterException, RetryableAdapterException {
+    AdapterConfig mockConfig = mock(AdapterConfig.class);
+    when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
+    EventPublisher mockPublisher = mock(EventPublisher.class);
+
+    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
+    adapter.setEventPublisher(mockPublisher);
+    adapter.runtimeToThrow = new RuntimeException("unexpected error");
+
+    ConfigEvent event = createTestConfigEvent();
+
+    FatalAdapterException thrown =
+        assertThrows(
+            FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
+
+    assertEquals(AdapterErrorCode.UNKNOWN_ERROR, thrown.getErrorCode());
+
+    ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+    verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+    ConfigResultEvent result = captor.getValue();
+    assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
+  }
+
+  @Test
+  void templateMethodShouldNotPublishWhenNoEventPublisher() {
+    AdapterConfig mockConfig = mock(AdapterConfig.class);
+    when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
+
+    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
+    adapter.fatalToThrow =
+        new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, "test error");
+
+    ConfigEvent event = createTestConfigEvent();
+
+    assertThrows(
+        FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
+    // No NPE from publishFailureResult when publisher is null
+  }
+
+  @Test
+  void templateMethodShouldNotPublishWhenEventIsNull() {
+    AdapterConfig mockConfig = mock(AdapterConfig.class);
+    when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
+    EventPublisher mockPublisher = mock(EventPublisher.class);
+
+    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
+    adapter.setEventPublisher(mockPublisher);
+    adapter.runtimeToThrow = new NullPointerException("null event");
+
+    assertThrows(FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", null));
+    // publishFailureResult should handle null event gracefully
+  }
+
+  @Test
+  void getAdapterSourceShouldReturnDefaultSource() {
+    AdapterConfig mockConfig = mock(AdapterConfig.class);
+    when(mockConfig.getProperty("my-adapter.topics")).thenReturn(null);
+
+    TestAdapter adapter = new TestAdapter(mockConfig, "my-adapter");
+
+    assertEquals("civitas.config-adapter.my-adapter", adapter.getAdapterSource());
+    adapter.close();
+  }
+
+  @Test
+  void publishFailureResultShouldHandlePublishException()
+      throws FatalAdapterException, RetryableAdapterException {
+    AdapterConfig mockConfig = mock(AdapterConfig.class);
+    when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
+    EventPublisher mockPublisher = mock(EventPublisher.class);
+    doThrow(new FatalAdapterException(AdapterErrorCode.PUBLISH_ERROR, "publish failed"))
+        .when(mockPublisher)
+        .publish(any(String.class), any(ConfigResultEvent.class));
+
+    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
+    adapter.setEventPublisher(mockPublisher);
+    adapter.fatalToThrow =
+        new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, "test error");
+
+    ConfigEvent event = createTestConfigEvent();
+
+    // Should still throw the original exception, not the publish exception
+    FatalAdapterException thrown =
+        assertThrows(
+            FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
+
+    assertEquals(AdapterErrorCode.INVALID_PAYLOAD, thrown.getErrorCode());
+  }
+
+  private ConfigEvent createTestConfigEvent() {
+    Metadata metadata =
+        new Metadata(
+            "msg-123",
+            OffsetDateTime.now(),
+            "test-source",
+            "corr-123",
+            "v1.0.0",
+            "test-result-topic");
+    Payload payload = new Payload("test", "test/resource-1", Operation.CREATE, null);
+    return new ConfigEvent(metadata, payload);
   }
 }
