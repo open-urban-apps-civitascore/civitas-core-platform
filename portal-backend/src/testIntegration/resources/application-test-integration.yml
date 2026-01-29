@@ -62,3 +62,7 @@ logging:
     kafka: WARN
     org.hibernate: WARN
 
+model-atlas:
+  baseUrl: "http://model-atlas:8080"
+  scope: default
+  stage: draft

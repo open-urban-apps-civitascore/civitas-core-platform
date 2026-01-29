@@ -429,7 +429,7 @@ class UserControllerIntegrationTest
       assertThat(response.getBody().getEmail()).isEqualTo("patched@example.com");
       assertThat(response.getBody().getPhone()).isEqualTo("+49999999999");
       assertThat(response.getBody().getActive()).isFalse();
-      assertThat(response.getBody().getTitle()).isEqualTo("MS");
+      assertThat(response.getBody().getTitle()).isEqualTo(UserTitleType.MS);
     }
 
     @Test
