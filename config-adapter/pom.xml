@@ -28,6 +28,7 @@
 		<module>config-adapter-keycloak</module>
 		<module>config-adapter-apisix</module>
 		<module>config-adapter-examples</module>
+		<module>config-adapter-frost</module>
 	</modules>
 
 	<properties>
