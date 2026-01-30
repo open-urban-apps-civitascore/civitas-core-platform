@@ -19,6 +19,7 @@
     "errors": {
       "invalidPhone": "Invalid phone number",
       "invalidEmail": "Invalid E-mail address",
+      "invalidNumber": "Enter a valid number",
       "required": "This field is required",
       "atLeast2": "The input must be at least 2 characters.",
       "atLeast10": "The input must be at least 10 characters.",

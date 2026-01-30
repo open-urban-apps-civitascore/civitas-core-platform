@@ -1,5 +1,7 @@
 import z from 'zod'
 
+import type { NODE_DEFS } from '@/app/(main)/datasources/components/connector-tab/connector_sources'
+
 export const CONNECTOR_TYPES = {
   MQTT: 'mqtt',
   SQL: 'sql',
@@ -46,9 +48,35 @@ export const buildConnectorConfigSchema = (config: ConnectorConfig[]) => {
 
   config.forEach(p => {
     let field: z.ZodTypeAny = z.any()
+    const isOptional = typeof p.placeholder === 'string' && p.placeholder.toLowerCase().includes('optional')
 
-    if (p.type === 'input') field = z.string()
-    if (p.type === 'checkbox') field = z.boolean()
+    if (typeof p.defaultValue === 'number') {
+      field = z.preprocess(val => {
+        if (typeof val === 'string') {
+          const trimmed = val.trim()
+          if (trimmed === '') return undefined
+          return Number(trimmed)
+        }
+        return val
+      }, z.number({
+        required_error: 'common.errors.required',
+        invalid_type_error: 'common.errors.invalidNumber',
+      }))
+    } else if (typeof p.defaultValue === 'string') {
+      field = z.string().min(1, 'common.errors.required')
+    } else if (typeof p.defaultValue === 'boolean') {
+      field = z.boolean()
+    } else {
+      // Fallback to type if defaultValue is missing/unknown
+      if (p.type === 'input' || p.type === 'textArea' || p.type === 'select') {
+        field = z.string().min(1, 'common.errors.required')
+      }
+      if (p.type === 'checkbox') field = z.boolean()
+    }
+
+    if (isOptional) {
+      field = z.preprocess(val => (val === '' ? undefined : val), field).optional()
+    }
 
     shape[p.key] = field
   })
@@ -68,14 +96,17 @@ export const buildConnectorDefaultConfig = (config: ConnectorConfig[]) => {
 
 /* schema */
 export const DatasourceBaseSchema = z.object({
-  id: z.number(),
+  id: z.number({
+    required_error: 'common.errors.required',
+    invalid_type_error: 'common.errors.invalidNumber',
+  }),
   name: z.string().min(1, 'common.errors.nameRequired'),
   description: z.string().min(1, 'common.errors.descriptionRequired').max(150, 'common.errors.descriptionMaxLength'),
   connection: ConnectionTypeSchema,
   lastActive: z.string(),
   tags: z.array(z.string()).default([]),
   status: DatasourceStatusSchema,
-  connector: z.object({ type: ConnectorTypeSchema.optional(), config: z.object().nullable() }),
+  connector: z.object({ type: ConnectorTypeSchema.optional(), config: z.record(z.string(), z.unknown()).nullable() }),
 })
 
 export type BaseDatasource = z.infer<typeof DatasourceBaseSchema>
@@ -113,3 +144,11 @@ export type DatasourceFormData = z.infer<ReturnType<typeof buildDatasourceFormSc
 /* API request types */
 export type CreateDatasourceData = Omit<BaseDatasource, 'id'>
 export type UpdateDatasourceData = Partial<CreateDatasourceData> & { id: number }
+
+/* Inferred defaults from connector_sources */
+export type ConnectorNodeDefs = typeof NODE_DEFS
+export type ConnectorDefaultsByType = {
+  [K in keyof ConnectorNodeDefs]: {
+    [P in ConnectorNodeDefs[K]['properties'][number] as P['key']]: P['defaultValue']
+  }
+}

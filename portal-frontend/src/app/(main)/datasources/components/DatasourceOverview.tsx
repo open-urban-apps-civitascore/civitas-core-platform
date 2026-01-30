@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Resolver, useForm } from 'react-hook-form'
+import { Resolver, useForm, useWatch } from 'react-hook-form'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
@@ -51,23 +51,21 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const updateDatasource = useUpdateDatasource()
   const isLoading = updateDatasource.isPending
 
-  const resolver: Resolver<DatasourceFormData> = useCallback(
-    async values => {
-      const schema = buildDatasourceFormSchema(
-        values.connector?.type
-          ? (NODE_DEFS[values.connector.type as ConnectorType].properties as ConnectorConfig[])
-          : [],
-        datasource.status,
-      )
-
-      return zodResolver(schema)(values, {}, {})
-    },
-    [datasource.status],
-  )
+  const resolver: Resolver<DatasourceFormData> = useCallback(async values => {
+    if ((values.status ?? DATASOURCE_STATUS_TYPES.DRAFT) === DATASOURCE_STATUS_TYPES.DRAFT) {
+      return { values, errors: {} }
+    }
+    const connectorConfig = values.connector?.type
+      ? (NODE_DEFS[values.connector.type as ConnectorType].properties as ConnectorConfig[])
+      : []
+    const schema = buildDatasourceFormSchema(connectorConfig, values.status ?? DATASOURCE_STATUS_TYPES.DRAFT)
+    return zodResolver(schema)(values, {}, {})
+  }, [])
 
   const form = useForm<DatasourceFormData>({
     resolver,
     mode: 'onChange',
+    reValidateMode: 'onChange',
     defaultValues: {
       id: datasource.id,
       name: datasource.name,
@@ -82,15 +80,10 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   })
 
   const connectorTypeWatch = form.watch('connector.type')
-
   const connectorConfig = useMemo(
     () => (connectorTypeWatch ? (NODE_DEFS[connectorTypeWatch].properties as ConnectorConfig[]) : []),
     [connectorTypeWatch],
   )
-
-  const schema = useMemo(() => {
-    return buildDatasourceFormSchema(connectorConfig, datasource.status)
-  }, [connectorConfig, datasource.status])
 
   useEffect(() => {
     const defaults = buildConnectorDefaultConfig(connectorConfig)
@@ -99,18 +92,25 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       keepDirty: true,
     })
     form.setValue('connector.config', defaults)
-  }, [schema, connectorConfig, form])
+  }, [connectorConfig, form])
 
   const statusWatch = form.watch('status')
   const nameWatch = form.watch('name')
   const descriptionWatch = form.watch('description')
 
+  useEffect(() => {
+    void form.trigger()
+  }, [statusWatch, connectorTypeWatch, form])
+
   const isDraftMode = statusWatch === DATASOURCE_STATUS_TYPES.DRAFT
 
-  // Check if all mandatory fields are filled to enable "Available" status
+  const formValues = useWatch({ control: form.control })
+
+  // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
-    return nameWatch.length > 0 && descriptionWatch.length > 0
-  }, [nameWatch, descriptionWatch])
+    const schema = buildDatasourceFormSchema(connectorConfig, DATASOURCE_STATUS_TYPES.AVAILABLE)
+    return schema.safeParse(formValues ?? form.getValues()).success
+  }, [formValues, connectorConfig, form])
 
   // Auto-revert status to draft when required fields become empty
   useEffect(() => {
@@ -136,14 +136,18 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
 
-  const submitDatasource = (onSuccess: (data: DatasourceBaseFormData) => void) => {
-    const submitHandler = (formData: DatasourceBaseFormData) => {
+  const submitDatasource = (onSuccess: (data: DatasourceFormData) => void) => {
+    const submitHandler = (formData: DatasourceFormData) => {
       const data = {
         id: formData.id,
         name: formData.name,
         description: formData.description,
         tags: formData.tags,
         status: formData.status,
+        connector: {
+          type: formData.connector.type,
+          config: formData.connector.config,
+        },
       }
       updateDatasource.mutate(data, { onSuccess: () => onSuccess(data) })
     }
@@ -190,7 +194,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       case 'basicInfo':
         return <BasicInfoTab form={form} isDraftMode={isDraftMode} />
       case 'connector':
-        return <ConnectorTab form={form} isDraftMode={isDraftMode} config={connectorConfig}/>
+        return <ConnectorTab form={form} isDraftMode={isDraftMode} config={connectorConfig} />
       case 'dataStructure':
       case 'accessPermissions':
       case 'dataspaces':
