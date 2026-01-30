@@ -1,5 +1,83 @@
 # APISIX Declarative Routes Configuration
 # M2: JWT validation via OpenID Connect (Keycloak JWKS)
+#
+# =============================================================================
+# JWT VALIDATION CONFIGURATION
+# =============================================================================
+#
+# PRODUCTION CONFIG (with HTTPS):
+# -------------------------------
+# When Keycloak runs with HTTPS and proper hostname config, use dynamic JWKS:
+#
+#   openid-connect:
+#     client_id: "apisix-validator"
+#     client_secret: "unused-for-jwks-validation"
+#     discovery: "https://auth.civitas.io/realms/civitas-core/.well-known/openid-configuration"
+#     bearer_only: true
+#     ssl_verify: true
+#     set_userinfo_header: true
+#     # No public_key - JWKS fetched dynamically from discovery's jwks_uri
+#
+# Benefits of dynamic JWKS:
+#   - Automatic key rotation support
+#   - No config changes needed when keys rotate
+#   - Keys cached (configurable TTL), not fetched per-request
+#
+# DEV CONFIG (current - with static public_key):
+# ----------------------------------------------
+# We use a static public_key because Keycloak returns localhost-based URLs
+# in its discovery document, which APISIX (inside Docker) cannot reach.
+#
+# WHY DYNAMIC JWKS DOESN'T WORK IN DEV:
+#
+# The problem:
+#   1. Browser accesses Keycloak at localhost:8080 (Docker port mapping)
+#   2. Keycloak's discovery returns: jwks_uri: "http://localhost:8080/..."
+#   3. APISIX (inside Docker) tries to fetch JWKS from localhost:8080
+#   4. But localhost inside the container is the container itself, not the host
+#   5. JWKS fetch fails, APISIX falls back to introspection, which also fails
+#
+# What we tried (all unsuccessful):
+#
+#   1. KC_HOSTNAME=civitas-keycloak (env var)
+#      Result: Ignored in dev mode (start-dev)
+#
+#   2. --hostname=civitas-keycloak (CLI in production mode)
+#      Result: Ignored without HTTPS - Keycloak docs say this is intentional
+#      security measure to prevent hostname spoofing attacks
+#
+#   3. --hostname=http://civitas-keycloak:8080 (full URL)
+#      Result: Warning about HTTP, still returns localhost
+#
+#   4. --proxy-headers=forwarded with Forwarded header
+#      Result: Still returns localhost
+#
+#   5. Host entry mapping (127.0.0.1 civitas-keycloak in /etc/hosts)
+#      Result: Doesn't help - Keycloak still returns localhost in URLs
+#
+# Root cause (from Keycloak docs):
+#   "With HTTPS not enabled, proxy-headers unset, and a non-URL hostname,
+#    the server is running in an insecure context."
+#   Keycloak intentionally ignores hostname config without HTTPS to prevent
+#   attackers from manipulating URLs via spoofed Host headers.
+#
+# The static public_key workaround:
+#   - Same RSA signature verification as dynamic JWKS
+#   - No per-request calls to Keycloak (key is pre-configured)
+#   - Drawback: Must manually update if Keycloak's signing key changes
+#   - In dev, keys never change (unless Keycloak data volume is deleted)
+#
+# To fetch current public key:
+#   curl -s http://localhost:8080/realms/civitas-core/protocol/openid-connect/certs | jq
+#
+# =============================================================================
+# TLS IN PRODUCTION
+# =============================================================================
+# With Linkerd service mesh, mTLS is handled transparently by sidecars.
+# APISIX talks HTTP to its local proxy, Linkerd encrypts pod-to-pod traffic.
+# So URLs stay http:// but traffic IS encrypted in transit.
+#
+# Without service mesh: use https:// URLs and ssl_verify: true.
 
 routes:
   # Protected API routes - require valid JWT
@@ -15,15 +93,38 @@ routes:
         send: 6
         read: 6
     plugins:
-      # JWT validation via OpenID Connect (validates tokens via Keycloak JWKS)
+      # Backend identifier for OPA authorization (M4)
+      # OPA uses this header to select the correct permission mappings file.
+      # Each backend (portal-backend, frost-server, etc.) provides its own mappings.
+      # Team 1 TODO: Config Adapter must set this header when creating routes.
+      #
+      # SECURITY NOTE (for Team 5 - OPA integration):
+      # APISIX's OPA plugin sends ctx.var.uri (normalized path) to OPA, NOT request_uri.
+      # This means path traversal (/../) and URL encoding are resolved before OPA sees them.
+      # See: https://github.com/apache/apisix/blob/master/apisix/plugins/opa/helper.lua#L41
+      # Our Rego policies include additional path validation as defense-in-depth.
+      proxy-rewrite:
+        headers:
+          set:
+            X-Authz-Backend: portal-backend
+      # JWT validation - see header comments for full explanation (TD-014)
       openid-connect:
-        # Required by plugin syntax but unused with bearer_only mode
-        client_id: "unused"
-        client_secret: "unused"
-        # TEAM3: We need a network policy for this.
+        # Required by plugin schema but unused for bearer_only + public_key validation
+        client_id: "apisix-validator"
+        client_secret: "unused-for-jwks-validation"
         discovery: "http://civitas-keycloak:8080/realms/civitas-core/.well-known/openid-configuration"
         bearer_only: true
         ssl_verify: false
+        public_key: |
+          -----BEGIN PUBLIC KEY-----
+          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoBMiel0QuEnffhFS7IUL
+          T6IwUUOpNLjTjZtzNSRP4nAmsTJBdo/PA1MSOpTDHO2gCF+kKjMUYofBibk2U+ta
+          YErB5JdxYgBBgqnl5F3KVae80n0XsrtIenkMit71McM6q1p5LpIf2cLzbdiYTzWY
+          2Z4ED+BD1xllfmWwF1dbBX9sWcszdafFTZ55P6ZoiA+FXmOEhAqjAqHR1yaz2SjD
+          f1F7fhLc6ADk249vw3MsD4RF5KYB6IHnUAXmjoSyayLSRw1f+wjU4vJv9xID1ioo
+          E+aAtJh0BDQMi51xrIcpZVeJAXqNZu/ITx71Nk9rJQyj/WMpqyxSapPJOdpssiKv
+          5wIDAQAB
+          -----END PUBLIC KEY-----
         # Pass decoded JWT claims downstream (prep for OPA in M4)
         set_userinfo_header: true
       # Request ID for tracing

@@ -74,7 +74,7 @@ class UserContextControllerIT {
 
     AssignmentContext assignment = group.getAssignments().get(0);
     assertThat(assignment.getRoleName()).isEqualTo("DataReader");
-    assertThat(assignment.getRoleType()).isEqualTo("STANDARD");
+    assertThat(assignment.getRoleType()).isEqualTo("DATA");
     assertThat(assignment.getScopeType()).isEqualTo("TENANT");
     assertThat(assignment.getScopeId()).isEqualTo("tenant-001");
     assertThat(assignment.getPermissions()).containsExactly("dataset:read");

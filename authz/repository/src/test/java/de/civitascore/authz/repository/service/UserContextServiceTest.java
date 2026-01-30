@@ -1,17 +1,20 @@
 package de.civitascore.authz.repository.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.authz.repository.data.UserRepository;
 import de.civitascore.authz.repository.model.dto.UserContextResponse;
 import de.civitascore.authz.repository.model.dto.UserContextResponse.AssignmentContext;
 import de.civitascore.authz.repository.model.dto.UserContextResponse.GroupContext;
-import de.civitascore.authz.repository.model.entity.Assignment;
-import de.civitascore.authz.repository.model.entity.Group;
-import de.civitascore.authz.repository.model.entity.Permission;
-import de.civitascore.authz.repository.model.entity.Role;
-import de.civitascore.authz.repository.model.entity.User;
+import de.civitascore.portal.model.embedded.RoleType;
+import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Permission;
+import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.entity.User;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -65,7 +68,7 @@ class UserContextServiceTest {
     @DisplayName("returns empty groups list when user has no groups")
     void returnsEmptyGroupsWhenNoGroups() {
       User user = createUser();
-      user.setGroups(new HashSet<>());
+      // createUser already returns empty groups set
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
 
       Optional<UserContextResponse> result = userContextService.getUserContext(EXTERNAL_ID);
@@ -79,8 +82,8 @@ class UserContextServiceTest {
     void mapsGroupWithNoAssignments() {
       User user = createUser();
       Group group = createGroup("Empty Group");
-      group.setAssignments(new HashSet<>());
-      user.setGroups(Set.of(group));
+      // createGroup already returns empty assignments set
+      when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
 
       Optional<UserContextResponse> result = userContextService.getUserContext(EXTERNAL_ID);
@@ -97,11 +100,11 @@ class UserContextServiceTest {
     void mapsRoleWithNoPermissions() {
       User user = createUser();
       Group group = createGroup("Test Group");
-      Role role = createRole("Empty Role", "STANDARD");
-      role.setPermissions(new HashSet<>());
-      Assignment assignment = createAssignment(group, role, "TENANT", "tenant-1");
-      group.setAssignments(Set.of(assignment));
-      user.setGroups(Set.of(group));
+      Role role = createRole("Empty Role", RoleType.SYSTEM);
+      // createRole already returns empty permissions set
+      Assignment assignment = createAssignment(group, role, ScopeType.TENANT, "tenant-1");
+      when(group.getAssignments()).thenReturn(Set.of(assignment));
+      when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
 
       Optional<UserContextResponse> result = userContextService.getUserContext(EXTERNAL_ID);
@@ -117,18 +120,19 @@ class UserContextServiceTest {
     void handlesNullScopeId() {
       User user = createUser();
       Group group = createGroup("Test Group");
-      Role role = createRole("Admin Role", "ADMIN");
-      role.setPermissions(Set.of(createPermission("admin:all")));
-      Assignment assignment = createAssignment(group, role, "GLOBAL", null);
-      group.setAssignments(Set.of(assignment));
-      user.setGroups(Set.of(group));
+      Role role = createRole("Admin Role", RoleType.SYSTEM);
+      Permission adminPermission = createPermission("admin:all");
+      when(role.getPermissions()).thenReturn(Set.of(adminPermission));
+      Assignment assignment = createAssignment(group, role, ScopeType.TENANT, null);
+      when(group.getAssignments()).thenReturn(Set.of(assignment));
+      when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
 
       Optional<UserContextResponse> result = userContextService.getUserContext(EXTERNAL_ID);
 
       assertThat(result).isPresent();
       AssignmentContext assignmentContext = result.get().getGroups().get(0).getAssignments().get(0);
-      assertThat(assignmentContext.getScopeType()).isEqualTo("GLOBAL");
+      assertThat(assignmentContext.getScopeType()).isEqualTo("TENANT");
       assertThat(assignmentContext.getScopeId()).isNull();
     }
 
@@ -137,16 +141,16 @@ class UserContextServiceTest {
     void sortsPermissionsAlphabetically() {
       User user = createUser();
       Group group = createGroup("Test Group");
-      Role role = createRole("Multi-Permission Role", "STANDARD");
-      role.setPermissions(
-          Set.of(
-              createPermission("zebra:read"),
-              createPermission("alpha:write"),
-              createPermission("beta:delete"),
-              createPermission("gamma:create")));
-      Assignment assignment = createAssignment(group, role, "TENANT", "tenant-1");
-      group.setAssignments(Set.of(assignment));
-      user.setGroups(Set.of(group));
+      Role role = createRole("Multi-Permission Role", RoleType.SYSTEM);
+      Permission zebraRead = createPermission("zebra:read");
+      Permission alphaWrite = createPermission("alpha:write");
+      Permission betaDelete = createPermission("beta:delete");
+      Permission gammaCreate = createPermission("gamma:create");
+      when(role.getPermissions())
+          .thenReturn(Set.of(zebraRead, alphaWrite, betaDelete, gammaCreate));
+      Assignment assignment = createAssignment(group, role, ScopeType.TENANT, "tenant-1");
+      when(group.getAssignments()).thenReturn(Set.of(assignment));
+      when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
 
       Optional<UserContextResponse> result = userContextService.getUserContext(EXTERNAL_ID);
@@ -163,11 +167,12 @@ class UserContextServiceTest {
       User user = createUser();
       Group group = createGroup("Test Group");
       UUID roleId = UUID.randomUUID();
-      Role role = createRoleWithId(roleId, "DataEditor", "DATA");
-      role.setPermissions(Set.of(createPermission("dataset:write")));
-      Assignment assignment = createAssignment(group, role, "DATASPACE", "dataspace-123");
-      group.setAssignments(Set.of(assignment));
-      user.setGroups(Set.of(group));
+      Role role = createRoleWithId(roleId, "DataEditor", RoleType.DATA);
+      Permission datasetWrite = createPermission("dataset:write");
+      when(role.getPermissions()).thenReturn(Set.of(datasetWrite));
+      Assignment assignment = createAssignment(group, role, ScopeType.DATASPACE, "dataspace-123");
+      when(group.getAssignments()).thenReturn(Set.of(assignment));
+      when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
 
       Optional<UserContextResponse> result = userContextService.getUserContext(EXTERNAL_ID);
@@ -188,9 +193,8 @@ class UserContextServiceTest {
       User user = createUser();
       Group group1 = createGroup("Group A");
       Group group2 = createGroup("Group B");
-      group1.setAssignments(new HashSet<>());
-      group2.setAssignments(new HashSet<>());
-      user.setGroups(Set.of(group1, group2));
+      // createGroup already returns empty assignments set
+      when(user.getGroups()).thenReturn(Set.of(group1, group2));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
 
       Optional<UserContextResponse> result = userContextService.getUserContext(EXTERNAL_ID);
@@ -207,14 +211,16 @@ class UserContextServiceTest {
     void mapsMultipleAssignmentsPerGroup() {
       User user = createUser();
       Group group = createGroup("Multi-Role Group");
-      Role role1 = createRole("Reader", "STANDARD");
-      Role role2 = createRole("Writer", "STANDARD");
-      role1.setPermissions(Set.of(createPermission("data:read")));
-      role2.setPermissions(Set.of(createPermission("data:write")));
-      Assignment assignment1 = createAssignment(group, role1, "TENANT", "tenant-1");
-      Assignment assignment2 = createAssignment(group, role2, "DATASPACE", "dataspace-1");
-      group.setAssignments(Set.of(assignment1, assignment2));
-      user.setGroups(Set.of(group));
+      Role role1 = createRole("Reader", RoleType.SYSTEM);
+      Role role2 = createRole("Writer", RoleType.DATA);
+      Permission dataRead = createPermission("data:read");
+      Permission dataWrite = createPermission("data:write");
+      when(role1.getPermissions()).thenReturn(Set.of(dataRead));
+      when(role2.getPermissions()).thenReturn(Set.of(dataWrite));
+      Assignment assignment1 = createAssignment(group, role1, ScopeType.TENANT, "tenant-1");
+      Assignment assignment2 = createAssignment(group, role2, ScopeType.DATASPACE, "dataspace-1");
+      when(group.getAssignments()).thenReturn(Set.of(assignment1, assignment2));
+      when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
 
       Optional<UserContextResponse> result = userContextService.getUserContext(EXTERNAL_ID);
@@ -228,51 +234,51 @@ class UserContextServiceTest {
     }
   }
 
-  // Helper methods for creating test entities
+  // Helper methods for creating test entities using mocks
+  // (portal-model entities have protected constructors)
 
   private User createUser() {
-    User user = new User();
-    user.setId(USER_ID);
-    user.setExternalId(EXTERNAL_ID);
-    user.setGroups(new HashSet<>());
+    User user = mock(User.class);
+    when(user.getId()).thenReturn(USER_ID);
+    when(user.getExternalId()).thenReturn(EXTERNAL_ID);
+    when(user.getGroups()).thenReturn(new HashSet<>());
     return user;
   }
 
   private Group createGroup(String name) {
-    Group group = new Group();
-    group.setId(UUID.randomUUID());
-    group.setName(name);
-    group.setAssignments(new HashSet<>());
+    Group group = mock(Group.class);
+    when(group.getId()).thenReturn(UUID.randomUUID());
+    when(group.getName()).thenReturn(name);
+    when(group.getAssignments()).thenReturn(new HashSet<>());
     return group;
   }
 
-  private Role createRole(String name, String roleType) {
+  private Role createRole(String name, RoleType roleType) {
     return createRoleWithId(UUID.randomUUID(), name, roleType);
   }
 
-  private Role createRoleWithId(UUID id, String name, String roleType) {
-    Role role = new Role();
-    role.setId(id);
-    role.setName(name);
-    role.setRoleType(roleType);
-    role.setPermissions(new HashSet<>());
+  private Role createRoleWithId(UUID id, String name, RoleType roleType) {
+    Role role = mock(Role.class);
+    when(role.getId()).thenReturn(id);
+    when(role.getName()).thenReturn(name);
+    when(role.getRoleType()).thenReturn(roleType);
+    when(role.getPermissions()).thenReturn(new HashSet<>());
     return role;
   }
 
   private Permission createPermission(String name) {
-    Permission permission = new Permission();
-    permission.setId(UUID.randomUUID());
-    permission.setName(name);
+    Permission permission = mock(Permission.class);
+    // Only stub methods actually used by UserContextService
+    when(permission.getName()).thenReturn(name);
     return permission;
   }
 
-  private Assignment createAssignment(Group group, Role role, String scopeType, String scopeId) {
-    Assignment assignment = new Assignment();
-    assignment.setId(UUID.randomUUID());
-    assignment.setGroup(group);
-    assignment.setRole(role);
-    assignment.setScopeType(scopeType);
-    assignment.setScopeId(scopeId);
+  private Assignment createAssignment(Group group, Role role, ScopeType scopeType, String scopeId) {
+    Assignment assignment = mock(Assignment.class);
+    // Only stub methods actually used by UserContextService
+    when(assignment.getRole()).thenReturn(role);
+    when(assignment.getScopeType()).thenReturn(scopeType);
+    when(assignment.getScopeId()).thenReturn(scopeId);
     return assignment;
   }
 }

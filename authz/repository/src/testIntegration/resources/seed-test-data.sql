@@ -1,18 +1,18 @@
 -- Test seed data for AuthZ Adapter integration tests
 
--- Create test permissions
+-- Create test permissions (using portal-model PermissionType enum: SYSTEM, DATA, GOVERNANCE)
 INSERT INTO permissions (id, name, description, permission_type, created_at)
 VALUES
-  ('a1111111-1111-1111-1111-111111111111', 'dataset:read', 'Read datasets', 'DATASET', NOW()),
-  ('a2222222-2222-2222-2222-222222222222', 'dataset:write', 'Write datasets', 'DATASET', NOW()),
-  ('a3333333-3333-3333-3333-333333333333', 'tenant:manage', 'Manage tenant', 'TENANT', NOW());
+  ('a1111111-1111-1111-1111-111111111111', 'dataset:read', 'Read datasets', 'DATA', NOW()),
+  ('a2222222-2222-2222-2222-222222222222', 'dataset:write', 'Write datasets', 'DATA', NOW()),
+  ('a3333333-3333-3333-3333-333333333333', 'tenant:manage', 'Manage tenant', 'SYSTEM', NOW());
 
--- Create test roles
+-- Create test roles (using portal-model RoleType enum: SYSTEM, DATA, GOVERNANCE)
 INSERT INTO roles (id, name, description, role_type, created_at)
 VALUES
-  ('b1111111-1111-1111-1111-111111111111', 'DataReader', 'Can read data', 'STANDARD', NOW()),
-  ('b2222222-2222-2222-2222-222222222222', 'DataEditor', 'Can read and write data', 'STANDARD', NOW()),
-  ('b3333333-3333-3333-3333-333333333333', 'TenantAdmin', 'Tenant administrator', 'ADMIN', NOW());
+  ('b1111111-1111-1111-1111-111111111111', 'DataReader', 'Can read data', 'DATA', NOW()),
+  ('b2222222-2222-2222-2222-222222222222', 'DataEditor', 'Can read and write data', 'DATA', NOW()),
+  ('b3333333-3333-3333-3333-333333333333', 'TenantAdmin', 'Tenant administrator', 'SYSTEM', NOW());
 
 -- Assign permissions to roles
 INSERT INTO role_permissions (role_id, permission_id)
@@ -56,7 +56,7 @@ VALUES
 -- Role with no permissions (for edge case testing)
 INSERT INTO roles (id, name, description, role_type, created_at)
 VALUES
-  ('b4444444-4444-4444-4444-444444444444', 'EmptyRole', 'Role with no permissions', 'STANDARD', NOW());
+  ('b4444444-4444-4444-4444-444444444444', 'EmptyRole', 'Role with no permissions', 'DATA', NOW());
 
 -- Group with no assignments (edge case)
 INSERT INTO groups (id, name, description, created_at)
@@ -92,20 +92,20 @@ VALUES
 -- User with many permissions (10+) for sorting test
 INSERT INTO permissions (id, name, description, permission_type, created_at)
 VALUES
-  ('a4444444-4444-4444-4444-444444444444', 'zebra:read', 'Zebra read', 'CUSTOM', NOW()),
-  ('a5555555-5555-5555-5555-555555555555', 'alpha:write', 'Alpha write', 'CUSTOM', NOW()),
-  ('a6666666-6666-6666-6666-666666666666', 'beta:delete', 'Beta delete', 'CUSTOM', NOW()),
-  ('a7777777-7777-7777-7777-777777777777', 'gamma:create', 'Gamma create', 'CUSTOM', NOW()),
-  ('a8888888-8888-8888-8888-888888888888', 'delta:update', 'Delta update', 'CUSTOM', NOW()),
-  ('a9999999-9999-9999-9999-999999999999', 'epsilon:list', 'Epsilon list', 'CUSTOM', NOW()),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'theta:export', 'Theta export', 'CUSTOM', NOW()),
-  ('abbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'iota:import', 'Iota import', 'CUSTOM', NOW()),
-  ('accccccc-cccc-cccc-cccc-cccccccccccc', 'kappa:admin', 'Kappa admin', 'CUSTOM', NOW()),
-  ('addddddd-dddd-dddd-dddd-dddddddddddd', 'lambda:view', 'Lambda view', 'CUSTOM', NOW());
+  ('a4444444-4444-4444-4444-444444444444', 'zebra:read', 'Zebra read', 'DATA', NOW()),
+  ('a5555555-5555-5555-5555-555555555555', 'alpha:write', 'Alpha write', 'DATA', NOW()),
+  ('a6666666-6666-6666-6666-666666666666', 'beta:delete', 'Beta delete', 'DATA', NOW()),
+  ('a7777777-7777-7777-7777-777777777777', 'gamma:create', 'Gamma create', 'DATA', NOW()),
+  ('a8888888-8888-8888-8888-888888888888', 'delta:update', 'Delta update', 'DATA', NOW()),
+  ('a9999999-9999-9999-9999-999999999999', 'epsilon:list', 'Epsilon list', 'DATA', NOW()),
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'theta:export', 'Theta export', 'DATA', NOW()),
+  ('abbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'iota:import', 'Iota import', 'DATA', NOW()),
+  ('accccccc-cccc-cccc-cccc-cccccccccccc', 'kappa:admin', 'Kappa admin', 'SYSTEM', NOW()),
+  ('addddddd-dddd-dddd-dddd-dddddddddddd', 'lambda:view', 'Lambda view', 'DATA', NOW());
 
 INSERT INTO roles (id, name, description, role_type, created_at)
 VALUES
-  ('b5555555-5555-5555-5555-555555555555', 'ManyPermsRole', 'Role with many permissions', 'STANDARD', NOW());
+  ('b5555555-5555-5555-5555-555555555555', 'ManyPermsRole', 'Role with many permissions', 'DATA', NOW());
 
 INSERT INTO role_permissions (role_id, permission_id)
 VALUES

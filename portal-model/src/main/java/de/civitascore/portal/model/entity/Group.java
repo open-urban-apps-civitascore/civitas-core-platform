@@ -16,6 +16,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.AccessLevel;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -60,6 +61,9 @@ public class Group extends NamedEntity {
       orphanRemoval = true)
   @Setter(AccessLevel.NONE) // Custom setter needed for orphanRemoval
   private Set<Group> childGroups = new HashSet<>();
+
+  @OneToMany(mappedBy = "group", fetch = FetchType.LAZY)
+  private Set<Assignment> assignments = new HashSet<>();
 
   /**
    * Custom setter for childGroups to properly handle orphanRemoval. Hibernate requires that the

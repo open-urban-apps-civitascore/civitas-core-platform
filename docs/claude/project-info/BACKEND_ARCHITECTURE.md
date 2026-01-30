@@ -24,7 +24,8 @@
 
 - `configuration/` - Spring configuration (Security, WebMvc, Auditor)
 - `controller/` - REST controllers (extend `BaseController`, thin delegation to services)
-- `model/entity/` - JPA entities with base classes (`BaseEntity`, `NamedEntity`, `ScopedEntity`)
+- `model/entity/` - JPA entities with base classes (in `portal-model` module, shared with AuthZ)
+- `model/embedded/` - Enum types for entities (in `portal-model` module)
 - `model/input/` - Request DTOs with relations as IDs
 - `model/output/` - Response DTOs with nested summaries (full responses)
 - `repository/` - JPA repositories with EntityGraph support

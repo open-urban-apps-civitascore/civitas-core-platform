@@ -1,6 +1,6 @@
 package de.civitascore.authz.repository.data;
 
-import de.civitascore.authz.repository.model.entity.User;
+import de.civitascore.portal.model.entity.User;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -6,8 +6,9 @@ CREATE TABLE IF NOT EXISTS users
     id          UUID                        NOT NULL,
     created_at  TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     modified_at TIMESTAMP WITHOUT TIME ZONE,
-    created_by  VARCHAR(255),
-    modified_by VARCHAR(255),
+    created_by  UUID,
+    modified_by UUID,
+    title       VARCHAR(255)                NOT NULL DEFAULT 'OTHER',
     first_name  VARCHAR(255)                NOT NULL,
     last_name   VARCHAR(255)                NOT NULL,
     email       VARCHAR(255)                NOT NULL,
@@ -24,8 +25,8 @@ CREATE TABLE IF NOT EXISTS groups
     description     TEXT,
     created_at      TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     modified_at     TIMESTAMP WITHOUT TIME ZONE,
-    created_by      VARCHAR(255),
-    modified_by     VARCHAR(255),
+    created_by      UUID,
+    modified_by     UUID,
     contact_user_id UUID,
     parent_group_id UUID,
     CONSTRAINT pk_groups PRIMARY KEY (id)
@@ -38,9 +39,10 @@ CREATE TABLE IF NOT EXISTS permissions
     description     TEXT,
     created_at      TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     modified_at     TIMESTAMP WITHOUT TIME ZONE,
-    created_by      VARCHAR(255),
-    modified_by     VARCHAR(255),
+    created_by      UUID,
+    modified_by     UUID,
     permission_type VARCHAR(255)                NOT NULL,
+    category        VARCHAR(255)                NOT NULL DEFAULT 'GENERAL',
     CONSTRAINT pk_permissions PRIMARY KEY (id)
 );
 
@@ -51,9 +53,10 @@ CREATE TABLE IF NOT EXISTS roles
     description TEXT,
     created_at  TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     modified_at TIMESTAMP WITHOUT TIME ZONE,
-    created_by  VARCHAR(255),
-    modified_by VARCHAR(255),
+    created_by  UUID,
+    modified_by UUID,
     role_type   VARCHAR(255)                NOT NULL,
+    readonly    BOOLEAN                     NOT NULL DEFAULT FALSE,
     CONSTRAINT pk_roles PRIMARY KEY (id)
 );
 
@@ -64,8 +67,8 @@ CREATE TABLE IF NOT EXISTS assignments
     scope_id             VARCHAR(255),
     created_at           TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     modified_at          TIMESTAMP WITHOUT TIME ZONE,
-    created_by           VARCHAR(255),
-    modified_by          VARCHAR(255),
+    created_by           UUID,
+    modified_by          UUID,
     group_id             UUID                        NOT NULL,
     role_id              UUID                        NOT NULL,
     is_inherited         BOOLEAN                     NOT NULL,

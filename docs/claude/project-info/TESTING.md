@@ -1,5 +1,52 @@
 # Testing Guidelines & Best Practices
 
+## Test Types Overview
+
+The platform has the following test suites. **Run all tests for major changes** (new features, refactoring, dependency updates).
+
+| Component | Test Type | Command | Count | Notes |
+|-----------|-----------|---------|-------|-------|
+| portal-frontend | Unit (Vitest) | `pnpm test` | 199 | Fast, mock-based |
+| portal-frontend | E2E (Playwright) | `pnpm test:e2e` | 42 | Requires Keycloak + backend |
+| portal-backend | Unit (JUnit) | `mvn test` | - | Surefire plugin |
+| portal-backend | Integration | `mvn verify` | - | Testcontainers, Failsafe |
+| authz/repository | Unit (JUnit) | `mvn -f authz/repository/pom.xml test` | 10 | Service layer tests |
+| authz/repository | Integration | `mvn -f authz/repository/pom.xml verify` | 9 | Full stack with H2 |
+| config-adapter | Unit/Integration | `mvn -f config-adapter/pom.xml test` | - | Kafka via Testcontainers |
+
+### Quick Reference: Running All Tests
+
+```bash
+# Frontend (from portal-frontend/)
+pnpm test                    # Unit tests
+pnpm test:e2e               # E2E tests (requires infrastructure)
+
+# Backend (from portal-backend/)
+mvn clean verify            # Unit + Integration tests
+
+# AuthZ Repository (from authz/repository/)
+mvn clean verify            # Unit + Integration tests
+
+# Config Adapter (from config-adapter/)
+mvn clean test              # All modules
+```
+
+### E2E Test Infrastructure Requirements
+
+E2E tests require running infrastructure:
+```bash
+# Start PostgreSQL
+cd dev-environment/postgres && docker compose up -d
+
+# Start Keycloak
+cd dev-environment/keycloak && docker compose up -d
+
+# Start backend
+cd portal-backend && mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
+```
+
+---
+
 ## Test Design Principles
 
 **Production Safety**: Mark tests as production-safe only if they are non-destructive and idempotent for repeated execution.

@@ -1,0 +1,87 @@
+{
+  "_comment": "Portal Backend API permission mappings. Owner: Team 2",
+  "_version": "1.0.0",
+  "_backend_id": "portal-backend",
+
+  "endpoints": {
+    "/v2/users/me": {
+      "GET": null
+    },
+    "/v2/users": {
+      "GET": "READ_USER",
+      "POST": "CREATE_USER"
+    },
+    "/v2/users/{id}": {
+      "GET": "READ_USER",
+      "PUT": "UPDATE_USER",
+      "PATCH": "UPDATE_USER",
+      "DELETE": "DELETE_USER"
+    },
+    "/v2/dataspaces": {
+      "GET": "READ_DATASPACE",
+      "POST": "CREATE_DATASPACE"
+    },
+    "/v2/dataspaces/{id}": {
+      "GET": "READ_DATASPACE",
+      "PUT": "UPDATE_DATASPACE",
+      "PATCH": "UPDATE_DATASPACE",
+      "DELETE": "DELETE_DATASPACE"
+    },
+    "/v2/assignments": {
+      "GET": "READ_ASSIGNMENT",
+      "POST": "CREATE_ASSIGNMENT"
+    },
+    "/v2/assignments/{id}": {
+      "GET": "READ_ASSIGNMENT",
+      "PUT": "UPDATE_ASSIGNMENT",
+      "PATCH": "UPDATE_ASSIGNMENT",
+      "DELETE": "DELETE_ASSIGNMENT"
+    },
+    "/v2/groups": {
+      "GET": "READ_GROUP",
+      "POST": "CREATE_GROUP"
+    },
+    "/v2/groups/{id}": {
+      "GET": "READ_GROUP",
+      "PUT": "UPDATE_GROUP",
+      "PATCH": "UPDATE_GROUP",
+      "DELETE": "DELETE_GROUP"
+    },
+    "/v2/permissions": {
+      "GET": "READ_PERMISSION",
+      "POST": "CREATE_PERMISSION"
+    },
+    "/v2/permissions/{id}": {
+      "GET": "READ_PERMISSION",
+      "PUT": "UPDATE_PERMISSION",
+      "PATCH": "UPDATE_PERMISSION",
+      "DELETE": "DELETE_PERMISSION"
+    },
+    "/v2/roles": {
+      "GET": "READ_ROLE",
+      "POST": "CREATE_ROLE"
+    },
+    "/v2/roles/{id}": {
+      "GET": "READ_ROLE",
+      "PUT": "UPDATE_ROLE",
+      "PATCH": "UPDATE_ROLE",
+      "DELETE": "DELETE_ROLE"
+    },
+    "/v2/catalogs": {
+      "GET": "READ_CATALOG"
+    },
+    "/v2/catalogs/{id}": {
+      "GET": "READ_CATALOG"
+    },
+    "/v2/datasets": {
+      "GET": "READ_DATASET",
+      "POST": "CREATE_DATASET"
+    },
+    "/v2/datasets/{id}": {
+      "GET": "READ_DATASET",
+      "PUT": "UPDATE_DATASET",
+      "PATCH": "UPDATE_DATASET",
+      "DELETE": "DELETE_DATASET"
+    }
+  }
+}

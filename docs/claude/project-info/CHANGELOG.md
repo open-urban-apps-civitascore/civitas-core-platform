@@ -2,7 +2,54 @@
 
 Running log of changes made to the codebase by Claude Code.
 
+## 2026-02-03
+
+### M4: Security Hardening & Review Comments
+- **R-012**: Clarified permission_eval.rego header comments (module provides primitives, main.rego makes decisions)
+- **R-013**: Added fail-secure design explanation (Rego undefined semantics provide fail-secure behavior)
+- **R-014**: Removed unused `lookup_info` debug helper, kept tested `all_user_permissions`
+- **R-015**: Added backend ID validation (alphanumeric, dashes, underscores only) - prevents injection
+- **R-016**: Added path validation with defense-in-depth checks:
+  - Reject path traversal (`..`)
+  - Reject null bytes
+  - Reject backslashes
+  - Path length limit (2048 chars)
+- **R-017**: Added design notes explaining exact-match-first pattern for backend-specific routes
+- Added 8 new security tests (66 total, all passing)
+- Fixed OPA data loading path: `backends/portal_backend/data.json` (OPA drops filenames from data path)
+
+### APISIX Security Documentation
+- Researched APISIX OPA plugin: uses `ctx.var.uri` (normalized path) - safe
+- Added security note to `apisix.yaml` explaining URL normalization for Team 5
+
+### Documentation Updates
+- Updated REGO_REQUIREMENTS_TRACEABILITY.md with new security requirements (R-SEC-1 through R-SEC-4)
+- Updated test coverage: 66 tests across 4 modules
+- Resolved TD-018 (URL normalization trust assumption)
+- Added TD-017 (data file schema validation), F-003 (provider architecture), F-004 (scope enforcement)
+
 ## 2026-01-30
+
+### M4: OPA + Rego Policies — COMPLETE
+- Added OPA to dev-environment (`dev-environment/opa/docker-compose.yml`)
+- Created Rego policy structure in `authz/rego/`:
+  - `policy/main.rego` - Entry point with allow/deny decision and detailed reason
+  - `policy/resource_mapping.rego` - URL path → resource type + operation mapping
+  - `policy/permission_eval.rego` - Permission evaluation (resource-level, no scope checks yet)
+  - `policy/public_endpoints.rego` - Public endpoints that bypass authorization
+  - `data/portal_backend_mappings.json` - Permission mappings from portal-backend API
+- Created comprehensive Rego test suite (49 tests, all passing):
+  - `test/main_test.rego` - Integration tests for decision logic
+  - `test/resource_mapping_test.rego` - URL parsing tests
+  - `test/permission_eval_test.rego` - Permission checking tests
+  - `test/public_endpoints_test.rego` - Public endpoint detection tests
+- OPA running and verified via HTTP API:
+  - Public endpoint → `{"allowed": true, "reason": "public_endpoint"}`
+  - Permission granted → `{"allowed": true, "reason": "permission_granted", "permission": "READ_USER"}`
+  - Permission denied → `{"allowed": false, "reason": "permission_denied", "required": "DELETE_USER"}`
+  - Self-access (/users/me) → `{"allowed": true, "reason": "self_access"}`
+- Note: Scope enforcement (TENANT → DATASPACE → DATASET) deferred to M4.5
+- Note: AuthZ Repository integration (external data source) deferred to M5
 
 ### Handoff: portal-model Extraktion
 - Created handoff document for Team 2: `docs/claude/handoff/TEAM2-PORTAL-MODEL-EXTRAKTION.md`

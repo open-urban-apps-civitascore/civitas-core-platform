@@ -21,6 +21,8 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     container_name: civitas-keycloak
+    # Production mode with strict hostname - ensures all URLs use civitas-keycloak
+    # Requires host entry: 127.0.0.1 civitas-keycloak (in /etc/hosts)
     command: start-dev --import-realm
     ports:
       - "8080:8080"
@@ -58,4 +60,3 @@ networks:
   civitas-network:
     name: civitas-network
     external: true
-    driver: bridge

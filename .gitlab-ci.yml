@@ -17,6 +17,7 @@ include:
   - .gitlab/ci/config-adapter.yml
   - .gitlab/ci/portal-model.yml
   - .gitlab/ci/renovate.yml
+  - .gitlab/ci/authz.yml
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Dependency-Scanning.v2.gitlab-ci.yml
     inputs:

@@ -1,0 +1,121 @@
+# GitLab CI jobs for AuthZ (OPA Rego policies)
+# Runs linting, type checking, unit tests, and bundle builds
+
+# Hidden job that defines rules for authz changes
+# All authz jobs should extend this
+.only-authz-changes:
+  rules:
+    # Always run on tags
+    - if: $CI_COMMIT_TAG
+    # Always run on main and develop branch
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    # Run on MR only when authz files change
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - authz/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/authz.yml
+
+# Common OPA configuration
+.opa-common:
+  image: openpolicyagent/opa:1.4.2-static
+
+# =============================================================================
+# Lint Stage
+# =============================================================================
+
+# Check Rego formatting
+lint-authz:
+  extends:
+    - .only-authz-changes
+    - .opa-common
+  stage: lint
+  needs: []
+  script:
+    - cd authz/rego
+    - echo "Checking Rego formatting..."
+    - opa fmt --diff policy lib providers
+    - echo "Formatting check passed"
+
+# =============================================================================
+# QA Stage
+# =============================================================================
+
+# Check Rego types (strict mode)
+check-authz:
+  extends:
+    - .only-authz-changes
+    - .opa-common
+  stage: qa
+  needs: []
+  script:
+    - cd authz/rego
+    - echo "Running strict type checking..."
+    - opa check --strict policy lib providers
+    - echo "Type check passed"
+
+# =============================================================================
+# Test Stage
+# =============================================================================
+
+# Run Rego unit tests
+test-authz:
+  extends:
+    - .only-authz-changes
+    - .opa-common
+  stage: test
+  needs: []
+  script:
+    - cd authz/rego
+    - echo "Running Rego unit tests..."
+    # Note: backends must be under data/ for data.backends.* to resolve
+    - mkdir -p /tmp/rego/data
+    - cp -r policy lib providers test /tmp/rego/
+    - cp -r backends /tmp/rego/data/
+    - cd /tmp/rego
+    - |
+      if ! opa test policy lib providers test data -v; then
+        echo "Tests failed"
+        exit 1
+      fi
+    - echo "All tests passed"
+
+# =============================================================================
+# Build Stage
+# =============================================================================
+
+# Build OPA bundle
+bundle-authz:
+  extends:
+    - .only-authz-changes
+    - .opa-common
+  stage: build
+  needs:
+    - job: test-authz
+      optional: true
+    - job: setup-version
+      optional: true
+  script:
+    - cd authz/rego
+    - echo "Building OPA bundle (revision ${REVISION:-$CI_COMMIT_SHORT_SHA})..."
+    # Create bundle directory structure
+    - mkdir -p /tmp/bundle/data
+    - cp -r policy lib providers /tmp/bundle/
+    - cp -r backends /tmp/bundle/data/
+    # Create manifest with revision
+    - |
+      cat > /tmp/bundle/.manifest << EOF
+      {
+        "revision": "${REVISION:-$CI_COMMIT_SHORT_SHA}",
+        "roots": ["civitas", "backends"]
+      }
+      EOF
+    # Build bundle
+    - opa build -b /tmp/bundle -o bundle.tar.gz
+    - echo "Bundle built successfully"
+    - tar -tzf bundle.tar.gz | head -20
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - authz/rego/bundle.tar.gz

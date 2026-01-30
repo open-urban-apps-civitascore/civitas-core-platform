@@ -15,7 +15,11 @@ M2   AuthN — APISIX JWT Validation (token validation via Keycloak JWKS)
  │
 M3   AuthZ Repository Service (Java service, DB → user authz context)
  │
-M4   OPA + Rego Policies (authorization decision logic)
+M4   OPA + Rego Policies (resource-level permissions, no scope checks)
+ │
+M4.5 Scope Enforcement (TENANT → DATASPACE → DATASET hierarchy) [DEFERRED - may be cut from v2]
+ │
+M4.6 Provider Architecture & OPA Bundles (modular backends, production hardening)
  │
 M5   Full AuthZ Integration (APISIX → OPA → Repository, wired and tested)
  │
@@ -78,6 +82,41 @@ Each milestone builds on the previous. No milestone should be started until its 
 - Dockerfile: multi-stage build, non-root user, healthcheck
 - 19 tests total: 10 unit tests + 9 integration tests (Testcontainers + PostgreSQL)
 - Note: Flat group membership only; hierarchical groups out of scope for this release
+
+### M4 — OPA + Rego Policies (2026-01-30, updated 2026-02-03)
+- Added OPA to docker-compose (`dev-environment/opa/docker-compose.yml`)
+- Created Rego policy structure in `authz/rego/`:
+  - `policy/main.rego` - Entry point with allow/deny decision
+  - `policy/resource_mapping.rego` - URL path → resource type + operation (with security hardening)
+  - `policy/permission_eval.rego` - Permission evaluation (resource-level)
+  - `backends/portal_backend/data.json` - Permission mappings (OPA bundle structure)
+- Security hardening (2026-02-03):
+  - Backend ID validation (alphanumeric only)
+  - Path validation (no traversal, null bytes, backslashes)
+  - Defense-in-depth for URL normalization
+- 66 Rego unit tests (all passing, including 8 security tests)
+- HTTP API verified for all decision types
+- 5/5 Playwright smoke tests pass (no regression)
+- Note: Scope enforcement deferred to M4.5, APISIX wiring to M5
+- Note: public_endpoints.rego removed (handled at APISIX level)
+
+### M4.6 — Provider Architecture & OPA Bundles (2026-02-03)
+- Created modular provider architecture for multi-backend support:
+  - `lib/genericrestmapper.rego` - Reusable path validation and pattern matching
+  - `providers/portal_backend.rego` - Portal Backend provider wrapping genericrestmapper
+  - `providers/frost_server.rego` - FROST Server stub (OData parsing deferred)
+- Refactored `resource_mapping.rego` as dispatcher routing to providers
+- Created OPA bundle infrastructure:
+  - `.manifest` with revision tracking and roots configuration
+  - `build-bundle.sh` with pre-flight checks (format, type check, tests)
+- Added GitLab CI pipeline (`.gitlab/ci/authz.yml`):
+  - `lint-authz` - Format checking
+  - `check-authz` - Strict type checking
+  - `test-authz` - Unit tests
+  - `bundle-authz` - Bundle build artifact
+- Updated docker-compose.yml for new directory structure (lib/, providers/, backends/)
+- Reorganized tests into `test/lib/`, `test/providers/`, `test/policy/`
+- 111 Rego tests pass (was 76, added 35 new tests for library/providers)
 
 ---
 
@@ -267,16 +306,16 @@ This test suite runs after every subsequent milestone as a gate:
 **Goal**: OPA evaluates authorization decisions using Rego policies. Policies parse APISIX request metadata, fetch user context from AuthZ Repository, and return allow/deny.
 
 ### Tasks
-1. Add OPA to docker-compose
-2. Write Rego policy package `civitas.authz`:
-   - Parse request path to extract: backend prefix, resource type, resource ID
-   - Map HTTP verb to permission operation (GET→READ, POST→CREATE, etc.)
-   - Call AuthZ Repository external data source for user context
-   - Evaluate: does the user have a permission matching the required operation + resource type at the correct scope?
-   - Handle scope inheritance (TENANT → DATASPACE → DATASET)
-   - Handle anonymous/public endpoints (allow without AuthZ)
-3. Define the request→resource→permission mapping configuration (per-backend, data-driven)
-4. OPA configuration: external data source pointing to AuthZ Repository
+1. ✅ Add OPA to docker-compose (`dev-environment/opa/docker-compose.yml`)
+2. ✅ Write Rego policy package `civitas.authz`:
+   - ✅ Parse request path to extract: backend prefix, resource type, resource ID
+   - ✅ Map HTTP verb to permission operation (GET→READ, POST→CREATE, etc.)
+   - ⏳ Call AuthZ Repository external data source for user context → M5
+   - ✅ Evaluate: does the user have a permission matching the required operation + resource type?
+   - ⏳ Handle scope inheritance (TENANT → DATASPACE → DATASET) → M4.5
+   - ✅ Handle anonymous/public endpoints (allow without AuthZ)
+3. ✅ Define the request→resource→permission mapping configuration (`authz/rego/data/portal_backend_mappings.json`)
+4. ⏳ OPA configuration: external data source pointing to AuthZ Repository → M5
 
 ### Rego Policy Structure (proposed)
 ```
@@ -295,12 +334,12 @@ authz/rego/
 ```
 
 ### Exit Criteria
-- [ ] OPA running and reachable
-- [ ] Rego policies correctly allow/deny for all test scenarios
-- [ ] URL parsing works for all portal backend endpoint patterns (`/v2/datasets/{id}`, `/v2/users/me`, etc.)
-- [ ] Scope inheritance works (TENANT → DATASPACE → DATASET)
-- [ ] Public endpoints pass without AuthZ
-- [ ] All Rego unit tests pass
+- [x] OPA running and reachable
+- [x] Rego policies correctly allow/deny for all test scenarios
+- [x] URL parsing works for all portal backend endpoint patterns (`/v2/datasets/{id}`, `/v2/users/me`, etc.)
+- [ ] ~~Scope inheritance works (TENANT → DATASPACE → DATASET)~~ → Moved to M4.5
+- [x] Public endpoints pass without AuthZ
+- [x] All Rego unit tests pass (49 tests)
 
 ### Tests (Pragmatic TDD)
 - **Rego unit tests** (OPA built-in test framework, `opa test`):
@@ -316,6 +355,78 @@ authz/rego/
 ### External Dependencies
 - HTTP-to-permission operation mappings from Team 2 (use working assumptions until delivered)
 - Backend URL pattern conventions (use current `/v2/{resource}` pattern)
+
+---
+
+## M4.6 — Provider Architecture & OPA Bundles
+
+**Goal**: Modular Rego architecture for multi-backend support + production-ready OPA bundle packaging.
+
+### Background
+- Current Rego works for portal-backend REST patterns (`/version/resource/{id}`)
+- FROST server uses OData patterns (completely different)
+- Production needs atomic deployments, versioning, and integrity verification
+
+### Tasks
+
+#### Provider Architecture
+1. Create `authz/rego/lib/genericrestmapper.rego`:
+   - Reusable path pattern matching for REST APIs
+   - `match_pattern(path, endpoints)` → matched pattern or ""
+   - `parse_path(path)` → validated path parts
+2. Create `authz/rego/providers/portal_backend.rego`:
+   - Thin wrapper around genericrestmapper
+   - Backend-specific configuration
+3. Create `authz/rego/providers/frost_server.rego` (stub):
+   - OData-specific parsing (to be implemented when FROST integration starts)
+4. Update `resource_mapping.rego` to dispatch to providers based on `X-Authz-Backend` header
+5. Move data files to sit alongside providers:
+   ```
+   authz/rego/
+   ├── lib/
+   │   └── genericrestmapper.rego
+   ├── providers/
+   │   ├── portal_backend/
+   │   │   ├── provider.rego
+   │   │   └── data.json
+   │   └── frost_server/
+   │       ├── provider.rego
+   │       └── data.json
+   └── policy/
+       ├── main.rego
+       ├── permission_eval.rego
+       └── resource_mapping.rego  (dispatcher)
+   ```
+
+#### OPA Bundles
+1. Create `.manifest` file with revision tracking and roots
+2. Add CI pipeline step: `opa build -b . -o bundle.tar.gz`
+3. Add pre-bundle validation:
+   - `opa fmt --diff` (format check)
+   - `opa check --strict` (type check)
+   - `opa test` (unit tests)
+4. Document bundle deployment workflow
+5. [Optional] Add `.signatures.json` for integrity verification
+
+### Exit Criteria
+- [x] genericrestmapper works standalone with tests
+- [x] portal_backend provider wraps genericrestmapper correctly
+- [x] frost_server provider stub exists (OData parsing deferred)
+- [x] Data files in backends/ directory (unchanged location for data.backends.* paths)
+- [x] OPA bundle builds successfully
+- [x] All 111 Rego tests pass (76 original + 35 new)
+- [x] Bundle can be loaded by OPA in dev-environment
+
+### Tests
+- Unit tests for genericrestmapper (path parsing, pattern matching)
+- Unit tests for each provider
+- Integration test: bundle loads and works end-to-end
+- Verify provider dispatch based on X-Authz-Backend header
+
+### Notes
+- This is a refactoring milestone — no new authorization logic
+- FROST OData parsing is out of scope; just create the structure
+- Bundle signing is optional for v2.0
 
 ---
 
@@ -430,7 +541,9 @@ Seed scripts:
 
 | Dependency | Owner | Needed By | Status | Workaround |
 |-----------|-------|-----------|--------|------------|
-| HTTP-to-permission operation mappings | Team 2 | M4 | Promised | Use working assumptions (GET→READ, POST→CREATE, etc.) |
-| Keycloak group claims | User (sprint) | M4 | Planned | M2 works without groups; M4 can use roles-only fallback |
-| Backend URL conventions for APISIX | Backend teams | M1 | Communicated | Use current `/v2/{resource}` pattern |
-| Portal backend API completeness | Team 2 | M0 | Unknown | Verify via Swagger, work with what exists |
+| HTTP-to-permission operation mappings (Portal) | Team 2 | M4 | **Delivered** | `backends/portal_backend/data.json` complete |
+| HTTP-to-permission operation mappings (FROST) | Team 2 | F-005 | Not started | Stub provider denies all; OData parsing needed first |
+| Keycloak group claims | User (sprint) | M4 | **Done** | Groups included in JWT via protocol mapper |
+| Backend URL conventions for APISIX | Backend teams | M1 | **Done** | `/v2/{resource}` pattern established |
+| Portal backend API completeness | Team 2 | M0 | **Done** | Swagger verified, all CRUD endpoints working |
+| APISIX X-Authz-Backend header | Team 1 | M5 | Pending | H-002 handoff doc created; dev config has header |

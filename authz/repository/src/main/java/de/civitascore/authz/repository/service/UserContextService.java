@@ -4,10 +4,10 @@ import de.civitascore.authz.repository.data.UserRepository;
 import de.civitascore.authz.repository.model.dto.UserContextResponse;
 import de.civitascore.authz.repository.model.dto.UserContextResponse.AssignmentContext;
 import de.civitascore.authz.repository.model.dto.UserContextResponse.GroupContext;
-import de.civitascore.authz.repository.model.entity.Assignment;
-import de.civitascore.authz.repository.model.entity.Group;
-import de.civitascore.authz.repository.model.entity.Permission;
-import de.civitascore.authz.repository.model.entity.User;
+import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Permission;
+import de.civitascore.portal.model.entity.User;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -58,8 +58,8 @@ public class UserContextService {
     return AssignmentContext.builder()
         .roleId(assignment.getRole().getId())
         .roleName(assignment.getRole().getName())
-        .roleType(assignment.getRole().getRoleType())
-        .scopeType(assignment.getScopeType())
+        .roleType(assignment.getRole().getRoleType().name())
+        .scopeType(assignment.getScopeType().name())
         .scopeId(assignment.getScopeId())
         .permissions(permissionNames)
         .build();
