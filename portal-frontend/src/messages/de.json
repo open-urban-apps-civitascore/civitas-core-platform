@@ -23,6 +23,7 @@
       "required": "Dieses Feld ist erforderlich",
       "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
       "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
+      "atLeast1Value": "Mindestens ein Wert ist erforderlich.",
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
       "notFound": "Keine {items} gefunden",
       "loadingError": "Fehler beim Laden der Daten",

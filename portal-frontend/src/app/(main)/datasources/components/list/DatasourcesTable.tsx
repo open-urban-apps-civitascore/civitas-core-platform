@@ -10,6 +10,7 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { Badge } from '@/components/ui/badge'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
 import { cn } from '@/lib/utils'
+import { CONNECTOR_TYPE_KEYS } from '@/types/connectors'
 import { BaseDatasource, CONNECTION_TYPES, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
@@ -68,7 +69,10 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     }),
     columnHelper.accessor('connector', {
       header: t('tableHeaders.connector'),
-      cell: info => info.getValue(),
+      cell: info => {
+        const connectorType = info.getValue().type
+        return connectorType ? CONNECTOR_TYPE_KEYS[connectorType] : '-'
+      },
       meta: {
         style: {
           width: '10%',

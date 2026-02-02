@@ -1,4 +1,4 @@
-import { CONNECTOR_TYPES } from '@/types/datasources'
+import { CONNECTOR_TYPES } from '@/types/connectors'
 
 export const NODE_DEFS = {
   [CONNECTOR_TYPES.MQTT]: {
@@ -16,6 +16,7 @@ export const NODE_DEFS = {
         rows: 3,
         placeholder: '- tcp://localhost:1883',
         defaultValue: '[]',
+        required: true,
       },
       {
         key: 'topics',
@@ -23,6 +24,7 @@ export const NODE_DEFS = {
         label: 'Topics',
         placeholder: 'foo/bar, sensors/#',
         defaultValue: '',
+        required: true,
       },
       {
         key: 'client_id',
@@ -30,6 +32,7 @@ export const NODE_DEFS = {
         label: 'Client ID',
         placeholder: 'optional',
         defaultValue: '',
+        required: false,
       },
       {
         key: 'qos',
@@ -37,6 +40,7 @@ export const NODE_DEFS = {
         label: 'QoS',
         options: ['0', '1', '2'],
         defaultValue: '1',
+        required: true,
       },
       {
         key: 'connect_timeout',
@@ -45,6 +49,7 @@ export const NODE_DEFS = {
         label: 'Connect Timeout',
         placeholder: '3s',
         defaultValue: '',
+        required: false,
       },
       {
         key: 'keepalive',
@@ -53,6 +58,7 @@ export const NODE_DEFS = {
         label: 'Keepalive',
         placeholder: '30s',
         defaultValue: '',
+        required: false,
       },
       {
         key: 'tls.enabled',
@@ -60,6 +66,7 @@ export const NODE_DEFS = {
         expert: true,
         label: 'TLS Enabled',
         defaultValue: false,
+        required: true,
       },
     ],
   },
@@ -89,6 +96,7 @@ export const NODE_DEFS = {
           'spanner',
         ],
         defaultValue: '',
+        required: true,
       },
       {
         key: 'dsn',
@@ -96,6 +104,7 @@ export const NODE_DEFS = {
         label: 'DSN',
         placeholder: 'Driver-spezifischer Connection String',
         defaultValue: '',
+        required: true,
       },
       {
         key: 'table',
@@ -103,6 +112,7 @@ export const NODE_DEFS = {
         label: 'Table',
         placeholder: 'tabelle',
         defaultValue: '',
+        required: true,
       },
       {
         key: 'columns',
@@ -111,6 +121,7 @@ export const NODE_DEFS = {
         rows: 3,
         placeholder: '["*"] oder ["col1","col2"]',
         defaultValue: '',
+        required: true,
       },
       {
         key: 'where',
@@ -118,6 +129,7 @@ export const NODE_DEFS = {
         label: 'WHERE',
         placeholder: 'col = ? AND id > ?',
         defaultValue: '',
+        required: false,
       },
       {
         key: 'args_mapping',
@@ -126,6 +138,7 @@ export const NODE_DEFS = {
         rows: 3,
         placeholder: '[- this.id, now() ]',
         defaultValue: '',
+        required: false,
       },
       {
         key: 'prefix',
@@ -134,6 +147,7 @@ export const NODE_DEFS = {
         label: 'Prefix SQL',
         placeholder: 'optional',
         defaultValue: '',
+        required: false,
       },
       {
         key: 'suffix',
@@ -142,6 +156,7 @@ export const NODE_DEFS = {
         label: 'Suffix SQL',
         placeholder: 'optional',
         defaultValue: '',
+        required: false,
       },
       {
         key: 'init_files',
@@ -150,6 +165,7 @@ export const NODE_DEFS = {
         label: 'Init SQL Files (array)',
         rows: 3,
         defaultValue: '[]',
+        required: false,
       },
       {
         key: 'init_statement',
@@ -158,6 +174,7 @@ export const NODE_DEFS = {
         label: 'Init SQL Statement',
         rows: 4,
         defaultValue: '',
+        required: false,
       },
       {
         key: 'conn_max_idle_time',
@@ -166,6 +183,7 @@ export const NODE_DEFS = {
         label: 'Max Idle Time',
         placeholder: 'e.g. 5m',
         defaultValue: '',
+        required: false,
       },
       {
         key: 'conn_max_life_time',
@@ -174,6 +192,7 @@ export const NODE_DEFS = {
         label: 'Max Life Time',
         placeholder: 'e.g. 1h',
         defaultValue: '',
+        required: false,
       },
       {
         key: 'conn_max_idle',
@@ -182,6 +201,7 @@ export const NODE_DEFS = {
         label: 'Max Idle Conns',
         placeholder: '2',
         defaultValue: 2,
+        required: false,
       },
       {
         key: 'conn_max_open',
@@ -190,6 +210,7 @@ export const NODE_DEFS = {
         label: 'Max Open Conns',
         placeholder: '0 (unlimited)',
         defaultValue: 0,
+        required: false,
       },
     ],
   },

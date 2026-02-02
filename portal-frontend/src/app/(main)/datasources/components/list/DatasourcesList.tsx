@@ -8,13 +8,13 @@ import { useEffect } from 'react'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { BaseDatasource } from '@/types/datasources'
 
 import { DatasourcesTable } from './DatasourcesTable'
-import { useQueryParams } from '@/hooks/use-query-params'
-import { SearchHeader } from '@/components/search-area/SearchArea'
 
 interface DatasourcesListProps {
   datasources: BaseDatasource[]

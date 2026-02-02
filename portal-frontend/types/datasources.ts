@@ -2,12 +2,7 @@ import z from 'zod'
 
 import type { NODE_DEFS } from '@/app/(main)/datasources/components/connector-tab/connector_sources'
 
-export const CONNECTOR_TYPES = {
-  MQTT: 'mqtt',
-  SQL: 'sql',
-} as const
-
-export type ConnectorType = (typeof CONNECTOR_TYPES)[keyof typeof CONNECTOR_TYPES]
+import { CONNECTOR_TYPES, ConnectorSchema } from './connectors'
 
 export const CONNECTION_TYPES = {
   ACTIVE: 'active',
@@ -43,62 +38,10 @@ export type ConnectorConfig = {
   placeholder: string
 }
 
-export const buildConnectorConfigSchema = (config: ConnectorConfig[]) => {
-  const shape: Record<string, z.ZodTypeAny> = {}
-
-  config.forEach(p => {
-    let field: z.ZodTypeAny = z.any()
-    const isOptional = typeof p.placeholder === 'string' && p.placeholder.toLowerCase().includes('optional')
-
-    if (typeof p.defaultValue === 'number') {
-      field = z.preprocess(val => {
-        if (typeof val === 'string') {
-          const trimmed = val.trim()
-          if (trimmed === '') return undefined
-          return Number(trimmed)
-        }
-        return val
-      }, z.number({
-        required_error: 'common.errors.required',
-        invalid_type_error: 'common.errors.invalidNumber',
-      }))
-    } else if (typeof p.defaultValue === 'string') {
-      field = z.string().min(1, 'common.errors.required')
-    } else if (typeof p.defaultValue === 'boolean') {
-      field = z.boolean()
-    } else {
-      // Fallback to type if defaultValue is missing/unknown
-      if (p.type === 'input' || p.type === 'textArea' || p.type === 'select') {
-        field = z.string().min(1, 'common.errors.required')
-      }
-      if (p.type === 'checkbox') field = z.boolean()
-    }
-
-    if (isOptional) {
-      field = z.preprocess(val => (val === '' ? undefined : val), field).optional()
-    }
-
-    shape[p.key] = field
-  })
-
-  return z.object(shape)
-}
-
-export const buildConnectorDefaultConfig = (config: ConnectorConfig[]) => {
-  const defaults: Record<string, unknown> = {}
-
-  config.forEach(p => {
-    defaults[p.key] = p.defaultValue
-  })
-
-  return defaults
-}
-
 /* schema */
 export const DatasourceBaseSchema = z.object({
   id: z.number({
-    required_error: 'common.errors.required',
-    invalid_type_error: 'common.errors.invalidNumber',
+    error: issue => (issue.input === undefined ? 'common.errors.required' : 'common.errors.invalidNumber'),
   }),
   name: z.string().min(1, 'common.errors.nameRequired'),
   description: z.string().min(1, 'common.errors.descriptionRequired').max(150, 'common.errors.descriptionMaxLength'),
@@ -111,10 +54,11 @@ export const DatasourceBaseSchema = z.object({
 
 export type BaseDatasource = z.infer<typeof DatasourceBaseSchema>
 
-/* Form schemas for create/edit */
+/* Form schemas for create */
 export const DatasourceCreateFormSchema = DatasourceBaseSchema.pick({ name: true })
 export type DatasourceCreateFormData = z.infer<typeof DatasourceCreateFormSchema>
 
+/* Form schemas for edit */
 export const DatasourceBaseFormSchema = DatasourceBaseSchema.pick({
   id: true,
   name: true,
@@ -125,21 +69,7 @@ export const DatasourceBaseFormSchema = DatasourceBaseSchema.pick({
 
 export type DatasourceBaseFormData = z.infer<typeof DatasourceBaseFormSchema>
 
-export const buildConnectorShema = (config: ConnectorConfig[], status: DatasourceStatusType) => {
-  const isAvailable = status === DATASOURCE_STATUS_TYPES.AVAILABLE
-  return z.object({
-    type: isAvailable ? ConnectorTypeSchema : ConnectorTypeSchema.optional(),
-    config: isAvailable ? buildConnectorConfigSchema(config) : buildConnectorConfigSchema(config).nullable(),
-  })
-}
-
-
-export const buildDatasourceFormSchema = (config: ConnectorConfig[], status: DatasourceStatusType) =>
-  DatasourceBaseFormSchema.extend({
-    connector: buildConnectorShema(config, status),
-  })
-
-export type DatasourceFormData = z.infer<ReturnType<typeof buildDatasourceFormSchema>>
+export type DatasourceFormData = z.infer<typeof DatasourceFormSchema>
 
 /* API request types */
 export type CreateDatasourceData = Omit<BaseDatasource, 'id'>
@@ -152,3 +82,7 @@ export type ConnectorDefaultsByType = {
     [P in ConnectorNodeDefs[K]['properties'][number] as P['key']]: P['defaultValue']
   }
 }
+
+export const DatasourceFormSchema = DatasourceBaseFormSchema.extend({
+  connector: ConnectorSchema,
+})
