@@ -1,21 +1,11 @@
 import z from 'zod'
 
 import type { NODE_DEFS } from '@/app/(main)/datasources/components/connector-tab/connector_sources'
+import { CONNECTION_TYPES, CONNECTOR_TYPES, DATASOURCE_STATUS_TYPES } from '@/const/datasources'
 
-import { CONNECTOR_TYPES, ConnectorSchema } from './connectors'
-
-export const CONNECTION_TYPES = {
-  ACTIVE: 'active',
-  INACTIVE: 'inactive',
-  STATIC: 'static',
-} as const
+import { ConnectorSchema, MqttSchema, SqlSchema } from './connectors'
 
 export type ConnectionType = (typeof CONNECTION_TYPES)[keyof typeof CONNECTION_TYPES]
-
-export const DATASOURCE_STATUS_TYPES = {
-  DRAFT: 'draft',
-  AVAILABLE: 'available',
-} as const
 
 export type DatasourceStatusType = (typeof DATASOURCE_STATUS_TYPES)[keyof typeof DATASOURCE_STATUS_TYPES]
 
@@ -28,7 +18,7 @@ export const DatasourceStatusSchema = enumFromConst(DATASOURCE_STATUS_TYPES)
 
 export type FormFieldType = 'input' | 'textArea' | 'select' | 'checkbox'
 
-export type ConnectorConfig = {
+export type ConnectorFieldOptions = {
   key: string
   type: FormFieldType
   label: string
@@ -39,7 +29,7 @@ export type ConnectorConfig = {
 }
 
 /* schema */
-export const DatasourceBaseSchema = z.object({
+export const DatasourceSchema = z.object({
   id: z.number({
     error: issue => (issue.input === undefined ? 'common.errors.required' : 'common.errors.invalidNumber'),
   }),
@@ -52,14 +42,14 @@ export const DatasourceBaseSchema = z.object({
   connector: z.object({ type: ConnectorTypeSchema.optional(), config: z.record(z.string(), z.unknown()).nullable() }),
 })
 
-export type BaseDatasource = z.infer<typeof DatasourceBaseSchema>
+export type Datasource = z.infer<typeof DatasourceSchema>
 
 /* Form schemas for create */
-export const DatasourceCreateFormSchema = DatasourceBaseSchema.pick({ name: true })
+export const DatasourceCreateFormSchema = DatasourceSchema.pick({ name: true })
 export type DatasourceCreateFormData = z.infer<typeof DatasourceCreateFormSchema>
 
 /* Form schemas for edit */
-export const DatasourceBaseFormSchema = DatasourceBaseSchema.pick({
+export const DatasourceBaseFormSchema = DatasourceSchema.pick({
   id: true,
   name: true,
   description: true,
@@ -69,13 +59,9 @@ export const DatasourceBaseFormSchema = DatasourceBaseSchema.pick({
 
 export type DatasourceBaseFormData = z.infer<typeof DatasourceBaseFormSchema>
 
-export type DatasourceFormData = z.infer<typeof DatasourceFormSchema>
-
-/* API request types */
-export type CreateDatasourceData = Omit<BaseDatasource, 'id'>
+export type CreateDatasourceData = Omit<Datasource, 'id'>
 export type UpdateDatasourceData = Partial<CreateDatasourceData> & { id: number }
 
-/* Inferred defaults from connector_sources */
 export type ConnectorNodeDefs = typeof NODE_DEFS
 export type ConnectorDefaultsByType = {
   [K in keyof ConnectorNodeDefs]: {
@@ -83,6 +69,50 @@ export type ConnectorDefaultsByType = {
   }
 }
 
+// export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorSchema.optional() })
 export const DatasourceFormSchema = DatasourceBaseFormSchema.extend({
-  connector: ConnectorSchema,
+  connector: ConnectorSchema.optional(),
+}).superRefine((data, ctx) => {
+  console.log('DATA', data)
+  if (data.status !== DATASOURCE_STATUS_TYPES.AVAILABLE) return
+
+  if (!data.description) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['description'],
+      message: 'required',
+    })
+  }
+
+  if (!data.connector) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['connector'],
+      message: 'required',
+    })
+    return
+  }
+
+  if (data.connector.type === CONNECTOR_TYPES.MQTT) {
+    const parsed = MqttSchema.parse(data.connector.config)
+    if (!parsed.urls?.length) {
+      ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'urls'], message: 'required' })
+    }
+    if (!parsed.topics?.length) {
+      ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'topics'], message: 'required' })
+    }
+  }
+
+  if (data.connector.type === CONNECTOR_TYPES.SQL) {
+    const parsed = SqlSchema.safeParse(data.connector.config)
+    if (!parsed.data?.dsn) {
+      ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'dsn'], message: 'required' })
+    }
+    if (!parsed.data?.table) {
+      ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'table'], message: 'required' })
+    }
+  }
 })
+
+export type DatasourceFormInput = z.input<typeof DatasourceFormSchema>
+export type DatasourceFormData = z.output<typeof DatasourceFormSchema>

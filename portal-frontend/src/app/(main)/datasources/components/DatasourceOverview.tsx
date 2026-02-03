@@ -13,13 +13,13 @@ import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { CONNECTOR_TYPES, DATASOURCE_STATUS_TYPES } from '@/const/datasources'
 import { cn } from '@/lib/utils'
-import { ConnectorConfigSchemaType, ConnectorType } from '@/types/connectors'
+import { ConnectorType, getConnectorDefaults } from '@/types/connectors'
 import {
-  BaseDatasource,
-  ConnectorConfig,
-  DATASOURCE_STATUS_TYPES,
-  DatasourceFormData,
+  ConnectorFieldOptions,
+  Datasource,
+  DatasourceFormInput,
   DatasourceFormSchema,
   DatasourceStatusType,
 } from '@/types/datasources'
@@ -32,13 +32,33 @@ import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'
 import { StatusDropdown } from './StatusDropdown'
 
 interface DatasourceOverviewProps {
-  datasource: BaseDatasource
+  datasource: Datasource
 }
 
 export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const { datasource } = props
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
+
+  const getConnector = (type: ConnectorType | undefined) =>
+    type === 'sql'
+      ? ({
+          type: 'sql',
+          config: getConnectorDefaults(CONNECTOR_TYPES.SQL),
+        } as const)
+      : ({
+          type: 'mqtt',
+          config: getConnectorDefaults(CONNECTOR_TYPES.MQTT),
+        } as const)
+
+  const defaultValues: DatasourceFormInput = {
+    id: datasource.id,
+    name: datasource.name ?? '',
+    description: datasource.description ?? '',
+    tags: datasource.tags ?? [],
+    status: datasource.status ?? DATASOURCE_STATUS_TYPES.DRAFT,
+    connector: getConnector(datasource.connector?.type),
+  }
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -49,44 +69,42 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const updateDatasource = useUpdateDatasource()
   const isLoading = updateDatasource.isPending
 
-  const parsedDatasource = DatasourceFormSchema.safeParse(datasource)
-
-  const form = useForm<DatasourceFormData>({
+  const form = useForm<DatasourceFormInput>({
     resolver: zodResolver(DatasourceFormSchema),
     mode: 'onChange',
-    reValidateMode: 'onChange',
-    defaultValues: parsedDatasource.success
-      ? parsedDatasource.data
-      : {
-          id: datasource.id,
-          name: datasource.name ?? '',
-          description: datasource.description ?? '',
-          tags: datasource.tags ?? [],
-          status: datasource.status ?? DATASOURCE_STATUS_TYPES.DRAFT,
-          connector: {
-            type: datasource.connector.type ?? undefined,
-            config: datasource.connector.config ?? null,
-          },
-        },
+    defaultValues,
   })
-
-  const connectorTypeWatch = form.watch('connector.type')
+  const connectorTypeWatch = form.watch('connector.type') as ConnectorType
   const connectorConfig = useMemo(
-    () => (connectorTypeWatch ? (NODE_DEFS[connectorTypeWatch].properties as ConnectorConfig[]) : []),
+    () => (connectorTypeWatch ? (NODE_DEFS[connectorTypeWatch].properties as ConnectorFieldOptions[]) : []),
     [connectorTypeWatch],
   )
+
+  useEffect(() => {
+    if (!connectorTypeWatch) return
+
+    form.setValue('connector', getConnector(connectorTypeWatch), { shouldDirty: true })
+  }, [connectorTypeWatch, form])
 
   const statusWatch = form.watch('status')
   const nameWatch = form.watch('name')
   const descriptionWatch = form.watch('description')
 
-  // useEffect(() => {
-  //   if (statusWatch === DATASOURCE_STATUS_TYPES.AVAILABLE) {
-  //     void form.trigger()
-  //   }
-  // }, [statusWatch, connectorTypeWatch, form])
+  useEffect(() => {
+    if (statusWatch === DATASOURCE_STATUS_TYPES.AVAILABLE) {
+      void form.trigger()
+    }
+  }, [statusWatch, connectorTypeWatch, form])
 
   const isDraftMode = statusWatch === DATASOURCE_STATUS_TYPES.DRAFT
+
+  useEffect(() => {
+    if (isDraftMode) {
+      form.clearErrors()
+    } else {
+      form.trigger()
+    }
+  }, [isDraftMode])
 
   const formValues = useWatch({ control: form.control })
 
@@ -121,42 +139,61 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
 
-  const getTypedConfig = <T extends ConnectorType>(type: T, config: unknown): ConnectorConfigSchemaType[T] => {
-    return config as ConnectorConfigSchemaType[T]
+  // const getTypedConfig = <T extends ConnectorType>(type: T, config: unknown): ConnectorConfigSchemaType[T] => {
+  //   return config as ConnectorConfigSchemaType[T]
+  // }
+
+  const buildApiPayload = (formData: DatasourceFormInput): Datasource => {
+    return {
+      id: formData.id,
+      name: formData.name,
+      description: formData.description,
+      tags: formData.tags,
+      status: formData.status,
+      lastActive: datasource.lastActive,
+      connection: datasource.connection,
+      connector: {
+        type: formData.connector?.type,
+        config: formData.connector?.config || null,
+      },
+    }
   }
 
-  const submitDatasource = (onSuccess: (data: DatasourceFormData) => void) => {
-    const submitHandler = (formData: DatasourceFormData) => {
-      const config = getTypedConfig(formData.connector.type, formData.connector.config)
-      const data = {
-        id: formData.id,
-        name: formData.name,
-        description: formData.description,
-        tags: formData.tags,
-        status: formData.status,
-        connector: {
-          type: formData.connector.type,
-          config,
-        },
-      }
-      updateDatasource.mutate(data, { onSuccess: () => onSuccess(data) })
-    }
-
+  const submitDatasource = (data: DatasourceFormInput) => {
     if (isDraftMode) {
-      // In draft mode, only validate name (always required) and bypass other validation
-      if (nameWatch.length > 0) {
-        submitHandler(form.getValues())
-      }
-    } else {
-      form.handleSubmit(submitHandler)()
+      // no validation block
+      updateDatasource.mutate(buildApiPayload(data))
+      return
     }
+
+    form.handleSubmit(values => {
+      const parsed = DatasourceFormSchema.parse(values)
+      updateDatasource.mutate(buildApiPayload(parsed))
+    })()
   }
+
+  // const submitDatasource = (onSuccess: (data: DatasourceFormData) => void) => {
+  //   const submitHandler = (formInput: DatasourceFormInput) => {
+  //     const parsed = DatasourceFormSchema.parse(formInput)
+
+  //     updateDatasource.mutate(parsed, {
+  //       onSuccess: () => onSuccess(parsed),
+  //     })
+  //   }
+
+  //   if (isDraftMode) {
+  //     if (nameWatch.length > 0) {
+  //       submitHandler(form.getValues())
+  //     }
+  //   } else {
+  //     form.handleSubmit(submitHandler)()
+  //   }
+  // }
 
   const handleSave = () => {
-    submitDatasource(data => {
-      form.reset(data)
-      router.refresh()
-    })
+    submitDatasource(form.getValues())
+    form.reset(form.getValues())
+    router.refresh()
   }
 
   const handleExit = () => {
@@ -173,10 +210,9 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const handleSaveAndExit = () => {
-    submitDatasource(() => {
-      setIsExitModalOpen(false)
-      router.push(`/datasources?${searchParams.toString()}`)
-    })
+    submitDatasource(form.getValues())
+    setIsExitModalOpen(false)
+    router.push(`/datasources?${searchParams.toString()}`)
   }
 
   const renderTabContent = () => {
@@ -184,7 +220,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       case 'basicInfo':
         return <BasicInfoTab form={form} isDraftMode={isDraftMode} />
       case 'connector':
-        return <ConnectorTab form={form} isDraftMode={isDraftMode} config={connectorConfig} />
+        return (
+          <ConnectorTab
+            form={form}
+            isDraftMode={isDraftMode}
+            config={connectorConfig}
+            connectorType={connectorTypeWatch}
+          />
+        )
       case 'dataStructure':
       case 'accessPermissions':
       case 'dataspaces':

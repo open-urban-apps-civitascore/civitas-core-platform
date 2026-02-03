@@ -58,7 +58,11 @@ export const FormSelect = <T extends FieldValues>(props: AccessibleSelectProps<T
               {required && <span className="text-red-500 ml-1">*</span>}
             </FormLabel>
 
-            <ShadcnSelect value={field.value} onValueChange={onChange ?? field.onChange}>
+            <ShadcnSelect
+              key={field.value ?? 'empty'}
+              value={field.value ?? ''}
+              onValueChange={onChange ?? field.onChange}
+            >
               <SelectTrigger
                 id={id}
                 data-testid={`${name}SelectTrigger`}

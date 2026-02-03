@@ -11,12 +11,12 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/comp
 import { Textarea } from '@/components/ui/textarea'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-import { DatasourceFormData } from '@/types/datasources'
+import { DatasourceFormInput } from '@/types/datasources'
 
 import { TagsMultiSelect } from './TagsMultiSelect'
 
 interface BasicInfoTabProps {
-  form: UseFormReturn<DatasourceFormData>
+  form: UseFormReturn<DatasourceFormInput>
   isReadOnly?: boolean
   isDraftMode?: boolean
 }

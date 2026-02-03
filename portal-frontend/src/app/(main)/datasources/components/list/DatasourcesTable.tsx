@@ -8,15 +8,16 @@ import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/Badges
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Badge } from '@/components/ui/badge'
+import { CONNECTION_TYPES, CONNECTOR_TYPE_KEYS, DATASOURCE_STATUS_TYPES } from '@/const/datasources'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
 import { cn } from '@/lib/utils'
-import { CONNECTOR_TYPE_KEYS } from '@/types/connectors'
-import { BaseDatasource, CONNECTION_TYPES, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
+import { ConnectorType } from '@/types/connectors'
+import { Datasource } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
-interface DatasourcesTableProps extends TableProps<BaseDatasource> {
-  datasources: BaseDatasource[]
+interface DatasourcesTableProps extends TableProps<Datasource> {
+  datasources: Datasource[]
   onDelete?: (id: number) => void
 }
 
@@ -37,7 +38,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
   const locale = useLocale() as AppLocale
-  const columnHelper = createColumnHelper<BaseDatasource>()
+  const columnHelper = createColumnHelper<Datasource>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -70,7 +71,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     columnHelper.accessor('connector', {
       header: t('tableHeaders.connector'),
       cell: info => {
-        const connectorType = info.getValue().type
+        const connectorType = info.getValue().type as ConnectorType
         return connectorType ? CONNECTOR_TYPE_KEYS[connectorType] : '-'
       },
       meta: {
@@ -160,7 +161,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     }),
     {
       id: 'actions',
-      cell: ({ row }: { row: Row<BaseDatasource> }) => (
+      cell: ({ row }: { row: Row<Datasource> }) => (
         <TableDropdownMenu
           menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDelete?.(row.original.id) }]}
         />

@@ -5,8 +5,9 @@ import { useTranslations } from 'next-intl'
 
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DATASOURCE_STATUS_TYPES } from '@/const/datasources'
 import { cn } from '@/lib/utils'
-import { DATASOURCE_STATUS_TYPES, DatasourceStatusType } from '@/types/datasources'
+import { DatasourceStatusType } from '@/types/datasources'
 
 interface StatusDropdownProps {
   status: DatasourceStatusType

@@ -40,7 +40,8 @@ export const FormCheckbox = <T extends FieldValues>(props: FormCheckboxProps<T>)
                 data-testid={`${name}Checkbox`}
                 data-test-element="formField"
                 className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0"
-                {...field}
+                checked={!!field.value}
+                onCheckedChange={checked => field.onChange(checked)}
                 disabled={disabled}
               />
             </FormControl>

@@ -1,4 +1,4 @@
-import { CONNECTOR_TYPES } from '@/types/connectors'
+import { CONNECTOR_TYPES } from '@/const/datasources'
 
 export const NODE_DEFS = {
   [CONNECTOR_TYPES.MQTT]: {
@@ -61,7 +61,7 @@ export const NODE_DEFS = {
         required: false,
       },
       {
-        key: 'tls.enabled',
+        key: 'tls',
         type: 'checkbox',
         expert: true,
         label: 'TLS Enabled',
@@ -95,7 +95,7 @@ export const NODE_DEFS = {
           'gocosmos',
           'spanner',
         ],
-        defaultValue: '',
+        defaultValue: 'postgres',
         required: true,
       },
       {

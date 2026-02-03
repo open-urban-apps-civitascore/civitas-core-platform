@@ -12,12 +12,12 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { BaseDatasource } from '@/types/datasources'
+import { Datasource } from '@/types/datasources'
 
 import { DatasourcesTable } from './DatasourcesTable'
 
 interface DatasourcesListProps {
-  datasources: BaseDatasource[]
+  datasources: Datasource[]
   rowCount: number
 }
 

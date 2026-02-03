@@ -5,15 +5,16 @@ import { FormSelect } from '@/components/form/fields/FormSelect'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { SelectOption } from '@/types/common'
 import { ConnectorType } from '@/types/connectors'
-import { ConnectorConfig, DatasourceFormData } from '@/types/datasources'
+import { ConnectorFieldOptions, DatasourceFormInput } from '@/types/datasources'
 
 import { NODE_DEFS } from './connector_sources'
 import { DynamiCformField } from './DynamicFormField'
 
 interface ConnectorTabProps {
-  form: UseFormReturn<DatasourceFormData>
+  form: UseFormReturn<DatasourceFormInput>
   isDraftMode: boolean
-  config: ConnectorConfig[]
+  connectorType: ConnectorType | undefined
+  config: ConnectorFieldOptions[]
 }
 export const ConnectorTab = (props: ConnectorTabProps) => {
   const { form, config } = props
@@ -40,7 +41,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
           key={property.key}
           form={form}
           label={property.label}
-          name={`connector.config.${property.key}` as Path<DatasourceFormData>}
+          name={`connector.config.${property.key}` as Path<DatasourceFormInput>}
           placeholder={property.placeholder}
           type={property.type}
           options={property.options?.map(option => ({ value: option, label: option }))}

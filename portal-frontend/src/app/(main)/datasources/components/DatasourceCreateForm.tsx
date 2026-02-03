@@ -15,8 +15,9 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { DATASOURCE_STATUS_TYPES } from '@/const/datasources'
 import { cn } from '@/lib/utils'
-import { DATASOURCE_STATUS_TYPES, DatasourceCreateFormData, DatasourceCreateFormSchema } from '@/types/datasources'
+import { DatasourceCreateFormData, DatasourceCreateFormSchema } from '@/types/datasources'
 
 export const DatasourceCreateForm = () => {
   const t = useTranslations('datasources')
@@ -42,7 +43,7 @@ export const DatasourceCreateForm = () => {
         description: '',
         tags: [],
         status: DATASOURCE_STATUS_TYPES.DRAFT,
-        connector: 'rest',
+        connector: { type: undefined, config: null },
         connection: 'inactive',
         lastActive: new Date().toISOString(),
       },
