@@ -441,7 +441,7 @@ class ApisixAdapterIntegrationTest {
     // First create an upstream that the route will reference
     String upstreamId = "test-upstream-serverless-post";
     Map<String, Object> upstreamConfig =
-            Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
     createUpstreamDirectly(upstreamId, upstreamConfig);
 
     // Create a route with serverless-post-function plugin (log phase)
@@ -450,29 +450,29 @@ class ApisixAdapterIntegrationTest {
     routeConfig.put("methods", List.of("GET", "POST"));
     routeConfig.put("upstream_id", upstreamId);
     routeConfig.put(
-            "plugins",
+        "plugins",
+        Map.of(
+            "serverless-post-function",
             Map.of(
-                    "serverless-post-function",
-                    Map.of(
-                            "phase",
-                            "log",
-                            "functions",
-                            List.of(
-                                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Post-function executed') end"))));
+                "phase",
+                "log",
+                "functions",
+                List.of(
+                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Post-function executed') end"))));
 
     ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
     await()
-            .atMost(10, SECONDS)
-            .pollInterval(1, SECONDS)
-            .untilAsserted(
-                    () -> {
-                      assertEquals(1, eventPublisher.getPublishedEvents().size());
-                      ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-                      assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
-                    });
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
 
     assertEquals(1, eventPublisher.getPublishedEvents().size());
     ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
@@ -484,7 +484,7 @@ class ApisixAdapterIntegrationTest {
     // First create an upstream
     String upstreamId = "test-upstream-serverless-header-filter";
     Map<String, Object> upstreamConfig =
-            Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
     createUpstreamDirectly(upstreamId, upstreamConfig);
 
     // Create a route with serverless-post-function using header_filter phase
@@ -493,29 +493,29 @@ class ApisixAdapterIntegrationTest {
     routeConfig.put("methods", List.of("GET"));
     routeConfig.put("upstream_id", upstreamId);
     routeConfig.put(
-            "plugins",
+        "plugins",
+        Map.of(
+            "serverless-post-function",
             Map.of(
-                    "serverless-post-function",
-                    Map.of(
-                            "phase",
-                            "header_filter",
-                            "functions",
-                            List.of(
-                                    "return function(conf, ctx) ngx.header['X-Custom-Post-Header'] = 'processed' end"))));
+                "phase",
+                "header_filter",
+                "functions",
+                List.of(
+                    "return function(conf, ctx) ngx.header['X-Custom-Post-Header'] = 'processed' end"))));
 
     ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
     await()
-            .atMost(10, SECONDS)
-            .pollInterval(1, SECONDS)
-            .untilAsserted(
-                    () -> {
-                      assertEquals(1, eventPublisher.getPublishedEvents().size());
-                      ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-                      assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
-                    });
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
   }
 
   @Test
@@ -525,7 +525,7 @@ class ApisixAdapterIntegrationTest {
     // First create an upstream
     String upstreamId = "test-upstream-for-add-serverless";
     Map<String, Object> upstreamConfig =
-            Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
     createUpstreamDirectly(upstreamId, upstreamConfig);
 
     // Create initial route without serverless-post-function
@@ -541,31 +541,31 @@ class ApisixAdapterIntegrationTest {
     updatedRouteConfig.put("methods", List.of("GET", "POST"));
     updatedRouteConfig.put("upstream_id", upstreamId);
     updatedRouteConfig.put(
-            "plugins",
+        "plugins",
+        Map.of(
+            "serverless-post-function",
             Map.of(
-                    "serverless-post-function",
-                    Map.of(
-                            "phase",
-                            "log",
-                            "functions",
-                            List.of("return function(conf, ctx) ngx.log(ngx.INFO, 'Added via UPDATE') end"))));
+                "phase",
+                "log",
+                "functions",
+                List.of("return function(conf, ctx) ngx.log(ngx.INFO, 'Added via UPDATE') end"))));
 
     ConfigEvent event =
-            createRouteConfigEvent("routes/" + routeId, Operation.UPDATE, updatedRouteConfig);
+        createRouteConfigEvent("routes/" + routeId, Operation.UPDATE, updatedRouteConfig);
 
     adapter.processConfigEvent(Topics.ROUTE_UPDATED.toString(), event);
 
     await()
-            .atMost(10, SECONDS)
-            .pollInterval(1, SECONDS)
-            .untilAsserted(
-                    () -> {
-                      JsonNode route = getRouteFromApisix(routeId);
-                      assertNotNull(route);
-                      JsonNode plugins = route.get("value").get("plugins");
-                      assertNotNull(plugins);
-                      assertTrue(plugins.has("serverless-post-function"));
-                    });
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              JsonNode route = getRouteFromApisix(routeId);
+              assertNotNull(route);
+              JsonNode plugins = route.get("value").get("plugins");
+              assertNotNull(plugins);
+              assertTrue(plugins.has("serverless-post-function"));
+            });
 
     assertEquals(1, eventPublisher.getPublishedEvents().size());
     ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
@@ -577,7 +577,7 @@ class ApisixAdapterIntegrationTest {
     // First create an upstream
     String upstreamId = "test-upstream-multi-serverless";
     Map<String, Object> upstreamConfig =
-            Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
     createUpstreamDirectly(upstreamId, upstreamConfig);
 
     // Create route with multiple Lua functions in serverless-post-function
@@ -586,30 +586,30 @@ class ApisixAdapterIntegrationTest {
     routeConfig.put("methods", List.of("GET", "POST", "PUT"));
     routeConfig.put("upstream_id", upstreamId);
     routeConfig.put(
-            "plugins",
+        "plugins",
+        Map.of(
+            "serverless-post-function",
             Map.of(
-                    "serverless-post-function",
-                    Map.of(
-                            "phase",
-                            "log",
-                            "functions",
-                            List.of(
-                                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 1') end",
-                                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 2') end"))));
+                "phase",
+                "log",
+                "functions",
+                List.of(
+                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 1') end",
+                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 2') end"))));
 
     ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
     await()
-            .atMost(10, SECONDS)
-            .pollInterval(1, SECONDS)
-            .untilAsserted(
-                    () -> {
-                      assertEquals(1, eventPublisher.getPublishedEvents().size());
-                      ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-                      assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
-                    });
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
   }
 
   @Test
@@ -617,7 +617,7 @@ class ApisixAdapterIntegrationTest {
     // First create an upstream
     String upstreamId = "test-upstream-serverless-combo";
     Map<String, Object> upstreamConfig =
-            Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
     createUpstreamDirectly(upstreamId, upstreamConfig);
 
     // Create route with serverless-post-function combined with other plugins
@@ -629,15 +629,15 @@ class ApisixAdapterIntegrationTest {
     Map<String, Object> plugins = new HashMap<>();
     plugins.put("prometheus", Map.of());
     plugins.put(
-            "response-rewrite", Map.of("headers", Map.of("set", Map.of("X-Processed-By", "apisix"))));
+        "response-rewrite", Map.of("headers", Map.of("set", Map.of("X-Processed-By", "apisix"))));
     plugins.put(
-            "serverless-post-function",
-            Map.of(
-                    "phase",
-                    "log",
-                    "functions",
-                    List.of(
-                            "return function(conf, ctx) ngx.log(ngx.INFO, 'Request processed: ' .. ngx.var.uri) end")));
+        "serverless-post-function",
+        Map.of(
+            "phase",
+            "log",
+            "functions",
+            List.of(
+                "return function(conf, ctx) ngx.log(ngx.INFO, 'Request processed: ' .. ngx.var.uri) end")));
     routeConfig.put("plugins", plugins);
 
     ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
@@ -645,14 +645,14 @@ class ApisixAdapterIntegrationTest {
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
     await()
-            .atMost(10, SECONDS)
-            .pollInterval(1, SECONDS)
-            .untilAsserted(
-                    () -> {
-                      assertEquals(1, eventPublisher.getPublishedEvents().size());
-                      ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-                      assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
-                    });
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
   }
 
   // ============== HELPER METHODS ==============
