@@ -19,6 +19,7 @@ package com.civitas.configadapter.model;
  * <ul>
  *   <li>Keycloak operations (realm, user, group, client, role)
  *   <li>APISIX operations (upstream, route)
+ *   <li>FROST operations (entity CRUD)
  *   <li>DummyLog operations (event processing)
  * </ul>
  */
@@ -48,6 +49,11 @@ public enum AdapterOperation {
   ROUTE_CREATE("route creation"),
   ROUTE_UPDATE("route update"),
   ROUTE_DELETE("route deletion"),
+
+  // FROST operations
+  FROST_ENTITY_CREATE("FROST entity creation"),
+  FROST_ENTITY_UPDATE("FROST entity update"),
+  FROST_ENTITY_DELETE("FROST entity deletion"),
 
   // DummyLog operations
   EVENT_PROCESSING("event processing");

@@ -1,4 +1,4 @@
-import { DatasourceCreateForm } from '../components/DatasourceCreateForm'
+import { DatasourceCreateForm } from './components/DatasourceCreateForm'
 
 const CreateDatasourcePage = () => {
   return <DatasourceCreateForm />

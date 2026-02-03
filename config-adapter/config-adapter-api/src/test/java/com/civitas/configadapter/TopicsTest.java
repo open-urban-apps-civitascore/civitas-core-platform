@@ -81,6 +81,51 @@ class TopicsTest {
   }
 
   @Test
+  void getValue_whenThingTopics_shouldReturnCorrectValues() {
+    assertEquals("core.civitas.data.thing.created", Topics.THING_CREATED.getValue());
+    assertEquals("core.civitas.data.thing.updated", Topics.THING_UPDATED.getValue());
+    assertEquals("core.civitas.data.thing.deleted", Topics.THING_DELETED.getValue());
+  }
+
+  @Test
+  void getValue_whenLocationTopics_shouldReturnCorrectValues() {
+    assertEquals("core.civitas.data.location.created", Topics.LOCATION_CREATED.getValue());
+    assertEquals("core.civitas.data.location.updated", Topics.LOCATION_UPDATED.getValue());
+    assertEquals("core.civitas.data.location.deleted", Topics.LOCATION_DELETED.getValue());
+  }
+
+  @Test
+  void getValue_whenSensorTopics_shouldReturnCorrectValues() {
+    assertEquals("core.civitas.data.sensor.created", Topics.SENSOR_CREATED.getValue());
+    assertEquals("core.civitas.data.sensor.updated", Topics.SENSOR_UPDATED.getValue());
+    assertEquals("core.civitas.data.sensor.deleted", Topics.SENSOR_DELETED.getValue());
+  }
+
+  @Test
+  void getValue_whenObservedPropertyTopics_shouldReturnCorrectValues() {
+    assertEquals(
+        "core.civitas.data.observedproperty.created", Topics.OBSERVED_PROPERTY_CREATED.getValue());
+    assertEquals(
+        "core.civitas.data.observedproperty.updated", Topics.OBSERVED_PROPERTY_UPDATED.getValue());
+    assertEquals(
+        "core.civitas.data.observedproperty.deleted", Topics.OBSERVED_PROPERTY_DELETED.getValue());
+  }
+
+  @Test
+  void getValue_whenDatastreamTopics_shouldReturnCorrectValues() {
+    assertEquals("core.civitas.data.datastream.created", Topics.DATASTREAM_CREATED.getValue());
+    assertEquals("core.civitas.data.datastream.updated", Topics.DATASTREAM_UPDATED.getValue());
+    assertEquals("core.civitas.data.datastream.deleted", Topics.DATASTREAM_DELETED.getValue());
+  }
+
+  @Test
+  void getValue_whenFrostProjectTopics_shouldReturnCorrectValues() {
+    assertEquals("core.civitas.data.project.created", Topics.FROST_PROJECT_CREATED.getValue());
+    assertEquals("core.civitas.data.project.updated", Topics.FROST_PROJECT_UPDATED.getValue());
+    assertEquals("core.civitas.data.project.deleted", Topics.FROST_PROJECT_DELETED.getValue());
+  }
+
+  @Test
   void isValidTopic_whenValidTopic_shouldReturnTrue() {
     assertTrue(Topics.isValidTopic("core.civitas.api.backend.created"));
     assertTrue(Topics.isValidTopic("core.civitas.api.route.created"));
@@ -166,9 +211,26 @@ class TopicsTest {
   }
 
   @Test
-  void values_whenCounted_shouldReturn25() {
-    // Verify total number of topics
-    // User: 7, Realm: 3, Client: 3, Group: 3, Role: 3, Backend: 3, Route: 3 = 25
-    assertEquals(25, Topics.values().length);
+  void allTopics_whenAccessed_shouldContainFrostTopics() {
+    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.thing.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.location.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.sensor.deleted"));
+    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.observedproperty.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.datastream.updated"));
+  }
+
+  @Test
+  void allTopics_whenAccessed_shouldContainFrostProjectTopics() {
+    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.project.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.project.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.project.deleted"));
+  }
+
+  @Test
+  void values_whenCounted_shouldReturn43() {
+    // User: 7, Realm: 3, Client: 3, Group: 3, Role: 3, Backend: 3, Route: 3,
+    // Thing: 3, Location: 3, Sensor: 3, ObservedProperty: 3, Datastream: 3,
+    // FROST Project: 3 = 43
+    assertEquals(43, Topics.values().length);
   }
 }

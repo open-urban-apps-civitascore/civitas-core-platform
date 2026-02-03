@@ -17,6 +17,7 @@ import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
+import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,8 +50,13 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
   @Override
   public void initialize(AdapterConfig config) {
     super.initialize(config);
-    logger.info("DummyLogAdapter '{}' initialized - will log all received events", getName());
-    logger.info("Subscribed to {} topics: {}", getSubscribedTopics().size(), getSubscribedTopics());
+    logger.info(
+        "DummyLogAdapter '{}' initialized - will log all received events",
+        Encode.forJava(getName()));
+    logger.info(
+        "Subscribed to {} topics: {}",
+        getSubscribedTopics().size(),
+        Encode.forJava(String.valueOf(getSubscribedTopics())));
   }
 
   @Override
@@ -59,28 +65,41 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
   }
 
   @Override
-  public void processConfigEvent(String topic, ConfigEvent event) {
+  protected String getResultType() {
+    return DUMMY_LOG_RESULT_TYPE;
+  }
+
+  @Override
+  protected String getAdapterSource() {
+    return DUMMY_LOG_SOURCE;
+  }
+
+  @Override
+  protected void doProcessConfigEvent(String topic, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
     logger.info("==================== DummyLogAdapter Event ====================");
-    logger.info("Operation:     {}", event.payload().operation());
-    logger.info("ResourceType: 	{}", event.payload().targetComponent());
-    logger.info("TargetResource:{}", event.payload().targetResource());
-    logger.info("MessageId:   	{}", event.metadata().messageId());
+    logger.info("Operation:     {}", Encode.forJava(String.valueOf(event.payload().operation())));
+    logger.info(
+        "ResourceType: 	{}", Encode.forJava(String.valueOf(event.payload().targetComponent())));
+    logger.info(
+        "TargetResource:{}", Encode.forJava(String.valueOf(event.payload().targetResource())));
+    logger.info("MessageId:   	{}", Encode.forJava(String.valueOf(event.metadata().messageId())));
     // keep in mind config could contain sensitive data (e.g. password) not for production
-    logger.info("Data:         	{}", event.payload().config());
-    logger.info("ResultTopic:  	{}", event.metadata().resultTopic());
+    logger.info("Data:         	{}", Encode.forJava(String.valueOf(event.payload().config())));
+    logger.info(
+        "ResultTopic:  	{}", Encode.forJava(String.valueOf(event.metadata().resultTopic())));
     logger.info("===============================================================");
 
     // Topic-based exception handling for testing/demonstration
     if (topic != null && topic.contains("fatal")) {
       logger.warn("Topic contains 'fatal' - throwing FatalAdapterException");
       throw new FatalAdapterException(
-          AdapterErrorCode.INVALID_PAYLOAD, null, "Simulated fatal error for topic: " + topic);
+          AdapterErrorCode.INVALID_PAYLOAD, "Simulated fatal error for topic: " + topic);
     }
 
     if (topic != null && topic.contains("retry")) {
       logger.warn("Topic contains 'retry' - throwing RetryableAdapterException");
-      throw new RetryableAdapterException(
-          AdapterErrorCode.SERVICE_UNAVAILABLE, null, ADAPTER_NAME, 503);
+      throw new RetryableAdapterException(AdapterErrorCode.SERVICE_UNAVAILABLE, ADAPTER_NAME, 503);
     }
 
     // Publish a result event if resultTopic is specified
@@ -103,7 +122,9 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
 
         getEventPublisher().publish(resultTopic, resultEvent);
         logger.debug(
-            "Published result event to topic {} for {}", resultTopic, event.metadata().messageId());
+            "Published result event to topic {} for {}",
+            Encode.forJava(resultTopic),
+            Encode.forJava(event.metadata().messageId()));
       } catch (Exception e) {
         logger.error("Failed to publish result event", e);
         throw new FatalAdapterException(

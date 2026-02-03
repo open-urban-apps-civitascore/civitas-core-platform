@@ -12,6 +12,7 @@ package com.civitas.configadapter.model;
 
 import com.civitas.configadapter.model.apisix.ApisixConfigValue;
 import com.civitas.configadapter.model.apisix.RouteConfigValue;
+import com.civitas.configadapter.model.frost.FrostConfigValue;
 import com.civitas.configadapter.model.idm.ClientConfig;
 import com.civitas.configadapter.model.idm.GroupConfig;
 import com.civitas.configadapter.model.idm.RealmConfig;
@@ -39,5 +40,11 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
   @JsonSubTypes.Type(value = GroupConfig.class, name = "group"),
   @JsonSubTypes.Type(value = ApisixConfigValue.class, name = "apisix-upstream"),
   @JsonSubTypes.Type(value = RouteConfigValue.class, name = "apisix-route"),
+  @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-thing"),
+  @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-location"),
+  @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-sensor"),
+  @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-observedproperty"),
+  @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-datastream"),
+  @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-project"),
 })
 public interface ConfigValue {}

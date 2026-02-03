@@ -1,4 +1,4 @@
-import { DetailedHTMLProps, HTMLAttributes } from 'react'
+import { DetailedHTMLProps, HTMLAttributes, useMemo } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -13,11 +13,30 @@ interface FormTextAreaProps<T extends FieldValues> extends InputPropsWithoutForm
   placeholder: string
   label: string
   formItemProps?: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>
+  hint?: string
+  maxLength?: number
+  hasCharacterCount?: boolean
+  className?: string
 }
 
 export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>) => {
-  const { form, name, placeholder, label, required, disabled, formItemProps } = props
+  const {
+    form,
+    name,
+    placeholder,
+    label,
+    required,
+    disabled,
+    formItemProps,
+    hint,
+    maxLength,
+    hasCharacterCount,
+    className,
+  } = props
   const isMobile = useIsMobile()
+
+  const fieldValue = form.watch(name)
+  const characterCount = useMemo(() => (fieldValue as string)?.length || 0, [fieldValue])
 
   return (
     <FormField
@@ -30,22 +49,36 @@ export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>)
             formItemProps?.className,
           )}
         >
-          <FormLabel>
-            {label}
-            {required && <span className="text-red-500 ml-1">*</span>}
-          </FormLabel>
+          <div>
+            <FormLabel>
+              {label}
+              {required && <span className="text-red-500 ml-1">*</span>}
+            </FormLabel>
+            {hint && <p className="text-sm text-muted-foreground mt-1">{hint}</p>}
+          </div>
           <div>
             <FormControl>
               <Textarea
                 data-testid={`${name}TextArea`}
                 data-test-element="formField"
-                className="disabled:opacity-100 disabled:border-hidden disabled:shadow-none disabled:min-h-4  disabled:py-0 disabled:resize-none disabled:pointer-events-none"
+                className={cn(
+                  'disabled:opacity-100 disabled:border-hidden disabled:shadow-none disabled:min-h-4 disabled:py-0 disabled:resize-none disabled:pointer-events-none',
+                  className,
+                )}
                 placeholder={placeholder}
+                maxLength={maxLength}
                 {...field}
                 disabled={disabled}
               />
             </FormControl>
-            <FormMessage className="mt-2" />
+            <div className="flex justify-between mt-1">
+              <FormMessage />
+              {hasCharacterCount && maxLength && (
+                <span className="text-sm text-muted-foreground ml-auto">
+                  {characterCount}/{maxLength}
+                </span>
+              )}
+            </div>
           </div>
         </FormItem>
       )}

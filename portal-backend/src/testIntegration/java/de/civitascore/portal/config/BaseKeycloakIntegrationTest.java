@@ -4,6 +4,7 @@ import dasniko.testcontainers.keycloak.KeycloakContainer;
 import de.civitascore.portal.PortalBackendApplication;
 import de.civitascore.portal.util.KeycloakTokenHelper;
 import de.civitascore.portal.util.TestContainerConfiguration;
+import lombok.AccessLevel;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -28,7 +29,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @ActiveProfiles("test-integration")
 @Testcontainers
 @Import(TestContainerConfiguration.class)
-@Slf4j
+@Slf4j(access = AccessLevel.PROTECTED)
 public abstract class BaseKeycloakIntegrationTest {
 
   protected static final PostgreSQLContainer<?> POSTGRES;

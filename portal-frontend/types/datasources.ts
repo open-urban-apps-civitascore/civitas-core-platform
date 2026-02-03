@@ -94,11 +94,11 @@ export const DatasourceFormSchema = DatasourceBaseFormSchema.extend({
   }
 
   if (data.connector.type === CONNECTOR_TYPES.MQTT) {
-    const parsed = MqttSchema.parse(data.connector.config)
-    if (!parsed.urls?.length) {
+    const parsed = MqttSchema.safeParse(data.connector.config)
+    if (!parsed.data?.urls?.length) {
       ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'urls'], message: 'required' })
     }
-    if (!parsed.topics?.length) {
+    if (!parsed.data?.topics?.length) {
       ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'topics'], message: 'required' })
     }
   }

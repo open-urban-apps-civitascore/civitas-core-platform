@@ -20,7 +20,7 @@ spring:
         jwt:
           jwk-set-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}/protocol/openid-connect/certs"
           # Token issuer validation
-          issuer-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}"
+          issuer-uri: "${keycloak.issuer-uri}/realms/${keycloak.realm}"
 
   # Kafka Configuration
   kafka:
@@ -122,4 +122,9 @@ outbox:
 # Kafka Topic Configuration
 kafka:
   topic-prefix: ${KAFKA_TOPIC_PREFIX:""}
+  
+model-atlas:
+  baseUrl: "http://model-atlas:8080"
+  scope: default
+  stage: draft
 

@@ -12,6 +12,7 @@ package com.civitas.configadapter.application;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.civitas.configadapter.exception.FatalAdapterException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -52,20 +53,19 @@ class ApplicationTest {
   void testFailureWithNonExistentOktaAdapter() {
     // Given a configuration that includes the non-existent 'okta' adapter
     // When creating the application
-    RuntimeException exception =
+    FatalAdapterException exception =
         assertThrows(
-            RuntimeException.class,
+            FatalAdapterException.class,
             () -> {
               new Application("application_wrong_adapter.properties");
             },
-            "Application should throw RuntimeException when adapter 'okta' does not exist");
+            "Application should throw FatalAdapterException when adapter 'okta' does not exist");
 
-    // Then the exception should indicate the failure to create the consumer
+    // Then the exception should indicate the adapter was not found
     String message = exception.getMessage();
     assertTrue(
-        message.contains("Failed to create consumer for adapter: okta"),
-        "Exception message should mention failure to create consumer for adapter 'okta', but was: "
-            + message);
+        message.contains("Adapter 'okta' not found via ServiceLoader"),
+        "Exception message should mention failure not found adapter 'okta', but was: " + message);
   }
 
   @Test
@@ -73,13 +73,13 @@ class ApplicationTest {
   void testFailureWithNoAdapters() {
     // Given a configuration with no adapters specified
     // When creating the application
-    RuntimeException exception =
+    FatalAdapterException exception =
         assertThrows(
-            RuntimeException.class,
+            FatalAdapterException.class,
             () -> {
               new Application("application-no-adapters.properties");
             },
-            "Application should throw RuntimeException when no adapters are configured");
+            "Application should throw FatalAdapterException when no adapters are configured");
 
     // Then the exception should indicate no adapters configured
     String message = exception.getMessage();
@@ -93,13 +93,13 @@ class ApplicationTest {
   void testFailureWithNoEventHandler() {
     // Given a configuration with adapters but no event handler
     // When creating the application
-    RuntimeException exception =
+    FatalAdapterException exception =
         assertThrows(
-            RuntimeException.class,
+            FatalAdapterException.class,
             () -> {
               new Application("application-no-eventhandler.properties");
             },
-            "Application should throw RuntimeException when no event handler is configured");
+            "Application should throw FatalAdapterException when no event handler is configured");
 
     // Then the exception should indicate no event consumer configured
     String message = exception.getMessage();
@@ -170,13 +170,13 @@ class ApplicationTest {
   void testFailureWithConflictingHandlerConfiguration() {
     // Given a configuration with both eventhandler.name AND eventconsumer.name specified
     // When creating the application
-    RuntimeException exception =
+    FatalAdapterException exception =
         assertThrows(
-            RuntimeException.class,
+            FatalAdapterException.class,
             () -> {
               new Application("application-conflicting-handler-config.properties");
             },
-            "Application should throw RuntimeException when both eventhandler.name and eventconsumer.name are specified");
+            "Application should throw FatalAdapterException when both eventhandler.name and eventconsumer.name are specified");
 
     // Then the exception should indicate the configuration conflict
     String message = exception.getMessage();
@@ -190,21 +190,19 @@ class ApplicationTest {
   void testFailureWithNonExistentEventConsumer() {
     // Given a configuration with a non-existent event consumer name 'rabbitmq'
     // When creating the application
-    RuntimeException exception =
+    FatalAdapterException exception =
         assertThrows(
-            RuntimeException.class,
+            FatalAdapterException.class,
             () -> {
               new Application("application-nonexistent-consumer.properties");
             },
-            "Application should throw RuntimeException when event consumer 'rabbitmq' does not exist");
+            "Application should throw FatalAdapterException when event consumer 'rabbitmq' does not exist");
 
-    // Then the exception or its cause should indicate the failure
-    // The inner exception is wrapped by the catch block in createConsumers
-    Throwable cause = exception.getCause();
-    String causeMessage = cause != null ? cause.getMessage() : "";
+    // Then the exception should indicate the event consumer was not found
+    String message = exception.getMessage();
     assertTrue(
-        causeMessage.contains("Event consumer 'rabbitmq' not found"),
-        "Exception cause should mention event consumer not found, but was: " + causeMessage);
+        message.contains("Event consumer 'rabbitmq' not found"),
+        "Exception message should mention event consumer not found, but was: " + message);
   }
 
   @Test

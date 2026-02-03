@@ -19,7 +19,6 @@ public class PrincipalUserDetails implements UserDetails {
   private final UUID userId;
   private final String username;
   private final String email;
-  private final String tenantId;
   private final String givenName;
   private final String familyName;
   private final Collection<? extends GrantedAuthority> authorities;

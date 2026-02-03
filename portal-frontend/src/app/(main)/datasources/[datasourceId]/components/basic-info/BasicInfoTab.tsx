@@ -1,14 +1,13 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useMemo } from 'react'
 import { UseFormReturn } from 'react-hook-form'
 
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
+import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Textarea } from '@/components/ui/textarea'
+import { FormItem, FormLabel } from '@/components/ui/form'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { DatasourceFormInput } from '@/types/datasources'
@@ -27,9 +26,6 @@ export const BasicInfoTab = (props: BasicInfoTabProps) => {
   const isMobile = useIsMobile()
 
   const tagsWatch = form.watch('tags')
-  const descriptionWatch = form.watch('description')
-
-  const characterCount = useMemo(() => descriptionWatch?.length || 0, [descriptionWatch])
 
   const handleTagsChange = (tags: string[]) => {
     form.setValue('tags', tags, { shouldDirty: true })
@@ -58,40 +54,17 @@ export const BasicInfoTab = (props: BasicInfoTabProps) => {
       </DetailsFieldContainer>
 
       <DetailsFieldContainer className="max-w-300">
-        <FormField
-          control={form.control}
+        <FormTextArea
+          form={form}
           name="description"
-          render={({ field }) => (
-            <FormItem className={cn(isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]')}>
-              <div>
-                <FormLabel className={isDraftMode ? 'data-[error=true]:text-foreground' : ''}>
-                  {t('form.description')}
-                  {!isDraftMode && <span className="text-red-500 ml-1">*</span>}
-                </FormLabel>
-                <p className="text-sm text-muted-foreground mt-1">{t('form.descriptionHint')}</p>
-              </div>
-              <div>
-                <FormControl>
-                  <Textarea
-                    data-testid="descriptionTextArea"
-                    placeholder={t('form.description')}
-                    className={cn(
-                      'min-h-[100px] resize-none disabled:opacity-100 disabled:text-muted-foreground disabled:border-hidden disabled:shadow-none',
-                      isDraftMode &&
-                        'aria-[invalid=true]:border-input aria-[invalid=true]:ring-ring/50 dark:aria-[invalid=true]:ring-ring/50',
-                    )}
-                    maxLength={150}
-                    disabled={isReadOnly}
-                    {...field}
-                  />
-                </FormControl>
-                <div className="flex justify-between mt-1">
-                  {!isDraftMode && <FormMessage data-testid="descriptionFormMessage" />}
-                  <span className="text-sm text-muted-foreground">{characterCount}/150</span>
-                </div>
-              </div>
-            </FormItem>
-          )}
+          label={t('form.description')}
+          placeholder={t('form.description')}
+          hint={t('form.descriptionHint')}
+          maxLength={150}
+          hasCharacterCount
+          disabled={isReadOnly}
+          required={!isDraftMode}
+          className="min-h-[100px] resize-none"
         />
       </DetailsFieldContainer>
 

@@ -24,9 +24,9 @@ import {
   DatasourceStatusType,
 } from '@/types/datasources'
 
+import { NODE_DEFS } from '../../components/connector-tab/connector_sources'
+import { ConnectorTab } from '../../components/connector-tab/ConnectorTab'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
-import { NODE_DEFS } from './connector-tab/connector_sources'
-import { ConnectorTab } from './connector-tab/ConnectorTab'
 import { ExitWarningModal } from './ExitWarningModal'
 import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'
 import { StatusDropdown } from './StatusDropdown'
