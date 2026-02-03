@@ -22,9 +22,9 @@ services:
     depends_on:
       - etcd
     ports:
-      - "9080:9080"
+      - "9080:80"
       - "9180:9180"
-      - "9443:9443"
+      - "9443:443"
     networks:
       - civitas-network
 
@@ -32,3 +32,4 @@ networks:
   civitas-network:
     name: civitas-network
     driver: bridge
+    external: true
