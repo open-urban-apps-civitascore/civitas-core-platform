@@ -434,6 +434,227 @@ class ApisixAdapterIntegrationTest {
     assertNotNull(exception.getErrorCode());
   }
 
+  // ============== SERVERLESS-POST-FUNCTION PLUGIN TESTS ==============
+
+  @Test
+  void createRouteWithServerlessPostFunction() throws Exception {
+    // First create an upstream that the route will reference
+    String upstreamId = "test-upstream-serverless-post";
+    Map<String, Object> upstreamConfig =
+            Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with serverless-post-function plugin (log phase)
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/serverless-post/*");
+    routeConfig.put("methods", List.of("GET", "POST"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+            "plugins",
+            Map.of(
+                    "serverless-post-function",
+                    Map.of(
+                            "phase",
+                            "log",
+                            "functions",
+                            List.of(
+                                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Post-function executed') end"))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+            .atMost(10, SECONDS)
+            .pollInterval(1, SECONDS)
+            .untilAsserted(
+                    () -> {
+                      assertEquals(1, eventPublisher.getPublishedEvents().size());
+                      ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+                      assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+                    });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+  }
+
+  @Test
+  void createRouteWithServerlessPostFunctionHeaderFilter() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-serverless-header-filter";
+    Map<String, Object> upstreamConfig =
+            Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with serverless-post-function using header_filter phase
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/header-filter/*");
+    routeConfig.put("methods", List.of("GET"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+            "plugins",
+            Map.of(
+                    "serverless-post-function",
+                    Map.of(
+                            "phase",
+                            "header_filter",
+                            "functions",
+                            List.of(
+                                    "return function(conf, ctx) ngx.header['X-Custom-Post-Header'] = 'processed' end"))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+            .atMost(10, SECONDS)
+            .pollInterval(1, SECONDS)
+            .untilAsserted(
+                    () -> {
+                      assertEquals(1, eventPublisher.getPublishedEvents().size());
+                      ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+                      assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+                    });
+  }
+
+  @Test
+  void updateRouteAddServerlessPostFunction() throws Exception {
+    String routeId = "test-route-add-serverless-post";
+
+    // First create an upstream
+    String upstreamId = "test-upstream-for-add-serverless";
+    Map<String, Object> upstreamConfig =
+            Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create initial route without serverless-post-function
+    Map<String, Object> initialRouteConfig = new HashMap<>();
+    initialRouteConfig.put("uri", "/api/v1/add-serverless/*");
+    initialRouteConfig.put("methods", List.of("GET"));
+    initialRouteConfig.put("upstream_id", upstreamId);
+    createRouteDirectly(routeId, initialRouteConfig);
+
+    // Update route to add serverless-post-function plugin
+    Map<String, Object> updatedRouteConfig = new HashMap<>();
+    updatedRouteConfig.put("uri", "/api/v1/add-serverless/*");
+    updatedRouteConfig.put("methods", List.of("GET", "POST"));
+    updatedRouteConfig.put("upstream_id", upstreamId);
+    updatedRouteConfig.put(
+            "plugins",
+            Map.of(
+                    "serverless-post-function",
+                    Map.of(
+                            "phase",
+                            "log",
+                            "functions",
+                            List.of("return function(conf, ctx) ngx.log(ngx.INFO, 'Added via UPDATE') end"))));
+
+    ConfigEvent event =
+            createRouteConfigEvent("routes/" + routeId, Operation.UPDATE, updatedRouteConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_UPDATED.toString(), event);
+
+    await()
+            .atMost(10, SECONDS)
+            .pollInterval(1, SECONDS)
+            .untilAsserted(
+                    () -> {
+                      JsonNode route = getRouteFromApisix(routeId);
+                      assertNotNull(route);
+                      JsonNode plugins = route.get("value").get("plugins");
+                      assertNotNull(plugins);
+                      assertTrue(plugins.has("serverless-post-function"));
+                    });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+  }
+
+  @Test
+  void createRouteWithMultipleServerlessFunctions() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-multi-serverless";
+    Map<String, Object> upstreamConfig =
+            Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create route with multiple Lua functions in serverless-post-function
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/multi-serverless/*");
+    routeConfig.put("methods", List.of("GET", "POST", "PUT"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+            "plugins",
+            Map.of(
+                    "serverless-post-function",
+                    Map.of(
+                            "phase",
+                            "log",
+                            "functions",
+                            List.of(
+                                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 1') end",
+                                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 2') end"))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+            .atMost(10, SECONDS)
+            .pollInterval(1, SECONDS)
+            .untilAsserted(
+                    () -> {
+                      assertEquals(1, eventPublisher.getPublishedEvents().size());
+                      ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+                      assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+                    });
+  }
+
+  @Test
+  void createRouteWithServerlessPostFunctionAndOtherPlugins() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-serverless-combo";
+    Map<String, Object> upstreamConfig =
+            Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create route with serverless-post-function combined with other plugins
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/serverless-combo/*");
+    routeConfig.put("methods", List.of("GET", "POST"));
+    routeConfig.put("upstream_id", upstreamId);
+
+    Map<String, Object> plugins = new HashMap<>();
+    plugins.put("prometheus", Map.of());
+    plugins.put(
+            "response-rewrite", Map.of("headers", Map.of("set", Map.of("X-Processed-By", "apisix"))));
+    plugins.put(
+            "serverless-post-function",
+            Map.of(
+                    "phase",
+                    "log",
+                    "functions",
+                    List.of(
+                            "return function(conf, ctx) ngx.log(ngx.INFO, 'Request processed: ' .. ngx.var.uri) end")));
+    routeConfig.put("plugins", plugins);
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+            .atMost(10, SECONDS)
+            .pollInterval(1, SECONDS)
+            .untilAsserted(
+                    () -> {
+                      assertEquals(1, eventPublisher.getPublishedEvents().size());
+                      ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+                      assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+                    });
+  }
+
   // ============== HELPER METHODS ==============
 
   private void createRouteDirectly(String routeId, Map<String, Object> config) throws Exception {
