@@ -61,7 +61,6 @@ export const DatasourcesList = (props: DatasourcesListProps) => {
             totalPages={totalPages}
             onPaginationChange={setPaginationParams}
             onSortingChange={setSortingParams}
-            onRowClick={datasource => router.push(`/datasources/${datasource.id}`)}
           />
         </TableContainer>
       </PageBackground>

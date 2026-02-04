@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { Datasource } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 
 interface DatasourcesTableProps extends TableProps<Datasource> {
   datasources: Datasource[]
@@ -47,7 +48,9 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     }),
     columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
-      cell: info => info.getValue(),
+      cell: info =>
+        info.getValue() ? <LinkCell href={`datasources/${info.row.id}`}>{info.getValue()}</LinkCell> : '-',
+
       meta: {
         style: {
           width: '20%',
