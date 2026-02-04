@@ -40,6 +40,9 @@
       "datasets": "Datensätze",
       "dataspaces": "Datenräume",
       "permissions": "Berechtigungen"
+    },
+    "info": {
+      "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind."
     }
   },
   "languages": {

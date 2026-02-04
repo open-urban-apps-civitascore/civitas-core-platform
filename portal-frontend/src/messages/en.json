@@ -40,6 +40,9 @@
       "datasets": "Datasets",
       "dataspaces": "Dataspaces",
       "permissions": "Permissions"
+    },
+    "info": {
+      "switchMode": "Switch to draft mode, as the requirements for available mode are not met."
     }
   },
   "languages": {

@@ -30,6 +30,7 @@ import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ExitWarningModal } from './ExitWarningModal'
 import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'
 import { StatusDropdown } from './StatusDropdown'
+import { toast } from 'sonner'
 
 interface DatasourceOverviewProps {
   datasource: Datasource
@@ -116,6 +117,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   useEffect(() => {
     if (statusWatch === DATASOURCE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
       form.setValue('status', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
+      toast.info(tCommon('info.switchMode'))
     }
   }, [canSetAvailable, statusWatch, form])
 
