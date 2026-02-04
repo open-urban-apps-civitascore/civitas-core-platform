@@ -19,6 +19,34 @@ echo
 
 echo "Checking prerequisites..."
 
+# Java
+if ! command -v java >/dev/null 2>&1; then
+    echo "ERROR: Java is not installed. Please install Java 21+."
+    exit 1
+fi
+
+JAVA_VERSION=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
+if [ "$JAVA_VERSION" -lt 21 ] 2>/dev/null; then
+    echo "ERROR: Java 21 or higher is required. Found Java $JAVA_VERSION."
+    exit 1
+fi
+echo "  Java $JAVA_VERSION found"
+
+# Maven
+if ! command -v mvn >/dev/null 2>&1; then
+    echo "ERROR: Maven is not installed. Please install Maven 3.6+."
+    exit 1
+fi
+
+MVN_VERSION=$(mvn -version 2>&1 | head -1 | awk '{print $3}')
+MVN_MAJOR=$(echo "$MVN_VERSION" | cut -d'.' -f1)
+MVN_MINOR=$(echo "$MVN_VERSION" | cut -d'.' -f2)
+if [ "$MVN_MAJOR" -lt 3 ] || ([ "$MVN_MAJOR" -eq 3 ] && [ "$MVN_MINOR" -lt 6 ]); then
+    echo "ERROR: Maven 3.6 or higher is required. Found Maven $MVN_VERSION."
+    exit 1
+fi
+echo "  Maven $MVN_VERSION found"
+
 # Docker
 if ! command -v docker >/dev/null 2>&1; then
     echo "ERROR: Docker is not installed."
@@ -126,67 +154,166 @@ echo
 
 # ---- Backend Services Selection -----------------------------------
 
+DEV_VERSION="1.0.0-dev"
+
 echo "======================================================"
-echo "Backend Services Startup Options"
+echo "Config Adapter Startup"
 echo "======================================================"
 echo
-echo "How would you like to start the backend services?"
+echo "How would you like to start the Config Adapter?"
 echo
-echo "  1) Command line (mvn spring-boot:run)"
+echo "  1) Command line (build & run)"
+echo "  2) Manual / IDE (for debugging)"
+echo
+read -p "Select option [1/2]: " config_adapter_option
+
+echo
+echo "======================================================"
+echo "Portal Backend Startup"
+echo "======================================================"
+echo
+echo "How would you like to start the Portal Backend?"
+echo
+echo "  1) Command line (build & run)"
 echo "  2) Manual / IDE (for debugging)"
 echo
 read -p "Select option [1/2]: " backend_option
 
-case $backend_option in
-    1)
-        echo
-        echo "Starting backend services via command line..."
-        echo
+echo
 
-        # Start config-adapter
-        echo "Starting Config Adapter..."
-        cd "$SCRIPT_DIR/../config-adapter"
-        gnome-terminal --title="Config Adapter" -- bash -c "mvn -pl config-adapter-application spring-boot:run -Dspring-boot.run.profiles=local; exec bash" 2>/dev/null || \
-        xterm -T "Config Adapter" -e "mvn -pl config-adapter-application spring-boot:run -Dspring-boot.run.profiles=local; bash" 2>/dev/null || \
-        {
-            echo "Could not open new terminal. Starting in background..."
-            mvn -pl config-adapter-application spring-boot:run -Dspring-boot.run.profiles=local &
-        }
+# ---- Build Phase ---------------------------------------------------
 
-        echo "Waiting for Config Adapter to start..."
-        sleep 10
+# Build config-adapter if command line option selected
+if [ "$config_adapter_option" = "1" ]; then
+    echo "Building Config Adapter (version: $DEV_VERSION)..."
+    cd "$SCRIPT_DIR/../config-adapter"
+    mvn clean install -DskipTests -Drevision=$DEV_VERSION
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Config Adapter build failed"
+        exit 1
+    fi
+    echo "  Config Adapter built successfully"
+    echo
+fi
 
-        # Start portal-backend
-        echo "Starting Portal Backend..."
-        cd "$SCRIPT_DIR/../portal-backend"
-        gnome-terminal --title="Portal Backend" -- bash -c "mvn spring-boot:run -Dspring-boot.run.profiles=local; exec bash" 2>/dev/null || \
-        xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local; bash" 2>/dev/null || \
-        {
-            echo "Could not open new terminal. Starting in background..."
-            mvn spring-boot:run -Dspring-boot.run.profiles=local &
-        }
+# Build portal-backend if command line option selected
+if [ "$backend_option" = "1" ]; then
+    echo "Building Portal Backend (config-adapter version: $DEV_VERSION)..."
+    cd "$SCRIPT_DIR/../portal-backend"
+    mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Portal Backend build failed"
+        exit 1
+    fi
+    echo "  Portal Backend built successfully"
+    echo
+fi
 
-        cd "$SCRIPT_DIR"
-        ;;
-    2)
-        echo
-        echo "Please start the following services manually in your IDE:"
-        echo
-        echo "  1. Config Adapter"
-        echo "     Project: config-adapter/config-adapter-application"
-        echo "     Main class: de.civitascore.configadapter.ConfigAdapterApplication"
-        echo "     Profile: local"
-        echo
-        echo "  2. Portal Backend"
-        echo "     Project: portal-backend"
-        echo "     Main class: de.civitascore.portal.PortalBackendApplication"
-        echo "     Profile: local"
-        echo
-        ;;
-    *)
-        echo "Invalid option. Please start backend services manually."
-        ;;
-esac
+# ---- Config Adapter Startup ----------------------------------------
+
+if [ "$config_adapter_option" = "1" ]; then
+    echo "Starting Config Adapter..."
+    cd "$SCRIPT_DIR/../config-adapter"
+
+    CONFIG_ADAPTER_JAR="$(pwd)/config-adapter-application/target/config-adapter-application-$DEV_VERSION.jar"
+
+    # Create a startup script with environment variables
+    cat > /tmp/start-config-adapter.sh << 'SCRIPT_EOF'
+#!/bin/bash
+# Config Adapter environment variables (from application.properties)
+export HEALTHCHECK_PORT=8088
+export ADAPTERS=keycloak,apisix,frost
+export EVENTHANDLER_NAME=kafka
+export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+export KAFKA_GROUP_ID=config-adapter-group
+export KAFKA_RETRY_MAX_ATTEMPTS=3
+export KAFKA_RETRY_INITIAL_BACKOFF_MS=1000
+export KAFKA_DLQ_TOPIC=core.civitas.idm.dlq
+export KEYCLOAK_URL=http://localhost:8080
+export KEYCLOAK_REALM=master
+export KEYCLOAK_USERNAME=admin
+export KEYCLOAK_PASSWORD=admin
+export KEYCLOAK_CLIENT_ID=admin-cli
+export KEYCLOAK_TOPICS=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.user.deleted,core.civitas.idm.group.created,core.civitas.idm.group.updated,core.civitas.idm.group.deleted
+export APISIX_ADMIN_URL=http://localhost:9180
+export APISIX_ADMIN_KEY=edd1c9f034335f136f87ad84b625c8f1
+export APISIX_TOPICS=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted
+export FROST_URL=http://localhost:9080/FROST-Server/v1.1
+export FROST_API_KEY=dev-frost-api-key
+export FROST_API_KEY_HEADER=X-API-Key
+export FROST_TOPICS=core.civitas.data.thing.created,core.civitas.data.thing.updated,core.civitas.data.thing.deleted,core.civitas.data.location.created,core.civitas.data.location.updated,core.civitas.data.location.deleted,core.civitas.data.sensor.created,core.civitas.data.sensor.updated,core.civitas.data.sensor.deleted,core.civitas.data.observedproperty.created,core.civitas.data.observedproperty.updated,core.civitas.data.observedproperty.deleted,core.civitas.data.datastream.created,core.civitas.data.datastream.updated,core.civitas.data.datastream.deleted
+
+java -jar "$1"
+exec bash
+SCRIPT_EOF
+    chmod +x /tmp/start-config-adapter.sh
+
+    gnome-terminal --title="Config Adapter" -- /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" 2>/dev/null || \
+    xterm -T "Config Adapter" -e /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" 2>/dev/null || \
+    {
+        echo "Could not open new terminal. Starting in background..."
+        /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" &
+    }
+
+    echo "Waiting for Config Adapter to start..."
+    sleep 10
+    echo
+else
+    echo "======================================================"
+    echo "Config Adapter - Manual Setup"
+    echo "======================================================"
+    echo
+    echo "Build first (if not already done):"
+    echo "  cd config-adapter"
+    echo "  mvn clean install -DskipTests -Drevision=$DEV_VERSION"
+    echo
+    echo "Then start in your IDE:"
+    echo "  Project: config-adapter/config-adapter-application"
+    echo "  Main class: de.civitascore.configadapter.ConfigAdapterApplication"
+    echo
+    echo "Environment variables to set in IDE:"
+    echo "  HEALTHCHECK_PORT=8088"
+    echo "  KAFKA_BOOTSTRAP_SERVERS=localhost:9092"
+    echo "  KEYCLOAK_URL=http://localhost:8080"
+    echo "  KEYCLOAK_REALM=master"
+    echo "  KEYCLOAK_USERNAME=admin"
+    echo "  KEYCLOAK_PASSWORD=admin"
+    echo "  KEYCLOAK_CLIENT_ID=admin-cli"
+    echo "  APISIX_ADMIN_URL=http://localhost:9180"
+    echo "  FROST_URL=http://localhost:9080/FROST-Server/v1.1"
+    echo "  FROST_API_KEY=dev-frost-api-key"
+    echo
+fi
+
+# ---- Portal Backend Startup ----------------------------------------
+
+if [ "$backend_option" = "1" ]; then
+    echo "Starting Portal Backend..."
+    cd "$SCRIPT_DIR/../portal-backend"
+    gnome-terminal --title="Portal Backend" -- bash -c "mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres; exec bash" 2>/dev/null || \
+    xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres; bash" 2>/dev/null || \
+    {
+        echo "Could not open new terminal. Starting in background..."
+        mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres &
+    }
+    echo
+else
+    echo "======================================================"
+    echo "Portal Backend - Manual Setup"
+    echo "======================================================"
+    echo
+    echo "Build first (if not already done):"
+    echo "  cd portal-backend"
+    echo "  mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION"
+    echo
+    echo "Then start in your IDE:"
+    echo "  Project: portal-backend"
+    echo "  Main class: de.civitascore.portal.PortalBackendApplication"
+    echo "  Profiles: local,postgres"
+    echo
+fi
+
+cd "$SCRIPT_DIR"
 
 # ---- Frontend Instructions ----------------------------------------
 
