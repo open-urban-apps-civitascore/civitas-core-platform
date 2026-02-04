@@ -420,6 +420,11 @@ Test scenarios:
 - ✅ Update route to add serverless-post-function plugin
 - ✅ Create route with multiple Lua functions
 - ✅ Combine serverless-post-function with other plugins
+- ✅ Create route with serverless-pre-function (rewrite phase)
+- ✅ Create route with serverless-pre-function (access phase)
+- ✅ Update route to add serverless-pre-function plugin
+- ✅ Create route with multiple serverless-pre-function Lua functions
+- ✅ Combine serverless-pre-function with serverless-post-function
 
 ### Test Coverage
 
@@ -692,6 +697,103 @@ end
 - APISIX validates Lua syntax - invalid code returns HTTP 400
 - Functions execute in order when multiple are provided
 - Use `ngx.log(ngx.INFO, ...)` for logging (visible in APISIX error.log)
+
+## serverless-pre-function Plugin
+
+The `serverless-pre-function` plugin allows executing custom Lua code **before** the request is proxied to the upstream. This is useful for:
+
+- **Request modification** - Add/modify headers before proxying
+- **Early validation** - Check request properties before processing
+- **Request enrichment** - Inject correlation IDs, timestamps, etc.
+
+### Available Phases
+
+| Phase | Description | Use Case |
+|-------|-------------|----------|
+| `rewrite` | During request rewriting (default) | Modify request before proxy |
+| `access` | After access phase | Post-authentication logic |
+
+### Plugin Configuration
+
+```json
+{
+  "serverless-pre-function": {
+    "phase": "rewrite",
+    "functions": [
+      "return function(conf, ctx) ngx.req.set_header('X-Request-ID', ngx.var.request_id) end"
+    ]
+  }
+}
+```
+
+### Configuration Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `phase` | string | No | Execution phase (default: `rewrite`) |
+| `functions` | array | Yes | Array of Lua function strings |
+
+### Example: Add Request Headers
+
+```json
+{
+  "plugins": {
+    "serverless-pre-function": {
+      "phase": "rewrite",
+      "functions": [
+        "return function(conf, ctx) ngx.req.set_header('X-Request-ID', ngx.var.request_id) end"
+      ]
+    }
+  }
+}
+```
+
+### Example: Request Timestamp Injection
+
+```json
+{
+  "plugins": {
+    "serverless-pre-function": {
+      "phase": "rewrite",
+      "functions": [
+        "return function(conf, ctx) ngx.req.set_header('X-Request-Start', tostring(ngx.now())) end"
+      ]
+    }
+  }
+}
+```
+
+### Example: Combining Pre and Post Functions
+
+Use `serverless-pre-function` to modify requests before proxy and `serverless-post-function` to process responses:
+
+```json
+{
+  "plugins": {
+    "serverless-pre-function": {
+      "phase": "rewrite",
+      "functions": [
+        "return function(conf, ctx) ngx.req.set_header('X-Request-Start', tostring(ngx.now())) end"
+      ]
+    },
+    "serverless-post-function": {
+      "phase": "log",
+      "functions": [
+        "return function(conf, ctx) ngx.log(ngx.INFO, 'Request completed: ' .. ngx.var.uri) end"
+      ]
+    }
+  }
+}
+```
+
+### Difference from serverless-post-function
+
+| Aspect | serverless-pre-function | serverless-post-function |
+|--------|------------------------|-------------------------|
+| **Execution Time** | Before proxy to upstream | After upstream response |
+| **Primary Use** | Request modification | Response processing |
+| **Common Phases** | `rewrite`, `access` | `header_filter`, `body_filter`, `log` |
+| **Can Modify** | Request headers, URI | Response headers, body |
 
 ## Future Enhancements
 

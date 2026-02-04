@@ -655,6 +655,293 @@ class ApisixAdapterIntegrationTest {
             });
   }
 
+  @Test
+  void createRouteWithInvalidLuaInServerlessPostFunction() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-invalid-lua-post";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with INVALID Lua syntax in serverless-post-function
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/invalid-lua-post/*");
+    routeConfig.put("methods", List.of("GET"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+        "plugins",
+        Map.of(
+            "serverless-post-function",
+            Map.of("phase", "log", "functions", List.of("this is not valid lua syntax !!!"))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    // APISIX should reject invalid Lua with HTTP 400 → FatalAdapterException
+    FatalAdapterException exception =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event));
+
+    assertNotNull(exception.getErrorCode());
+  }
+
+  // ============== SERVERLESS-PRE-FUNCTION PLUGIN TESTS ==============
+
+  @Test
+  void createRouteWithServerlessPreFunction() throws Exception {
+    // First create an upstream that the route will reference
+    String upstreamId = "test-upstream-serverless-pre";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with serverless-pre-function plugin (rewrite phase)
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/serverless-pre/*");
+    routeConfig.put("methods", List.of("GET", "POST"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+        "plugins",
+        Map.of(
+            "serverless-pre-function",
+            Map.of(
+                "phase",
+                "rewrite",
+                "functions",
+                List.of(
+                    "return function(conf, ctx) ngx.req.set_header('X-Request-ID', ngx.var.request_id) end"))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+  }
+
+  @Test
+  void createRouteWithServerlessPreFunctionAccessPhase() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-serverless-pre-access";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with serverless-pre-function using access phase
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/pre-access/*");
+    routeConfig.put("methods", List.of("GET"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+        "plugins",
+        Map.of(
+            "serverless-pre-function",
+            Map.of(
+                "phase",
+                "access",
+                "functions",
+                List.of(
+                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Pre-access check passed') end"))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+  }
+
+  @Test
+  void updateRouteAddServerlessPreFunction() throws Exception {
+    String routeId = "test-route-add-serverless-pre";
+
+    // First create an upstream
+    String upstreamId = "test-upstream-for-add-serverless-pre";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create initial route without serverless-pre-function
+    Map<String, Object> initialRouteConfig = new HashMap<>();
+    initialRouteConfig.put("uri", "/api/v1/add-serverless-pre/*");
+    initialRouteConfig.put("methods", List.of("GET"));
+    initialRouteConfig.put("upstream_id", upstreamId);
+    createRouteDirectly(routeId, initialRouteConfig);
+
+    // Update route to add serverless-pre-function plugin
+    Map<String, Object> updatedRouteConfig = new HashMap<>();
+    updatedRouteConfig.put("uri", "/api/v1/add-serverless-pre/*");
+    updatedRouteConfig.put("methods", List.of("GET", "POST"));
+    updatedRouteConfig.put("upstream_id", upstreamId);
+    updatedRouteConfig.put(
+        "plugins",
+        Map.of(
+            "serverless-pre-function",
+            Map.of(
+                "phase",
+                "rewrite",
+                "functions",
+                List.of(
+                    "return function(conf, ctx) ngx.req.set_header('X-Added-Via', 'UPDATE') end"))));
+
+    ConfigEvent event =
+        createRouteConfigEvent("routes/" + routeId, Operation.UPDATE, updatedRouteConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_UPDATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              JsonNode route = getRouteFromApisix(routeId);
+              assertNotNull(route);
+              JsonNode plugins = route.get("value").get("plugins");
+              assertNotNull(plugins);
+              assertTrue(plugins.has("serverless-pre-function"));
+            });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+  }
+
+  @Test
+  void createRouteWithMultipleServerlessPreFunctions() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-multi-serverless-pre";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create route with multiple Lua functions in serverless-pre-function
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/multi-serverless-pre/*");
+    routeConfig.put("methods", List.of("GET", "POST", "PUT"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+        "plugins",
+        Map.of(
+            "serverless-pre-function",
+            Map.of(
+                "phase",
+                "rewrite",
+                "functions",
+                List.of(
+                    "return function(conf, ctx) ngx.req.set_header('X-Pre-Func-1', 'value1') end",
+                    "return function(conf, ctx) ngx.req.set_header('X-Pre-Func-2', 'value2') end"))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+  }
+
+  @Test
+  void createRouteWithServerlessPreAndPostFunctions() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-pre-and-post";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create route with both serverless-pre-function and serverless-post-function
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/pre-and-post/*");
+    routeConfig.put("methods", List.of("GET", "POST"));
+    routeConfig.put("upstream_id", upstreamId);
+
+    Map<String, Object> plugins = new HashMap<>();
+    plugins.put(
+        "serverless-pre-function",
+        Map.of(
+            "phase",
+            "rewrite",
+            "functions",
+            List.of(
+                "return function(conf, ctx) ngx.req.set_header('X-Request-Start', ngx.now()) end")));
+    plugins.put(
+        "serverless-post-function",
+        Map.of(
+            "phase",
+            "log",
+            "functions",
+            List.of(
+                "return function(conf, ctx) ngx.log(ngx.INFO, 'Request completed: ' .. ngx.var.uri) end")));
+    routeConfig.put("plugins", plugins);
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+  }
+
+  @Test
+  void createRouteWithInvalidLuaInServerlessPreFunction() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-invalid-lua-pre";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with INVALID Lua syntax in serverless-pre-function
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/invalid-lua-pre/*");
+    routeConfig.put("methods", List.of("GET"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+        "plugins",
+        Map.of(
+            "serverless-pre-function",
+            Map.of("phase", "rewrite", "functions", List.of("this is not valid lua syntax !!!"))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    // APISIX should reject invalid Lua with HTTP 400 → FatalAdapterException
+    FatalAdapterException exception =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event));
+
+    assertNotNull(exception.getErrorCode());
+  }
+
   // ============== HELPER METHODS ==============
 
   private void createRouteDirectly(String routeId, Map<String, Object> config) throws Exception {
