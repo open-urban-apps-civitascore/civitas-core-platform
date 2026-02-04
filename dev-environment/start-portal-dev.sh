@@ -294,7 +294,7 @@ if [ "$backend_option" = "1" ]; then
     xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres -Dconfig-adapter.version=$DEV_VERSION; bash" 2>/dev/null || \
     {
         echo "Could not open new terminal. Starting in background..."
-        mvn spring-boot:run --Dspring-boot.run.profiles=local,postgres --Dconfig-adapter.version=$DEV_VERSION &
+        mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres -Dconfig-adapter.version=$DEV_VERSION &
     }
     echo
 else
