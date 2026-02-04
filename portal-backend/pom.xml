@@ -46,7 +46,7 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
-        <config-adapter.version>0.0.0-671-ge1279f8</config-adapter.version>
+        <config-adapter.version>0.0.0-838-g0b0d1ab</config-adapter.version>
     </properties>
 
     <dependencyManagement>
