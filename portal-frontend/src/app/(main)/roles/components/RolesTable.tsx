@@ -3,11 +3,10 @@ import { useLocale, useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { Role, ROLE_ORIGINS } from '@/types/roles'
+import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
-
-import { Role, ROLE_ORIGINS } from '../../../../../types/roles'
-import { TableProps } from '../../../../../types/table'
 
 interface RolesTableProps extends TableProps<Role> {
   roles: Role[]

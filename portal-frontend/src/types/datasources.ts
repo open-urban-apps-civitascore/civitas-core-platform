@@ -1,7 +1,7 @@
 import z from 'zod'
 
 import type { NODE_DEFS } from '@/app/(main)/datasources/components/connector-tab/connector_sources'
-import { CONNECTION_TYPES, CONNECTOR_TYPES, DATASOURCE_STATUS_TYPES } from '@/const/datasources'
+import { CONNECTION_TYPES, CONNECTOR_TYPES, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 
 import { ConnectorApiSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
 

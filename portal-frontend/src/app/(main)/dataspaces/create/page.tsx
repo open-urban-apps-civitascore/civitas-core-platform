@@ -9,8 +9,8 @@ import { useCreateDataspace } from '@/app/services/api/dataspaces/clientRequests
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
+import { DataSpaceFormData, dataSpaceSchema } from '@/types/dataspaces'
 
-import { DataSpaceFormData, dataSpaceSchema } from '../../../../../types/dataspaces'
 import { DataSpaceForm } from '../components/DataSpaceForm'
 
 const CreateDataSpacePage = () => {

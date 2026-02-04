@@ -4,10 +4,9 @@ import { useTranslations } from 'next-intl'
 import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { DataSpace } from '@/types/dataspaces'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
-
-import { DataSpace } from '../../../../../types/dataspaces'
 
 interface DataSpacesTableProps extends TableProps<DataSpace> {
   dataspaces: DataSpace[]
