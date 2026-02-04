@@ -1,5 +1,5 @@
 # CIVITAS CORE AuthZ Policy - Permission Evaluation
-# M4: Resource-level permission checks (no scope enforcement - see M4.5)
+# M5: Resource-level permission checks with user_context_fetcher integration
 #
 # This module handles:
 #   - Permission lookup from backend endpoint mappings
@@ -7,14 +7,29 @@
 #   - Authentication checks (user context has identity)
 #   - Permission evaluation (user has required permission in assignments)
 #
+# User context is obtained via user_context_fetcher, which handles:
+#   - Decoding X-Userinfo header from APISIX
+#   - Fetching from AuthZ Repository via http.send()
+#   - Fallback to input.user_context for testing
+#
 # main.rego uses these rules to produce final allow/deny decisions with reasons.
-# Public endpoints are handled at APISIX level (never reach OPA). 
+# Public endpoints are handled at APISIX level (never reach OPA).
+
+# [R-021] Why no roles in this code?
+# The AuthZ Repository's /user-context/{externalId} endpoint returns PRE-FLATTENED
+# data with permissions already resolved. Role→permission mapping happens in the
+# AuthZ Repository (Java), not in Rego. Benefits:
+#   - Simpler Rego (no role lookup logic)
+#   - More efficient (one API call returns everything)
+#   - Immediate updates (role changes don't require Rego redeployment)
+# The response structure: groups[].assignments[].permissions[] (roles resolved)
 
 package civitas.authz.permission_eval
 
 import rego.v1
 
 import data.civitas.authz.resource_mapping
+import data.civitas.authz.user_context_fetcher
 
 # =============================================================================
 # PERMISSION LOOKUP FROM BACKEND MAPPINGS
@@ -79,16 +94,26 @@ is_null_permission_endpoint := true if {
 # =============================================================================
 # AUTHENTICATION CHECK
 # =============================================================================
-
+# [R-022] is_authenticated vs main.rego's has_user_context:
+# - has_user_context (main.rego): Used to fail-secure when AuthZ Repository is down
+# - is_authenticated (here): Used specifically for null-permission endpoints
+#
+# The null-permission flow (e.g., /users/me):
+#   is_null_permission_endpoint=true + is_authenticated=true → has_permission=true
+# This check enables "any authenticated user can access" endpoints without
+# requiring a specific permission. Both checks verify "user_context exists with
+# identity" but serve different decision branches.
+#
 # User is authenticated if we have user context with identity
+# Uses user_context_fetcher to get user context (fetched or from input)
 default is_authenticated := false
 
 is_authenticated := true if {
-    input.user_context.userId != null
+    user_context_fetcher.user_context.userId != null
 }
 
 is_authenticated := true if {
-    input.user_context.externalId != null
+    user_context_fetcher.user_context.externalId != null
 }
 
 # =============================================================================
@@ -104,17 +129,55 @@ has_permission := true if {
     is_authenticated
 }
 
-# User has permission if it's in their assignments (any scope - M4)
+# User has permission if it's in their assignments with matching scope (M5.1)
 has_permission := true if {
     required_permission != ""
     user_has_permission(required_permission)
 }
 
-# Check if user has a specific permission in any of their assignments
+# =============================================================================
+# SCOPE ENFORCEMENT (M5.1)
+# =============================================================================
+# Check if user has a specific permission with matching scope.
+#
+# Scope matching rules:
+#   - Resource endpoints: assignment.scopeId must match resource ID from path
+#   - TENANT-scoped resources: assignment.scopeType must be TENANT (no scopeId check)
+#   - Collection endpoints: any matching permission (filtering is backend's job)
+#
+# See Q-005 in BACKLOG.md: Pending PO clarification on whether TENANT scope
+# should act as wildcard (access all) or only for tenant-level resources.
+
+# For collection endpoints: permission in any scope is sufficient
+# (Backend filters results based on user's scopes)
 user_has_permission(permission) if {
-    some group in input.user_context.groups
+    resource_mapping.is_collection_endpoint
+    some group in user_context_fetcher.user_context.groups
     some assignment in group.assignments
     permission in assignment.permissions
+}
+
+# For resource endpoints with TENANT-scoped resources (users, groups, roles, etc.):
+# User must have permission with scopeType=TENANT
+user_has_permission(permission) if {
+    resource_mapping.is_resource_endpoint
+    resource_mapping.expected_scope_type == "TENANT"
+    some group in user_context_fetcher.user_context.groups
+    some assignment in group.assignments
+    permission in assignment.permissions
+    assignment.scopeType == "TENANT"
+}
+
+# For resource endpoints with DATASPACE/DATASET resources:
+# User must have permission with matching scopeType AND scopeId
+user_has_permission(permission) if {
+    resource_mapping.is_resource_endpoint
+    resource_mapping.expected_scope_type != "TENANT"
+    some group in user_context_fetcher.user_context.groups
+    some assignment in group.assignments
+    permission in assignment.permissions
+    assignment.scopeType == resource_mapping.expected_scope_type
+    assignment.scopeId == resource_mapping.resource_id
 }
 
 # =============================================================================
@@ -123,8 +186,9 @@ user_has_permission(permission) if {
 
 # Collect all user permissions (for debugging/logging)
 # Used by tests; useful for troubleshooting permission issues
+# Uses user_context_fetcher to get user context (fetched or from input)
 all_user_permissions contains permission if {
-    some group in input.user_context.groups
+    some group in user_context_fetcher.user_context.groups
     some assignment in group.assignments
     some permission in assignment.permissions
 }

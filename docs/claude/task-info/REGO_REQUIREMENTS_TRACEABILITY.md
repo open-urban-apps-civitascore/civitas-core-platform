@@ -4,7 +4,7 @@ Requirements-to-code traceability for the CIVITAS CORE AuthZ Rego policies (M4).
 
 **Source**: `docs/claude/additional-info/Authorization_Data_Model.md` (CIVITAS CORE official spec)
 
-**Last reviewed**: 2026-02-03
+**Last reviewed**: 2026-02-04
 
 ---
 
@@ -18,10 +18,11 @@ Requirements-to-code traceability for the CIVITAS CORE AuthZ Rego policies (M4).
 | Permission Evaluation | 4/6 | 1 (scope) | 0 |
 | Security Hardening | 4/4 | 0 | 0 |
 | Data Model Alignment | 4/5 | 1 (scope) | 0 |
+| User Context Fetcher | 5/5 | 0 | 0 |
 
-**Overall**: Core M4 requirements are met. Scope enforcement (M4.5) is correctly deferred.
+**Overall**: Core M4 requirements are met. M5 integration complete. Scope enforcement (M4.5) is correctly deferred.
 
-**Test Coverage**: 66 tests (8 security tests added 2026-02-03)
+**Test Coverage**: 136 tests (was 66 after M4, added 70 for M5 user_context_fetcher + http.send mocking)
 
 ---
 
@@ -456,11 +457,12 @@ user_has_permission(permission) if {
 
 | Module | Tests | Coverage Notes |
 |--------|-------|----------------|
-| `main.rego` | 10 | All decision paths tested |
+| `main.rego` | 24 | All decision paths including http.send mocking |
 | `resource_mapping.rego` | 21 | Path parsing, backend detection, security |
-| `permission_eval.rego` | 18 | Permission lookup, null permissions, auth |
+| `permission_eval.rego` | 34 | Permission lookup, null permissions, auth, http.send mocking |
+| `user_context_fetcher.rego` | 40 | Base64 decoding, http.send, error handling |
 | `edge_cases.rego` | 17 | URL edge cases (encoding, slashes, etc.) |
-| **Total** | **66** | |
+| **Total** | **136** | |
 
 ---
 

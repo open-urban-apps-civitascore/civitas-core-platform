@@ -17,11 +17,15 @@ M3   AuthZ Repository Service (Java service, DB → user authz context)
  │
 M4   OPA + Rego Policies (resource-level permissions, no scope checks)
  │
-M4.5 Scope Enforcement (TENANT → DATASPACE → DATASET hierarchy) [DEFERRED - may be cut from v2]
+M4.5 Scope Inheritance (TENANT → DATASPACE → DATASET permission inheritance) [DEFERRED - cut from v2]
  │
 M4.6 Provider Architecture & OPA Bundles (modular backends, production hardening)
  │
 M5   Full AuthZ Integration (APISIX → OPA → Repository, wired and tested)
+ │
+M5.1 Scope Enforcement (resource endpoints require matching scopeId)
+ │
+M5.5 Collection Endpoint Filtering (OPA returns allowed scopes via forward-auth)
  │
 M6   Documentation & Handoff
  │
@@ -117,6 +121,99 @@ Each milestone builds on the previous. No milestone should be started until its 
 - Updated docker-compose.yml for new directory structure (lib/, providers/, backends/)
 - Reorganized tests into `test/lib/`, `test/providers/`, `test/policy/`
 - 111 Rego tests pass (was 76, added 35 new tests for library/providers)
+
+### M5 — Full AuthZ Integration (2026-02-04) — COMPLETE
+- Created `user_context_fetcher.rego` module:
+  - Decodes X-Userinfo header (base64url-encoded JWT claims from APISIX openid-connect plugin)
+  - Extracts `sub` claim (Keycloak user ID / externalId)
+  - Fetches user_context from AuthZ Repository via http.send()
+  - Tests mock http.send() using OPA's `with http.send as mock_fn` syntax
+  - Fail-secure: denies if AuthZ Repository unavailable (`missing_user_context` reason)
+- Removed input.user_context fallback per TCB minimization (R-019 code review)
+- Updated `main.rego` and `permission_eval.rego` to use user_context_fetcher
+- Changed AuthZ Repository port from 8090 -> 8091 (avoids Kafka-UI conflict)
+- Created unified authz docker-compose (`dev-environment/authz/`):
+  - AuthZ Repository service (build from Dockerfile)
+  - OPA service (with dependency on authz-repository)
+  - APISIX service (with OPA plugin configured)
+- Created APISIX config with OPA plugin:
+  - `apisix-config.yaml` - Enables OPA plugin
+  - `apisix-routes.yaml` - Routes with proxy-rewrite + openid-connect + opa plugins
+- Created test data infrastructure:
+  - `seed-authz-data.sql` - Permissions, roles, groups, users, assignments
+  - `seed-keycloak-users.sh` - Creates matching Keycloak test users
+- Created `integration-test.sh` with test scenarios:
+  - Admin user with full permissions -> 200
+  - Reader user with read-only permissions -> 200 for reads, 403 for writes
+  - No-perms user -> 403 on protected, 200 on /users/me (null-permission)
+  - Unauthenticated -> 401
+  - Public health endpoint -> 200
+- Fixed integration-test.sh (client_secret, curl flags, bash arithmetic)
+- Added OAuth flow validation test (`portal-frontend/e2e/auth/oauth-flow.spec.ts`)
+- Fixed missing AUTH_SECRET in portal-frontend .env.local (NextAuth v5 requirement)
+- 136 Rego tests pass (was 111, added 25 for user_context_fetcher + http.send error cases)
+
+### M5.1 — Scope Enforcement for Resource Endpoints (2026-02-04) — COMPLETE
+- OPA now verifies permission scope matches the resource being accessed
+- Resource endpoints (`/v2/datasets/{id}`) require `scopeId` to match the resource ID
+- TENANT-scoped resources (users, groups, roles, permissions, assignments) require `scopeType=TENANT`
+- Collection endpoints allow any scope (backend filters results)
+- Added to `portal_backend.rego` provider:
+  - `resource_id` - extracted from path (`/v2/resource/{id}` → id)
+  - `expected_scope_type` - mapped from resource name (datasets→DATASET, users→TENANT, etc.)
+  - `is_resource_endpoint` / `is_collection_endpoint` - endpoint type classification
+  - `resource_scope_type` - mapping from resource names to scope types
+- Updated `permission_eval.rego` with three scope-aware `user_has_permission` rules:
+  - Collection endpoints: any scope works (backend filters)
+  - TENANT resources: require `scopeType=TENANT`
+  - DATASPACE/DATASET resources: require matching `scopeType` AND `scopeId`
+- Updated `resource_mapping.rego` to dispatch scope values to providers
+- Added Q-005 to backlog: clarify TENANT scope semantics with PO
+- Security fix: Previously user with permission for resource-A could access resource-B
+- 142 Rego tests pass (was 136, added 6 for scope enforcement scenarios)
+
+---
+
+### M5.5 — Collection Endpoint Filtering (2026-02-04) — COMPLETE
+
+**Goal**: Filter collection endpoint results to only include resources the user is authorized to see.
+
+**Architecture**: See [ADR-001: Collection Endpoint Authorization Filtering](../adrs/ADR-001-collection-endpoint-filtering.md)
+
+**Implementation Summary**:
+- Updated OPA `main.rego` to include scope header generation in decision response
+- APISIX OPA plugin's `send_headers_upstream` passes `X-Allowed-Scope-Ids` to backend (no forward-auth needed)
+- Backend servlet filter (`AllowedScopesFilter`) parses header into `@RequestScope` bean (`AllowedScopes`)
+- Services override `preProcessQuery()` to apply JPA specification filtering
+- TENANT-scoped users receive wildcard (`*`) to skip filtering
+- Header size limits configured to 32KB in both APISIX and Spring Boot
+
+**Components Created/Modified**:
+- `authz/rego/policy/main.rego` - Added `has_tenant_scope`, `specific_scope_ids`, `allowed_scope_ids_header` rules
+- `authz/rego/test/policy/main_test.rego` - Added 9 new header tests (151 total tests)
+- `dev-environment/authz/apisix-routes.yaml` - Added `send_headers_upstream` to OPA plugin
+- `dev-environment/authz/apisix-config.yaml` - Added `proxy_buffer_size: 32k`
+- `portal-backend/.../security/AllowedScopes.java` - New @RequestScope bean
+- `portal-backend/.../security/AllowedScopesFilter.java` - New servlet filter
+- `portal-backend/.../specification/ScopeFilteringSpecification.java` - JPA specifications
+- `portal-backend/.../service/DataSetService.java` - Added `preProcessQuery()` override
+- `portal-backend/.../service/DataSpaceService.java` - Added `preProcessQuery()` override
+- `portal-backend/src/main/resources/application.yaml` - Added `max-http-request-header-size: 32KB`
+
+**Exit Criteria**:
+- [x] OPA decision includes `headers` with `X-Allowed-Scope-Ids`
+- [x] APISIX OPA plugin passes header to backend (`send_headers_upstream`)
+- [x] Backend filters collection results by scope
+- [x] TENANT users see all resources (wildcard `*`)
+- [x] DATASPACE-scoped users see only authorized resources
+- [x] Empty scope returns empty results
+- [x] All 151 Rego tests pass (was 142)
+- [x] All 15 new backend tests pass (filter + specification)
+- [x] Backend compiles successfully
+
+---
+
+## In Progress
 
 ---
 
@@ -434,11 +531,48 @@ authz/rego/
 
 **Goal**: Wire APISIX → OPA → AuthZ Repository into a working chain. Verify with integration tests.
 
+### User Context Flow
+
+```
+Request with JWT
+       │
+       ▼
+    APISIX
+       │ validates JWT (openid-connect plugin)
+       │ passes request + JWT claims to OPA (opa plugin)
+       ▼
+      OPA
+       │ extracts `sub` (externalId) from JWT claims
+       │ calls AuthZ Repository via http.send()
+       ▼
+ AuthZ Repository
+       │ maps externalId → userId (database lookup)
+       │ fetches groups, assignments, permissions
+       │ returns user_context JSON
+       ▼
+      OPA
+       │ evaluates policies with user_context
+       │ returns allow/deny decision
+       ▼
+    APISIX
+       │ forwards request (200) or rejects (403)
+       ▼
+    Backend
+```
+
+**Data Sources:**
+- **Keycloak JWT**: Contains `sub` (externalId), system roles, group memberships
+- **AuthZ Repository**: Maps externalId→userId, provides fine-grained permissions from database
+
 ### Tasks
 1. Configure APISIX `opa` plugin on protected routes
-   - OPA endpoint: `http://opa:8181/v1/data/civitas/authz/allow`
-   - Send request method, path, headers (including Authorization)
-2. Create unified docker-compose (`/authz/docker-compose.yml`) wiring:
+   - OPA endpoint: `http://opa:8181/v1/data/civitas/authz/decision`
+   - APISIX passes request info + JWT claims (set_userinfo_header: true)
+2. Implement OPA http.send() to call AuthZ Repository
+   - Extract `sub` from `input.user_info` (JWT claims from APISIX)
+   - Call `GET /api/v1/user-context/{externalId}`
+   - Handle errors (fail-secure: deny if fetch fails)
+3. Create unified docker-compose (`/authz/docker-compose.yml`) wiring:
    - APISIX + etcd
    - OPA (with Rego policies mounted)
    - AuthZ Repository (connected to PostgreSQL)
@@ -450,13 +584,15 @@ authz/rego/
 5. Verify: authorized user gets data, unauthorized user gets 403
 
 ### Exit Criteria
-- [ ] Full docker-compose stack starts successfully
-- [ ] Authorized request: valid JWT + sufficient permissions → 200 + data
-- [ ] Unauthorized request: valid JWT + insufficient permissions → 403
-- [ ] Unauthenticated request: no/invalid JWT → 401
-- [ ] Public endpoint: no JWT needed → 200
-- [ ] APISIX logs show OPA plugin invocations
-- [ ] OPA decision logs show correct evaluation
+- [x] Full docker-compose stack starts successfully
+- [x] Authorized request: valid JWT + sufficient permissions → 200 + data
+- [x] Unauthorized request: valid JWT + insufficient permissions → 403
+- [x] Unauthenticated request: no/invalid JWT → 401
+- [x] Public endpoint: no JWT needed → 200
+- [x] APISIX logs show OPA plugin invocations
+- [x] OPA decision logs show correct evaluation
+- [x] All 136 Rego tests pass (including user_context_fetcher + http.send error tests)
+- [x] Integration tests pass (15/15 scenarios in integration-test.sh)
 
 ### Tests (Pragmatic TDD)
 - **DB→Repository→OPA→APISIX integration test** (docker-compose based):

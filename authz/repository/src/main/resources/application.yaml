@@ -22,7 +22,7 @@ spring:
         default_schema: public
 
 server:
-  port: ${SERVER_PORT:8090}
+  port: ${SERVER_PORT:8091}
 
 management:
   endpoints:

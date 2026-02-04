@@ -1,0 +1,32 @@
+# APISIX Configuration for AuthZ Integration
+# M5: Enables OPA plugin for authorization decisions
+# M5.5: Adds proxy buffer size for scope ID headers
+
+apisix:
+  node_listen:
+    - 9080
+  enable_http2: true
+  ssl:
+    enable: true
+    listen:
+      - port: 9443
+
+# M5.5: Increase buffer sizes for large X-Allowed-Scope-Ids headers
+# When users have access to many dataspaces, the scope ID list can be large.
+# Default is 4k which may be insufficient for 100+ scope IDs.
+nginx_config:
+  http:
+    proxy_buffer_size: 32k
+    proxy_buffers: 4 32k
+
+deployment:
+  role: data_plane
+  role_data_plane:
+    config_provider: yaml
+
+# Enable OPA plugin
+plugins:
+  - proxy-rewrite
+  - openid-connect
+  - opa
+  - request-id

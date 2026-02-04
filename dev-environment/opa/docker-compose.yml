@@ -30,10 +30,14 @@ services:
       - ../../authz/rego/backends:/data/backends:ro
     ports:
       - "8181:8181"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - civitas-network
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8181/health"]
+      # Note: -static image has no wget/curl/shell. Use OPA binary directly.
+      # OPA's eval command returns 0 on success.
+      test: ["CMD", "/opa", "eval", "-f", "pretty", "true"]
       interval: 10s
       timeout: 5s
       retries: 3

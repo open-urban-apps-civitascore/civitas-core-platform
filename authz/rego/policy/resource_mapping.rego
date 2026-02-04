@@ -32,10 +32,21 @@ import data.civitas.authz.providers.portal_backend
 # SECURITY NOTE: backend_data_key is used as a key in data.backends[key], which
 # is an in-memory object lookup, NOT a filesystem read. OPA loads all data at
 # startup; there's no dynamic file access. Path traversal is not possible here.
+#
+# NOTE: APISIX may send headers with mixed case (X-Authz-Backend) or lowercase
+# (x-authz-backend) depending on version. We check both.
 default backend := "unknown"
 
 backend := header_value if {
 	header_value := input.request.headers["x-authz-backend"]
+	header_value != ""
+	is_valid_backend_id(header_value)
+}
+
+# Handle mixed-case header from APISIX OPA plugin
+backend := header_value if {
+	not input.request.headers["x-authz-backend"]
+	header_value := input.request.headers["X-Authz-Backend"]
 	header_value != ""
 	is_valid_backend_id(header_value)
 }
@@ -123,4 +134,56 @@ backend_endpoints := frost_server.endpoints if {
 # Delegated to restmapper library for consistency.
 is_special_segment(segment) if {
 	restmapper.is_reserved_segment(segment)
+}
+
+# =============================================================================
+# SCOPE ENFORCEMENT (M5.1 - dispatched to providers)
+# =============================================================================
+# Each provider exposes scope information for resource endpoints.
+# This enables permission_eval.rego to verify that user's permission scope
+# matches the resource being accessed.
+
+# Resource ID extracted from path (e.g., /v2/datasets/{id} -> id)
+# Undefined for collection endpoints
+resource_id := portal_backend.resource_id if {
+	backend_data_key == "portal_backend"
+}
+
+resource_id := frost_server.resource_id if {
+	backend_data_key == "frost_server"
+}
+
+# Expected scope type for the resource (TENANT, DATASPACE, or DATASET)
+expected_scope_type := portal_backend.expected_scope_type if {
+	backend_data_key == "portal_backend"
+}
+
+expected_scope_type := frost_server.expected_scope_type if {
+	backend_data_key == "frost_server"
+}
+
+# Is this a resource endpoint (has specific ID)?
+default is_resource_endpoint := false
+
+is_resource_endpoint if {
+	backend_data_key == "portal_backend"
+	portal_backend.is_resource_endpoint
+}
+
+is_resource_endpoint if {
+	backend_data_key == "frost_server"
+	frost_server.is_resource_endpoint
+}
+
+# Is this a collection endpoint (list/create)?
+default is_collection_endpoint := false
+
+is_collection_endpoint if {
+	backend_data_key == "portal_backend"
+	portal_backend.is_collection_endpoint
+}
+
+is_collection_endpoint if {
+	backend_data_key == "frost_server"
+	frost_server.is_collection_endpoint
 }

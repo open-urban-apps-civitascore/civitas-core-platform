@@ -8,15 +8,22 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.specification.ScopeFilteringSpecification;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
@@ -27,6 +34,7 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
   private final DistributionService distributionService;
 
   private final ObjectMapper objectMapper;
+  private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   @Override
   protected DataSetRepository getRepository() {
@@ -185,5 +193,27 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
               + dataSet.getDataSetStatus());
     }
     return dataSet;
+  }
+
+  /**
+   * Apply scope-based filtering for collection queries (M5.5).
+   *
+   * <p>Filters datasets to only those belonging to dataspaces the user is authorized to access.
+   * Wildcard (*) or inactive scope filtering bypasses the filter.
+   */
+  @Override
+  protected Specification<DataSet> preProcessQuery(Specification<DataSet> spec, Pageable pageable) {
+    AllowedScopes scopes = allowedScopesProvider.getObject();
+
+    if (!scopes.isActive() || scopes.isWildcard()) {
+      // No filtering: direct backend access or TENANT scope
+      return spec;
+    }
+
+    log.debug("Filtering datasets by {} allowed dataspaces", scopes.getScopeIds().size());
+    Specification<DataSet> scopeFilter =
+        ScopeFilteringSpecification.dataSetInDataSpaces(scopes.getScopeIds());
+
+    return spec == null ? scopeFilter : spec.and(scopeFilter);
   }
 }

@@ -31,7 +31,9 @@ public class UserContextService {
 
   private UserContextResponse mapToResponse(User user) {
     List<GroupContext> groupContexts =
-        user.getGroups().stream().map(this::mapGroupContext).toList();
+        user.getGroups() == null
+            ? List.of()
+            : user.getGroups().stream().map(this::mapGroupContext).toList();
 
     return UserContextResponse.builder()
         .userId(user.getId())
@@ -42,7 +44,9 @@ public class UserContextService {
 
   private GroupContext mapGroupContext(Group group) {
     List<AssignmentContext> assignmentContexts =
-        group.getAssignments().stream().map(this::mapAssignmentContext).toList();
+        group.getAssignments() == null
+            ? List.of()
+            : group.getAssignments().stream().map(this::mapAssignmentContext).toList();
 
     return GroupContext.builder()
         .id(group.getId())
@@ -52,14 +56,17 @@ public class UserContextService {
   }
 
   private AssignmentContext mapAssignmentContext(Assignment assignment) {
+    var role = assignment.getRole();
     List<String> permissionNames =
-        assignment.getRole().getPermissions().stream().map(Permission::getName).sorted().toList();
+        role == null || role.getPermissions() == null
+            ? List.of()
+            : role.getPermissions().stream().map(Permission::getName).sorted().toList();
 
     return AssignmentContext.builder()
-        .roleId(assignment.getRole().getId())
-        .roleName(assignment.getRole().getName())
-        .roleType(assignment.getRole().getRoleType().name())
-        .scopeType(assignment.getScopeType().name())
+        .roleId(role != null ? role.getId() : null)
+        .roleName(role != null ? role.getName() : null)
+        .roleType(role != null && role.getRoleType() != null ? role.getRoleType().name() : null)
+        .scopeType(assignment.getScopeType() != null ? assignment.getScopeType().name() : null)
         .scopeId(assignment.getScopeId())
         .permissions(permissionNames)
         .build();

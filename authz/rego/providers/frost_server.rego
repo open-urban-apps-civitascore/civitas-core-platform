@@ -58,3 +58,22 @@ request_path := "" if {
 
 # Path parts for debugging/logging
 path_parts := restmapper.parse_path(input.request.path)
+
+# =============================================================================
+# SCOPE ENFORCEMENT (M5.1 - Stub)
+# =============================================================================
+# These are intentionally undefined for the FROST server stub.
+# When OData parsing is implemented (F-005), proper scope extraction will be added.
+# For now, the fail-secure behavior (all requests denied) handles this.
+
+# Stub: resource_id undefined (OData uses Things(123) syntax)
+# resource_id := ...
+
+# Stub: expected_scope_type undefined
+# expected_scope_type := ...
+
+# Stub: is_resource_endpoint undefined
+# is_resource_endpoint if { ... }
+
+# Stub: is_collection_endpoint undefined
+# is_collection_endpoint if { ... }

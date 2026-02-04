@@ -12,14 +12,21 @@
 This document covers deployment of the CIVITAS authorization system, consisting of:
 
 1. **OPA (Open Policy Agent)** - Policy evaluation service
-2. **AuthZ Repository** - User context REST API (provides user permissions to OPA)
-3. **APISIX OPA Plugin** - Routes requests through OPA for authorization
+2. **AuthZ Repository** - User context REST API (maps externalId→userId, provides permissions to OPA)
+3. **APISIX JWT Validation** - Validates JWTs using Keycloak JWKS (dynamic key fetch)
+4. **APISIX OPA Plugin** - Routes requests through OPA for authorization
+
+**External Dependency**: Keycloak must be reachable from APISIX for JWKS (JWT signing key) retrieval.
 
 ---
 
 ## Architecture Overview
 
 ```
+                                    Keycloak
+                                        ↑
+                                   [JWKS fetch]
+                                        │
 Request → APISIX → [JWT validation] → [OPA plugin] → Backend Service
                                             ↓
                                     OPA (Rego policies)
@@ -30,11 +37,13 @@ Request → APISIX → [JWT validation] → [OPA plugin] → Backend Service
 ```
 
 **Request flow**:
-1. APISIX validates JWT (openid-connect plugin)
-2. APISIX calls OPA for authorization decision (opa plugin)
-3. OPA evaluates Rego policies, fetching user context from AuthZ Repository
-4. OPA returns allow/deny decision
-5. APISIX forwards request to backend (if allowed) or returns 403
+1. APISIX validates JWT using keys from Keycloak JWKS (openid-connect plugin)
+2. APISIX passes request + JWT claims to OPA (opa plugin)
+3. OPA extracts `sub` (externalId) from JWT claims
+4. OPA calls AuthZ Repository to get user permissions (externalId→userId mapping happens here)
+5. OPA evaluates Rego policies with user context
+6. OPA returns allow/deny decision
+7. APISIX forwards request to backend (if allowed) or returns 403
 
 ---
 
@@ -169,6 +178,39 @@ Decision logs are written to stdout in JSON format (configured via `decision_log
 
 ## Component 2: AuthZ Repository
 
+### Security: Network Isolation Required
+
+**CRITICAL**: The AuthZ Repository API has no application-level authentication. Security is enforced via:
+
+1. **Kubernetes NetworkPolicy** - Only OPA pods can reach AuthZ Repository (port 8091)
+2. **Linkerd mTLS** - All pod-to-pod traffic is encrypted and authenticated via service mesh
+
+Example NetworkPolicy:
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: authz-repository-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app: authz-repository
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: opa
+      ports:
+        - port: 8091
+```
+
+With Linkerd, mTLS is automatic when both pods are meshed. Verify with:
+```bash
+linkerd viz tap deploy/authz-repository
+```
+
 ### Container Build
 
 ```dockerfile
@@ -196,7 +238,7 @@ Note: Requires `portal-model` module (shared JPA entities).
 | `DATABASE_URL` | Yes | `jdbc:postgresql://localhost:5432/portal_backend` | PostgreSQL JDBC URL |
 | `DATABASE_USERNAME` | Yes | `admin` | DB username |
 | `DATABASE_PASSWORD` | Yes | `admin` | DB password |
-| `SERVER_PORT` | No | `8090` | HTTP port |
+| `SERVER_PORT` | No | `8091` | HTTP port |
 | `SQL_LOGGING` | No | `INFO` | Set to `DEBUG` for SQL query logging |
 
 ### Database Access
@@ -215,7 +257,7 @@ This service shares the `portal_backend` database but should have its own creden
 ### Health Check
 
 ```
-GET http://authz-repository:8090/actuator/health
+GET http://authz-repository:8091/actuator/health
 ```
 
 Returns `200 OK` with health details (DB connection status).
@@ -223,14 +265,105 @@ Returns `200 OK` with health details (DB connection status).
 ### API Endpoint
 
 ```
-GET http://authz-repository:8090/api/user-context/{userId}
+GET http://authz-repository:8091/api/v1/user-context/{externalId}
 ```
 
 Returns user's groups, assignments, roles, and permissions for OPA to evaluate.
 
+**Note**: The path parameter is `externalId` (Keycloak subject ID), not the internal database `userId`.
+
 ---
 
-## Component 3: APISIX OPA Plugin
+## Component 3: APISIX JWT Validation (Keycloak JWKS)
+
+### Keycloak Connectivity Requirement
+
+**CRITICAL**: APISIX must be able to reach Keycloak's JWKS endpoint to validate JWTs dynamically.
+
+JWKS endpoint: `https://{keycloak-host}/realms/{realm}/.well-known/openid-configuration`
+
+This returns the `jwks_uri` which APISIX uses to fetch signing keys for JWT validation.
+
+### Production Configuration
+
+```yaml
+plugins:
+  openid-connect:
+    client_id: "apisix-validator"
+    client_secret: "unused-for-bearer-only"
+    discovery: "https://keycloak.civitas.io/realms/civitas-core/.well-known/openid-configuration"
+    bearer_only: true
+    ssl_verify: true
+    set_userinfo_header: true
+    # No public_key - keys fetched dynamically from JWKS
+```
+
+**Key settings:**
+- `discovery`: Points to Keycloak's OpenID configuration (must be HTTPS in production)
+- `bearer_only: true`: Only validate bearer tokens, don't initiate OAuth flows
+- `ssl_verify: true`: Verify Keycloak's TLS certificate (requires valid cert)
+- `set_userinfo_header: true`: Pass decoded JWT claims to upstream (needed for OPA)
+- **No `public_key`**: Keys are fetched dynamically from JWKS, enabling automatic key rotation
+
+### Network Requirements for JWKS
+
+| From | To | Port | Protocol | Purpose |
+|------|-----|------|----------|---------|
+| APISIX | Keycloak | 443 | HTTPS | JWKS fetch, token introspection |
+
+**With Linkerd**: If both are meshed, mTLS is automatic. APISIX talks HTTPS to Keycloak regardless.
+
+**Without Linkerd**: Ensure Keycloak has a valid TLS certificate that APISIX trusts.
+
+### JWKS Caching
+
+APISIX caches JWKS responses. Default behavior:
+- Keys are cached until they expire or a validation fails
+- On validation failure with unknown key ID (`kid`), APISIX re-fetches JWKS
+- This handles key rotation automatically
+
+### Keycloak Configuration Requirements
+
+Ensure Keycloak is configured to:
+
+1. **Include required claims in access tokens**:
+   - `sub` (subject) - used as externalId for AuthZ Repository lookup
+   - `groups` - group memberships (optional, for Keycloak-managed groups)
+   - `realm_access.roles` - system roles
+
+2. **Use RS256 signing algorithm** (default, but verify):
+   - Keycloak Admin → Realm Settings → Keys → Active RS256 key exists
+
+3. **Proper hostname configuration** (for JWKS URLs):
+   - Keycloak must return correct public URLs in discovery document
+   - Set `KC_HOSTNAME` environment variable in production
+
+### Troubleshooting JWKS Issues
+
+**APISIX returns 401 with "JWT validation failed"**:
+```bash
+# Test JWKS endpoint is reachable from APISIX container
+docker exec apisix curl -s https://keycloak:443/realms/civitas-core/.well-known/openid-configuration
+
+# Check if JWKS URI is correct
+curl -s https://keycloak/realms/civitas-core/.well-known/openid-configuration | jq '.jwks_uri'
+
+# Fetch JWKS directly
+curl -s https://keycloak/realms/civitas-core/protocol/openid-connect/certs | jq '.keys[].kid'
+```
+
+**Certificate errors**:
+- Ensure Keycloak's TLS cert is trusted by APISIX
+- For internal CAs, mount the CA cert into APISIX container
+- As a last resort (not recommended), set `ssl_verify: false`
+
+**Key rotation issues**:
+- APISIX should automatically handle rotation via JWKS re-fetch
+- If tokens fail validation after rotation, restart APISIX to clear cache
+
+---
+
+## Component 4: APISIX OPA Plugin
 
 ### Plugin Configuration
 
@@ -301,6 +434,8 @@ networks:
     name: civitas-network
 
 services:
+  keycloak:
+    networks: [civitas-network]
   opa:
     networks: [civitas-network]
   authz-repository:
@@ -313,19 +448,30 @@ services:
 
 ### Service Discovery
 
-| Service | Port | Internal DNS |
-|---------|------|--------------|
-| OPA | 8181 | `opa:8181` or `civitas-opa:8181` |
-| AuthZ Repository | 8090 | `authz-repository:8090` |
+| Service | Port | Internal DNS | Notes |
+|---------|------|--------------|-------|
+| Keycloak | 443 | `keycloak:443` | HTTPS required for JWKS |
+| OPA | 8181 | `opa:8181` | HTTP (internal only) |
+| AuthZ Repository | 8091 | `authz-repository:8091` | HTTP (internal only) |
+
+### Required Connectivity
+
+| From | To | Purpose |
+|------|-----|---------|
+| APISIX | Keycloak | JWT validation (JWKS fetch) |
+| APISIX | OPA | Authorization decisions |
+| OPA | AuthZ Repository | User context lookup |
+| AuthZ Repository | PostgreSQL | Permission data |
 
 ---
 
 ## Deployment Order
 
 1. **PostgreSQL** - Database must be running and migrated
-2. **AuthZ Repository** - Needs database connection
-3. **OPA** - Needs AuthZ Repository for user context (graceful degradation if unavailable)
-4. **APISIX** - Update routes with OPA plugin (can be rolling update)
+2. **Keycloak** - Must be running with valid TLS cert for JWKS
+3. **AuthZ Repository** - Needs database connection
+4. **OPA** - Needs AuthZ Repository for user context (graceful degradation if unavailable)
+5. **APISIX** - Update routes with OPA plugin (can be rolling update)
 
 ---
 
@@ -348,7 +494,7 @@ curl http://localhost:8181/v1/policies
 ### 3. Verify AuthZ Repository is healthy
 
 ```bash
-curl http://localhost:8090/actuator/health
+curl http://localhost:8091/actuator/health
 # Expected: {"status":"UP",...}
 ```
 
@@ -406,6 +552,15 @@ curl -H "Authorization: Bearer $TOKEN" http://apisix:9080/v2/users
 
 - Check that the requested path exists in the backend's data file
 - Verify path pattern matching (e.g., `/v2/users/123` matches `/v2/users/{id}`)
+
+### OPA returns "missing_user_context"
+
+This indicates OPA couldn't get user context (AuthZ Repository unavailable or returned error).
+
+- Verify AuthZ Repository is running: `curl http://authz-repository:8091/actuator/health`
+- Check network connectivity between OPA and AuthZ Repository
+- Check AuthZ Repository logs for database connection issues
+- **Note**: This is fail-secure behavior. If user context cannot be fetched, authorization is denied.
 
 ### AuthZ Repository connection refused
 

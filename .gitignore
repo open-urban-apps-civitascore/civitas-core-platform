@@ -15,3 +15,6 @@ gl-dependency-scanning.json
 **/.DS_Store
 errorlogs.txt
 errorlogs.txt
+
+# Watchtower symlink (private upstream digest)
+docs/claude/upstream-digest.md

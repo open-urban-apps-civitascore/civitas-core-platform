@@ -1,0 +1,102 @@
+# M5: Full AuthZ Integration Stack
+#
+# Complete authorization chain: APISIX -> OPA -> AuthZ Repository
+#
+# This compose file brings up all components needed for end-to-end authorization:
+#   - AuthZ Repository: Serves user context (permissions, roles, groups)
+#   - OPA: Policy decision point, fetches context from AuthZ Repository
+#   - APISIX: API gateway, validates JWT and calls OPA for authorization
+#
+# Prerequisites:
+#   - PostgreSQL (civitas-postgres-portal) must be running with portal_backend DB
+#   - Keycloak (civitas-keycloak) must be running
+#   - Portal Backend (port 8089) should be running for actual API requests
+#
+# Usage:
+#   docker compose up -d
+#
+# Test:
+#   ./integration-test.sh
+
+services:
+  # AuthZ Repository - serves user context to OPA
+  authz-repository:
+    build:
+      context: ../../authz/repository
+      dockerfile: Dockerfile
+    container_name: civitas-authz-repository
+    restart: always
+    environment:
+      DATABASE_URL: jdbc:postgresql://civitas-postgres-portal:5432/portal_backend
+      DATABASE_USERNAME: admin
+      DATABASE_PASSWORD: admin
+      SERVER_PORT: 8091
+    ports:
+      - "8091:8091"
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # OPA - Policy Decision Point
+  opa:
+    image: openpolicyagent/opa:1.4.2-static
+    container_name: civitas-opa
+    restart: always
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=info"
+      - "--log-format=json"
+      - "--set=decision_logs.console=true"
+      - "/policies"
+      - "/lib"
+      - "/providers"
+      - "/data"
+    volumes:
+      - ../../authz/rego/policy:/policies:ro
+      - ../../authz/rego/lib:/lib:ro
+      - ../../authz/rego/providers:/providers:ro
+      - ../../authz/rego/backends:/data/backends:ro
+    ports:
+      - "8181:8181"
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "-f", "pretty", "true"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      authz-repository:
+        condition: service_healthy
+
+  # APISIX - API Gateway with OPA plugin
+  apisix:
+    image: apache/apisix:3.14.0-debian
+    container_name: civitas-apisix-authz
+    restart: always
+    volumes:
+      - ./apisix-config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./apisix-routes.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "9080:9080"
+      - "9443:9443"
+    networks:
+      - civitas-network
+    depends_on:
+      opa:
+        condition: service_healthy
+
+networks:
+  civitas-network:
+    name: civitas-network
+    external: true

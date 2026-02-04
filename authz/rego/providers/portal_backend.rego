@@ -52,3 +52,62 @@ request_path := "" if {
 
 # Path parts for debugging/logging
 path_parts := restmapper.parse_path(input.request.path)
+
+# =============================================================================
+# SCOPE ENFORCEMENT (M5.1)
+# =============================================================================
+# Maps resources to their expected scope types and extracts resource IDs
+# for scope enforcement on resource endpoints.
+#
+# Scope model (without inheritance):
+#   - TENANT resources: users, groups, roles, permissions, assignments, catalogs
+#   - DATASPACE resources: dataspaces
+#   - DATASET resources: datasets
+#
+# For resource endpoints (/v2/resource/{id}), the {id} IS the scopeId.
+# TENANT-scoped resources don't require specific scopeId matching (Q-005 pending).
+
+# Map resource name to expected scope type
+resource_scope_type := {
+	"users": "TENANT",
+	"groups": "TENANT",
+	"roles": "TENANT",
+	"permissions": "TENANT",
+	"assignments": "TENANT",
+	"catalogs": "TENANT",
+	"dataspaces": "DATASPACE",
+	"datasets": "DATASET",
+}
+
+# Extract resource name from path (second segment: /v2/{resource}/...)
+resource_name := path_parts[1] if {
+	count(path_parts) >= 2
+}
+
+# Extract resource ID from path (third segment: /v2/resource/{id})
+# Only defined for resource endpoints, not collection endpoints
+resource_id := path_parts[2] if {
+	count(path_parts) == 3
+	path_parts[2] != ""
+	not restmapper.is_reserved_segment(path_parts[2])
+}
+
+# Expected scope type for the resource being accessed
+expected_scope_type := resource_scope_type[resource_name] if {
+	resource_scope_type[resource_name]
+}
+
+# Is this a resource endpoint (has an ID) vs collection endpoint?
+is_resource_endpoint if {
+	resource_id
+}
+
+# Is this a collection endpoint (no ID)?
+is_collection_endpoint if {
+	count(path_parts) == 2
+}
+
+is_collection_endpoint if {
+	count(path_parts) == 3
+	restmapper.is_reserved_segment(path_parts[2])
+}

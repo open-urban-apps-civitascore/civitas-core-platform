@@ -6,12 +6,15 @@ The platform has the following test suites. **Run all tests for major changes** 
 
 | Component | Test Type | Command | Count | Notes |
 |-----------|-----------|---------|-------|-------|
-| portal-frontend | Unit (Vitest) | `pnpm test` | 199 | Fast, mock-based |
-| portal-frontend | E2E (Playwright) | `pnpm test:e2e` | 42 | Requires Keycloak + backend |
-| portal-backend | Unit (JUnit) | `mvn test` | - | Surefire plugin |
+| portal-frontend | Unit (Vitest) | `pnpm test` | 244 | Fast, mock-based (2 skipped) |
+| portal-frontend | E2E (Playwright) | `pnpm test:e2e` | 38 | Team 2's tests. Many broken (TD-011/TD-012). |
+| portal-backend | Unit (JUnit) | `mvn test` | 32 | Surefire plugin |
 | portal-backend | Integration | `mvn verify` | - | Testcontainers, Failsafe |
 | authz/repository | Unit (JUnit) | `mvn -f authz/repository/pom.xml test` | 10 | Service layer tests |
 | authz/repository | Integration | `mvn -f authz/repository/pom.xml verify` | 9 | Full stack with H2 |
+| authz/rego | Rego (OPA) | `cd authz/rego && opa test . -v` | 151 | OPA built-in test framework |
+| authz/e2e | E2E (Playwright) | `cd authz/e2e && npx playwright test` | 10 (7 pass w/o authz stack) | OAuth flow + authz integration. 3 tests need full APISIX/OPA stack. |
+| authz/e2e | Shell integration | `cd dev-environment/authz && ./integration-test.sh` | 15 | Curl-based AuthZ scenarios |
 | config-adapter | Unit/Integration | `mvn -f config-adapter/pom.xml test` | - | Kafka via Testcontainers |
 
 ### Quick Reference: Running All Tests

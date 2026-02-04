@@ -1,17 +1,32 @@
 # Tests for main.rego - Entry point authorization decisions
+#
+# Tests mock http.send() using OPA's `with http.send as mock_fn` syntax.
 
 package civitas.authz_test
 
 import rego.v1
 
 import data.civitas.authz
+import data.test.helpers.mock_http
 
 # =============================================================================
 # TEST HELPERS
 # =============================================================================
 
-# Standard request with backend header
+# Standard request with backend header and userinfo
 portal_request(method, path) := {
+    "request": {
+        "method": method,
+        "path": path,
+        "headers": {
+            "x-authz-backend": "portal-backend",
+            "x-userinfo": mock_http.encode_userinfo("test-user")
+        }
+    }
+}
+
+# Request without userinfo header (no auth)
+portal_request_no_auth(method, path) := {
     "request": {
         "method": method,
         "path": path,
@@ -19,8 +34,26 @@ portal_request(method, path) := {
     }
 }
 
-# User context with specific permissions
-user_context_with_permissions(perms) := {
+# User context with TENANT-scoped permissions (for tenant-level resources)
+user_context_tenant_scoped(perms) := {
+    "userId": "user-1",
+    "externalId": "keycloak-sub-1",
+    "groups": [{
+        "id": "group-1",
+        "name": "Test Group",
+        "assignments": [{
+            "roleId": "role-1",
+            "roleName": "Test Role",
+            "roleType": "SYSTEM",
+            "scopeType": "TENANT",
+            "scopeId": "tenant-1",
+            "permissions": perms
+        }]
+    }]
+}
+
+# User context with permissions scoped to a specific resource (M5.1)
+user_context_with_scope(perms, scope_type, scope_id) := {
     "userId": "user-1",
     "externalId": "keycloak-sub-1",
     "groups": [{
@@ -30,12 +63,31 @@ user_context_with_permissions(perms) := {
             "roleId": "role-1",
             "roleName": "Test Role",
             "roleType": "DATA",
-            "scopeType": "TENANT",
-            "scopeId": "tenant-1",
+            "scopeType": scope_type,
+            "scopeId": scope_id,
             "permissions": perms
         }]
     }]
 }
+
+# Mock http.send functions for TENANT-scoped resources (users, groups, roles, etc.)
+mock_send_admin(_) := {"status_code": 200, "body": user_context_tenant_scoped(["READ_USER", "CREATE_USER", "DELETE_USER"])}
+mock_send_reader(_) := {"status_code": 200, "body": user_context_tenant_scoped(["READ_USER"])}
+
+# Mock for collection endpoints (any scope works for collections)
+mock_send_dataset_creator(_) := {"status_code": 200, "body": user_context_tenant_scoped(["CREATE_DATASET"])}
+
+# Mock for DATASPACE resource endpoint - must be scoped to the specific dataspace ID
+mock_send_dataspace_updater(_) := {"status_code": 200, "body": user_context_with_scope(["UPDATE_DATASPACE"], "DATASPACE", "abc-123")}
+
+# Mock for collection GET (any scope works)
+mock_send_all_read(_) := {"status_code": 200, "body": user_context_tenant_scoped(["READ_USER", "READ_DATASET"])}
+
+mock_send_authenticated_no_groups(_) := {"status_code": 200, "body": {"userId": "123", "externalId": "keycloak-sub-123", "groups": []}}
+mock_send_authenticated_no_groups_field(_) := {"status_code": 200, "body": {"userId": "123", "externalId": "ext-123"}}
+mock_send_empty(_) := {"status_code": 200, "body": {}}
+mock_send_null_ids(_) := {"status_code": 200, "body": {"userId": null, "externalId": null, "groups": []}}
+mock_send_error(_) := {"status_code": 500, "body": {"error": "Internal server error"}}
 
 # =============================================================================
 # PERMISSION-BASED ACCESS TESTS
@@ -43,44 +95,40 @@ user_context_with_permissions(perms) := {
 
 # Test: Authenticated user with correct permission is allowed
 test_permission_granted if {
-    input_data := object.union(portal_request("GET", "/v2/users"), {
-        "user_context": user_context_with_permissions(["READ_USER", "CREATE_USER"])
-    })
-    result := authz.decision with input as input_data
-    result.allowed == true
+    result := authz.decision
+        with http.send as mock_send_admin
+        with input as portal_request("GET", "/v2/users")
+    result.allow == true
     result.reason == "permission_granted"
     result.permission == "READ_USER"
 }
 
 # Test: Authenticated user without required permission is denied
 test_permission_denied if {
-    input_data := object.union(portal_request("DELETE", "/v2/users/123"), {
-        "user_context": user_context_with_permissions(["READ_USER"])
-    })
-    result := authz.decision with input as input_data
-    result.allowed == false
+    result := authz.decision
+        with http.send as mock_send_reader
+        with input as portal_request("DELETE", "/v2/users/123")
+    result.allow == false
     result.reason == "permission_denied"
     result.required == "DELETE_USER"
 }
 
 # Test: POST to collection requires CREATE permission
 test_create_permission if {
-    input_data := object.union(portal_request("POST", "/v2/datasets"), {
-        "user_context": user_context_with_permissions(["CREATE_DATASET"])
-    })
-    result := authz.decision with input as input_data
-    result.allowed == true
+    result := authz.decision
+        with http.send as mock_send_dataset_creator
+        with input as portal_request("POST", "/v2/datasets")
+    result.allow == true
     result.reason == "permission_granted"
     result.permission == "CREATE_DATASET"
 }
 
 # Test: PUT to resource requires UPDATE permission
 test_update_permission if {
-    input_data := object.union(portal_request("PUT", "/v2/dataspaces/abc-123"), {
-        "user_context": user_context_with_permissions(["UPDATE_DATASPACE"])
-    })
-    result := authz.decision with input as input_data
-    result.allowed == true
+    result := authz.decision
+        with http.send as mock_send_dataspace_updater
+        with input as portal_request("PUT", "/v2/dataspaces/abc-123")
+    result.allow == true
     result.reason == "permission_granted"
 }
 
@@ -90,24 +138,17 @@ test_update_permission if {
 
 # Test: /users/me allowed for any authenticated user
 test_users_me_allowed_for_authenticated if {
-    input_data := object.union(portal_request("GET", "/v2/users/me"), {
-        "user_context": {
-            "userId": "123",
-            "externalId": "keycloak-sub-123",
-            "groups": []
-        }
-    })
-    result := authz.decision with input as input_data
-    result.allowed == true
+    result := authz.decision
+        with http.send as mock_send_authenticated_no_groups
+        with input as portal_request("GET", "/v2/users/me")
+    result.allow == true
     result.reason == "authenticated_endpoint"
 }
 
-# Test: /users/me denied for unauthenticated request
+# Test: /users/me denied for unauthenticated request (no X-Userinfo header)
 test_users_me_denied_without_auth if {
-    result := authz.decision with input as object.union(portal_request("GET", "/v2/users/me"), {
-        "user_context": {}
-    })
-    result.allowed == false
+    result := authz.decision with input as portal_request_no_auth("GET", "/v2/users/me")
+    result.allow == false
     result.reason == "authentication_required"
 }
 
@@ -115,40 +156,376 @@ test_users_me_denied_without_auth if {
 # ERROR CASE TESTS
 # =============================================================================
 
-# Test: No user context results in denial
-test_no_user_context_denied if {
-    input_data := object.union(portal_request("GET", "/v2/datasets"), {
-        "user_context": {}
-    })
-    result := authz.decision with input as input_data
-    result.allowed == false
+# Test: Empty user context from AuthZ Repository results in denial (fail-secure)
+test_empty_user_context_denied if {
+    result := authz.decision
+        with http.send as mock_send_empty
+        with input as portal_request("GET", "/v2/datasets")
+    result.allow == false
+    result.reason == "missing_user_context"
+}
+
+# Test: Missing X-Userinfo header results in denial (AuthZ Repository not called)
+test_missing_userinfo_header_denied if {
+    result := authz.decision with input as portal_request_no_auth("GET", "/v2/users")
+    result.allow == false
+    result.reason == "missing_user_context"
+}
+
+# Test: User context with null userId/externalId results in denial
+test_null_user_ids_denied if {
+    result := authz.decision
+        with http.send as mock_send_null_ids
+        with input as portal_request("GET", "/v2/datasets")
+    result.allow == false
+    result.reason == "missing_user_context"
+}
+
+# Test: Malformed user context (missing groups) still allows null-permission endpoints
+test_malformed_user_context_allows_null_permission if {
+    result := authz.decision
+        with http.send as mock_send_authenticated_no_groups_field
+        with input as portal_request("GET", "/v2/users/me")
+    result.allow == true
+    result.reason == "authenticated_endpoint"
 }
 
 # Test: Unknown endpoint path results in denial
 test_unknown_endpoint_denied if {
-    input_data := object.union(portal_request("GET", "/v2/unknown-resource"), {
-        "user_context": user_context_with_permissions(["READ_USER", "READ_DATASET"])
-    })
-    result := authz.decision with input as input_data
-    result.allowed == false
+    result := authz.decision
+        with http.send as mock_send_all_read
+        with input as portal_request("GET", "/v2/unknown-resource")
+    result.allow == false
     result.reason == "unknown_endpoint"
 }
 
 # Test: Missing backend header results in denial
 test_unknown_backend_denied if {
-    result := authz.decision with input as {
-        "request": {
-            "method": "GET",
-            "path": "/v2/users",
-            "headers": {}
-        },
-        "user_context": user_context_with_permissions(["READ_USER"])
-    }
-    result.allowed == false
+    result := authz.decision
+        with http.send as mock_send_reader
+        with input as {
+            "request": {
+                "method": "GET",
+                "path": "/v2/users",
+                "headers": {
+                    "x-userinfo": mock_http.encode_userinfo("test-user")
+                }
+            }
+        }
+    result.allow == false
     result.reason == "unknown_backend"
+}
+
+# Test: http.send error results in denial (fail-secure)
+test_http_send_error_denied if {
+    result := authz.decision
+        with http.send as mock_send_error
+        with input as portal_request("GET", "/v2/users")
+    result.allow == false
+    result.reason == "missing_user_context"
 }
 
 # Test: Default deny when no rules match
 test_default_deny if {
     authz.allow == false with input as {}
+}
+
+# =============================================================================
+# SCOPE ENFORCEMENT TESTS (M5.1)
+# =============================================================================
+
+# Mock for user with DATASPACE-scoped permission to ds-123
+mock_send_ds123_reader(_) := {"status_code": 200, "body": user_context_with_scope(["READ_DATASPACE"], "DATASPACE", "ds-123")}
+
+# Mock for user with DATASET-scoped permission to dataset-abc
+mock_send_dataset_abc_reader(_) := {"status_code": 200, "body": user_context_with_scope(["READ_DATASET"], "DATASET", "dataset-abc")}
+
+# Mock for user with wrong scope (has permission but for different resource)
+mock_send_wrong_scope(_) := {"status_code": 200, "body": user_context_with_scope(["READ_DATASPACE"], "DATASPACE", "other-ds")}
+
+# Test: User with correct DATASPACE scope can access that dataspace
+test_scope_dataspace_correct if {
+    result := authz.decision
+        with http.send as mock_send_ds123_reader
+        with input as portal_request("GET", "/v2/dataspaces/ds-123")
+    result.allow == true
+    result.reason == "permission_granted"
+}
+
+# Test: User with wrong DATASPACE scope is denied
+test_scope_dataspace_wrong if {
+    result := authz.decision
+        with http.send as mock_send_wrong_scope
+        with input as portal_request("GET", "/v2/dataspaces/ds-123")
+    result.allow == false
+    result.reason == "permission_denied"
+}
+
+# Test: User with correct DATASET scope can access that dataset
+test_scope_dataset_correct if {
+    result := authz.decision
+        with http.send as mock_send_dataset_abc_reader
+        with input as portal_request("GET", "/v2/datasets/dataset-abc")
+    result.allow == true
+    result.reason == "permission_granted"
+}
+
+# Test: User with DATASET scope for one dataset cannot access another
+test_scope_dataset_wrong if {
+    result := authz.decision
+        with http.send as mock_send_dataset_abc_reader
+        with input as portal_request("GET", "/v2/datasets/other-dataset")
+    result.allow == false
+    result.reason == "permission_denied"
+}
+
+# Test: TENANT-scoped user can access tenant-level resources (users)
+test_scope_tenant_user_access if {
+    result := authz.decision
+        with http.send as mock_send_admin
+        with input as portal_request("GET", "/v2/users/user-123")
+    result.allow == true
+    result.reason == "permission_granted"
+}
+
+# Test: Collection endpoints work with any scope (backend filters results)
+test_scope_collection_any_scope if {
+    result := authz.decision
+        with http.send as mock_send_ds123_reader
+        with input as portal_request("GET", "/v2/dataspaces")
+    result.allow == true
+    result.reason == "permission_granted"
+}
+
+# =============================================================================
+# SCOPE HEADER TESTS (M5.5 - Collection Endpoint Filtering)
+# =============================================================================
+# These tests verify that the decision includes X-Allowed-Scope-Ids header
+# for backend collection filtering.
+
+# Helper: User context with multiple DATASPACE-scoped assignments
+user_context_multi_dataspace(perms) := {
+    "userId": "user-1",
+    "externalId": "keycloak-sub-1",
+    "groups": [{
+        "id": "group-1",
+        "name": "Test Group",
+        "assignments": [
+            {
+                "roleId": "role-1",
+                "roleName": "Reader",
+                "roleType": "DATA",
+                "scopeType": "DATASPACE",
+                "scopeId": "ds-aaa",
+                "permissions": perms
+            },
+            {
+                "roleId": "role-2",
+                "roleName": "Reader",
+                "roleType": "DATA",
+                "scopeType": "DATASPACE",
+                "scopeId": "ds-zzz",
+                "permissions": perms
+            }
+        ]
+    }]
+}
+
+# Helper: User with both TENANT and DATASPACE scopes (TENANT takes priority)
+user_context_tenant_and_dataspace(perms) := {
+    "userId": "user-1",
+    "externalId": "keycloak-sub-1",
+    "groups": [{
+        "id": "group-1",
+        "name": "Admin Group",
+        "assignments": [
+            {
+                "roleId": "role-admin",
+                "roleName": "Admin",
+                "roleType": "SYSTEM",
+                "scopeType": "TENANT",
+                "scopeId": "tenant-1",
+                "permissions": perms
+            }
+        ]
+    },
+    {
+        "id": "group-2",
+        "name": "Reader Group",
+        "assignments": [
+            {
+                "roleId": "role-reader",
+                "roleName": "Reader",
+                "roleType": "DATA",
+                "scopeType": "DATASPACE",
+                "scopeId": "ds-123",
+                "permissions": perms
+            }
+        ]
+    }]
+}
+
+# Helper: User with multiple groups with different scopes
+user_context_multiple_groups_dataspace(perms) := {
+    "userId": "user-1",
+    "externalId": "keycloak-sub-1",
+    "groups": [
+        {
+            "id": "group-1",
+            "name": "Group A",
+            "assignments": [{
+                "roleId": "role-1",
+                "roleName": "Reader",
+                "roleType": "DATA",
+                "scopeType": "DATASPACE",
+                "scopeId": "ds-from-group1",
+                "permissions": perms
+            }]
+        },
+        {
+            "id": "group-2",
+            "name": "Group B",
+            "assignments": [{
+                "roleId": "role-2",
+                "roleName": "Reader",
+                "roleType": "DATA",
+                "scopeType": "DATASPACE",
+                "scopeId": "ds-from-group2",
+                "permissions": perms
+            }]
+        }
+    ]
+}
+
+# User context with DATASET scope (not DATASPACE)
+user_context_dataset_scope(perms) := {
+    "userId": "user-1",
+    "externalId": "keycloak-sub-1",
+    "groups": [{
+        "id": "group-1",
+        "name": "Test Group",
+        "assignments": [{
+            "roleId": "role-1",
+            "roleName": "Reader",
+            "roleType": "DATA",
+            "scopeType": "DATASET",
+            "scopeId": "dataset-123",
+            "permissions": perms
+        }]
+    }]
+}
+
+# Mock functions for header tests
+mock_send_multi_dataspace(_) := {"status_code": 200, "body": user_context_multi_dataspace(["READ_DATASPACE"])}
+mock_send_tenant_and_dataspace(_) := {"status_code": 200, "body": user_context_tenant_and_dataspace(["READ_DATASPACE"])}
+mock_send_multi_groups_dataspace(_) := {"status_code": 200, "body": user_context_multiple_groups_dataspace(["READ_DATASPACE"])}
+mock_send_dataset_scope(_) := {"status_code": 200, "body": user_context_dataset_scope(["READ_DATASET"])}
+mock_send_no_matching_permission(_) := {"status_code": 200, "body": user_context_tenant_scoped(["OTHER_PERMISSION"])}
+
+# Test: TENANT scope returns wildcard "*" header
+test_scope_header_tenant_wildcard if {
+    result := authz.decision
+        with http.send as mock_send_admin
+        with input as portal_request("GET", "/v2/users")
+    result.allow == true
+    result.headers["X-Allowed-Scope-Ids"] == "*"
+}
+
+# Test: Multiple DATASPACE scopes return comma-separated sorted IDs
+test_scope_header_multiple_dataspaces if {
+    result := authz.decision
+        with http.send as mock_send_multi_dataspace
+        with input as portal_request("GET", "/v2/dataspaces")
+    result.allow == true
+    # IDs are sorted alphabetically: ds-aaa, ds-zzz
+    result.headers["X-Allowed-Scope-Ids"] == "ds-aaa,ds-zzz"
+}
+
+# Test: TENANT scope takes priority over DATASPACE (returns wildcard)
+test_scope_header_tenant_priority if {
+    result := authz.decision
+        with http.send as mock_send_tenant_and_dataspace
+        with input as portal_request("GET", "/v2/dataspaces")
+    result.allow == true
+    result.headers["X-Allowed-Scope-Ids"] == "*"
+}
+
+# Test: Scopes collected across multiple groups
+test_scope_header_multiple_groups if {
+    result := authz.decision
+        with http.send as mock_send_multi_groups_dataspace
+        with input as portal_request("GET", "/v2/dataspaces")
+    result.allow == true
+    # IDs from both groups, sorted
+    result.headers["X-Allowed-Scope-Ids"] == "ds-from-group1,ds-from-group2"
+}
+
+# Test: Single DATASPACE scope returns single ID
+test_scope_header_single_dataspace if {
+    result := authz.decision
+        with http.send as mock_send_ds123_reader
+        with input as portal_request("GET", "/v2/dataspaces")
+    result.allow == true
+    result.headers["X-Allowed-Scope-Ids"] == "ds-123"
+}
+
+# Test: Resource endpoint (not collection) still includes header
+test_scope_header_resource_endpoint if {
+    result := authz.decision
+        with http.send as mock_send_ds123_reader
+        with input as portal_request("GET", "/v2/dataspaces/ds-123")
+    result.allow == true
+    # Resource endpoint allowed (scope matches), header still present
+    result.headers["X-Allowed-Scope-Ids"] == "ds-123"
+}
+
+# Test: DATASET endpoint with DATASET scope returns DATASET IDs
+test_scope_header_dataset_endpoint if {
+    result := authz.decision
+        with http.send as mock_send_dataset_scope
+        with input as portal_request("GET", "/v2/datasets")
+    result.allow == true
+    result.headers["X-Allowed-Scope-Ids"] == "dataset-123"
+}
+
+# Test: Empty header when no scopes match expected type
+# User has DATASET scope with READ_DATASPACE permission (can access collection)
+# but the scope type doesn't match DATASPACE, so header is empty
+user_context_dataset_scope_with_dataspace_perm := {
+    "userId": "user-1",
+    "externalId": "keycloak-sub-1",
+    "groups": [{
+        "id": "group-1",
+        "name": "Test Group",
+        "assignments": [{
+            "roleId": "role-1",
+            "roleName": "Reader",
+            "roleType": "DATA",
+            "scopeType": "DATASET",
+            "scopeId": "dataset-123",
+            "permissions": ["READ_DATASPACE", "READ_DATASET"]
+        }]
+    }]
+}
+
+mock_send_dataset_scope_with_dataspace_perm(_) := {"status_code": 200, "body": user_context_dataset_scope_with_dataspace_perm}
+
+test_scope_header_wrong_scope_type if {
+    result := authz.decision
+        with http.send as mock_send_dataset_scope_with_dataspace_perm
+        with input as portal_request("GET", "/v2/dataspaces")
+    # Should be allowed (collection endpoint, any permission works)
+    result.allow == true
+    # But header is empty - user has READ_DATASPACE but only via DATASET scope,
+    # not DATASPACE scope, so no scope IDs match the expected type
+    result.headers["X-Allowed-Scope-Ids"] == ""
+}
+
+# Test: Decision has headers object structure
+test_scope_header_structure if {
+    result := authz.decision
+        with http.send as mock_send_admin
+        with input as portal_request("GET", "/v2/users")
+    result.headers != null
+    object.keys(result.headers) == {"X-Allowed-Scope-Ids"}
 }

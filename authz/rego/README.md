@@ -46,6 +46,25 @@ authz/rego/
 
 ## Architecture
 
+### User Context (M5)
+
+OPA needs user context (groups, roles, permissions) to evaluate authorization. This comes from two sources:
+
+1. **JWT claims from Keycloak**: Contains system roles and group memberships
+2. **AuthZ Repository lookup**: Maps Keycloak `sub` (externalId) to internal userId and fetches full permission hierarchy from database
+
+**M5 Integration** (not yet implemented):
+- APISIX validates JWT and passes claims to OPA via the OPA plugin
+- OPA extracts `sub` from JWT claims
+- OPA calls AuthZ Repository (`http.send`) to get user's permissions: `GET /api/v1/user-context/{externalId}`
+- AuthZ Repository does the externalId→userId mapping and returns groups/assignments/permissions
+- OPA evaluates policies with the combined context
+
+**Why two sources?**
+- JWT contains Keycloak-managed data (system roles, group memberships)
+- AuthZ Repository contains platform-managed data (fine-grained permissions, scope assignments)
+- The split allows Keycloak to handle identity while the platform manages authorization
+
 ### Request Flow
 
 ```
