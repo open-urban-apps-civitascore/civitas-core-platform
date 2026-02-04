@@ -8,6 +8,15 @@ Spring Boot REST API with OAuth2/Keycloak integration, PostgreSQL database, and 
 
 * Java 21, Maven 3.6+, Docker & Docker Compose
 
+#### GitLab authentication
+
+As some of our dependencies are located in GitLab registry, you need to add a [personal access token (PAT)](https://docs.gitlab.com/user/profile/personal_access_tokens/) in your local `settings.xml` for dependency resolution.  
+For this:
+
+- copy `settings.xml.template` to `settings.xml` (untracked file)
+- create a PAT in GitLab with `read_api` scope
+- replace the placeholder `YOUR_GITLAB_PERSONAL_ACCESS_TOKEN` in `settings.xml` with your PAT
+
 ### 1. Start Infrastructure
 
 > **Recommended:**
