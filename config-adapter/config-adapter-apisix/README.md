@@ -20,6 +20,7 @@ The APISIX adapter integrates with Apache APISIX API Gateway's Admin API to mana
 ┌─────────────────┐
 │  Kafka Topics   │
 │  - backend.*    │
+│  - route.*      │
 └────────┬────────┘
          │ CloudEvents
          ↓
@@ -34,7 +35,8 @@ The APISIX adapter integrates with Apache APISIX API Gateway's Admin API to mana
 ┌────────────────────────┐
 │   APISIX Admin API     │
 │  - Upstream Management │
-│  - Configuration       │
+│  - Route Management    │
+│  - Plugin Config       │
 └────────────────────────┘
 ```
 
@@ -56,13 +58,27 @@ The APISIX adapter integrates with Apache APISIX API Gateway's Admin API to mana
 | UPDATE | PUT | `/apisix/admin/upstreams/{id}` | Update existing upstream |
 | DELETE | DELETE | `/apisix/admin/upstreams/{id}` | Delete upstream |
 
+### Route Management
+
+| Operation | HTTP Method | Endpoint | Description |
+|-----------|-------------|----------|-------------|
+| CREATE | POST | `/apisix/admin/routes` | Create new route |
+| UPDATE | PUT | `/apisix/admin/routes/{id}` | Update existing route |
+| DELETE | DELETE | `/apisix/admin/routes/{id}` | Delete route |
+
 ### Subscribed Topics
 
-The adapter subscribes to backend lifecycle events:
+The adapter subscribes to backend and route lifecycle events:
 
+**Backend Topics:**
 - `core.civitas.api.backend.created` - New backend services
 - `core.civitas.api.backend.updated` - Backend updates
 - `core.civitas.api.backend.deleted` - Backend removal
+
+**Route Topics:**
+- `core.civitas.api.route.created` - New routes
+- `core.civitas.api.route.updated` - Route updates
+- `core.civitas.api.route.deleted` - Route removal
 
 ## Configuration
 
@@ -75,8 +91,8 @@ apisix.admin.url=http://localhost:9180
 # APISIX Admin API Key (for authentication)
 apisix.admin.key=edd1c9f034335f136f87ad84b625c8f1
 
-# Topics to subscribe to
-apisix.topics=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted
+# Topics to subscribe to (backend and route events)
+apisix.topics=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted,core.civitas.api.route.created,core.civitas.api.route.updated,core.civitas.api.route.deleted
 ```
 
 ### Environment Variables
@@ -86,7 +102,7 @@ All properties can be overridden with environment variables:
 ```bash
 APISIX_ADMIN_URL=http://apisix:9180
 APISIX_ADMIN_KEY=your-api-key
-APISIX_TOPICS=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted
+APISIX_TOPICS=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted,core.civitas.api.route.created,core.civitas.api.route.updated,core.civitas.api.route.deleted
 ```
 
 ### Docker Compose Example
@@ -102,7 +118,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       APISIX_ADMIN_URL: http://apisix:9180
       APISIX_ADMIN_KEY: ${APISIX_API_KEY}
-      APISIX_TOPICS: core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted
+      APISIX_TOPICS: core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted,core.civitas.api.route.created,core.civitas.api.route.updated,core.civitas.api.route.deleted
     depends_on:
       - kafka
       - apisix
@@ -309,7 +325,10 @@ APISIX upstreams support various load balancing algorithms and health check conf
 | `UPSTREAM_CREATE_FAILED` | Failed to create upstream | Check configuration and APISIX logs |
 | `UPSTREAM_UPDATE_FAILED` | Failed to update upstream | Verify upstream exists and config is valid |
 | `UPSTREAM_DELETE_FAILED` | Failed to delete upstream | Check if upstream is in use by routes |
-| `UNKNOWN_RESOURCE_TYPE` | Unsupported resource type | Currently only `upstreams` is supported |
+| `ROUTE_CREATE_FAILED` | Failed to create route | Verify uri and upstream_id are valid |
+| `ROUTE_UPDATE_FAILED` | Failed to update route | Verify route exists and config is valid |
+| `ROUTE_DELETE_FAILED` | Failed to delete route | Check route ID exists |
+| `UNKNOWN_RESOURCE_TYPE` | Unsupported resource type | Only `upstreams` and `routes` are supported |
 | `PROCESSING_ERROR` | General processing error | Check event format and APISIX availability |
 
 ### Error Response Example
@@ -393,6 +412,14 @@ Test scenarios:
 - ✅ Update upstream with new nodes
 - ✅ Delete upstream
 - ✅ Handle invalid configuration gracefully
+- ✅ Create route with plugins
+- ✅ Update route configuration
+- ✅ Delete route
+- ✅ Create route with serverless-post-function (log phase)
+- ✅ Create route with serverless-post-function (header_filter phase)
+- ✅ Update route to add serverless-post-function plugin
+- ✅ Create route with multiple Lua functions
+- ✅ Combine serverless-post-function with other plugins
 
 ### Test Coverage
 
@@ -411,23 +438,23 @@ The adapter uses JAX-RS Client API for clean, maintainable code:
 **Before (java.net.http.HttpClient):**
 ```java
 HttpRequest request = HttpRequest.newBuilder()
-    .uri(URI.create(url))
-    .header("Content-Type", "application/json")
-    .header("X-API-KEY", adminApiKey)
-    .PUT(HttpRequest.BodyPublishers.ofString(json))
-    .timeout(Duration.ofSeconds(30))
-    .build();
+        .uri(URI.create(url))
+        .header("Content-Type", "application/json")
+        .header("X-API-KEY", adminApiKey)
+        .PUT(HttpRequest.BodyPublishers.ofString(json))
+        .timeout(Duration.ofSeconds(30))
+        .build();
 HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 ```
 
 **After (JAX-RS Client):**
 ```java
 Response response = client.target(adminApiUrl)
-    .path("/apisix/admin/upstreams/{id}")
-    .resolveTemplate("id", upstreamId)
-    .request(MediaType.APPLICATION_JSON)
-    .header("X-API-KEY", adminApiKey)
-    .put(Entity.json(configValue));
+        .path("/apisix/admin/upstreams/{id}")
+        .resolveTemplate("id", upstreamId)
+        .request(MediaType.APPLICATION_JSON)
+        .header("X-API-KEY", adminApiKey)
+        .put(Entity.json(configValue));
 ```
 
 **Benefits:**
@@ -474,36 +501,207 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 }
 ```
 
-## Future Enhancements
+## Route Configuration
 
-### Routes API (Planned)
+Routes define how requests are matched and forwarded to upstreams. The adapter supports full CRUD operations for routes with plugin configuration.
 
-Support for APISIX routes configuration:
+### Route Event Format
 
 ```json
 {
-  "targetResource": "routes/api-route",
-  "operation": "CREATE",
-  "config": {
-    "uri": "/api/*",
-    "upstream_id": "my-backend",
-    "plugins": {
-      "rate-limit": {
-        "count": 100,
-        "time_window": 60
+  "specversion": "1.0",
+  "type": "core.civitas.api.route.created",
+  "source": "civitas.api.provisioning",
+  "id": "event-route-123",
+  "datacontenttype": "application/json",
+  "data": {
+    "metadata": {
+      "messageId": "msg-route-456",
+      "timestamp": "2025-01-22T10:00:00Z",
+      "source": "api.service",
+      "correlationId": "corr-route-789",
+      "configVersion": "1.0",
+      "resultTopic": "api.results"
+    },
+    "payload": {
+      "targetComponent": "apisix",
+      "targetResource": "routes/my-api-route",
+      "operation": "CREATE",
+      "config": {
+        "path": "routes/my-api-route",
+        "value": {
+          "uri": "/api/v1/*",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "upstream_id": "my-backend",
+          "plugins": {
+            "prometheus": {},
+            "proxy-rewrite": {
+              "uri": "/rewritten"
+            }
+          }
+        }
       }
     }
   }
 }
 ```
 
+### Route Configuration Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `uri` | string | Yes | URI path pattern (supports wildcards with `*`) |
+| `methods` | array | No | HTTP methods to match (e.g., `["GET", "POST"]`) |
+| `upstream_id` | string | Yes* | Reference to existing upstream |
+| `upstream` | object | Yes* | Inline upstream definition |
+| `plugins` | object | No | Plugin configurations |
+| `host` | string | No | Match specific host header |
+| `hosts` | array | No | Match multiple hosts |
+| `priority` | integer | No | Route priority (higher = more priority) |
+
+*Either `upstream_id` or `upstream` must be provided.
+
+## serverless-post-function Plugin
+
+The `serverless-post-function` plugin allows executing custom Lua code **after** the request has been processed. This is useful for:
+
+- **Response manipulation** - Add/modify headers after upstream response
+- **Custom logging** - Log metrics or data after request completion
+- **Post-processing logic** - Execute cleanup or notification tasks
+
+### Available Phases
+
+| Phase | Description | Use Case |
+|-------|-------------|----------|
+| `rewrite` | During request rewriting | Modify request before proxy |
+| `access` | After access phase | Post-authentication logic |
+| `header_filter` | After receiving response headers | Modify response headers |
+| `body_filter` | After receiving response body | Modify response body |
+| `log` | At the end of request processing | Logging, metrics, cleanup |
+
+### Plugin Configuration
+
+```json
+{
+  "serverless-post-function": {
+    "phase": "log",
+    "functions": [
+      "return function(conf, ctx) ngx.log(ngx.INFO, 'Request completed for: ' .. ngx.var.uri) end"
+    ]
+  }
+}
+```
+
+### Configuration Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `phase` | string | No | Execution phase (default: `access`) |
+| `functions` | array | Yes | Array of Lua function strings |
+
+### Example: Add Custom Response Header
+
+```json
+{
+  "plugins": {
+    "serverless-post-function": {
+      "phase": "header_filter",
+      "functions": [
+        "return function(conf, ctx) ngx.header['X-Processed-By'] = 'civitas-gateway' end"
+      ]
+    }
+  }
+}
+```
+
+### Example: Custom Logging
+
+```json
+{
+  "plugins": {
+    "serverless-post-function": {
+      "phase": "log",
+      "functions": [
+        "return function(conf, ctx) ngx.log(ngx.INFO, 'Method: ' .. ngx.var.request_method .. ', URI: ' .. ngx.var.uri .. ', Status: ' .. ngx.var.status) end"
+      ]
+    }
+  }
+}
+```
+
+### Example: Multiple Functions
+
+```json
+{
+  "plugins": {
+    "serverless-post-function": {
+      "phase": "log",
+      "functions": [
+        "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 1: Request logged') end",
+        "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 2: Metrics sent') end"
+      ]
+    }
+  }
+}
+```
+
+### Combined with Other Plugins
+
+The `serverless-post-function` plugin can be combined with other plugins:
+
+```json
+{
+  "plugins": {
+    "prometheus": {},
+    "response-rewrite": {
+      "headers": {
+        "set": {
+          "X-Upstream-Response-Time": "$upstream_response_time"
+        }
+      }
+    },
+    "serverless-post-function": {
+      "phase": "log",
+      "functions": [
+        "return function(conf, ctx) ngx.log(ngx.INFO, 'Request processed: ' .. ngx.var.uri) end"
+      ]
+    }
+  }
+}
+```
+
+### Lua Function Syntax
+
+Lua functions must follow this format:
+```lua
+return function(conf, ctx)
+    -- Your code here
+    -- conf: plugin configuration
+    -- ctx: request context
+end
+```
+
+**Available ngx variables:**
+- `ngx.var.uri` - Request URI
+- `ngx.var.request_method` - HTTP method
+- `ngx.var.status` - Response status code
+- `ngx.var.remote_addr` - Client IP
+- `ngx.header['Header-Name']` - Response headers (in header_filter phase)
+
+**Important Notes:**
+- APISIX validates Lua syntax - invalid code returns HTTP 400
+- Functions execute in order when multiple are provided
+- Use `ngx.log(ngx.INFO, ...)` for logging (visible in APISIX error.log)
+
+## Future Enhancements
+
 ### SSL/TLS Certificates (Planned)
 
 Manage SSL certificates and SNI configuration.
 
-### Plugin Configuration (Planned)
+### Services API (Planned)
 
-Configure APISIX plugins via CloudEvents.
+Support for APISIX services for shared route configurations.
 
 ## Performance Considerations
 
@@ -513,9 +711,9 @@ JAX-RS Client automatically manages connection pooling:
 
 ```java
 Client client = ClientBuilder.newBuilder()
-    .connectTimeout(10, TimeUnit.SECONDS)
-    .readTimeout(30, TimeUnit.SECONDS)
-    .build();
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build();
 ```
 
 ### Timeouts
