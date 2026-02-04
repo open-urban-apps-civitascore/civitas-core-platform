@@ -61,6 +61,8 @@ build-portal-model:
   stage: build-package
   needs:
     - job: setup-version
+    - job: lint-portal-model
+    - job: dependency-prune-portal-model
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
