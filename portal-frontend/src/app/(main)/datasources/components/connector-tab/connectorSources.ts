@@ -1,6 +1,6 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
-export const NODE_DEFS = {
+export const CONNECTORS = {
   [CONNECTOR_TYPES.MQTT]: {
     icon: 'radio',
     type: 'input',

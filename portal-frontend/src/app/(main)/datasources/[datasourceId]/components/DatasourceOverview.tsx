@@ -24,7 +24,7 @@ import {
 } from '@/types/datasources'
 import { getConnectorFormData, getInitialConnectorFormData, mapConnectorConfigToApiData } from '@/utils/connectors'
 
-import { NODE_DEFS } from '../../components/connector-tab/connector_sources'
+import { CONNECTORS } from '../../components/connector-tab/connectorSources'
 import { ConnectorTab } from '../../components/connector-tab/ConnectorTab'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ExitWarningModal } from './ExitWarningModal'
@@ -72,7 +72,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const connectorTypeWatch = form.watch('connector.type') as ConnectorType
   const connectorConfig = useMemo(
-    () => (connectorTypeWatch ? (NODE_DEFS[connectorTypeWatch].properties as ConnectorField[]) : []),
+    () => (connectorTypeWatch ? (CONNECTORS[connectorTypeWatch].properties as ConnectorField[]) : []),
     [connectorTypeWatch],
   )
 

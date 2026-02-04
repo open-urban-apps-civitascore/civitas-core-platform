@@ -1,6 +1,6 @@
 import z from 'zod'
 
-import type { NODE_DEFS } from '@/app/(main)/datasources/components/connector-tab/connector_sources'
+import type { CONNECTORS } from '@/app/(main)/datasources/components/connector-tab/connectorSources'
 import { CONNECTION_TYPES, CONNECTOR_TYPES, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 
 import { ConnectorApiSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
@@ -62,7 +62,7 @@ export type DatasourceBaseFormData = z.infer<typeof DatasourceBaseFormSchema>
 export type CreateDatasourceData = Omit<Datasource, 'id'>
 export type UpdateDatasourceData = Partial<CreateDatasourceData> & { id: number }
 
-export type ConnectorNodeDefs = typeof NODE_DEFS
+export type ConnectorNodeDefs = typeof CONNECTORS
 export type ConnectorDefaultsByType = {
   [K in keyof ConnectorNodeDefs]: {
     [P in ConnectorNodeDefs[K]['properties'][number] as P['key']]: P['defaultValue']

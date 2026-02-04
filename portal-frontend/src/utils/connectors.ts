@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { NODE_DEFS } from '@/app/(main)/datasources/components/connector-tab/connector_sources'
+import { CONNECTORS } from '@/app/(main)/datasources/components/connector-tab/connectorSources'
 import { CONNECTOR_TYPES } from '@/const/connectors'
 import {
   ConnectorApiConfig,
@@ -13,7 +13,7 @@ import {
 } from '@/types/connectors'
 
 export const getConnectorDefaults = <T extends ConnectorType>(type: T): ConnectorApiConfig[T] => {
-  return NODE_DEFS[type].properties.reduce(
+  return CONNECTORS[type].properties.reduce(
     (acc, property) => {
       acc[property.key as keyof ConnectorApiConfig[T]] =
         property.defaultValue as ConnectorApiConfig[T][keyof ConnectorApiConfig[T]]

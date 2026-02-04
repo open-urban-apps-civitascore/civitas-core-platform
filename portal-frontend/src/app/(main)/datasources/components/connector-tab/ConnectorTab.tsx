@@ -9,7 +9,7 @@ import { SelectOption } from '@/types/common'
 import { ConnectorType } from '@/types/connectors'
 import { ConnectorField, DatasourceFormDraft } from '@/types/datasources'
 
-import { NODE_DEFS } from './connector_sources'
+import { CONNECTORS } from './connectorSources'
 import { DynamicFormField } from './DynamicFormField'
 
 interface ConnectorTabProps {
@@ -21,7 +21,7 @@ interface ConnectorTabProps {
 export const ConnectorTab = (props: ConnectorTabProps) => {
   const { form, config, isDraftMode } = props
   const t = useTranslations('datasources.connectorTab')
-  const connectorTypeOptions: SelectOption[] = Object.entries(NODE_DEFS).map(([type, def]) => ({
+  const connectorTypeOptions: SelectOption[] = Object.entries(CONNECTORS).map(([type, def]) => ({
     value: type as ConnectorType,
     label: def.label,
   }))
