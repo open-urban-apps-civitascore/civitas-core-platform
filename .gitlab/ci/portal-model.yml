@@ -14,6 +14,47 @@
         - .gitlab-ci.yml
         - .gitlab/ci/portal-model.yml
 
+lint-portal-model:
+  extends: .only-portal-model-changes
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: lint
+  needs:
+    - job: setup-version
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: portal-model-maven
+      files:
+        - portal-model/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd portal-model
+    - mvn spotless:check -Drevision=$REVISION
+
+dependency-prune-portal-model:
+  extends: .only-portal-model-changes
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: lint
+  needs:
+    - job: setup-version
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: portal-model-maven
+      files:
+        - portal-model/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd portal-model
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Drevision=$REVISION -DfailOnWarning=true -DignoreNonCompile=false
+  allow_failure:
+    exit_codes:
+      - 1
+
 build-portal-model:
   extends: .only-portal-model-changes
   image: maven:3.9-eclipse-temurin-21-alpine
