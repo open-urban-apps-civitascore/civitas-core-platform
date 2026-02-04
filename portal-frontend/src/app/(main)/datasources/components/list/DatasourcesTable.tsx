@@ -8,10 +8,9 @@ import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/Badges
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Badge } from '@/components/ui/badge'
-import { CONNECTION_TYPES, CONNECTOR_TYPE_KEYS, DATASOURCE_STATUS_TYPES } from '@/const/datasources'
+import { CONNECTION_TYPES, CONNECTOR_TYPE_KEYS, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
 import { cn } from '@/lib/utils'
-import { ConnectorType } from '@/types/connectors'
 import { Datasource } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
@@ -71,7 +70,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     columnHelper.accessor('connector', {
       header: t('tableHeaders.connector'),
       cell: info => {
-        const connectorType = info.getValue().type as ConnectorType
+        const connectorType = info.getValue()?.type
         return connectorType ? CONNECTOR_TYPE_KEYS[connectorType] : '-'
       },
       meta: {

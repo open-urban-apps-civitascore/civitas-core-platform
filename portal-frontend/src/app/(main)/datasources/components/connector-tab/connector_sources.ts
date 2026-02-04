@@ -1,4 +1,4 @@
-import { CONNECTOR_TYPES } from '@/const/datasources'
+import { CONNECTOR_TYPES } from '@/const/connectors'
 
 export const NODE_DEFS = {
   [CONNECTOR_TYPES.MQTT]: {

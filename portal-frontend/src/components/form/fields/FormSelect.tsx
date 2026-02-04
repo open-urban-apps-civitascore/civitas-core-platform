@@ -1,6 +1,7 @@
 import { SelectTriggerProps } from '@radix-ui/react-select'
 import { Check } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { DetailedHTMLProps, HTMLAttributes } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
 import { FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -18,11 +19,11 @@ export interface AccessibleSelectProps<T extends FieldValues> {
   name: Path<T>
   // eslint-disable-next-line react/boolean-prop-naming
   required?: boolean
-  className?: string
   // eslint-disable-next-line react/boolean-prop-naming
   disabled?: boolean
   selectTriggerProps?: SelectTriggerProps
   onChange?: (value: string) => void
+  formItemProps?: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>
 }
 
 export const FormSelect = <T extends FieldValues>(props: AccessibleSelectProps<T>) => {
@@ -34,10 +35,10 @@ export const FormSelect = <T extends FieldValues>(props: AccessibleSelectProps<T
     form,
     name,
     required = false,
-    className,
     disabled = false,
     selectTriggerProps,
     onChange,
+    formItemProps,
   } = props
 
   const t = useTranslations('common')
@@ -51,7 +52,10 @@ export const FormSelect = <T extends FieldValues>(props: AccessibleSelectProps<T
       render={({ field }) => {
         return (
           <FormItem
-            className={cn(isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]', className)}
+            className={cn(
+              isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]',
+              formItemProps?.className,
+            )}
           >
             <FormLabel htmlFor={id} className="text-sm font-medium text-gray-700 dark:text-gray-200">
               {label}

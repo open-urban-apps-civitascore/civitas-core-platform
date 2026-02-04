@@ -7,14 +7,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm, useFormState, useWatch } from 'react-hook-form'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
-import { ContentCard } from '@/components/content-card/ContentCard'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
-import { DATASOURCE_STATUS_TYPES } from '@/const/datasources'
-import { cn } from '@/lib/utils'
+import { DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 import { ConnectorType } from '@/types/connectors'
 import {
   ConnectorField,
@@ -82,7 +80,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     if (!connectorTypeWatch) return
 
     form.setValue('connector', getConnectorFormData(connectorTypeWatch, defaultValues.connector), { shouldDirty: true })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch, form])
 
   const statusWatch = form.watch('status')
@@ -257,17 +255,15 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         </div>
       </div>
       <PageBackground className="overflow-y-auto">
-        <ContentCard className={cn('h-full overflow-auto')}>
-          <Form {...form}>
-            <form
-              data-testid="datasourceEditForm"
-              aria-label={`${tCommon('form')} ${t('edit.basicInfo.title')}`}
-              onSubmit={e => e.preventDefault()}
-            >
-              {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
-            </form>
-          </Form>
-        </ContentCard>
+        <Form {...form}>
+          <form
+            data-testid="datasourceEditForm"
+            aria-label={`${tCommon('form')} ${t('edit.basicInfo.title')}`}
+            onSubmit={e => e.preventDefault()}
+          >
+            {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
+          </form>
+        </Form>
       </PageBackground>
 
       <ExitWarningModal

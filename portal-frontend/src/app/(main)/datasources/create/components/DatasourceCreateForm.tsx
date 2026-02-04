@@ -15,7 +15,7 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
-import { DATASOURCE_STATUS_TYPES } from '@/const/datasources'
+import { DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 import { cn } from '@/lib/utils'
 import { DatasourceCreateFormData, DatasourceCreateFormSchema } from '@/types/datasources'
 

@@ -1,4 +1,5 @@
-import { CONNECTOR_DEFAULTS, CONNECTOR_TYPES } from '@/const/datasources'
+/* eslint-disable @typescript-eslint/naming-convention */
+import { CONNECTOR_DEFAULTS, CONNECTOR_TYPES } from '@/const/connectors'
 import {
   ConnectorApiData,
   ConnectorDraft,
@@ -18,15 +19,17 @@ export const getConnectorDefaults = <T extends ConnectorType>(
 export const mapMqttApiDataToForm = (config: MqttApiConfig): MqttLooseConfig => {
   return {
     ...config,
-    urls: config.urls.join(','),
-    topics: config.topics.join(','),
+    urls: config.urls.join(',') || '',
+    topics: config.topics.join(',') || '',
   }
 }
 
 export const mapSqlApiDataToForm = (config: SqlApiConfig): SqlLooseConfig => {
   return {
     ...config,
-    columns: config.columns.join(','),
+    columns: config.columns.join(',') || '',
+    args_mapping: config.args_mapping.join(',') || '',
+    init_files: config.init_files.join(',') || '',
   }
 }
 export const mapMqttFormToApiData = (config: MqttLooseConfig): MqttApiConfig => {
@@ -41,6 +44,8 @@ export const mapSqlFormToApiData = (config: SqlLooseConfig): SqlApiConfig => {
   return {
     ...config,
     columns: config.columns?.split(',') || [],
+    args_mapping: config.args_mapping?.split(',') || [],
+    init_files: config.init_files?.split(',') || [],
   }
 }
 
