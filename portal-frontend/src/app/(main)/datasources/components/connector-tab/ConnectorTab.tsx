@@ -5,19 +5,19 @@ import { FormSelect } from '@/components/form/fields/FormSelect'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { SelectOption } from '@/types/common'
 import { ConnectorType } from '@/types/connectors'
-import { ConnectorFieldOptions, DatasourceFormInput } from '@/types/datasources'
+import { ConnectorField, DatasourceFormDraft } from '@/types/datasources'
 
 import { NODE_DEFS } from './connector_sources'
-import { DynamiCformField } from './DynamicFormField'
+import { DynamicFormField } from './DynamicFormField'
 
 interface ConnectorTabProps {
-  form: UseFormReturn<DatasourceFormInput>
+  form: UseFormReturn<DatasourceFormDraft>
   isDraftMode: boolean
   connectorType: ConnectorType | undefined
-  config: ConnectorFieldOptions[]
+  config: ConnectorField[]
 }
 export const ConnectorTab = (props: ConnectorTabProps) => {
-  const { form, config } = props
+  const { form, config, isDraftMode } = props
   const t = useTranslations('datasources.connectorTab')
   const connectorTypeOptions: SelectOption[] = Object.entries(NODE_DEFS).map(([type, def]) => ({
     value: type as ConnectorType,
@@ -37,14 +37,15 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
 
       <SubHeader title={t('title2')} />
       {config.map(property => (
-        <DynamiCformField
+        <DynamicFormField<DatasourceFormDraft>
           key={property.key}
           form={form}
           label={property.label}
-          name={`connector.config.${property.key}` as Path<DatasourceFormInput>}
+          name={`connector.config.${property.key}` as Path<DatasourceFormDraft>}
           placeholder={property.placeholder}
           type={property.type}
           options={property.options?.map(option => ({ value: option, label: option }))}
+          shouldShowErrors={!isDraftMode}
         />
       ))}
     </div>

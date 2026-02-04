@@ -17,6 +17,7 @@ interface FormTextAreaProps<T extends FieldValues> extends InputPropsWithoutForm
   maxLength?: number
   hasCharacterCount?: boolean
   className?: string
+  shouldShowErrors?: boolean
 }
 
 export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>) => {
@@ -32,6 +33,7 @@ export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>)
     maxLength,
     hasCharacterCount,
     className,
+    shouldShowErrors = true,
   } = props
   const isMobile = useIsMobile()
 
@@ -72,7 +74,7 @@ export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>)
               />
             </FormControl>
             <div className="flex justify-between mt-1">
-              <FormMessage />
+              {shouldShowErrors && <FormMessage />}
               {hasCharacterCount && maxLength && (
                 <span className="text-sm text-muted-foreground ml-auto">
                   {characterCount}/{maxLength}

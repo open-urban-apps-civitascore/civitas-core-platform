@@ -6,7 +6,7 @@ import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { InputPropsWithoutForm, SelectOption } from '@/types/common'
 
-export interface TypeComponentMappingProps<T extends FieldValues> extends InputPropsWithoutForm {
+export interface DynamicFormFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
   id?: string
   type: 'textArea' | 'input' | 'select' | 'checkbox'
   form: UseFormReturn<T>
@@ -14,12 +14,22 @@ export interface TypeComponentMappingProps<T extends FieldValues> extends InputP
   name: Path<T>
   placeholder: string
   options?: SelectOption[]
+  shouldShowErrors: boolean
 }
-export const DynamiCformField = <T extends FieldValues>(props: TypeComponentMappingProps<T>) => {
-  const { id = '', type, form, label, name, placeholder, required = false, options = [] } = props
+export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldProps<T>) => {
+  const { id = '', type, form, label, name, placeholder, required = false, options = [], shouldShowErrors } = props
   switch (type) {
     case 'textArea':
-      return <FormTextArea form={form} name={name} placeholder={placeholder} label={label} required={required} />
+      return (
+        <FormTextArea
+          form={form}
+          name={name}
+          placeholder={placeholder}
+          label={label}
+          required={required}
+          shouldShowErrors={shouldShowErrors}
+        />
+      )
     case 'checkbox':
       return <FormCheckbox form={form} name={name} label={label} required={required} />
     case 'select':
@@ -36,6 +46,15 @@ export const DynamiCformField = <T extends FieldValues>(props: TypeComponentMapp
       )
     case 'input':
     default:
-      return <TextField form={form} name={name} placeholder={placeholder} label={label} required={required} />
+      return (
+        <TextField
+          form={form}
+          name={name}
+          placeholder={placeholder}
+          label={label}
+          required={required}
+          shouldShowErrors={shouldShowErrors}
+        />
+      )
   }
 }

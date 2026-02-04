@@ -10,12 +10,12 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { FormItem, FormLabel } from '@/components/ui/form'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-import { DatasourceFormInput } from '@/types/datasources'
+import { DatasourceFormDraft } from '@/types/datasources'
 
 import { TagsMultiSelect } from './TagsMultiSelect'
 
 interface BasicInfoTabProps {
-  form: UseFormReturn<DatasourceFormInput>
+  form: UseFormReturn<DatasourceFormDraft>
   isReadOnly?: boolean
   isDraftMode?: boolean
 }

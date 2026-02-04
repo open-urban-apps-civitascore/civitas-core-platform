@@ -3,7 +3,7 @@ import z from 'zod'
 import type { NODE_DEFS } from '@/app/(main)/datasources/components/connector-tab/connector_sources'
 import { CONNECTION_TYPES, CONNECTOR_TYPES, DATASOURCE_STATUS_TYPES } from '@/const/datasources'
 
-import { ConnectorSchema, MqttSchema, SqlSchema } from './connectors'
+import { ConnectorApiSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
 
 export type ConnectionType = (typeof CONNECTION_TYPES)[keyof typeof CONNECTION_TYPES]
 
@@ -18,7 +18,7 @@ export const DatasourceStatusSchema = enumFromConst(DATASOURCE_STATUS_TYPES)
 
 export type FormFieldType = 'input' | 'textArea' | 'select' | 'checkbox'
 
-export type ConnectorFieldOptions = {
+export type ConnectorField = {
   key: string
   type: FormFieldType
   label: string
@@ -39,7 +39,7 @@ export const DatasourceSchema = z.object({
   lastActive: z.string(),
   tags: z.array(z.string()).default([]),
   status: DatasourceStatusSchema,
-  connector: z.object({ type: ConnectorTypeSchema.optional(), config: z.record(z.string(), z.unknown()).nullable() }),
+  connector: ConnectorApiSchema.nullable(),
 })
 
 export type Datasource = z.infer<typeof DatasourceSchema>
@@ -69,50 +69,59 @@ export type ConnectorDefaultsByType = {
   }
 }
 
-// export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorSchema.optional() })
-export const DatasourceFormSchema = DatasourceBaseFormSchema.extend({
-  connector: ConnectorSchema.optional(),
-}).superRefine((data, ctx) => {
-  console.log('DATA', data)
-  if (data.status !== DATASOURCE_STATUS_TYPES.AVAILABLE) return
+export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorLooseSchema.nullable() })
+export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorStrictSchema })
+export const DatasourceApiDataSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorApiSchema.optional() })
 
-  if (!data.description) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['description'],
-      message: 'required',
-    })
-  }
+export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>
+export type DatasourceFormAvailable = z.output<typeof DatasourceFormAvailableSchema>
+export type DatasourceApiData = z.output<typeof DatasourceApiDataSchema>
 
-  if (!data.connector) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['connector'],
-      message: 'required',
-    })
-    return
-  }
+// export const DatasourceFormSchema = DatasourceBaseFormSchema.extend({
+//   connector: ConnectorSchema.optional(),
+// }).superRefine((data, ctx) => {
+//   console.log('DATA', data)
+//   if (data.status !== DATASOURCE_STATUS_TYPES.AVAILABLE) return
 
-  if (data.connector.type === CONNECTOR_TYPES.MQTT) {
-    const parsed = MqttSchema.safeParse(data.connector.config)
-    if (!parsed.data?.urls?.length) {
-      ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'urls'], message: 'required' })
-    }
-    if (!parsed.data?.topics?.length) {
-      ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'topics'], message: 'required' })
-    }
-  }
+//   if (!data.description) {
+//     ctx.addIssue({
+//       code: 'custom',
+//       path: ['description'],
+//       message: 'required',
+//     })
+//   }
 
-  if (data.connector.type === CONNECTOR_TYPES.SQL) {
-    const parsed = SqlSchema.safeParse(data.connector.config)
-    if (!parsed.data?.dsn) {
-      ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'dsn'], message: 'required' })
-    }
-    if (!parsed.data?.table) {
-      ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'table'], message: 'required' })
-    }
-  }
-})
+//   if (!data.connector) {
+//     ctx.addIssue({
+//       code: 'custom',
+//       path: ['connector'],
+//       message: 'required',
+//     })
+//     return
+//   }
 
-export type DatasourceFormInput = z.input<typeof DatasourceFormSchema>
-export type DatasourceFormData = z.output<typeof DatasourceFormSchema>
+//   if (data.connector.type === CONNECTOR_TYPES.MQTT) {
+//     const parsed = MqttSchema.safeParse(data.connector.config)
+//     const urls = parseStringArray(data.connector.config?.urls) ?? []
+//     const topics = parseStringArray(data.connector.config?.topics) ?? []
+//     // console.log('PARSED', parsed.data)
+//     // console.log('URLS TOPICS',   urls, topics)
+//     if (!urls.length) {
+//       ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'urls'], message: 'required' })
+//     }
+//     if (!topics.length) {
+//       ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'topics'], message: 'required' })
+//     }
+//   }
+
+//   if (data.connector.type === CONNECTOR_TYPES.SQL) {
+//     const parsed = SqlSchema.safeParse(data.connector.config)
+//     if (!parsed.data?.dsn || parsed.data.dsn.trim().length < 1) {
+//       ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'dsn'], message: 'required' })
+//     }
+//     if (!parsed.data?.table || parsed.data.table.trim().length < 1) {
+//       console.trace('ERROR')
+//       ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'table'], message: 'required' })
+//     }
+//   }
+// })

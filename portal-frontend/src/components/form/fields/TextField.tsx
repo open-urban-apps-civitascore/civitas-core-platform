@@ -15,10 +15,11 @@ interface TextFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
   // eslint-disable-next-line react/boolean-prop-naming
   required?: boolean
   formItemProps?: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>
+  shouldShowErrors?: boolean
 }
 
 export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
-  const { form, name, placeholder, label, required = false, formItemProps, disabled } = props
+  const { form, name, placeholder, label, required = false, formItemProps, disabled, shouldShowErrors = true } = props
   const isMobile = useIsMobile()
   return (
     <FormField
@@ -46,7 +47,7 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
                 disabled={disabled}
               />
             </FormControl>
-            <FormMessage data-testid={`${name}FormMessage`} className="mt-2" />
+            {shouldShowErrors && <FormMessage data-testid={`${name}FormMessage`} className="mt-2" />}
           </div>
         </FormItem>
       )}

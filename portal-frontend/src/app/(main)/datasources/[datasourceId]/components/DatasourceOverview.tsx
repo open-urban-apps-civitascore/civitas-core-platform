@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm, useFormState, useWatch } from 'react-hook-form'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
@@ -13,16 +13,18 @@ import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
-import { CONNECTOR_TYPES, DATASOURCE_STATUS_TYPES } from '@/const/datasources'
+import { DATASOURCE_STATUS_TYPES } from '@/const/datasources'
 import { cn } from '@/lib/utils'
-import { ConnectorType, getConnectorDefaults } from '@/types/connectors'
+import { ConnectorType } from '@/types/connectors'
 import {
-  ConnectorFieldOptions,
+  ConnectorField,
   Datasource,
-  DatasourceFormInput,
-  DatasourceFormSchema,
+  DatasourceFormAvailableSchema,
+  DatasourceFormDraft,
+  DatasourceFormDraftSchema,
   DatasourceStatusType,
 } from '@/types/datasources'
+import { getConnectorFormData, getInitialConnectorFormData, mapConnectorConfigToApiData } from '@/utils/connectors'
 
 import { NODE_DEFS } from '../../components/connector-tab/connector_sources'
 import { ConnectorTab } from '../../components/connector-tab/ConnectorTab'
@@ -40,24 +42,13 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
 
-  const getConnector = (type: ConnectorType | undefined) =>
-    type === 'sql'
-      ? ({
-          type: 'sql',
-          config: getConnectorDefaults(CONNECTOR_TYPES.SQL),
-        } as const)
-      : ({
-          type: 'mqtt',
-          config: getConnectorDefaults(CONNECTOR_TYPES.MQTT),
-        } as const)
-
-  const defaultValues: DatasourceFormInput = {
+  const defaultValues: DatasourceFormDraft = {
     id: datasource.id,
     name: datasource.name ?? '',
     description: datasource.description ?? '',
     tags: datasource.tags ?? [],
     status: datasource.status ?? DATASOURCE_STATUS_TYPES.DRAFT,
-    connector: getConnector(datasource.connector?.type),
+    connector: datasource.connector?.type ? getInitialConnectorFormData(datasource.connector) : null,
   }
 
   const router = useRouter()
@@ -69,21 +60,29 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const updateDatasource = useUpdateDatasource()
   const isLoading = updateDatasource.isPending
 
-  const form = useForm<DatasourceFormInput>({
-    resolver: zodResolver(DatasourceFormSchema),
+  const form = useForm<DatasourceFormDraft>({
+    resolver: zodResolver(DatasourceFormDraftSchema),
     mode: 'onChange',
     defaultValues,
   })
+
+  const { errors: formErrors } = useFormState({ control: form.control })
+
+  useEffect(() => {
+    console.error('FORMERRORS: ', formErrors)
+  }, [formErrors])
+
   const connectorTypeWatch = form.watch('connector.type') as ConnectorType
   const connectorConfig = useMemo(
-    () => (connectorTypeWatch ? (NODE_DEFS[connectorTypeWatch].properties as ConnectorFieldOptions[]) : []),
+    () => (connectorTypeWatch ? (NODE_DEFS[connectorTypeWatch].properties as ConnectorField[]) : []),
     [connectorTypeWatch],
   )
 
   useEffect(() => {
     if (!connectorTypeWatch) return
 
-    form.setValue('connector', getConnector(connectorTypeWatch), { shouldDirty: true })
+    form.setValue('connector', getConnectorFormData(connectorTypeWatch, defaultValues.connector), { shouldDirty: true })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch, form])
 
   const statusWatch = form.watch('status')
@@ -104,14 +103,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     } else {
       form.trigger()
     }
-  }, [isDraftMode])
+  }, [isDraftMode, form])
 
   const formValues = useWatch({ control: form.control })
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
     const values = form.getValues()
-    return DatasourceFormSchema.safeParse(values).success
+    return DatasourceFormAvailableSchema.safeParse(values).success
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
 
@@ -139,11 +138,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
 
-  // const getTypedConfig = <T extends ConnectorType>(type: T, config: unknown): ConnectorConfigSchemaType[T] => {
-  //   return config as ConnectorConfigSchemaType[T]
-  // }
-
-  const buildApiPayload = (formData: DatasourceFormInput): Datasource => {
+  const buildApiPayload = (formData: DatasourceFormDraft): Datasource => {
     return {
       id: formData.id,
       name: formData.name,
@@ -152,14 +147,11 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       status: formData.status,
       lastActive: datasource.lastActive,
       connection: datasource.connection,
-      connector: {
-        type: formData.connector?.type,
-        config: formData.connector?.config || null,
-      },
+      connector: formData.connector ? mapConnectorConfigToApiData(formData.connector) : null,
     }
   }
 
-  const submitDatasource = (data: DatasourceFormInput) => {
+  const submitDatasource = (data: DatasourceFormDraft) => {
     if (isDraftMode) {
       // no validation block
       updateDatasource.mutate(buildApiPayload(data))
@@ -167,28 +159,12 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     }
 
     form.handleSubmit(values => {
-      const parsed = DatasourceFormSchema.parse(values)
-      updateDatasource.mutate(buildApiPayload(parsed))
+      const parsed = DatasourceFormAvailableSchema.safeParse(values)
+      if (parsed.success) {
+        updateDatasource.mutate(buildApiPayload(values))
+      }
     })()
   }
-
-  // const submitDatasource = (onSuccess: (data: DatasourceFormData) => void) => {
-  //   const submitHandler = (formInput: DatasourceFormInput) => {
-  //     const parsed = DatasourceFormSchema.parse(formInput)
-
-  //     updateDatasource.mutate(parsed, {
-  //       onSuccess: () => onSuccess(parsed),
-  //     })
-  //   }
-
-  //   if (isDraftMode) {
-  //     if (nameWatch.length > 0) {
-  //       submitHandler(form.getValues())
-  //     }
-  //   } else {
-  //     form.handleSubmit(submitHandler)()
-  //   }
-  // }
 
   const handleSave = () => {
     submitDatasource(form.getValues())
