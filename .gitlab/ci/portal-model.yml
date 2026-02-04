@@ -1,0 +1,107 @@
+# Hidden job that defines rules for portal-model changes
+# All portal-model jobs should extend this
+.only-portal-model-changes:
+  rules:
+    # Always run on tags
+    - if: $CI_COMMIT_TAG
+    # Always run on main and develop branch
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    # Run on MR only when portal-model files change
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - portal-model/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/portal-model.yml
+
+lint-portal-model:
+  extends: .only-portal-model-changes
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: lint
+  needs:
+    - job: setup-version
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: portal-model-maven
+      files:
+        - portal-model/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd portal-model
+    - mvn spotless:check -Drevision=$REVISION
+
+dependency-prune-portal-model:
+  extends: .only-portal-model-changes
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: lint
+  needs:
+    - job: setup-version
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: portal-model-maven
+      files:
+        - portal-model/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd portal-model
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Drevision=$REVISION -DfailOnWarning=true -DignoreNonCompile=false
+  allow_failure:
+    exit_codes:
+      - 1
+
+build-portal-model:
+  extends: .only-portal-model-changes
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: build-package
+  needs:
+    - job: setup-version
+    - job: lint-portal-model
+    - job: dependency-prune-portal-model
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: portal-model-maven
+      files:
+        - portal-model/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd portal-model
+    - mvn package -DskipTests -Drevision=$REVISION
+  artifacts:
+    when: on_success
+    paths:
+      - portal-model/target/*.jar
+    expire_in: 1 month
+
+publish-portal-model:
+  extends: .only-portal-model-changes
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: deploy-package
+  needs:
+    - job: setup-version
+    - job: build-portal-model
+      optional: true
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: portal-model-maven
+      files:
+        - portal-model/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd portal-model
+    # Deploy to GitLab Maven repository
+    - |
+      mvn deploy -DskipTests -Drevision=$REVISION \
+        -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
+        -s ci_settings.xml
