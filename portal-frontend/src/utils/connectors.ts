@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { CONNECTOR_DEFAULTS, CONNECTOR_TYPES } from '@/const/connectors'
+import { NODE_DEFS } from '@/app/(main)/datasources/components/connector-tab/connector_sources'
+import { CONNECTOR_TYPES } from '@/const/connectors'
 import {
+  ConnectorApiConfig,
   ConnectorApiData,
   ConnectorDraft,
   ConnectorType,
@@ -10,10 +12,15 @@ import {
   SqlLooseConfig,
 } from '@/types/connectors'
 
-export const getConnectorDefaults = <T extends ConnectorType>(
-  type: T,
-): T extends 'mqtt' ? MqttLooseConfig : SqlLooseConfig => {
-  return CONNECTOR_DEFAULTS[type] as never
+export const getConnectorDefaults = <T extends ConnectorType>(type: T): ConnectorApiConfig[T] => {
+  return NODE_DEFS[type].properties.reduce(
+    (acc, property) => {
+      acc[property.key as keyof ConnectorApiConfig[T]] =
+        property.defaultValue as ConnectorApiConfig[T][keyof ConnectorApiConfig[T]]
+      return acc
+    },
+    {} as ConnectorApiConfig[T],
+  )
 }
 
 export const mapMqttApiDataToForm = (config: MqttApiConfig): MqttLooseConfig => {
@@ -28,7 +35,6 @@ export const mapSqlApiDataToForm = (config: SqlApiConfig): SqlLooseConfig => {
   return {
     ...config,
     columns: config.columns.join(',') || '',
-    args_mapping: config.args_mapping.join(',') || '',
     init_files: config.init_files.join(',') || '',
   }
 }
@@ -44,7 +50,6 @@ export const mapSqlFormToApiData = (config: SqlLooseConfig): SqlApiConfig => {
   return {
     ...config,
     columns: config.columns?.split(',') || [],
-    args_mapping: config.args_mapping?.split(',') || [],
     init_files: config.init_files?.split(',') || [],
   }
 }
@@ -53,12 +58,12 @@ export const getInitialConnectorFormData = (connector: ConnectorApiData | null) 
   if (connector?.type === 'sql') {
     return {
       type: connector?.type,
-      config: connector?.config ? mapSqlApiDataToForm(connector?.config) : getConnectorDefaults(CONNECTOR_TYPES.SQL),
+      config: mapSqlApiDataToForm(connector?.config || getConnectorDefaults(CONNECTOR_TYPES.SQL)),
     } as const
   }
   return {
     type: connector?.type || 'mqtt',
-    config: connector?.config ? mapMqttApiDataToForm(connector?.config) : getConnectorDefaults(CONNECTOR_TYPES.MQTT),
+    config: mapMqttApiDataToForm(connector?.config || getConnectorDefaults(CONNECTOR_TYPES.MQTT)),
   } as const
 }
 
@@ -67,13 +72,18 @@ export const getConnectorFormData = (type: ConnectorType, connectorFormData: Con
     case CONNECTOR_TYPES.SQL:
       return {
         type: type,
-        config: connectorFormData?.type === type ? connectorFormData.config : getConnectorDefaults(CONNECTOR_TYPES.SQL),
+        config:
+          connectorFormData?.type === type
+            ? connectorFormData.config
+            : mapSqlApiDataToForm(getConnectorDefaults(CONNECTOR_TYPES.SQL)),
       }
     case CONNECTOR_TYPES.MQTT:
       return {
         type: type,
         config:
-          connectorFormData?.type === type ? connectorFormData.config : getConnectorDefaults(CONNECTOR_TYPES.MQTT),
+          connectorFormData?.type === type
+            ? connectorFormData.config
+            : mapMqttApiDataToForm(getConnectorDefaults(CONNECTOR_TYPES.MQTT)),
       }
   }
 }

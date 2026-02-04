@@ -18,11 +18,10 @@ import { TagsMultiSelect } from './TagsMultiSelect'
 interface BasicInfoTabProps {
   form: UseFormReturn<DatasourceFormDraft>
   isReadOnly?: boolean
-  isDraftMode?: boolean
 }
 
 export const BasicInfoTab = (props: BasicInfoTabProps) => {
-  const { form, isReadOnly = false, isDraftMode = false } = props
+  const { form, isReadOnly = false } = props
   const t = useTranslations('datasources')
   const isMobile = useIsMobile()
 

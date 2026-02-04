@@ -192,7 +192,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const renderTabContent = () => {
     switch (selectedTab) {
       case 'basicInfo':
-        return <BasicInfoTab form={form} isDraftMode={isDraftMode} />
+        return <BasicInfoTab form={form} />
       case 'connector':
         return (
           <ConnectorTab

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention */
 import { ConnectorType, ConnectorTypeKey } from '@/types/connectors'
 
 export const CONNECTION_TYPES = {
@@ -20,31 +19,3 @@ export const CONNECTOR_TYPES = {
 export const CONNECTOR_TYPE_KEYS: Record<ConnectorType, ConnectorTypeKey> = Object.fromEntries(
   Object.entries(CONNECTOR_TYPES).map(([k, v]) => [v, k]),
 ) as Record<ConnectorType, ConnectorTypeKey>
-
-export const CONNECTOR_DEFAULTS = {
-  mqtt: {
-    urls: '',
-    topics: '',
-    client_id: '',
-    qos: '1',
-    connect_timeout: '',
-    keepalive: '',
-    tls: false,
-  },
-  sql: {
-    driver: 'postgres',
-    dsn: '',
-    table: '',
-    columns: '*',
-    where: '',
-    args_mapping: '',
-    prefix: '',
-    suffix: '',
-    init_files: '',
-    init_statement: '',
-    conn_max_idle_time: '',
-    conn_max_life_time: '',
-    conn_max_idle: 2,
-    conn_max_open: 0,
-  },
-}

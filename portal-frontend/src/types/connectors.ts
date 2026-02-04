@@ -14,7 +14,6 @@ export const parseStringArray = (v: unknown): string[] | undefined => {
       .split(',')
       .map(s => s.trim())
       .filter(Boolean)
-    console.log('parseStringArray', value)
     return value
   }
   return undefined
@@ -66,12 +65,10 @@ export const SqlStrictSchema = SqlBaseSchema.extend({
   dsn: z.string().min(1, 'required'),
   table: z.string().min(1, 'required'),
   columns: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'required')),
-  args_mapping: z.preprocess(parseStringArray, z.array(z.string())),
   init_files: z.preprocess(parseStringArray, z.array(z.string())),
 })
 export const SqlApiSchema = SqlBaseSchema.extend({
   columns: z.preprocess(parseStringArray, z.array(z.string())),
-  args_mapping: z.preprocess(parseStringArray, z.array(z.string())),
   init_files: z.preprocess(parseStringArray, z.array(z.string())),
 })
 
@@ -115,9 +112,9 @@ export const ConnectorApiSchema = z.discriminatedUnion('type', [
   }),
 ])
 
-export type ConnectorConfig = {
-  mqtt: z.infer<typeof MqttBaseSchema>
-  sql: z.infer<typeof SqlBaseSchema>
+export type ConnectorApiConfig = {
+  mqtt: z.infer<typeof MqttApiSchema>
+  sql: z.infer<typeof SqlApiSchema>
 }
 
 export type ConnectorDraft = z.input<typeof ConnectorLooseSchema>
