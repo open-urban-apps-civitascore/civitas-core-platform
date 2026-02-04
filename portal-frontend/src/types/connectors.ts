@@ -36,8 +36,8 @@ export const MqttStrictSchema = MqttBaseSchema.extend({
   topics: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'required')),
 })
 export const MqttApiSchema = MqttBaseSchema.extend({
-  urls: z.preprocess(parseStringArray, z.array(z.string())),
-  topics: z.preprocess(parseStringArray, z.array(z.string())),
+  urls: z.array(z.string()),
+  topics: z.array(z.string()),
 })
 
 const SqlBaseSchema = z.object({
@@ -68,8 +68,8 @@ export const SqlStrictSchema = SqlBaseSchema.extend({
   init_files: z.preprocess(parseStringArray, z.array(z.string())),
 })
 export const SqlApiSchema = SqlBaseSchema.extend({
-  columns: z.preprocess(parseStringArray, z.array(z.string())),
-  init_files: z.preprocess(parseStringArray, z.array(z.string())),
+  columns: z.array(z.string()),
+  init_files: z.array(z.string()),
 })
 
 export type MqttLooseConfig = z.infer<typeof MqttLooseSchema>

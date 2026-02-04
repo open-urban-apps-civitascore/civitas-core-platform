@@ -44,7 +44,7 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
         />
       )
     case 'checkbox':
-      return <FormCheckbox form={form} name={name} label={label} required={required} className={className} />
+      return <FormCheckbox form={form} name={name} label={label} required={required} formItemProps={{ className }} />
     case 'select':
       return (
         <FormSelect

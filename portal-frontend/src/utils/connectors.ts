@@ -12,6 +12,8 @@ import {
   SqlLooseConfig,
 } from '@/types/connectors'
 
+const getArrayFromString = (value: string | undefined) => (!!value ? value?.split(',') : [])
+
 export const getConnectorDefaults = <T extends ConnectorType>(type: T): ConnectorApiConfig[T] => {
   return CONNECTORS[type].properties.reduce(
     (acc, property) => {
@@ -41,30 +43,33 @@ export const mapSqlApiDataToForm = (config: SqlApiConfig): SqlLooseConfig => {
 export const mapMqttFormToApiData = (config: MqttLooseConfig): MqttApiConfig => {
   return {
     ...config,
-    urls: config.urls?.split(',') || [],
-    topics: config.topics?.split(',') || [],
+    urls: getArrayFromString(config.urls),
+    topics: getArrayFromString(config.topics),
   }
 }
 
 export const mapSqlFormToApiData = (config: SqlLooseConfig): SqlApiConfig => {
   return {
     ...config,
-    columns: config.columns?.split(',') || [],
-    init_files: config.init_files?.split(',') || [],
+    columns: getArrayFromString(config.columns),
+    init_files: getArrayFromString(config.init_files),
   }
 }
 
 export const getInitialConnectorFormData = (connector: ConnectorApiData | null) => {
-  if (connector?.type === 'sql') {
-    return {
-      type: connector?.type,
-      config: mapSqlApiDataToForm(connector?.config || getConnectorDefaults(CONNECTOR_TYPES.SQL)),
-    } as const
+  switch (connector?.type) {
+    case CONNECTOR_TYPES.SQL:
+      return {
+        type: connector?.type,
+        config: mapSqlApiDataToForm(connector?.config || getConnectorDefaults(CONNECTOR_TYPES.SQL)),
+      }
+    case CONNECTOR_TYPES.MQTT:
+    default:
+      return {
+        type: connector?.type || 'mqtt',
+        config: mapMqttApiDataToForm(connector?.config || getConnectorDefaults(CONNECTOR_TYPES.MQTT)),
+      }
   }
-  return {
-    type: connector?.type || 'mqtt',
-    config: mapMqttApiDataToForm(connector?.config || getConnectorDefaults(CONNECTOR_TYPES.MQTT)),
-  } as const
 }
 
 export const getConnectorFormData = (type: ConnectorType, connectorFormData: ConnectorDraft | null) => {

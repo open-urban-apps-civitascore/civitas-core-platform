@@ -43,7 +43,7 @@ export const DatasourceCreateForm = () => {
         description: '',
         tags: [],
         status: DATASOURCE_STATUS_TYPES.DRAFT,
-        connector: { type: undefined, config: null },
+        connector: null,
         connection: 'inactive',
         lastActive: new Date().toISOString(),
       },

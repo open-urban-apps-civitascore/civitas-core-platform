@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm, useFormState, useWatch } from 'react-hook-form'
+import { toast } from 'sonner'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
@@ -13,7 +14,7 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { DATASOURCE_STATUS_TYPES } from '@/const/connectors'
-import { ConnectorType } from '@/types/connectors'
+import { ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
   ConnectorField,
   Datasource,
@@ -24,13 +25,12 @@ import {
 } from '@/types/datasources'
 import { getConnectorFormData, getInitialConnectorFormData, mapConnectorConfigToApiData } from '@/utils/connectors'
 
+import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { CONNECTORS } from './connector-tab/connectorSources'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
-import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ExitWarningModal } from './ExitWarningModal'
 import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'
 import { StatusDropdown } from './StatusDropdown'
-import { toast } from 'sonner'
 
 interface DatasourceOverviewProps {
   datasource: Datasource
@@ -65,13 +65,11 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     defaultValues,
   })
 
-  const { errors: formErrors } = useFormState({ control: form.control })
+  const statusWatch = form.watch('status')
+  const nameWatch = form.watch('name')
+  const descriptionWatch = form.watch('description')
+  const connectorTypeWatch = form.watch('connector.type')
 
-  useEffect(() => {
-    console.error('FORMERRORS: ', formErrors)
-  }, [formErrors])
-
-  const connectorTypeWatch = form.watch('connector.type') as ConnectorType
   const connectorConfig = useMemo(
     () => (connectorTypeWatch ? (CONNECTORS[connectorTypeWatch].properties as ConnectorField[]) : []),
     [connectorTypeWatch],
@@ -84,10 +82,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch, form])
 
-  const statusWatch = form.watch('status')
-  const nameWatch = form.watch('name')
-  const descriptionWatch = form.watch('description')
-
+  // revalidate form on status or connector type switch
   useEffect(() => {
     if (statusWatch === DATASOURCE_STATUS_TYPES.AVAILABLE) {
       void form.trigger()
@@ -119,7 +114,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       form.setValue('status', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
-  }, [canSetAvailable, statusWatch, form])
+  }, [canSetAvailable, statusWatch, form, tCommon])
 
   // Check which tabs are completed
   const completedTabs = useMemo((): DatasourceTab[] => {
@@ -127,9 +122,11 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     if (nameWatch.length > 0 && descriptionWatch.length > 0) {
       completed.push('basicInfo')
     }
+    if (ConnectorStrictSchema.safeParse(formValues.connector).success) completed.push('connector')
     // Other tabs would have their completion logic here
     return completed
-  }, [nameWatch, descriptionWatch])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formValues])
 
   // Tabs that are disabled (for future implementation)
   const disabledTabs: DatasourceTab[] = ['dataStructure', 'accessPermissions', 'dataspaces']

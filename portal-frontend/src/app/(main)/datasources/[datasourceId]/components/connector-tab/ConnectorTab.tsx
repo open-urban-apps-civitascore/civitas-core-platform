@@ -21,10 +21,16 @@ interface ConnectorTabProps {
 export const ConnectorTab = (props: ConnectorTabProps) => {
   const { form, config, isDraftMode } = props
   const t = useTranslations('datasources.connectorTab')
+  const tCommon = useTranslations('common')
   const connectorTypeOptions: SelectOption[] = Object.entries(CONNECTORS).map(([type, def]) => ({
     value: type as ConnectorType,
     label: def.label,
   }))
+
+  const getLabel = (label: { label: string; labelHint: string | null }) => {
+    const labelHint = label.labelHint ? `(${tCommon(`info.${label.labelHint}`)})` : ''
+    return `${label.label} ${labelHint}`
+  }
 
   return (
     <div>
@@ -48,7 +54,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
             <DynamicFormField<DatasourceFormDraft>
               key={property.key}
               form={form}
-              label={property.label}
+              label={getLabel(property.label)}
               name={`connector.config.${property.key}` as Path<DatasourceFormDraft>}
               placeholder={property.placeholder}
               type={property.type}

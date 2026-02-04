@@ -1,8 +1,9 @@
+import { Toaster } from 'sonner'
+
 import { auth } from '@/auth'
 import { AppHeader } from '@/components/appHeader/AppHeader'
 import { AppSidebar } from '@/components/appSidebar/AppSidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
-import { Toaster } from 'sonner'
 
 interface MainLayoutProps {
   children: React.ReactNode

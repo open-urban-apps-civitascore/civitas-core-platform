@@ -21,7 +21,7 @@ export type FormFieldType = 'input' | 'textArea' | 'select' | 'checkbox'
 export type ConnectorField = {
   key: string
   type: FormFieldType
-  label: string
+  label: { label: string; labelHint: string | null }
   options?: string[]
   defaultValue?: unknown
   required?: boolean
@@ -76,52 +76,3 @@ export const DatasourceApiDataSchema = DatasourceBaseFormSchema.extend({ connect
 export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>
 export type DatasourceFormAvailable = z.output<typeof DatasourceFormAvailableSchema>
 export type DatasourceApiData = z.output<typeof DatasourceApiDataSchema>
-
-// export const DatasourceFormSchema = DatasourceBaseFormSchema.extend({
-//   connector: ConnectorSchema.optional(),
-// }).superRefine((data, ctx) => {
-//   console.log('DATA', data)
-//   if (data.status !== DATASOURCE_STATUS_TYPES.AVAILABLE) return
-
-//   if (!data.description) {
-//     ctx.addIssue({
-//       code: 'custom',
-//       path: ['description'],
-//       message: 'required',
-//     })
-//   }
-
-//   if (!data.connector) {
-//     ctx.addIssue({
-//       code: 'custom',
-//       path: ['connector'],
-//       message: 'required',
-//     })
-//     return
-//   }
-
-//   if (data.connector.type === CONNECTOR_TYPES.MQTT) {
-//     const parsed = MqttSchema.safeParse(data.connector.config)
-//     const urls = parseStringArray(data.connector.config?.urls) ?? []
-//     const topics = parseStringArray(data.connector.config?.topics) ?? []
-//     // console.log('PARSED', parsed.data)
-//     // console.log('URLS TOPICS',   urls, topics)
-//     if (!urls.length) {
-//       ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'urls'], message: 'required' })
-//     }
-//     if (!topics.length) {
-//       ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'topics'], message: 'required' })
-//     }
-//   }
-
-//   if (data.connector.type === CONNECTOR_TYPES.SQL) {
-//     const parsed = SqlSchema.safeParse(data.connector.config)
-//     if (!parsed.data?.dsn || parsed.data.dsn.trim().length < 1) {
-//       ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'dsn'], message: 'required' })
-//     }
-//     if (!parsed.data?.table || parsed.data.table.trim().length < 1) {
-//       console.trace('ERROR')
-//       ctx.addIssue({ code: 'custom', path: ['connector', 'config', 'table'], message: 'required' })
-//     }
-//   }
-// })
