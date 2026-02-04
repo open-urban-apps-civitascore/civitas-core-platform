@@ -24,8 +24,8 @@ import {
 } from '@/types/datasources'
 import { getConnectorFormData, getInitialConnectorFormData, mapConnectorConfigToApiData } from '@/utils/connectors'
 
-import { CONNECTORS } from '../../components/connector-tab/connectorSources'
-import { ConnectorTab } from '../../components/connector-tab/ConnectorTab'
+import { CONNECTORS } from './connector-tab/connectorSources'
+import { ConnectorTab } from './connector-tab/ConnectorTab'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ExitWarningModal } from './ExitWarningModal'
 import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'

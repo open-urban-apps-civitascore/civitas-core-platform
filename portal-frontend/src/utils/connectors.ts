@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { CONNECTORS } from '@/app/(main)/datasources/components/connector-tab/connectorSources'
+import { CONNECTORS } from '@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources'
 import { CONNECTOR_TYPES } from '@/const/connectors'
 import {
   ConnectorApiConfig,
