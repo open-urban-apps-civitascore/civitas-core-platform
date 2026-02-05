@@ -47,6 +47,28 @@ if [ "$MVN_MAJOR" -lt 3 ] || ([ "$MVN_MAJOR" -eq 3 ] && [ "$MVN_MINOR" -lt 6 ]);
 fi
 echo "  Maven $MVN_VERSION found"
 
+# Node.js (for frontend)
+if ! command -v node >/dev/null 2>&1; then
+    echo "WARNING: Node.js is not installed. Frontend cannot be started."
+    NODE_AVAILABLE=false
+else
+    NODE_VERSION=$(node -v | sed 's/v//' | cut -d'.' -f1)
+    if [ "$NODE_VERSION" -lt 18 ] 2>/dev/null; then
+        echo "WARNING: Node.js 18+ recommended. Found Node.js $NODE_VERSION."
+    fi
+    echo "  Node.js $(node -v) found"
+    NODE_AVAILABLE=true
+fi
+
+# pnpm (for frontend)
+if ! command -v pnpm >/dev/null 2>&1; then
+    echo "WARNING: pnpm is not installed. Frontend cannot be started."
+    PNPM_AVAILABLE=false
+else
+    echo "  pnpm $(pnpm -v) found"
+    PNPM_AVAILABLE=true
+fi
+
 # Docker
 if ! command -v docker >/dev/null 2>&1; then
     echo "ERROR: Docker is not installed."
@@ -315,18 +337,58 @@ fi
 
 cd "$SCRIPT_DIR"
 
-# ---- Frontend Instructions ----------------------------------------
+# ---- Frontend Startup ----------------------------------------------
 
 echo
 echo "======================================================"
-echo "Frontend Setup"
+echo "Portal Frontend Startup"
 echo "======================================================"
 echo
-echo "To start the frontend, run in a new terminal:"
-echo
-echo "  cd portal-frontend"
-echo "  pnpm install    # if not done yet"
-echo "  pnpm dev"
+
+if [ "$NODE_AVAILABLE" = true ] && [ "$PNPM_AVAILABLE" = true ]; then
+    echo "How would you like to start the Portal Frontend?"
+    echo
+    echo "  1) Command line (pnpm dev)"
+    echo "  2) Manual (start later)"
+    echo "  3) Skip (not needed)"
+    echo
+    read -p "Select option [1/2/3]: " frontend_option
+
+    if [ "$frontend_option" = "1" ]; then
+        echo
+        echo "Starting Portal Frontend..."
+        cd "$SCRIPT_DIR/../portal-frontend"
+
+        # Install dependencies if node_modules doesn't exist
+        if [ ! -d "node_modules" ]; then
+            echo "Installing dependencies (pnpm install)..."
+            pnpm install
+        fi
+
+        gnome-terminal --title="Portal Frontend" -- bash -c "pnpm dev; exec bash" 2>/dev/null || \
+        xterm -T "Portal Frontend" -e "pnpm dev; bash" 2>/dev/null || \
+        {
+            echo "Could not open new terminal. Starting in background..."
+            pnpm dev &
+        }
+        echo "  Frontend started on http://localhost:3000"
+        cd "$SCRIPT_DIR"
+    elif [ "$frontend_option" = "2" ]; then
+        echo
+        echo "To start the frontend later, run:"
+        echo "  cd portal-frontend"
+        echo "  pnpm install    # if not done yet"
+        echo "  pnpm dev"
+    else
+        echo "  Frontend skipped"
+    fi
+else
+    echo "Node.js/pnpm not available. To start the frontend manually:"
+    echo "  cd portal-frontend"
+    echo "  pnpm install    # if not done yet"
+    echo "  pnpm dev"
+fi
+
 echo
 echo "======================================================"
 echo "Service URLs"
