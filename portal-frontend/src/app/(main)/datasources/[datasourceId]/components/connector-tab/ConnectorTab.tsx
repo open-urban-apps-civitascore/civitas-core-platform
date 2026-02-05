@@ -7,7 +7,7 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { ConnectorType } from '@/types/connectors'
-import { ConnectorField, DatasourceFormDraft } from '@/types/datasources'
+import { ConnectorField as FormField, DatasourceFormDraft } from '@/types/datasources'
 
 import { FooterElement } from '../FooterElement'
 import { CONNECTORS } from './connectorSources'
@@ -17,10 +17,10 @@ interface ConnectorTabProps {
   form: UseFormReturn<DatasourceFormDraft>
   isDraftMode: boolean
   connectorType: ConnectorType | undefined
-  config: ConnectorField[]
+  formfields: FormField[]
 }
 export const ConnectorTab = (props: ConnectorTabProps) => {
-  const { form, config, isDraftMode } = props
+  const { form, formfields: config, isDraftMode } = props
   const t = useTranslations('datasources.connectorTab')
   const tCommon = useTranslations('common')
   const connectorTypeOptions: SelectOption[] = Object.entries(CONNECTORS).map(([type, def]) => ({

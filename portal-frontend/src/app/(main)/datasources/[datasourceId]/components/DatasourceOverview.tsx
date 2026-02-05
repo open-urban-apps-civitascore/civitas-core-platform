@@ -195,7 +195,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
           <ConnectorTab
             form={form}
             isDraftMode={isDraftMode}
-            config={connectorConfig}
+            formfields={connectorConfig}
             connectorType={connectorTypeWatch}
           />
         )
