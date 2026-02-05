@@ -16,7 +16,6 @@ import { Form } from '@/components/ui/form'
 import { DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 import { ConnectorStrictSchema } from '@/types/connectors'
 import {
-  ConnectorField,
   Datasource,
   DatasourceFormAvailableSchema,
   DatasourceFormDraft,
@@ -26,7 +25,6 @@ import {
 import { getConnectorFormData, getInitialConnectorFormData, mapConnectorFormToApiData } from '@/utils/connectors'
 
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
-import { CONNECTORS } from './connector-tab/connectorSources'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
 import { ExitWarningModal } from './ExitWarningModal'
 import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'
@@ -72,11 +70,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const connectorTypeWatch = form.watch('connector.type')
 
   const isDraftMode = statusWatch === DATASOURCE_STATUS_TYPES.DRAFT
-
-  const connectorConfig = useMemo(
-    () => (connectorTypeWatch ? (CONNECTORS[connectorTypeWatch].properties as ConnectorField[]) : []),
-    [connectorTypeWatch],
-  )
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
@@ -148,7 +141,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const submitDatasource = (data: DatasourceFormDraft) => {
     if (isDraftMode) {
-      // no validation block
       updateDatasource.mutate(buildApiPayload(data))
       return
     }
@@ -191,14 +183,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       case 'basicInfo':
         return <BasicInfoTab form={form} />
       case 'connector':
-        return (
-          <ConnectorTab
-            form={form}
-            isDraftMode={isDraftMode}
-            formfields={connectorConfig}
-            connectorType={connectorTypeWatch}
-          />
-        )
+        return <ConnectorTab form={form} isDraftMode={isDraftMode} />
       case 'dataStructure':
       case 'accessPermissions':
       case 'dataspaces':

@@ -1,4 +1,5 @@
 import { useTranslations } from 'next-intl'
+import { useMemo } from 'react'
 import { Path, UseFormReturn } from 'react-hook-form'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
@@ -7,7 +8,7 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { ConnectorType } from '@/types/connectors'
-import { ConnectorField as FormField, DatasourceFormDraft } from '@/types/datasources'
+import { ConnectorField, DatasourceFormDraft } from '@/types/datasources'
 
 import { FooterElement } from '../FooterElement'
 import { CONNECTORS } from './connectorSources'
@@ -16,17 +17,21 @@ import { DynamicFormField } from './DynamicFormField'
 interface ConnectorTabProps {
   form: UseFormReturn<DatasourceFormDraft>
   isDraftMode: boolean
-  connectorType: ConnectorType | undefined
-  formfields: FormField[]
 }
 export const ConnectorTab = (props: ConnectorTabProps) => {
-  const { form, formfields: config, isDraftMode } = props
+  const { form, isDraftMode } = props
   const t = useTranslations('datasources.connectorTab')
   const tCommon = useTranslations('common')
   const connectorTypeOptions: SelectOption[] = Object.entries(CONNECTORS).map(([type, def]) => ({
     value: type as ConnectorType,
     label: def.label,
   }))
+
+  const connectorType = form.watch('connector.type')
+  const connectorConfig = useMemo(
+    () => (connectorType ? (CONNECTORS[connectorType].properties as ConnectorField[]) : []),
+    [connectorType],
+  )
 
   const getLabel = (label: { label: string; labelHint: string | null }) => {
     const labelHint = label.labelHint ? `(${tCommon(`info.${label.labelHint}`)})` : ''
@@ -49,10 +54,10 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
         />
       </ContentCard>
 
-      {config.length > 0 && (
+      {connectorConfig.length > 0 && (
         <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement />}>
           <SubHeader title={t('title2')} className="pb-4  border-b-1 mb-3" />
-          {config.map(property => (
+          {connectorConfig.map(property => (
             <DynamicFormField<DatasourceFormDraft>
               key={property.key}
               form={form}
