@@ -176,14 +176,17 @@ describe('BasicInfoTab', () => {
   })
 
   describe('Draft Mode', () => {
-    test('description required asterisk is hidden in draft mode', () => {
+    test('name and description required asterisk is visible in draft mode', () => {
       setup({ isDraftMode: true })
+      const nameLabel = screen.getByText('form.name')
       const descriptionLabel = screen.getByText('form.description')
-      const asterisk = descriptionLabel.parentElement?.querySelector('.text-red-500')
-      expect(asterisk).not.toBeInTheDocument()
+      const nameAsterisk = nameLabel.parentElement?.querySelector('.text-red-500')
+      const descriptionAsterisk = descriptionLabel.parentElement?.querySelector('.text-red-500')
+      expect(nameAsterisk).toBeInTheDocument()
+      expect(descriptionAsterisk).toBeInTheDocument()
     })
 
-    test('description required asterisk is visible when not in draft mode', () => {
+    test('name and description required asterisk is visible when not in draft mode', () => {
       setup({ isDraftMode: false })
       const descriptionLabel = screen.getByText('form.description')
       const asterisk = descriptionLabel.parentElement?.querySelector('.text-red-500')
