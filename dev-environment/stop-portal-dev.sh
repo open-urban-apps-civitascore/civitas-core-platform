@@ -10,23 +10,41 @@ echo "CIVITAS CORE Platform - Stopping Services"
 echo "======================================================"
 echo
 
+# Ask about cleanup before stopping
+read -p "Also remove volumes (deletes all data)? [y/N]: " remove_volumes
+echo
+
+if [[ "$remove_volumes" =~ ^[Yy]$ ]]; then
+    COMPOSE_DOWN="docker compose down -v"
+    echo "Stopping services and removing volumes..."
+else
+    COMPOSE_DOWN="docker compose down"
+    echo "Stopping services (keeping volumes)..."
+fi
+echo
+
 cd "$SCRIPT_DIR/frost"
-docker compose down 2>/dev/null && echo "  FROST Server stopped" || true
+$COMPOSE_DOWN 2>/dev/null && echo "  FROST Server stopped" || true
 
 cd "$SCRIPT_DIR/apisix"
-docker compose down 2>/dev/null && echo "  APISIX stopped" || true
+$COMPOSE_DOWN 2>/dev/null && echo "  APISIX stopped" || true
 
 cd "$SCRIPT_DIR/keycloak"
-docker compose down 2>/dev/null && echo "  Keycloak stopped" || true
+$COMPOSE_DOWN 2>/dev/null && echo "  Keycloak stopped" || true
 
 cd "$SCRIPT_DIR/kafka"
-docker compose down 2>/dev/null && echo "  Kafka stopped" || true
+$COMPOSE_DOWN 2>/dev/null && echo "  Kafka stopped" || true
 
 cd "$SCRIPT_DIR/postgres"
-docker compose down 2>/dev/null && echo "  PostgreSQL stopped" || true
+$COMPOSE_DOWN 2>/dev/null && echo "  PostgreSQL stopped" || true
 
 echo
 echo "All infrastructure services stopped."
+
+# Show what was cleaned up
+if [[ "$remove_volumes" =~ ^[Yy]$ ]]; then
+    echo "All volumes removed (databases, Keycloak data, Kafka data, etc.)"
+fi
 echo
 
 # Optionally remove the network
@@ -35,6 +53,14 @@ if [[ "$remove_network" =~ ^[Yy]$ ]]; then
     docker network rm civitas-network 2>/dev/null && \
         echo "  Network removed" || \
         echo "  Could not remove network (may still be in use)"
+fi
+
+# Optionally prune unused images
+read -p "Remove unused Docker images (docker image prune)? [y/N]: " prune_images
+if [[ "$prune_images" =~ ^[Yy]$ ]]; then
+    docker image prune -f && \
+        echo "  Unused images removed" || \
+        echo "  Could not prune images"
 fi
 
 echo
