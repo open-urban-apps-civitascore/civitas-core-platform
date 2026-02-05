@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from 'next-intl'
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/BadgesWithTooltip'
 import { DataTable } from '@/components/table/DataTable'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Badge } from '@/components/ui/badge'
 import { CONNECTION_TYPES, CONNECTOR_TYPE_KEYS, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
@@ -14,7 +15,6 @@ import { cn } from '@/lib/utils'
 import { Datasource } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
-import { LinkCell } from '@/components/table/link-cell/LinkCell'
 
 interface DatasourcesTableProps extends TableProps<Datasource> {
   datasources: Datasource[]

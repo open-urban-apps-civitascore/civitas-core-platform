@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import { useForm, useFormState, useWatch } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
@@ -14,7 +14,7 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { DATASOURCE_STATUS_TYPES } from '@/const/connectors'
-import { ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
+import { ConnectorStrictSchema } from '@/types/connectors'
 import {
   ConnectorField,
   Datasource,
