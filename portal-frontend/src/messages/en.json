@@ -43,7 +43,8 @@
     },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
-      "commaSeparated": "comma-separated"
+      "commaSeparated": "comma-separated",
+      "requiredInAvailable": "This field is required in the available mode."
     }
   },
   "languages": {

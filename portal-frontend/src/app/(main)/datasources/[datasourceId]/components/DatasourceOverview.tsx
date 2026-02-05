@@ -65,16 +65,25 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     defaultValues,
   })
 
+  const formValues = useWatch({ control: form.control })
   const statusWatch = form.watch('status')
   const nameWatch = form.watch('name')
   const descriptionWatch = form.watch('description')
   const connectorTypeWatch = form.watch('connector.type')
+
+  const isDraftMode = statusWatch === DATASOURCE_STATUS_TYPES.DRAFT
 
   const connectorConfig = useMemo(
     () => (connectorTypeWatch ? (CONNECTORS[connectorTypeWatch].properties as ConnectorField[]) : []),
     [connectorTypeWatch],
   )
 
+  // Allow "Available" only when the form would be valid in AVAILABLE mode
+  const canSetAvailable = useMemo(() => {
+    return DatasourceFormAvailableSchema.safeParse(formValues).success
+  }, [formValues])
+
+  // set connector config field values when changing connector type
   useEffect(() => {
     if (!connectorTypeWatch) return
 
@@ -89,8 +98,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     }
   }, [statusWatch, connectorTypeWatch, form])
 
-  const isDraftMode = statusWatch === DATASOURCE_STATUS_TYPES.DRAFT
-
   useEffect(() => {
     if (isDraftMode) {
       form.clearErrors()
@@ -98,15 +105,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       form.trigger()
     }
   }, [isDraftMode, form])
-
-  const formValues = useWatch({ control: form.control })
-
-  // Allow "Available" only when the form would be valid in AVAILABLE mode
-  const canSetAvailable = useMemo(() => {
-    const values = form.getValues()
-    return DatasourceFormAvailableSchema.safeParse(values).success
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formValues])
 
   // Auto-revert status to draft when required fields become empty
   useEffect(() => {

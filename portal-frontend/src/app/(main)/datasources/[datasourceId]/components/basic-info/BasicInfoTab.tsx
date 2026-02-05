@@ -13,6 +13,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { DatasourceFormDraft } from '@/types/datasources'
 
+import { FooterElement } from '../FooterElement'
 import { TagsMultiSelect } from './TagsMultiSelect'
 
 interface BasicInfoTabProps {
@@ -32,7 +33,7 @@ export const BasicInfoTab = (props: BasicInfoTabProps) => {
   }
 
   return (
-    <ContentCard className={cn('h-full overflow-auto')}>
+    <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement />}>
       <div className="max-w-300 flex flex-col gap-2 pt-2" data-testid="basicInfoTab">
         <DetailsFieldContainer className="pt-0 border-b-0">
           <SubHeader

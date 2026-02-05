@@ -34,7 +34,7 @@ export const DatasourceSchema = z.object({
     error: issue => (issue.input === undefined ? 'common.errors.required' : 'common.errors.invalidNumber'),
   }),
   name: z.string().min(1, 'common.errors.nameRequired'),
-  description: z.string().min(1, 'common.errors.descriptionRequired').max(150, 'common.errors.descriptionMaxLength'),
+  description: z.string(),
   connection: ConnectionTypeSchema,
   lastActive: z.string(),
   tags: z.array(z.string()).default([]),
@@ -70,7 +70,10 @@ export type ConnectorDefaultsByType = {
 }
 
 export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorLooseSchema.nullable() })
-export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorStrictSchema })
+export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
+  description: z.string().min(1, 'common.errors.descriptionRequired').max(150, 'common.errors.descriptionMaxLength'),
+  connector: ConnectorStrictSchema,
+})
 export const DatasourceApiDataSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorApiSchema.optional() })
 
 export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>

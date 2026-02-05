@@ -43,7 +43,8 @@
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
-      "commaSeparated": "durch Kommas getrennt"
+      "commaSeparated": "durch Kommas getrennt",
+      "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus."
     }
   },
   "languages": {

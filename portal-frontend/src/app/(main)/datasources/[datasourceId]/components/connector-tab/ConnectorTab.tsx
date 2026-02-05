@@ -9,6 +9,7 @@ import { SelectOption } from '@/types/common'
 import { ConnectorType } from '@/types/connectors'
 import { ConnectorField, DatasourceFormDraft } from '@/types/datasources'
 
+import { FooterElement } from '../FooterElement'
 import { CONNECTORS } from './connectorSources'
 import { DynamicFormField } from './DynamicFormField'
 
@@ -34,7 +35,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
 
   return (
     <div>
-      <ContentCard className={cn('h-full overflow-auto mb-6')}>
+      <ContentCard className={cn('h-full overflow-auto mb-6')} footerElement={<FooterElement />}>
         <SubHeader title={t('title1')} className="pb-4  border-b-1" />
 
         <FormSelect
@@ -44,11 +45,12 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
           name="connector.type"
           options={connectorTypeOptions}
           formItemProps={{ className: 'py-6' }}
+          required
         />
       </ContentCard>
 
       {config.length > 0 && (
-        <ContentCard className={cn('h-full overflow-auto')}>
+        <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement />}>
           <SubHeader title={t('title2')} className="pb-4  border-b-1 mb-3" />
           {config.map(property => (
             <DynamicFormField<DatasourceFormDraft>
