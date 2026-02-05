@@ -23,7 +23,7 @@ import {
   DatasourceFormDraftSchema,
   DatasourceStatusType,
 } from '@/types/datasources'
-import { getConnectorFormData, getInitialConnectorFormData, mapConnectorConfigToApiData } from '@/utils/connectors'
+import { getConnectorFormData, getInitialConnectorFormData, mapConnectorFormToApiData } from '@/utils/connectors'
 
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { CONNECTORS } from './connector-tab/connectorSources'
@@ -142,7 +142,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       status: formData.status,
       lastActive: datasource.lastActive,
       connection: datasource.connection,
-      connector: formData.connector ? mapConnectorConfigToApiData(formData.connector) : null,
+      connector: formData.connector ? mapConnectorFormToApiData(formData.connector) : null,
     }
   }
 

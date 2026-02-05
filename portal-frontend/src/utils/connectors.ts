@@ -61,7 +61,7 @@ export const getInitialConnectorFormData = (connector: ConnectorApiData | null) 
     case CONNECTOR_TYPES.SQL:
       return {
         type: connector?.type,
-        config: mapSqlApiDataToForm(connector?.config || getConnectorDefaults(CONNECTOR_TYPES.SQL)),
+        config: mapSqlApiDataToForm(connector?.config),
       }
     case CONNECTOR_TYPES.MQTT:
     default:
@@ -93,7 +93,7 @@ export const getConnectorFormData = (type: ConnectorType, connectorFormData: Con
   }
 }
 
-export const mapConnectorConfigToApiData = (connectorFormData: ConnectorDraft) => {
+export const mapConnectorFormToApiData = (connectorFormData: ConnectorDraft) => {
   switch (connectorFormData.type) {
     case CONNECTOR_TYPES.SQL:
       return {

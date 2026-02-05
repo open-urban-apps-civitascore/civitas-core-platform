@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
-import { DatasourceBaseFormData, DatasourceBaseFormSchema } from '@/types/datasources'
+import { DatasourceBaseFormData, DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
 
 import { BasicInfoTab } from './BasicInfoTab'
 
@@ -49,15 +49,15 @@ interface WrapperProps {
   initialValues?: Partial<DatasourceBaseFormData>
 }
 
-const TestWrapper = ({ isReadOnly = false, isDraftMode = false, initialValues = {} }: WrapperProps) => {
-  const form = useForm<DatasourceBaseFormData>({
-    resolver: zodResolver(DatasourceBaseFormSchema),
+const TestWrapper = ({ isReadOnly = false, initialValues = {} }: WrapperProps) => {
+  const form = useForm<DatasourceFormDraft>({
+    resolver: zodResolver(DatasourceFormDraftSchema),
     defaultValues: { ...defaultFormValues, ...initialValues },
   })
 
   return (
     <Form {...form}>
-      <BasicInfoTab form={form} isReadOnly={isReadOnly} isDraftMode={isDraftMode} />
+      <BasicInfoTab form={form} isReadOnly={isReadOnly} />
     </Form>
   )
 }
