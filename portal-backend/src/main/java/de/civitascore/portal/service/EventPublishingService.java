@@ -55,8 +55,7 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
       entity = getRepository().saveAndFlush(entity);
     }
 
-    postSave(entity, preProcessedInput);
-    return entity;
+    return postSave(entity, preProcessedInput);
   }
 
   @Override
