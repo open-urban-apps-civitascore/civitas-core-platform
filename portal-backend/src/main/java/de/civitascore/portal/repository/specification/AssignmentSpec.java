@@ -14,5 +14,11 @@ interface AssignmentUserIdSpec extends BaseSpec<Assignment> {}
 @Spec(path = "group.id", params = "groupId", spec = Equal.class)
 interface AssignmentGroupIdSpec extends BaseSpec<Assignment> {}
 
+@Spec(path = "scopeId", params = "scopeId", spec = Equal.class)
+interface AssignmentScopeIdSpec extends BaseSpec<Assignment> {}
+
 public interface AssignmentSpec
-    extends AssignmentRoleIdSpec, AssignmentUserIdSpec, AssignmentGroupIdSpec {}
+    extends AssignmentRoleIdSpec,
+        AssignmentUserIdSpec,
+        AssignmentGroupIdSpec,
+        AssignmentScopeIdSpec {}
