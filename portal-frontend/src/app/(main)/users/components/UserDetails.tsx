@@ -27,7 +27,7 @@ export const UserDetails = (props: UserDetailsProps) => {
   const t = useTranslations('users')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
 
-  const tabValues: Record<'userData' | 'roles' | 'groups' | 'dataSpaces' | 'account', Tab> = {
+  const tabValues: Record<'userData' | 'roles' | 'groups' | 'account', Tab> = {
     userData: {
       label: t('detailsTabs.userData'),
       value: 'userDetails',
@@ -36,11 +36,6 @@ export const UserDetails = (props: UserDetailsProps) => {
     groups: {
       label: t('detailsTabs.groups'),
       value: 'userGroups',
-      isActive: isEditMode,
-    },
-    dataSpaces: {
-      label: t('detailsTabs.dataspaces'),
-      value: 'dataspaces',
       isActive: isEditMode,
     },
     roles: {
@@ -54,7 +49,7 @@ export const UserDetails = (props: UserDetailsProps) => {
       isActive: isEditMode,
     },
   }
-  const tabs: Tab[] = [tabValues.userData, tabValues.groups, tabValues.dataSpaces, tabValues.roles, tabValues.account]
+  const tabs: Tab[] = [tabValues.userData, tabValues.groups, tabValues.roles, tabValues.account]
 
   const defaultTab = tabValues.userData.value
 

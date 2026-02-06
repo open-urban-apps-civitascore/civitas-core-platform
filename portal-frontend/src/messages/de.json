@@ -158,26 +158,18 @@
       "phone": "Telefonnummer",
       "email": "E-Mail",
       "group": "Gruppe",
-      "position": "Position",
-      "description": "Tätigkeitsbeschreibung",
       "status": {
         "title": "Status",
         "active": "Aktiv",
         "inactive": "Inaktiv"
-      }
+      },
+      "selectTitle": "Titel wählen..."
     },
     "detailsTabs": {
       "userData": "Benutzerdaten",
       "roles": "Rollen",
       "groups": "Gruppen",
-      "dataspaces": "Datenräume und -sätze",
       "account": "Account"
-    },
-    "form": {
-      "selectTitle": "Titel wählen...",
-      "selectAuthority": "Amt wählen...",
-      "selectDepartment": "Abteilung wählen...",
-      "selectGroup": "Gruppe wählen..."
     },
     "roles": {
       "title": "Übersicht: Rollen",

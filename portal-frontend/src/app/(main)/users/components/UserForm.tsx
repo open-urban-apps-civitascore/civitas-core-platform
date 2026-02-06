@@ -156,7 +156,7 @@ export const UserForm = (props: UserFormProps) => {
                     id="title-select"
                     label={t('info.title.title')}
                     options={titleOptions}
-                    placeholder={t('form.selectTitle')}
+                    placeholder={t('info.selectTitle')}
                     form={form}
                     name="title"
                     required={!isReadOnly}

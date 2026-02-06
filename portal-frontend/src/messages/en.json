@@ -154,26 +154,18 @@
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
-      "position": "Position",
-      "description": "Activity Description",
       "status": {
         "title": "Status",
         "active": "Active",
         "inactive": "Inactive"
-      }
+      },
+      "selectTitle": "Select title..."
     },
     "detailsTabs": {
       "userData": "User Data",
       "roles": "Roles",
       "groups": "Groups",
-      "dataspaces": "Data Spaces and Datasets",
       "account": "Account"
-    },
-    "form": {
-      "selectTitle": "Select titel...",
-      "selectAuthority": "Select authority...",
-      "selectDepartment": "Select department...",
-      "selectGroup": "Select group..."
     },
     "roles": {
       "title": "Overview: Roles",
