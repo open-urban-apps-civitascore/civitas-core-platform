@@ -345,6 +345,40 @@ echo "Portal Frontend Startup"
 echo "======================================================"
 echo
 
+FRONTEND_DIR="$SCRIPT_DIR/../portal-frontend"
+
+# Ensure .env.local exists
+if [ ! -f "$FRONTEND_DIR/.env.local" ]; then
+    if [ -f "$FRONTEND_DIR/.env.local.template" ]; then
+        echo "Creating .env.local from template..."
+        cp "$FRONTEND_DIR/.env.local.template" "$FRONTEND_DIR/.env.local"
+        echo "  .env.local created"
+    else
+        echo "WARNING: .env.local.template not found in portal-frontend/"
+    fi
+fi
+
+# Check if Keycloak client secret needs to be configured
+if [ -f "$FRONTEND_DIR/.env.local" ]; then
+    CURRENT_SECRET=$(grep '^KEYCLOAK_CLIENT_SECRET=' "$FRONTEND_DIR/.env.local" | cut -d'=' -f2)
+    if [ "$CURRENT_SECRET" = "XXXXXXXXXXXXXXXXXXX" ] || [ -z "$CURRENT_SECRET" ]; then
+        echo
+        echo "The Keycloak client secret is not configured in .env.local."
+        echo "You can find it in Keycloak Admin (http://localhost:8080):"
+        echo "  Realm: civitas-core > Clients > portal-frontend > Credentials"
+        echo
+        read -p "Enter Keycloak client secret (or press Enter to skip): " keycloak_secret
+        if [ -n "$keycloak_secret" ]; then
+            sed -i "s|^KEYCLOAK_CLIENT_SECRET=.*|KEYCLOAK_CLIENT_SECRET=$keycloak_secret|" "$FRONTEND_DIR/.env.local"
+            echo "  Keycloak client secret updated in .env.local"
+        else
+            echo "  Skipped. Update KEYCLOAK_CLIENT_SECRET in portal-frontend/.env.local before using the frontend."
+        fi
+    fi
+fi
+
+echo
+
 if [ "$NODE_AVAILABLE" = true ] && [ "$PNPM_AVAILABLE" = true ]; then
     echo "How would you like to start the Portal Frontend?"
     echo
