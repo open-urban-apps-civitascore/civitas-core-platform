@@ -81,51 +81,54 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     return DatasourceFormAvailableSchema.safeParse(formValues).success
   }, [formValues])
 
-  // set connector config field values when changing connector type
-  useEffect(() => {
-    if (!connectorTypeWatch) return
-
+  const updateConnectorConfig = () =>
     form.setValue('connector', getConnectorFormData(connectorTypeWatch, defaultValues.connector), { shouldDirty: true })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectorTypeWatch, form])
 
-  // revalidate form on status or connector type switch
-  useEffect(() => {
-    if (statusWatch === DATASOURCE_STATUS_TYPES.AVAILABLE) {
+  const revalidateForm = () => {
+    if (!isDraftMode) {
       void form.trigger()
     }
-  }, [statusWatch, connectorTypeWatch, form])
+  }
+  // Auto-revert status to draft when required fields become empty
+  const revalidateDraftMode = () => {
+    if (statusWatch === DATASOURCE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+      form.setValue('status', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
+      toast.info(tCommon('info.switchMode'))
+    }
+  }
+
+  useEffect(() => {
+    if (!connectorTypeWatch) return
+    updateConnectorConfig()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectorTypeWatch])
 
   useEffect(() => {
     if (isDraftMode) {
       form.clearErrors()
     } else {
-      form.trigger()
+      revalidateForm()
     }
-  }, [isDraftMode, form])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectorTypeWatch, isDraftMode])
 
-  // Auto-revert status to draft when required fields become empty
   useEffect(() => {
-    if (statusWatch === DATASOURCE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
-      form.setValue('status', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
-      toast.info(tCommon('info.switchMode'))
-    }
-  }, [canSetAvailable, statusWatch, form, tCommon])
+    revalidateDraftMode()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSetAvailable, statusWatch])
 
-  // Check which tabs are completed
   const completedTabs = useMemo((): DatasourceTab[] => {
     const completed: DatasourceTab[] = []
     if (nameWatch.length > 0 && descriptionWatch.length > 0) {
       completed.push('basicInfo')
     }
     if (ConnectorStrictSchema.safeParse(formValues.connector).success) completed.push('connector')
-    // Other tabs would have their completion logic here
     return completed
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
 
   // Tabs that are disabled (for future implementation)
-  const disabledTabs: DatasourceTab[] = ['dataStructure', 'accessPermissions', 'dataspaces']
+  const disabledTabs: DatasourceTab[] = ['dataStructure', 'accessPermissions']
 
   const handleStatusChange = (newStatus: DatasourceStatusType) => {
     form.setValue('status', newStatus, { shouldDirty: true })
@@ -191,7 +194,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         return <ConnectorTab form={form} isDraftMode={isDraftMode} />
       case 'dataStructure':
       case 'accessPermissions':
-      case 'dataspaces':
       default:
         return null
     }
