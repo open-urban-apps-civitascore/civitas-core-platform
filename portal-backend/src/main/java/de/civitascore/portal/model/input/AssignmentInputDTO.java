@@ -13,9 +13,12 @@ public class AssignmentInputDTO extends BaseInputDTO {
 
   @NotNull(message = "Role ID is required") private UUID roleId;
 
-  @NotNull(message = "Scope type is required") private ScopeType scopeType;
+  /** Scope type is not required for SYSTEM Roles but must be provided for all other roles */
+  private ScopeType scopeType;
 
-  private String scopeId;
-  private Boolean isInherited;
-  private UUID parentAssignmentId;
+  /**
+   * Scope ID is not required if there is no scopeType or if the scope type is PLATFORM, but must be
+   * provided for all other scope types
+   */
+  private UUID scopeId;
 }

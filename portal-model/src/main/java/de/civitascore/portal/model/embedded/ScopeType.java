@@ -9,12 +9,21 @@ package de.civitascore.portal.model.embedded;
  * @see de.civitascore.portal.model.entity.base.ScopedEntity
  */
 public enum ScopeType {
-  /** Tenant-wide scope for system roles. */
-  TENANT,
+  /** Platform-wide scope for data roles. Requires scope ID to be null. */
+  PLATFORM,
+
+  /** Data structure scope for data/governance roles. Requires scope ID. */
+  DATASTRUCTURE,
+
+  /** Data source scope for data/governance roles. Requires scope ID. */
+  DATASOURCE,
+
+  /** Dataset scope for data/governance roles. Requires scope ID. */
+  DATASET,
 
   /** Dataspace scope for data/governance roles. Requires scope ID. */
   DATASPACE,
 
-  /** Dataset scope for data/governance roles. Requires scope ID. */
-  DATASET
+  /** Datacatalogue scope for data/governance roles. Requires scope ID. */
+  CATALOG,
 }
