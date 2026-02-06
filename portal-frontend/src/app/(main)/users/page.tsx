@@ -35,8 +35,8 @@ const UsersPage = async ({ searchParams }: Props) => {
   const sorting = sort.map((entry: string) => ({ id: entry.split(',')[0], desc: entry.split(',')[1] === 'DESC' }))
 
   return (
-    <PageContainer headerType="onlyTitle" testId="usersPage">
-      <PageHeader title={t('title')} />
+    <PageContainer headerType="withSubTabsOrSubtitle" testId="usersPage">
+      <PageHeader title={t('title')} subtitle={t('subtitle')} />
       <PageBackground>
         <TableContainer>
           <UsersListContent
