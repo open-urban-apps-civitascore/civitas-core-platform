@@ -63,6 +63,11 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     defaultValues,
   })
 
+  useEffect(() => {
+    form.reset(defaultValues)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datasource])
+
   const formValues = useWatch({ control: form.control })
   const statusWatch = form.watch('status')
   const nameWatch = form.watch('name')
@@ -129,8 +134,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const buildApiPayload = (formData: DatasourceFormDraft): Datasource => {
     return {
       id: formData.id,
-      name: formData.name,
-      description: formData.description,
+      name: formData.name.trim(),
+      description: formData.description.trim(),
       tags: formData.tags,
       status: formData.status,
       lastActive: datasource.lastActive,

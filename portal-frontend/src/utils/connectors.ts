@@ -1,9 +1,14 @@
-/* eslint-disable @typescript-eslint/naming-convention */
 import { CONNECTORS } from '@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources'
 import { CONNECTOR_TYPES } from '@/const/connectors'
 import { ConnectorApiConfig, ConnectorApiData, ConnectorDraft, ConnectorType } from '@/types/connectors'
 
-const getArrayFromString = (value: string | undefined) => (!!value ? value?.split(',') : [])
+const getArrayFromString = (value: string | undefined) =>
+  !!value
+    ? value
+        ?.split(',')
+        .map(v => v.trim())
+        .filter(Boolean)
+    : []
 
 export const getConnectorDefaults = <T extends ConnectorType>(type: T): ConnectorApiConfig[T] => {
   return CONNECTORS[type].properties.reduce(
@@ -36,18 +41,20 @@ export const mapApiToForm = <T extends Record<string, unknown>, K extends readon
 export const mapFormToApi = <T extends Record<string, unknown>, K extends readonly (keyof T)[]>(
   config: T,
   fields: K,
-): Omit<T, K[number]> & {
-  [P in K[number]]: string[]
-} => {
+): Omit<T, K[number]> & { [P in K[number]]: string[] } => {
   const result = { ...config } as Record<string, unknown>
+
+  Object.entries(result).forEach(([key, value]) => {
+    if (typeof value === 'string') {
+      result[key] = value.trim()
+    }
+  })
 
   fields.forEach(key => {
     result[key as string] = getArrayFromString(config[key] as string)
   })
 
-  return result as Omit<T, K[number]> & {
-    [P in K[number]]: string[]
-  }
+  return result as Omit<T, K[number]> & { [P in K[number]]: string[] }
 }
 
 export const getInitialConnectorFormData = (connector: ConnectorApiData | null): ConnectorDraft => {

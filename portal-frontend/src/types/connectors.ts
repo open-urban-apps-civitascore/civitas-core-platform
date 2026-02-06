@@ -3,6 +3,8 @@ import { z } from 'zod'
 
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
+import { trimmedString } from './common'
+
 export type ConnectorTypeKey = keyof typeof CONNECTOR_TYPES
 
 export type ConnectorType = (typeof CONNECTOR_TYPES)[keyof typeof CONNECTOR_TYPES]
@@ -62,8 +64,8 @@ const SqlBaseSchema = z.object({
 export const SqlLooseSchema = SqlBaseSchema
 
 export const SqlStrictSchema = SqlBaseSchema.extend({
-  dsn: z.string().min(1, 'required'),
-  table: z.string().min(1, 'required'),
+  dsn: trimmedString,
+  table: trimmedString,
   columns: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'required')),
   init_files: z.preprocess(parseStringArray, z.array(z.string())),
 })

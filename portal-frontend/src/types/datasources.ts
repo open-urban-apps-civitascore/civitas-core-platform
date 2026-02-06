@@ -3,6 +3,7 @@ import z from 'zod'
 import type { CONNECTORS } from '@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources'
 import { CONNECTION_TYPES, CONNECTOR_TYPES, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 
+import { trimmedString } from './common'
 import { ConnectorApiSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
 
 export type ConnectionType = (typeof CONNECTION_TYPES)[keyof typeof CONNECTION_TYPES]
@@ -33,7 +34,7 @@ export const DatasourceSchema = z.object({
   id: z.number({
     error: issue => (issue.input === undefined ? 'common.errors.required' : 'common.errors.invalidNumber'),
   }),
-  name: z.string().min(1, 'common.errors.nameRequired'),
+  name: trimmedString,
   description: z.string(),
   connection: ConnectionTypeSchema,
   lastActive: z.string(),
@@ -71,7 +72,8 @@ export type ConnectorDefaultsByType = {
 
 export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorLooseSchema.nullable() })
 export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
-  description: z.string().min(1, 'common.errors.descriptionRequired').max(150, 'common.errors.descriptionMaxLength'),
+  name: trimmedString,
+  description: trimmedString.max(150, 'common.errors.descriptionMaxLength'),
   connector: ConnectorStrictSchema,
 })
 export const DatasourceApiDataSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorApiSchema.optional() })
