@@ -5,7 +5,6 @@ import { useEffect, useMemo } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
-import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -96,7 +95,7 @@ export const UserDetails = (props: UserDetailsProps) => {
         title={title}
         subTabs={{ tabs: tabs, selectedTab: subTabValue || defaultTab, onClick: newTab => handleSelectTab(newTab) }}
       />
-      <PageBackground>{userData ? Content : <NoDataPage title={t('notFound')} />}</PageBackground>
+      {userData ? Content : <NoDataPage title={t('notFound')} />}
     </PageContainer>
   )
 }

@@ -11,17 +11,6 @@ export type Contact = {
 
 export type UserGroup = Item
 
-export type Authority = Item & {
-  departments: Item[]
-}
-
-export type UserAuthority = {
-  id: string
-  department: {
-    id: string
-  } | null
-} | null
-
 export type User = {
   id: string
   firstName: string
@@ -29,10 +18,8 @@ export type User = {
   email: string
   phone: string
   title: TitleType
-  authority: UserAuthority | null
   groups: string[]
   active: boolean
-  positionDescription: string | null
 }
 
 export type CreateUserData = Omit<User, 'id'>
@@ -42,8 +29,6 @@ export type PatchUserData = Partial<CreateUserData> & WithId
 export type ListUser = {
   id: string
   fullName: string
-  authority: string
-  department: string
   email: string
   isActive: boolean
 }
@@ -63,7 +48,6 @@ export type GroupUser = {
   id: string
   fullName: string
   email: string
-  authority: UserAuthority | null
   isActive: boolean
 }
 
@@ -96,16 +80,8 @@ export const UserFormSchema = z.object({
   email: z.email({
     message: 'common.errors.invalidEmail',
   }),
-  authority: z.string(),
-  department: z.string(),
   phone: PhoneSchema,
   active: z.boolean(),
-  positionDescription: z
-    .string()
-    .min(10, {
-      message: 'common.errors.atLeast10',
-    })
-    .or(z.literal('')),
 })
 
 export type UserFormData = z.infer<typeof UserFormSchema>

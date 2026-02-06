@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server'
 
-import { TitleType, User } from '@/types/users'
+import { User } from '@/types/users'
 
 import { UserDetails } from '../components/UserDetails'
 
@@ -8,13 +8,11 @@ export const defaultFormUser: User = {
   id: '',
   firstName: '',
   lastName: '',
-  title: 'male' as TitleType,
+  title: 'MR',
   email: '',
   active: false,
-  authority: null,
   groups: [],
   phone: '',
-  positionDescription: '',
 }
 
 const CreateUserPage = async () => {

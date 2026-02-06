@@ -15,6 +15,7 @@ import { Group, UserGroupsListData } from '@/types/groups'
 import { Role } from '@/types/roles'
 
 import GroupsTable from './GroupsTable'
+import { PageBackground } from '@/components/page-background/PageBackground'
 
 interface GroupsTabProps {
   userId: string
@@ -80,28 +81,30 @@ export const GroupsTab = (props: GroupsTabProps) => {
 
   const CustomElement = <Button>{t('groupsTab.addGroup')}</Button>
   return (
-    <ContentCard className={cn(!error && !isLoading ? 'h-full' : 'h-50')}>
-      {!error && !isLoading && (
-        <>
-          <SubHeader title={t('groupsTab.title')} customElement={CustomElement} />
-          <SearchHeader searchString={searchString} onChangeSearchString={setSearchString} className="my-2" />
-          <TableContainer className="[--search-height:calc(--spacing(30))]">
-            <GroupsTable
-              groups={filteredGroups}
-              rowCount={rowCount}
-              pageIndex={pageIndex}
-              pageSize={pageSize}
-              onPaginationChange={handlePagination}
-              sorting={sorting}
-              onSortingChange={setSorting}
-              totalPages={totalPages}
-              isLoading={isLoading}
-            />
-          </TableContainer>
-        </>
-      )}
-      {isLoading && <LoadingSpinner className="h-full" />}
-      {error && <p className="h-full flex items-center justify-center">{tCommon('errors.loadingError')}</p>}
-    </ContentCard>
+    <PageBackground>
+      <ContentCard className={cn(!error && !isLoading ? 'h-full' : 'h-50')}>
+        {!error && !isLoading && (
+          <>
+            <SubHeader title={t('groupsTab.title')} customElement={CustomElement} />
+            <SearchHeader searchString={searchString} onChangeSearchString={setSearchString} className="my-2" />
+            <TableContainer className="[--search-height:calc(--spacing(30))]">
+              <GroupsTable
+                groups={filteredGroups}
+                rowCount={rowCount}
+                pageIndex={pageIndex}
+                pageSize={pageSize}
+                onPaginationChange={handlePagination}
+                sorting={sorting}
+                onSortingChange={setSorting}
+                totalPages={totalPages}
+                isLoading={isLoading}
+              />
+            </TableContainer>
+          </>
+        )}
+        {isLoading && <LoadingSpinner className="h-full" />}
+        {error && <p className="h-full flex items-center justify-center">{tCommon('errors.loadingError')}</p>}
+      </ContentCard>
+    </PageBackground>
   )
 }

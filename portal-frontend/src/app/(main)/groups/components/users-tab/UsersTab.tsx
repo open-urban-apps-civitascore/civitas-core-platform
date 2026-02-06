@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 
 import { usePatchGroup } from '@/app/services/api/groups/clientRequests'
-import { useGetAuthorities, useGetUsers } from '@/app/services/api/users/clientRequests'
+import { useGetUsers } from '@/app/services/api/users/clientRequests'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
@@ -55,11 +55,7 @@ export const UsersTab = (props: UsersTabProps) => {
     isEnabled: originalUsers.length > 0,
   })
 
-  const { data: authoritiesData, isLoading: areAuthoritiesLoading } = useGetAuthorities({
-    isEnabled: originalUsers.length > 0,
-  })
-
-  const isLoading = isFetchingUsers || areAuthoritiesLoading || updateGroup.isPending
+  const isLoading = isFetchingUsers || updateGroup.isPending
   const rowCount = usersData?.totalElements || 0
 
   useEffect(() => {
@@ -67,8 +63,8 @@ export const UsersTab = (props: UsersTabProps) => {
   }, [rowCount, setTotalPages, pageSize])
 
   const users = useMemo(
-    () => (isLoading ? [] : mapGroupListUsers(usersData?.data || [], authoritiesData?.data || [], originalUsers)),
-    [usersData?.data, authoritiesData?.data, originalUsers, isLoading],
+    () => (isLoading ? [] : mapGroupListUsers(usersData?.data || [], originalUsers)),
+    [usersData?.data, originalUsers, isLoading],
   )
 
   // closes the user assignment modal after update

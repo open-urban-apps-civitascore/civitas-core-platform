@@ -48,14 +48,6 @@ export const UsersTable = (props: UsersTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('authority', {
-      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.authority')} />,
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor('department', {
-      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.department')} />,
-      cell: info => info.getValue(),
-    }),
     columnHelper.accessor('email', {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.email')} />,
       cell: info => info.getValue(),
