@@ -12,7 +12,6 @@ import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { Select } from '@/components/form/fields/Select'
-import { Switch } from '@/components/form/fields/Switch'
 import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -20,7 +19,6 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { cn } from '@/lib/utils'
 import { User, UserFormData, UserFormSchema } from '@/types/users'
 import { mapUserToFormData } from '@/utils/users'
 
@@ -71,8 +69,6 @@ export const UserForm = (props: UserFormProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultUserData])
 
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  const watchStatus = form.watch('active')
   const watch = form.watch()
 
   // checks if changed phone number without whitespaces is the same as initial phone number or if any other field has been changed
@@ -193,7 +189,7 @@ export const UserForm = (props: UserFormProps) => {
                     disabled={isReadOnly}
                   />
                 </DetailsFieldContainer>
-                <DetailsFieldContainer>
+                <DetailsFieldContainer className="border-b-0">
                   <TextField
                     form={form}
                     label={t('info.phone')}
@@ -201,15 +197,6 @@ export const UserForm = (props: UserFormProps) => {
                     placeholder={t('info.phone')}
                     disabled={isReadOnly}
                   />
-                </DetailsFieldContainer>
-                <DetailsFieldContainer className="border-b-0 flex items-center">
-                  <Switch form={form} name="active" label={t('info.status.title')} isReadOnly={isReadOnly} />
-                  <span
-                    data-testid="activeStatus"
-                    className={cn('ml-3 text-sm', isReadOnly && 'text-muted-foreground')}
-                  >
-                    {watchStatus ? t('info.status.active') : t('info.status.inactive')}
-                  </span>
                 </DetailsFieldContainer>
               </>
             )}
