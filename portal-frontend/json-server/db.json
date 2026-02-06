@@ -6774,7 +6774,7 @@
       "lastActive": "2025-01-01T00:00:00",
       "tags": [],
       "status": "draft",
-      "id": 1
+      "id": "1"
     },
     {
       "name": "Datasource 2",
@@ -6787,7 +6787,7 @@
         "Tag2"
       ],
       "status": "draft",
-      "id": 2
+      "id": "2"
     },
     {
       "name": "Datasource 3",
@@ -6801,7 +6801,7 @@
         "Tag3"
       ],
       "status": "available",
-      "id": 3
+      "id": "3"
     },
     {
       "name": "Datasource 4",
@@ -6816,7 +6816,7 @@
         "Tag4"
       ],
       "status": "available",
-      "id": 4
+      "id": "4"
     },
     {
       "name": "Datasource 5",
@@ -6831,7 +6831,7 @@
         "Tag4"
       ],
       "status": "draft",
-      "id": 5
+      "id": "5"
     },
     {
       "name": "Datasource 6",
@@ -6846,7 +6846,7 @@
         "Tag4"
       ],
       "status": "available",
-      "id": 6
+      "id": "6"
     },
     {
       "name": "Test Datasource",
@@ -6876,7 +6876,7 @@
       },
       "connection": "inactive",
       "lastActive": "2026-02-04T12:11:34.305Z",
-      "id": 8
+      "id": "8"
     }
   ]
 }

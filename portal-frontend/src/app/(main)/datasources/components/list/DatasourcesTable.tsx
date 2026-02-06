@@ -18,7 +18,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface DatasourcesTableProps extends TableProps<Datasource> {
   datasources: Datasource[]
-  onDelete?: (id: number) => void
+  onDelete?: (id: string) => void
 }
 
 export const DatasourcesTable = (props: DatasourcesTableProps) => {

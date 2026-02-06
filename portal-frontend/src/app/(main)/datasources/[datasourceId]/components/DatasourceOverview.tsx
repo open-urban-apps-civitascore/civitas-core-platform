@@ -21,8 +21,9 @@ import {
   DatasourceFormDraft,
   DatasourceFormDraftSchema,
   DatasourceStatusType,
+  DatasourceUpdateSchema,
 } from '@/types/datasources'
-import { getConnectorFormData, getInitialConnectorFormData, mapConnectorFormToApiData } from '@/utils/connectors'
+import { getConnectorFormData, getInitialConnectorFormData } from '@/utils/connectors'
 
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
@@ -134,37 +135,50 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
 
-  const buildApiPayload = (formData: DatasourceFormDraft): Datasource => {
-    return {
-      id: formData.id,
-      name: formData.name.trim(),
-      description: formData.description.trim(),
-      tags: formData.tags,
-      status: formData.status,
-      lastActive: datasource.lastActive,
-      connection: datasource.connection,
-      connector: formData.connector ? mapConnectorFormToApiData(formData.connector) : null,
-    }
-  }
+  // const buildApiPayload = (formData: DatasourceFormDraft): DatasourceUpdateData | undefined => {
+  //   const parsed = DatasourceUpdateSchema.safeParse(formData)
+  //   if (parsed.error) {
+  //     console.error(parsed.error)
+  //     toast.error('Form data invalid')
+  //   }
+  //   return parsed.data
+  // return {
+  //   id: formData.id,
+  //   name: formData.name.trim(),
+  //   description: formData.description.trim(),
+  //   tags: formData.tags,
+  //   status: formData.status,
+  //   connector: formData.connector ? mapConnectorFormToApiData(formData.connector) : null,
+  // }
+  // }
 
-  const submitDatasource = (data: DatasourceFormDraft) => {
-    if (isDraftMode) {
-      updateDatasource.mutate(buildApiPayload(data))
-      return
-    }
+  // const buildApiPayload = (formData: DatasourceFormDraft): Datasource => {
+  //   return {
+  //     id: formData.id,
+  //     name: formData.name.trim(),
+  //     description: formData.description.trim(),
+  //     tags: formData.tags,
+  //     status: formData.status,
+  //     lastActive: datasource.lastActive,
+  //     connection: datasource.connection,
+  //     connector: formData.connector ? mapConnectorFormToApiData(formData.connector) : null,
+  //   }
+  // }
 
-    form.handleSubmit(values => {
-      const parsed = DatasourceFormAvailableSchema.safeParse(values)
-      if (parsed.success) {
-        updateDatasource.mutate(buildApiPayload(values))
-      }
-    })()
+  const submitDatasource = (onSuccess?: () => void) => {
+    const parsed = isDraftMode
+      ? DatasourceUpdateSchema.safeParse(form.getValues())
+      : DatasourceFormAvailableSchema.safeParse(form.getValues())
+    if (parsed.data) {
+      updateDatasource.mutate(parsed.data, { onSuccess: () => onSuccess?.() })
+    } else if (parsed.error) {
+      console.error(parsed.error)
+      toast.error('Form data invalid')
+    }
   }
 
   const handleSave = () => {
-    submitDatasource(form.getValues())
-    form.reset(form.getValues())
-    router.refresh()
+    submitDatasource(() => router.refresh())
   }
 
   const handleExit = () => {
@@ -181,9 +195,10 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const handleSaveAndExit = () => {
-    submitDatasource(form.getValues())
-    setIsExitModalOpen(false)
-    router.push(`/datasources?${searchParams.toString()}`)
+    submitDatasource(() => {
+      setIsExitModalOpen(false)
+      router.push(`/datasources?${searchParams.toString()}`)
+    })
   }
 
   const renderTabContent = () => {

@@ -1,7 +1,4 @@
 import { InputHTMLAttributes } from 'react'
-import z from 'zod'
-
-export const trimmedString = z.string().trim().min(1, 'common.errors.descriptionRequired')
 
 export type Item = {
   id: string

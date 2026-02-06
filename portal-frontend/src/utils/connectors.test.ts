@@ -1,7 +1,7 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
 import {
-  ConnectorApiConfig,
-  ConnectorApiData,
+  ConnectorApiResponseConfig,
+  ConnectorApiResponseData,
   ConnectorDraft,
   MqttApiConfig,
   MqttLooseConfig,
@@ -40,7 +40,7 @@ vi.mock('@/app/(main)/datasources/[datasourceId]/components/connector-tab/connec
 describe('getConnectorDefaults', () => {
   it('returns mqtt defaults', () => {
     const result = getConnectorDefaults(CONNECTOR_TYPES.MQTT)
-    expect(result).toEqual<ConnectorApiConfig['mqtt']>({
+    expect(result).toEqual<ConnectorApiResponseConfig['mqtt']>({
       urls: [],
       topics: [],
     })
@@ -48,7 +48,7 @@ describe('getConnectorDefaults', () => {
 
   it('returns sql defaults', () => {
     const result = getConnectorDefaults(CONNECTOR_TYPES.SQL)
-    expect(result).toEqual<ConnectorApiConfig['sql']>({
+    expect(result).toEqual<ConnectorApiResponseConfig['sql']>({
       columns: [],
       init_files: [],
     })
@@ -99,7 +99,7 @@ describe('getInitialConnectorFormData', () => {
   it('returns datasource config if it exists for selected type', () => {
     const apiConnector = { type: 'sql', config: { columns: ['c1'], init_files: ['f1', 'f2'] } }
 
-    const result = getInitialConnectorFormData(apiConnector as ConnectorApiData)
+    const result = getInitialConnectorFormData(apiConnector as ConnectorApiResponseData)
     expect(result.type).toBe('sql')
     expect(result.config).toEqual<SqlLooseConfig>({
       columns: 'c1',

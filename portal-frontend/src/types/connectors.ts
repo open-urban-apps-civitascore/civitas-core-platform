@@ -3,8 +3,6 @@ import { z } from 'zod'
 
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
-import { trimmedString } from './common'
-
 export type ConnectorTypeKey = keyof typeof CONNECTOR_TYPES
 
 export type ConnectorType = (typeof CONNECTOR_TYPES)[keyof typeof CONNECTOR_TYPES]
@@ -37,7 +35,13 @@ export const MqttStrictSchema = MqttBaseSchema.extend({
   urls: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'required')),
   topics: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'required')),
 })
-export const MqttApiSchema = MqttBaseSchema.extend({
+
+export const MqttUpdateSchema = MqttBaseSchema.extend({
+  urls: z.preprocess(parseStringArray, z.array(z.string())),
+  topics: z.preprocess(parseStringArray, z.array(z.string())),
+})
+
+export const MqttApiResponseSchema = MqttBaseSchema.extend({
   urls: z.array(z.string()),
   topics: z.array(z.string()),
 })
@@ -64,22 +68,28 @@ const SqlBaseSchema = z.object({
 export const SqlLooseSchema = SqlBaseSchema
 
 export const SqlStrictSchema = SqlBaseSchema.extend({
-  dsn: trimmedString,
-  table: trimmedString,
+  dsn: z.string().trim().min(1, 'common.errors.descriptionRequired'),
+  table: z.string().trim().min(1, 'common.errors.descriptionRequired'),
   columns: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'required')),
   init_files: z.preprocess(parseStringArray, z.array(z.string())),
 })
-export const SqlApiSchema = SqlBaseSchema.extend({
+export const SqlUpdateSchema = SqlBaseSchema.extend({
+  dsn: z.string().trim(),
+  table: z.string().trim(),
+  columns: z.preprocess(parseStringArray, z.array(z.string())),
+  init_files: z.preprocess(parseStringArray, z.array(z.string())),
+})
+export const SqlApiResponseSchema = SqlBaseSchema.extend({
   columns: z.array(z.string()),
   init_files: z.array(z.string()),
 })
 
 export type MqttLooseConfig = z.infer<typeof MqttLooseSchema>
 export type MqttStrictConfig = z.infer<typeof MqttStrictSchema>
-export type MqttApiConfig = z.infer<typeof MqttApiSchema>
+export type MqttApiConfig = z.infer<typeof MqttApiResponseSchema>
 export type SqlLooseConfig = z.infer<typeof SqlLooseSchema>
 export type SqlStrictConfig = z.infer<typeof SqlStrictSchema>
-export type SqlApiConfig = z.infer<typeof SqlApiSchema>
+export type SqlApiConfig = z.infer<typeof SqlApiResponseSchema>
 
 export const ConnectorLooseSchema = z.discriminatedUnion('type', [
   z.object({
@@ -103,22 +113,34 @@ export const ConnectorStrictSchema = z.discriminatedUnion('type', [
   }),
 ])
 
-export const ConnectorApiSchema = z.discriminatedUnion('type', [
+export const ConnectorApiResponseSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal(CONNECTOR_TYPES.MQTT),
-    config: MqttApiSchema,
+    config: MqttApiResponseSchema,
   }),
   z.object({
     type: z.literal(CONNECTOR_TYPES.SQL),
-    config: SqlApiSchema,
+    config: SqlApiResponseSchema,
   }),
 ])
 
-export type ConnectorApiConfig = {
-  mqtt: z.infer<typeof MqttApiSchema>
-  sql: z.infer<typeof SqlApiSchema>
+export const ConnectorUpdateSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal(CONNECTOR_TYPES.MQTT),
+    config: MqttUpdateSchema,
+  }),
+  z.object({
+    type: z.literal(CONNECTOR_TYPES.SQL),
+    config: SqlUpdateSchema,
+  }),
+])
+
+export type ConnectorApiResponseConfig = {
+  mqtt: z.infer<typeof MqttApiResponseSchema>
+  sql: z.infer<typeof SqlApiResponseSchema>
 }
 
 export type ConnectorDraft = z.input<typeof ConnectorLooseSchema>
 export type ConnectorAvailable = z.output<typeof ConnectorStrictSchema>
-export type ConnectorApiData = z.output<typeof ConnectorApiSchema>
+export type ConnectorApiResponseData = z.infer<typeof ConnectorApiResponseSchema>
+export type ConnectorUpdateData = z.infer<typeof ConnectorUpdateSchema>

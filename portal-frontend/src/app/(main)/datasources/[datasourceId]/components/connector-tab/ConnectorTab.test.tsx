@@ -86,7 +86,7 @@ vi.mock('./connectorSources', () => ({
 }))
 
 const defaultValues: DatasourceFormDraft = {
-  id: 1,
+  id: '1',
   name: '',
   description: '',
   tags: [],

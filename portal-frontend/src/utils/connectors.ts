@@ -1,23 +1,15 @@
 import { CONNECTORS } from '@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources'
 import { CONNECTOR_TYPES } from '@/const/connectors'
-import { ConnectorApiConfig, ConnectorApiData, ConnectorDraft, ConnectorType } from '@/types/connectors'
+import { ConnectorApiResponseConfig, ConnectorApiResponseData, ConnectorDraft, ConnectorType } from '@/types/connectors'
 
-const getArrayFromString = (value: string | undefined) =>
-  !!value
-    ? value
-        ?.split(',')
-        .map(v => v.trim())
-        .filter(Boolean)
-    : []
-
-export const getConnectorDefaults = <T extends ConnectorType>(type: T): ConnectorApiConfig[T] => {
+export const getConnectorDefaults = <T extends ConnectorType>(type: T): ConnectorApiResponseConfig[T] => {
   return CONNECTORS[type].properties.reduce(
     (acc, property) => {
-      acc[property.key as keyof ConnectorApiConfig[T]] =
-        property.defaultValue as ConnectorApiConfig[T][keyof ConnectorApiConfig[T]]
+      acc[property.key as keyof ConnectorApiResponseConfig[T]] =
+        property.defaultValue as ConnectorApiResponseConfig[T][keyof ConnectorApiResponseConfig[T]]
       return acc
     },
-    {} as ConnectorApiConfig[T],
+    {} as ConnectorApiResponseConfig[T],
   )
 }
 
@@ -38,26 +30,7 @@ export const mapApiToForm = <T extends Record<string, unknown>, K extends readon
   }
 }
 
-export const mapFormToApi = <T extends Record<string, unknown>, K extends readonly (keyof T)[]>(
-  config: T,
-  fields: K,
-): Omit<T, K[number]> & { [P in K[number]]: string[] } => {
-  const result = { ...config } as Record<string, unknown>
-
-  Object.entries(result).forEach(([key, value]) => {
-    if (typeof value === 'string') {
-      result[key] = value.trim()
-    }
-  })
-
-  fields.forEach(key => {
-    result[key as string] = getArrayFromString(config[key] as string)
-  })
-
-  return result as Omit<T, K[number]> & { [P in K[number]]: string[] }
-}
-
-export const getInitialConnectorFormData = (connector: ConnectorApiData | null): ConnectorDraft => {
+export const getInitialConnectorFormData = (connector: ConnectorApiResponseData | null): ConnectorDraft => {
   switch (connector?.type) {
     case CONNECTOR_TYPES.SQL:
       return {
@@ -90,21 +63,6 @@ export const getConnectorFormData = (type: ConnectorType, connectorFormData: Con
           connectorFormData?.type === type
             ? connectorFormData.config
             : mapApiToForm(getConnectorDefaults(CONNECTOR_TYPES.MQTT), ['urls', 'topics']),
-      }
-  }
-}
-
-export const mapConnectorFormToApiData = (connectorFormData: ConnectorDraft): ConnectorApiData => {
-  switch (connectorFormData.type) {
-    case CONNECTOR_TYPES.SQL:
-      return {
-        type: connectorFormData.type,
-        config: mapFormToApi(connectorFormData?.config, ['columns', 'init_files']),
-      }
-    case CONNECTOR_TYPES.MQTT:
-      return {
-        type: connectorFormData.type,
-        config: mapFormToApi(connectorFormData?.config, ['urls', 'topics']),
       }
   }
 }

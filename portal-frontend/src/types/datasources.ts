@@ -3,8 +3,13 @@ import z from 'zod'
 import type { CONNECTORS } from '@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources'
 import { CONNECTION_TYPES, CONNECTOR_TYPES, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 
-import { trimmedString } from './common'
-import { ConnectorApiSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
+import { WithId } from './common'
+import {
+  ConnectorApiResponseSchema,
+  ConnectorLooseSchema,
+  ConnectorStrictSchema,
+  ConnectorUpdateSchema,
+} from './connectors'
 
 export type ConnectionType = (typeof CONNECTION_TYPES)[keyof typeof CONNECTION_TYPES]
 
@@ -29,28 +34,21 @@ export type ConnectorField = {
   placeholder: string
 }
 
-/* schema */
-export const DatasourceSchema = z.object({
-  id: z.number({
-    error: issue => (issue.input === undefined ? 'common.errors.required' : 'common.errors.invalidNumber'),
-  }),
-  name: trimmedString,
-  description: z.string(),
+export const DatasourceApiResponseSchema = z.object({
+  id: z.string(),
+  name: z.string().trim().min(1, 'common.errors.descriptionRequired'),
+  description: z.string().trim(),
   connection: ConnectionTypeSchema,
   lastActive: z.string(),
   tags: z.array(z.string()).default([]),
   status: DatasourceStatusSchema,
-  connector: ConnectorApiSchema.nullable(),
+  connector: ConnectorApiResponseSchema.nullable(),
 })
 
-export type Datasource = z.infer<typeof DatasourceSchema>
-
-/* Form schemas for create */
-export const DatasourceCreateFormSchema = DatasourceSchema.pick({ name: true })
-export type DatasourceCreateFormData = z.infer<typeof DatasourceCreateFormSchema>
+export type Datasource = z.infer<typeof DatasourceApiResponseSchema>
 
 /* Form schemas for edit */
-export const DatasourceBaseFormSchema = DatasourceSchema.pick({
+export const DatasourceBaseFormSchema = DatasourceApiResponseSchema.pick({
   id: true,
   name: true,
   description: true,
@@ -59,9 +57,6 @@ export const DatasourceBaseFormSchema = DatasourceSchema.pick({
 }).required({ tags: true })
 
 export type DatasourceBaseFormData = z.infer<typeof DatasourceBaseFormSchema>
-
-export type CreateDatasourceData = Omit<Datasource, 'id'>
-export type UpdateDatasourceData = Partial<CreateDatasourceData> & { id: number }
 
 export type ConnectorNodeDefs = typeof CONNECTORS
 export type ConnectorDefaultsByType = {
@@ -72,12 +67,22 @@ export type ConnectorDefaultsByType = {
 
 export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorLooseSchema.nullable() })
 export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
-  name: trimmedString,
-  description: trimmedString.max(150, 'common.errors.descriptionMaxLength'),
+  name: z.string().trim().min(1, 'common.errors.descriptionRequired'),
+  description: z
+    .string()
+    .trim()
+    .min(1, 'common.errors.descriptionRequired')
+    .max(150, 'common.errors.descriptionMaxLength'),
   connector: ConnectorStrictSchema,
 })
-export const DatasourceApiDataSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorApiSchema.optional() })
+export const DatasourceUpdateSchema = DatasourceBaseFormSchema.extend({
+  connector: ConnectorUpdateSchema.nullable(),
+})
 
 export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>
 export type DatasourceFormAvailable = z.output<typeof DatasourceFormAvailableSchema>
-export type DatasourceApiData = z.output<typeof DatasourceApiDataSchema>
+export type DatasourceUpdateData = Partial<z.infer<typeof DatasourceUpdateSchema>> & WithId
+
+export const DatasourceCreateFormSchema = DatasourceApiResponseSchema.pick({ name: true })
+export type DatasourceCreateFormData = z.infer<typeof DatasourceCreateFormSchema>
+export type DatasourceCreateData = Omit<Datasource, 'id'>
