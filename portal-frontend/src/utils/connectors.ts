@@ -1,16 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { CONNECTORS } from '@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources'
 import { CONNECTOR_TYPES } from '@/const/connectors'
-import {
-  ConnectorApiConfig,
-  ConnectorApiData,
-  ConnectorDraft,
-  ConnectorType,
-  MqttApiConfig,
-  MqttLooseConfig,
-  SqlApiConfig,
-  SqlLooseConfig,
-} from '@/types/connectors'
+import { ConnectorApiConfig, ConnectorApiData, ConnectorDraft, ConnectorType } from '@/types/connectors'
 
 const getArrayFromString = (value: string | undefined) => (!!value ? value?.split(',') : [])
 
@@ -25,54 +16,57 @@ export const getConnectorDefaults = <T extends ConnectorType>(type: T): Connecto
   )
 }
 
-export const mapMqttApiDataToForm = (config: MqttApiConfig): MqttLooseConfig => {
-  return {
-    ...config,
-    urls: config.urls.join(',') || '',
-    topics: config.topics.join(',') || '',
+export const mapApiToForm = <T extends Record<string, unknown>, K extends readonly (keyof T)[]>(
+  config: T,
+  fields: K,
+): Omit<T, K[number]> & {
+  [P in K[number]]: string
+} => {
+  const result = { ...config } as Record<string, unknown>
+
+  fields.forEach(key => {
+    result[key as string] = Array.isArray(config[key]) ? (config[key] as string[]).join(',') : ''
+  })
+
+  return result as Omit<T, K[number]> & {
+    [P in K[number]]: string
   }
 }
 
-export const mapSqlApiDataToForm = (config: SqlApiConfig): SqlLooseConfig => {
-  return {
-    ...config,
-    columns: config.columns.join(',') || '',
-    init_files: config.init_files.join(',') || '',
-  }
-}
-export const mapMqttFormToApiData = (config: MqttLooseConfig): MqttApiConfig => {
-  return {
-    ...config,
-    urls: getArrayFromString(config.urls),
-    topics: getArrayFromString(config.topics),
+export const mapFormToApi = <T extends Record<string, unknown>, K extends readonly (keyof T)[]>(
+  config: T,
+  fields: K,
+): Omit<T, K[number]> & {
+  [P in K[number]]: string[]
+} => {
+  const result = { ...config } as Record<string, unknown>
+
+  fields.forEach(key => {
+    result[key as string] = getArrayFromString(config[key] as string)
+  })
+
+  return result as Omit<T, K[number]> & {
+    [P in K[number]]: string[]
   }
 }
 
-export const mapSqlFormToApiData = (config: SqlLooseConfig): SqlApiConfig => {
-  return {
-    ...config,
-    columns: getArrayFromString(config.columns),
-    init_files: getArrayFromString(config.init_files),
-  }
-}
-
-export const getInitialConnectorFormData = (connector: ConnectorApiData | null) => {
+export const getInitialConnectorFormData = (connector: ConnectorApiData | null): ConnectorDraft => {
   switch (connector?.type) {
     case CONNECTOR_TYPES.SQL:
       return {
         type: connector?.type,
-        config: mapSqlApiDataToForm(connector?.config),
+        config: mapApiToForm(connector?.config, ['columns', 'init_files']),
       }
     case CONNECTOR_TYPES.MQTT:
     default:
       return {
         type: connector?.type || 'mqtt',
-        config: mapMqttApiDataToForm(connector?.config || getConnectorDefaults(CONNECTOR_TYPES.MQTT)),
+        config: mapApiToForm(connector?.config || getConnectorDefaults(CONNECTOR_TYPES.MQTT), ['urls', 'topics']),
       }
   }
 }
 
-export const getConnectorFormData = (type: ConnectorType, connectorFormData: ConnectorDraft | null) => {
+export const getConnectorFormData = (type: ConnectorType, connectorFormData: ConnectorDraft | null): ConnectorDraft => {
   switch (type) {
     case CONNECTOR_TYPES.SQL:
       return {
@@ -80,7 +74,7 @@ export const getConnectorFormData = (type: ConnectorType, connectorFormData: Con
         config:
           connectorFormData?.type === type
             ? connectorFormData.config
-            : mapSqlApiDataToForm(getConnectorDefaults(CONNECTOR_TYPES.SQL)),
+            : mapApiToForm(getConnectorDefaults(CONNECTOR_TYPES.SQL), ['columns', 'init_files']),
       }
     case CONNECTOR_TYPES.MQTT:
       return {
@@ -88,22 +82,22 @@ export const getConnectorFormData = (type: ConnectorType, connectorFormData: Con
         config:
           connectorFormData?.type === type
             ? connectorFormData.config
-            : mapMqttApiDataToForm(getConnectorDefaults(CONNECTOR_TYPES.MQTT)),
+            : mapApiToForm(getConnectorDefaults(CONNECTOR_TYPES.MQTT), ['urls', 'topics']),
       }
   }
 }
 
-export const mapConnectorFormToApiData = (connectorFormData: ConnectorDraft) => {
+export const mapConnectorFormToApiData = (connectorFormData: ConnectorDraft): ConnectorApiData => {
   switch (connectorFormData.type) {
     case CONNECTOR_TYPES.SQL:
       return {
         type: connectorFormData.type,
-        config: mapSqlFormToApiData(connectorFormData?.config),
+        config: mapFormToApi(connectorFormData?.config, ['columns', 'init_files']),
       }
     case CONNECTOR_TYPES.MQTT:
       return {
         type: connectorFormData.type,
-        config: mapMqttFormToApiData(connectorFormData?.config),
+        config: mapFormToApi(connectorFormData?.config, ['urls', 'topics']),
       }
   }
 }
