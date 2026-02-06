@@ -14,7 +14,7 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { DATASOURCE_STATUS_TYPES } from '@/const/connectors'
-import { ConnectorStrictSchema } from '@/types/connectors'
+import { ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
   Datasource,
   DatasourceFormAvailableSchema,
@@ -82,8 +82,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     return DatasourceFormAvailableSchema.safeParse(formValues).success
   }, [formValues])
 
-  const updateConnectorConfig = () =>
-    form.setValue('connector', getConnectorFormData(connectorTypeWatch, defaultValues.connector), { shouldDirty: true })
+  const updateConnectorConfig = (connectorType: ConnectorType) =>
+    form.setValue('connector', getConnectorFormData(connectorType, defaultValues.connector), { shouldDirty: true })
 
   const revalidateForm = () => {
     if (!isDraftMode) {
@@ -100,7 +100,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   useEffect(() => {
     if (!connectorTypeWatch) return
-    updateConnectorConfig()
+    updateConnectorConfig(connectorTypeWatch)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch])
 
@@ -134,36 +134,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const handleStatusChange = (newStatus: DatasourceStatusType) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
-
-  // const buildApiPayload = (formData: DatasourceFormDraft): DatasourceUpdateData | undefined => {
-  //   const parsed = DatasourceUpdateSchema.safeParse(formData)
-  //   if (parsed.error) {
-  //     console.error(parsed.error)
-  //     toast.error('Form data invalid')
-  //   }
-  //   return parsed.data
-  // return {
-  //   id: formData.id,
-  //   name: formData.name.trim(),
-  //   description: formData.description.trim(),
-  //   tags: formData.tags,
-  //   status: formData.status,
-  //   connector: formData.connector ? mapConnectorFormToApiData(formData.connector) : null,
-  // }
-  // }
-
-  // const buildApiPayload = (formData: DatasourceFormDraft): Datasource => {
-  //   return {
-  //     id: formData.id,
-  //     name: formData.name.trim(),
-  //     description: formData.description.trim(),
-  //     tags: formData.tags,
-  //     status: formData.status,
-  //     lastActive: datasource.lastActive,
-  //     connection: datasource.connection,
-  //     connector: formData.connector ? mapConnectorFormToApiData(formData.connector) : null,
-  //   }
-  // }
 
   const submitDatasource = (onSuccess?: () => void) => {
     const parsed = isDraftMode
@@ -206,7 +176,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       case 'basicInfo':
         return <BasicInfoTab form={form} />
       case 'connector':
-        return <ConnectorTab form={form} isDraftMode={isDraftMode} />
+        return <ConnectorTab form={form} isDraftMode={isDraftMode} onConnectorTypeChange={updateConnectorConfig} />
       case 'dataStructure':
       case 'accessPermissions':
       default:
