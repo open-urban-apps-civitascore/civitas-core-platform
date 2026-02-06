@@ -315,8 +315,7 @@ class RoleControllerIntegrationTest
       AssignmentInputDTO assignmentInput = new AssignmentInputDTO();
       assignmentInput.setRoleId(roleId);
       assignmentInput.setGroupId(groups.getLeft().getId());
-      assignmentInput.setScopeType(ScopeType.TENANT);
-      assignmentInput.setIsInherited(false);
+      assignmentInput.setScopeType(ScopeType.PLATFORM);
       assignmentService.create(assignmentInput);
 
       assignmentInput.setGroupId(groups.getMiddle().getId());
@@ -359,8 +358,7 @@ class RoleControllerIntegrationTest
       AssignmentInputDTO assignmentInput = new AssignmentInputDTO();
       assignmentInput.setRoleId(roleId);
       assignmentInput.setGroupId(groups.getLeft().getId());
-      assignmentInput.setScopeType(ScopeType.TENANT);
-      assignmentInput.setIsInherited(false);
+      assignmentInput.setScopeType(ScopeType.PLATFORM);
       assignmentService.create(assignmentInput);
 
       assignmentInput.setGroupId(groups.getMiddle().getId());
