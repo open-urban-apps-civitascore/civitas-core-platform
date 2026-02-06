@@ -100,7 +100,8 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
             handleNestedResource(
                 model, resource, property, baseOutputDTO.getId().toString(), baseOutputDTO);
         case BaseSummaryDTO baseSummaryDTO ->
-            handleNestedResource(model, resource, property, baseSummaryDTO.getId(), baseSummaryDTO);
+            handleNestedResource(
+                model, resource, property, baseSummaryDTO.getId().toString(), baseSummaryDTO);
         default -> handleLiteralValue(model, resource, property, value, propertyAnnotation);
       }
 
@@ -124,7 +125,8 @@ public class GenericDcatMapper<T extends BaseOutputDTO> extends DcatMapper<T>
             handleNestedResource(
                 model, resource, property, baseOutputDTO.getId().toString(), baseOutputDTO);
         case BaseSummaryDTO baseSummaryDTO ->
-            handleNestedResource(model, resource, property, baseSummaryDTO.getId(), baseSummaryDTO);
+            handleNestedResource(
+                model, resource, property, baseSummaryDTO.getId().toString(), baseSummaryDTO);
         default -> handleLiteralValue(model, resource, property, item, propertyAnnotation);
       }
     }
