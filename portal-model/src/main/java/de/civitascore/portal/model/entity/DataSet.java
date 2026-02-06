@@ -80,4 +80,7 @@ public class DataSet extends NamedEntity {
 
   @Column(name = "format")
   private String format;
+
+  @OneToMany(mappedBy = "dataset", fetch = FetchType.LAZY)
+  private Set<Assignment> assignments = new HashSet<>();
 }

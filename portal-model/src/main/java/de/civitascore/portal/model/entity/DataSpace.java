@@ -63,4 +63,7 @@ public class DataSpace extends NamedEntity {
 
   @Column(name = "external_id")
   private String externalId;
+
+  @OneToMany(mappedBy = "dataSpace", fetch = FetchType.LAZY)
+  private Set<Assignment> assignments = new HashSet<>();
 }

@@ -7,6 +7,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.util.HashSet;
 import java.util.Set;
@@ -43,4 +44,7 @@ public class Catalog extends NamedEntity {
         @Index(name = "idx_catalog_datasets_dataset", columnList = "dataset_id")
       })
   private Set<DataSet> dataSets = new HashSet<>();
+
+  @OneToMany(mappedBy = "catalog", fetch = FetchType.LAZY)
+  private Set<Assignment> assignments = new HashSet<>();
 }
