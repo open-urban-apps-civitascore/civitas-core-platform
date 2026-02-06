@@ -206,7 +206,7 @@ echo
 # ---- Build Phase ---------------------------------------------------
 
 # Build config-adapter if command line option selected
-if [ "$config_adapter_option" = "1" ]; then
+if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
     echo "Building Config Adapter (version: $DEV_VERSION)..."
     cd "$SCRIPT_DIR/../config-adapter"
     mvn clean install -DskipTests -Drevision=$DEV_VERSION
