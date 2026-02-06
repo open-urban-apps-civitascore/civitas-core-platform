@@ -75,7 +75,7 @@ export const UserForm = (props: UserFormProps) => {
   const isFormDirty = useMemo(() => {
     const dirtyFields = form.formState.dirtyFields
     const isPhoneFieldDirty =
-      dirtyFields.phone && form.getValues('phone').replace(/\s+/g, '') !== defaultUserData.phone.replace(/\s+/g, '')
+      dirtyFields.phone && form.getValues('phone')?.replace(/\s+/g, '') !== defaultUserData.phone?.replace(/\s+/g, '')
     const isNonPhoneFieldDirty = Object.keys(dirtyFields).find(field => field !== 'phone')
     return isNonPhoneFieldDirty || isPhoneFieldDirty
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -21,9 +21,9 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { GroupAssignmentUser } from '@/types/users'
+import { ListUser } from '@/types/users'
 import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
-import { mapGoupAssignmentUsers } from '@/utils/users'
+import { mapListUsers } from '@/utils/users'
 
 export type UserSelection = { selectAll: boolean; selectedIds: string[]; excludedIds: string[] }
 
@@ -55,7 +55,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
 
   const users = useMemo(() => {
     if (usersData?.data && usersData?.data.length > 0) {
-      const allUsers = mapGoupAssignmentUsers(usersData?.data)
+      const allUsers = mapListUsers(usersData?.data)
       const unassignedUsers = allUsers.filter(user => !originalUsers.find(original => original.id === user.id))
       return unassignedUsers
     } else return []
@@ -89,7 +89,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     })
   }
 
-  const columnHelper = createColumnHelper<GroupAssignmentUser>()
+  const columnHelper = createColumnHelper<ListUser>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -131,7 +131,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.email')} />,
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor('isActive', {
+    columnHelper.accessor('active', {
       header: tUsers('info.status.active'),
       cell: info => <StatusLabel isChecked={info.getValue()} />,
     }),

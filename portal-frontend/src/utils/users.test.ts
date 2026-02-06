@@ -20,7 +20,7 @@ describe('mapListUsers', () => {
         id: '12345',
         fullName: 'Max Mustermann',
         email: 'maxmustermann@test.de',
-        isActive: true,
+        active: true,
       },
     ])
   })
@@ -49,7 +49,7 @@ describe('mapUserToFormData', () => {
       lastName: '',
       email: '',
       phone: '',
-      active: false,
+      active: true,
     }
 
     expect(mapUserToFormData(null)).toEqual(expected)

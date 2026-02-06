@@ -1,4 +1,4 @@
-import { GroupAssignmentUser, GroupListUser, ListUser, User, UserFormData } from '@/types/users'
+import { GroupListUser, ListUser, User, UserFormData } from '@/types/users'
 
 export const mapListUsers = (users: User[]): ListUser[] =>
   users.map(user => {
@@ -6,7 +6,7 @@ export const mapListUsers = (users: User[]): ListUser[] =>
       id: user.id,
       fullName: `${user.firstName} ${user.lastName}`,
       email: user.email,
-      isActive: user.active,
+      active: user.active,
     }
   })
 
@@ -19,18 +19,8 @@ export const mapGroupListUsers = (
       id: user.id,
       fullName: `${user.firstName} ${user.lastName}`,
       email: user.email,
-      isActive: user.active,
+      active: user.active,
       assignedAt: userAssignments.find(assignment => assignment.id === user.id)?.assignedAt ?? '',
-    }
-  })
-
-export const mapGoupAssignmentUsers = (users: User[]): GroupAssignmentUser[] =>
-  users.map(user => {
-    return {
-      id: user.id,
-      fullName: `${user.firstName} ${user.lastName}`,
-      email: user.email,
-      isActive: user.active,
     }
   })
 
@@ -41,5 +31,5 @@ export const mapUserToFormData = (userResponse: User | null): UserFormData => ({
   email: userResponse?.email || '',
   phone: userResponse?.phone || '',
   title: userResponse?.title || 'MR',
-  active: userResponse?.active || false,
+  active: userResponse?.active || true,
 })
