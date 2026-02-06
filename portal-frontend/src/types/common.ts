@@ -1,3 +1,4 @@
+import { AxiosRequestConfig } from 'axios'
 import { InputHTMLAttributes } from 'react'
 
 export type Item = {
@@ -49,6 +50,7 @@ export type UpdateInput = {
 export type BaseMutationInput = {
   key: string
   errorMessage: string
+  headers?: AxiosRequestConfig['headers']
 }
 
 export type CreateMutationInput = BaseMutationInput

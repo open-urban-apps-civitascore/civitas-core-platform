@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
@@ -19,11 +20,16 @@ export const useGetAuthorities = ({ params, isEnabled }: GetListInput = {}) =>
   })
 
 export const useCreateUser = () =>
-  useCreateMutation<User, CreateUserData>({ key, errorMessage: 'An error occurred while creating the user.' })
+  useCreateMutation<User, CreateUserData>({
+    key,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while creating the user.',
+  })
 
 export const useUpdateUser = () =>
   useUpdateMutation<User, UpdateUserData>({
     key,
     method: 'PUT',
-    errorMessage: 'An error occurred while creating the user.',
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while updating the user.',
   })
