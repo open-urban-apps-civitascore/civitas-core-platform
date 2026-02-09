@@ -15,6 +15,9 @@ gl-dependency-scanning.json
 **/.DS_Store
 errorlogs.txt
 errorlogs.txt
+.vscode
 
-# Watchtower symlink (private upstream digest)
-docs/claude/upstream-digest.md
+# Claude Code state (symlinked to private archive repo)
+/CLAUDE.md
+/.claude
+/docs/claude

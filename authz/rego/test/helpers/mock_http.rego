@@ -19,6 +19,14 @@ package test.helpers.mock_http
 import rego.v1
 
 # =============================================================================
+# TEST CONFIGURATION
+# =============================================================================
+
+# All tests must provide data.config with authz_repository_url (no hardcoded default).
+# Use: with data.config as mock_http.test_config
+mock_config := {"authz_repository_url": "http://test-authz-repo:8091/api/v1/user-context"}
+
+# =============================================================================
 # USERINFO HEADER ENCODING
 # =============================================================================
 

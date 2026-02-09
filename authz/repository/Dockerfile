@@ -1,21 +1,14 @@
-# Build stage
-FROM maven:3.9-eclipse-temurin-21-alpine AS builder
+# AuthZ Repository - Runtime-only Docker image
+#
+# The JAR must be pre-built on the host before building this image:
+#   mvn -f authz/repository/pom.xml package -DskipTests
+#
+# This is required because portal-model:1.0.0-SNAPSHOT is a local dependency
+# not published to Maven Central, so multi-stage Maven builds inside Docker
+# cannot resolve it. Building on the host (where ~/.m2 has it) works fine.
+#
+# The start-dev.sh script handles this automatically.
 
-WORKDIR /app
-
-# Copy pom.xml first for better layer caching
-COPY pom.xml .
-
-# Download dependencies (cached unless pom.xml changes)
-RUN mvn dependency:go-offline -B
-
-# Copy source code
-COPY src src
-
-# Build the application
-RUN mvn package -DskipTests -B
-
-# Runtime stage
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
@@ -24,8 +17,8 @@ WORKDIR /app
 RUN addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
 
-# Copy the built JAR from builder stage
-COPY --from=builder /app/target/*.jar app.jar
+# Copy pre-built JAR
+COPY target/*.jar app.jar
 
 # Switch to non-root user
 USER appuser
@@ -34,7 +27,7 @@ USER appuser
 EXPOSE 8091
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8091/actuator/health || exit 1
 
 # Run the application

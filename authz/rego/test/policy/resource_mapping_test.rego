@@ -14,22 +14,31 @@ portal_request(method, path) := {
     "request": {
         "method": method,
         "path": path,
-        "headers": {"x-authz-backend": "portal-backend"}
-    }
+        "headers": {}
+    },
+    "service": {"name": "portal-backend"}
 }
 
 # =============================================================================
 # BACKEND DETECTION TESTS
 # =============================================================================
 
-test_backend_from_header if {
+test_backend_from_service if {
     result := resource_mapping.backend with input as portal_request("GET", "/v2/users")
     result == "portal-backend"
 }
 
-test_backend_unknown_without_header if {
+test_backend_unknown_without_service if {
     result := resource_mapping.backend with input as {
         "request": {"path": "/v2/users", "headers": {}}
+    }
+    result == "unknown"
+}
+
+test_backend_unknown_empty_service_name if {
+    result := resource_mapping.backend with input as {
+        "request": {"path": "/v2/users", "headers": {}},
+        "service": {"name": ""}
     }
     result == "unknown"
 }
@@ -121,7 +130,8 @@ test_path_traversal_encoded_rejected if {
 # Null byte injection should be rejected
 test_null_byte_rejected if {
     result := resource_mapping.is_valid_path with input as {
-        "request": {"path": "/v2/users\u0000/admin", "method": "GET", "headers": {"x-authz-backend": "portal-backend"}}
+        "request": {"path": "/v2/users\u0000/admin", "method": "GET", "headers": {}},
+        "service": {"name": "portal-backend"}
     }
     result == false
 }
@@ -135,7 +145,8 @@ test_backslash_rejected if {
 # Backend ID validation - valid IDs
 test_valid_backend_id if {
     result := resource_mapping.backend with input as {
-        "request": {"path": "/v2/users", "method": "GET", "headers": {"x-authz-backend": "portal-backend"}}
+        "request": {"path": "/v2/users", "method": "GET", "headers": {}},
+        "service": {"name": "portal-backend"}
     }
     result == "portal-backend"
 }
@@ -143,14 +154,16 @@ test_valid_backend_id if {
 # Backend ID with special characters should be rejected
 test_invalid_backend_id_traversal if {
     result := resource_mapping.backend with input as {
-        "request": {"path": "/v2/users", "method": "GET", "headers": {"x-authz-backend": "../etc/passwd"}}
+        "request": {"path": "/v2/users", "method": "GET", "headers": {}},
+        "service": {"name": "../etc/passwd"}
     }
     result == "unknown"
 }
 
 test_invalid_backend_id_spaces if {
     result := resource_mapping.backend with input as {
-        "request": {"path": "/v2/users", "method": "GET", "headers": {"x-authz-backend": "portal backend"}}
+        "request": {"path": "/v2/users", "method": "GET", "headers": {}},
+        "service": {"name": "portal backend"}
     }
     result == "unknown"
 }
@@ -160,14 +173,16 @@ test_invalid_backend_id_spaces if {
 # =============================================================================
 
 test_all_resource_paths if {
-    # Test all endpoints in portal_backend.json resolve correctly
+    # Test all endpoints in portal_backend/data.json resolve correctly
     patterns := [
         ["/v2/users", "/v2/users"],
         ["/v2/users/123", "/v2/users/{id}"],
-        ["/v2/dataspaces", "/v2/dataspaces"],
-        ["/v2/dataspaces/abc", "/v2/dataspaces/{id}"],
         ["/v2/datasets", "/v2/datasets"],
         ["/v2/datasets/xyz", "/v2/datasets/{id}"],
+        ["/v2/datasources", "/v2/datasources"],
+        ["/v2/datasources/ds1", "/v2/datasources/{id}"],
+        ["/v2/datastructures", "/v2/datastructures"],
+        ["/v2/datastructures/dstr1", "/v2/datastructures/{id}"],
         ["/v2/groups", "/v2/groups"],
         ["/v2/groups/g1", "/v2/groups/{id}"],
         ["/v2/roles", "/v2/roles"],
@@ -176,11 +191,33 @@ test_all_resource_paths if {
         ["/v2/permissions/p1", "/v2/permissions/{id}"],
         ["/v2/assignments", "/v2/assignments"],
         ["/v2/assignments/a1", "/v2/assignments/{id}"],
-        ["/v2/catalogs", "/v2/catalogs"],
-        ["/v2/catalogs/c1", "/v2/catalogs/{id}"],
     ]
     every pattern in patterns {
         actual := resource_mapping.path_pattern with input as portal_request("GET", pattern[0])
         actual == pattern[1]
+    }
+}
+
+# Test: Sub-resource paths resolve correctly
+test_sub_resource_paths if {
+    patterns := [
+        ["/v2/datasets/abc/release", "/v2/datasets/{id}/release"],
+        ["/v2/datasets/abc/assignments", "/v2/datasets/{id}/assignments"],
+        ["/v2/datasets/abc/assignments/xyz", "/v2/datasets/{id}/assignments/{id}"],
+        ["/v2/datasources/abc/release", "/v2/datasources/{id}/release"],
+        ["/v2/datastructures/abc/assignments/xyz", "/v2/datastructures/{id}/assignments/{id}"],
+    ]
+    every pattern in patterns {
+        actual := resource_mapping.path_pattern with input as portal_request("POST", pattern[0])
+        actual == pattern[1]
+    }
+}
+
+# Test: Removed endpoints (dataspaces, catalogs) are now unknown
+test_removed_endpoints_unknown if {
+    removed := ["/v2/dataspaces", "/v2/dataspaces/abc", "/v2/catalogs", "/v2/catalogs/c1"]
+    every path in removed {
+        actual := resource_mapping.path_pattern with input as portal_request("GET", path)
+        actual == ""
     }
 }

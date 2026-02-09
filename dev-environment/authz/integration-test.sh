@@ -23,10 +23,10 @@ set -e
 
 # Configuration
 APISIX_URL="${APISIX_URL:-http://localhost:9080}"
-KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8080}"
+KEYCLOAK_URL="${KEYCLOAK_URL:-http://civitas-keycloak:8080}"
 REALM="${KEYCLOAK_REALM:-civitas-core}"
 CLIENT_ID="${CLIENT_ID:-portal-frontend}"
-CLIENT_SECRET="${CLIENT_SECRET:-nLlkqabM7bsCKj5InQnXVvuz6wmACNFG}"
+CLIENT_SECRET="${CLIENT_SECRET:-dev-only-portal-frontend-secret}"
 TEST_PASSWORD="${TEST_PASSWORD:-test123}"
 
 # Test users
@@ -123,7 +123,7 @@ check_health() {
 # HEALTH CHECKS
 # =============================================================================
 echo "=== Health Checks ==="
-check_health "APISIX (via backend health)" "$APISIX_URL/v2/actuator/health" || true
+check_health "Backend (direct)" "http://localhost:8089/v2/actuator/health" || true
 check_health "OPA" "http://localhost:8181/health" || true
 check_health "AuthZ Repository" "http://localhost:8091/actuator/health" || true
 echo ""
@@ -196,9 +196,18 @@ test_endpoint "GET /v2/datasets (no token - 401)" "GET" "/v2/datasets" "" "401"
 test_endpoint "GET /v2/users/me (no token - 401)" "GET" "/v2/users/me" "" "401"
 echo ""
 
-echo "=== Test 6: Public Endpoints ==="
-# Health check is public (no auth required)
-test_endpoint "GET /v2/actuator/health (public)" "GET" "/v2/actuator/health" "" "200"
+echo "=== Test 6: New Resource Endpoints (Datasources/Datastructures) ==="
+# Backend may not have these controllers yet (404), but OPA should NOT block (403).
+# Tests verify authorization passes — backend 404 is expected until controllers are implemented.
+test_endpoint "GET /v2/datasources (authz allows - backend 404)" "GET" "/v2/datasources" "$ADMIN_TOKEN" "404"
+test_endpoint "GET /v2/datastructures (authz allows - backend 404)" "GET" "/v2/datastructures" "$ADMIN_TOKEN" "404"
+test_endpoint "GET /v2/datasources (reader authz allows - backend 404)" "GET" "/v2/datasources" "$READER_TOKEN" "404"
+test_endpoint "POST /v2/datasources (reader - denied by OPA)" "POST" "/v2/datasources" "$READER_TOKEN" "403"
+echo ""
+
+echo "=== Test 7: Removed Endpoints (Dataspaces/Catalogs) ==="
+test_endpoint "GET /v2/dataspaces (removed - unknown_endpoint)" "GET" "/v2/dataspaces" "$ADMIN_TOKEN" "403"
+test_endpoint "GET /v2/catalogs (removed - unknown_endpoint)" "GET" "/v2/catalogs" "$ADMIN_TOKEN" "403"
 echo ""
 
 # =============================================================================

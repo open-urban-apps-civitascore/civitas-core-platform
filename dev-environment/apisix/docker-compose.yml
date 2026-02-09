@@ -1,4 +1,95 @@
+# APISIX Gateway Stack with M5 Authorization
+#
+# Services:
+#   - APISIX: API gateway with JWT validation + OPA authorization
+#   - AuthZ Repository: Serves user context (permissions, roles, groups) to OPA
+#   - OPA: Policy decision point, evaluates Rego policies
+#   - authz-seed: One-shot container that seeds dev admin data after Flyway migrations
+#
+# Included by dev-environment/backend/docker-compose.yml — team 2 gets
+# authorization automatically when starting their dev environment.
+
 services:
+  # AuthZ Repository - serves user context to OPA
+  authz-repository:
+    build:
+      context: ../../authz/repository
+      dockerfile: Dockerfile
+    container_name: civitas-authz-repository
+    restart: always
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
+      DATABASE_USERNAME: admin
+      DATABASE_PASSWORD: admin
+      SERVER_PORT: 8091
+    ports:
+      - "8091:8091"
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres-portal:
+        condition: service_healthy
+
+  # OPA - Policy Decision Point
+  opa:
+    image: openpolicyagent/opa:1.4.2-static
+    container_name: civitas-opa
+    restart: always
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=info"
+      - "--log-format=json"
+      - "--set=decision_logs.console=true"
+      - "/policies"
+      - "/lib"
+      - "/providers"
+      - "/data"
+    volumes:
+      - ../../authz/rego/policy:/policies:ro
+      - ../../authz/rego/lib:/lib:ro
+      - ../../authz/rego/providers:/providers:ro
+      - ../../authz/rego/backends:/data/backends:ro
+      - ./opa-config.json:/data/config.json:ro
+    ports:
+      - "8181:8181"
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "-f", "pretty", "true"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      authz-repository:
+        condition: service_healthy
+
+  # One-shot: Seed dev admin data after Flyway migrations complete
+  authz-seed:
+    image: postgres:17-alpine
+    container_name: civitas-authz-seed
+    restart: "no"
+    volumes:
+      - ./seed-dev-admin.sql:/seed-dev-admin.sql:ro
+    command: >
+      psql -h postgres-portal -U admin -d portal_backend -f /seed-dev-admin.sql
+    environment:
+      PGPASSWORD: admin
+    networks:
+      - civitas-network
+    depends_on:
+      portal-backend:
+        condition: service_healthy
+
+  # APISIX - API Gateway with JWT validation + OPA authorization
   apisix:
     image: apache/apisix:3.14.0-debian
     container_name: civitas-apisix
@@ -6,16 +97,16 @@ services:
     volumes:
       - ./apisix_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
       - ./apisix_conf/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "9080:9080"
       - "9443:9443"
     networks:
       - civitas-network
+    depends_on:
+      opa:
+        condition: service_healthy
 
 networks:
   civitas-network:
     name: civitas-network
-    driver: bridge
     external: true

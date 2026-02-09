@@ -2,7 +2,7 @@
 
 **To**: Team 3 (Deployment/Infrastructure)
 **From**: InfoSec (AuthZ implementation)
-**Date**: 2026-02-03
+**Date**: 2026-02-13 (updated from 2026-02-03)
 **Priority**: Required for M5 (Full AuthZ Integration)
 
 ---
@@ -13,8 +13,8 @@ This document covers deployment of the CIVITAS authorization system, consisting 
 
 1. **OPA (Open Policy Agent)** - Policy evaluation service
 2. **AuthZ Repository** - User context REST API (maps externalId→userId, provides permissions to OPA)
-3. **APISIX JWT Validation** - Validates JWTs using Keycloak JWKS (dynamic key fetch)
-4. **APISIX OPA Plugin** - Routes requests through OPA for authorization
+3. **APISIX Plugin Config** - Shared auth+authz plugin bundle (openid-connect + OPA + request-id)
+4. **APISIX Services** - Backend definitions with upstream config (OPA reads service name for backend dispatch)
 
 **External Dependency**: Keycloak must be reachable from APISIX for JWKS (JWT signing key) retrieval.
 
@@ -37,13 +37,14 @@ Request → APISIX → [JWT validation] → [OPA plugin] → Backend Service
 ```
 
 **Request flow**:
-1. APISIX validates JWT using keys from Keycloak JWKS (openid-connect plugin)
-2. APISIX passes request + JWT claims to OPA (opa plugin)
-3. OPA extracts `sub` (externalId) from JWT claims
-4. OPA calls AuthZ Repository to get user permissions (externalId→userId mapping happens here)
-5. OPA evaluates Rego policies with user context
-6. OPA returns allow/deny decision
-7. APISIX forwards request to backend (if allowed) or returns 403
+1. APISIX validates JWT using keys from Keycloak JWKS (openid-connect plugin in Plugin Config)
+2. APISIX passes request + service metadata to OPA (opa plugin with `with_service=true`)
+3. OPA reads `input.service.name` to identify which backend's permission mappings to use
+4. OPA decodes X-Userinfo header to extract `sub` (externalId) from JWT claims
+5. OPA calls AuthZ Repository to get user permissions (externalId→userId mapping happens here)
+6. OPA evaluates Rego policies with user context
+7. OPA returns allow/deny decision (+ `X-Allowed-Scope-Ids` header for collection filtering)
+8. APISIX forwards request to backend (if allowed) or returns 403
 
 ---
 
@@ -141,6 +142,8 @@ Returns `200 OK` when ready to accept queries.
 
 ### Decision Endpoint
 
+The APISIX OPA plugin calls this automatically. For manual testing:
+
 ```
 POST http://opa:8181/v1/data/civitas/authz/decision
 Content-Type: application/json
@@ -150,22 +153,23 @@ Content-Type: application/json
     "request": {
       "method": "GET",
       "path": "/v2/users",
-      "headers": {"x-authz-backend": "portal-backend"}
+      "headers": {}
     },
-    "user_context": {
-      "userId": "user-1",
-      "groups": [...]
-    }
+    "service": {"name": "portal-backend"}
   }
 }
 ```
+
+Note: In production, APISIX sends the full service object (via `with_service=true`), not just the name. OPA reads `input.service.name` to identify the backend.
 
 Response:
 ```json
 {
   "result": {
-    "allowed": true,
-    "reason": "user has READ_USER permission"
+    "allow": true,
+    "reason": "permission_granted",
+    "permission": "READ_USER",
+    "headers": {"X-Allowed-Scope-Ids": "*"}
   }
 }
 ```
@@ -173,6 +177,8 @@ Response:
 ### Decision Logging
 
 Decision logs are written to stdout in JSON format (configured via `decision_logs.console=true`). In production, collect these with your logging infrastructure.
+
+**Token masking**: The policy file `policy/mask.rego` strips sensitive headers (X-Access-Token, X-Userinfo, Authorization) from decision log entries. These appear as `"erased": [...]` in the log output. This is required for TR-03187 compliance — JWTs and user claims must not appear in logs.
 
 ---
 
@@ -225,7 +231,7 @@ RUN mvn clean package -DskipTests
 # Runtime
 FROM eclipse-temurin:21-jre-alpine
 COPY --from=build /app/target/authz-repository-*.jar /app/app.jar
-EXPOSE 8090
+EXPOSE 8091
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
 ```
 
@@ -291,19 +297,19 @@ plugins:
   openid-connect:
     client_id: "apisix-validator"
     client_secret: "unused-for-bearer-only"
-    discovery: "https://keycloak.civitas.io/realms/civitas-core/.well-known/openid-configuration"
+    discovery: "https://auth.civitas.io/realms/civitas-core/.well-known/openid-configuration"
     bearer_only: true
+    use_jwks: true
     ssl_verify: true
     set_userinfo_header: true
-    # No public_key - keys fetched dynamically from JWKS
 ```
 
 **Key settings:**
 - `discovery`: Points to Keycloak's OpenID configuration (must be HTTPS in production)
 - `bearer_only: true`: Only validate bearer tokens, don't initiate OAuth flows
+- `use_jwks: true`: Validate JWT signatures using JWKS from the discovery endpoint (automatic key rotation)
 - `ssl_verify: true`: Verify Keycloak's TLS certificate (requires valid cert)
 - `set_userinfo_header: true`: Pass decoded JWT claims to upstream (needed for OPA)
-- **No `public_key`**: Keys are fetched dynamically from JWKS, enabling automatic key rotation
 
 ### Network Requirements for JWKS
 
@@ -363,52 +369,72 @@ curl -s https://keycloak/realms/civitas-core/protocol/openid-connect/certs | jq 
 
 ---
 
-## Component 4: APISIX OPA Plugin
+## Component 4: APISIX Plugin Config + Services
 
-### Plugin Configuration
+APISIX now uses **Plugin Config** (shared plugin bundle) and **Services** (backend definitions) instead of per-route plugin configuration. See [Team 1 Handoff](TEAM1-APISIX-CONFIG-ADAPTER.md) for the full architecture and route creation guide.
 
-Add the OPA plugin to protected routes in APISIX:
+### What Team 3 needs to configure
+
+**1. Plugin Config** (created once, referenced by all protected routes):
+
+```yaml
+plugin_configs:
+  - id: 1
+    desc: "Standard auth + authz (openid-connect + OPA)"
+    plugins:
+      openid-connect:
+        client_id: "apisix-validator"
+        client_secret: "..."
+        discovery: "https://auth.civitas.io/realms/civitas-core/.well-known/openid-configuration"
+        bearer_only: true
+        use_jwks: true
+        ssl_verify: true
+        set_userinfo_header: true
+      opa:
+        host: "http://opa:8181"
+        policy: "civitas/authz/decision"
+        with_route: true
+        with_service: true
+        with_consumer: false
+        send_headers_upstream:
+          - "X-Allowed-Scope-Ids"
+      request-id:
+        include_in_response: true
+```
+
+**2. Services** (one per backend, created by Config Adapter — see Team 1 handoff):
+
+```yaml
+services:
+  - id: svc-portal-backend
+    name: portal-backend        # OPA reads this to identify the backend
+    upstream:
+      nodes:
+        "portal-backend:8089": 1
+```
+
+**3. Routes** reference service + plugin config by ID:
 
 ```yaml
 routes:
   - id: portal-backend-api
     uri: /v2/*
-    upstream:
-      nodes:
-        "portal-backend:8089": 1
-    plugins:
-      # 1. Set backend identifier (existing - see Team 1 handoff)
-      proxy-rewrite:
-        headers:
-          set:
-            X-Authz-Backend: portal-backend
-
-      # 2. JWT validation (existing)
-      openid-connect:
-        # ... existing config
-
-      # 3. OPA authorization (NEW for M5)
-      opa:
-        host: "http://opa:8181"
-        policy: "civitas/authz/decision"
-        with_route: false
-        with_service: false
-        with_consumer: false
-        keepalive: true
-        keepalive_timeout: 60000
-        keepalive_pool: 5
+    service_id: svc-portal-backend
+    plugin_config_id: 1           # Protected: auth + authz
 ```
 
-### Plugin Parameters
+Health checks go directly to backend (port 8089), not through APISIX.
+
+### Key OPA Plugin Parameters
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
 | `host` | `http://opa:8181` | OPA server URL |
 | `policy` | `civitas/authz/decision` | Policy path (minus `/v1/data/`) |
-| `with_route` | `false` | Don't send APISIX route info to OPA |
-| `with_service` | `false` | Don't send APISIX service info |
+| `with_route` | `true` | Send APISIX route metadata to OPA (logging/debugging) |
+| `with_service` | `true` | **Required**: Sends service object to OPA (backend identification) |
 | `with_consumer` | `false` | Don't send APISIX consumer info |
-| `keepalive` | `true` | Reuse connections to OPA |
+| `send_headers_upstream` | `["X-Allowed-Scope-Ids"]` | Forward OPA response headers to backend (M5.5 collection filtering) |
 
 ### Security Note: URL Normalization
 
@@ -508,34 +534,29 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision \
       "request": {
         "method": "GET",
         "path": "/v2/users",
-        "headers": {"x-authz-backend": "portal-backend"}
+        "headers": {}
       },
-      "user_context": {
-        "userId": "test-user",
-        "groups": [{
-          "assignments": [{
-            "permissions": ["READ_USER"]
-          }]
-        }]
-      }
+      "service": {"name": "portal-backend"}
     }
   }'
 
-# Expected: {"result":{"allowed":true,"reason":"user has READ_USER permission"}}
+# Expected (without auth): {"result":{"allow":false,"reason":"missing_user_context"}}
+# This confirms OPA is running, policies are loaded, and backend dispatch works.
 ```
 
 ### 5. Test end-to-end through APISIX
 
 ```bash
-# Get a valid JWT from Keycloak
-TOKEN=$(curl -s -X POST "http://keycloak:8080/realms/civitas-core/protocol/openid-connect/token" \
+# Get a valid JWT from Keycloak (use civitas-keycloak hostname for issuer alignment)
+TOKEN=$(curl -s -X POST "http://civitas-keycloak:8080/realms/civitas-core/protocol/openid-connect/token" \
   -d "grant_type=password" \
   -d "client_id=portal-frontend" \
-  -d "username=test-user" \
-  -d "password=test-password" | jq -r '.access_token')
+  -d "client_secret=dev-only-portal-frontend-secret" \
+  -d "username=authz.admin@e2e.civitas.dev" \
+  -d "password=test123" | jq -r '.access_token')
 
 # Make request through APISIX
-curl -H "Authorization: Bearer $TOKEN" http://apisix:9080/v2/users
+curl -H "Authorization: Bearer $TOKEN" http://localhost:9080/v2/users
 # Expected: 200 OK (if user has READ_USER permission) or 403 Forbidden
 ```
 
@@ -545,8 +566,10 @@ curl -H "Authorization: Bearer $TOKEN" http://apisix:9080/v2/users
 
 ### OPA returns "unknown_backend"
 
-- Check that `X-Authz-Backend` header is being set by APISIX
+- Check that APISIX Service has correct `name` field (e.g., `portal-backend`)
+- Verify OPA plugin has `with_service: true` in the Plugin Config
 - Verify backend identifier matches data file (e.g., `portal-backend` → `backends/portal_backend/data.json`)
+- Service names use dashes; OPA converts to underscores for data lookup (`portal-backend` → `portal_backend`)
 
 ### OPA returns "endpoint_not_configured"
 
@@ -578,7 +601,7 @@ This indicates OPA couldn't get user context (AuthZ Repository unavailable or re
 
 ## Related Documents
 
-- [Team 1 Handoff: X-Authz-Backend Header](TEAM1-APISIX-CONFIG-ADAPTER.md) - Config Adapter requirements
+- [Team 1 Handoff: Plugin Config + Service Architecture](TEAM1-APISIX-CONFIG-ADAPTER.md) - Config Adapter route creation guide
 - [AuthZ Rego README](../../../authz/rego/README.md) - Policy architecture documentation
 - [MILESTONES.md](../project-info/MILESTONES.md) - M4, M4.5, M5 milestone details
 
@@ -590,7 +613,8 @@ This indicates OPA couldn't get user context (AuthZ Repository unavailable or re
 - [ ] OPA health check passing
 - [ ] AuthZ Repository deployed with read-only DB credentials
 - [ ] AuthZ Repository health check passing
-- [ ] APISIX routes updated with OPA plugin
+- [ ] APISIX Plugin Config created with openid-connect + OPA + request-id
+- [ ] OPA plugin has `with_service: true` and `send_headers_upstream: ["X-Allowed-Scope-Ids"]`
 - [ ] End-to-end authorization test passing
-- [ ] Decision logs being collected
+- [ ] Decision logs being collected (verify tokens are masked)
 - [ ] Network policies configured (if Kubernetes)

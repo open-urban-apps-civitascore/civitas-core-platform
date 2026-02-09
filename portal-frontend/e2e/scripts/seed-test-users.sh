@@ -25,7 +25,7 @@ KC_REALM="${KC_REALM:-civitas-core}"
 KC_ADMIN_USER="${KC_ADMIN_USER:-admin}"
 KC_ADMIN_PASS="${KC_ADMIN_PASS:-admin}"
 
-KC_TEST_PASSWORD="e2eTestPass1!"
+KC_TEST_PASSWORD="${KC_TEST_PASSWORD:-e2eTestPass1!}"
 
 # ---------------------------------------------------------------------------
 # Test users (fixed UUIDs for determinism)

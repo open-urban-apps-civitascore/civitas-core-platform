@@ -13,7 +13,7 @@ import data.civitas.authz.providers.portal_backend
 portal_request(method, path) := {"request": {
 	"method": method,
 	"path": path,
-	"headers": {"x-authz-backend": "portal-backend"},
+	"headers": {},
 }}
 
 # =============================================================================
@@ -79,4 +79,120 @@ test_request_path_invalid if {
 test_path_parts if {
 	result := portal_backend.path_parts with input as portal_request("GET", "/v2/datasets/abc")
 	result == ["v2", "datasets", "abc"]
+}
+
+# =============================================================================
+# SUB-RESOURCE PATH PATTERN TESTS
+# =============================================================================
+
+test_path_pattern_4_segment_release if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v2/datasets/abc-123/release")
+	result == "/v2/datasets/{id}/release"
+}
+
+test_path_pattern_4_segment_assignments if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v2/datasets/abc-123/assignments")
+	result == "/v2/datasets/{id}/assignments"
+}
+
+test_path_pattern_5_segment_assignment_delete if {
+	result := portal_backend.path_pattern with input as portal_request("DELETE", "/v2/datasets/abc-123/assignments/assign-456")
+	result == "/v2/datasets/{id}/assignments/{id}"
+}
+
+test_path_pattern_datasource_release if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v2/datasources/ds-123/release")
+	result == "/v2/datasources/{id}/release"
+}
+
+test_path_pattern_datastructure_assignments if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v2/datastructures/dstr-123/assignments")
+	result == "/v2/datastructures/{id}/assignments"
+}
+
+# =============================================================================
+# NEW RESOURCE ENDPOINT TESTS
+# =============================================================================
+
+test_endpoints_contains_datasources if {
+	portal_backend.endpoints["/v2/datasources"]
+}
+
+test_endpoints_contains_datasources_id if {
+	portal_backend.endpoints["/v2/datasources/{id}"]
+}
+
+test_endpoints_contains_datastructures if {
+	portal_backend.endpoints["/v2/datastructures"]
+}
+
+test_endpoints_contains_datastructures_id if {
+	portal_backend.endpoints["/v2/datastructures/{id}"]
+}
+
+# =============================================================================
+# REMOVED ENDPOINT TESTS
+# =============================================================================
+
+test_endpoints_no_dataspaces if {
+	not portal_backend.endpoints["/v2/dataspaces"]
+}
+
+test_endpoints_no_dataspaces_id if {
+	not portal_backend.endpoints["/v2/dataspaces/{id}"]
+}
+
+test_endpoints_no_catalogs if {
+	not portal_backend.endpoints["/v2/catalogs"]
+}
+
+test_endpoints_no_catalogs_id if {
+	not portal_backend.endpoints["/v2/catalogs/{id}"]
+}
+
+# =============================================================================
+# SCOPE TYPE TESTS FOR NEW RESOURCES
+# =============================================================================
+
+test_scope_type_datasources if {
+	result := portal_backend.expected_scope_type with input as portal_request("GET", "/v2/datasources")
+	result == "DATASOURCE"
+}
+
+test_scope_type_datastructures if {
+	result := portal_backend.expected_scope_type with input as portal_request("GET", "/v2/datastructures")
+	result == "DATASTRUCTURE"
+}
+
+# =============================================================================
+# SUB-RESOURCE SCOPE ENFORCEMENT TESTS
+# =============================================================================
+
+# Sub-resource resource_id should be the parent resource ID (parts[2])
+test_resource_id_4_segment if {
+	result := portal_backend.resource_id with input as portal_request("POST", "/v2/datasets/abc-123/release")
+	result == "abc-123"
+}
+
+test_resource_id_5_segment if {
+	result := portal_backend.resource_id with input as portal_request("DELETE", "/v2/datasets/abc-123/assignments/assign-456")
+	result == "abc-123"
+}
+
+# Sub-resource paths are resource endpoints (not collection)
+test_is_resource_endpoint_4_segment if {
+	portal_backend.is_resource_endpoint with input as portal_request("POST", "/v2/datasets/abc-123/release")
+}
+
+test_is_resource_endpoint_5_segment if {
+	portal_backend.is_resource_endpoint with input as portal_request("DELETE", "/v2/datasets/abc-123/assignments/assign-456")
+}
+
+# Sub-resource paths are NOT collection endpoints
+test_not_collection_endpoint_4_segment if {
+	not portal_backend.is_collection_endpoint with input as portal_request("POST", "/v2/datasets/abc-123/release")
+}
+
+test_not_collection_endpoint_5_segment if {
+	not portal_backend.is_collection_endpoint with input as portal_request("DELETE", "/v2/datasets/abc-123/assignments/assign-456")
 }

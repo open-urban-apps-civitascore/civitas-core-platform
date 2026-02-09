@@ -132,7 +132,7 @@ echo ""
 
 # Verify users can authenticate
 echo "=== Verifying User Authentication ==="
-CLIENT_SECRET="${CLIENT_SECRET:-nLlkqabM7bsCKj5InQnXVvuz6wmACNFG}"
+CLIENT_SECRET="${CLIENT_SECRET:-dev-only-portal-frontend-secret}"
 for email in "authz.admin@e2e.civitas.dev" "authz.reader@e2e.civitas.dev" "authz.none@e2e.civitas.dev"; do
     TOKEN=$(curl -sf -X POST "$KEYCLOAK_URL/realms/$REALM/protocol/openid-connect/token" \
         -H "Content-Type: application/x-www-form-urlencoded" \

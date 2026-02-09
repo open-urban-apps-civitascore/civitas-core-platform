@@ -3,11 +3,11 @@ spring:
     name: authz-repository
 
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/portal_backend}
+    url: ${DATABASE_URL}
     # Production: use read-only account with SELECT on these tables only:
     # users, groups, group_members, assignments, roles, role_permissions, permissions
-    username: ${DATABASE_USERNAME:admin}
-    password: ${DATABASE_PASSWORD:admin}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
     hikari:
       maximum-pool-size: 5
       read-only: true

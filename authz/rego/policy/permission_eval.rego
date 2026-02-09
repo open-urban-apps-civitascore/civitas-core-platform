@@ -143,18 +143,29 @@ has_permission := true if {
 # Scope matching rules:
 #   - Resource endpoints: assignment.scopeId must match resource ID from path
 #   - TENANT-scoped resources: assignment.scopeType must be TENANT (no scopeId check)
-#   - Collection endpoints: any matching permission (filtering is backend's job)
+#   - Collection endpoints: TENANT scope or matching scope type required (Q-006: fail-secure)
 #
 # See Q-005 in BACKLOG.md: Pending PO clarification on whether TENANT scope
 # should act as wildcard (access all) or only for tenant-level resources.
 
-# For collection endpoints: permission in any scope is sufficient
-# (Backend filters results based on user's scopes)
+# For collection endpoints with TENANT scope: always allowed
+# (TENANT scope users can see all resources in list endpoints)
 user_has_permission(permission) if {
     resource_mapping.is_collection_endpoint
     some group in user_context_fetcher.user_context.groups
     some assignment in group.assignments
     permission in assignment.permissions
+    assignment.scopeType == "TENANT"
+}
+
+# For collection endpoints with matching scope type: allowed
+# (User has permission via scope type matching the resource's expected scope type)
+user_has_permission(permission) if {
+    resource_mapping.is_collection_endpoint
+    some group in user_context_fetcher.user_context.groups
+    some assignment in group.assignments
+    permission in assignment.permissions
+    assignment.scopeType == resource_mapping.expected_scope_type
 }
 
 # For resource endpoints with TENANT-scoped resources (users, groups, roles, etc.):

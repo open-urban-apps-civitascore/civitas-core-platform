@@ -77,6 +77,8 @@ resource_scope_type := {
 	"catalogs": "TENANT",
 	"dataspaces": "DATASPACE",
 	"datasets": "DATASET",
+	"datasources": "DATASOURCE",
+	"datastructures": "DATASTRUCTURE",
 }
 
 # Extract resource name from path (second segment: /v2/{resource}/...)
@@ -88,6 +90,14 @@ resource_name := path_parts[1] if {
 # Only defined for resource endpoints, not collection endpoints
 resource_id := path_parts[2] if {
 	count(path_parts) == 3
+	path_parts[2] != ""
+	not restmapper.is_reserved_segment(path_parts[2])
+}
+
+# Sub-resource paths (4 or 5 segments): parent resource ID is parts[2]
+# e.g., /v2/datasets/{id}/release or /v2/datasets/{id}/assignments/{id}
+resource_id := path_parts[2] if {
+	count(path_parts) >= 4
 	path_parts[2] != ""
 	not restmapper.is_reserved_segment(path_parts[2])
 }

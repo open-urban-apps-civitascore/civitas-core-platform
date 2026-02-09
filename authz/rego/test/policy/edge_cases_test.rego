@@ -15,8 +15,9 @@ portal_request(path) := {
     "request": {
         "method": "GET",
         "path": path,
-        "headers": {"x-authz-backend": "portal-backend"}
-    }
+        "headers": {}
+    },
+    "service": {"name": "portal-backend"}
 }
 
 # =============================================================================
@@ -91,8 +92,8 @@ test_empty_path if {
     parts[0] == ""
 }
 
-# Backend still works with malformed paths (comes from header)
-test_backend_from_header_regardless_of_path if {
+# Backend still works with malformed paths (comes from service metadata)
+test_backend_from_service_regardless_of_path if {
     backend := resource_mapping.backend with input as portal_request("/")
     backend == "portal-backend"
 }

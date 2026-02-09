@@ -72,12 +72,12 @@ mock_http_send_null_ids(_) := {"status_code": 200, "body": {"userId": null, "ext
 test_user_context_fetched_with_header if {
     ctx := user_context_fetcher.user_context
         with http.send as mock_http_send_success
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "method": "GET",
                 "path": "/v2/users",
                 "headers": {
-                    "x-authz-backend": "portal-backend",
                     "x-userinfo": mock_http.encode_userinfo("keycloak-sub-123")
                 }
             }
@@ -91,6 +91,7 @@ test_user_context_fetched_with_header if {
 test_user_context_with_only_external_id if {
     ctx := user_context_fetcher.user_context
         with http.send as mock_http_send_minimal
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "method": "GET",
@@ -107,6 +108,7 @@ test_user_context_with_only_external_id if {
 test_user_context_source_is_fetched if {
     source := user_context_fetcher.user_context_source
         with http.send as mock_http_send_success
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "method": "GET",
@@ -134,6 +136,7 @@ test_user_context_undefined_without_header if {
 test_user_context_undefined_on_404 if {
     not user_context_fetcher.user_context
         with http.send as mock_http_send_not_found
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "headers": {
@@ -147,6 +150,7 @@ test_user_context_undefined_on_404 if {
 test_user_context_undefined_on_error if {
     not user_context_fetcher.user_context
         with http.send as mock_http_send_error
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "headers": {
@@ -160,6 +164,7 @@ test_user_context_undefined_on_error if {
 test_empty_response_invalid if {
     not user_context_fetcher.user_context
         with http.send as mock_http_send_empty
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "headers": {
@@ -173,6 +178,7 @@ test_empty_response_invalid if {
 test_null_ids_invalid if {
     not user_context_fetcher.user_context
         with http.send as mock_http_send_null_ids
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "headers": {
@@ -270,10 +276,9 @@ test_external_id_missing_sub if {
 # CONFIGURATION TESTS
 # =============================================================================
 
-# Test: Default authz_repository_url
-test_default_authz_repository_url if {
-    url := user_context_fetcher.authz_repository_url with input as {}
-    url == "http://host.docker.internal:8091/api/v1/user-context"
+# Test: authz_repository_url is undefined when not configured (fail-secure)
+test_no_default_authz_repository_url if {
+    not user_context_fetcher.authz_repository_url with input as {} with data.config as {}
 }
 
 # Test: Default request_timeout
@@ -317,6 +322,7 @@ test_debug_info_no_header if {
 test_debug_info_with_header if {
     info := user_context_fetcher.debug_info
         with http.send as mock_http_send_success
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "headers": {
@@ -334,6 +340,7 @@ test_debug_info_with_header if {
 test_debug_info_fetch_failed if {
     info := user_context_fetcher.debug_info
         with http.send as mock_http_send_error
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "headers": {

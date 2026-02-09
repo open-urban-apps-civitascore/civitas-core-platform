@@ -2,11 +2,12 @@
 # Maps HTTP request to backend, path pattern, and method for permission lookup.
 #
 # This module acts as a dispatcher, routing requests to the appropriate backend
-# provider based on the X-Authz-Backend header. Each backend provider handles
+# provider based on APISIX service metadata. Each backend provider handles
 # its own path pattern matching.
 #
 # Backend identification:
-#   APISIX sets X-Authz-Backend header per route (source of truth for routing).
+#   APISIX sends service metadata to OPA via with_service=true in the OPA plugin.
+#   OPA reads input.service.name to determine the backend (source of truth).
 #   Each backend provides its own mappings file in backends/{backend_id}/data.json
 #
 # Provider architecture:
@@ -26,29 +27,22 @@ import data.civitas.authz.providers.portal_backend
 # BACKEND IDENTIFICATION
 # =============================================================================
 
-# Backend is determined by X-Authz-Backend header set by APISIX.
-# This header is the contract between APISIX (routing) and OPA (authorization).
+# Backend is determined by APISIX Service name, sent via with_service=true.
+# This is the contract between APISIX (routing) and OPA (authorization).
+#
+# APISIX sends the full Service object in input.service when with_service=true.
+# The service name is the canonical backend identifier (e.g., "portal-backend").
 #
 # SECURITY NOTE: backend_data_key is used as a key in data.backends[key], which
 # is an in-memory object lookup, NOT a filesystem read. OPA loads all data at
 # startup; there's no dynamic file access. Path traversal is not possible here.
-#
-# NOTE: APISIX may send headers with mixed case (X-Authz-Backend) or lowercase
-# (x-authz-backend) depending on version. We check both.
+# Validation is defense-in-depth.
 default backend := "unknown"
 
-backend := header_value if {
-	header_value := input.request.headers["x-authz-backend"]
-	header_value != ""
-	is_valid_backend_id(header_value)
-}
-
-# Handle mixed-case header from APISIX OPA plugin
-backend := header_value if {
-	not input.request.headers["x-authz-backend"]
-	header_value := input.request.headers["X-Authz-Backend"]
-	header_value != ""
-	is_valid_backend_id(header_value)
+backend := service_name if {
+	service_name := input.service.name
+	service_name != ""
+	is_valid_backend_id(service_name)
 }
 
 # Backend ID validation: alphanumeric, dashes, underscores only
@@ -105,7 +99,7 @@ path_pattern := portal_backend.path_pattern if {
 	backend_data_key == "portal_backend"
 }
 
-# FROST Server provider (stub - returns empty, denying all requests)
+# FROST Server provider
 path_pattern := frost_server.path_pattern if {
 	backend_data_key == "frost_server"
 }

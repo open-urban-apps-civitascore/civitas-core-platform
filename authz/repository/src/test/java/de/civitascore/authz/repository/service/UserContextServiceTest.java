@@ -36,6 +36,8 @@ class UserContextServiceTest {
 
   private static final String EXTERNAL_ID = "test-external-id";
   private static final UUID USER_ID = UUID.randomUUID();
+  private static final UUID SCOPE_ID_1 = UUID.randomUUID();
+  private static final UUID SCOPE_ID_2 = UUID.randomUUID();
 
   @Nested
   @DisplayName("getUserContext")
@@ -102,7 +104,7 @@ class UserContextServiceTest {
       Group group = createGroup("Test Group");
       Role role = createRole("Empty Role", RoleType.SYSTEM);
       // createRole already returns empty permissions set
-      Assignment assignment = createAssignment(group, role, ScopeType.TENANT, "tenant-1");
+      Assignment assignment = createAssignment(group, role, ScopeType.TENANT, SCOPE_ID_1);
       when(group.getAssignments()).thenReturn(Set.of(assignment));
       when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
@@ -148,7 +150,7 @@ class UserContextServiceTest {
       Permission gammaCreate = createPermission("gamma:create");
       when(role.getPermissions())
           .thenReturn(Set.of(zebraRead, alphaWrite, betaDelete, gammaCreate));
-      Assignment assignment = createAssignment(group, role, ScopeType.TENANT, "tenant-1");
+      Assignment assignment = createAssignment(group, role, ScopeType.TENANT, SCOPE_ID_1);
       when(group.getAssignments()).thenReturn(Set.of(assignment));
       when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
@@ -170,7 +172,7 @@ class UserContextServiceTest {
       Role role = createRoleWithId(roleId, "DataEditor", RoleType.DATA);
       Permission datasetWrite = createPermission("dataset:write");
       when(role.getPermissions()).thenReturn(Set.of(datasetWrite));
-      Assignment assignment = createAssignment(group, role, ScopeType.DATASPACE, "dataspace-123");
+      Assignment assignment = createAssignment(group, role, ScopeType.DATASPACE, SCOPE_ID_1);
       when(group.getAssignments()).thenReturn(Set.of(assignment));
       when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
@@ -183,7 +185,7 @@ class UserContextServiceTest {
       assertThat(assignmentContext.getRoleName()).isEqualTo("DataEditor");
       assertThat(assignmentContext.getRoleType()).isEqualTo("DATA");
       assertThat(assignmentContext.getScopeType()).isEqualTo("DATASPACE");
-      assertThat(assignmentContext.getScopeId()).isEqualTo("dataspace-123");
+      assertThat(assignmentContext.getScopeId()).isEqualTo(SCOPE_ID_1.toString());
       assertThat(assignmentContext.getPermissions()).containsExactly("dataset:write");
     }
 
@@ -217,8 +219,8 @@ class UserContextServiceTest {
       Permission dataWrite = createPermission("data:write");
       when(role1.getPermissions()).thenReturn(Set.of(dataRead));
       when(role2.getPermissions()).thenReturn(Set.of(dataWrite));
-      Assignment assignment1 = createAssignment(group, role1, ScopeType.TENANT, "tenant-1");
-      Assignment assignment2 = createAssignment(group, role2, ScopeType.DATASPACE, "dataspace-1");
+      Assignment assignment1 = createAssignment(group, role1, ScopeType.TENANT, SCOPE_ID_1);
+      Assignment assignment2 = createAssignment(group, role2, ScopeType.DATASPACE, SCOPE_ID_2);
       when(group.getAssignments()).thenReturn(Set.of(assignment1, assignment2));
       when(user.getGroups()).thenReturn(Set.of(group));
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
@@ -273,7 +275,7 @@ class UserContextServiceTest {
     return permission;
   }
 
-  private Assignment createAssignment(Group group, Role role, ScopeType scopeType, String scopeId) {
+  private Assignment createAssignment(Group group, Role role, ScopeType scopeType, UUID scopeId) {
     Assignment assignment = mock(Assignment.class);
     // Only stub methods actually used by UserContextService
     when(assignment.getRole()).thenReturn(role);

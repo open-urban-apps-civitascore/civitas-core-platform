@@ -22,11 +22,14 @@ spring:
     consumer:
       bootstrap-servers: localhost:9092
 
-# Backend running on HOST, Keycloak in Docker with port mapping
+# Backend running on HOST, Keycloak in Docker with port mapping.
+# Uses civitas-keycloak hostname so the JWT issuer claim matches across
+# all services (APISIX, OPA, frontend). Requires /etc/hosts entry:
+#   127.0.0.1 civitas-keycloak
 keycloak:
   realm: "civitas-core"
-  auth-server-url: http://localhost:8080
-  issuer-uri: http://localhost:8080
+  auth-server-url: http://civitas-keycloak:8080
+  issuer-uri: http://civitas-keycloak:8080
   target-realm: "civitas-core"
 
 kafka:

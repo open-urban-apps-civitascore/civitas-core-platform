@@ -611,7 +611,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "**********",
+      "secret": "dev-only-portal-frontend-secret",
       "redirectUris": ["http://localhost:3000/api/auth/callback/keycloak"],
       "webOrigins": ["http://localhost:3000"],
       "notBefore": 0,

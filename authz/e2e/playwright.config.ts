@@ -43,7 +43,7 @@ export default defineConfig({
     trace: 'on-first-retry',
 
     /* Screenshot on failure */
-    screenshot: 'only-on-failure',
+    screenshot: 'on',
   },
 
   projects: [

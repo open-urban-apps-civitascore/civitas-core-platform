@@ -1,17 +1,15 @@
-# CIVITAS CORE AuthZ - FROST Server Provider (Stub)
-# Placeholder provider for OGC SensorThings API (FROST Server).
+# CIVITAS CORE AuthZ - FROST Server Provider
+# Maps HTTP requests for the FROST Server (OGC SensorThings API proxy).
 #
-# FROST Server uses OData-style URLs which require different parsing than
-# REST APIs. This stub denies all requests until proper OData parsing is
-# implemented in a future milestone.
+# FROST Server is accessed via a dataset-scoped proxy path:
+#   /api/v1/{dataset_id}/sta  →  READ_DATASET
 #
-# OData URL examples:
-#   /v1.1/Things
-#   /v1.1/Things(123)
-#   /v1.1/Things(123)/Datastreams
-#   /v1.1/Things?$filter=name eq 'sensor1'
+# The {dataset_id} is the same dataset ID from portal_backend's PostgreSQL.
+# APISIX routes to the correct FROST instance based on the dataset ID;
+# OPA only checks that the user has READ_DATASET for that specific dataset.
 #
-# See F-005 in backlog for OData parsing implementation
+# Note: Native OData endpoints (/v1.1/Things etc.) are NOT exposed through
+# APISIX. All FROST access goes through the /api/v1/{id}/sta proxy path.
 
 package civitas.authz.providers.frost_server
 
@@ -23,7 +21,7 @@ import data.civitas.authz.lib.restmapper
 # ENDPOINT CONFIGURATION
 # =============================================================================
 
-# Endpoints map from data file (empty for now)
+# Endpoints map from data file
 endpoints := data.backends.frost_server.endpoints if {
 	data.backends.frost_server.endpoints
 }
@@ -36,9 +34,9 @@ endpoints := {} if {
 # PATH PATTERN MATCHING
 # =============================================================================
 
-# Stub: All FROST Server requests return empty pattern (denied by fail-secure)
-# This is intentional - FROST Server support requires OData parsing
-default path_pattern := ""
+# Match request path against FROST endpoints using generic REST mapper.
+# The 4-segment rule handles /api/v1/{id}/sta pattern matching.
+path_pattern := restmapper.match_pattern(input.request.path, endpoints)
 
 # =============================================================================
 # REQUEST ACCESSORS
@@ -60,20 +58,26 @@ request_path := "" if {
 path_parts := restmapper.parse_path(input.request.path)
 
 # =============================================================================
-# SCOPE ENFORCEMENT (M5.1 - Stub)
+# SCOPE ENFORCEMENT
 # =============================================================================
-# These are intentionally undefined for the FROST server stub.
-# When OData parsing is implemented (F-005), proper scope extraction will be added.
-# For now, the fail-secure behavior (all requests denied) handles this.
+# FROST paths are /api/v1/{dataset_id}/sta — the {id} is always a dataset ID.
+# Scope type is always DATASET since all FROST access is dataset-scoped.
 
-# Stub: resource_id undefined (OData uses Things(123) syntax)
-# resource_id := ...
+# Extract dataset ID from path (third segment: /api/v1/{id}/sta)
+resource_id := path_parts[2] if {
+	count(path_parts) == 4
+	path_parts[2] != ""
+	not restmapper.is_reserved_segment(path_parts[2])
+}
 
-# Stub: expected_scope_type undefined
-# expected_scope_type := ...
+# All FROST resources are dataset-scoped
+expected_scope_type := "DATASET" if {
+	resource_id
+}
 
-# Stub: is_resource_endpoint undefined
-# is_resource_endpoint if { ... }
+# FROST endpoints are always resource endpoints (dataset-specific)
+is_resource_endpoint if {
+	resource_id
+}
 
-# Stub: is_collection_endpoint undefined
-# is_collection_endpoint if { ... }
+# No collection endpoints — FROST is always accessed via dataset ID

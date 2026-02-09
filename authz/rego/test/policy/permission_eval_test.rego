@@ -18,10 +18,10 @@ portal_request(method, path) := {
         "method": method,
         "path": path,
         "headers": {
-            "x-authz-backend": "portal-backend",
             "x-userinfo": mock_http.encode_userinfo("test-user")
         }
-    }
+    },
+    "service": {"name": "portal-backend"}
 }
 
 # Request without userinfo header (for testing lookups only)
@@ -29,8 +29,9 @@ portal_request_no_auth(method, path) := {
     "request": {
         "method": method,
         "path": path,
-        "headers": {"x-authz-backend": "portal-backend"}
-    }
+        "headers": {}
+    },
+    "service": {"name": "portal-backend"}
 }
 
 user_with_permissions(perms) := {
@@ -43,8 +44,8 @@ user_with_permissions(perms) := {
             "roleId": "role-1",
             "roleName": "Test Role",
             "roleType": "DATA",
-            "scopeType": "DATASPACE",
-            "scopeId": "ds-1",
+            "scopeType": "DATASET",
+            "scopeId": "dataset-1",
             "permissions": perms
         }]
     }]
@@ -75,8 +76,8 @@ mock_send_multiple_groups(_) := {"status_code": 200, "body": {
                 "roleId": "role-1",
                 "roleName": "Reader",
                 "roleType": "DATA",
-                "scopeType": "DATASPACE",
-                "scopeId": "ds-1",
+                "scopeType": "DATASET",
+                "scopeId": "dataset-1",
                 "permissions": ["READ_DATASET"]
             }]
         },
@@ -87,8 +88,8 @@ mock_send_multiple_groups(_) := {"status_code": 200, "body": {
                 "roleId": "role-2",
                 "roleName": "Creator",
                 "roleType": "DATA",
-                "scopeType": "DATASPACE",
-                "scopeId": "ds-2",
+                "scopeType": "DATASET",
+                "scopeId": "dataset-2",
                 "permissions": ["CREATE_DATASET"]
             }]
         }
@@ -140,9 +141,9 @@ test_required_permission_create_dataset if {
 }
 
 # Test: Permission lookup from mappings - PUT resource
-test_required_permission_update_dataspace if {
-    result := permission_eval.required_permission with input as portal_request_no_auth("PUT", "/v2/dataspaces/123")
-    result == "UPDATE_DATASPACE"
+test_required_permission_update_datasource if {
+    result := permission_eval.required_permission with input as portal_request_no_auth("PUT", "/v2/datasources/123")
+    result == "UPDATE_DATASOURCE"
 }
 
 # Test: Permission lookup from mappings - DELETE resource
@@ -209,6 +210,7 @@ test_is_known_endpoint_unknown if {
 test_has_permission_matching if {
     result := permission_eval.has_permission
         with http.send as mock_send_read_dataset
+        with data.config as mock_http.mock_config
         with input as portal_request("GET", "/v2/datasets")
     result == true
 }
@@ -217,6 +219,7 @@ test_has_permission_matching if {
 test_has_permission_not_matching if {
     result := permission_eval.has_permission
         with http.send as mock_send_read_only
+        with data.config as mock_http.mock_config
         with input as portal_request("DELETE", "/v2/datasets/123")
     result == false
 }
@@ -225,6 +228,7 @@ test_has_permission_not_matching if {
 test_has_permission_empty if {
     result := permission_eval.has_permission
         with http.send as mock_send_no_perms
+        with data.config as mock_http.mock_config
         with input as portal_request("GET", "/v2/users")
     result == false
 }
@@ -233,6 +237,7 @@ test_has_permission_empty if {
 test_has_permission_multiple_groups if {
     result := permission_eval.has_permission
         with http.send as mock_send_multiple_groups
+        with data.config as mock_http.mock_config
         with input as portal_request("POST", "/v2/datasets")
     result == true
 }
@@ -241,6 +246,7 @@ test_has_permission_multiple_groups if {
 test_users_me_allowed_authenticated if {
     result := permission_eval.has_permission
         with http.send as mock_send_no_groups
+        with data.config as mock_http.mock_config
         with input as portal_request("GET", "/v2/users/me")
     result == true
 }
@@ -249,6 +255,7 @@ test_users_me_allowed_authenticated if {
 test_has_permission_no_groups if {
     result := permission_eval.has_permission
         with http.send as mock_send_no_groups
+        with data.config as mock_http.mock_config
         with input as portal_request("GET", "/v2/users")
     result == false
 }
@@ -260,6 +267,7 @@ test_has_permission_no_groups if {
 test_all_user_permissions if {
     result := permission_eval.all_user_permissions
         with http.send as mock_send_multi_role
+        with data.config as mock_http.mock_config
         with input as portal_request("GET", "/v2/users")
     result == {"READ_USER", "CREATE_USER", "READ_DATASET"}
 }
@@ -271,6 +279,7 @@ test_all_user_permissions if {
 test_is_authenticated_with_user_id if {
     result := permission_eval.is_authenticated
         with http.send as mock_send_user_id_only
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "headers": {
@@ -284,6 +293,7 @@ test_is_authenticated_with_user_id if {
 test_is_authenticated_with_external_id if {
     result := permission_eval.is_authenticated
         with http.send as mock_send_external_id_only
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "headers": {
@@ -297,6 +307,7 @@ test_is_authenticated_with_external_id if {
 test_is_not_authenticated_empty_context if {
     result := permission_eval.is_authenticated
         with http.send as mock_send_empty
+        with data.config as mock_http.mock_config
         with input as {
             "request": {
                 "headers": {

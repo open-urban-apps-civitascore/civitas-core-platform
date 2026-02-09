@@ -24,7 +24,9 @@ deployment:
   role_data_plane:
     config_provider: yaml
 
-# Enable OPA plugin
+# Enabled plugins
+# NOTE: proxy-rewrite is available for route-specific header manipulation
+# but is no longer needed for backend identification (replaced by with_service).
 plugins:
   - proxy-rewrite
   - openid-connect

@@ -1,24 +1,43 @@
 # APISIX Routes with OPA Authorization
 # M5: Full AuthZ integration - APISIX -> OPA -> AuthZ Repository
 #
-# Request flow:
-#   1. proxy-rewrite: Sets X-Authz-Backend header for OPA
-#   2. openid-connect: Validates JWT, sets X-Userinfo header (base64 claims)
-#   3. opa: Calls OPA for authorization decision
-#   4. Request forwarded to backend if allowed (403 if denied)
+# Architecture:
+#   - Plugin Config: Reusable auth+authz plugin bundle (openid-connect + opa)
+#   - Services: Backend definitions with upstream config (portal-backend, frost-server)
+#   - Routes: Map URIs to services, reference plugin config for protection
+#
+# Request flow (protected routes):
+#   1. openid-connect: Validates JWT, sets X-Userinfo header (base64 claims)
+#   2. opa: Calls OPA for authorization decision (with_service=true sends service
+#      metadata to OPA, so OPA knows which backend's permission mappings to use)
+#   3. Request forwarded to backend if allowed (403 if denied)
+#
+# Public routes simply omit plugin_config_id — no auth or authz applied.
 #
 # =============================================================================
-# JWT VALIDATION NOTES (see dev-environment/apisix/apisix_conf/apisix.yaml)
+# JWT VALIDATION NOTES
 # =============================================================================
-# We use a static public_key because Keycloak in dev mode returns localhost URLs
-# in its discovery document, which APISIX (inside Docker) cannot reach.
-# In production with HTTPS, use dynamic JWKS discovery instead.
+# Uses dynamic JWKS discovery via the civitas-keycloak hostname. This works
+# because both Docker DNS and /etc/hosts resolve civitas-keycloak to the same
+# Keycloak instance, so the JWT issuer claim matches in all contexts.
+#
+# Prerequisite: /etc/hosts must contain: 127.0.0.1 civitas-keycloak
 
-routes:
-  # Protected API routes - require valid JWT and OPA authorization
-  - id: portal-backend-api
-    name: "Portal Backend API (AuthZ)"
-    uri: /v2/*
+# =============================================================================
+# SERVICES - Backend upstream definitions
+# =============================================================================
+# Each service represents a backend. The service name is the canonical backend
+# identifier used by OPA for permission mapping dispatch.
+#
+# Convention: service name matches the permission mappings directory name
+# (with dashes, OPA converts to underscores for data file lookup).
+#   portal-backend -> data.backends.portal_backend.endpoints
+#   frost-server   -> data.backends.frost_server.endpoints
+
+services:
+  - id: svc-portal-backend
+    name: portal-backend
+    desc: "Portal Backend API Service"
     upstream:
       type: roundrobin
       nodes:
@@ -27,43 +46,42 @@ routes:
         connect: 6
         send: 6
         read: 6
-    plugins:
-      # 1. Backend identifier for OPA authorization
-      # OPA uses this header to select the correct permission mappings file.
-      proxy-rewrite:
-        headers:
-          set:
-            X-Authz-Backend: portal-backend
 
-      # 2. JWT validation - validates token and sets X-Userinfo header
+# =============================================================================
+# PLUGIN CONFIGS - Reusable plugin bundles
+# =============================================================================
+# Attach plugin_config_id to protected routes. Public routes omit it.
+# Route-level plugins override plugin config plugins (APISIX precedence:
+# Consumer > Consumer Group > Route > Plugin Config > Service).
+#
+# To disable a specific plugin on one route while keeping the rest:
+#   plugins:
+#     openid-connect:
+#       _meta:
+#         disable: true
+
+plugin_configs:
+  - id: 1
+    desc: "Standard auth + authz (openid-connect + OPA)"
+    plugins:
+      # 1. JWT validation - validates token and sets X-Userinfo header
       openid-connect:
         client_id: "apisix-validator"
         client_secret: "unused-for-jwks-validation"
         discovery: "http://civitas-keycloak:8080/realms/civitas-core/.well-known/openid-configuration"
         bearer_only: true
+        use_jwks: true
         ssl_verify: false
-        public_key: |
-          -----BEGIN PUBLIC KEY-----
-          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoBMiel0QuEnffhFS7IUL
-          T6IwUUOpNLjTjZtzNSRP4nAmsTJBdo/PA1MSOpTDHO2gCF+kKjMUYofBibk2U+ta
-          YErB5JdxYgBBgqnl5F3KVae80n0XsrtIenkMit71McM6q1p5LpIf2cLzbdiYTzWY
-          2Z4ED+BD1xllfmWwF1dbBX9sWcszdafFTZ55P6ZoiA+FXmOEhAqjAqHR1yaz2SjD
-          f1F7fhLc6ADk249vw3MsD4RF5KYB6IHnUAXmjoSyayLSRw1f+wjU4vJv9xID1ioo
-          E+aAtJh0BDQMi51xrIcpZVeJAXqNZu/ITx71Nk9rJQyj/WMpqyxSapPJOdpssiKv
-          5wIDAQAB
-          -----END PUBLIC KEY-----
         # Pass decoded JWT claims to OPA via X-Userinfo header
         set_userinfo_header: true
 
-      # 3. OPA authorization - calls OPA for permission decision
+      # 2. OPA authorization - calls OPA for permission decision
       # OPA will:
+      #   - Read input.service.name to identify the backend (with_service=true)
       #   - Decode X-Userinfo to get external ID (sub claim)
       #   - Fetch user context from AuthZ Repository
-      #   - Evaluate permission against endpoint mappings
+      #   - Evaluate permission against backend's endpoint mappings
       #   - Return allowed/denied decision
-      #
-      # NOTE: with_route=true so OPA can see the route ID to determine the backend.
-      # The proxy-rewrite headers are for upstream, not visible to OPA.
       #
       # M5.5: send_headers_upstream passes OPA response headers to backend.
       # OPA returns X-Allowed-Scope-Ids for collection filtering.
@@ -71,23 +89,25 @@ routes:
         host: "http://civitas-opa:8181"
         policy: "civitas/authz/decision"
         with_route: true
-        with_service: false
+        with_service: true
         with_consumer: false
         send_headers_upstream:
           - "X-Allowed-Scope-Ids"
 
-      # 4. Request ID for tracing
+      # 3. Request ID for tracing
       request-id:
         include_in_response: true
 
-  # Backend health check (public, no auth required)
-  - id: backend-health
-    name: "Backend Health Check"
-    uri: /v2/actuator/health
-    upstream:
-      type: roundrobin
-      nodes:
-        "host.docker.internal:8089": 1
-    plugins: {}
+# =============================================================================
+# ROUTES
+# =============================================================================
+
+routes:
+  # Protected API routes - require valid JWT and OPA authorization
+  - id: portal-backend-api
+    name: "Portal Backend API (AuthZ)"
+    uri: /v2/*
+    service_id: svc-portal-backend
+    plugin_config_id: 1
 
 #END

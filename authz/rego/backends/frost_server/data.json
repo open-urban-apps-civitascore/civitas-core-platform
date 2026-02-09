@@ -1,7 +1,10 @@
 {
   "_comment": "FROST Server (OGC SensorThings API) - Stub",
-  "_version": "0.0.0",
+  "_version": "1.0.0",
   "_backend_id": "frost-server",
-  "_note": "OData URL parsing not yet implemented. See F-005 in backlog.",
-  "endpoints": {}
+  "endpoints": {
+    "/api/v1/{id}/sta": {
+      "GET": "READ_DATASET"
+    }
+  }
 }

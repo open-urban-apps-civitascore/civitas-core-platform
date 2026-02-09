@@ -70,10 +70,10 @@ OPA needs user context (groups, roles, permissions) to evaluate authorization. T
 ```
 APISIX Request → resource_mapping.rego (dispatcher)
                         │
-                        ├─ X-Authz-Backend: portal-backend
+                        ├─ input.service.name: "portal-backend"
                         │       └→ portal_backend.rego → genericrestmapper.rego
                         │
-                        └─ X-Authz-Backend: frost-server
+                        └─ input.service.name: "frost-server"
                                 └→ frost_server.rego (stub, denies all)
 
                         ↓
@@ -84,6 +84,9 @@ APISIX Request → resource_mapping.rego (dispatcher)
                  (final decision)
 ```
 
+Backend identification uses APISIX Service metadata (`with_service=true` in the OPA plugin).
+OPA reads `input.service.name` to dispatch to the correct provider.
+
 ### Why This Architecture?
 
 **Problem**: Different backends have different URL patterns:
@@ -93,7 +96,7 @@ APISIX Request → resource_mapping.rego (dispatcher)
 **Solution**: Provider pattern with shared library:
 1. `genericrestmapper.rego` - Handles common REST `/version/resource/{id}` patterns
 2. Each provider wraps the library or implements custom parsing
-3. `resource_mapping.rego` dispatches based on `X-Authz-Backend` header
+3. `resource_mapping.rego` dispatches based on `input.service.name` (APISIX service metadata)
 4. FROST provider is a stub until OData parsing is implemented (F-005)
 
 ### Data Path Convention
@@ -143,16 +146,9 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision \
       "request": {
         "method": "GET",
         "path": "/v2/users",
-        "headers": {"x-authz-backend": "portal-backend"}
+        "headers": {}
       },
-      "user_context": {
-        "userId": "user-1",
-        "groups": [{
-          "assignments": [{
-            "permissions": ["READ_USER"]
-          }]
-        }]
-      }
+      "service": {"name": "portal-backend"}
     }
   }'
 ```
@@ -217,6 +213,5 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision \
 
 ## Related Documentation
 
-- [MILESTONES.md](../../docs/claude/project-info/MILESTONES.md) - M4, M4.6 milestone details
-- [BACKLOG.md](../../docs/claude/project-info/BACKLOG.md) - F-005 (FROST OData parsing)
-- [Authorization Data Model](../../docs/claude/additional-info/Authorization_Data_Model.md) - Permission model
+- [ADR-001: Collection Endpoint Filtering](../../docs/architecture/ADR-001-collection-endpoint-filtering.md) - Scope-based filtering design
+- [AuthZ Deployment Guide](../../docs/handoff/TEAM3-AUTHZ-DEPLOYMENT.md) - Deployment and operations

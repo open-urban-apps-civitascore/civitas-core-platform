@@ -28,12 +28,37 @@ import rego.v1
 # CONFIGURATION
 # =============================================================================
 
-# AuthZ Repository URL - configurable via external data or default
-# Default URL for development (AuthZ Repository running on host)
-# In production, this should be overridden via data.config.authz_repository_url
-# to point to the containerized AuthZ Repository service.
-default authz_repository_url := "http://host.docker.internal:8091/api/v1/user-context"
-
+# AuthZ Repository URL — REQUIRED, no default.
+# If not configured, all authorization decisions will deny (fail-secure).
+#
+# HOW TO CONFIGURE:
+# OPA reads configuration from JSON files mounted into its /data/ directory.
+# Any file at /data/<name>.json becomes accessible in Rego as data.<name>.
+# So /data/config.json → data.config, and we read data.config.authz_repository_url.
+#
+# Step 1: Create a JSON file with the URL:
+#
+#   {
+#     "config": {
+#       "authz_repository_url": "http://authz-repository:8091/api/v1/user-context"
+#     }
+#   }
+#
+# Step 2: Mount it into the OPA container at /data/config.json:
+#
+#   # Docker Compose example:
+#   volumes:
+#     - ./opa-config.json:/data/config.json:ro
+#
+#   # Kubernetes example:
+#   volumeMounts:
+#     - name: opa-config
+#       mountPath: /data/config.json
+#       subPath: config.json
+#       readOnly: true
+#
+# For a working example, see: dev-environment/authz/docker-compose.yml
+# and dev-environment/authz/opa-config.json
 authz_repository_url := data.config.authz_repository_url if {
     data.config.authz_repository_url
 }

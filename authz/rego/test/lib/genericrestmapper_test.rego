@@ -17,6 +17,9 @@ mock_endpoints := {
 	"/v2/users/me": {"GET": null},
 	"/v2/datasets": {"GET": "READ_DATASET"},
 	"/v2/datasets/{id}": {"GET": "READ_DATASET", "DELETE": "DELETE_DATASET"},
+	"/v2/datasets/{id}/release": {"POST": "RELEASE_DATASET"},
+	"/v2/datasets/{id}/assignments": {"POST": "UPDATE_DATASET"},
+	"/v2/datasets/{id}/assignments/{id}": {"DELETE": "UPDATE_DATASET"},
 }
 
 # =============================================================================
@@ -162,8 +165,14 @@ test_match_pattern_trailing_slash if {
 	result == ""
 }
 
-# No match - too many segments
-test_match_pattern_nested_resource if {
+# No match - too many segments (6+)
+test_match_pattern_too_many_segments if {
+	result := restmapper.match_pattern("/v2/users/123/groups/456/extra", mock_endpoints)
+	result == ""
+}
+
+# No match - 5-segment path not in endpoints
+test_match_pattern_nested_resource_unknown if {
 	result := restmapper.match_pattern("/v2/users/123/groups/456", mock_endpoints)
 	result == ""
 }
@@ -171,5 +180,67 @@ test_match_pattern_nested_resource if {
 # No match - case sensitivity
 test_match_pattern_case_sensitive if {
 	result := restmapper.match_pattern("/V2/Users", mock_endpoints)
+	result == ""
+}
+
+# =============================================================================
+# 4-SEGMENT SUB-RESOURCE PATTERN MATCHING TESTS
+# =============================================================================
+
+# Pattern match - 4-segment sub-resource (/v2/datasets/{id}/release)
+test_match_pattern_4_segment_subresource if {
+	result := restmapper.match_pattern("/v2/datasets/abc-123/release", mock_endpoints)
+	result == "/v2/datasets/{id}/release"
+}
+
+# Pattern match - 4-segment with UUID
+test_match_pattern_4_segment_uuid if {
+	result := restmapper.match_pattern("/v2/datasets/550e8400-e29b-41d4-a716-446655440000/release", mock_endpoints)
+	result == "/v2/datasets/{id}/release"
+}
+
+# Pattern match - 4-segment assignments sub-resource
+test_match_pattern_4_segment_assignments if {
+	result := restmapper.match_pattern("/v2/datasets/abc-123/assignments", mock_endpoints)
+	result == "/v2/datasets/{id}/assignments"
+}
+
+# No match - 4-segment with unknown sub-resource
+test_match_pattern_4_segment_unknown_subresource if {
+	result := restmapper.match_pattern("/v2/datasets/abc-123/unknown", mock_endpoints)
+	result == ""
+}
+
+# No match - 4-segment with reserved segment as ID
+test_match_pattern_4_segment_reserved_id if {
+	result := restmapper.match_pattern("/v2/datasets/me/release", mock_endpoints)
+	result == ""
+}
+
+# =============================================================================
+# 5-SEGMENT SUB-RESOURCE PATTERN MATCHING TESTS
+# =============================================================================
+
+# Pattern match - 5-segment sub-resource (/v2/datasets/{id}/assignments/{id})
+test_match_pattern_5_segment_subresource if {
+	result := restmapper.match_pattern("/v2/datasets/abc-123/assignments/assign-456", mock_endpoints)
+	result == "/v2/datasets/{id}/assignments/{id}"
+}
+
+# Pattern match - 5-segment with UUIDs
+test_match_pattern_5_segment_uuids if {
+	result := restmapper.match_pattern("/v2/datasets/550e8400-e29b-41d4-a716-446655440000/assignments/660e8400-e29b-41d4-a716-446655440000", mock_endpoints)
+	result == "/v2/datasets/{id}/assignments/{id}"
+}
+
+# No match - 5-segment with empty sub-resource ID (trailing slash)
+test_match_pattern_5_segment_trailing_slash if {
+	result := restmapper.match_pattern("/v2/datasets/abc-123/assignments/", mock_endpoints)
+	result == ""
+}
+
+# No match - 5-segment with reserved segment as sub-resource ID
+test_match_pattern_5_segment_reserved_subid if {
+	result := restmapper.match_pattern("/v2/datasets/abc-123/assignments/me", mock_endpoints)
 	result == ""
 }

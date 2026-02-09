@@ -98,7 +98,7 @@ evaluate_request := {"allow": false, "reason": "permission_denied", "required": 
     not permission_eval.has_permission
 }
 
-# 6. Unknown backend (no X-Authz-Backend header)
+# 6. Unknown backend (no APISIX service metadata or unknown service name)
 evaluate_request := {"allow": false, "reason": "unknown_backend"} if {
     resource_mapping.backend == "unknown"
 }

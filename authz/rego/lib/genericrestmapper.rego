@@ -101,5 +101,35 @@ match_pattern(path, endpoints) := pattern if {
 	endpoints[pattern]
 }
 
-# 3. No match - return empty string
+# 3. Pattern match - 4-segment sub-resource: /version/resource/id/action
+match_pattern(path, endpoints) := pattern if {
+	is_valid_path(path)
+	not endpoints[path]
+
+	parts := parse_path(path)
+	count(parts) == 4
+	parts[2] != ""
+	not is_reserved_segment(parts[2])
+
+	pattern := concat("/", ["", parts[0], parts[1], "{id}", parts[3]])
+	endpoints[pattern]
+}
+
+# 4. Pattern match - 5-segment sub-resource: /version/resource/id/sub/id
+match_pattern(path, endpoints) := pattern if {
+	is_valid_path(path)
+	not endpoints[path]
+
+	parts := parse_path(path)
+	count(parts) == 5
+	parts[2] != ""
+	not is_reserved_segment(parts[2])
+	parts[4] != ""
+	not is_reserved_segment(parts[4])
+
+	pattern := concat("/", ["", parts[0], parts[1], "{id}", parts[3], "{id}"])
+	endpoints[pattern]
+}
+
+# 5. No match - return empty string
 default match_pattern(_, _) := ""
