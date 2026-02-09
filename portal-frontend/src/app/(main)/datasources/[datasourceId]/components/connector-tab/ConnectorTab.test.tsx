@@ -55,7 +55,7 @@ vi.mock('./connectorSources', () => ({
         {
           key: 'dsn',
           type: 'input',
-          placeholder: 'postgres://user:pass@host:5432/db',
+          placeholder: 'postgres://test:test@host:5432/db',
           required: true,
           label: { label: 'DSN', labelHint: null },
         },
