@@ -1,5 +1,7 @@
 'use client'
 
+import { DATASOURCE_STATUS_TYPES } from '@/types/datasources'
+
 /**
  * DataSourcePanel Component
  *
@@ -7,7 +9,6 @@
  * Allows selecting a datasource entity and displays its metadata.
  *
  */
-
 import { datasourceToSelectable, useDataSourceEntities } from '../../../_services/entityService'
 import type { DataSourceNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
@@ -47,7 +48,9 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
     }
   }
 
-  const selectableEntities = entities.map(datasourceToSelectable)
+  const selectableEntities = entities
+    .filter(entity => entity.status === DATASOURCE_STATUS_TYPES.AVAILABLE)
+    .map(datasourceToSelectable)
 
   return (
     <div className="space-y-4 p-4">
