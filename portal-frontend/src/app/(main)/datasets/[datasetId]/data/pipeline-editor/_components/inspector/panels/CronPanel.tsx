@@ -12,6 +12,7 @@ import { ExternalLink, Info } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 
+import { isValidQuartzCron } from '../../../_services/validationService'
 import type { CronNodeData } from '../../../_types/nodes'
 
 interface CronPanelProps {
@@ -21,11 +22,14 @@ interface CronPanelProps {
 
 export const CronPanel: React.FC<CronPanelProps> = ({ data, onUpdate }) => {
   const handleExpressionChange = (expression: string) => {
+    const trimmed = expression.trim()
     onUpdate({
       cronExpression: expression,
-      configured: expression.trim() !== '',
+      configured: trimmed !== '' && isValidQuartzCron(trimmed),
     })
   }
+
+  const hasValidationError = !!data.cronExpression?.trim() && !isValidQuartzCron(data.cronExpression.trim())
 
   return (
     <div className="space-y-4 p-4">
@@ -34,9 +38,15 @@ export const CronPanel: React.FC<CronPanelProps> = ({ data, onUpdate }) => {
         <Input
           value={data.cronExpression || ''}
           onChange={e => handleExpressionChange(e.target.value)}
-          placeholder="*/5 * * * *"
+          placeholder="0,30 */2 * * * *"
           className="font-mono"
         />
+        {hasValidationError && (
+          <p className="text-xs text-destructive">
+            Invalid cron expression. Must be 6-field Quartz syntax (seconds minutes hours day-of-month month
+            day-of-week).
+          </p>
+        )}
       </div>
 
       <div className="flex items-start gap-2 rounded-md bg-blue-50 p-3 dark:bg-blue-950/30">
@@ -46,7 +56,7 @@ export const CronPanel: React.FC<CronPanelProps> = ({ data, onUpdate }) => {
             A CRON expression defines when the pipeline should run automatically.
           </p>
           <a
-            href="http://www.cronmaker.com/?1"
+            href="https://uptimerobot.com/free-tools/cron-expression-generator/?input=0%2C30+*%2F2+*+*+*+*&format=quartz"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"

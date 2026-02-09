@@ -6,7 +6,53 @@
  *
  */
 
+import { isCronNodeData } from '../_types/nodes'
 import { type Pipeline, PIPELINE_NODE_TYPES } from '../_types/pipeline'
+
+// ============================================================================
+// Quartz Cron Validation
+// ============================================================================
+
+/**
+ * Validates a 6-field Quartz cron expression.
+ * Fields: seconds minutes hours day-of-month month day-of-week
+ *
+ * Supports: wildcards (*), ranges (-), steps (/), lists (,), and ? for day-of-month/day-of-week.
+ */
+export const isValidQuartzCron = (expression: string): boolean => {
+  const trimmed = expression.trim()
+  if (!trimmed) return false
+
+  const fields = trimmed.split(/\s+/)
+  if (fields.length !== 6) return false
+
+  const [seconds, minutes, hours, dayOfMonth, month, dayOfWeek] = fields
+
+  // Seconds: 0-59, supports *, */N, ranges, steps, lists
+  const secondsPattern = /^(\*(\/\d+)?|(\d|[0-5]\d)([-/]\d+)?)([,](\*(\/\d+)?|(\d|[0-5]\d)([-/]\d+)?))*$/
+  // Minutes: 0-59
+  const minutesPattern = /^(\*(\/\d+)?|(\d|[0-5]\d)([-/]\d+)?)([,](\*(\/\d+)?|(\d|[0-5]\d)([-/]\d+)?))*$/
+  // Hours: 0-23
+  const hoursPattern = /^(\*(\/\d+)?|(\d|1\d|2[0-3])([-/]\d+)?)([,](\*(\/\d+)?|(\d|1\d|2[0-3])([-/]\d+)?))*$/
+  // Day of month: 1-31 or ? or L or W
+  const dayOfMonthPattern =
+    /^(\*(\/\d+)?|\?|L|(\d|[12]\d|3[01])([-/]\d+)?[WL]?)([,](\*(\/\d+)?|(\d|[12]\d|3[01])([-/]\d+)?[WL]?))*$/
+  // Month: 1-12 or JAN-DEC
+  const monthPattern =
+    /^(\*(\/\d+)?|(\d|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([-/](\d|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC))?)([,](\*(\/\d+)?|(\d|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)([-/](\d|1[0-2]|JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC))?))*$/i
+  // Day of week: 1-7 or SUN-SAT or ? or L
+  const dayOfWeekPattern =
+    /^(\*(\/\d+)?|\?|L|([1-7]|SUN|MON|TUE|WED|THU|FRI|SAT)([-/]([1-7]|SUN|MON|TUE|WED|THU|FRI|SAT))?[L#]?(\d)?)([,](\*(\/\d+)?|([1-7]|SUN|MON|TUE|WED|THU|FRI|SAT)([-/]([1-7]|SUN|MON|TUE|WED|THU|FRI|SAT))?[L#]?(\d)?))*$/i
+
+  return (
+    secondsPattern.test(seconds) &&
+    minutesPattern.test(minutes) &&
+    hoursPattern.test(hours) &&
+    dayOfMonthPattern.test(dayOfMonth) &&
+    monthPattern.test(month) &&
+    dayOfWeekPattern.test(dayOfWeek)
+  )
+}
 
 // ============================================================================
 // Validation Types
@@ -196,6 +242,35 @@ const validateNodeConfiguration: ValidationRule = {
 }
 
 /**
+ * Rule: CRON nodes must have a valid 6-field Quartz cron expression.
+ */
+const validateCronExpression: ValidationRule = {
+  id: 'cron-expression-valid',
+  name: 'Valid Cron Expression',
+  description: 'CRON nodes must have a valid 6-field Quartz cron expression',
+  validate: (pipeline: Pipeline) => {
+    const errors: PipelineValidationError[] = []
+
+    pipeline.nodes.forEach(node => {
+      if (node.type === PIPELINE_NODE_TYPES.Cron && isCronNodeData(node.data)) {
+        const expression = node.data.cronExpression?.trim()
+        if (expression && !isValidQuartzCron(expression)) {
+          errors.push({
+            id: crypto.randomUUID(),
+            type: 'node',
+            elementId: node.id,
+            message: `${node.data.label || 'CRON'} has an invalid cron expression. Must be a 6-field Quartz syntax.`,
+            severity: 'error',
+          })
+        }
+      }
+    })
+
+    return { errors, warnings: [] }
+  },
+}
+
+/**
  * Rule: All nodes must be connected to the pipeline flow.
  */
 const validateOrphanNodes: ValidationRule = {
@@ -244,6 +319,7 @@ export const VALIDATION_RULES: ValidationRule[] = [
   validateEndNode,
   validateApiPairing,
   validateNodeConfiguration,
+  validateCronExpression,
   validateOrphanNodes,
 ]
 
