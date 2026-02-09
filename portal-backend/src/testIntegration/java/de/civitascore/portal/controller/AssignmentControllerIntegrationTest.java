@@ -51,7 +51,7 @@ class AssignmentControllerIntegrationTest
     AssignmentInputDTO input = new AssignmentInputDTO();
     input.setGroupId(groupId);
     input.setRoleId(roleId);
-    input.setScopeType(ScopeType.PLATFORM);
+    input.setScopeType(ScopeType.TENANT);
     return input;
   }
 
@@ -224,7 +224,7 @@ class AssignmentControllerIntegrationTest
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(UUID.randomUUID());
       input.setRoleId(createTestRole());
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
@@ -239,7 +239,7 @@ class AssignmentControllerIntegrationTest
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(createTestGroup());
       input.setRoleId(UUID.randomUUID());
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
@@ -379,27 +379,27 @@ class AssignmentControllerIntegrationTest
     @DisplayName("Should handle global scope assignment")
     void shouldHandleGlobalScopeAssignment() {
       AssignmentInputDTO input = createValidInput();
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
       input.setScopeId(null);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getScopeType()).isEqualTo(ScopeType.PLATFORM);
+      assertThat(response.getBody().getScopeType()).isEqualTo(ScopeType.TENANT);
     }
 
     @Test
     @DisplayName("Should handle tenant scope assignment")
     void shouldHandleTenantScopeAssignment() {
       AssignmentInputDTO input = createValidInput();
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getScopeType()).isEqualTo(ScopeType.PLATFORM);
+      assertThat(response.getBody().getScopeType()).isEqualTo(ScopeType.TENANT);
     }
   }
 
@@ -420,7 +420,7 @@ class AssignmentControllerIntegrationTest
       UUID scopeID = UUID.randomUUID();
       input1.setScopeId(scopeID);
 
-      input1.setScopeType(ScopeType.PLATFORM);
+      input1.setScopeType(ScopeType.TENANT);
 
       AssignmentInputDTO input2 = new AssignmentInputDTO();
       input2.setGroupId(groupId);
@@ -440,7 +440,7 @@ class AssignmentControllerIntegrationTest
     @DisplayName("Should handle null scope ID for global scope")
     void shouldHandleNullScopeIdForGlobalScope() {
       AssignmentInputDTO input = createValidInput();
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
       input.setScopeId(null);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);

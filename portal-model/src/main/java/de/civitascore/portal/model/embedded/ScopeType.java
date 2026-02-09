@@ -9,8 +9,8 @@ package de.civitascore.portal.model.embedded;
  * @see de.civitascore.portal.model.entity.base.ScopedEntity
  */
 public enum ScopeType {
-  /** Platform-wide scope for data roles. Requires scope ID to be null. */
-  PLATFORM,
+  /** Tenant-wide scope for data roles. Requires scope ID to be null. */
+  TENANT,
 
   /** Data structure scope for data/governance roles. Requires scope ID. */
   DATASTRUCTURE,

@@ -17,7 +17,7 @@ public class AssignmentInputDTO extends BaseInputDTO {
   private ScopeType scopeType;
 
   /**
-   * Scope ID is not required if there is no scopeType or if the scope type is PLATFORM, but must be
+   * Scope ID is not required if there is no scopeType or if the scope type is TENANT, but must be
    * provided for all other scope types
    */
   private UUID scopeId;

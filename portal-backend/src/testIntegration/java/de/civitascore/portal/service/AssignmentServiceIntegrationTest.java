@@ -290,7 +290,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
       input.setScopeId(null);
 
       Assignment assignment = assignmentService.create(input);
@@ -298,7 +298,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(assignment.getDataset()).isNull();
       assertThat(assignment.getDataSpace()).isNull();
       assertThat(assignment.getCatalog()).isNull();
-      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.PLATFORM);
+      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.TENANT);
     }
   }
 
@@ -324,17 +324,17 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should succeed when scopeType is PLATFORM and no scope entity is set")
-    void shouldSucceedWhenScopeTypeIsPlatformAndNoScopeEntity() {
+    @DisplayName("Should succeed when scopeType is TENANT and no scope entity is set")
+    void shouldSucceedWhenScopeTypeIsTenantAndNoScopeEntity() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
 
       Assignment assignment = assignmentService.create(input);
 
       assertThat(assignment).isNotNull();
-      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.PLATFORM);
+      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.TENANT);
       assertThat(assignment.getDataset()).isNull();
       assertThat(assignment.getDataSpace()).isNull();
       assertThat(assignment.getCatalog()).isNull();
@@ -420,7 +420,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testSystemRole.getId());
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
 
       assertThatThrownBy(() -> assignmentService.create(input))
           .isInstanceOf(InvalidDataAccessApiUsageException.class)
@@ -433,13 +433,13 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
 
       Assignment assignment = assignmentService.create(input);
 
       assertThat(assignment).isNotNull();
       assertThat(assignment.getRole().getRoleType()).isEqualTo(RoleType.DATA);
-      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.PLATFORM);
+      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.TENANT);
     }
 
     @Test
@@ -468,13 +468,13 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(governanceRole.getId());
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
 
       Assignment assignment = assignmentService.create(input);
 
       assertThat(assignment).isNotNull();
       assertThat(assignment.getRole().getRoleType()).isEqualTo(RoleType.GOVERNANCE);
-      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.PLATFORM);
+      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.TENANT);
     }
 
     @Test
@@ -540,19 +540,19 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should create valid DATA assignment with PLATFORM scope")
-    void shouldCreateValidDataAssignmentWithPlatformScope() {
+    @DisplayName("Should create valid DATA assignment with TENANT scope")
+    void shouldCreateValidDataAssignmentWithTenantScope() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
 
       Assignment assignment = assignmentService.create(input);
 
       assertThat(assignment).isNotNull();
       assertThat(assignment.getId()).isNotNull();
       assertThat(assignment.getRole().getRoleType()).isEqualTo(RoleType.DATA);
-      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.PLATFORM);
+      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.TENANT);
       assertThat(assignment.getDataset()).isNull();
       assertThat(assignment.getDataSpace()).isNull();
       assertThat(assignment.getCatalog()).isNull();
@@ -656,12 +656,12 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should have null scopeId when scopeType is PLATFORM")
-    void shouldHaveNullScopeIdForPlatformScope() {
+    @DisplayName("Should have null scopeId when scopeType is TENANT")
+    void shouldHaveNullScopeIdForTenantScope() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
-      input.setScopeType(ScopeType.PLATFORM);
+      input.setScopeType(ScopeType.TENANT);
 
       Assignment assignment = assignmentService.create(input);
 
@@ -720,7 +720,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       // Test with each valid scope type
       ScopeType[] scopeTypes =
           new ScopeType[] {
-            ScopeType.PLATFORM, ScopeType.DATASET, ScopeType.DATASPACE, ScopeType.CATALOG
+            ScopeType.TENANT, ScopeType.DATASET, ScopeType.DATASPACE, ScopeType.CATALOG
           };
 
       for (ScopeType scopeType : scopeTypes) {
@@ -781,7 +781,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       AssignmentInputDTO input1 = new AssignmentInputDTO();
       input1.setGroupId(testGroup.getId());
       input1.setRoleId(testDataRole.getId());
-      input1.setScopeType(ScopeType.PLATFORM);
+      input1.setScopeType(ScopeType.TENANT);
 
       Assignment assignment1 = assignmentService.create(input1);
 
@@ -789,7 +789,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       AssignmentInputDTO input2 = new AssignmentInputDTO();
       input2.setGroupId(testGroup.getId());
       input2.setRoleId(secondDataRole.getId());
-      input2.setScopeType(ScopeType.PLATFORM);
+      input2.setScopeType(ScopeType.TENANT);
 
       Assignment assignment2 = assignmentService.create(input2);
 

@@ -95,15 +95,14 @@ public class Assignment extends BaseEntity {
   }
 
   protected void validateScope() {
-    if (scopeType == null || scopeType == ScopeType.PLATFORM) {
+    if (scopeType == null || scopeType == ScopeType.TENANT) {
       // no scope entity should be set
       if (dataStructure != null
           || dataSource != null
           || dataset != null
           || dataSpace != null
           || catalog != null) {
-        throw new IllegalStateException(
-            "No scope entity should be set for SYSTEM or PLATFORM scope");
+        throw new IllegalStateException("No scope entity should be set for SYSTEM or TENANT scope");
       }
     } else {
       // implicit check if more than one scope entity is set
