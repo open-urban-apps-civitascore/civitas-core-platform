@@ -25,6 +25,7 @@ import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
+import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
@@ -255,7 +256,7 @@ class ApisixAdapterIntegrationTest {
             FatalAdapterException.class,
             () -> adapter.processConfigEvent(Topics.BACKEND_CREATED.toString(), event));
 
-    assertNotNull(exception.getErrorCode());
+    assertEquals(AdapterErrorCode.APISIX_UPSTREAM_ERROR, exception.getErrorCode());
   }
 
   // ============== ROUTE INTEGRATION TESTS ==============
@@ -431,7 +432,7 @@ class ApisixAdapterIntegrationTest {
             FatalAdapterException.class,
             () -> adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event));
 
-    assertNotNull(exception.getErrorCode());
+    assertEquals(AdapterErrorCode.APISIX_ROUTE_ERROR, exception.getErrorCode());
   }
 
   // ============== SERVERLESS-POST-FUNCTION PLUGIN TESTS ==============
@@ -682,7 +683,7 @@ class ApisixAdapterIntegrationTest {
             FatalAdapterException.class,
             () -> adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event));
 
-    assertNotNull(exception.getErrorCode());
+    assertEquals(AdapterErrorCode.APISIX_ROUTE_ERROR, exception.getErrorCode());
   }
 
   // ============== SERVERLESS-PRE-FUNCTION PLUGIN TESTS ==============
@@ -724,10 +725,6 @@ class ApisixAdapterIntegrationTest {
               ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
               assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
             });
-
-    assertEquals(1, eventPublisher.getPublishedEvents().size());
-    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
   }
 
   @Test
@@ -939,7 +936,375 @@ class ApisixAdapterIntegrationTest {
             FatalAdapterException.class,
             () -> adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event));
 
-    assertNotNull(exception.getErrorCode());
+    assertEquals(AdapterErrorCode.APISIX_ROUTE_ERROR, exception.getErrorCode());
+  }
+
+  // ============== RESPONSE-REWRITE PLUGIN TESTS ==============
+
+  @Test
+  void createRouteWithResponseRewriteSetHeaders() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-response-rewrite-set";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with response-rewrite plugin using "set" headers operation
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/response-set/*");
+    routeConfig.put("methods", List.of("GET", "POST"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+        "plugins",
+        Map.of(
+            "response-rewrite",
+            Map.of(
+                "headers",
+                Map.of(
+                    "set",
+                    Map.of(
+                        "X-Server-Id", "server-1",
+                        "X-Environment", "production")))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+  }
+
+  @Test
+  void createRouteWithResponseRewriteRemoveHeaders() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-response-rewrite-remove";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with response-rewrite plugin to remove headers
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/response-remove/*");
+    routeConfig.put("methods", List.of("GET"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+        "plugins",
+        Map.of(
+            "response-rewrite",
+            Map.of("headers", Map.of("remove", List.of("X-Internal-Header", "X-Debug-Info")))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+  }
+
+  @Test
+  void createRouteWithResponseRewriteStatusCode() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-response-rewrite-status";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with response-rewrite plugin to override status code
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/response-status/*");
+    routeConfig.put("methods", List.of("POST"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put("plugins", Map.of("response-rewrite", Map.of("status_code", 201)));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+  }
+
+  @Test
+  void createRouteWithResponseRewriteBody() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-response-rewrite-body";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with response-rewrite plugin to replace response body
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/response-body/*");
+    routeConfig.put("methods", List.of("GET"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+        "plugins",
+        Map.of("response-rewrite", Map.of("body", "{\"status\":\"ok\",\"processed\":true}")));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+  }
+
+  @Test
+  void createRouteWithResponseRewriteBodyBase64() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-response-rewrite-base64";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with response-rewrite plugin using base64 encoded body
+    // Base64 of: {"result":"encoded"}
+    String base64Body = "eyJyZXN1bHQiOiJlbmNvZGVkIn0=";
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/response-base64/*");
+    routeConfig.put("methods", List.of("GET"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+        "plugins", Map.of("response-rewrite", Map.of("body", base64Body, "body_base64", true)));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+  }
+
+  @Test
+  void createRouteWithResponseRewriteFilters() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-response-rewrite-filters";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with response-rewrite plugin using Lua-based body filters
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/response-filters/*");
+    routeConfig.put("methods", List.of("GET"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+        "plugins",
+        Map.of(
+            "response-rewrite",
+            Map.of(
+                "filters",
+                List.of(
+                    Map.of("regex", "old_text", "replace", "new_text"),
+                    Map.of("regex", "internal_value", "replace", "public_value")))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+  }
+
+  @Test
+  void createRouteWithResponseRewriteVars() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-response-rewrite-vars";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with response-rewrite plugin using APISIX variables
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/response-vars/*");
+    routeConfig.put("methods", List.of("GET"));
+    routeConfig.put("upstream_id", upstreamId);
+    routeConfig.put(
+        "plugins",
+        Map.of(
+            "response-rewrite",
+            Map.of(
+                "headers",
+                Map.of(
+                    "set",
+                    Map.of(
+                        "X-Upstream-Status", "$upstream_status",
+                        "X-Request-Id", "$request_id")))));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+  }
+
+  @Test
+  void updateRouteAddResponseRewrite() throws Exception {
+    String routeId = "test-route-add-response-rewrite";
+
+    // First create an upstream
+    String upstreamId = "test-upstream-for-add-response-rewrite";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create initial route without response-rewrite
+    Map<String, Object> initialRouteConfig = new HashMap<>();
+    initialRouteConfig.put("uri", "/api/v1/add-response-rewrite/*");
+    initialRouteConfig.put("methods", List.of("GET"));
+    initialRouteConfig.put("upstream_id", upstreamId);
+    createRouteDirectly(routeId, initialRouteConfig);
+
+    // Update route to add response-rewrite plugin
+    Map<String, Object> updatedRouteConfig = new HashMap<>();
+    updatedRouteConfig.put("uri", "/api/v1/add-response-rewrite/*");
+    updatedRouteConfig.put("methods", List.of("GET", "POST"));
+    updatedRouteConfig.put("upstream_id", upstreamId);
+    updatedRouteConfig.put(
+        "plugins",
+        Map.of(
+            "response-rewrite", Map.of("headers", Map.of("set", Map.of("X-Added-Via", "UPDATE")))));
+
+    ConfigEvent event =
+        createRouteConfigEvent("routes/" + routeId, Operation.UPDATE, updatedRouteConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_UPDATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              JsonNode route = getRouteFromApisix(routeId);
+              assertNotNull(route);
+              JsonNode plugins = route.get("value").get("plugins");
+              assertNotNull(plugins);
+              assertTrue(plugins.has("response-rewrite"));
+            });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+  }
+
+  @Test
+  void createRouteWithResponseRewriteFullConfig() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-response-rewrite-full";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with response-rewrite plugin combining headers, status, and body
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/response-full/*");
+    routeConfig.put("methods", List.of("GET", "POST", "PUT"));
+    routeConfig.put("upstream_id", upstreamId);
+
+    Map<String, Object> responseRewriteConfig = new HashMap<>();
+    responseRewriteConfig.put("status_code", 200);
+    responseRewriteConfig.put(
+        "headers",
+        Map.of(
+            "set", Map.of("X-Processed", "true", "Content-Type", "application/json"),
+            "remove", List.of("X-Internal", "X-Debug")));
+    responseRewriteConfig.put("body", "{\"result\":\"success\",\"processed\":true}");
+    routeConfig.put("plugins", Map.of("response-rewrite", responseRewriteConfig));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
+
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              assertEquals(1, eventPublisher.getPublishedEvents().size());
+              ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+              assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+            });
+  }
+
+  @Test
+  void createRouteWithInvalidResponseRewriteConfig() throws Exception {
+    // First create an upstream
+    String upstreamId = "test-upstream-invalid-response-rewrite";
+    Map<String, Object> upstreamConfig =
+        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+    createUpstreamDirectly(upstreamId, upstreamConfig);
+
+    // Create a route with INVALID response-rewrite config (invalid status_code)
+    Map<String, Object> routeConfig = new HashMap<>();
+    routeConfig.put("uri", "/api/v1/invalid-response-rewrite/*");
+    routeConfig.put("methods", List.of("GET"));
+    routeConfig.put("upstream_id", upstreamId);
+    // status_code must be between 200-598, using 999 should be invalid
+    routeConfig.put("plugins", Map.of("response-rewrite", Map.of("status_code", 999)));
+
+    ConfigEvent event = createRouteConfigEvent("routes", Operation.CREATE, routeConfig);
+
+    // APISIX should reject invalid status_code with HTTP 400 → FatalAdapterException
+    FatalAdapterException exception =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event));
+
+    assertEquals(AdapterErrorCode.APISIX_ROUTE_ERROR, exception.getErrorCode());
   }
 
   // ============== HELPER METHODS ==============
