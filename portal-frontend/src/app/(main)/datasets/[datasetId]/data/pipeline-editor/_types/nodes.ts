@@ -57,7 +57,7 @@ export interface ControlNodeData extends BasePipelineNodeData {
 // ============================================================================
 
 /**
- * Data for nodes that reference external entities (DataSource, API, FROST).
+ * Data for nodes that reference external entities (DataSource, API).
  * These nodes have a "not configured" state until an entity is selected.
  *
  */
@@ -68,7 +68,6 @@ export interface EntityNodeData extends BasePipelineNodeData {
    * ID of the selected entity.
    * - For datasources: number (real API)
    * - For apis: string (mock)
-   * - For frost/persistence: string (mock)
    */
   entityId?: number | string
   /** Display name of the selected entity */
@@ -111,19 +110,19 @@ export interface ApiNodeData extends BasePipelineNodeData {
 }
 
 /**
- * Data specific to FROST/Persistence nodes.
- * Entity ID is a string (mock data until API exists).
+ * Data specific to FROST storage nodes.
+ * Auto-configured with the platform's fixed FROST server.
+ * No user configuration needed.
  *
  */
 export interface FrostNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Frost
-  entityId?: string
-  entityName?: string
-  entityMetadata?: {
-    serverUrl?: string
-    version?: string
-    description?: string
-  }
+  /** Fixed FROST server display name */
+  serverName: string
+  /** Fixed FROST server URL */
+  serverUrl: string
+  /** SensorThings API version */
+  version: string
 }
 
 // ============================================================================
@@ -272,9 +271,12 @@ export const createDefaultNodeData = (nodeType: PipelineNodeType): PipelineNodeD
       }
     case PIPELINE_NODE_TYPES.Frost:
       return {
-        label: 'FROST',
-        configured: false, // Needs entity selection
+        label: 'Storage',
+        configured: true, // Auto-configured with fixed server
         entityType: ENTITY_TYPES.Frost,
+        serverName: 'Frost Server',
+        serverUrl: 'https://frost.example.com/v1.1',
+        version: '1.1',
       }
     case PIPELINE_NODE_TYPES.Cron:
       return {
@@ -307,18 +309,5 @@ export interface MockApiEntity {
   name: string
   method: string
   path: string
-  description: string
-}
-
-/**
- * Mock FROST/Persistence entities for dropdown selection.
- * Replace with real API data when available.
- *
- */
-export interface MockFrostEntity {
-  id: string
-  name: string
-  serverUrl: string
-  version: string
   description: string
 }

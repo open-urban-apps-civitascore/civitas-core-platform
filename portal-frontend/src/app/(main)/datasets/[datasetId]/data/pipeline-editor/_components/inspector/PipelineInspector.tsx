@@ -114,7 +114,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
       return <CronPanel data={data} onUpdate={handleNodeUpdate} />
     }
     if (isFrostNodeData(data)) {
-      return <FrostPanel data={data} onUpdate={handleNodeUpdate} />
+      return <FrostPanel data={data} />
     }
     if (isMappingNodeData(data)) {
       return <MappingPanel data={data} onUpdate={handleNodeUpdate} />

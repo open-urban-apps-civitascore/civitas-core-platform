@@ -102,7 +102,7 @@ export const PALETTE_NODE_DEFINITIONS: Record<PipelineNodeType, PaletteItem> = {
   // Storage nodes
   [PIPELINE_NODE_TYPES.Frost]: {
     type: PIPELINE_NODE_TYPES.Frost,
-    label: 'FROST',
+    label: 'FROST Server',
     icon: Snowflake,
     description: 'SensorThings API persistence. Store or retrieve data.',
   },

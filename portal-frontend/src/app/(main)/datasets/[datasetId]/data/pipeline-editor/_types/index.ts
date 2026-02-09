@@ -40,7 +40,6 @@ export {
   isMappingNodeData,
   type MappingNodeData,
   type MockApiEntity,
-  type MockFrostEntity,
   type PipelineNodeData,
 } from './nodes'
 
