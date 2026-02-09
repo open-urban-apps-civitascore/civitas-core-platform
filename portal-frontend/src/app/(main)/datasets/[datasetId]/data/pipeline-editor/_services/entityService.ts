@@ -3,7 +3,6 @@
  *
  * Provides hooks for fetching entities used in pipeline nodes.
  * - DataSources: Uses real API via useGetDatasources()
- * - API Entities: Uses mock data (until API exists)
  *
  */
 
@@ -11,9 +10,6 @@ import { useCallback, useMemo } from 'react'
 
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
 import type { Datasource } from '@/types/datasources'
-
-import { MOCK_API_ENTITIES } from '../_constants/mockEntities'
-import type { MockApiEntity } from '../_types/nodes'
 
 // ============================================================================
 // Types
@@ -74,35 +70,6 @@ export const useDataSourceEntities = (): UseEntityResult<Datasource> => {
 }
 
 // ============================================================================
-// API Entity Hook (Mock Data)
-// ============================================================================
-
-/**
- * Hook to fetch API entities for ApiRequest and ApiResponse nodes.
- * Uses mock data until real API exists.
- *
- */
-export const useApiEntities = (): UseEntityResult<MockApiEntity> => {
-  // Mock data - simulates API response
-  const entities = useMemo(() => MOCK_API_ENTITIES, [])
-
-  const getEntityById = useCallback(
-    (id: string | number): MockApiEntity | undefined => {
-      return entities.find(e => e.id === String(id))
-    },
-    [entities],
-  )
-
-  return {
-    entities,
-    isLoading: false,
-    isError: false,
-    error: null,
-    getEntityById,
-  }
-}
-
-// ============================================================================
 // Entity Conversion Helpers
 // ============================================================================
 
@@ -119,19 +86,5 @@ export const datasourceToSelectable = (ds: Datasource): SelectableEntity => ({
     status: ds.status,
     tags: ds.tags,
     description: ds.description,
-  },
-})
-
-/**
- * Converts a MockApiEntity to SelectableEntity format.
- *
- */
-export const apiEntityToSelectable = (api: MockApiEntity): SelectableEntity => ({
-  id: api.id,
-  name: api.name,
-  metadata: {
-    method: api.method,
-    path: api.path,
-    description: api.description,
   },
 })

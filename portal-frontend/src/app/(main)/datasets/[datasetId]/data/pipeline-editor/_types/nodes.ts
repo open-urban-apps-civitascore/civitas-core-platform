@@ -57,18 +57,14 @@ export interface ControlNodeData extends BasePipelineNodeData {
 // ============================================================================
 
 /**
- * Data for nodes that reference external entities (DataSource, API).
+ * Data for nodes that reference external entities (DataSource).
  * These nodes have a "not configured" state until an entity is selected.
  *
  */
 export interface EntityNodeData extends BasePipelineNodeData {
   /** Type of entity this node references */
   entityType: EntityType
-  /**
-   * ID of the selected entity.
-   * - For datasources: number (real API)
-   * - For apis: string (mock)
-   */
+  /** ID of the selected entity */
   entityId?: number | string
   /** Display name of the selected entity */
   entityName?: string
@@ -94,19 +90,15 @@ export interface DataSourceNodeData extends BasePipelineNodeData {
 
 /**
  * Data specific to API Request/Response nodes.
- * Entity ID is a string (mock data until API exists).
+ * Auto-configured with a dynamically generated API path.
+ * No user configuration needed.
  *
  */
 export interface ApiNodeData extends BasePipelineNodeData {
   nodeType: typeof PIPELINE_NODE_TYPES.ApiRequest | typeof PIPELINE_NODE_TYPES.ApiResponse
   entityType: typeof ENTITY_TYPES.Api
-  entityId?: string
-  entityName?: string
-  entityMetadata?: {
-    method?: string
-    path?: string
-    description?: string
-  }
+  /** Auto-generated API path (e.g., "api/123") */
+  apiPath: string
 }
 
 /**
@@ -233,7 +225,7 @@ export const isMappingNodeData = (data: PipelineNodeData): data is MappingNodeDa
  * Used when creating new nodes from the palette.
  *
  */
-export const createDefaultNodeData = (nodeType: PipelineNodeType): PipelineNodeData => {
+export const createDefaultNodeData = (nodeType: PipelineNodeType, datasetId?: string): PipelineNodeData => {
   switch (nodeType) {
     case PIPELINE_NODE_TYPES.Start:
       return {
@@ -259,15 +251,17 @@ export const createDefaultNodeData = (nodeType: PipelineNodeType): PipelineNodeD
       return {
         nodeType: PIPELINE_NODE_TYPES.ApiRequest,
         label: 'API Request',
-        configured: false, // Needs entity selection
+        configured: true, // Auto-configured with generated path
         entityType: ENTITY_TYPES.Api,
+        apiPath: `api/${datasetId ?? ''}`,
       }
     case PIPELINE_NODE_TYPES.ApiResponse:
       return {
         nodeType: PIPELINE_NODE_TYPES.ApiResponse,
         label: 'API Response',
-        configured: false, // Needs entity selection
+        configured: true, // Auto-configured with generated path
         entityType: ENTITY_TYPES.Api,
+        apiPath: `api/${datasetId ?? ''}`,
       }
     case PIPELINE_NODE_TYPES.Frost:
       return {
@@ -293,21 +287,4 @@ export const createDefaultNodeData = (nodeType: PipelineNodeType): PipelineNodeD
     default:
       throw new Error(`Unknown node type: ${nodeType}`)
   }
-}
-
-// ============================================================================
-// Mock Entity Data (Until APIs exist)
-// ============================================================================
-
-/**
- * Mock API entities for dropdown selection.
- * Replace with real API data when available.
- *
- */
-export interface MockApiEntity {
-  id: string
-  name: string
-  method: string
-  path: string
-  description: string
 }

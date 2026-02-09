@@ -10,6 +10,7 @@
  */
 
 import type { Connection } from '@xyflow/react'
+import { useParams } from 'next/navigation'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
@@ -59,6 +60,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   children,
   sessionManager,
 }) => {
+  const params = useParams<{ datasetId: string }>()
   const activeSession = sessionManager.getActiveSession()
   const pipeline = activeSession?.pipeline || createEmptyPipeline()
 
@@ -126,7 +128,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Node Operations =====
   const addNode = useCallback(
     (context: NodeCreationContext) => {
-      const nodeData = createDefaultNodeData(context.nodeType)
+      const nodeData = createDefaultNodeData(context.nodeType, params.datasetId)
       const newNode: PipelineNode = {
         id: crypto.randomUUID(),
         type: context.nodeType as PipelineNodeType,
@@ -135,7 +137,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       }
       dispatch({ type: 'ADD_NODE', payload: newNode })
     },
-    [dispatch],
+    [dispatch, params.datasetId],
   )
 
   const updateNode = useCallback(

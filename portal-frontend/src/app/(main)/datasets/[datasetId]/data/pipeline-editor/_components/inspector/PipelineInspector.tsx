@@ -108,7 +108,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className 
       return <DataSourcePanel data={data} onUpdate={handleNodeUpdate} />
     }
     if (isApiNodeData(data)) {
-      return <ApiPanel data={data} onUpdate={handleNodeUpdate} />
+      return <ApiPanel data={data} />
     }
     if (isCronNodeData(data)) {
       return <CronPanel data={data} onUpdate={handleNodeUpdate} />

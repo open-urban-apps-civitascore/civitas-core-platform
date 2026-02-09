@@ -113,7 +113,6 @@ pipeline-editor/
     ├── nodeCategories.ts               # Category definitions
     ├── paletteItems.ts                 # Palette configuration
     ├── pipelineStyles.ts               # Visual constants
-    └── mockEntities.ts                 # Mock data for API/FROST
 ```
 
 ### Layout
