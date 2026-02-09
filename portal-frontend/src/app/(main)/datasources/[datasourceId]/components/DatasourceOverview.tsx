@@ -14,16 +14,16 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { DATASOURCE_STATUS_TYPES } from '@/const/connectors'
-import { ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
+import { ConnectorApiToFormSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
   Datasource,
   DatasourceFormAvailableSchema,
   DatasourceFormDraft,
   DatasourceFormDraftSchema,
+  DatasourceFormToApiSchema,
   DatasourceStatusType,
-  DatasourceUpdateSchema,
 } from '@/types/datasources'
-import { getConnectorFormData, getInitialConnectorFormData } from '@/utils/connectors'
+import { getConnectorFormData } from '@/utils/connectors'
 
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
@@ -46,7 +46,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     description: datasource.description ?? '',
     tags: datasource.tags ?? [],
     status: datasource.status ?? DATASOURCE_STATUS_TYPES.DRAFT,
-    connector: datasource.connector?.type ? getInitialConnectorFormData(datasource.connector) : null,
+    connector: ConnectorApiToFormSchema.safeParse(datasource.connector).data ?? null,
   }
 
   const router = useRouter()
@@ -100,6 +100,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   useEffect(() => {
     if (!connectorTypeWatch) return
+    console.log('updateConnectorConfig')
     updateConnectorConfig(connectorTypeWatch)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch])
@@ -137,7 +138,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const submitDatasource = (onSuccess?: () => void) => {
     const parsed = isDraftMode
-      ? DatasourceUpdateSchema.safeParse(form.getValues())
+      ? DatasourceFormToApiSchema.safeParse(form.getValues())
       : DatasourceFormAvailableSchema.safeParse(form.getValues())
     if (parsed.data) {
       updateDatasource.mutate(parsed.data, { onSuccess: () => onSuccess?.() })

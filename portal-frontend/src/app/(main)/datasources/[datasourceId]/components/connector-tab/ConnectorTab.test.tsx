@@ -85,6 +85,8 @@ vi.mock('./connectorSources', () => ({
   },
 }))
 
+const onConnectorTypeChange = vi.fn()
+
 const defaultValues: DatasourceFormDraft = {
   id: '1',
   name: '',
@@ -114,7 +116,7 @@ const renderConnectorTab = (isDraftMode = false, values?: Partial<DatasourceForm
 
     return (
       <Form {...form}>
-        <ConnectorTab form={form} isDraftMode={isDraftMode} />
+        <ConnectorTab form={form} isDraftMode={isDraftMode} onConnectorTypeChange={onConnectorTypeChange} />
       </Form>
     )
   }

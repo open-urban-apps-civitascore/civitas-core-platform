@@ -6,9 +6,10 @@ import { CONNECTION_TYPES, CONNECTOR_TYPES, DATASOURCE_STATUS_TYPES } from '@/co
 import { WithId } from './common'
 import {
   ConnectorApiResponseSchema,
+  ConnectorApiToFormSchema,
+  ConnectorFormToApiSchema,
   ConnectorLooseSchema,
   ConnectorStrictSchema,
-  ConnectorUpdateSchema,
 } from './connectors'
 
 export type ConnectionType = (typeof CONNECTION_TYPES)[keyof typeof CONNECTION_TYPES]
@@ -75,13 +76,16 @@ export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
     .max(150, 'common.errors.descriptionMaxLength'),
   connector: ConnectorStrictSchema,
 })
-export const DatasourceUpdateSchema = DatasourceBaseFormSchema.extend({
-  connector: ConnectorUpdateSchema.nullable(),
+export const DatasourceFormToApiSchema = DatasourceBaseFormSchema.extend({
+  connector: ConnectorFormToApiSchema.nullable(),
+})
+export const DatasourceApiToFormSchema = DatasourceBaseFormSchema.extend({
+  connector: ConnectorApiToFormSchema.nullable(),
 })
 
 export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>
 export type DatasourceFormAvailable = z.output<typeof DatasourceFormAvailableSchema>
-export type DatasourceUpdateData = Partial<z.infer<typeof DatasourceUpdateSchema>> & WithId
+export type DatasourceUpdateData = Partial<z.infer<typeof DatasourceFormToApiSchema>> & WithId
 
 export const DatasourceCreateFormSchema = DatasourceApiResponseSchema.pick({ name: true })
 export type DatasourceCreateFormData = z.infer<typeof DatasourceCreateFormSchema>

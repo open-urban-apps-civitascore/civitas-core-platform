@@ -12,8 +12,8 @@ export const DATASOURCE_STATUS_TYPES = {
 } as const
 
 export const CONNECTOR_TYPES = {
-  MQTT: 'mqtt',
-  SQL: 'sql',
+  mqtt: 'mqtt',
+  sql: 'sql',
 } as const
 
 export const CONNECTOR_TYPE_KEYS: Record<ConnectorType, ConnectorTypeKey> = Object.fromEntries(

@@ -1,7 +1,7 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
 export const CONNECTORS = {
-  [CONNECTOR_TYPES.MQTT]: {
+  [CONNECTOR_TYPES.mqtt]: {
     icon: 'radio',
     type: 'input',
     label: 'MQTT',
@@ -15,7 +15,7 @@ export const CONNECTORS = {
         label: { label: 'Brokers', labelHint: 'commaSeparated' },
         rows: 3,
         placeholder: 'tcp://localhost:1883',
-        defaultValue: [],
+        defaultValue: '',
         required: true,
       },
       {
@@ -23,7 +23,7 @@ export const CONNECTORS = {
         type: 'input',
         label: { label: 'Topics', labelHint: 'commaSeparated' },
         placeholder: 'foo/bar, sensors/#',
-        defaultValue: [],
+        defaultValue: '',
         required: true,
       },
       {
@@ -71,7 +71,7 @@ export const CONNECTORS = {
     ],
   },
 
-  [CONNECTOR_TYPES.SQL]: {
+  [CONNECTOR_TYPES.sql]: {
     icon: 'database',
     type: 'input',
     label: 'SQL',
@@ -120,7 +120,7 @@ export const CONNECTORS = {
         label: { label: 'Columns', labelHint: 'commaSeparated' },
         rows: 3,
         placeholder: '* oder col1, col2',
-        defaultValue: ['*'],
+        defaultValue: '*',
         required: true,
       },
       {
@@ -164,7 +164,7 @@ export const CONNECTORS = {
         expert: true,
         label: { label: 'Init SQL Files', labelHint: 'commaSeparated' },
         rows: 3,
-        defaultValue: [],
+        defaultValue: '',
         required: false,
       },
       {
