@@ -107,13 +107,6 @@ export const SqlApiToFormSchema = SqlBaseSchema.extend({
   init_files: z.preprocess(stringifyStringArray, z.string()),
 })
 
-export type MqttLooseConfig = z.infer<typeof MqttLooseSchema>
-export type MqttStrictConfig = z.infer<typeof MqttStrictSchema>
-export type MqttApiConfig = z.infer<typeof MqttApiResponseSchema>
-export type SqlLooseConfig = z.infer<typeof SqlLooseSchema>
-export type SqlStrictConfig = z.infer<typeof SqlStrictSchema>
-export type SqlApiConfig = z.infer<typeof SqlApiResponseSchema>
-
 const ConnectorApiResponseConfig = {
   [CONNECTOR_TYPES.mqtt]: MqttApiResponseSchema,
   [CONNECTOR_TYPES.sql]: SqlApiResponseSchema,
@@ -185,4 +178,3 @@ export const ConnectorFormToApiSchema = z.union(
 )
 
 export type ConnectorDraft = z.infer<typeof ConnectorLooseSchema>
-export type ConnectorApiResponse = z.infer<typeof ConnectorApiResponseSchema>
