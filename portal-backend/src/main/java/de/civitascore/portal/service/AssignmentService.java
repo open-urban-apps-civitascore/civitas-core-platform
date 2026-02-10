@@ -88,16 +88,6 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   }
 
   /**
-   * Assignment needs to be pulled again from the database to populate the scopeId which is a
-   * Formula field
-   */
-  @Override
-  protected Assignment postSave(Assignment entity, AssignmentInputDTO input) {
-    return findById(entity.getId())
-        .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), entity.getId()));
-  }
-
-  /**
    * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
    * Assignment along with Group, Role, and ParentAssignment in a single JOIN query, preventing N+1
    * query problems that would occur with lazy loading.

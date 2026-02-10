@@ -31,6 +31,9 @@ public class AssignmentAssembler implements BaseAssembler<Assignment, Assignment
       output.setRole(roleMapper.toSummary(entity.getRole()));
     }
 
+    // Map scopeId
+    output.setScopeId(entity.getScopeId());
+
     return output;
   }
 
