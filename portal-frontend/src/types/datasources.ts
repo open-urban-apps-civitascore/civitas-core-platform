@@ -67,13 +67,16 @@ export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
     .max(150, 'common.errors.descriptionMaxLength'),
   connector: ConnectorStrictSchema,
 })
-export const DatasourceFormToApiSchema = DatasourceBaseFormSchema.extend({
-  connector: ConnectorFormToApiSchema.nullable(),
+export const DatasourceFormToApiSchema = DatasourceBaseFormSchema.partial().extend({
+  connector: ConnectorFormToApiSchema.nullable().optional(),
 })
 
+export type DatasourceFormToApiData = z.infer<typeof DatasourceFormToApiSchema>
+
 export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>
-export type DatasourceUpdateData = Partial<z.infer<typeof DatasourceFormToApiSchema>> & WithId
 
 export const DatasourceCreateFormSchema = DatasourceApiResponseSchema.pick({ name: true })
 export type DatasourceCreateFormData = z.infer<typeof DatasourceCreateFormSchema>
 export type DatasourceCreateData = Omit<Datasource, 'id'>
+
+export type DatasourceUpdateData = Partial<z.infer<typeof DatasourceFormToApiSchema>> & WithId

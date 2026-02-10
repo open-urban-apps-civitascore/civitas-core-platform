@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
+import { usePatchDatasource, useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -30,6 +30,7 @@ import { ConnectorTab } from './connector-tab/ConnectorTab'
 import { ExitWarningModal } from './ExitWarningModal'
 import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'
 import { StatusDropdown } from './StatusDropdown'
+import { pickDirtyValues } from '@/utils/form'
 
 interface DatasourceOverviewProps {
   datasource: Datasource
@@ -136,15 +137,27 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const submitDatasource = (onSuccess?: () => void) => {
+    const values = form.getValues()
     const parsed = isDraftMode
-      ? DatasourceFormToApiSchema.safeParse(form.getValues())
-      : DatasourceFormAvailableSchema.safeParse(form.getValues())
-    if (parsed.data) {
-      updateDatasource.mutate(parsed.data, { onSuccess: () => onSuccess?.() })
-    } else if (parsed.error) {
+      ? DatasourceFormToApiSchema.safeParse(values)
+      : DatasourceFormAvailableSchema.safeParse(values)
+    if (!parsed.success) {
       console.error(parsed.error)
       toast.error('Form data invalid')
+      return
     }
+
+    const dirtyFields = form.formState.dirtyFields
+    const updateData = pickDirtyValues(parsed.data, dirtyFields)
+
+    // use this implementation once json-server is not used anymore.
+    // json-server can not patch nested values, so patching the connector config does not work with json-server
+    // if (updateData.connector && !defaultValues.connector) {
+    // updateData.connector = parsed.data.connector
+    // }
+    updateData.connector = parsed.data.connector
+
+    updateDatasource.mutate({ ...updateData, id: values.id }, { onSuccess: () => onSuccess?.() })
   }
 
   const handleSave = () => {

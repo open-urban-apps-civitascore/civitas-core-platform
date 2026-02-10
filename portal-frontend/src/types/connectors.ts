@@ -53,8 +53,8 @@ export const MqttApiResponseSchema = MqttBaseSchema.extend({
 })
 
 export const MqttFormToApiSchema = MqttBaseSchema.extend({
-  urls: z.preprocess(parseStringArray, z.array(z.string())),
-  topics: z.preprocess(parseStringArray, z.array(z.string())),
+  urls: z.preprocess(parseStringArray, z.array(z.string())).optional(),
+  topics: z.preprocess(parseStringArray, z.array(z.string())).optional(),
 })
 
 export const MqttApiToFormSchema = MqttBaseSchema.extend({
@@ -96,10 +96,10 @@ export const SqlApiResponseSchema = SqlBaseSchema.extend({
 })
 
 export const SqlFormToApiSchema = SqlBaseSchema.extend({
-  dsn: z.string().trim(),
-  table: z.string().trim(),
-  columns: z.preprocess(parseStringArray, z.array(z.string())),
-  init_files: z.preprocess(parseStringArray, z.array(z.string())),
+  dsn: z.string().trim().optional(),
+  table: z.string().trim().optional(),
+  columns: z.preprocess(parseStringArray, z.array(z.string())).optional(),
+  init_files: z.preprocess(parseStringArray, z.array(z.string())).optional(),
 })
 
 export const SqlApiToFormSchema = SqlBaseSchema.extend({
@@ -171,7 +171,7 @@ export const ConnectorApiToFormSchema = z.union(
 export const ConnectorFormToApiSchema = z.union(
   Object.entries(ConnectorFormToApiConfig).map(([type, schema]) =>
     z.object({
-      type: z.literal(type as ConnectorType),
+      type: z.literal(type as ConnectorType).optional(),
       config: schema,
     }),
   ),
