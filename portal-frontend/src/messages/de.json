@@ -26,7 +26,7 @@
       "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
       "itemsNotFound": "Keine {items} gefunden",
-      "itemNotFound": "{items} nicht gefunden",
+      "itemNotFound": "{item} nicht gefunden",
       "loadingError": "Fehler beim Laden der Daten",
       "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
       "nameRequired": "Name ist erforderlich",

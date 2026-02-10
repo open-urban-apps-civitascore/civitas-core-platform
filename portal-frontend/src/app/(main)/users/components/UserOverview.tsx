@@ -10,7 +10,6 @@ import { toast } from 'sonner'
 import { useCreateUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -25,7 +24,7 @@ import { RolesTab } from './roles-tab/RolesTab'
 
 interface UserDetailsProps {
   title: string
-  userData: User | null
+  userData: User
   isEditMode?: boolean
   testId?: string
 }
@@ -133,20 +132,15 @@ export const UserDetails = (props: UserDetailsProps) => {
 
   const handleSave = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
 
-  const NotFoundPage = <NoDataPage title={tCommon('errors.itemNotFound', { item: tCommon('items.user') })} />
-
   const renderTabContent = () => {
-    if (!userData) return NotFoundPage
     switch (subTabValue) {
-      case tabValues.userData.value:
-      case '':
-        return <UserBasicInfoTab userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
       case tabValues.groups.value:
         return <GroupsTab userId={userData.id} />
       case tabValues.roles.value:
         return <RolesTab groupIds={userData.groups} />
+      case tabValues.userData.value:
       default:
-        return NotFoundPage
+        return <UserBasicInfoTab userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
     }
   }
 
