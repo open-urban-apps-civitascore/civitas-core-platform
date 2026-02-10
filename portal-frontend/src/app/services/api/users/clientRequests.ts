@@ -8,7 +8,13 @@ import { Authority, CreateUserData, UpdateUserData, User } from '@/types/users'
 const key = 'users'
 
 export const useGetUsers = ({ params, isEnabled }: GetListInput = {}) =>
-  useDataQuery<User[]>({ key, params, errorMessage: 'An error occurred while fetching users data.', isEnabled })
+  useDataQuery<User[]>({
+    key,
+    params,
+    errorMessage: 'An error occurred while fetching users data.',
+    isEnabled,
+    headers: { 'x-api-request': 'true' },
+  })
 
 // TODO: This query will be removed and it's relating UI-Elements adjusted since the implementation of authorities is not part of v2
 export const useGetAuthorities = ({ params, isEnabled }: GetListInput = {}) =>

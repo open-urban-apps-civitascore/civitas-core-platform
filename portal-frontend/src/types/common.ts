@@ -34,6 +34,7 @@ export type DataQueryInput = {
   id?: string
   params?: URLSearchParams
   isEnabled?: boolean
+  headers?: AxiosRequestConfig['headers']
 }
 
 export type WithId<T = string> = { id: T }
