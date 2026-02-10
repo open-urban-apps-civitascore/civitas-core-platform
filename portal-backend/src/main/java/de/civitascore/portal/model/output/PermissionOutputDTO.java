@@ -1,5 +1,7 @@
 package de.civitascore.portal.model.output;
 
+import de.civitascore.portal.model.embedded.PermissionCategory;
+import de.civitascore.portal.model.embedded.PermissionName;
 import de.civitascore.portal.model.embedded.PermissionType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -7,8 +9,8 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class PermissionOutputDTO extends BaseOutputDTO {
-  private String name;
+  private PermissionName name;
   private String description;
   private PermissionType permissionType;
-  private String category;
+  private PermissionCategory category;
 }
