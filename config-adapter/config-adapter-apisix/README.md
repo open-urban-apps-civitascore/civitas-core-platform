@@ -436,6 +436,15 @@ Test scenarios:
 - ✅ Update route to add response-rewrite plugin
 - ✅ Create route with response-rewrite (full configuration)
 - ✅ Handle invalid response-rewrite configuration
+- ✅ Create route with proxy-rewrite (static URI replacement)
+- ✅ Create route with proxy-rewrite (regex URI path transformation)
+- ✅ Create route with proxy-rewrite (path stripping - critical use case)
+- ✅ Create route with proxy-rewrite (request header manipulation)
+- ✅ Update route to add proxy-rewrite plugin
+- ✅ Create route with proxy-rewrite (host modification)
+- ✅ Create route with proxy-rewrite (full configuration)
+- ✅ Combine proxy-rewrite with other plugins
+- ✅ Handle invalid proxy-rewrite configuration
 
 ### Test Coverage
 
@@ -1002,6 +1011,226 @@ The `response-rewrite` plugin can be combined with other plugins:
 | **Headers** | Response headers | Request headers |
 | **Body** | Can replace response body | Cannot modify request body |
 | **Timing** | After upstream responds | Before proxying to upstream |
+
+## proxy-rewrite Plugin
+
+The `proxy-rewrite` plugin modifies the request sent to the upstream before it is proxied. This is useful for:
+
+- **Path transformation** - Rewrite the request URI before forwarding
+- **Path stripping** - Remove API prefixes (e.g., `/api/v1/users` → `/users`)
+- **Host modification** - Change the Host header sent to upstream
+- **Request header manipulation** - Set, add, or remove request headers
+
+### Plugin Configuration
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `uri` | string | No | New static URI to replace the original request path |
+| `regex_uri` | array | No | Regex pattern and replacement: `["pattern", "replacement"]` |
+| `host` | string | No | New Host header value to send to upstream |
+| `headers.set` | object | No | Headers to set (overwrite existing or add new) |
+| `headers.add` | object | No | Headers to add (append to existing) |
+| `headers.remove` | array | No | Header names to remove from request |
+| `method` | string | No | Override HTTP method (e.g., change GET to POST) |
+
+### Example: Static URI Replacement
+
+Replace the entire request path with a fixed URI:
+
+```json
+{
+  "plugins": {
+    "proxy-rewrite": {
+      "uri": "/users"
+    }
+  }
+}
+```
+
+**Result:** `/api/v1/users/123` → `/users` (backend receives `/users`)
+
+### Example: Path Stripping (Critical Use Case)
+
+Strip the API version prefix from requests:
+
+```json
+{
+  "plugins": {
+    "proxy-rewrite": {
+      "regex_uri": ["^/api/v1/(.*)", "/$1"]
+    }
+  }
+}
+```
+
+**Result:** `/api/v1/users/123` → `/users/123` (backend receives `/users/123`)
+
+### Example: Host Header Modification
+
+Change the Host header sent to the upstream (useful for virtual hosting):
+
+```json
+{
+  "plugins": {
+    "proxy-rewrite": {
+      "host": "internal-backend.local"
+    }
+  }
+}
+```
+
+### Example: Request Header Manipulation
+
+Set, add, and remove request headers before proxying:
+
+```json
+{
+  "plugins": {
+    "proxy-rewrite": {
+      "headers": {
+        "set": {
+          "X-Forwarded-Prefix": "/api/v1/data",
+          "X-Real-IP": "$remote_addr"
+        },
+        "add": {
+          "X-Request-ID": "$request_id",
+          "X-Request-Source": "gateway"
+        },
+        "remove": ["X-Internal-Token", "X-Debug-Mode"]
+      }
+    }
+  }
+}
+```
+
+### Example: Full Configuration (Combined)
+
+Combining path stripping, host modification, and header manipulation:
+
+```json
+{
+  "plugins": {
+    "proxy-rewrite": {
+      "regex_uri": ["^/api/v1/data/(.*)", "/$1"],
+      "host": "internal-backend.local",
+      "headers": {
+        "set": {
+          "X-Forwarded-Prefix": "/api/v1/data",
+          "X-Real-IP": "$remote_addr",
+          "Host": "internal-backend.local"
+        },
+        "add": {
+          "X-Request-ID": "$request_id"
+        },
+        "remove": ["X-Internal-Token", "X-Debug-Mode"]
+      }
+    }
+  }
+}
+```
+
+### Available Variables
+
+APISIX variables can be used in header values:
+
+| Variable | Description |
+|----------|-------------|
+| `$remote_addr` | Client IP address |
+| `$request_id` | Unique request identifier |
+| `$host` | Original Host header |
+| `$uri` | Original request URI |
+| `$args` | Query string arguments |
+| `$http_HEADER` | Any request header (e.g., `$http_authorization`) |
+
+### Combining with Other Plugins
+
+The `proxy-rewrite` plugin can be combined with other plugins:
+
+```json
+{
+  "plugins": {
+    "prometheus": {},
+    "proxy-rewrite": {
+      "regex_uri": ["^/api/v1/data/(.*)", "/$1"],
+      "headers": {
+        "set": {
+          "X-Forwarded-Prefix": "/api/v1/data"
+        }
+      }
+    },
+    "response-rewrite": {
+      "headers": {
+        "set": {
+          "X-Processed-By": "civitas-gateway"
+        }
+      }
+    }
+  }
+}
+```
+
+### CloudEvent Example
+
+Complete CloudEvent for creating a route with `proxy-rewrite`:
+
+```json
+{
+  "specversion": "1.0",
+  "type": "core.civitas.api.route.created",
+  "source": "civitas.api.provisioning",
+  "id": "event-proxy-rewrite-001",
+  "datacontenttype": "application/json",
+  "data": {
+    "metadata": {
+      "messageId": "msg-proxy-rewrite-001",
+      "timestamp": "2025-01-23T10:00:00Z",
+      "source": "api.service",
+      "correlationId": "corr-proxy-rewrite-001",
+      "configVersion": "1.0",
+      "resultTopic": "api.results"
+    },
+    "payload": {
+      "targetComponent": "apisix",
+      "targetResource": "routes/my-api-route",
+      "operation": "CREATE",
+      "config": {
+        "path": "routes/my-api-route",
+        "value": {
+          "uri": "/api/v1/*",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "upstream_id": "backend-service",
+          "plugins": {
+            "proxy-rewrite": {
+              "regex_uri": ["^/api/v1/(.*)", "/$1"]
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Common Use Cases
+
+| Use Case | Configuration |
+|----------|---------------|
+| Strip `/api/v1` prefix | `"regex_uri": ["^/api/v1/(.*)", "/$1"]` |
+| Strip `/v2` prefix | `"regex_uri": ["^/v2/(.*)", "/$1"]` |
+| Add prefix to path | `"regex_uri": ["^/(.*)", "/backend/$1"]` |
+| Replace entire path | `"uri": "/fixed-path"` |
+| Change host header | `"host": "internal.example.com"` |
+| Forward client IP | `"headers": {"set": {"X-Real-IP": "$remote_addr"}}` |
+
+### Error Handling
+
+Common errors when configuring `proxy-rewrite`:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| HTTP 400 - Invalid regex | `regex_uri` has invalid regex pattern | Verify regex syntax is valid |
+| HTTP 400 - Invalid config | `regex_uri` array has wrong length | Must have exactly 2 elements: `["pattern", "replacement"]` |
+| HTTP 400 - Unknown field | Unsupported configuration field | Check APISIX documentation for valid fields |
 
 ## Future Enhancements
 
