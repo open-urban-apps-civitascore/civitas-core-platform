@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { useCreateUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
+import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
@@ -37,6 +38,7 @@ export const UserDetails = (props: UserDetailsProps) => {
   const router = useRouter()
   const [defaultUserData, setDefaultUserData] = useState(userData)
   const [isReadOnly, setIsReadOnly] = useState(isEditMode)
+  const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const isLoading = createUser.isPending || updateUser.isPending
@@ -46,7 +48,7 @@ export const UserDetails = (props: UserDetailsProps) => {
     toast.error(tCommon('errors.unexpectedError'))
   }
 
-  const tabValues: Record<'userData' | 'roles' | 'groups' | 'account', Tab> = {
+  const tabValues: Record<'userData' | 'roles' | 'groups', Tab> = {
     userData: {
       label: t('detailsTabs.userData'),
       value: 'userDetails',
@@ -62,13 +64,8 @@ export const UserDetails = (props: UserDetailsProps) => {
       value: 'roles',
       isActive: true,
     },
-    account: {
-      label: t('detailsTabs.account'),
-      value: 'account',
-      isActive: true,
-    },
   }
-  const tabs: Tab[] = [tabValues.userData, tabValues.groups, tabValues.roles, tabValues.account]
+  const tabs: Tab[] = [tabValues.userData, tabValues.groups, tabValues.roles]
 
   const defaultTab = tabValues.userData.value
 
@@ -105,9 +102,15 @@ export const UserDetails = (props: UserDetailsProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultUserData])
 
-  const handleCancelClick = () => {
+  const handleExit = () => {
     form.reset()
     setIsReadOnly(true)
+    setIsExitModalOpen(false)
+  }
+
+  const handleExitButtonClick = () => {
+    if (isFormDirty) setIsExitModalOpen(true)
+    else handleExit()
   }
 
   const handleCreateUser = async (formData: UserFormData) => {
@@ -130,6 +133,7 @@ export const UserDetails = (props: UserDetailsProps) => {
       onSuccess: ({ data }) => {
         setDefaultUserData(data)
         setIsReadOnly(true)
+        if (isExitModalOpen) setIsExitModalOpen(false)
         toast.success(t('messages.updateSuccess'))
       },
       onError,
@@ -163,7 +167,7 @@ export const UserDetails = (props: UserDetailsProps) => {
   const SaveAndExitButtons = (
     <ActionButtons
       confirmButtonType="button"
-      onCancelClick={handleCancelClick}
+      onCancelClick={handleExitButtonClick}
       onConfirmClick={handleSave}
       isConfirmButtonDisabled={isSaveButtonDisabled}
       isCancelButtonDisabled={isCancelButtonDisabled}
@@ -188,6 +192,13 @@ export const UserDetails = (props: UserDetailsProps) => {
         customElement={isReadOnly ? EditButton : SaveAndExitButtons}
       />
       {userData ? Content : <NoDataPage title={t('notFound')} />}
+      <ExitWarningModal
+        isOpen={isExitModalOpen}
+        onClose={() => setIsExitModalOpen(false)}
+        onDiscard={handleExit}
+        onSave={handleSave}
+        isLoading={isLoading}
+      />
     </PageContainer>
   )
 }
