@@ -425,6 +425,17 @@ Test scenarios:
 - ✅ Update route to add serverless-pre-function plugin
 - ✅ Create route with multiple serverless-pre-function Lua functions
 - ✅ Combine serverless-pre-function with serverless-post-function
+- ✅ Create route with response-rewrite (set headers)
+- ✅ Create route with response-rewrite (add headers)
+- ✅ Create route with response-rewrite (remove headers)
+- ✅ Create route with response-rewrite (status code override)
+- ✅ Create route with response-rewrite (body replacement)
+- ✅ Create route with response-rewrite (base64 encoded body)
+- ✅ Create route with response-rewrite (Lua body filters)
+- ✅ Create route with response-rewrite (APISIX variables)
+- ✅ Update route to add response-rewrite plugin
+- ✅ Create route with response-rewrite (full configuration)
+- ✅ Handle invalid response-rewrite configuration
 
 ### Test Coverage
 
@@ -794,6 +805,203 @@ Use `serverless-pre-function` to modify requests before proxy and `serverless-po
 | **Primary Use** | Request modification | Response processing |
 | **Common Phases** | `rewrite`, `access` | `header_filter`, `body_filter`, `log` |
 | **Can Modify** | Request headers, URI | Response headers, body |
+
+## response-rewrite Plugin
+
+The `response-rewrite` plugin modifies the response returned by the upstream before sending it to the client. This is useful for:
+
+- **Header manipulation** - Set, add, or remove response headers
+- **Status code override** - Change the HTTP status code returned to clients
+- **Body replacement** - Replace the entire response body
+- **Content transformation** - Use Lua-based filters to transform response content
+
+### Plugin Configuration
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `status_code` | integer | No | Override HTTP status code (200-598) |
+| `body` | string | No | Replacement response body |
+| `body_base64` | boolean | No | Whether body is base64 encoded (default: false) |
+| `headers.set` | object | No | Headers to set (overwrite existing or add new) |
+| `headers.add` | object | No | Headers to add (append to existing) |
+| `headers.remove` | array | No | Header names to remove from response |
+| `filters` | array | No | Lua-based body filter configurations |
+
+### Example: Set Response Headers
+
+```json
+{
+  "plugins": {
+    "response-rewrite": {
+      "headers": {
+        "set": {
+          "X-Server-Id": "server-1",
+          "X-Environment": "production"
+        }
+      }
+    }
+  }
+}
+```
+
+### Example: Add and Remove Headers
+
+```json
+{
+  "plugins": {
+    "response-rewrite": {
+      "headers": {
+        "add": {
+          "X-Custom-Header": "custom-value"
+        },
+        "remove": ["X-Internal-Header", "X-Debug-Info"]
+      }
+    }
+  }
+}
+```
+
+### Example: Override Status Code
+
+```json
+{
+  "plugins": {
+    "response-rewrite": {
+      "status_code": 201
+    }
+  }
+}
+```
+
+### Example: Replace Response Body
+
+```json
+{
+  "plugins": {
+    "response-rewrite": {
+      "body": "{\"status\":\"ok\",\"processed\":true}"
+    }
+  }
+}
+```
+
+### Example: Base64 Encoded Body
+
+```json
+{
+  "plugins": {
+    "response-rewrite": {
+      "body": "eyJyZXN1bHQiOiJlbmNvZGVkIn0=",
+      "body_base64": true
+    }
+  }
+}
+```
+
+### Example: Lua Body Filters
+
+Body filters use regex patterns to transform response content:
+
+```json
+{
+  "plugins": {
+    "response-rewrite": {
+      "filters": [
+        {
+          "regex": "old_text",
+          "replace": "new_text"
+        },
+        {
+          "regex": "internal_value",
+          "replace": "public_value"
+        }
+      ]
+    }
+  }
+}
+```
+
+### Example: Full Configuration (Combined)
+
+```json
+{
+  "plugins": {
+    "response-rewrite": {
+      "status_code": 200,
+      "headers": {
+        "set": {
+          "X-Processed": "true",
+          "Content-Type": "application/json"
+        },
+        "remove": ["X-Internal", "X-Debug"]
+      },
+      "body": "{\"result\":\"success\",\"processed\":true}"
+    }
+  }
+}
+```
+
+### Available Variables
+
+APISIX variables can be used in header values:
+
+| Variable | Description |
+|----------|-------------|
+| `$upstream_status` | Upstream response status code |
+| `$upstream_response_time` | Upstream response time |
+| `$request_id` | Unique request identifier |
+| `$remote_addr` | Client IP address |
+| `$host` | Request host header |
+
+**Example with Variables:**
+```json
+{
+  "plugins": {
+    "response-rewrite": {
+      "headers": {
+        "set": {
+          "X-Upstream-Status": "$upstream_status",
+          "X-Request-Id": "$request_id"
+        }
+      }
+    }
+  }
+}
+```
+
+### Combining with Other Plugins
+
+The `response-rewrite` plugin can be combined with other plugins:
+
+```json
+{
+  "plugins": {
+    "prometheus": {},
+    "serverless-post-function": {
+      "phase": "log",
+      "functions": [
+        "return function(conf, ctx) ngx.log(ngx.INFO, 'Request processed') end"
+      ]
+    },
+    "response-rewrite": {
+      "headers": {
+        "set": {
+          "X-Processed-By": "civitas-gateway"
+        }
+      }
+    }
+  }
+}
+```
+
+### Difference from proxy-rewrite
+
+| Aspect | response-rewrite | proxy-rewrite |
+|--------|-----------------|---------------|
+| **Target** | Modifies response from upstream | Modifies request to upstream |
+| **Headers** | Response headers | Request headers |
+| **Body** | Can replace response body | Cannot modify request body |
+| **Timing** | After upstream responds | Before proxying to upstream |
 
 ## Future Enhancements
 
