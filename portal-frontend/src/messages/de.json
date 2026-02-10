@@ -25,7 +25,8 @@
       "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
       "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
-      "notFound": "Keine {items} gefunden",
+      "itemsNotFound": "Keine {items} gefunden",
+      "itemNotFound": "{items} nicht gefunden",
       "loadingError": "Fehler beim Laden der Daten",
       "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
       "nameRequired": "Name ist erforderlich",
@@ -147,7 +148,6 @@
     "newUser": "User erstellen",
     "createUser": "User erstellen",
     "searchUsers": "Filtern...",
-    "notFound": "User nicht gefunden",
     "info": {
       "header": "User Informationen",
       "subheader": "Persönliche Angaben und allgemeine Informationen.",

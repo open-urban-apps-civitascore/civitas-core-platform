@@ -9,7 +9,6 @@ import { toast } from 'sonner'
 
 import { useCreateUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
-import { ContentCard } from '@/components/content-card/ContentCard'
 import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -134,22 +133,20 @@ export const UserDetails = (props: UserDetailsProps) => {
 
   const handleSave = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
 
-  let Content = <ContentCard>No data</ContentCard>
-  if (userData) {
+  const NotFoundPage = <NoDataPage title={tCommon('errors.itemNotFound', { item: tCommon('items.user') })} />
+
+  const renderTabContent = () => {
+    if (!userData) return NotFoundPage
     switch (subTabValue) {
       case tabValues.userData.value:
       case '':
-        Content = <UserBasicInfoTab userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
-        break
+        return <UserBasicInfoTab userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
       case tabValues.groups.value:
-        Content = <GroupsTab userId={userData.id} />
-        break
+        return <GroupsTab userId={userData.id} />
       case tabValues.roles.value:
-        Content = <RolesTab groupIds={userData.groups} />
-        break
+        return <RolesTab groupIds={userData.groups} />
       default:
-        Content = <ContentCard>No data</ContentCard>
-        break
+        return NotFoundPage
     }
   }
 
@@ -183,7 +180,7 @@ export const UserDetails = (props: UserDetailsProps) => {
         subTabs={{ tabs: tabs, selectedTab: subTabValue || defaultTab, onClick: newTab => handleSelectTab(newTab) }}
         customElement={isReadOnly ? EditButton : SaveAndExitButtons}
       />
-      {userData ? Content : <NoDataPage title={t('notFound')} />}
+      {renderTabContent()}
       <ExitWarningModal
         isOpen={isExitModalOpen}
         onClose={() => setIsExitModalOpen(false)}

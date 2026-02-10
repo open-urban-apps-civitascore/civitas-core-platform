@@ -12,7 +12,7 @@ interface PageProps {
 const EditUserPage = async (props: PageProps) => {
   const { params } = props
   const { userId } = await params
-  const t = await getTranslations('users')
+  const t = await getTranslations('common')
 
   const getUserData = async (userId: string) => {
     const userRequest = getUser(userId)
@@ -32,7 +32,7 @@ const EditUserPage = async (props: PageProps) => {
       testId="userDetailsPage"
       userData={userData}
       isEditMode
-      title={userData ? `${userData.firstName} ${userData.lastName}` : t('notFound')}
+      title={userData ? `${userData.firstName} ${userData.lastName}` : t('itemNotFound', { item: t('items.user') })}
     />
   )
 }
