@@ -139,7 +139,11 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
     if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
       return getIdFromOutput(response.getBody());
     }
-    throw new IllegalStateException("Failed to create test entity");
+    throw new IllegalStateException(
+        "Failed to create test entity. Status: "
+            + response.getStatusCode()
+            + ", Body: "
+            + response.getBody());
   }
 
   protected HttpHeaders withHeaders(Consumer<HttpHeaders> customizer) {
