@@ -191,6 +191,10 @@
       "contact": "Ansprechpartner",
       "description": "Beschreibung",
       "roles": "Rollen"
+    },
+    "messages": {
+      "createSuccess": "User wurde erfolgreich angelegt.",
+      "updateSuccess": "User wurde erfolgreich aktualisiert."
     }
   },
   "groups": {

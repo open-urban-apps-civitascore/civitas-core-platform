@@ -40,7 +40,7 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
               <Input
                 data-testid={`${name}TextField`}
                 data-test-element="formField"
-                className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0"
+                className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
                 placeholder={placeholder}
                 {...field}
                 disabled={disabled}

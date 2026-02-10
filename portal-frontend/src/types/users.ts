@@ -68,5 +68,4 @@ export const UserFormSchema = UserSchema.omit({
 export type UserFormData = z.infer<typeof UserFormSchema>
 
 export type CreateUserData = Omit<User, 'id'>
-export type UpdateUserData = User
-export type PatchUserData = Partial<CreateUserData> & WithId
+export type UpdateUserData = Partial<CreateUserData> & WithId

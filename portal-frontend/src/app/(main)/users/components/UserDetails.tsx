@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
 
 import { useCreateUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
@@ -13,6 +14,7 @@ import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
+import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { User, UserFormData, UserFormSchema } from '@/types/users'
 import { mapUserToFormData } from '@/utils/users'
@@ -35,12 +37,14 @@ export const UserDetails = (props: UserDetailsProps) => {
   const router = useRouter()
   const [defaultUserData, setDefaultUserData] = useState(userData)
   const [isReadOnly, setIsReadOnly] = useState(isEditMode)
-  const [isSaveButtonDisabled, setIsSaveButtonDisabled] = useState(true)
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const isLoading = createUser.isPending || updateUser.isPending
 
-  const { setSubTabValueParam, subTabValue, getApiRequestParamsByUrl } = useQueryParams()
+  const { setSubTabValueParam, subTabValue } = useQueryParams()
+  const onError = () => {
+    toast.error(tCommon('errors.unexpectedError'))
+  }
 
   const tabValues: Record<'userData' | 'roles' | 'groups' | 'account', Tab> = {
     userData: {
@@ -51,24 +55,24 @@ export const UserDetails = (props: UserDetailsProps) => {
     groups: {
       label: t('detailsTabs.groups'),
       value: 'userGroups',
-      isActive: isEditMode,
+      isActive: true,
     },
     roles: {
       label: t('detailsTabs.roles'),
       value: 'roles',
-      isActive: isEditMode,
+      isActive: true,
     },
     account: {
       label: t('detailsTabs.account'),
       value: 'account',
-      isActive: isEditMode,
+      isActive: true,
     },
   }
   const tabs: Tab[] = [tabValues.userData, tabValues.groups, tabValues.roles, tabValues.account]
 
   const defaultTab = tabValues.userData.value
 
-  const isBlockedTab = useMemo(() => !isEditMode && subTabValue !== defaultTab, [isEditMode, subTabValue, defaultTab])
+  const isBlockedTab = useMemo(() => subTabValue !== defaultTab, [subTabValue, defaultTab])
 
   useEffect(() => {
     if (!subTabValue || isBlockedTab) {
@@ -85,38 +89,50 @@ export const UserDetails = (props: UserDetailsProps) => {
     defaultValues: mapUserToFormData(defaultUserData),
   })
 
+  const watch = form.watch()
+
+  const isFormDirty = useMemo(() => {
+    const dirtyFields = form.formState.dirtyFields
+    const isPhoneFieldDirty =
+      dirtyFields.phone && form.getValues('phone')?.replace(/\s+/g, '') !== defaultUserData?.phone?.replace(/\s+/g, '')
+    const isNonPhoneFieldDirty = Object.keys(dirtyFields).find(field => field !== 'phone')
+    return isNonPhoneFieldDirty || isPhoneFieldDirty
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watch, form, defaultUserData?.phone])
+
   useEffect(() => {
     form.reset(mapUserToFormData(defaultUserData))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultUserData])
 
   const handleCancelClick = () => {
-    const apiParams = getApiRequestParamsByUrl()
-    router.push(`/users?${apiParams}`)
+    form.reset()
+    setIsReadOnly(true)
   }
 
   const handleCreateUser = async (formData: UserFormData) => {
     const parsed = UserFormSchema.parse(formData)
-
     const mappedData: User = { ...parsed, groups: defaultUserData?.groups || [] }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
     createUser.mutate(createUserData, {
       onSuccess: ({ data }) => {
+        toast.success(t('messages.createSuccess'))
         router.push(`/users/${data.id}`)
       },
+      onError,
     })
   }
 
   const handleUpdateUser = async (formData: UserFormData) => {
     const parsed = UserFormSchema.parse(formData)
-
-    const updateUserData = { ...parsed, groups: defaultUserData?.groups || [] }
-    updateUser.mutate(updateUserData, {
+    updateUser.mutate(parsed, {
       onSuccess: ({ data }) => {
         setDefaultUserData(data)
         setIsReadOnly(true)
+        toast.success(t('messages.updateSuccess'))
       },
+      onError,
     })
   }
 
@@ -127,18 +143,7 @@ export const UserDetails = (props: UserDetailsProps) => {
     switch (subTabValue) {
       case tabValues.userData.value:
       case '':
-        Content = (
-          <UserForm
-            userData={userData}
-            isEditMode={isEditMode}
-            form={form}
-            isReadOnly={isReadOnly}
-            setIsReadOnly={setIsReadOnly}
-            defaultUserData={defaultUserData}
-            isLoading={isLoading}
-            setIsSaveButtonDisabled={setIsSaveButtonDisabled}
-          />
-        )
+        Content = <UserForm userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
         break
       case tabValues.groups.value:
         Content = <GroupsTab userId={userData.id} />
@@ -152,17 +157,27 @@ export const UserDetails = (props: UserDetailsProps) => {
     }
   }
 
-  const customElement = (
+  const isSaveButtonDisabled = !isFormDirty || isLoading
+  const isCancelButtonDisabled = isLoading
+
+  const SaveAndExitButtons = (
     <ActionButtons
       confirmButtonType="button"
       onCancelClick={handleCancelClick}
       onConfirmClick={handleSave}
       isConfirmButtonDisabled={isSaveButtonDisabled}
+      isCancelButtonDisabled={isCancelButtonDisabled}
       cancelButtonTitle={tCommon('actions.exit')}
       hasCard={false}
-      className='px-6 py-0'
-      wrapperClassname='w-auto'
+      className="px-6 py-0"
+      wrapperClassname="w-auto"
     />
+  )
+
+  const EditButton = (
+    <Button data-testid="editButton" type="button" onClick={() => setIsReadOnly(false)} className="mx-6">
+      {tCommon('actions.edit')}
+    </Button>
   )
 
   return (
@@ -170,7 +185,7 @@ export const UserDetails = (props: UserDetailsProps) => {
       <PageHeader
         title={title}
         subTabs={{ tabs: tabs, selectedTab: subTabValue || defaultTab, onClick: newTab => handleSelectTab(newTab) }}
-        customElement={!isReadOnly ? customElement : undefined}
+        customElement={isReadOnly ? EditButton : SaveAndExitButtons}
       />
       {userData ? Content : <NoDataPage title={t('notFound')} />}
     </PageContainer>

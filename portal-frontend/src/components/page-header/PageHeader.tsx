@@ -55,7 +55,7 @@ export const PageHeader = (props: PageHeaderProps) => {
           )}
           {subtitle && <p className="mt-6 text-muted-foreground">{subtitle}</p>}
         </div>
-       {customElement}
+        {customElement}
       </div>
       {subTabs && (
         <TabsSection

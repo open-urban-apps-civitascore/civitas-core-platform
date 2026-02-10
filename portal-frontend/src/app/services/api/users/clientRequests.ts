@@ -20,7 +20,7 @@ export const useCreateUser = () =>
 export const useUpdateUser = () =>
   useUpdateMutation<User, UpdateUserData>({
     key,
-    method: 'PUT',
+    method: 'PATCH',
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating the user.',
   })

@@ -1,8 +1,6 @@
 'use client'
 
-import { SquarePen } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { Dispatch, SetStateAction, useEffect, useMemo } from 'react'
 import { UseFormReturn } from 'react-hook-form'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
@@ -12,7 +10,6 @@ import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
-import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { User, UserFormData } from '@/types/users'
 
@@ -20,27 +17,14 @@ export type FormUser = Omit<User, 'roles'>
 
 interface UserFormProps {
   userData: User
-  isEditMode?: boolean
   form: UseFormReturn<UserFormData>
   isReadOnly: boolean
-  setIsReadOnly: Dispatch<SetStateAction<boolean>>
   isLoading: boolean
-  defaultUserData: User | null
-  setIsSaveButtonDisabled: Dispatch<SetStateAction<boolean>>
 }
 
 export const UserForm = (props: UserFormProps) => {
-  const {
-    isEditMode = false,
-    form,
-    isReadOnly,
-    setIsReadOnly,
-    isLoading,
-    defaultUserData,
-    setIsSaveButtonDisabled,
-  } = props
+  const { form, isReadOnly, isLoading } = props
   const t = useTranslations('users')
-  const tCommon = useTranslations('common')
 
   const titleOptions = [
     {
@@ -57,46 +41,18 @@ export const UserForm = (props: UserFormProps) => {
     },
   ]
 
-  const watch = form.watch()
-
-  const isFormDirty = useMemo(() => {
-    const dirtyFields = form.formState.dirtyFields
-    const isPhoneFieldDirty =
-      dirtyFields.phone && form.getValues('phone')?.replace(/\s+/g, '') !== defaultUserData?.phone?.replace(/\s+/g, '')
-    const isNonPhoneFieldDirty = Object.keys(dirtyFields).find(field => field !== 'phone')
-    return isNonPhoneFieldDirty || isPhoneFieldDirty
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watch, form, defaultUserData?.phone])
-
-  useEffect(() => {
-    setIsSaveButtonDisabled(!isFormDirty)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFormDirty])
-
-  const EditButton = (
-    <Button data-testid="editButton" variant="outline" type="button" onClick={() => setIsReadOnly(false)}>
-      <SquarePen />
-      {tCommon('actions.edit')}
-    </Button>
-  )
-
   return (
     <PageBackground hasBackground={!isReadOnly}>
       <Form {...form}>
         <form onSubmit={e => e.preventDefault()} data-testid="userDetailsForm">
           <ContentCard>
             <DetailsFieldContainer className="pt-0 pb-4 text-xl">
-              <SubHeader
-                title={t('info.header')}
-                subtitle={t('info.subheader')}
-                customElement={isEditMode && isReadOnly && !isLoading && EditButton}
-              />
+              <SubHeader title={t('info.header')} subtitle={t('info.subheader')} />
             </DetailsFieldContainer>
             {isLoading ? (
               <LoadingSpinner />
             ) : (
               <>
-                {' '}
                 <DetailsFieldContainer>
                   <TextField
                     form={form}
