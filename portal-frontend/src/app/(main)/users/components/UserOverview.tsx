@@ -69,15 +69,8 @@ export const UserDetails = (props: UserDetailsProps) => {
 
   const defaultTab = tabValues.userData.value
 
-  const isBlockedTab = useMemo(() => subTabValue !== defaultTab, [subTabValue, defaultTab])
-
-  useEffect(() => {
-    if (!subTabValue || isBlockedTab) {
-      setSubTabValueParam(defaultTab)
-    }
-  }, [subTabValue, setSubTabValueParam, defaultTab, isBlockedTab])
-
   const handleSelectTab = (newTab: string) => {
+    console.log('handleSelectTab', newTab)
     setSubTabValueParam(newTab)
   }
 
