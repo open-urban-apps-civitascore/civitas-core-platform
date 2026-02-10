@@ -82,7 +82,7 @@ export const DatasourceCreateForm = () => {
               onClick={form.handleSubmit(handleCreateDatasource)}
               disabled={!form.formState.isDirty || isLoading}
             >
-              {t('actions.saveAndContinue')}
+              {tCommon('actions.saveAndContinue')}
             </Button>
           </div>
         </div>

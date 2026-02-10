@@ -170,7 +170,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
               onClick={handleExit}
               disabled={isLoading}
             >
-              {t('actions.exit')}
+              {tCommon('actions.exit')}
             </Button>
             <Button
               data-testid="saveButton"

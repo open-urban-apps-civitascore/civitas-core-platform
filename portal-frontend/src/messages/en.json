@@ -14,7 +14,9 @@
       "add": "Add",
       "edit": "Edit",
       "editBase": "Edit base",
-      "open": "open"
+      "open": "open",
+      "saveAndContinue": "Save and continue",
+      "exit": "Exit"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
@@ -408,10 +410,6 @@
       "tagsPlaceholder": "Add tag...",
       "tagsSearch": "Search tag...",
       "noTagsFound": "No tags found"
-    },
-    "actions": {
-      "saveAndContinue": "Save and continue",
-      "exit": "Exit"
     },
     "exitModal": {
       "title": "Save before exiting?",

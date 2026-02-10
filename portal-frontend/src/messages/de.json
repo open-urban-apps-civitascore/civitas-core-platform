@@ -14,7 +14,9 @@
       "add": "Hinzufügen",
       "edit": "Bearbeiten",
       "editBase": "Basis bearbeiten",
-      "open": "öffnen"
+      "open": "öffnen",
+      "saveAndContinue": "Erstellen und weiter",
+      "exit": "Beenden"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -405,10 +407,6 @@
       "tagsPlaceholder": "Tag hinzufügen...",
       "tagsSearch": "Tag suchen ...",
       "noTagsFound": "Keine Tags gefunden"
-    },
-    "actions": {
-      "saveAndContinue": "Erstellen und weiter",
-      "exit": "Beenden"
     },
     "tabs": {
       "basicInfo": "Basisinformationen",
