@@ -70,7 +70,6 @@ export const UserDetails = (props: UserDetailsProps) => {
   const defaultTab = tabValues.userData.value
 
   const handleSelectTab = (newTab: string) => {
-    console.log('handleSelectTab', newTab)
     setSubTabValueParam(newTab)
   }
 
