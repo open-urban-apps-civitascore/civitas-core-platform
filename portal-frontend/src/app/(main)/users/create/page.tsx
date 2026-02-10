@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server'
 
 import { User } from '@/types/users'
 
-import { UserDetails } from '../components/UserDetails'
+import { UserDetails } from '../components/UserOverview'
 
 export const defaultFormUser: User = {
   id: '',

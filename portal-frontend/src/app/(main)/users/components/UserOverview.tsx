@@ -20,9 +20,9 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { User, UserFormData, UserFormSchema } from '@/types/users'
 import { mapUserToFormData } from '@/utils/users'
 
+import { UserBasicInfoTab } from './basic-info-tab/UserBasicInfoTab'
 import { GroupsTab } from './groups-tab/GroupsTab'
 import { RolesTab } from './roles-tab/RolesTab'
-import { UserForm } from './UserForm'
 
 interface UserDetailsProps {
   title: string
@@ -147,7 +147,7 @@ export const UserDetails = (props: UserDetailsProps) => {
     switch (subTabValue) {
       case tabValues.userData.value:
       case '':
-        Content = <UserForm userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
+        Content = <UserBasicInfoTab userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
         break
       case tabValues.groups.value:
         Content = <GroupsTab userId={userData.id} />

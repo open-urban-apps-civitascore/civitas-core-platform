@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server'
 import { getGroups } from '@/app/services/api/groups/serverRequests'
 import { getUser } from '@/app/services/api/users/serverRequests'
 
-import { UserDetails } from '../components/UserDetails'
+import { UserDetails } from '../components/UserOverview'
 
 interface PageProps {
   params: Promise<{ userId: string }>

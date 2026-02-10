@@ -15,14 +15,14 @@ import { User, UserFormData } from '@/types/users'
 
 export type FormUser = Omit<User, 'roles'>
 
-interface UserFormProps {
+interface UserBasicInfoTabProps {
   userData: User
   form: UseFormReturn<UserFormData>
   isReadOnly: boolean
   isLoading: boolean
 }
 
-export const UserForm = (props: UserFormProps) => {
+export const UserBasicInfoTab = (props: UserBasicInfoTabProps) => {
   const { form, isReadOnly, isLoading } = props
   const t = useTranslations('users')
 
