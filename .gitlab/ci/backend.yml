@@ -128,7 +128,7 @@ test-backend:
 
 integration-test-backend:
   extends: .only-backend-changes
-  image: maven:3.9-eclipse-temurin-21-alpine
+  image: maven:3.9-eclipse-temurin-25
   stage: test
   needs:
     - job: publish-config-adapter
