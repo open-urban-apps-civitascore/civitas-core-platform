@@ -34,6 +34,7 @@
         <spotless.version>2.46.1</spotless.version>
         <surefire.version>3.5.4</surefire.version>
         <failsafe.version>3.5.4</failsafe.version>
+        <skipUnitTests>false</skipUnitTests>
         <jacoco.version>0.8.14</jacoco.version>
         <flyway.version>11.17.1</flyway.version>
         <mapstruct.version>1.6.3</mapstruct.version>
@@ -385,6 +386,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire.version}</version>
                 <configuration>
+                    <skipTests>${skipUnitTests}</skipTests>
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
