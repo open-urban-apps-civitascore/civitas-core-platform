@@ -10,7 +10,6 @@ export const getConnectorDefaults = (type: ConnectorType): ConnectorDraft['confi
     },
     {} as ConnectorDraft['config'],
   )
-  console.log('getConnectorDefaults', defaults)
   return defaults
 }
 
@@ -18,7 +17,5 @@ export const getConnectorFormData = <T extends ConnectorType>(
   type: T,
   connectorFormData: ConnectorDraft | null,
 ): ConnectorDraft => {
-  const data = connectorFormData?.type === type ? connectorFormData : { type, config: getConnectorDefaults(type) }
-  console.log('getConnectorFormData', data)
   return connectorFormData?.type === type ? connectorFormData : { type, config: getConnectorDefaults(type) }
 }

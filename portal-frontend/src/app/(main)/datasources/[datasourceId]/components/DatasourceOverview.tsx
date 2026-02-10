@@ -100,7 +100,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   useEffect(() => {
     if (!connectorTypeWatch) return
-    console.log('updateConnectorConfig')
     updateConnectorConfig(connectorTypeWatch)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch])

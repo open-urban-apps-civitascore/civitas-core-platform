@@ -1,7 +1,7 @@
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
 export const CONNECTORS = {
-  [CONNECTOR_TYPES.mqtt]: {
+  [CONNECTOR_TYPES.MQTT]: {
     icon: 'radio',
     type: 'input',
     label: 'MQTT',
@@ -71,7 +71,7 @@ export const CONNECTORS = {
     ],
   },
 
-  [CONNECTOR_TYPES.sql]: {
+  [CONNECTOR_TYPES.SQL]: {
     icon: 'database',
     type: 'input',
     label: 'SQL',

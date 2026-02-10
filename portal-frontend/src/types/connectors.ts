@@ -108,28 +108,28 @@ export const SqlApiToFormSchema = SqlBaseSchema.extend({
 })
 
 const ConnectorApiResponseConfig = {
-  [CONNECTOR_TYPES.mqtt]: MqttApiResponseSchema,
-  [CONNECTOR_TYPES.sql]: SqlApiResponseSchema,
+  [CONNECTOR_TYPES.MQTT]: MqttApiResponseSchema,
+  [CONNECTOR_TYPES.SQL]: SqlApiResponseSchema,
 } as const
 
 const ConnectorLooseConfig = {
-  [CONNECTOR_TYPES.mqtt]: MqttLooseSchema,
-  [CONNECTOR_TYPES.sql]: SqlLooseSchema,
+  [CONNECTOR_TYPES.MQTT]: MqttLooseSchema,
+  [CONNECTOR_TYPES.SQL]: SqlLooseSchema,
 } as const
 
 const ConnectorStrictConfig = {
-  [CONNECTOR_TYPES.mqtt]: MqttStrictSchema,
-  [CONNECTOR_TYPES.sql]: SqlStrictSchema,
+  [CONNECTOR_TYPES.MQTT]: MqttStrictSchema,
+  [CONNECTOR_TYPES.SQL]: SqlStrictSchema,
 } as const
 
 const ConnectorApiToFormConfig = {
-  [CONNECTOR_TYPES.mqtt]: MqttApiToFormSchema,
-  [CONNECTOR_TYPES.sql]: SqlApiToFormSchema,
+  [CONNECTOR_TYPES.MQTT]: MqttApiToFormSchema,
+  [CONNECTOR_TYPES.SQL]: SqlApiToFormSchema,
 } as const
 
 const ConnectorFormToApiConfig = {
-  [CONNECTOR_TYPES.mqtt]: MqttFormToApiSchema,
-  [CONNECTOR_TYPES.sql]: SqlFormToApiSchema,
+  [CONNECTOR_TYPES.MQTT]: MqttFormToApiSchema,
+  [CONNECTOR_TYPES.SQL]: SqlFormToApiSchema,
 } as const
 
 export const ConnectorApiResponseSchema = z.union(

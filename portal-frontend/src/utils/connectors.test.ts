@@ -22,7 +22,7 @@ vi.mock('@/app/(main)/datasources/[datasourceId]/components/connector-tab/connec
 
 describe('getConnectorDefaults', () => {
   it('returns mqtt defaults', () => {
-    const result = getConnectorDefaults(CONNECTOR_TYPES.mqtt)
+    const result = getConnectorDefaults(CONNECTOR_TYPES.MQTT)
     expect(result).toEqual({
       urls: '',
       topics: '',
@@ -30,7 +30,7 @@ describe('getConnectorDefaults', () => {
   })
 
   it('returns sql defaults', () => {
-    const result = getConnectorDefaults(CONNECTOR_TYPES.sql)
+    const result = getConnectorDefaults(CONNECTOR_TYPES.SQL)
     expect(result).toEqual({
       columns: '',
       init_files: '',
@@ -41,24 +41,24 @@ describe('getConnectorDefaults', () => {
 describe('getConnectorFormData', () => {
   it('returns existing connector when type matches', () => {
     const existing: ConnectorDraft = {
-      type: CONNECTOR_TYPES.mqtt,
+      type: CONNECTOR_TYPES.MQTT,
       config: { urls: 'a', topics: 'b' },
     }
 
-    const result = getConnectorFormData(CONNECTOR_TYPES.mqtt, existing)
+    const result = getConnectorFormData(CONNECTOR_TYPES.MQTT, existing)
 
     expect(result).toBe(existing)
   })
 
   it('creates new connector when type does not match', () => {
     const existing: ConnectorDraft = {
-      type: CONNECTOR_TYPES.mqtt,
+      type: CONNECTOR_TYPES.MQTT,
       config: { urls: 'a', topics: 'b' },
     }
 
-    const result = getConnectorFormData(CONNECTOR_TYPES.sql, existing)
+    const result = getConnectorFormData(CONNECTOR_TYPES.SQL, existing)
 
-    expect(result.type).toBe(CONNECTOR_TYPES.sql)
+    expect(result.type).toBe(CONNECTOR_TYPES.SQL)
     expect(result.config).toEqual({
       columns: '',
       init_files: '',
