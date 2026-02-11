@@ -120,13 +120,6 @@
             <version>${spring-kafka.version}</version>
         </dependency>
 
-        <!-- Jackson JSR310 for Java 8 Date/Time support (used in tests) -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-            <scope>test</scope>
-        </dependency>
-
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
@@ -291,6 +284,9 @@
                         <ignoredUnusedDeclaredDependency>com.civitas:event-handler-kafka</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
+                    <ignoredNonTestScopedDependencies>
+                        <ignoredNonTestScopedDependency>com.fasterxml.jackson.datatype:jackson-datatype-jsr310</ignoredNonTestScopedDependency>
+                    </ignoredNonTestScopedDependencies>
                     <ignoredUsedUndeclaredDependencies>
                         <ignoredUsedUndeclaredDependency>org.springframework.boot:*</ignoredUsedUndeclaredDependency>
                         <ignoredUsedUndeclaredDependency>org.springframework.security:*</ignoredUsedUndeclaredDependency>
