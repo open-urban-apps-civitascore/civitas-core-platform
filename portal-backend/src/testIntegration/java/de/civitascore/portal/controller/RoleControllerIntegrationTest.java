@@ -316,7 +316,6 @@ class RoleControllerIntegrationTest
       assignmentInput.setRoleId(roleId);
       assignmentInput.setGroupId(groups.getLeft().getId());
       assignmentInput.setScopeType(ScopeType.TENANT);
-      assignmentInput.setIsInherited(false);
       assignmentService.create(assignmentInput);
 
       assignmentInput.setGroupId(groups.getMiddle().getId());
@@ -360,7 +359,6 @@ class RoleControllerIntegrationTest
       assignmentInput.setRoleId(roleId);
       assignmentInput.setGroupId(groups.getLeft().getId());
       assignmentInput.setScopeType(ScopeType.TENANT);
-      assignmentInput.setIsInherited(false);
       assignmentService.create(assignmentInput);
 
       assignmentInput.setGroupId(groups.getMiddle().getId());
