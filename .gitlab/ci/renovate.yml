@@ -1,0 +1,41 @@
+# Renovate bot configuration validation
+# Ensures renovate.json is valid before merging changes
+
+validate-renovate-config:
+  image: node:22-alpine
+  stage: lint
+  needs: []
+  rules:
+    # Always run on main and develop branch
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    # Run on MR when renovate config changes
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - renovate.json
+        - .gitlab-ci.yml
+        - .gitlab/ci/renovate.yml
+  script:
+    - npx --yes --package renovate -- renovate-config-validator
+  allow_failure: false
+
+# Renovate bot execution job
+# Runs on schedule to check for dependency updates
+# Requires:
+#   1. RENOVATE_TOKEN variable (Project Access Token or Personal Access Token)
+#      - Scopes needed: api, read_repository, write_repository
+#      - Role needed: Developer or higher
+#   2. Schedule variable: RENOVATE_ENABLED=true (set when creating the schedule)
+renovate:
+  image: renovate/renovate:39
+  stage: deploy
+  needs: []
+  rules:
+    # Only run when explicitly enabled via schedule variable
+    - if: $RENOVATE_ENABLED == "true"
+  variables:
+    RENOVATE_CONFIG_FILE: renovate.json
+    LOG_LEVEL: info
+  script:
+    - renovate --platform gitlab --endpoint $CI_SERVER_URL/api/v4 $CI_PROJECT_PATH
+  allow_failure: true

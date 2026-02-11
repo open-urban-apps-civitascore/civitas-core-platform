@@ -7,6 +7,7 @@ export const useDataQuery = <TResponse>({
   id,
   key: queryKey,
   params,
+  headers,
   isEnabled,
   errorMessage,
 }: DataQueryInput): UseQueryResult<ApiServiceResponse<TResponse>> => {
@@ -16,6 +17,7 @@ export const useDataQuery = <TResponse>({
       apiRequest<TResponse>({
         endpoint: id ? `/${queryKey}/${id}` : `/${queryKey}`,
         method: 'GET',
+        headers,
         params: params,
         errorMessage: errorMessage,
       }),

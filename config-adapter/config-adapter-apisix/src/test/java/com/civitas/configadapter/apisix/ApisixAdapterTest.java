@@ -535,6 +535,165 @@ class ApisixAdapterTest {
 
       verify(mockPublisher, never()).publish(any(String.class), any(ConfigResultEvent.class));
     }
+
+    // ============== RESPONSE-REWRITE PLUGIN TESTS ==============
+
+    @Test
+    void testRouteCreateWithResponseRewriteHeaders()
+        throws FatalAdapterException, RetryableAdapterException {
+      when(mockResponse.getStatus()).thenReturn(201);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/1\"}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      Map<String, Object> routeConfig =
+          Map.of(
+              "uri",
+              "/api/v1/response-headers/*",
+              "upstream_id",
+              "backend-service",
+              "plugins",
+              Map.of(
+                  "response-rewrite",
+                  Map.of(
+                      "headers",
+                      Map.of(
+                          "set", Map.of("X-Server-Id", "server-1"),
+                          "add", Map.of("X-Custom", "value"),
+                          "remove", List.of("X-Internal")))));
+
+      ConfigEvent event = createRouteConfigEvent(Operation.CREATE, "routes", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+      assertEquals("APISIX route created successfully", result.message());
+    }
+
+    @Test
+    void testRouteCreateWithResponseRewriteStatusCode()
+        throws FatalAdapterException, RetryableAdapterException {
+      when(mockResponse.getStatus()).thenReturn(201);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/1\"}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      Map<String, Object> routeConfig =
+          Map.of(
+              "uri",
+              "/api/v1/response-status/*",
+              "upstream_id",
+              "backend-service",
+              "plugins",
+              Map.of("response-rewrite", Map.of("status_code", 201)));
+
+      ConfigEvent event = createRouteConfigEvent(Operation.CREATE, "routes", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+    }
+
+    @Test
+    void testRouteCreateWithResponseRewriteBody()
+        throws FatalAdapterException, RetryableAdapterException {
+      when(mockResponse.getStatus()).thenReturn(201);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/1\"}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      Map<String, Object> routeConfig =
+          Map.of(
+              "uri",
+              "/api/v1/response-body/*",
+              "upstream_id",
+              "backend-service",
+              "plugins",
+              Map.of(
+                  "response-rewrite", Map.of("body", "{\"status\":\"ok\"}", "body_base64", false)));
+
+      ConfigEvent event = createRouteConfigEvent(Operation.CREATE, "routes", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+    }
+
+    @Test
+    void testRouteCreateWithResponseRewriteFilters()
+        throws FatalAdapterException, RetryableAdapterException {
+      when(mockResponse.getStatus()).thenReturn(201);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/1\"}");
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      Map<String, Object> routeConfig =
+          Map.of(
+              "uri",
+              "/api/v1/response-filters/*",
+              "upstream_id",
+              "backend-service",
+              "plugins",
+              Map.of(
+                  "response-rewrite",
+                  Map.of("filters", List.of(Map.of("regex", "old_text", "replace", "new_text")))));
+
+      ConfigEvent event = createRouteConfigEvent(Operation.CREATE, "routes", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+    }
+
+    @Test
+    void testRouteUpdateWithResponseRewrite()
+        throws FatalAdapterException, RetryableAdapterException {
+      when(mockResponse.getStatus()).thenReturn(200);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"key\":\"routes/test-route-id\"}");
+      when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+
+      Map<String, Object> routeConfig =
+          Map.of(
+              "uri",
+              "/api/v1/updated/*",
+              "upstream_id",
+              "backend-service",
+              "plugins",
+              Map.of(
+                  "response-rewrite",
+                  Map.of(
+                      "status_code",
+                      200,
+                      "headers",
+                      Map.of("set", Map.of("X-Updated", "true")),
+                      "body",
+                      "{\"updated\":true}")));
+
+      ConfigEvent event =
+          createRouteConfigEvent(Operation.UPDATE, "routes/test-route-id", routeConfig);
+
+      adapter.processConfigEvent("core.civitas.api.route.updated", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+      assertEquals("APISIX route updated successfully", result.message());
+      assertEquals("test-route-id", result.resourceId());
+    }
   }
 
   private ConfigEvent createConfigEvent(

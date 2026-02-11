@@ -148,27 +148,19 @@
   },
   "users": {
     "title": "Übersicht: User",
+    "subtitle": "Alle User, die in unserem Mandanten verfügbar sind.",
     "newUser": "User erstellen",
     "createUser": "User erstellen",
     "searchUsers": "Filtern...",
     "notFound": "User nicht gefunden",
-    "detailsTabs": {
-      "userData": "Benutzerdaten",
-      "roles": "Rollen",
-      "groups": "Gruppen",
-      "dataspaces": "Datenräume und -sätze",
-      "account": "Account"
-    },
     "info": {
       "header": "User Informationen",
       "subheader": "Persönliche Angaben und allgemeine Informationen.",
       "id": "ID",
-      "displayName": "Anzeigename",
+      "displayName": "Name",
       "title": { "title": "Anrede", "mr": "Herr", "ms": "Frau", "other": "Keine Angabe" },
       "firstName": "Vorname",
       "lastName": "Name",
-      "authority": "Amt",
-      "department": "Abteilung",
       "role": "Systemrolle",
       "phone": "Telefonnummer",
       "email": "E-Mail",
@@ -180,6 +172,13 @@
         "active": "Aktiv",
         "inactive": "Inaktiv"
       }
+    },
+    "detailsTabs": {
+      "userData": "Benutzerdaten",
+      "roles": "Rollen",
+      "groups": "Gruppen",
+      "dataspaces": "Datenräume und -sätze",
+      "account": "Account"
     },
     "form": {
       "selectTitle": "Titel wählen...",

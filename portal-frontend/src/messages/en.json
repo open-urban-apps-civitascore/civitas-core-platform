@@ -143,24 +143,20 @@
     }
   },
   "users": {
-    "users": "Users",
-    "user": "User",
     "title": "Overview: Users",
+    "subtitle": "All users that are available in our tenant.",
     "newUser": "Create User",
     "createUser": "Create User",
     "searchUsers": "Filter...",
     "notFound": "User not found",
-
     "info": {
       "header": "User Information",
       "subheader": "Personal details and general information.",
       "id": "ID",
-      "displayName": "Display Name",
+      "displayName": "Name",
       "title": { "title": "Title", "mr": "Mr", "ms": "Ms", "other": "No Specification" },
       "firstName": "First Name",
       "lastName": "Last Name",
-      "authority": "Authority",
-      "department": "Department",
       "role": "System Role",
       "phone": "Telephone Number",
       "email": "E-Mail",

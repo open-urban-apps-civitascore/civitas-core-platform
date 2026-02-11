@@ -3,15 +3,14 @@ import { formatDistanceStrict } from 'date-fns'
 import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
+import { ActivityBadge } from '@/components/activity-badge/ActivityBadge'
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/BadgesWithTooltip'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { Badge } from '@/components/ui/badge'
 import { CONNECTION_TYPES, CONNECTOR_TYPE_KEYS, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
-import { cn } from '@/lib/utils'
 import { Datasource } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
@@ -86,28 +85,19 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     columnHelper.accessor('connection', {
       header: t('tableHeaders.connection'),
       cell: info => {
-        let bgColor = 'bg-green-600/10'
-        let textColor = 'text-green-800'
         const connection = info.getValue()
+        let isActive: boolean | undefined
         switch (connection) {
           case CONNECTION_TYPES.INACTIVE:
-            bgColor = 'bg-red-600/10'
-            textColor = 'text-red-700'
-            break
-          case CONNECTION_TYPES.STATIC:
-            bgColor = 'bg-secondary'
-            textColor = 'text-foreground'
+            isActive = false
             break
           case CONNECTION_TYPES.ACTIVE:
+            isActive = true
+            break
+          default:
             break
         }
-        return connection ? (
-          <Badge className={cn(bgColor, textColor)} variant="secondary">
-            {connection}
-          </Badge>
-        ) : (
-          '-'
-        )
+        return connection ? <ActivityBadge isActive={isActive} title={connection} /> : '-'
       },
       meta: {
         style: {
