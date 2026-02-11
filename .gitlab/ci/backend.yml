@@ -11,6 +11,7 @@
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - portal-backend/**/*
+        - portal-model/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
 
@@ -92,10 +93,11 @@ test-backend:
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: test
   needs:
+    - job: setup-version
+      artifacts: true
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
-      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -107,8 +109,8 @@ test-backend:
       - .m2/repository
   script:
     - cd portal-backend
-    # Unit tests use Maven cache, no need for published artifacts yet
-    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report -s ci_settings.xml
+    # Run tests using published portal-model from GitLab Maven repository
+    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report -s ci_settings.xml -Dportal-model.version=$REVISION
     # To print coverage, picked up by coverage regex
     - cat target/site/jacoco/index.html| grep -o '<tfoot>.*</tfoot>'
   coverage: '/Total.*?([0-9]{1,3})%/'
@@ -129,13 +131,14 @@ build-backend:
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: build
   needs:
+    - job: setup-version
+      artifacts: true
     - lint-backend
     - dependency-prune-backend
     - test-backend
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
-      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -149,7 +152,7 @@ build-backend:
     - cd portal-backend
     # Use GitLab Maven repository for config-adapter and portal-model dependencies
     - |
-      mvn package -DskipTests -s ci_settings.xml
+      mvn package -DskipTests -s ci_settings.xml -Dportal-model.version=$REVISION
   artifacts:
     when: on_success
     paths:

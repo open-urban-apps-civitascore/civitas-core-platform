@@ -1,11 +1,12 @@
 package de.civitascore.portal.model.entity;
 
-import de.civitascore.portal.model.embedded.AssignmentType;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
-import de.civitascore.portal.model.entity.base.ScopedEntity;
+import de.civitascore.portal.model.entity.base.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
@@ -13,6 +14,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -22,15 +26,33 @@ import lombok.Setter;
     uniqueConstraints =
         @UniqueConstraint(
             name = "uk_assignment_group_role_scope",
-            columnNames = {"group_id", "role_id", "scope_type", "scope_id"}),
+            columnNames = {
+              "group_id",
+              "role_id",
+              "scope_type",
+              "data_structure_id",
+              "data_source_id",
+              "dataset_id",
+              "data_space_id",
+              "catalog_id"
+            }),
     indexes = {
       @Index(name = "idx_assignment_group", columnList = "group_id"),
       @Index(name = "idx_assignment_role", columnList = "role_id"),
-      @Index(name = "idx_assignment_scope", columnList = "scope_type, scope_id")
+      @Index(name = "idx_assignment_datastructure", columnList = "data_structure_id"),
+      @Index(name = "idx_assignment_datasource", columnList = "data_source_id"),
+      @Index(name = "idx_assignment_dataset", columnList = "dataset_id"),
+      @Index(name = "idx_assignment_dataspace", columnList = "data_space_id"),
+      @Index(name = "idx_assignment_catalog", columnList = "catalog_id"),
+      @Index(
+          name = "idx_assignment_scope",
+          columnList =
+              "scope_type, data_structure_id, data_source_id, dataset_id, data_space_id,"
+                  + " catalog_id")
     })
 @Getter
 @Setter
-public class Assignment extends ScopedEntity {
+public class Assignment extends BaseEntity {
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "group_id", nullable = false)
@@ -40,49 +62,94 @@ public class Assignment extends ScopedEntity {
   @JoinColumn(name = "role_id", nullable = false)
   private Role role;
 
-  @Column(name = "is_inherited", nullable = false)
-  private Boolean isInherited = false;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "scope_type")
+  private ScopeType scopeType;
 
   @ManyToOne(fetch = FetchType.LAZY)
-  @JoinColumn(name = "parent_assignment_id")
-  private Assignment parentAssignment;
+  @JoinColumn(name = "data_structure_id")
+  private DataStructure dataStructure;
 
-  /**
-   * Derives the assignment type based on the role type. Binary assignments: System roles assigned
-   * to user groups Ternary assignments: Data/Governance roles assigned to datasets/dataspaces
-   *
-   * @return BINARY for system roles, TERNARY for data and governance roles
-   */
-  public AssignmentType getAssignmentType() {
-    if (role == null || role.getRoleType() == null) {
-      return null;
-    }
-    return role.getRoleType() == RoleType.SYSTEM ? AssignmentType.BINARY : AssignmentType.TERNARY;
+  @Column(name = "data_structure_id", insertable = false, updatable = false)
+  private UUID dataStructureId;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "data_source_id")
+  private DataSource dataSource;
+
+  @Column(name = "data_source_id", insertable = false, updatable = false)
+  private UUID dataSourceId;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "dataset_id")
+  private DataSet dataset;
+
+  @Column(name = "dataset_id", insertable = false, updatable = false)
+  private UUID datasetId;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "data_space_id")
+  private DataSpace dataSpace;
+
+  @Column(name = "data_space_id", insertable = false, updatable = false)
+  private UUID dataSpaceId;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "catalog_id")
+  private Catalog catalog;
+
+  @Column(name = "catalog_id", insertable = false, updatable = false)
+  private UUID catalogId;
+
+  public UUID getScopeId() {
+    return Stream.of(dataStructureId, dataSourceId, datasetId, dataSpaceId, catalogId)
+        .filter(Objects::nonNull)
+        .findFirst()
+        .orElse(null);
   }
 
   @PrePersist
   protected void validateBeforePersist() {
     validateScope();
-    validateAssignment();
+    validateRoleType();
   }
 
-  @Override
-  protected void validateOnUpdate() {
-    super.validateOnUpdate();
-    validateAssignment();
-  }
-
-  private void validateAssignment() {
-    if (role.getRoleType() == RoleType.SYSTEM) {
-      // Binary assignment: System roles must use TENANT scope
-      if (getScopeType() != ScopeType.TENANT) {
-        throw new IllegalStateException(role.getRoleType() + " roles must use TENANT scope");
+  protected void validateScope() {
+    if (scopeType == null || scopeType == ScopeType.TENANT) {
+      // no scope entity should be set
+      if (dataStructure != null
+          || dataSource != null
+          || dataset != null
+          || dataSpace != null
+          || catalog != null) {
+        throw new IllegalStateException("No scope entity should be set for SYSTEM or TENANT scope");
       }
     } else {
-      // Ternary assignment: Data/Governance roles require explicit scope
-      if (getScopeType() == null) {
-        throw new IllegalStateException(role.getRoleType() + " roles require explicit scope");
+      // implicit check if more than one scope entity is set
+      if (dataStructure != null && scopeType != ScopeType.DATASTRUCTURE) {
+        throw new IllegalStateException("DataStructure requires DATASTRUCTURE scope");
       }
+      if (dataSource != null && scopeType != ScopeType.DATASOURCE) {
+        throw new IllegalStateException("DataSource requires DATASOURCE scope");
+      }
+      if (dataset != null && scopeType != ScopeType.DATASET) {
+        throw new IllegalStateException("DataSet requires DATASET scope");
+      }
+      if (dataSpace != null && scopeType != ScopeType.DATASPACE) {
+        throw new IllegalStateException("DataSpace requires DATASPACE scope");
+      }
+      if (catalog != null && scopeType != ScopeType.CATALOG) {
+        throw new IllegalStateException("Catalog requires DATACATALOGUE scope");
+      }
+    }
+  }
+
+  private void validateRoleType() {
+    if (scopeType == null && role.getRoleType() != RoleType.SYSTEM) {
+      throw new IllegalStateException("Only SYSTEM roles can have null scope");
+    }
+    if (scopeType != null && role.getRoleType() == RoleType.SYSTEM) {
+      throw new IllegalStateException("SYSTEM roles cannot have scope");
     }
   }
 }

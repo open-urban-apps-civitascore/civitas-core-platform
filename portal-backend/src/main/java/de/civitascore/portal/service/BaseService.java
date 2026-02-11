@@ -50,8 +50,7 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
     entity = postConvertToEntity(entity, preProcessedInput);
     entity = preSave(entity);
     T saved = getRepository().save(entity);
-    postSave(saved, preProcessedInput);
-    return saved;
+    return postSave(saved, preProcessedInput);
   }
 
   /**
@@ -78,8 +77,7 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
     entity = postConvertToEntity(entity, preProcessedInput);
     entity = preSave(entity);
     T saved = getRepository().save(entity);
-    postSave(saved, preProcessedInput);
-    return saved;
+    return postSave(saved, preProcessedInput);
   }
 
   /**
@@ -234,8 +232,11 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
    *
    * @param entity the saved entity
    * @param input the input DTO
+   * @return the processed entity to return from service method
    */
-  protected void postSave(T entity, I input) {}
+  protected T postSave(T entity, I input) {
+    return entity;
+  }
 
   /**
    * Pre-process input before updating entity.

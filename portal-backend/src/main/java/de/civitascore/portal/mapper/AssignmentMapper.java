@@ -19,28 +19,24 @@ public interface AssignmentMapper
 
   @Mapping(target = "group", ignore = true)
   @Mapping(target = "role", ignore = true)
-  @Mapping(target = "assignmentType", ignore = true)
-  @Mapping(target = "parentAssignment", ignore = true)
+  @Mapping(target = "scopeId", ignore = true)
   @Override
   Assignment toEntity(AssignmentInputDTO input);
 
   @Mapping(target = "group", ignore = true)
   @Mapping(target = "role", ignore = true)
-  @Mapping(target = "parentAssignment", ignore = true)
   @Override
   AssignmentOutputDTO toOutput(Assignment entity);
 
   @Mapping(target = "groupId", source = "group.id")
   @Mapping(target = "roleId", source = "role.id")
-  @Mapping(target = "parentAssignmentId", source = "parentAssignment.id")
   @Override
   AssignmentInputDTO toInput(Assignment entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "group", ignore = true)
   @Mapping(target = "role", ignore = true)
-  @Mapping(target = "assignmentType", ignore = true)
-  @Mapping(target = "parentAssignment", ignore = true)
+  @Mapping(target = "scopeId", ignore = true)
   @Override
   void updateEntity(@MappingTarget Assignment entity, AssignmentInputDTO input);
 }

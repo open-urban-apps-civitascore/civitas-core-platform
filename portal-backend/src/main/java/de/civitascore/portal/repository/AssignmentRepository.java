@@ -18,9 +18,9 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
    * read operations (GET/UPDATE) instead of regular findById.
    *
    * @param id the assignment ID
-   * @return the assignment with eagerly fetched group, role, and parent assignment
+   * @return the assignment with eagerly fetched group, and role
    */
-  @EntityGraph(attributePaths = {"group", "role", "parentAssignment"})
+  @EntityGraph(attributePaths = {"group", "role"})
   @Query("SELECT a FROM Assignment a WHERE a.id = :id")
   Optional<Assignment> findByIdWithRelations(@Param("id") UUID id);
 
@@ -29,9 +29,20 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
    * problems when loading assignments with their roles.
    *
    * @param roleId the role ID
-   * @return the assignments with eagerly fetched roles
+   * @return the assignments with eagerly fetched groups
    */
   @EntityGraph(attributePaths = {"group"})
   @Query("SELECT a FROM Assignment a WHERE a.role.id = :roleId")
   List<Assignment> findAllByRoleId(@Param("roleId") UUID roleId);
+
+  /**
+   * Find all assignments for the given group ID with groups eagerly fetched. This prevents N+1
+   * query problems when loading assignments with their groups.
+   *
+   * @param groupId the group ID
+   * @return the assignments with eagerly fetched roles
+   */
+  @EntityGraph(attributePaths = {"role"})
+  @Query("SELECT a FROM Assignment a WHERE a.group.id = :groupId")
+  List<Assignment> findAllByGroupId(@Param("groupId") UUID groupId);
 }

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
-import { DatasourceFormData, DatasourceFormSchema } from '@/types/datasources'
+import { DatasourceBaseFormData, DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
 
 import { BasicInfoTab } from './BasicInfoTab'
 
@@ -35,7 +35,7 @@ vi.mock('./TagsMultiSelect', () => ({
   ),
 }))
 
-const defaultFormValues: DatasourceFormData = {
+const defaultFormValues: DatasourceBaseFormData = {
   id: 1,
   name: '',
   description: '',
@@ -46,18 +46,18 @@ const defaultFormValues: DatasourceFormData = {
 interface WrapperProps {
   isReadOnly?: boolean
   isDraftMode?: boolean
-  initialValues?: Partial<DatasourceFormData>
+  initialValues?: Partial<DatasourceBaseFormData>
 }
 
-const TestWrapper = ({ isReadOnly = false, isDraftMode = false, initialValues = {} }: WrapperProps) => {
-  const form = useForm<DatasourceFormData>({
-    resolver: zodResolver(DatasourceFormSchema),
+const TestWrapper = ({ isReadOnly = false, initialValues = {} }: WrapperProps) => {
+  const form = useForm<DatasourceFormDraft>({
+    resolver: zodResolver(DatasourceFormDraftSchema),
     defaultValues: { ...defaultFormValues, ...initialValues },
   })
 
   return (
     <Form {...form}>
-      <BasicInfoTab form={form} isReadOnly={isReadOnly} isDraftMode={isDraftMode} />
+      <BasicInfoTab form={form} isReadOnly={isReadOnly} />
     </Form>
   )
 }
@@ -176,14 +176,17 @@ describe('BasicInfoTab', () => {
   })
 
   describe('Draft Mode', () => {
-    test('description required asterisk is hidden in draft mode', () => {
+    test('name and description required asterisk is visible in draft mode', () => {
       setup({ isDraftMode: true })
+      const nameLabel = screen.getByText('form.name')
       const descriptionLabel = screen.getByText('form.description')
-      const asterisk = descriptionLabel.parentElement?.querySelector('.text-red-500')
-      expect(asterisk).not.toBeInTheDocument()
+      const nameAsterisk = nameLabel.parentElement?.querySelector('.text-red-500')
+      const descriptionAsterisk = descriptionLabel.parentElement?.querySelector('.text-red-500')
+      expect(nameAsterisk).toBeInTheDocument()
+      expect(descriptionAsterisk).toBeInTheDocument()
     })
 
-    test('description required asterisk is visible when not in draft mode', () => {
+    test('name and description required asterisk is visible when not in draft mode', () => {
       setup({ isDraftMode: false })
       const descriptionLabel = screen.getByText('form.description')
       const asterisk = descriptionLabel.parentElement?.querySelector('.text-red-500')
