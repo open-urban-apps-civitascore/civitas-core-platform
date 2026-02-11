@@ -22,6 +22,8 @@ import static org.mockito.Mockito.when;
 
 import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.adapter.ConfigAdapter;
+import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.model.ConfigEvent;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.CloudEventData;
@@ -89,7 +91,8 @@ class CloudEventProcessorTest {
   }
 
   @Test
-  void handleEventShouldThrowExceptionForInvalidJson() {
+  void handleEventShouldThrowExceptionForInvalidJson()
+      throws FatalAdapterException, RetryableAdapterException {
     ConfigAdapter mockAdapter = mock(ConfigAdapter.class);
     CloudEventProcessor processor = new CloudEventProcessor(mockAdapter);
 
@@ -109,7 +112,8 @@ class CloudEventProcessorTest {
   }
 
   @Test
-  void handleEventShouldThrowExceptionForEmptyData() {
+  void handleEventShouldThrowExceptionForEmptyData()
+      throws FatalAdapterException, RetryableAdapterException {
     ConfigAdapter mockAdapter = mock(ConfigAdapter.class);
     CloudEventProcessor processor = new CloudEventProcessor(mockAdapter);
 
@@ -127,7 +131,8 @@ class CloudEventProcessorTest {
   }
 
   @Test
-  void handleEventShouldThrowExceptionForDataDeserializationError() {
+  void handleEventShouldThrowExceptionForDataDeserializationError()
+      throws FatalAdapterException, RetryableAdapterException {
     ConfigAdapter mockAdapter = mock(ConfigAdapter.class);
     CloudEventProcessor processor = new CloudEventProcessor(mockAdapter);
 
@@ -146,7 +151,8 @@ class CloudEventProcessorTest {
   }
 
   @Test
-  void handleEventShouldThrowExceptionForProcessingError() {
+  void handleEventShouldThrowExceptionForProcessingError()
+      throws FatalAdapterException, RetryableAdapterException {
     ConfigAdapter mockAdapter = mock(ConfigAdapter.class);
     CloudEventProcessor processor = new CloudEventProcessor(mockAdapter);
 

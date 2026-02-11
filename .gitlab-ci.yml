@@ -11,6 +11,8 @@ include:
   - .gitlab/ci/frontend.yml
   - .gitlab/ci/backend.yml
   - .gitlab/ci/config-adapter.yml
+  - .gitlab/ci/portal-model.yml
+  - .gitlab/ci/renovate.yml
   - template: Jobs/SAST.gitlab-ci.yml
   - template: Jobs/Dependency-Scanning.v2.gitlab-ci.yml
     inputs:
@@ -49,8 +51,8 @@ stages: [
     lint, # Lints all code
     qa, # License sanning, SAST, Secret detection for all code
     test-package, # Test only config adpater
-    build-package, # Build only config adpater
-    deploy-package, # Deploy only config adpater (which is required for backend test/build)
+    build-package, # Build config adpater and portal-model
+    deploy-package, # Deploy config adpater and portal-model (which is required for backend test/build)
     test, # Test backend & frontend
     build, # Build backend & frontend
     container-qa, # Container scanning for built images

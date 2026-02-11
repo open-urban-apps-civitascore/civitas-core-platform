@@ -59,6 +59,11 @@ cd ../../config-adapter
 mvn clean install -DskipTests -Drevision=1.0.1
 cd ../dev-environment/backend
 
+echo "Building Portal Model..."
+cd ../../portal-model
+mvn clean install -DskipTests -Drevision=1.0.0-SNAPSHOT
+cd ../dev-environment/backend
+
 echo "Building Portal Backend..."
 cd ../../portal-backend
 mvn clean package -DskipTests -Dconfig-adapter.version=1.0.1

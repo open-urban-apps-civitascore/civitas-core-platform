@@ -1,3 +1,4 @@
+import { AxiosRequestConfig } from 'axios'
 import { InputHTMLAttributes } from 'react'
 
 export type Item = {
@@ -33,6 +34,7 @@ export type DataQueryInput = {
   id?: string
   params?: URLSearchParams
   isEnabled?: boolean
+  headers?: AxiosRequestConfig['headers']
 }
 
 export type WithId<T = string> = { id: T }
@@ -49,6 +51,7 @@ export type UpdateInput = {
 export type BaseMutationInput = {
   key: string
   errorMessage: string
+  headers?: AxiosRequestConfig['headers']
 }
 
 export type CreateMutationInput = BaseMutationInput

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { User } from '@/types/users'
 
 import { apiRequest } from '../request/apiRequest'
@@ -8,7 +9,6 @@ export const getUsers = async (params: URLSearchParams) =>
     endpoint: '/users',
     method: 'GET',
     params: params,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     headers: { ...(await getServerRequestHeaders()), 'x-api-request': 'true' },
     errorMessage: 'An error occurred while fetching users.',
   })
@@ -17,6 +17,6 @@ export const getUser = async (id: string) =>
   apiRequest<User>({
     method: 'GET',
     endpoint: `/users/${id}`,
-    headers: await getServerRequestHeaders(),
+    headers: { ...(await getServerRequestHeaders()), 'x-api-request': 'true' },
     errorMessage: 'An error occurred while fetching user data.',
   })

@@ -13,6 +13,7 @@ package com.civitas.configadapter.messaging;
 import com.civitas.configadapter.ConfigBase;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.ApplicationConfig;
+import com.civitas.configadapter.exception.FatalAdapterException;
 
 /**
  * Base interface for event-handling components ({@link EventConsumer} and {@link EventPublisher})
@@ -34,5 +35,5 @@ public interface EventBase extends ConfigBase {
    * @param config the application configuration providing connection settings, must not be null
    * @param adapter the ConfigAdapter this component will work with, must not be null
    */
-  void initialize(ApplicationConfig config, ConfigAdapter adapter);
+  void initialize(ApplicationConfig config, ConfigAdapter adapter) throws FatalAdapterException;
 }

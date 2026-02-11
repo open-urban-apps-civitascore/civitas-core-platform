@@ -23,6 +23,7 @@ import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.configuration.ApplicationConfig;
 import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.Config;
@@ -144,7 +145,7 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldCreateRealm() {
+  void shouldCreateRealm() throws FatalAdapterException, RetryableAdapterException {
     // Given - Create RealmConfig directly (as a developer would)
     RealmConfig realmConfig = new RealmConfig();
     realmConfig.setRealm("test-realm");
@@ -171,7 +172,7 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldUpdateRealm() {
+  void shouldUpdateRealm() throws FatalAdapterException, RetryableAdapterException {
     // Given - create realm first
     createRealm("update-realm");
 
@@ -205,7 +206,7 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldCreateUser() {
+  void shouldCreateUser() throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm first
     createRealm("user-realm");
 
@@ -249,7 +250,7 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldCreateClient() {
+  void shouldCreateClient() throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm first
     createRealm("client-realm");
 
@@ -280,7 +281,7 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldDeleteRealm() {
+  void shouldDeleteRealm() throws FatalAdapterException, RetryableAdapterException {
     // Given - create realm first
     createRealm("delete-realm");
 
@@ -303,7 +304,7 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldCreateRole() {
+  void shouldCreateRole() throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm first
     createRealm("role-create-realm");
 
@@ -330,7 +331,7 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldCreateRoleWithNestedRole() {
+  void shouldCreateRoleWithNestedRole() throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm first
     createRealm("role-nested-create-realm");
 
@@ -376,7 +377,7 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldUpdateRole() {
+  void shouldUpdateRole() throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm first
     createRealm("role-update-realm");
 
@@ -415,7 +416,7 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldDeleteRole() {
+  void shouldDeleteRole() throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm first
     createRealm("role-delete-realm");
 
@@ -449,7 +450,8 @@ class KeycloakAdapterIntegrationTest {
   // ============== GROUP TESTS ==============
 
   @Test
-  void createGroup_whenValidConfig_shouldCreateGroupInRealm() {
+  void createGroup_whenValidConfig_shouldCreateGroupInRealm()
+      throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm first
     createRealm("group-create-realm");
 
@@ -477,7 +479,8 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void createGroup_whenConfigHasRealmRoles_shouldAssignRolesToGroup() {
+  void createGroup_whenConfigHasRealmRoles_shouldAssignRolesToGroup()
+      throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm and role first
     createRealm("group-roles-realm");
 
@@ -521,7 +524,8 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void createGroup_whenConfigHasParentId_shouldCreateAsSubgroup() {
+  void createGroup_whenConfigHasParentId_shouldCreateAsSubgroup()
+      throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm and parent group first
     createRealm("subgroup-realm");
 
@@ -561,7 +565,8 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void updateGroup_whenValidConfig_shouldUpdateGroupAndAssignRoles() {
+  void updateGroup_whenValidConfig_shouldUpdateGroupAndAssignRoles()
+      throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm and group first
     createRealm("group-update-realm");
 
@@ -605,7 +610,8 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void deleteGroup_whenValidConfig_shouldRemoveGroupFromRealm() {
+  void deleteGroup_whenValidConfig_shouldRemoveGroupFromRealm()
+      throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm and group first
     createRealm("group-delete-realm");
 
@@ -663,7 +669,8 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldHandleCorrelationIdInResults() {
+  void shouldHandleCorrelationIdInResults()
+      throws FatalAdapterException, RetryableAdapterException {
     // Given
     String correlationId = UUID.randomUUID().toString();
     RealmConfig realmConfig = new RealmConfig();
@@ -685,7 +692,8 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void updateUser_whenRoleMissingInConfig_shouldRemoveRoleFromUser() {
+  void updateUser_whenRoleMissingInConfig_shouldRemoveRoleFromUser()
+      throws FatalAdapterException, RetryableAdapterException {
     // Given - Realm, 2 roles and User with both roles
     createRealm("user-sync-realm");
 
@@ -735,7 +743,8 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void updateGroup_whenRoleMissingInConfig_shouldRemoveRoleFromGroup() {
+  void updateGroup_whenRoleMissingInConfig_shouldRemoveRoleFromGroup()
+      throws FatalAdapterException, RetryableAdapterException {
     // Given - Realm, 2 roles and group with both roles
     createRealm("group-sync-realm");
 
@@ -783,7 +792,8 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void updateClient_whenValidConfig_shouldUpdateClientAttributes() {
+  void updateClient_whenValidConfig_shouldUpdateClientAttributes()
+      throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm and client first
     createRealm("client-update-realm");
 
@@ -828,7 +838,8 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void deleteClient_whenValidConfig_shouldRemoveClientFromRealm() {
+  void deleteClient_whenValidConfig_shouldRemoveClientFromRealm()
+      throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm and client first
     createRealm("client-delete-realm");
 
