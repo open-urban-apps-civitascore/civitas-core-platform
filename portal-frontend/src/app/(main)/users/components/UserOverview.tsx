@@ -22,14 +22,14 @@ import { UserBasicInfoTab } from './basic-info-tab/UserBasicInfoTab'
 import { GroupsTab } from './groups-tab/GroupsTab'
 import { RolesTab } from './roles-tab/RolesTab'
 
-interface UserDetailsProps {
+interface UserOverviewProps {
   title: string
   userData: User
   isCreateMode?: boolean
   testId?: string
 }
 
-export const UserDetails = (props: UserDetailsProps) => {
+export const UserOverview = (props: UserOverviewProps) => {
   const { title, userData, isCreateMode = false, testId } = props
   const params = useSearchParams()
   const mode = params.get('mode')
