@@ -60,11 +60,7 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
-
-    assertEquals(1, eventPublisher.getPublishedEvents().size());
-    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+    awaitRouteInApisix("/api/v1/serverless-post/*", "serverless-post-function");
   }
 
   @Test
@@ -91,7 +87,7 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/header-filter/*", "serverless-post-function");
   }
 
   @Test
@@ -132,9 +128,14 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
             () -> {
               JsonNode route = getRouteFromApisix(routeId);
               assertNotNull(route);
-              JsonNode plugins = route.get("value").get("plugins");
-              assertNotNull(plugins);
-              assertTrue(plugins.has("serverless-post-function"));
+              JsonNode serverlessPostFunction =
+                  route.get("value").get("plugins").get("serverless-post-function");
+              assertNotNull(serverlessPostFunction, "serverless-post-function plugin should exist");
+              assertEquals(
+                  "log", serverlessPostFunction.get("phase").asText(), "phase should be log");
+              assertTrue(
+                  serverlessPostFunction.get("functions").isArray(),
+                  "functions should be an array");
             });
 
     assertEquals(1, eventPublisher.getPublishedEvents().size());
@@ -167,7 +168,7 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/multi-serverless/*", "serverless-post-function");
   }
 
   @Test
@@ -198,7 +199,8 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix(
+        "/api/v1/serverless-combo/*", "serverless-post-function", "prometheus", "response-rewrite");
   }
 
   @Test
@@ -252,7 +254,7 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/serverless-pre/*", "serverless-pre-function");
   }
 
   @Test
@@ -279,7 +281,7 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/pre-access/*", "serverless-pre-function");
   }
 
   @Test
@@ -321,9 +323,15 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
             () -> {
               JsonNode route = getRouteFromApisix(routeId);
               assertNotNull(route);
-              JsonNode plugins = route.get("value").get("plugins");
-              assertNotNull(plugins);
-              assertTrue(plugins.has("serverless-pre-function"));
+              JsonNode serverlessPreFunction =
+                  route.get("value").get("plugins").get("serverless-pre-function");
+              assertNotNull(serverlessPreFunction, "serverless-pre-function plugin should exist");
+              assertEquals(
+                  "rewrite",
+                  serverlessPreFunction.get("phase").asText(),
+                  "phase should be rewrite");
+              assertTrue(
+                  serverlessPreFunction.get("functions").isArray(), "functions should be an array");
             });
 
     assertEquals(1, eventPublisher.getPublishedEvents().size());
@@ -356,7 +364,7 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/multi-serverless-pre/*", "serverless-pre-function");
   }
 
   @Test
@@ -392,7 +400,8 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix(
+        "/api/v1/pre-and-post/*", "serverless-pre-function", "serverless-post-function");
   }
 
   @Test

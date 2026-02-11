@@ -12,6 +12,7 @@ package com.civitas.configadapter.apisix;
 
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
+import com.civitas.configadapter.model.ConfigValue;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
@@ -31,6 +32,29 @@ final class ApisixTestFixtures {
     return Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
   }
 
+  // ---- Private helpers ----
+
+  private static Metadata fixedMetadata() {
+    return new Metadata(
+        "msg-123", OffsetDateTime.now(), "test-source", "corr-123", "v1.0.0", "test-result-topic");
+  }
+
+  private static Metadata randomMetadata() {
+    return new Metadata(
+        UUID.randomUUID().toString(),
+        OffsetDateTime.now(),
+        "test.source",
+        UUID.randomUUID().toString(),
+        "1.0",
+        "result.topic");
+  }
+
+  private static ConfigEvent createEvent(
+      Metadata metadata, String target, Operation op, ConfigValue value, String configPath) {
+    Payload payload = new Payload("apisix", target, op, new Config(configPath, value));
+    return new ConfigEvent(metadata, payload);
+  }
+
   // ---- Fixed-ID factories (unit tests) ----
 
   /**
@@ -38,17 +62,7 @@ final class ApisixTestFixtures {
    * "corr-123"}). Use in unit tests where deterministic IDs simplify assertion.
    */
   static ConfigEvent upstreamEvent(Operation op, String target, Map<String, Object> val) {
-    Metadata metadata =
-        new Metadata(
-            "msg-123",
-            OffsetDateTime.now(),
-            "test-source",
-            "corr-123",
-            "v1.0.0",
-            "test-result-topic");
-    ApisixConfigValue apisixValue = new ApisixConfigValue(val);
-    Payload payload = new Payload("apisix", target, op, new Config(null, apisixValue));
-    return new ConfigEvent(metadata, payload);
+    return createEvent(fixedMetadata(), target, op, new ApisixConfigValue(val), null);
   }
 
   /**
@@ -56,17 +70,7 @@ final class ApisixTestFixtures {
    * "corr-123"}). Use in unit tests where deterministic IDs simplify assertion.
    */
   static ConfigEvent routeEvent(Operation op, String target, Map<String, Object> val) {
-    Metadata metadata =
-        new Metadata(
-            "msg-123",
-            OffsetDateTime.now(),
-            "test-source",
-            "corr-123",
-            "v1.0.0",
-            "test-result-topic");
-    RouteConfigValue routeValue = new RouteConfigValue(val);
-    Payload payload = new Payload("apisix", target, op, new Config(null, routeValue));
-    return new ConfigEvent(metadata, payload);
+    return createEvent(fixedMetadata(), target, op, new RouteConfigValue(val), null);
   }
 
   // ---- Random-ID factories (integration tests) ----
@@ -76,18 +80,7 @@ final class ApisixTestFixtures {
    * to avoid ID collisions between concurrent test runs.
    */
   static ConfigEvent upstreamEventRandomIds(String target, Operation op, Map<String, Object> val) {
-    Metadata metadata =
-        new Metadata(
-            UUID.randomUUID().toString(),
-            OffsetDateTime.now(),
-            "test.source",
-            UUID.randomUUID().toString(),
-            "1.0",
-            "result.topic");
-    ApisixConfigValue apisixValue = new ApisixConfigValue(val);
-    Config config = new Config(target, apisixValue);
-    Payload payload = new Payload("apisix", target, op, config);
-    return new ConfigEvent(metadata, payload);
+    return createEvent(randomMetadata(), target, op, new ApisixConfigValue(val), target);
   }
 
   /**
@@ -95,17 +88,6 @@ final class ApisixTestFixtures {
    * avoid ID collisions between concurrent test runs.
    */
   static ConfigEvent routeEventRandomIds(String target, Operation op, Map<String, Object> val) {
-    Metadata metadata =
-        new Metadata(
-            UUID.randomUUID().toString(),
-            OffsetDateTime.now(),
-            "test.source",
-            UUID.randomUUID().toString(),
-            "1.0",
-            "result.topic");
-    RouteConfigValue routeValue = new RouteConfigValue(val);
-    Config config = new Config(target, routeValue);
-    Payload payload = new Payload("apisix", target, op, config);
-    return new ConfigEvent(metadata, payload);
+    return createEvent(randomMetadata(), target, op, new RouteConfigValue(val), target);
   }
 }

@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.exception.FatalAdapterException;
@@ -47,11 +48,7 @@ class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
-
-    assertEquals(1, eventPublisher.getPublishedEvents().size());
-    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+    awaitRouteInApisix("/api/v1/test/*", "prometheus");
   }
 
   @Test
@@ -119,6 +116,7 @@ class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
             () -> {
               try {
                 getRouteFromApisix(routeId);
+                fail("Route should have been deleted but still exists");
               } catch (Exception e) {
                 assertTrue(e.getMessage().contains("404") || e.getMessage().contains("not found"));
               }
@@ -151,7 +149,7 @@ class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/full-plugins/*", "prometheus", "proxy-rewrite", "response-rewrite");
   }
 
   @Test

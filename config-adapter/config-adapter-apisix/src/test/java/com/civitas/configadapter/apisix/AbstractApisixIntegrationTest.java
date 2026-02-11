@@ -14,6 +14,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.Topics;
@@ -88,6 +89,20 @@ abstract class AbstractApisixIntegrationTest {
                     .forStatusCode(200))
             .withReuse(false);
     APISIX.start();
+
+    // Singleton container pattern: containers are shared across all subclasses of
+    // AbstractApisixIntegrationTest for performance (one startup instead of six).
+    // @AfterAll cannot be used here because it runs after EACH subclass — the first
+    // @AfterAll would stop the containers and break all subsequent subclasses.
+    // A JVM shutdown hook ensures cleanup regardless of test execution order.
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                () -> {
+                  APISIX.stop();
+                  ETCD.stop();
+                  NETWORK.close();
+                }));
   }
 
   protected ApisixAdapter adapter;
@@ -158,6 +173,109 @@ abstract class AbstractApisixIntegrationTest {
                   ConfigResultEvent.Status.SUCCESS,
                   eventPublisher.getPublishedEvents().getFirst().status());
             });
+  }
+
+  protected void awaitRouteInApisix(String expectedUri, String... expectedPlugins) {
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              JsonNode route = findRouteByUri(expectedUri);
+              assertNotNull(route, "Route with URI '" + expectedUri + "' should exist in APISIX");
+              if (expectedPlugins.length > 0) {
+                JsonNode plugins = route.get("value").get("plugins");
+                assertNotNull(plugins, "Route should have plugins");
+                for (String plugin : expectedPlugins) {
+                  assertTrue(plugins.has(plugin), "Route should have plugin: " + plugin);
+                }
+              }
+            });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  protected void awaitUpstreamInApisix(int expectedNodeCount) {
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              JsonNode upstream = findUpstreamByNodeCount(expectedNodeCount);
+              assertNotNull(
+                  upstream, "Upstream with " + expectedNodeCount + " nodes should exist in APISIX");
+            });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  private JsonNode findRouteByUri(String uri) throws Exception {
+    String url = adminApiUrl + "/apisix/admin/routes";
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .GET()
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() != 200) {
+      throw new RuntimeException(
+          "Failed to list routes. Status: " + response.statusCode() + ", Body: " + response.body());
+    }
+
+    JsonNode root = objectMapper.readTree(response.body());
+    JsonNode list = root.get("list");
+    if (list != null && list.isArray()) {
+      for (JsonNode item : list) {
+        JsonNode value = item.get("value");
+        if (value != null && value.has("uri") && uri.equals(value.get("uri").asText())) {
+          return item;
+        }
+      }
+    }
+    return null;
+  }
+
+  private JsonNode findUpstreamByNodeCount(int expectedNodeCount) throws Exception {
+    String url = adminApiUrl + "/apisix/admin/upstreams";
+
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("X-API-KEY", ADMIN_API_KEY)
+            .GET()
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    if (response.statusCode() != 200) {
+      throw new RuntimeException(
+          "Failed to list upstreams. Status: "
+              + response.statusCode()
+              + ", Body: "
+              + response.body());
+    }
+
+    JsonNode root = objectMapper.readTree(response.body());
+    JsonNode list = root.get("list");
+    if (list != null && list.isArray()) {
+      for (JsonNode item : list) {
+        JsonNode value = item.get("value");
+        if (value != null && value.has("nodes") && value.get("nodes").size() == expectedNodeCount) {
+          return item;
+        }
+      }
+    }
+    return null;
   }
 
   // ---- Direct APISIX Admin API helpers ----

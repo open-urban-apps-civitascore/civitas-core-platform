@@ -46,7 +46,7 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/users/*", "proxy-rewrite");
   }
 
   @Test
@@ -65,7 +65,7 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/*", "proxy-rewrite");
   }
 
   @Test
@@ -86,7 +86,7 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/*", "proxy-rewrite");
   }
 
   @Test
@@ -113,7 +113,7 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/data/*", "proxy-rewrite");
   }
 
   @Test
@@ -154,9 +154,10 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
             () -> {
               JsonNode route = getRouteFromApisix(routeId);
               assertNotNull(route);
-              JsonNode plugins = route.get("value").get("plugins");
-              assertNotNull(plugins);
-              assertTrue(plugins.has("proxy-rewrite"));
+              JsonNode proxyRewrite = route.get("value").get("plugins").get("proxy-rewrite");
+              assertNotNull(proxyRewrite, "proxy-rewrite plugin should exist");
+              assertTrue(proxyRewrite.has("regex_uri"), "proxy-rewrite should have regex_uri");
+              assertTrue(proxyRewrite.has("headers"), "proxy-rewrite should have headers");
             });
 
     assertEquals(1, eventPublisher.getPublishedEvents().size());
@@ -179,7 +180,7 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/external/*", "proxy-rewrite");
   }
 
   @Test
@@ -207,7 +208,7 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/full-proxy/*", "proxy-rewrite");
   }
 
   @Test
@@ -237,7 +238,7 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/combo/*", "proxy-rewrite", "prometheus", "response-rewrite");
   }
 
   @Test

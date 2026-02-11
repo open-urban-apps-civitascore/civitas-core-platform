@@ -57,7 +57,7 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/response-set/*", "response-rewrite");
   }
 
   @Test
@@ -79,7 +79,7 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/response-remove/*", "response-rewrite");
   }
 
   @Test
@@ -97,7 +97,7 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/response-status/*", "response-rewrite");
   }
 
   @Test
@@ -117,7 +117,7 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/response-body/*", "response-rewrite");
   }
 
   @Test
@@ -138,7 +138,7 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/response-base64/*", "response-rewrite");
   }
 
   @Test
@@ -164,7 +164,7 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/response-filters/*", "response-rewrite");
   }
 
   @Test
@@ -192,7 +192,7 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/response-vars/*", "response-rewrite");
   }
 
   @Test
@@ -228,9 +228,10 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
             () -> {
               JsonNode route = getRouteFromApisix(routeId);
               assertNotNull(route);
-              JsonNode plugins = route.get("value").get("plugins");
-              assertNotNull(plugins);
-              assertTrue(plugins.has("response-rewrite"));
+              JsonNode responseRewrite = route.get("value").get("plugins").get("response-rewrite");
+              assertNotNull(responseRewrite, "response-rewrite plugin should exist");
+              JsonNode headersSet = responseRewrite.path("headers").path("set");
+              assertTrue(headersSet.has("X-Added-Via"), "headers.set should contain X-Added-Via");
             });
 
     assertEquals(1, eventPublisher.getPublishedEvents().size());
@@ -262,7 +263,7 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
 
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
-    awaitSuccessResult();
+    awaitRouteInApisix("/api/v1/response-full/*", "response-rewrite");
   }
 
   @Test
