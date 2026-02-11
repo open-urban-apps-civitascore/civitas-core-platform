@@ -8,7 +8,13 @@ import { CreateUserData, UpdateUserData, User } from '@/types/users'
 const key = 'users'
 
 export const useGetUsers = ({ params, isEnabled }: GetListInput = {}) =>
-  useDataQuery<User[]>({ key, params, errorMessage: 'An error occurred while fetching users data.', isEnabled })
+  useDataQuery<User[]>({
+    key,
+    params,
+    errorMessage: 'An error occurred while fetching users data.',
+    isEnabled,
+    headers: { 'x-api-request': 'true' },
+  })
 
 export const useCreateUser = () =>
   useCreateMutation<User, CreateUserData>({

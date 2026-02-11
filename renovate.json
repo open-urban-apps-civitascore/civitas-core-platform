@@ -1,0 +1,115 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "baseBranches": ["develop"],
+  "labels": ["v::2", "dependencies"],
+  "prConcurrentLimit": 10,
+  "rangeStrategy": "bump",
+  "semanticCommits": "enabled",
+  "separateMajorMinor": true,
+  "separateMultipleMajor": true,
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "assignees": []
+  },
+  "packageRules": [
+    {
+      "description": "Frontend dependencies (Next.js/React)",
+      "matchFileNames": ["portal-frontend/**"],
+      "groupName": "frontend dependencies",
+      "commitMessagePrefix": "chore(frontend):",
+      "addLabels": ["cop frontend", "team data mgmt"]
+    },
+    {
+      "description": "Backend dependencies (Spring Boot)",
+      "matchFileNames": ["portal-backend/**"],
+      "groupName": "backend dependencies",
+      "commitMessagePrefix": "chore(backend):",
+      "addLabels": ["cop backend", "team data mgmt"]
+    },
+    {
+      "description": "Config Adapter dependencies",
+      "matchFileNames": ["config-adapter/**"],
+      "groupName": "config-adapter dependencies",
+      "commitMessagePrefix": "chore(config-adapter):",
+      "addLabels": ["cop backend", "team interfaces"]
+    },
+    {
+      "description": "Group Spring Boot dependencies",
+      "matchPackagePatterns": ["^org\\.springframework"],
+      "groupName": "Spring Boot dependencies",
+      "matchFileNames": ["portal-backend/**", "config-adapter/**"]
+    },
+    {
+      "description": "Group React ecosystem",
+      "matchPackagePatterns": ["^react", "^@types/react"],
+      "groupName": "React ecosystem",
+      "matchFileNames": ["portal-frontend/**"]
+    },
+    {
+      "description": "Group Next.js related packages",
+      "matchPackageNames": ["next"],
+      "matchPackagePatterns": ["^@next/", "^next-"],
+      "groupName": "Next.js",
+      "matchFileNames": ["portal-frontend/**"]
+    },
+    {
+      "description": "Group testing libraries",
+      "matchPackagePatterns": ["^@testing-library/", "^vitest", "^@vitest/", "^@playwright/", "junit", "mockito"],
+      "groupName": "testing libraries"
+    },
+    {
+      "description": "Group linting and formatting tools",
+      "matchPackagePatterns": ["^eslint", "^@eslint/", "^prettier", "^@prettier/", "checkstyle", "spotbugs"],
+      "groupName": "linting and formatting"
+    },
+    {
+      "description": "Pin Docker digests",
+      "matchDatasources": ["docker"],
+      "pinDigests": true
+    },
+    {
+      "description": "Update Docker base images",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "groupName": "Docker base images",
+      "commitMessagePrefix": "chore(docker):"
+    },
+    {
+      "description": "Group GitLab CI container images",
+      "matchDatasources": ["docker"],
+      "matchFileNames": [".gitlab-ci.yml", ".gitlab/ci/**"],
+      "groupName": "GitLab CI images",
+      "commitMessagePrefix": "chore(ci):",
+      "addLabels": ["ci/cd"]
+    },
+    {
+      "description": "Group dev environment containers",
+      "matchDatasources": ["docker"],
+      "matchFileNames": ["dev-environment/**"],
+      "groupName": "dev environment containers",
+      "commitMessagePrefix": "chore(dev-env):",
+      "addLabels": ["dev-environment"]
+    }
+  ],
+  "maven": {
+    "enabled": true
+  },
+  "npm": {
+    "enabled": true
+  },
+  "dockerfile": {
+    "enabled": true
+  },
+  "docker-compose": {
+    "enabled": true
+  },
+  "gitlabci": {
+    "enabled": true
+  },
+  "postUpdateOptions": [
+    "npmDedupe"
+  ]
+}
