@@ -17,7 +17,7 @@ export type TitleType = z.infer<typeof TitleSchema>
 
 export const PhoneSchema = z
   .string()
-  .optional()
+  .transform(value => (value === '' ? undefined : value))
   .refine(value => !value || /^[0-9+()\s-]+$/.test(value), { message: 'common.errors.invalidPhone' })
   .superRefine((value, ctx) => {
     if (!value) return
@@ -43,7 +43,7 @@ export const UserSchema = z.object({
   email: z.email({
     message: 'common.errors.invalidEmail',
   }),
-  phone: PhoneSchema.optional(),
+  phone: PhoneSchema.nullable(),
   active: z.boolean(),
   groups: z.array(z.string()),
 })
@@ -63,6 +63,8 @@ export type GroupListUser = ListUser & {
 
 export const UserFormSchema = UserSchema.omit({
   groups: true,
+}).extend({
+  phone: PhoneSchema.optional(),
 })
 
 export type UserFormData = z.infer<typeof UserFormSchema>

@@ -109,18 +109,22 @@ export const UserDetails = (props: UserDetailsProps) => {
     const mappedData: User = { ...parsed, groups: defaultUserData?.groups || [] }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
-    createUser.mutate(createUserData, {
-      onSuccess: ({ data }) => {
-        toast.success(t('messages.createSuccess'))
-        router.push(`/users/${data.id}?mode=edit`)
+    createUser.mutate(
+      { ...createUserData, phone: createUserData.phone || null },
+      {
+        onSuccess: ({ data }) => {
+          toast.success(t('messages.createSuccess'))
+          router.push(`/users/${data.id}?mode=edit`)
+        },
+        onError,
       },
-      onError,
-    })
+    )
   }
 
   const handleUpdateUser = async (formData: UserFormData) => {
     const parsed = UserFormSchema.parse(formData)
-    updateUser.mutate(parsed, {
+    const updateData = { ...parsed, phone: !parsed.phone && defaultUserData.phone ? null : parsed.phone }
+    updateUser.mutate(updateData, {
       onSuccess: ({ data }) => {
         setDefaultUserData(data)
         if (isExitModalOpen) setIsExitModalOpen(false)
