@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server'
 import { getGroups } from '@/app/services/api/groups/serverRequests'
 import { getUser } from '@/app/services/api/users/serverRequests'
 
-import { UserDetails } from '../components/UserDetails'
+import { UserDetails } from '../components/UserOverview'
 
 interface PageProps {
   params: Promise<{ userId: string }>
@@ -12,7 +12,7 @@ interface PageProps {
 const EditUserPage = async (props: PageProps) => {
   const { params } = props
   const { userId } = await params
-  const t = await getTranslations('users')
+  const t = await getTranslations('common')
 
   const getUserData = async (userId: string) => {
     const userRequest = getUser(userId)
@@ -31,8 +31,7 @@ const EditUserPage = async (props: PageProps) => {
     <UserDetails
       testId="userDetailsPage"
       userData={userData}
-      isEditMode
-      title={userData ? `${userData.firstName} ${userData.lastName}` : t('notFound')}
+      title={userData ? `${userData.firstName} ${userData.lastName}` : t('itemNotFound', { item: t('items.user') })}
     />
   )
 }

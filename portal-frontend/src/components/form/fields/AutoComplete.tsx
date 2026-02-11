@@ -57,7 +57,7 @@ export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>)
   const error =
     inputValue.trim().length < minLength
       ? t('errors.minChar', { amount: minLength.toString() })
-      : t('errors.notFound', { items: label })
+      : t('errors.itemsNotFound', { items: label })
 
   return (
     <FormField

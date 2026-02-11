@@ -8,6 +8,7 @@ import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
+import { PageBackground } from '@/components/page-background/PageBackground'
 import { cn } from '@/lib/utils'
 import { ROLE_TYPES } from '@/types/roles'
 
@@ -46,37 +47,39 @@ export const RolesTab = (props: RolesTabProps) => {
   const isLoading = isLoadingGroups || areRolesLoading
 
   return (
-    <ContentCard className={cn((error || isLoading) && 'h-50')}>
-      {!error && !isLoading && (
-        <>
-          <DetailsFieldContainer isTitleField>
-            <h2>{t('users.roles.title')}</h2>
-          </DetailsFieldContainer>
-          <RoleCategory
-            title={t('roles.systemRoles')}
-            rolesType={ROLE_TYPES.SYSTEM}
-            roles={roles.filter(role => role.type === ROLE_TYPES.SYSTEM)}
-            isLoading={isLoading}
-          />
+    <PageBackground>
+      <ContentCard className={cn((error || isLoading) && 'h-50')}>
+        {!error && !isLoading && (
+          <>
+            <DetailsFieldContainer isTitleField>
+              <h2>{t('users.roles.title')}</h2>
+            </DetailsFieldContainer>
+            <RoleCategory
+              title={t('roles.systemRoles')}
+              rolesType={ROLE_TYPES.SYSTEM}
+              roles={roles.filter(role => role.type === ROLE_TYPES.SYSTEM)}
+              isLoading={isLoading}
+            />
 
-          <RoleCategory
-            title={t('roles.dataRoles')}
-            rolesType={ROLE_TYPES.DATA}
-            roles={roles.filter(role => role.type === ROLE_TYPES.DATA)}
-            isLoading={isLoading}
-          />
+            <RoleCategory
+              title={t('roles.dataRoles')}
+              rolesType={ROLE_TYPES.DATA}
+              roles={roles.filter(role => role.type === ROLE_TYPES.DATA)}
+              isLoading={isLoading}
+            />
 
-          <RoleCategory
-            title={t('roles.governanceRoles')}
-            rolesType={ROLE_TYPES.GOVERNANCE}
-            roles={roles.filter(role => role.type === ROLE_TYPES.GOVERNANCE)}
-            isLoading={isLoading}
-            className="border-b-0"
-          />
-        </>
-      )}
-      {isLoading && <LoadingSpinner className="h-full" />}
-      {error && <p className="h-full flex items-center justify-center">{t('common.errors.loadingError')}</p>}
-    </ContentCard>
+            <RoleCategory
+              title={t('roles.governanceRoles')}
+              rolesType={ROLE_TYPES.GOVERNANCE}
+              roles={roles.filter(role => role.type === ROLE_TYPES.GOVERNANCE)}
+              isLoading={isLoading}
+              className="border-b-0"
+            />
+          </>
+        )}
+        {isLoading && <LoadingSpinner className="h-full" />}
+        {error && <p className="h-full flex items-center justify-center">{t('common.errors.loadingError')}</p>}
+      </ContentCard>
+    </PageBackground>
   )
 }

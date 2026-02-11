@@ -57,6 +57,8 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
+  --popover-dark: oklch(26.862% 0.00003 271.152);
+  --popover-foreground-dark: oklch(98.511% 0.00011 271.152);
   --primary: oklch(49.999% 0.11934 242.772);
   --primary-foreground: oklch(0.985 0 0);
   --primary-light: oklch(55.167% 0.01387 285.878);
@@ -87,7 +89,7 @@
   --success: oklch(75.099% 0.17584 156.33);
   --warn: oklch(85.148% 0.17171 99.388);
   --error: oklch(67.512% 0.20416 358.512);
-  --search-height:calc(--spacing(16));
+  --search-height: calc(--spacing(16));
   --status-label: oklch(90.196% 0.02539 233.145);
 }
 
