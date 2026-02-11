@@ -289,6 +289,7 @@
                         <ignoredUnusedDeclaredDependency>io.rest-assured:rest-assured</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.hibernate.orm:hibernate-processor</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>com.civitas:event-handler-kafka</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
                     <ignoredUsedUndeclaredDependencies>
                         <ignoredUsedUndeclaredDependency>org.springframework.boot:*</ignoredUsedUndeclaredDependency>
