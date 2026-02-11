@@ -131,12 +131,13 @@ integration-test-backend:
   image: maven:3.9-eclipse-temurin-21
   stage: test
   needs:
+    - job: setup-version
+      artifacts: true
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
-      optional: true
   services:
-    - docker:dind
+    - docker:27-dind
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_DRIVER: overlay2
@@ -151,7 +152,7 @@ integration-test-backend:
   script:
     - cd portal-backend
     # Run integration tests only, skipping unit tests
-    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent-integration verify jacoco:report-integration -DskipUnitTests=true -Dspotless.skip=true -s ci_settings.xml
+    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent-integration verify jacoco:report-integration -DskipUnitTests=true -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$REVISION
     # Print coverage, picked up by coverage regex
     - cat target/site/jacoco-it/index.html | grep -o '<tfoot>.*</tfoot>'
   coverage: '/Total.*?([0-9]{1,3})%/'
