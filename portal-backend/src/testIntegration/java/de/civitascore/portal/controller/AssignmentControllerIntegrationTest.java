@@ -5,13 +5,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
+import de.civitascore.portal.model.input.CatalogInputDTO;
+import de.civitascore.portal.model.input.DataSetInputDTO;
+import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
+import de.civitascore.portal.model.output.CatalogOutputDTO;
+import de.civitascore.portal.model.output.DataSetOutputDTO;
+import de.civitascore.portal.model.output.DataSpaceOutputDTO;
 import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.util.RestPage;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -119,6 +126,77 @@ class AssignmentControllerIntegrationTest
     throw new IllegalStateException("Failed to create test role");
   }
 
+  private UUID createTestDataSpace() {
+    DataSpaceInputDTO input = new DataSpaceInputDTO();
+    input.setName("Test DataSpace " + System.currentTimeMillis());
+    input.setDescription("Test dataspace for assignment");
+
+    HttpHeaders headers = createAuthHeaders();
+    HttpEntity<DataSpaceInputDTO> request = new HttpEntity<>(input, headers);
+    ResponseEntity<DataSpaceOutputDTO> response =
+        restTemplate.exchange(
+            "/dataspaces",
+            HttpMethod.POST,
+            request,
+            new ParameterizedTypeReference<DataSpaceOutputDTO>() {});
+
+    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
+      return response.getBody().getId();
+    }
+    throw new IllegalStateException("Failed to create test dataspace");
+  }
+
+  private UUID createTestDataSet(UUID dataSpaceId) {
+    DataSetInputDTO input = new DataSetInputDTO();
+    input.setName("Test DataSet " + System.currentTimeMillis());
+    input.setDescription("Test dataset for assignment");
+    input.setDataSpaceIds(List.of(dataSpaceId));
+
+    HttpHeaders headers = createAuthHeaders();
+    HttpEntity<DataSetInputDTO> request = new HttpEntity<>(input, headers);
+    ResponseEntity<DataSetOutputDTO> response =
+        restTemplate.exchange(
+            "/datasets",
+            HttpMethod.POST,
+            request,
+            new ParameterizedTypeReference<DataSetOutputDTO>() {});
+
+    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
+      return response.getBody().getId();
+    }
+    throw new IllegalStateException("Failed to create test dataset");
+  }
+
+  private UUID createTestCatalog() {
+    CatalogInputDTO input = new CatalogInputDTO();
+    input.setName("Test Catalog " + System.currentTimeMillis());
+    input.setDescription("Test catalog for assignment");
+
+    HttpHeaders headers = createAuthHeaders();
+    HttpEntity<CatalogInputDTO> request = new HttpEntity<>(input, headers);
+    ResponseEntity<CatalogOutputDTO> response =
+        restTemplate.exchange(
+            "/catalogs",
+            HttpMethod.POST,
+            request,
+            new ParameterizedTypeReference<CatalogOutputDTO>() {});
+
+    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
+      return response.getBody().getId();
+    }
+    throw new IllegalStateException("Failed to create test catalog");
+  }
+
+  private UUID getScopeIdForType(ScopeType scopeType) {
+    return switch (scopeType) {
+      case TENANT -> null;
+      case DATASPACE -> createTestDataSpace();
+      case DATASET -> createTestDataSet(createTestDataSpace());
+      case CATALOG -> createTestCatalog();
+      case DATASOURCE, DATASTRUCTURE -> null;
+    };
+  }
+
   @Nested
   @DisplayName("Create Assignment Tests")
   class CreateAssignmentTests {
@@ -172,7 +250,8 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should create assignment with different scope types")
     void shouldCreateAssignmentWithDifferentScopeTypes() {
-      for (ScopeType scopeType : ScopeType.values()) {
+      for (ScopeType scopeType :
+          List.of(ScopeType.TENANT, ScopeType.DATASPACE, ScopeType.DATASET, ScopeType.CATALOG)) {
         UUID groupId = createTestGroup();
         UUID roleId = createTestRole();
 
@@ -180,12 +259,13 @@ class AssignmentControllerIntegrationTest
         input.setGroupId(groupId);
         input.setRoleId(roleId);
         input.setScopeType(scopeType);
-        UUID scopeID = UUID.randomUUID();
-        input.setScopeId(scopeID);
+        input.setScopeId(getScopeIdForType(scopeType));
 
         ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getStatusCode())
+            .as("Should create assignment with scope type " + scopeType)
+            .isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getScopeType()).isEqualTo(scopeType);
       }
@@ -194,16 +274,16 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should create assignment with scope ID")
     void shouldCreateAssignmentWithScopeId() {
+      UUID dataSpaceId = createTestDataSpace();
       AssignmentInputDTO input = createValidInput();
       input.setScopeType(ScopeType.DATASPACE);
-      UUID scopeID = UUID.randomUUID();
-      input.setScopeId(scopeID);
+      input.setScopeId(dataSpaceId);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getScopeId()).isEqualTo(scopeID);
+      assertThat(response.getBody().getScopeId()).isEqualTo(dataSpaceId);
     }
 
     @Test
@@ -417,17 +497,13 @@ class AssignmentControllerIntegrationTest
       AssignmentInputDTO input1 = new AssignmentInputDTO();
       input1.setGroupId(groupId);
       input1.setRoleId(role1Id);
-      UUID scopeID = UUID.randomUUID();
-      input1.setScopeId(scopeID);
-
       input1.setScopeType(ScopeType.TENANT);
 
       AssignmentInputDTO input2 = new AssignmentInputDTO();
       input2.setGroupId(groupId);
       input2.setRoleId(role2Id);
       input2.setScopeType(ScopeType.DATASPACE);
-      UUID scopeID2 = UUID.randomUUID();
-      input2.setScopeId(scopeID2);
+      input2.setScopeId(createTestDataSpace());
 
       ResponseEntity<AssignmentOutputDTO> response1 = performCreate(input1);
       ResponseEntity<AssignmentOutputDTO> response2 = performCreate(input2);

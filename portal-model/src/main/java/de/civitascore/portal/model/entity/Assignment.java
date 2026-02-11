@@ -70,40 +70,26 @@ public class Assignment extends BaseEntity {
   @JoinColumn(name = "data_structure_id")
   private DataStructure dataStructure;
 
-  @Column(name = "data_structure_id", insertable = false, updatable = false)
-  private UUID dataStructureId;
-
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "data_source_id")
   private DataSource dataSource;
-
-  @Column(name = "data_source_id", insertable = false, updatable = false)
-  private UUID dataSourceId;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "dataset_id")
   private DataSet dataset;
 
-  @Column(name = "dataset_id", insertable = false, updatable = false)
-  private UUID datasetId;
-
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "data_space_id")
   private DataSpace dataSpace;
-
-  @Column(name = "data_space_id", insertable = false, updatable = false)
-  private UUID dataSpaceId;
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "catalog_id")
   private Catalog catalog;
 
-  @Column(name = "catalog_id", insertable = false, updatable = false)
-  private UUID catalogId;
-
   public UUID getScopeId() {
-    return Stream.of(dataStructureId, dataSourceId, datasetId, dataSpaceId, catalogId)
+    return Stream.of(dataStructure, dataSource, dataset, dataSpace, catalog)
         .filter(Objects::nonNull)
+        .map(e -> e.getId())
         .findFirst()
         .orElse(null);
   }
