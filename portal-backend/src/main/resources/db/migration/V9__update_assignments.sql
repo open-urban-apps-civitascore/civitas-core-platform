@@ -28,3 +28,15 @@ ALTER TABLE assignments
 
 ALTER TABLE assignments
     ADD CONSTRAINT uk_assignment_group_role_scope UNIQUE NULLS NOT DISTINCT (group_id, role_id, scope_type, data_structure_id, data_source_id, dataset_id, data_space_id, catalog_id);
+
+-- Indices for foreign key lookups
+CREATE INDEX idx_assignment_group ON assignments (group_id);
+CREATE INDEX idx_assignment_role ON assignments (role_id);
+CREATE INDEX idx_assignment_datastructure ON assignments (data_structure_id);
+CREATE INDEX idx_assignment_datasource ON assignments (data_source_id);
+CREATE INDEX idx_assignment_dataset ON assignments (dataset_id);
+CREATE INDEX idx_assignment_dataspace ON assignments (data_space_id);
+CREATE INDEX idx_assignment_catalog ON assignments (catalog_id);
+
+-- Composite index for scope-based queries
+CREATE INDEX idx_assignment_scope ON assignments (scope_type, data_structure_id, data_source_id, dataset_id, data_space_id, catalog_id);
