@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form'
 import { useCreateDataset, usePatchDataset } from '@/app/services/api/datasets/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { Select } from '@/components/form/fields/Select'
+import { FormSelect } from '@/components/form/fields/FormSelect'
 import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
@@ -140,7 +140,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
           ) : (
             <>
               <DetailsFieldContainer className="max-w-300">
-                <Select
+                <FormSelect
                   id="dataspaceSelect"
                   form={form}
                   label={t('overview.info.dataspace')}

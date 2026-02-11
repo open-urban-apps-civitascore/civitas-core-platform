@@ -6769,17 +6769,17 @@
     {
       "name": "Datasource 1",
       "description": "Description of Datasource",
-      "connector": "REST",
+      "connector": null,
       "connection": "inactive",
       "lastActive": "2025-01-01T00:00:00",
       "tags": [],
       "status": "draft",
-      "id": 1
+      "id": "1"
     },
     {
       "name": "Datasource 2",
       "description": "Description of Datasource",
-      "connector": "MQTT",
+      "connector": null,
       "connection": "active",
       "lastActive": "2025-05-01T00:00:00",
       "tags": [
@@ -6787,12 +6787,12 @@
         "Tag2"
       ],
       "status": "draft",
-      "id": 2
+      "id": "2"
     },
     {
       "name": "Datasource 3",
       "description": "Description of Datasource",
-      "connector": "CSV",
+      "connector": null,
       "connection": "static",
       "lastActive": "2026-01-15T00:00:00",
       "tags": [
@@ -6801,12 +6801,12 @@
         "Tag3"
       ],
       "status": "available",
-      "id": 3
+      "id": "3"
     },
     {
       "name": "Datasource 4",
       "description": "Description of Datasource",
-      "connector": "SQL",
+      "connector": null,
       "connection": "active",
       "lastActive": "2025-12-14T00:00:00",
       "tags": [
@@ -6816,12 +6816,12 @@
         "Tag4"
       ],
       "status": "available",
-      "id": 4
+      "id": "4"
     },
     {
       "name": "Datasource 5",
       "description": "Description of Datasource",
-      "connector": "S3",
+      "connector": null,
       "connection": "inactive",
       "lastActive": "2026-01-21T00:00:00",
       "tags": [
@@ -6831,12 +6831,12 @@
         "Tag4"
       ],
       "status": "draft",
-      "id": 5
+      "id": "5"
     },
     {
       "name": "Datasource 6",
       "description": "Description of Datasource",
-      "connector": "MQTT",
+      "connector": null,
       "connection": "inactive",
       "lastActive": "2025-01-25T00:00:00",
       "tags": [
@@ -6846,40 +6846,37 @@
         "Tag4"
       ],
       "status": "available",
-      "id": 6
+      "id": "6"
     },
     {
-      "name": "test",
-      "description": "",
+      "name": "Test Datasource",
+      "description": "sdasd",
       "tags": [],
       "status": "draft",
-      "connector": "rest",
+      "connector": {
+        "type": "sql",
+        "config": {
+          "driver": "postgres",
+          "dsn": "",
+          "table": "sdasd",
+          "columns": [
+            "*"
+          ],
+          "where": "",
+          "args_mapping": "",
+          "prefix": "",
+          "suffix": "",
+          "init_files": [],
+          "init_statement": "",
+          "conn_max_idle_time": "",
+          "conn_max_life_time": "",
+          "conn_max_idle": 2,
+          "conn_max_open": 0
+        }
+      },
       "connection": "inactive",
-      "lastActive": "2026-01-21T14:00:20.791Z",
-      "id": 7
-    },
-    {
-      "name": "test2",
-      "description": "jnknjdcdsncjndscj",
-      "tags": [
-        "new",
-        "world"
-      ],
-      "status": "draft",
-      "connector": "rest",
-      "connection": "inactive",
-      "lastActive": "2026-01-21T14:00:41.180Z",
-      "id": 8
-    },
-    {
-      "name": "test 3",
-      "description": "saddsasdasadasdasd",
-      "tags": [],
-      "status": "available",
-      "connector": "rest",
-      "connection": "inactive",
-      "lastActive": "2026-01-21T14:19:02.316Z",
-      "id": 9
+      "lastActive": "2026-02-04T12:11:34.305Z",
+      "id": "8"
     }
   ]
 }

@@ -19,9 +19,11 @@
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
       "invalidEmail": "Ungültige E-Mail Adresse",
+      "invalidNumber": "Bitte geben Sie eine gültige Zahl ein",
       "required": "Dieses Feld ist erforderlich",
       "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
       "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
+      "atLeast1Value": "Mindestens ein Wert ist erforderlich.",
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
       "notFound": "Keine {items} gefunden",
       "loadingError": "Fehler beim Laden der Daten",
@@ -38,6 +40,11 @@
       "datasets": "Datensätze",
       "dataspaces": "Datenräume",
       "permissions": "Berechtigungen"
+    },
+    "info": {
+      "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
+      "commaSeparated": "durch Kommas getrennt",
+      "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus."
     }
   },
   "languages": {
@@ -429,6 +436,13 @@
       "title": "Vor dem Beenden speichern?",
       "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
       "discard": "Verwerfen"
+    },
+    "connectorTab": {
+      "title1": "Konnektor",
+      "title2": "Konfiguration",
+      "type": "Typ",
+      "connection": "Verbindung",
+      "establishConnection": "Verbindung herstellen"
     }
   }
 }

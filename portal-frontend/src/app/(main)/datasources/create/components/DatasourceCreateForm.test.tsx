@@ -85,7 +85,7 @@ describe('DatasourceCreateForm', () => {
           description: '',
           tags: [],
           status: 'draft',
-          connector: 'rest',
+          connector: null,
           connection: 'inactive',
         }),
         expect.any(Object),

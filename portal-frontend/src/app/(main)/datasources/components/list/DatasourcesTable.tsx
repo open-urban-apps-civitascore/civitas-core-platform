@@ -7,15 +7,17 @@ import { ActivityBadge } from '@/components/activity-badge/ActivityBadge'
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/BadgesWithTooltip'
 import { DataTable } from '@/components/table/DataTable'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { CONNECTION_TYPES, CONNECTOR_TYPE_KEYS, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
-import { CONNECTION_TYPES, Datasource, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
+import { Datasource } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
 interface DatasourcesTableProps extends TableProps<Datasource> {
   datasources: Datasource[]
-  onDelete?: (id: number) => void
+  onDelete?: (id: string) => void
 }
 
 export const DatasourcesTable = (props: DatasourcesTableProps) => {
@@ -45,7 +47,9 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     }),
     columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
-      cell: info => info.getValue(),
+      cell: info =>
+        info.getValue() ? <LinkCell href={`datasources/${info.row.id}`}>{info.getValue()}</LinkCell> : '-',
+
       meta: {
         style: {
           width: '20%',
@@ -67,7 +71,10 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     }),
     columnHelper.accessor('connector', {
       header: t('tableHeaders.connector'),
-      cell: info => info.getValue(),
+      cell: info => {
+        const connectorType = info.getValue()?.type
+        return connectorType ? CONNECTOR_TYPE_KEYS[connectorType] : '-'
+      },
       meta: {
         style: {
           width: '10%',

@@ -1,3 +1,5 @@
+import { Toaster } from 'sonner'
+
 import { auth } from '@/auth'
 import { AppHeader } from '@/components/appHeader/AppHeader'
 import { AppSidebar } from '@/components/appSidebar/AppSidebar'
@@ -21,6 +23,7 @@ const MainLayout = async (props: MainLayoutProps) => {
         <div className="h-[calc(100%-var(--header-height))] [--title-height:calc(--spacing(30))] [--page-padding:calc(--spacing(4))]">
           {children}
         </div>
+        <Toaster />
       </SidebarInset>
     </SidebarProvider>
   )

@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 
 import { cn } from '@/lib/utils'
 
-export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'accessPermissions' | 'dataspaces'
+export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'accessPermissions'
 
 interface SegmentedControlBarProps {
   selectedTab: DatasourceTab
@@ -14,7 +14,7 @@ interface SegmentedControlBarProps {
   disabledTabs?: DatasourceTab[]
 }
 
-const tabs: DatasourceTab[] = ['basicInfo', 'connector', 'dataStructure', 'accessPermissions', 'dataspaces']
+const tabs: DatasourceTab[] = ['basicInfo', 'connector', 'dataStructure', 'accessPermissions']
 
 export const SegmentedControlBar = (props: SegmentedControlBarProps) => {
   const { selectedTab, onTabChange, completedTabs = [], disabledTabs = [] } = props
