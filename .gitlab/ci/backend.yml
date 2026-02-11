@@ -70,12 +70,8 @@ lint-backend:
 dependency-prune-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-21-alpine
-  stage: test
-  needs:
-    - job: publish-config-adapter
-      optional: true
-    - job: publish-portal-model
-      optional: true
+  stage: lint
+  needs: []
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -87,7 +83,7 @@ dependency-prune-backend:
       - .m2/repository
   script:
     - cd portal-backend
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false -DignoredDependencies=org.springframework.boot:*,org.springframework.security:*,org.springframework:*,jakarta.*,org.springdoc:*,org.slf4j:*
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -DfailOnWarning=true -DignoreNonCompile=false -DignoredDependencies=org.springframework.boot:*,org.springframework.security:*,org.springframework:*,jakarta.*,org.springdoc:*,org.slf4j:* -s ci_settings.xml
   allow_failure:
     exit_codes:
       - 1
