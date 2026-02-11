@@ -17,7 +17,7 @@ export const defaultFormUser: User = {
 
 const CreateUserPage = async () => {
   const t = await getTranslations('users')
-  return <UserDetails testId="createUserPage" userData={defaultFormUser} title={t('newUser')} />
+  return <UserDetails testId="createUserPage" userData={defaultFormUser} title={t('newUser')} isCreateMode />
 }
 
 export default CreateUserPage

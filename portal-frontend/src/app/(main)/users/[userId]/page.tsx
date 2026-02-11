@@ -31,7 +31,6 @@ const EditUserPage = async (props: PageProps) => {
     <UserDetails
       testId="userDetailsPage"
       userData={userData}
-      isEditMode
       title={userData ? `${userData.firstName} ${userData.lastName}` : t('itemNotFound', { item: t('items.user') })}
     />
   )

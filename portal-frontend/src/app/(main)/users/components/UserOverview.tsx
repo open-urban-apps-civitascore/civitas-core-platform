@@ -1,7 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -25,22 +25,23 @@ import { RolesTab } from './roles-tab/RolesTab'
 interface UserDetailsProps {
   title: string
   userData: User
-  isEditMode?: boolean
+  isCreateMode?: boolean
   testId?: string
 }
 
 export const UserDetails = (props: UserDetailsProps) => {
-  const { title, userData, isEditMode = false, testId } = props
+  const { title, userData, isCreateMode = false, testId } = props
+  const params = useSearchParams()
+  const mode = params.get('mode')
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
   const router = useRouter()
   const [defaultUserData, setDefaultUserData] = useState(userData)
-  const [isReadOnly, setIsReadOnly] = useState(isEditMode)
+  const [isReadOnly, setIsReadOnly] = useState(isCreateMode ? false : mode !== 'edit')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const isLoading = createUser.isPending || updateUser.isPending
-
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const onError = () => {
     toast.error(tCommon('errors.unexpectedError'))
@@ -111,7 +112,7 @@ export const UserDetails = (props: UserDetailsProps) => {
     createUser.mutate(createUserData, {
       onSuccess: ({ data }) => {
         toast.success(t('messages.createSuccess'))
-        router.push(`/users/${data.id}`)
+        router.push(`/users/${data.id}?mode=edit`)
       },
       onError,
     })
@@ -122,15 +123,15 @@ export const UserDetails = (props: UserDetailsProps) => {
     updateUser.mutate(parsed, {
       onSuccess: ({ data }) => {
         setDefaultUserData(data)
-        setIsReadOnly(true)
         if (isExitModalOpen) setIsExitModalOpen(false)
+        router.refresh()
         toast.success(t('messages.updateSuccess'))
       },
       onError,
     })
   }
 
-  const handleSave = isEditMode ? form.handleSubmit(handleUpdateUser) : form.handleSubmit(handleCreateUser)
+  const handleSave = isCreateMode ? form.handleSubmit(handleCreateUser) : form.handleSubmit(handleUpdateUser)
 
   const renderTabContent = () => {
     switch (subTabValue) {
