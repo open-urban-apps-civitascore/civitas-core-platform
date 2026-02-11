@@ -20,7 +20,7 @@ const EditUserPage = async (props: PageProps) => {
     const [userResponse, groupsResponse] = await Promise.all([userRequest, groupsRequest])
     const userData = userResponse.data
     const groupsData = groupsResponse.data
-    const groupsContainingUser = groupsData.filter(group => group.users.find(user => user.id === userData.id))
+    const groupsContainingUser = groupsData.filter(group => group.members?.find(member => member.id === userData.id))
     const user = { ...userData, groups: groupsContainingUser.map(group => group.id) }
     return user
   }

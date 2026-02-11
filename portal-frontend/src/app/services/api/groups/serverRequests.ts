@@ -8,6 +8,7 @@ export const getGroups = async (params?: URLSearchParams) =>
     method: 'GET',
     endpoint: `/groups`,
     params,
-    headers: await getServerRequestHeaders(),
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    headers: { ...(await getServerRequestHeaders()), 'x-api-request': 'true' },
     errorMessage: 'An error occurred while fetching groups data.',
   })

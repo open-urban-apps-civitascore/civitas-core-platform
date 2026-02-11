@@ -1,4 +1,4 @@
-import { GroupListUser, ListUser, User, UserFormData } from '@/types/users'
+import { ListUser, User, UserFormData } from '@/types/users'
 
 export const mapListUsers = (users: User[]): ListUser[] =>
   users.map(user => {
@@ -10,17 +10,13 @@ export const mapListUsers = (users: User[]): ListUser[] =>
     }
   })
 
-export const mapGroupListUsers = (
-  users: User[],
-  userAssignments: { id: string; assignedAt: string }[],
-): GroupListUser[] =>
+export const mapGroupListUsers = (users: User[]): ListUser[] =>
   users.map(user => {
     return {
       id: user.id,
       fullName: `${user.firstName} ${user.lastName}`,
       email: user.email,
       active: user.active,
-      assignedAt: userAssignments.find(assignment => assignment.id === user.id)?.assignedAt ?? '',
     }
   })
 

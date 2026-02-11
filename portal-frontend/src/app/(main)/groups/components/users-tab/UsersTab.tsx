@@ -12,18 +12,18 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Group, GroupTabProps } from '@/types/groups'
+import { Group } from '@/types/groups'
 import { mapGroupListUsers } from '@/utils/users'
 
 import { AssignUsersModal } from './AssignUsersModal'
 import { UsersTable } from './UsersTable'
 
-interface UsersTabProps extends GroupTabProps {
+interface UsersTabProps {
   groupData: Group
 }
 export const UsersTab = (props: UsersTabProps) => {
   const { groupData } = props
-  const originalUsers = groupData.users
+  const originalUsers = groupData.members || []
   const t = useTranslations('groups')
   const updateGroup = usePatchGroup()
 
@@ -42,16 +42,16 @@ export const UsersTab = (props: UsersTabProps) => {
     totalPages,
   } = useQueryParams()
 
-  const userRequestParams = useMemo(() => {
+  const getUserRequestParams = () => {
     const params = new URLSearchParams(getApiRequestParamsByUrl())
-    originalUsers.forEach(user => {
-      params.append('id', String(user.id))
+    originalUsers?.forEach(user => {
+      params.append('id', String(user))
     })
     return params
-  }, [getApiRequestParamsByUrl, originalUsers])
+  }
 
   const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
-    params: userRequestParams,
+    params: getUserRequestParams(),
     isEnabled: originalUsers.length > 0,
   })
 
@@ -62,10 +62,7 @@ export const UsersTab = (props: UsersTabProps) => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, setTotalPages, pageSize])
 
-  const users = useMemo(
-    () => (isLoading ? [] : mapGroupListUsers(usersData?.data || [], originalUsers)),
-    [usersData?.data, originalUsers, isLoading],
-  )
+  const users = useMemo(() => (isLoading ? [] : mapGroupListUsers(usersData?.data || [])), [usersData?.data, isLoading])
 
   // closes the user assignment modal after update
   useEffect(() => {
@@ -76,9 +73,8 @@ export const UsersTab = (props: UsersTabProps) => {
 
   const handleUpdateGroupUsers = async (userSelection: RowSelectionState) => {
     const selectedUserIds = Object.keys(userSelection).filter(key => userSelection[key])
-    const selectedUserInfo = selectedUserIds.map(userId => ({ id: userId, assignedAt: new Date().toISOString() }))
-    const updateUserData = selectedUserInfo.concat(originalUsers)
-    updateGroup.mutate({ id: groupData.id, users: updateUserData })
+    const updateUserData = selectedUserIds.concat(originalUsers.map(user => user.id))
+    updateGroup.mutate({ id: groupData.id, memberIds: updateUserData })
   }
 
   const CustomElement = (
@@ -100,7 +96,7 @@ export const UsersTab = (props: UsersTabProps) => {
         <AssignUsersModal
           isUpdating={updateGroup.isPending}
           originalUsers={originalUsers}
-          groupTitle={groupData.title}
+          groupTitle={groupData.name}
           open={isAssignUsersOpen}
           onOpenChange={setIsAssignUsersOpen}
           onUpdateUsers={handleUpdateGroupUsers}
@@ -128,7 +124,7 @@ export const UsersTab = (props: UsersTabProps) => {
       <AssignUsersModal
         isUpdating={updateGroup.isPending}
         originalUsers={originalUsers}
-        groupTitle={groupData.title}
+        groupTitle={groupData.name}
         open={isAssignUsersOpen}
         onOpenChange={setIsAssignUsersOpen}
         onUpdateUsers={handleUpdateGroupUsers}

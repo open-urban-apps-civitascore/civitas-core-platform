@@ -106,7 +106,7 @@ export const UserDetails = (props: UserDetailsProps) => {
 
   const handleCreateUser = async (formData: UserFormData) => {
     const parsed = UserFormSchema.parse(formData)
-    const mappedData: User = { ...parsed, groups: defaultUserData?.groups || [] }
+    const mappedData = { ...parsed, groups: defaultUserData?.groups || [] }
     // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createUserData } = mappedData
     createUser.mutate(

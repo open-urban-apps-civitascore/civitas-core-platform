@@ -112,17 +112,17 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
                 : false
           }
           onCheckedChange={value => handleCheckedChange(value, row)}
-          aria-label={`Select group ${row.original.title}`}
+          aria-label={`Select group ${row.original.name}`}
           id={row.id}
         />
       ),
     }),
-    columnHelper.accessor('title', {
+    columnHelper.accessor('name', {
       header: ({ column }) => (
         <SortableTableHeader column={column} title={tRoles('groupAssignmentTab.modal.tableHeaders.name')} />
       ),
       cell: ({ row }: CellContext<Group, unknown>) => (
-        <ExpanderCell row={row} value={row.original.title} className="font-medium" />
+        <ExpanderCell row={row} value={row.original.name} className="font-medium" />
       ),
       meta: {
         style: {
@@ -131,7 +131,7 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
         },
       },
     }),
-    columnHelper.accessor('users', {
+    columnHelper.accessor('members', {
       header: tRoles('groupAssignmentTab.modal.tableHeaders.usersCount'),
       cell: info => info.getValue()?.length,
       meta: {
@@ -162,7 +162,7 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
     state: { pagination: { pageIndex, pageSize }, sorting, rowSelection: selection },
     manualPagination: true,
     manualSorting: true,
-    getSubRows: row => row.subgroups || [],
+    // getSubRows: row => row.subgroups || [],
     getExpandedRowModel: getExpandedRowModel(),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),

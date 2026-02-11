@@ -1,15 +1,18 @@
 import { AxiosRequestConfig } from 'axios'
 import { InputHTMLAttributes } from 'react'
+import z from 'zod'
 
 export type Item = {
   id: string
   title: string
 }
 
-export type Item2 = {
-  id: string
-  name: string
-}
+export const ItemScheme = z.object({
+  id: z.string(),
+  name: z.string(),
+})
+
+export type Item2 = z.infer<typeof ItemScheme>
 
 export type SelectOption = {
   value: string
@@ -31,6 +34,7 @@ export type GetItemInput = {
 export type DataQueryInput = {
   key: string
   errorMessage: string
+  headers?: AxiosRequestConfig['headers']
   id?: string
   params?: URLSearchParams
   isEnabled?: boolean

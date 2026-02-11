@@ -4,7 +4,6 @@ import {
   getCoreRowModel,
   getExpandedRowModel,
   getSortedRowModel,
-  Row,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
@@ -43,15 +42,10 @@ export const GroupsTable = (props: GroupsTableProps) => {
       cell: info => info.getValue(),
       enableHiding: true,
     }),
-    columnHelper.accessor('parent', {
-      header: 'parent',
-      cell: info => info.getValue(),
-      enableHiding: true,
-    }),
-    columnHelper.accessor('title', {
+    columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('list.title')} />,
       cell: ({ row }: CellContext<Group, unknown>) => (
-        <ExpanderCell row={row} value={row.original.title} className="font-medium" />
+        <ExpanderCell row={row} value={row.original.name} className="font-medium" />
       ),
       meta: {
         style: {
@@ -60,13 +54,13 @@ export const GroupsTable = (props: GroupsTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('users', {
+    columnHelper.accessor('members', {
       header: t('list.users'),
       cell: info => info.getValue()?.length,
     }),
-    columnHelper.accessor('contact', {
+    columnHelper.accessor('contactUser', {
       header: t('list.contact'),
-      cell: info => info.getValue()?.displayName,
+      cell: info => info.getValue()?.name,
     }),
     columnHelper.accessor('description', {
       header: t('list.description'),
@@ -96,7 +90,7 @@ export const GroupsTable = (props: GroupsTableProps) => {
     state: { pagination: { pageIndex, pageSize }, sorting, rowSelection },
     manualPagination: true,
     manualSorting: true,
-    getSubRows: row => row.subgroups || [],
+    // getSubRows: row => row.subgroups || [],
     getExpandedRowModel: getExpandedRowModel(),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -106,7 +100,7 @@ export const GroupsTable = (props: GroupsTableProps) => {
     onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
   })
 
-  const checkIfRowClickable = (row: Row<Group>) => !row.original.parent
+  // const checkIfRowClickable = (row: Row<Group>) => !row.original.parent
 
   return (
     <DataTable
@@ -116,7 +110,7 @@ export const GroupsTable = (props: GroupsTableProps) => {
       totalPages={totalPages}
       onRowClick={onRowClick}
       isLoading={isLoading}
-      isRowClickable={checkIfRowClickable}
+      // isRowClickable={checkIfRowClickable}
     />
   )
 }

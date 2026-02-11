@@ -6,7 +6,6 @@ import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { UserGroupsListData } from '@/types/groups'
 import { TableProps } from '@/types/table'
-import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
 
 interface GroupsTableProps extends TableProps<UserGroupsListData> {
@@ -37,7 +36,7 @@ const GroupsTable = (props: GroupsTableProps) => {
       cell: info => info.getValue(),
       enableHiding: true,
     }),
-    columnHelper.accessor('title', {
+    columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('groupsTab.name')} />,
       cell: info => info.getValue(),
       meta: {
@@ -47,13 +46,9 @@ const GroupsTable = (props: GroupsTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('memberSince', {
-      header: t('groupsTab.memberSince'),
-      cell: info => formatDate(info.getValue(), locale),
-    }),
-    columnHelper.accessor('contact', {
+    columnHelper.accessor('contactUser', {
       header: t('groupsTab.contact'),
-      cell: info => info.getValue()?.displayName || '-',
+      cell: info => info.getValue()?.name || '-',
     }),
     columnHelper.accessor('description', {
       header: t('groupsTab.description'),
@@ -69,7 +64,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('roles', {
       header: t('groupsTab.roles'),
-      cell: info => <BadgesWithTooltip items={info.getValue()} minVisibleBadges={2} />,
+      cell: info => <BadgesWithTooltip items={info.getValue()?.map(role => role.name) || []} minVisibleBadges={2} />,
     }),
   ]
 

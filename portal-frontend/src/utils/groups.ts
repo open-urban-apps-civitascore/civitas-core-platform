@@ -4,28 +4,28 @@ export const mapGroupDetailsData = (groupResponse: Group | null): Group | null =
   groupResponse
     ? {
         ...groupResponse,
-        contact: groupResponse.contact || { id: '', displayName: '' },
+        contactUser: groupResponse.contactUser || { id: '', name: '' },
         roles: groupResponse.roles || [],
-        subgroups: groupResponse.subgroups.flatMap(subgroup => mapGroupDetailsData(subgroup) ?? []),
       }
     : null
 
-export const mapGroupToBaseFormData = (groupData: Group): GroupBaseFormData => ({
+export const mapGroupApiToFormData = (groupData: Group): GroupBaseFormData => ({
   id: groupData.id,
-  title: groupData.title,
+  name: groupData.name,
   description: groupData.description || '',
-  contact: groupData.contact?.id || '',
+  contactUser: groupData.contactUser?.id || '',
 })
 
-export const flattenGroups = (groups: Group[]): Group[] => {
-  const result: Group[] = []
+// TODO: subgroups have been excluded from v::2, so the implementation of subgroups has been commented out
+// export const flattenGroups = (groups: Group[]): Group[] => {
+//   const result: Group[] = []
 
-  const processGroup = (group: Group) => {
-    result.push({ ...group, subgroups: [] })
-    group.subgroups?.forEach(processGroup)
-  }
+//   const processGroup = (group: Group) => {
+//     result.push({ ...group, subgroups: [] })
+//     group.subgroups?.forEach(processGroup)
+//   }
 
-  groups.forEach(processGroup)
+//   groups.forEach(processGroup)
 
-  return result
-}
+//   return result
+// }

@@ -1,15 +1,10 @@
-import { Group, GroupBaseFormData } from '@/types/groups'
+import { GroupBaseFormData } from '@/types/groups'
 import { Contact } from '@/types/users'
 
-export const mapFormGroupToApiData = (formData: GroupBaseFormData, groupData: Group, contact: Contact | null) => {
-  const group: Group = {
+export const mapFormGroupToApiData = (formData: GroupBaseFormData, contact: Contact | null) => {
+  const group = {
     ...formData,
-    contact: contact ? { id: contact.id, displayName: contact.displayName } : null,
-    parent: groupData.parent,
-    roles: groupData.roles,
-    subgroups: groupData.subgroups,
-    users: groupData.users,
-    dataspace: groupData.dataspace,
+    contactUser: contact?.id,
   }
   return group
 }

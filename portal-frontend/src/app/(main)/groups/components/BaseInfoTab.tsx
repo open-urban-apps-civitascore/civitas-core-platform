@@ -18,9 +18,9 @@ import { Form } from '@/components/ui/form'
 import { useDebounce } from '@/hooks/use-debounce'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-import { Group, GroupBaseFormData, GroupBaseFormDataSchema, GroupTabProps } from '@/types/groups'
+import { Group, GroupBaseFormData, GroupBaseFormDataSchema } from '@/types/groups'
 import { Contact } from '@/types/users'
-import { mapGroupToBaseFormData } from '@/utils/groups'
+import { mapGroupApiToFormData } from '@/utils/groups'
 
 import { mapFormGroupToApiData } from '../utils/mappers'
 
@@ -36,7 +36,8 @@ const getContactListItems = (contacts: Contact[]) =>
       </div>
     ),
   }))
-interface BaseInfoTabProps extends GroupTabProps {
+interface BaseInfoTabProps {
+  groupData: Group
   isEditMode: boolean
 }
 
@@ -47,13 +48,14 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const router = useRouter()
   const createGroup = useCreateGroup()
   const updateGroup = useUpdateGroup()
+  console.log('group data', groupData)
 
-  const [defaultFormData, setDefaultFormData] = useState(mapGroupToBaseFormData(groupData))
+  const [defaultFormData, setDefaultFormData] = useState(mapGroupApiToFormData(groupData))
   const [isContactListOpen, setIsContactListOpen] = useState(false)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [contacts, setContacts] = useState<Contact[]>([])
   const [contactListItems, setContactListItems] = useState<SelectItem[]>([])
-  const [contactInput, setContactInput] = useState(groupData.contact?.displayName || '')
+  const [contactInput, setContactInput] = useState(groupData.contactUser?.name || '')
   const debouncedInput = useDebounce(contactInput, 300)
   // eslint-disable-next-line @typescript-eslint/naming-convention
   const getUsersParams = new URLSearchParams({ displayName_like: debouncedInput })
@@ -80,7 +82,8 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   })
 
   useEffect(() => {
-    form.setValue('contact', selectedContact?.id || '')
+    console.log('form values', form.getValues())
+    form.setValue('contactUser', selectedContact?.id || '')
   }, [selectedContact, form])
 
   useEffect(() => {
@@ -89,7 +92,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   useEffect(() => {
     if (debouncedInput.trim().length < MIN_LENGTH) {
-      form.setValue('contact', '')
+      form.setValue('contactUser', '')
       setSelectedContact(null)
       setContacts([])
       setContactListItems([])
@@ -98,13 +101,13 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   const handleCreateGroup = async (formData: GroupBaseFormData) => {
     // eslint-disable-next-line unused-imports/no-unused-vars
-    const { id, ...createGroupData } = mapFormGroupToApiData(formData, groupData, selectedContact)
+    const { id, ...createGroupData } = mapFormGroupToApiData(formData, selectedContact)
     createGroup.mutate(createGroupData, { onSuccess: ({ data }) => router.push(`/groups/${data.id}`) })
   }
 
   const handleUpdateGroup = async (formData: GroupBaseFormData) => {
-    const updateGroupData = mapFormGroupToApiData(formData, groupData, selectedContact)
-    updateGroup.mutate(updateGroupData, { onSuccess: ({ data }) => setDefaultFormData(mapGroupToBaseFormData(data)) })
+    const updateGroupData = mapFormGroupToApiData(formData, selectedContact)
+    updateGroup.mutate(updateGroupData, { onSuccess: ({ data }) => setDefaultFormData(mapGroupApiToFormData(data)) })
   }
 
   const handleContactInputChange = async (value: string) => {
@@ -113,7 +116,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   }
 
   const handleSelectContact = (newSelection: SelectItem) => {
-    form.setValue('contact', newSelection.value, { shouldDirty: true })
+    form.setValue('contactUser', newSelection.value, { shouldDirty: true })
     const selectedContact = contacts.find(contact => contact.id === newSelection.value)
     if (selectedContact) {
       setSelectedContact(selectedContact)
@@ -141,7 +144,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
             <h2>{t('details.baseInfo')}</h2>
           </DetailsFieldContainer>
           <DetailsFieldContainer>
-            <TextField form={form} label={t('details.name')} name="title" placeholder={t('details.name')} required />
+            <TextField form={form} label={t('details.name')} name="name" placeholder={t('details.name')} required />
           </DetailsFieldContainer>
 
           <DetailsFieldContainer>
@@ -164,7 +167,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               isOpen={isContactListOpen}
               listItems={contactListItems}
               form={form}
-              name="contact"
+              name="contactUser"
               placeholder={t('details.contact.placeholder')}
               label={t('details.contact.label')}
               inputValue={contactInput}
@@ -180,7 +183,9 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
         <ActionButtons
           onCancelClick={() => router.push('/groups')}
           confirmButtonType="submit"
-          isConfirmButtonDisabled={!form.formState.isDirty && form.getValues().contact === defaultFormData.contact}
+          isConfirmButtonDisabled={
+            !form.formState.isDirty && form.getValues().contactUser === defaultFormData.contactUser
+          }
         />
       </form>
     </Form>

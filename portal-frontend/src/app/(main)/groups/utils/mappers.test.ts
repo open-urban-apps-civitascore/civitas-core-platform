@@ -15,11 +15,11 @@ const formData: GroupBaseFormData = {
 
 const groupData: Group = {
   id: 'g1',
-  title: 'Group 01',
+  name: 'Group 01',
   description: 'Group 01 description',
   roles: ['admin'],
   users: [{ id: 'u1', assignedAt: '2024-01-01' }],
-  contact: null,
+  contactUser: null,
   parent: 'g0',
   subgroups: [],
   dataspace: { id: 'ds1', title: 'dataspace1' },
@@ -50,7 +50,7 @@ describe('mapFormGroupToApiData', () => {
 
     const result = mapFormGroupToApiData(formData, groupData, contact)
 
-    expect(result.contact).toEqual({
+    expect(result.contactUser).toEqual({
       id: 'u1',
       displayName: 'Max Mustermann',
     })
@@ -59,7 +59,7 @@ describe('mapFormGroupToApiData', () => {
 
     const result2 = mapFormGroupToApiData(formData, groupData, contact2)
 
-    expect(result2.contact).toBeNull()
+    expect(result2.contactUser).toBeNull()
   })
 
   it('sets contact when contact to null when no contact is provided', () => {
@@ -70,7 +70,7 @@ describe('mapFormGroupToApiData', () => {
 
     const result = mapFormGroupToApiData(formData, groupData, contact)
 
-    expect(result.contact).toEqual({
+    expect(result.contactUser).toEqual({
       id: 'u1',
       displayName: 'Max Mustermann',
     })

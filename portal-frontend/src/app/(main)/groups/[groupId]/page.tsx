@@ -24,7 +24,7 @@ const EditGroupPage = () => {
     return <ErrorPage testId="editGroupErrorPage" title={t('errors.loadingError', { item: t('items.groups') })} />
   }
 
-  return <GroupDetails title={groupData?.data.title || ''} groupData={groupData?.data} isEditMode />
+  return <GroupDetails title={groupData?.data.name || ''} groupData={groupData?.data} isEditMode />
 }
 
 export default EditGroupPage

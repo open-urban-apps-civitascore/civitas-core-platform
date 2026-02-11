@@ -57,10 +57,6 @@ export type ListUser = {
   active: boolean
 }
 
-export type GroupListUser = ListUser & {
-  assignedAt: string
-}
-
 export const UserFormSchema = UserSchema.omit({
   groups: true,
 }).extend({

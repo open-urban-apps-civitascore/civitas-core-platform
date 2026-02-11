@@ -7,7 +7,6 @@ import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
-import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
@@ -16,22 +15,19 @@ import { Group, UserGroupsListData } from '@/types/groups'
 import { Role } from '@/types/roles'
 
 import GroupsTable from './GroupsTable'
+import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 
 interface GroupsTabProps {
   userId: string
 }
 
-const transformGroupsToListData = (groups: Group[], roles: Role[], userId: string): UserGroupsListData[] =>
+const transformGroupsToListData = (groups: Group[], roles: Role[]) =>
   groups.map(group => ({
     id: group.id,
-    title: group.title,
+    name: group.name,
     description: group.description,
-    roles: group.roles.flatMap(groupRole => {
-      const matchingRole = roles.find(role => role.id === groupRole)
-      return matchingRole ? matchingRole.name : []
-    }),
-    memberSince: group.users.find(user => user.id === userId)?.assignedAt || '',
-    contact: group.contact,
+    roles: group.roles?.flatMap(groupRole => (roles.find(role => role.id === groupRole.id) ? groupRole : [])) || [],
+    contactUser: group.contactUser,
   }))
 
 export const GroupsTab = (props: GroupsTabProps) => {
@@ -48,8 +44,10 @@ export const GroupsTab = (props: GroupsTabProps) => {
 
   const groups = useMemo(() => {
     if (groupsData && rolesData && userId) {
-      const userGroups = groupsData?.data.filter(group => group.users.filter(user => user.id === userId).length > 0)
-      return transformGroupsToListData(userGroups, rolesData.data, userId)
+      const userGroups = groupsData?.data.filter(
+        group => group?.members && group.members.filter(user => user?.id === userId).length > 0,
+      )
+      return transformGroupsToListData(userGroups, rolesData.data)
     } else {
       return []
     }
@@ -59,8 +57,8 @@ export const GroupsTab = (props: GroupsTabProps) => {
     if (searchString) {
       return groups.filter(
         group =>
-          group.title.toLowerCase().includes(searchString.toLowerCase()) ||
-          group.contact?.displayName.toLowerCase().includes(searchString.toLowerCase()) ||
+          group.name.toLowerCase().includes(searchString.toLowerCase()) ||
+          group.contactUser?.name.toLowerCase().includes(searchString.toLowerCase()) ||
           group.description.toLowerCase().includes(searchString.toLowerCase()),
       )
     } else {
