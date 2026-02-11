@@ -135,7 +135,7 @@ integration-test-backend:
       artifacts: true
     - job: publish-config-adapter
       optional: true
-    # - job: publish-portal-model
+    - job: publish-portal-model
   services:
     - docker:27-dind
   variables:
