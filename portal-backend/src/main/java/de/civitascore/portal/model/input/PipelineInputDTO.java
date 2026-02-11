@@ -1,0 +1,28 @@
+package de.civitascore.portal.model.input;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+public class PipelineInputDTO extends BaseInputDTO {
+
+  @NotBlank(message = "Name is required") private String name;
+
+  private String description;
+
+  @NotNull(message = "DataSet ID is required") private UUID dataSetId;
+
+  private String styles;
+
+  private Long[] dataSources;
+
+  private String[] apis;
+
+  private Long[] persistences;
+
+  private String model;
+}

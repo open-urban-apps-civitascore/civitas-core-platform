@@ -11,8 +11,10 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSetSeriesRepository;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DistributionRepository;
+import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,6 +32,7 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
   private final AgentRepository agentRepository;
   private final DistributionRepository distributionRepository;
   private final CatalogRepository catalogRepository;
+  private final PipelineRepository pipelineRepository;
   private final ObjectMapper objectMapper;
 
   public DataSetService(
@@ -41,6 +44,7 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
       AgentRepository agentRepository,
       DistributionRepository distributionRepository,
       CatalogRepository catalogRepository,
+      PipelineRepository pipelineRepository,
       ObjectMapper objectMapper) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
@@ -50,6 +54,7 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
     this.agentRepository = agentRepository;
     this.distributionRepository = distributionRepository;
     this.catalogRepository = catalogRepository;
+    this.pipelineRepository = pipelineRepository;
     this.objectMapper = objectMapper;
   }
 
@@ -113,6 +118,12 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
         .map(catalogRepository::findAllById)
         .map(HashSet::new)
         .ifPresent(entity::setCatalogs);
+
+    // Set pipelines
+    Optional.ofNullable(input.getPipelineIds())
+        .map(pipelineRepository::findAllById)
+        .map(ArrayList::new)
+        .ifPresent(entity::setPipelines);
 
     return super.postConvertToEntity(entity, input);
   }

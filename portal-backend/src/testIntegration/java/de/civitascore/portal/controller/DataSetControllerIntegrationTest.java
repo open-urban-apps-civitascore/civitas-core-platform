@@ -2,6 +2,7 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
@@ -42,6 +43,7 @@ class DataSetControllerIntegrationTest
     input.setName("test_dataset_" + System.currentTimeMillis());
     input.setDescription("A test dataset for integration testing");
     input.setFormat("JSON");
+    input.setOpenDataAccess(false);
     input.setExternalId("ext-" + System.currentTimeMillis());
     return input;
   }
@@ -50,6 +52,7 @@ class DataSetControllerIntegrationTest
   protected DataSetInputDTO createInvalidInput() {
     DataSetInputDTO input = new DataSetInputDTO();
     input.setDescription("Invalid dataset without required fields");
+    input.setOpenDataAccess(false);
     return input;
   }
 
@@ -60,6 +63,7 @@ class DataSetControllerIntegrationTest
     input.setName("Updated DataSet");
     input.setDescription("Updated description");
     input.setFormat("CSV");
+    input.setOpenDataAccess(false);
     return input;
   }
 
@@ -98,6 +102,9 @@ class DataSetControllerIntegrationTest
       DataSetOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
       assertThat(output.getName()).as("Name should match input").isEqualTo(input.getName());
+      assertThat(output.getDataSetStatus())
+          .as("Status should match input")
+          .isEqualTo(DataSetStatus.DRAFT);
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo(input.getDescription());

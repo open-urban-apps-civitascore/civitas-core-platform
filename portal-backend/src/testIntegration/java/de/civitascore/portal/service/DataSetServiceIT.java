@@ -1,0 +1,217 @@
+package de.civitascore.portal.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.RoleType;
+import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.Catalog;
+import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.CatalogRepository;
+import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DistributionRepository;
+import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.repository.RoleRepository;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
+
+@DisplayName("DataSet Service Integration Tests")
+class DataSetServiceIT extends BaseKeycloakIntegrationTest {
+
+  @Autowired private DataSetService dataSetService;
+
+  @Autowired private DataSetRepository dataSetRepository;
+  @Autowired private PipelineRepository pipelineRepository;
+  @Autowired private DistributionRepository distributionRepository;
+  @Autowired private CatalogRepository catalogRepository;
+  @Autowired private AssignmentRepository assignmentRepository;
+  @Autowired private GroupRepository groupRepository;
+  @Autowired private RoleRepository roleRepository;
+
+  @AfterEach
+  void cleanup() {
+    assignmentRepository.deleteAll();
+    pipelineRepository.deleteAll();
+    distributionRepository.deleteAll();
+    catalogRepository.deleteAll();
+    dataSetRepository.deleteAll();
+    roleRepository.deleteAll();
+    groupRepository.deleteAll();
+  }
+
+  @Test
+  @Transactional
+  @DisplayName("Should retrieve dataset with all relationships")
+  void getDataSetWithRelationships() {
+    DataSet dataSet = createInitialDataSet();
+    UUID dataSetId = dataSet.getId();
+
+    Pipeline pipeline1 = createPipelineForDataSet(dataSet, "Pipeline 1");
+    Pipeline pipeline2 = createPipelineForDataSet(dataSet, "Pipeline 2");
+    dataSet.getPipelines().addAll(Set.of(pipeline1, pipeline2));
+
+    Distribution distribution1 = createDistributionForDataSet(dataSet, "/api/v1/traffic");
+    Distribution distribution2 = createDistributionForDataSet(dataSet, "/api/v1/weather");
+    dataSet.getDistributions().addAll(Set.of(distribution1, distribution2));
+
+    Catalog catalog1 = createInitialCatalog("Catalog 1");
+    Catalog catalog2 = createInitialCatalog("Catalog 2");
+    catalog1.getDataSets().add(dataSet);
+    catalog2.getDataSets().add(dataSet);
+    catalogRepository.save(catalog1);
+    catalogRepository.save(catalog2);
+    dataSet.getCatalogs().addAll(Set.of(catalog1, catalog2));
+
+    Assignment assignment1 = createAssignmentForDataSet(dataSet, "Test Assignment 1");
+    Assignment assignment2 = createAssignmentForDataSet(dataSet, "Test Assignment 2");
+    dataSet.getAssignments().addAll(Set.of(assignment1, assignment2));
+
+    dataSet = dataSetRepository.save(dataSet);
+
+    Optional<DataSet> retrievedDataSetOpt = dataSetService.findById(dataSet.getId());
+
+    assertThat(retrievedDataSetOpt).isPresent();
+    DataSet retrievedDataSet = retrievedDataSetOpt.get();
+
+    assertThat(retrievedDataSet.getId()).isEqualTo(dataSet.getId());
+    assertThat(retrievedDataSet.getName()).isEqualTo(dataSet.getName());
+    assertThat(retrievedDataSet.getTitle()).isEqualTo(dataSet.getTitle());
+    assertThat(retrievedDataSet.getDescription()).isEqualTo(dataSet.getDescription());
+    assertThat(retrievedDataSet.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
+    assertThat(retrievedDataSet.getPersistenceId()).isEqualTo(12345L);
+
+    assertThat(retrievedDataSet.getPipelines())
+        .isNotNull()
+        .hasSize(2)
+        .extracting(Pipeline::getName)
+        .containsExactlyInAnyOrder(pipeline1.getName(), pipeline2.getName());
+
+    retrievedDataSet
+        .getPipelines()
+        .forEach(
+            pipeline -> {
+              assertThat(pipeline.getDataSet()).isNotNull();
+              assertThat(pipeline.getDataSet().getId()).isEqualTo(dataSetId);
+            });
+
+    assertThat(retrievedDataSet.getDistributions())
+        .isNotNull()
+        .hasSize(2)
+        .extracting(Distribution::getAccessUrl)
+        .containsExactlyInAnyOrder(distribution1.getAccessUrl(), distribution2.getAccessUrl());
+
+    retrievedDataSet
+        .getDistributions()
+        .forEach(
+            distribution -> {
+              assertThat(distribution.getDataSet()).isNotNull();
+              assertThat(distribution.getDataSet().getId()).isEqualTo(dataSetId);
+            });
+
+    assertThat(retrievedDataSet.getCatalogs())
+        .isNotNull()
+        .hasSize(2)
+        .extracting(Catalog::getName)
+        .containsExactlyInAnyOrder(catalog1.getName(), catalog2.getName());
+
+    assertThat(retrievedDataSet.getAssignments())
+        .isNotNull()
+        .hasSize(2)
+        .extracting(assignment -> assignment.getRole().getName())
+        .containsExactlyInAnyOrder(
+            assignment1.getRole().getName(), assignment2.getRole().getName());
+
+    retrievedDataSet
+        .getAssignments()
+        .forEach(
+            assignment -> {
+              assertThat(assignment.getDataset()).isNotNull();
+              assertThat(assignment.getDataset().getId()).isEqualTo(dataSetId);
+            });
+  }
+
+  /**************
+   * Helper methods to create test data with relationships
+   *************/
+
+  private DataSet createInitialDataSet() {
+    DataSet dataSet = new DataSet();
+    dataSet.setName("test_dataset_" + System.currentTimeMillis());
+    dataSet.setTitle("Test Dataset");
+    dataSet.setDescription("Test dataset for relationship testing");
+    dataSet.setPersistenceId(12345L);
+    dataSet.setIdentifier("test-identifier-001");
+    dataSet.setVersion("1.0.0");
+    dataSet.setExternalId("ext-dataset-" + System.currentTimeMillis());
+    dataSet.setFormat("JSON");
+    return dataSetRepository.save(dataSet);
+  }
+
+  private Pipeline createPipelineForDataSet(DataSet dataSet, String name) {
+    Pipeline pipeline = new Pipeline();
+    pipeline.setName(name + "_" + System.currentTimeMillis());
+    pipeline.setDescription("Test pipeline for " + name);
+    pipeline.setDataSet(dataSet);
+    pipeline.setStyles(
+        "{\"nodes\":[{\"id\":\"1\",\"type\":\"input\"}],\"edges\":[],\"viewport\":{\"x\":0,\"y\":0,\"zoom\":1}}");
+    pipeline.setDataSources(Arrays.asList(100L, 200L, 300L));
+    pipeline.setApis(Arrays.asList("/api/v1/traffic", "/api/v1/weather"));
+    pipeline.setPersistences(Collections.singletonList(12345L));
+    pipeline.setModel(
+        "{\"input\":{\"type\":\"kafka\"},\"pipeline\":[{\"processor\":\"transform\"}],\"output\":{\"type\":\"frost\"}}");
+    return pipelineRepository.save(pipeline);
+  }
+
+  private Distribution createDistributionForDataSet(DataSet dataSet, String apiPath) {
+    Distribution distribution = new Distribution();
+    distribution.setAccessUrl("http://localhost:8080" + apiPath);
+    distribution.setApiType("SensorThings");
+    distribution.setFormat("application/json");
+    distribution.setAutoGenerated(true);
+    distribution.setDataSet(dataSet);
+    return distributionRepository.save(distribution);
+  }
+
+  private Catalog createInitialCatalog(String name) {
+    Catalog catalog = new Catalog();
+    catalog.setName(name + "_" + System.currentTimeMillis());
+    catalog.setDescription("Test catalog for " + name);
+    return catalogRepository.save(catalog);
+  }
+
+  private Assignment createAssignmentForDataSet(DataSet dataSet, String roleName) {
+    Group group = new Group();
+    group.setName("Test Group " + roleName + "_" + System.currentTimeMillis());
+    group.setDescription("Test group for " + roleName);
+    group = groupRepository.save(group);
+
+    Role role = new Role();
+    role.setName(roleName.toLowerCase().replace(" ", "_") + "_" + System.currentTimeMillis());
+    role.setDescription("Test role for " + roleName);
+    role.setRoleType(RoleType.DATA);
+    role = roleRepository.save(role);
+
+    Assignment assignment = new Assignment();
+    assignment.setGroup(group);
+    assignment.setRole(role);
+    assignment.setScopeType(ScopeType.DATASET);
+    assignment.setDataset(dataSet);
+    return assignmentRepository.save(assignment);
+  }
+}
