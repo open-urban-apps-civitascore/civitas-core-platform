@@ -7,6 +7,7 @@ export const useUpdateMutation = <TResponse, TData extends WithId<string | numbe
   method,
   key: mutationKey,
   errorMessage,
+  headers,
 }: UpdateMutationInput) => {
   const queryClient = useQueryClient()
 
@@ -15,6 +16,7 @@ export const useUpdateMutation = <TResponse, TData extends WithId<string | numbe
       apiRequest<TResponse>({
         method: method,
         endpoint: `/${mutationKey}/${data.id}`,
+        headers,
         data: data,
         errorMessage: errorMessage,
       }),
