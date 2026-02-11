@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { usePatchDatasource, useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
+import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -24,13 +24,13 @@ import {
   DatasourceStatusType,
 } from '@/types/datasources'
 import { getConnectorFormData } from '@/utils/connectors'
+import { pickDirtyValues } from '@/utils/form'
 
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
 import { ExitWarningModal } from './ExitWarningModal'
 import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'
 import { StatusDropdown } from './StatusDropdown'
-import { pickDirtyValues } from '@/utils/form'
 
 interface DatasourceOverviewProps {
   datasource: Datasource
