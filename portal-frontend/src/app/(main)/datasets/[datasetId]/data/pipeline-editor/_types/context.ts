@@ -100,8 +100,10 @@ export interface ActivePipelineContextValue {
   hideValidationPanel: () => void
 
   // ===== Pipeline Operations =====
-  /** Save pipeline (logs to console, marks clean) */
+  /** Save pipeline to backend API */
   savePipeline: () => void
+  /** Whether a save operation is currently in progress */
+  isSaving: boolean
 
   // ===== Session Info =====
   /** ID of the active session */

@@ -13,6 +13,7 @@ A visual pipeline editor for defining data processing pipelines in CIVITAS/CORE,
 - [Extending the Editor](#extending-the-editor)
 - [Validation](#validation)
 - [Backend Integration](#backend-integration)
+- [Pipeline Types](#pipeline-types)
 
 ---
 
@@ -103,7 +104,9 @@ pipeline-editor/
 │   ├── pipelineService.ts              # Pipeline state operations
 │   ├── sessionService.ts               # Session management
 │   ├── validationService.ts            # Pipeline validation
-│   └── entityService.ts                # Entity data fetching
+│   ├── entityService.ts                # Entity data fetching
+│   ├── modelBuilderService.ts          # RedPandaConnect model generation
+│   └── payloadBuilderService.ts        # Backend payload assembly
 ├── _types/
 │   ├── pipeline.ts                     # Core types
 │   ├── nodes.ts                        # Node data types
@@ -237,8 +240,9 @@ const {
   validationResult,
   canSave,
 
-  // Session
-  savePipeline,
+  // Save
+  savePipeline, // POST to backend API
+  isSaving, // True during save request
 } = useActivePipeline()
 ```
 
@@ -259,12 +263,14 @@ const { sessions, activeSessionId, createSession, closeSession, switchToSession,
 
 ### Services
 
-| Service             | Purpose                                  |
-| ------------------- | ---------------------------------------- |
-| `pipelineService`   | Pipeline reducer, node/edge operations   |
-| `sessionService`    | Session reducer, multi-tab management    |
-| `validationService` | Pipeline validation rules                |
-| `entityService`     | Entity data fetching (datasources, APIs) |
+| Service                 | Purpose                                      |
+| ----------------------- | -------------------------------------------- |
+| `pipelineService`       | Pipeline reducer, node/edge operations       |
+| `sessionService`        | Session reducer, multi-tab management        |
+| `validationService`     | Pipeline validation rules                    |
+| `entityService`         | Entity data fetching (datasources, APIs)     |
+| `modelBuilderService`   | RedPandaConnect config generation from graph |
+| `payloadBuilderService` | Assembles full backend payload from pipeline |
 
 ---
 
@@ -537,37 +543,113 @@ for (const node of newNodes) {
 
 ## Backend Integration
 
-### Save Payload
+### API Endpoint
 
-When saving a pipeline, the following payload is sent to the backend:
+Pipelines are saved via `POST /pipeline` on the real backend. The request is routed through the Next.js API proxy using the `x-api-request: true` header (same pattern as other backend APIs like users).
 
 ```typescript
-interface PipelinePayload {
-  name: string // Pipeline name
-  description: string // Pipeline description
-  styles: object // React Flow viewport and node positions
-  dataSources: number[] // IDs from DataSource nodes
-  apis: number[] // IDs from ApiRequest/ApiResponse nodes
-  persistences: number[] // IDs from FROST nodes
-  model: string // Pipeline in RedPandaConnect format
+// src/app/services/api/pipelines/clientRequests.ts
+export const useCreatePipeline = () => {
+  return useCreateMutation<unknown, PipelinePayload>({
+    key: 'pipeline',
+    errorMessage: 'An error occurred while saving the pipeline.',
+    headers: { 'x-api-request': 'true' },
+  })
 }
 ```
 
-### Entity ID Extraction
+### Save Payload
 
-Entity IDs are extracted from configured nodes:
+When saving a pipeline, the `payloadBuilderService` assembles the following payload:
 
 ```typescript
-// DataSource nodes → dataSources array
-// ApiRequest/ApiResponse nodes → apis array
-// FROST nodes → persistences array
+interface PipelinePayload {
+  name: string // Pipeline name from session
+  description: string // Always "-" for now
+  styles: PipelineStylesPayload // Viewport + node positions (for reload)
+  dataSources: number[] // Entity IDs from DataSource nodes
+  apis: string[] // API paths from ApiRequest/ApiResponse nodes
+  persistences: string[] // Hardcoded ["frost"] if FROST node exists
+  model: string // RedPandaConnect config as JSON string (empty for provide pipelines)
+}
+
+interface PipelineStylesPayload {
+  viewport?: Viewport // React Flow viewport (zoom, pan)
+  nodePositions: Record<string, { x: number; y: number }> // Node ID → position
+}
 ```
 
-### API Endpoint
+### Payload Assembly (`payloadBuilderService`)
 
-```
-POST /backend/pipeline
-```
+The `buildPipelinePayload()` function extracts data from the pipeline graph:
+
+1. **Styles** – Captures viewport and all node positions for frontend reload
+2. **DataSources** – Numeric entity IDs from configured DataSource nodes
+3. **APIs** – Unique `apiPath` strings from ApiRequest/ApiResponse nodes
+4. **Persistences** – Hardcoded `["frost"]` when any FROST node is present
+5. **Model** – RedPandaConnect config JSON string from `modelBuilderService`, or empty string for provide pipelines
+
+### Model Generation (`modelBuilderService`)
+
+The `buildRedPandaConnectModel()` function transforms the visual graph into a RedPandaConnect configuration. It is a pure-function service with no hooks or side effects.
+
+**Process:**
+
+1. Traverse graph from Start → End following edges to get ordered nodes
+2. Detect pipeline type (`feedin` or `provide`) based on node composition
+3. If `provide` → return `null` (no model needed)
+4. If `feedin` → build input, processors, and output sections
+
+**Node Handler Registry:**
+
+Each node type that contributes to the model registers a handler:
+
+| Node Type    | Section     | Output                                           |
+| ------------ | ----------- | ------------------------------------------------ |
+| `dataSource` | `input`     | Connector config with `label: "datasource_<id>"` |
+| `mapping`    | `processor` | `{ bloblang: "<user's mapping code>" }`          |
+| `frost`      | `output`    | Static FROST switch + branch template            |
+
+The DataSource input uses the connector type from entity metadata (mqtt, sql, csv, etc.). The backend resolves actual connection credentials from the label.
+
+The FROST section is a fixed template that generates thing/observation upsert logic with `${FROST_BASE}` env variable placeholder (backend resolves at deploy time).
+
+### Save Flow
+
+1. User clicks "Save" in toolbar (enabled only after validation passes)
+2. `savePipeline()` in `PipelineEditorProvider` calls `buildPipelinePayload()`
+3. `useCreatePipeline().mutate()` sends `POST /api/pipeline` with `x-api-request: true`
+4. Proxy routes to real backend at `API_URL/pipeline`
+5. On success: session is marked as clean (no more unsaved changes)
+6. On error: error is logged to console
+
+### Save Button States
+
+- `isSaving` is exposed via `useActivePipeline()` context
+- Save button shows a loading spinner and "Saving..." text while request is in flight
+- Both Validate and Save buttons are disabled during save
+
+---
+
+## Pipeline Types
+
+Pipeline type is detected automatically by `modelBuilderService` based on node composition.
+
+### Feed-in Pipeline
+
+**Flow:** `Start → DataSource → Mapping → FROST → End`
+
+Ingests data from an external source, transforms it, and writes to a FROST server. Generates a full RedPandaConnect config with:
+
+- `input` – DataSource connector config (type from entity metadata, label with datasource ID)
+- `pipeline.processors[]` – User's Bloblang mapping + FROST switch/branch logic
+- `output` – FROST HTTP client (POST on match, drop on no match)
+
+### Provide Pipeline
+
+**Flow:** `Start → API Request → Data from FROST → API Response → End`
+
+Exposes data from a FROST server via a REST API. Does **not** generate a RedPandaConnect config (`model: ""`). The backend uses the `apis` array to configure APISIX routes and the `persistences` array to know which FROST server to read from.
 
 ---
 

@@ -13,7 +13,10 @@ import type { Connection } from '@xyflow/react'
 import { useParams } from 'next/navigation'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 
+import { useCreatePipeline } from '@/app/services/api/pipelines/clientRequests'
+
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
+import { buildPipelinePayload } from '../../_services/payloadBuilderService'
 import {
   createEmptyPipeline,
   getPipelineStats,
@@ -272,15 +275,25 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   }, [])
 
   // ===== Pipeline Operations =====
+  const createPipeline = useCreatePipeline()
+
   const savePipeline = useCallback(() => {
-    if (!activeSession) return
+    if (!activeSession || !pipeline) return
 
-    // Log the pipeline to console
-    console.log('Saving pipeline:', pipeline)
+    const payload = buildPipelinePayload(pipeline)
 
-    // Mark session as clean
-    sessionManager.markSessionClean(activeSession.id)
-  }, [activeSession, pipeline, sessionManager])
+    createPipeline.mutate(payload, {
+      onSuccess: () => {
+        sessionManager.markSessionClean(activeSession.id)
+        console.log('Pipeline saved successfully')
+      },
+      onError: error => {
+        console.error('Failed to save pipeline:', error)
+      },
+    })
+  }, [activeSession, pipeline, sessionManager, createPipeline])
+
+  const isSaving = createPipeline.isPending
 
   // ===== Context Value =====
   const contextValue: ActivePipelineContextValue = useMemo(
@@ -327,6 +340,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
       // Pipeline operations
       savePipeline,
+      isSaving,
 
       // Session info
       activeSessionId: activeSession?.id || null,
@@ -359,6 +373,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       shouldShowValidationPanel,
       hideValidationPanel,
       savePipeline,
+      isSaving,
     ],
   )
 

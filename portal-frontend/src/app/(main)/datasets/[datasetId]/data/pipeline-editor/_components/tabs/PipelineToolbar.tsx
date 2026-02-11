@@ -9,7 +9,7 @@
  *
  */
 
-import { CheckCircle2, Save } from 'lucide-react'
+import { CheckCircle2, Loader2, Save } from 'lucide-react'
 import { useCallback } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -35,7 +35,8 @@ interface PipelineToolbarProps {
  *
  */
 export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = '' }) => {
-  const { pipeline, runValidation, savePipeline, isDirty, canSave, isValidationRequired } = useActivePipeline()
+  const { pipeline, runValidation, savePipeline, isDirty, canSave, isValidationRequired, isSaving } =
+    useActivePipeline()
 
   /**
    * Handle validate button click.
@@ -85,14 +86,14 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
 
       {/* Right side - Actions */}
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={handleValidate} disabled={!pipeline}>
+        <Button variant="outline" size="sm" onClick={handleValidate} disabled={!pipeline || isSaving}>
           <CheckCircle2 className="mr-1 h-4 w-4" />
           Validate
         </Button>
 
-        <Button variant="default" size="sm" onClick={handleSave} disabled={!canSave}>
-          <Save className="mr-1 h-4 w-4" />
-          Save
+        <Button variant="default" size="sm" onClick={handleSave} disabled={!canSave || isSaving}>
+          {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+          {isSaving ? 'Saving...' : 'Save'}
         </Button>
       </div>
     </div>
