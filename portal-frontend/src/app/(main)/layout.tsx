@@ -22,7 +22,14 @@ const MainLayout = async (props: MainLayoutProps) => {
         <div className="h-[calc(100%-var(--header-height))] [--title-height:calc(--spacing(30))] [--page-padding:calc(--spacing(4))]">
           {children}
         </div>
-        <Toaster />
+        <Toaster
+          toastOptions={{
+            style: {
+              background: 'var(--popover-dark)',
+              color: 'var(--popover-foreground-dark)',
+            },
+          }}
+        />
       </SidebarInset>
     </SidebarProvider>
   )
