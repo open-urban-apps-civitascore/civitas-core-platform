@@ -184,7 +184,7 @@ echo "======================================================"
 echo
 echo "How would you like to start the Config Adapter?"
 echo
-echo "  1) Command line (build & run)"
+echo "  1) Automatic (command line: build & run)"
 echo "  2) Manual / IDE (for debugging)"
 echo
 read -p "Select option [1/2]: " config_adapter_option
@@ -196,7 +196,7 @@ echo "======================================================"
 echo
 echo "How would you like to start the Portal Backend?"
 echo
-echo "  1) Command line (build & run)"
+echo "  1) Automatic (command line: build & run)"
 echo "  2) Manual / IDE (for debugging)"
 echo
 read -p "Select option [1/2]: " backend_option
