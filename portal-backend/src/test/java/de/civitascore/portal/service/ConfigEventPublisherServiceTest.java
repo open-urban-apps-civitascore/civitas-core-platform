@@ -6,6 +6,7 @@ import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.idm.UserConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +21,7 @@ class ConfigEventPublisherServiceTest {
   @BeforeEach
   void setUp() {
     objectMapper = new ObjectMapper();
+    objectMapper.registerModule(new JavaTimeModule());
     // Initialize without Kafka producer (will only log events)
     configEventPublisher = new ConfigEventPublisherService(null, objectMapper);
   }
