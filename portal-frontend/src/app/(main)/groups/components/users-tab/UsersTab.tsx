@@ -45,7 +45,7 @@ export const UsersTab = (props: UsersTabProps) => {
   const getUserRequestParams = () => {
     const params = new URLSearchParams(getApiRequestParamsByUrl())
     originalUsers?.forEach(user => {
-      params.append('id', String(user))
+      params.append('id', user.id)
     })
     return params
   }

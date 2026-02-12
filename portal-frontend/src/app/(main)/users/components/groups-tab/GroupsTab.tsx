@@ -7,15 +7,15 @@ import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
+import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Group, UserGroupsListData } from '@/types/groups'
+import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
 
 import GroupsTable from './GroupsTable'
-import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 
 interface GroupsTabProps {
   userId: string
