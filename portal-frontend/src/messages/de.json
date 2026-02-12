@@ -17,7 +17,9 @@
       "editBase": "Basis bearbeiten",
       "open": "öffnen",
       "saveAndContinue": "Erstellen und weiter",
-      "exit": "Beenden"
+      "exit": "Beenden",
+      "assignItem": "{item} hinzufügen",
+      "assignTo": "zu {item}"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",

@@ -28,4 +28,5 @@ export const mapUserToFormData = (userResponse: User | null): UserFormData => ({
   phone: userResponse?.phone || '',
   title: userResponse?.title || 'MR',
   active: userResponse?.active || true,
+  groups: userResponse?.groups || null,
 })

@@ -30,12 +30,12 @@ export type UserSelection = { selectAll: boolean; selectedIds: string[]; exclude
 interface GroupAssignmentModalProps extends DialogProps {
   originalGroups: string[]
   userName: string
-  onUpdateGroups: (groupSelection: RowSelectionState) => void
+  onAssignGroups: (groupSelection: RowSelectionState) => void
   isUpdating?: boolean
 }
 
 export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
-  const { originalGroups, userName, open, onOpenChange = () => {}, onUpdateGroups, isUpdating = false } = props
+  const { originalGroups, userName, open, onOpenChange = () => {}, onAssignGroups, isUpdating = false } = props
   const tCommon = useTranslations('common')
   const t = useTranslations('users')
   const [pageIndex, setPageIndex] = useState(0)
@@ -46,8 +46,6 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
   const selectAllCheckbox = useRef<HTMLButtonElement>(null)
   const { getApiRequestParams } = useQueryParams()
 
-  // this implementation has to be adjusted when the backend is implemented
-  // only unassigned users have to be returned from the backend directly
   const { data: groupsData, isFetching: isFetchingGroups } = useGetGroups({
     params: getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString }),
   })
@@ -165,10 +163,8 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="block sm:max-w-[95%] sm:w-[95%] md:max-w-[1061px] h-[80%] max-h-[743px]  [--title-height:64px] [--button-height:60px]">
         <DialogHeader>
-          <DialogTitle>{t('users.assign')}</DialogTitle>
-          <DialogDescription>
-            {t('users.toGroup')} {userName}
-          </DialogDescription>
+          <DialogTitle>{tCommon('actions.assignItem', { item: tCommon('items.group') })}</DialogTitle>
+          <DialogDescription>{tCommon('actions.assignTo', { item: userName })}</DialogDescription>
         </DialogHeader>
         <SearchHeader
           searchString={searchString}
@@ -190,7 +186,10 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
         </div>
         <ActionButtons
           confirmButtonType="button"
-          onConfirmClick={() => onUpdateGroups(selection)}
+          onConfirmClick={() => {
+            onAssignGroups(selection)
+            onOpenChange(false)
+          }}
           onCancelClick={() => onOpenChange(false)}
           isConfirmButtonDisabled={isUpdating || isFetchingGroups}
           hasCard={false}

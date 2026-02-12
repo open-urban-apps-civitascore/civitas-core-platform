@@ -1,6 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { RowSelectionState } from '@tanstack/react-table'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -16,6 +17,7 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { User, UserFormData, UserFormSchema } from '@/types/users'
+import { pickDirtyValues } from '@/utils/form'
 import { mapUserToFormData } from '@/utils/users'
 
 import { UserBasicInfoTab } from './basic-info-tab/UserBasicInfoTab'
@@ -78,20 +80,28 @@ export const UserOverview = (props: UserOverviewProps) => {
   })
 
   const watch = form.watch()
+  const groupWatch = form.watch('groups')
 
   const isFormDirty = useMemo(() => {
+    console.log(watch)
     const dirtyFields = form.formState.dirtyFields
     const isPhoneFieldDirty =
       dirtyFields.phone && form.getValues('phone')?.replace(/\s+/g, '') !== defaultUserData?.phone?.replace(/\s+/g, '')
     const isNonPhoneFieldDirty = Object.keys(dirtyFields).find(field => field !== 'phone')
     return isNonPhoneFieldDirty || isPhoneFieldDirty
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watch, form, defaultUserData?.phone])
 
   useEffect(() => {
     form.reset(mapUserToFormData(defaultUserData))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultUserData])
+
+  const handleAssignGroups = (groupSelection: RowSelectionState) => {
+    console.log('handleAssignGroups')
+    const selectedgroupIds = Object.keys(groupSelection).filter(key => groupSelection[key])
+    const updateGroupData = selectedgroupIds.concat(groupWatch || [])
+    form.setValue('groups', updateGroupData)
+  }
 
   const handleExit = () => {
     form.reset()
@@ -123,16 +133,24 @@ export const UserOverview = (props: UserOverviewProps) => {
 
   const handleUpdateUser = async (formData: UserFormData) => {
     const parsed = UserFormSchema.parse(formData)
-    const updateData = { ...parsed, phone: !parsed.phone && defaultUserData.phone ? null : parsed.phone }
-    updateUser.mutate(updateData, {
-      onSuccess: ({ data }) => {
-        setDefaultUserData(data)
-        if (isExitModalOpen) setIsExitModalOpen(false)
-        router.refresh()
-        toast.success(t('messages.updateSuccess'))
+    const dirtyFields = form.formState.dirtyFields
+    const fieldsToUpdate = pickDirtyValues(parsed, dirtyFields)
+    const updateData = {
+      ...fieldsToUpdate,
+      phone: !parsed.phone && dirtyFields.phone ? null : fieldsToUpdate.phone,
+    }
+    updateUser.mutate(
+      { ...updateData, id: parsed.id },
+      {
+        onSuccess: ({ data }) => {
+          setDefaultUserData(data)
+          if (isExitModalOpen) setIsExitModalOpen(false)
+          router.refresh()
+          toast.success(t('messages.updateSuccess'))
+        },
+        onError,
       },
-      onError,
-    })
+    )
   }
 
   const handleSave = isCreateMode ? form.handleSubmit(handleCreateUser) : form.handleSubmit(handleUpdateUser)
@@ -140,9 +158,9 @@ export const UserOverview = (props: UserOverviewProps) => {
   const renderTabContent = () => {
     switch (subTabValue) {
       case tabValues.groups.value:
-        return <GroupsTab user={userData} />
+        return <GroupsTab user={watch} onAssignGroups={handleAssignGroups} />
       case tabValues.roles.value:
-        return <RolesTab groupIds={userData.groups} />
+        return <RolesTab groupIds={userData.groups || []} />
       case tabValues.userData.value:
       default:
         return <UserBasicInfoTab userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />

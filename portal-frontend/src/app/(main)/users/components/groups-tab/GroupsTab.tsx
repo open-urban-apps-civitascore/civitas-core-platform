@@ -1,4 +1,4 @@
-import { PaginationState, SortingState } from '@tanstack/react-table'
+import { PaginationState, RowSelectionState, SortingState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 
@@ -11,20 +11,21 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { User } from '@/types/users'
+import { UserFormData } from '@/types/users'
 import { mapGroupsApiToListData } from '@/utils/groups'
 
 import { GroupAssignmentModal } from './GroupAssignmentModal'
 import GroupsTable from './GroupsTable'
 
 interface GroupsTabProps {
-  user: User
+  user: UserFormData
+  onAssignGroups: (groupSelection: RowSelectionState) => void
 }
 
 export const GroupsTab = (props: GroupsTabProps) => {
-  const { user } = props
-  const userId = user.id
-  const groupIds = user.groups
+  const { user, onAssignGroups } = props
+  console.log('USER', user)
+  const originalGroupIds = user.groups || []
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
   const [searchString, setSearchString] = useState('')
@@ -35,7 +36,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
 
   const getGroupsRequestParams = () => {
     const params = new URLSearchParams()
-    groupIds.forEach(group => {
+    originalGroupIds.forEach(group => {
       params.append('id', group)
     })
     return params
@@ -45,18 +46,16 @@ export const GroupsTab = (props: GroupsTabProps) => {
     data: groupsData,
     isFetching: isLoadingGroups,
     error: groupsError,
-  } = useGetGroups({ isEnabled: groupIds.length > 0, params: getGroupsRequestParams() })
+  } = useGetGroups({ isEnabled: originalGroupIds?.length > 0, params: getGroupsRequestParams() })
 
   const groups = useMemo(() => {
-    if (groupsData && userId) {
-      const userGroups = groupsData?.data.filter(
-        group => group?.members && group.members.filter(user => user?.id === userId).length > 0,
-      )
+    if (groupsData && user.id) {
+      const userGroups = groupsData?.data.filter(group => user.groups?.includes(group.id))
       return mapGroupsApiToListData(userGroups)
     } else {
       return []
     }
-  }, [groupsData, userId])
+  }, [groupsData, user])
 
   const filteredGroups = useMemo(() => {
     if (searchString) {
@@ -83,8 +82,6 @@ export const GroupsTab = (props: GroupsTabProps) => {
   }
 
   const handleDelete = (id: string) => {}
-
-  const handleUpdateGroups = () => {}
 
   const CustomElement = <Button onClick={() => setIsGroupAssignmentModalOpen(true)}>{t('groupsTab.addGroup')}</Button>
   return (
@@ -113,8 +110,9 @@ export const GroupsTab = (props: GroupsTabProps) => {
         <GroupAssignmentModal
           open={isGroupAssignmentModalOpen}
           userName={`${user.firstName} ${user.lastName}`}
-          originalGroups={groupIds}
-          onUpdateGroups={handleUpdateGroups}
+          originalGroups={originalGroupIds}
+          onAssignGroups={onAssignGroups}
+          onOpenChange={setIsGroupAssignmentModalOpen}
         />
         {isLoading && <LoadingSpinner className="h-full" />}
         {error && <p className="h-full flex items-center justify-center">{tCommon('errors.loadingError')}</p>}

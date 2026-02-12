@@ -45,7 +45,7 @@ export const UserSchema = z.object({
   }),
   phone: PhoneSchema.nullable(),
   active: z.boolean(),
-  groups: z.array(z.string()),
+  groups: z.array(z.string()).nullable(),
 })
 
 export type User = z.infer<typeof UserSchema>
@@ -57,9 +57,7 @@ export type ListUser = {
   active: boolean
 }
 
-export const UserFormSchema = UserSchema.omit({
-  groups: true,
-}).extend({
+export const UserFormSchema = UserSchema.extend({
   phone: PhoneSchema.optional(),
 })
 
