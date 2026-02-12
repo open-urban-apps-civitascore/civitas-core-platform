@@ -14,6 +14,7 @@
         - portal-model/**/* # Backend depends on portal-model, so run when model changes too
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
+        - .gitlab/ci/portal-model.yml # Also run when portal-model changes since backend depends on it
 
 # Generate maven dependency graph JSON for license scanning
 # This must always run (needs: []) to ensure dependency scanning has the graph
