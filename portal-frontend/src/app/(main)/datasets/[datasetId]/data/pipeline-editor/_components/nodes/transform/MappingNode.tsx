@@ -11,6 +11,7 @@
 
 import type { NodeProps } from '@xyflow/react'
 import { Workflow } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 import type { MappingNodeData } from '../../../_types/nodes'
 import { isMappingNodeData } from '../../../_types/nodes'
@@ -26,6 +27,8 @@ import { BasePipelineNode } from '../base/BasePipelineNode'
  *
  */
 export const MappingNode: React.FC<NodeProps> = ({ data, selected: isSelected = false }) => {
+  const t = useTranslations('pipelineEditor')
+
   // Type guard to ensure we have the correct data shape
   const nodeData = data as MappingNodeData
 
@@ -33,9 +36,8 @@ export const MappingNode: React.FC<NodeProps> = ({ data, selected: isSelected = 
   const isConfigured = isMappingNodeData(nodeData) && nodeData.mappingCode !== ''
 
   // Show line count as sublabel when configured
-  const sublabel = isConfigured
-    ? `${nodeData.mappingCode.split('\n').length} line${nodeData.mappingCode.split('\n').length !== 1 ? 's' : ''}`
-    : undefined
+  const lineCount = nodeData.mappingCode.split('\n').length
+  const sublabel = isConfigured ? t('lines', { count: lineCount }) : undefined
 
   return (
     <BasePipelineNode

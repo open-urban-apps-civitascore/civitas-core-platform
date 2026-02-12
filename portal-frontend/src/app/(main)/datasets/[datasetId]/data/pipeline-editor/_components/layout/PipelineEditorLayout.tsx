@@ -16,6 +16,7 @@
  *
  */
 
+import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -52,10 +53,12 @@ interface PipelineEditorLayoutInnerProps {
  * Does NOT call usePipelineSession() - receives it via props.
  */
 const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ className = '', sessionManager }) => {
+  const t = useTranslations('pipelineEditor')
+
   // ===== Tab management handlers =====
   const handleCreateSession = useCallback(() => {
-    sessionManager.createSession('Untitled Pipeline')
-  }, [sessionManager])
+    sessionManager.createSession(t('tabs.untitledPipeline'))
+  }, [sessionManager, t])
 
   const handleCloseSession = useCallback(
     (sessionId: string) => {

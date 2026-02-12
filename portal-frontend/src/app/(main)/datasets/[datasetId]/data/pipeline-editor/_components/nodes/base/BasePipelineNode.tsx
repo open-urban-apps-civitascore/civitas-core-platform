@@ -15,6 +15,7 @@
 
 import { Handle, Position } from '@xyflow/react'
 import type { LucideIcon } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import type { CSSProperties, ReactNode } from 'react'
 
 import type { NodeCategory } from '../../../_constants/nodeCategories'
@@ -146,6 +147,7 @@ export const BasePipelineNode: React.FC<BasePipelineNodeProps> = ({
   className = '',
   validationSeverity = 'none',
 }) => {
+  const t = useTranslations('pipelineEditor')
   const containerStyle = getNodeContainerStyle(category, isConfigured, isSelected)
   const handleStyle = getHandleStyle(isSelected)
   const categoryColor = CATEGORY_COLORS[category]
@@ -257,7 +259,7 @@ export const BasePipelineNode: React.FC<BasePipelineNodeProps> = ({
               marginTop: '2px',
             }}
           >
-            Not configured
+            {t('nodeLabels.notConfigured')}
           </div>
         )}
       </div>

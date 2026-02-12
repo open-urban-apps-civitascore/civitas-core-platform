@@ -9,6 +9,7 @@
  */
 
 import { Plus, X } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useCallback, useState } from 'react'
 
 import type { PipelineSession } from '../../_types/session'
@@ -23,9 +24,10 @@ interface TabProps {
   onSelect: (sessionId: string) => void
   onClose: (sessionId: string) => void
   onRename: (sessionId: string, newName: string) => void
+  closeTabTitle: string
 }
 
-const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onClose, onRename }) => {
+const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onClose, onRename, closeTabTitle }) => {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(session.name)
 
@@ -98,7 +100,7 @@ const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onClose, onRenam
       <button
         onClick={handleClose}
         className="flex-shrink-0 rounded p-1 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
-        title="Close tab"
+        title={closeTabTitle}
       >
         <X className="h-3 w-3" />
       </button>
@@ -131,6 +133,8 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
   onRenameSession,
   onCreateSession,
 }) => {
+  const t = useTranslations('pipelineEditor')
+
   return (
     <div className="flex items-center overflow-hidden border-b border-border bg-muted/30">
       {/* Scrollable Tabs Container */}
@@ -143,6 +147,7 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
             onSelect={onSelectSession}
             onClose={onCloseSession}
             onRename={onRenameSession}
+            closeTabTitle={t('tabs.closeTab')}
           />
         ))}
       </div>
@@ -151,7 +156,7 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
       <button
         onClick={onCreateSession}
         className="flex-shrink-0 border-r border-border p-2 transition-colors hover:bg-muted"
-        title="New pipeline"
+        title={t('tabs.newPipeline')}
       >
         <Plus className="h-4 w-4 text-muted-foreground" />
       </button>

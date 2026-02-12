@@ -8,6 +8,7 @@
  */
 
 import { X } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -34,7 +35,7 @@ interface EntitySelectorProps {
 
 export const EntitySelector: React.FC<EntitySelectorProps> = ({
   label,
-  placeholder = 'Select an entity...',
+  placeholder,
   entities,
   selectedId,
   isLoading,
@@ -42,6 +43,10 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
   onChange,
   isDisabled = false,
 }) => {
+  const t = useTranslations('pipelineEditor')
+  const tCommon = useTranslations('common')
+  const resolvedPlaceholder = placeholder ?? t('entitySelector.selectEntity')
+
   const handleValueChange = (value: string) => {
     if (value === '__clear__') {
       onChange(undefined)
@@ -61,24 +66,24 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
 
       {isLoading ? (
         <div className="flex h-9 items-center rounded-md border border-border bg-muted px-3">
-          <span className="text-sm text-muted-foreground">Loading...</span>
+          <span className="text-sm text-muted-foreground">{tCommon('loading')}</span>
         </div>
       ) : isError ? (
         <div className="flex h-9 items-center rounded-md border border-destructive bg-destructive/10 px-3">
-          <span className="text-sm text-destructive">Error loading entities</span>
+          <span className="text-sm text-destructive">{t('entitySelector.errorLoading')}</span>
         </div>
       ) : (
         <div className="relative">
           <Select value={selectedValue} onValueChange={handleValueChange} disabled={isDisabled}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder={placeholder} />
+              <SelectValue placeholder={resolvedPlaceholder} />
             </SelectTrigger>
             <SelectContent>
               {selectedValue && (
                 <SelectItem value="__clear__" className="text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <X className="h-3 w-3" />
-                    Clear selection
+                    {t('entitySelector.clearSelection')}
                   </div>
                 </SelectItem>
               )}

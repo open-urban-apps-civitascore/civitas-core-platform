@@ -8,6 +8,8 @@
  *
  */
 
+import { useTranslations } from 'next-intl'
+
 import type { ApiNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
 
@@ -16,13 +18,14 @@ interface ApiPanelProps {
 }
 
 export const ApiPanel: React.FC<ApiPanelProps> = ({ data }) => {
+  const t = useTranslations('pipelineEditor')
   const isRequest = data.nodeType === 'apiRequest'
 
   return (
     <div className="space-y-4 p-4">
       <EntityMetadata
-        title={isRequest ? 'API Request Details' : 'API Response Details'}
-        items={[{ label: 'API Path', value: data.apiPath }]}
+        title={isRequest ? t('apiPanel.requestDetails') : t('apiPanel.responseDetails')}
+        items={[{ label: t('apiPanel.apiPath'), value: data.apiPath }]}
       />
     </div>
   )

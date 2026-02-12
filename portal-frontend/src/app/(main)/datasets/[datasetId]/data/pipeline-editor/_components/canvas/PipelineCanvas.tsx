@@ -23,6 +23,7 @@ import {
   ReactFlow,
   useReactFlow,
 } from '@xyflow/react'
+import { useTranslations } from 'next-intl'
 import { useCallback, useMemo } from 'react'
 
 import { CANVAS_CONFIG } from '../../_constants/pipelineStyles'
@@ -49,6 +50,7 @@ interface PipelineCanvasProps {
  *
  */
 export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }) => {
+  const t = useTranslations('pipelineEditor')
   const { pipeline, dispatch, addNode, addEdge, validateConnection, hideValidationPanel } = useActivePipeline()
   const { screenToFlowPosition } = useReactFlow()
 
@@ -145,7 +147,7 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
   if (!pipeline) {
     return (
       <div className={`flex h-full w-full items-center justify-center ${className}`}>
-        <p className="text-muted-foreground">No pipeline available</p>
+        <p className="text-muted-foreground">{t('canvas.noPipeline')}</p>
       </div>
     )
   }

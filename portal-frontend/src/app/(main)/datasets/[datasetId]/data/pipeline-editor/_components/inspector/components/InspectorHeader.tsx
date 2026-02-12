@@ -9,6 +9,7 @@
  */
 
 import { Clock, Database, Globe, Play, Reply, Snowflake, Square, Workflow } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import type { ReactNode } from 'react'
 
 import type { PipelineNodeType } from '../../../_types/pipeline'
@@ -38,15 +39,16 @@ const NODE_TYPE_ICONS: Record<PipelineNodeType, ReactNode> = {
   mapping: <Workflow className="h-4 w-4" />,
 }
 
-const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
-  start: 'Start',
-  end: 'End',
-  dataSource: 'DataSource',
-  apiRequest: 'API Request',
-  apiResponse: 'API Response',
-  cron: 'CRON Trigger',
-  frost: 'FROST Storage',
-  mapping: 'Mapping',
+// Mapping from PipelineNodeType to translation key
+const NODE_TYPE_TO_TRANSLATION_KEY: Record<PipelineNodeType, string> = {
+  start: 'start',
+  end: 'end',
+  dataSource: 'dataSource',
+  apiRequest: 'apiRequest',
+  apiResponse: 'apiResponse',
+  cron: 'cronTrigger',
+  frost: 'frostStorage',
+  mapping: 'mapping',
 }
 
 // ============================================================================
@@ -54,8 +56,10 @@ const NODE_TYPE_LABELS: Record<PipelineNodeType, string> = {
 // ============================================================================
 
 export const InspectorHeader: React.FC<InspectorHeaderProps> = ({ nodeType, label, isConfigured }) => {
+  const t = useTranslations('pipelineEditor')
   const icon = NODE_TYPE_ICONS[nodeType]
-  const typeLabel = NODE_TYPE_LABELS[nodeType]
+  const translationKey = NODE_TYPE_TO_TRANSLATION_KEY[nodeType]
+  const typeLabel = t(`nodeTypes.${translationKey}`)
 
   return (
     <div className="flex items-center gap-3 border-b border-border p-3">
@@ -76,7 +80,7 @@ export const InspectorHeader: React.FC<InspectorHeaderProps> = ({ nodeType, labe
             : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
         }`}
       >
-        {isConfigured ? 'Configured' : 'Not configured'}
+        {isConfigured ? t('inspector.configured') : t('inspector.notConfigured')}
       </div>
     </div>
   )

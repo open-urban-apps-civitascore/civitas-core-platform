@@ -10,6 +10,7 @@
  */
 
 import { CheckCircle2, Loader2, Save } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -35,6 +36,7 @@ interface PipelineToolbarProps {
  *
  */
 export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = '' }) => {
+  const t = useTranslations('pipelineEditor')
   const { pipeline, runValidation, savePipeline, isDirty, canSave, isValidationRequired, isSaving } =
     useActivePipeline()
 
@@ -72,7 +74,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
         {pipeline && (
           <>
             <span className="text-sm font-medium">{pipeline.name}</span>
-            {isDirty && <span className="text-xs text-muted-foreground">(unsaved changes)</span>}
+            {isDirty && <span className="text-xs text-muted-foreground">{t('toolbar.unsavedChanges')}</span>}
           </>
         )}
       </div>
@@ -80,7 +82,7 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
       {/* Center - Validation hint when needed */}
       <div className="flex items-center gap-2">
         {isDirty && isValidationRequired && (
-          <span className="text-xs text-muted-foreground">Click Validate before saving</span>
+          <span className="text-xs text-muted-foreground">{t('toolbar.validateBeforeSave')}</span>
         )}
       </div>
 
@@ -88,12 +90,12 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
       <div className="flex items-center gap-2">
         <Button variant="outline" size="sm" onClick={handleValidate} disabled={!pipeline || isSaving}>
           <CheckCircle2 className="mr-1 h-4 w-4" />
-          Validate
+          {t('toolbar.validate')}
         </Button>
 
         <Button variant="default" size="sm" onClick={handleSave} disabled={!canSave || isSaving}>
           {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
-          {isSaving ? 'Saving...' : 'Save'}
+          {isSaving ? t('toolbar.saving') : t('toolbar.save')}
         </Button>
       </div>
     </div>

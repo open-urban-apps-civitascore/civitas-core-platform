@@ -9,6 +9,7 @@
  */
 
 import { CheckCircle2, ClipboardList } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 import type { ValidationResultWithNodeStatus } from '../../../_services/validationService'
 import { ValidationIssueItem } from './ValidationIssueItem'
@@ -32,6 +33,7 @@ interface ValidationPanelProps {
  *
  */
 export const ValidationPanel: React.FC<ValidationPanelProps> = ({ validationResult }) => {
+  const t = useTranslations('pipelineEditor')
   const { isValid, errors, warnings } = validationResult
   const errorCount = errors.length
   const warningCount = warnings.length
@@ -45,7 +47,7 @@ export const ValidationPanel: React.FC<ValidationPanelProps> = ({ validationResu
         ) : (
           <ClipboardList className="h-4 w-4 text-muted-foreground" />
         )}
-        <h3 className="text-sm font-medium text-foreground">Validation Results</h3>
+        <h3 className="text-sm font-medium text-foreground">{t('validation.results')}</h3>
       </div>
 
       {/* Content */}
@@ -54,10 +56,8 @@ export const ValidationPanel: React.FC<ValidationPanelProps> = ({ validationResu
           // Success State
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <CheckCircle2 className="mb-3 h-12 w-12 text-green-500" />
-            <p className="text-lg font-medium text-green-700">Pipeline is valid</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              All validation checks passed. You can save the pipeline.
-            </p>
+            <p className="text-lg font-medium text-green-700">{t('validation.pipelineValid')}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t('validation.allChecksPassed')}</p>
           </div>
         ) : (
           // Errors and Warnings
@@ -67,11 +67,15 @@ export const ValidationPanel: React.FC<ValidationPanelProps> = ({ validationResu
               <div>
                 <h4 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-red-600">
                   <span className="text-xs">❌</span>
-                  <span>Errors ({errorCount})</span>
+                  <span>{t('validation.errors', { count: errorCount })}</span>
                 </h4>
                 <div className="space-y-2">
                   {errors.map(error => (
-                    <ValidationIssueItem key={error.id} message={error.message} severity="error" />
+                    <ValidationIssueItem
+                      key={error.id}
+                      message={t(error.messageKey, error.messageParams || {})}
+                      severity="error"
+                    />
                   ))}
                 </div>
               </div>
@@ -82,11 +86,15 @@ export const ValidationPanel: React.FC<ValidationPanelProps> = ({ validationResu
               <div>
                 <h4 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-orange-600">
                   <span className="text-xs">⚠️</span>
-                  <span>Warnings ({warningCount})</span>
+                  <span>{t('validation.warnings', { count: warningCount })}</span>
                 </h4>
                 <div className="space-y-2">
                   {warnings.map(warning => (
-                    <ValidationIssueItem key={warning.id} message={warning.message} severity="warning" />
+                    <ValidationIssueItem
+                      key={warning.id}
+                      message={t(warning.messageKey, warning.messageParams || {})}
+                      severity="warning"
+                    />
                   ))}
                 </div>
               </div>
@@ -96,9 +104,7 @@ export const ValidationPanel: React.FC<ValidationPanelProps> = ({ validationResu
             {!isValid && (
               <div className="mt-4 rounded-md border border-muted bg-muted/30 p-3">
                 <p className="text-xs text-muted-foreground">
-                  {errorCount > 0
-                    ? 'Fix the errors above before saving the pipeline.'
-                    : 'Pipeline has warnings but can be saved.'}
+                  {errorCount > 0 ? t('validation.fixErrors') : t('validation.hasWarnings')}
                 </p>
               </div>
             )}

@@ -8,6 +8,8 @@
  *
  */
 
+import { useTranslations } from 'next-intl'
+
 import type { FrostNodeData } from '../../../_types/nodes'
 import { EntityMetadata } from '../components/EntityMetadata'
 
@@ -16,14 +18,16 @@ interface FrostPanelProps {
 }
 
 export const FrostPanel: React.FC<FrostPanelProps> = ({ data }) => {
+  const t = useTranslations('pipelineEditor')
+
   return (
     <div className="space-y-4 p-4">
       <EntityMetadata
-        title="FROST Server Details"
+        title={t('frostPanel.details')}
         items={[
-          { label: 'Server Name', value: data.serverName },
-          { label: 'Server URL', value: data.serverUrl },
-          { label: 'Version', value: data.version },
+          { label: t('frostPanel.serverName'), value: data.serverName },
+          { label: t('frostPanel.serverUrl'), value: data.serverUrl },
+          { label: t('frostPanel.version'), value: data.version },
         ]}
       />
     </div>

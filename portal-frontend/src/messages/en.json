@@ -426,5 +426,143 @@
       "description": "There are unsaved changes. \"Discard\" cannot be undone.",
       "discard": "Discard"
     }
+  },
+  "pipelineEditor": {
+    "canvas": {
+      "noPipeline": "No pipeline available"
+    },
+    "inspector": {
+      "edgeProperties": "Edge Properties",
+      "source": "Source",
+      "target": "Target",
+      "properties": "Properties",
+      "noNodeSelected": "No node selected",
+      "noNodeSelectedHint": "Select a node on the canvas to view and edit its properties",
+      "configured": "Configured",
+      "notConfigured": "Not configured"
+    },
+    "nodeTypes": {
+      "start": "Start",
+      "end": "End",
+      "dataSource": "Data Source",
+      "apiRequest": "API Request",
+      "apiResponse": "API Response",
+      "cronTrigger": "CRON Trigger",
+      "frostStorage": "FROST Server",
+      "mapping": "Mapping"
+    },
+    "palette": {
+      "title": "Nodes"
+    },
+    "categories": {
+      "general": "General",
+      "sources": "Sources",
+      "trigger": "Trigger",
+      "storage": "Storage",
+      "transformation": "Transformation"
+    },
+    "paletteItems": {
+      "flowStart": "Flow Start",
+      "flowStartDesc": "Pipeline entry point. Execution starts here.",
+      "flowEnd": "Flow End",
+      "flowEndDesc": "Pipeline exit point. Execution ends here.",
+      "dataSource": "Data Source",
+      "dataSourceDesc": "Data source. Select a configured data source.",
+      "apiRequest": "API Request",
+      "apiRequestDesc": "REST API request trigger. Creates endpoint that serves data on HTTP request.",
+      "apiResponse": "API Response",
+      "apiResponseDesc": "REST API response. Returns data to client.",
+      "cron": "CRON",
+      "cronDesc": "Scheduled trigger. Executes pipeline on schedule.",
+      "frostServer": "FROST Server",
+      "frostServerDesc": "SensorThings API persistence. Store or retrieve data.",
+      "mapping": "Mapping",
+      "mappingDesc": "Bloblang data transformation. Map and transform data."
+    },
+    "controlPanel": {
+      "entryPoint": "Pipeline Entry Point",
+      "entryPointDesc": "The Start node marks where the pipeline execution begins. Connect it to a trigger or data source node to define how the pipeline is activated.",
+      "exitPoint": "Pipeline Exit Point",
+      "exitPointDesc": "The End node marks where the pipeline execution completes. All data flow paths should eventually lead to this node.",
+      "nodeInformation": "Node Information",
+      "type": "Type",
+      "configurable": "Configurable",
+      "no": "No"
+    },
+    "cronPanel": {
+      "cronExpression": "CRON Expression",
+      "invalidCron": "Invalid cron expression. Must be 6-field Quartz syntax (seconds minutes hours day-of-month month day-of-week).",
+      "cronHint": "A CRON expression defines when the pipeline should run automatically.",
+      "learnCron": "Learn about CRON expressions",
+      "currentExpression": "Current Expression"
+    },
+    "dataSourcePanel": {
+      "label": "Data Source",
+      "placeholder": "Select a datasource...",
+      "details": "Data Source Details",
+      "connector": "Connector",
+      "connection": "Connection",
+      "status": "Status",
+      "description": "Description",
+      "tags": "Tags",
+      "showDataStructure": "Show Data Structure"
+    },
+    "apiPanel": {
+      "requestDetails": "API Request Details",
+      "responseDetails": "API Response Details",
+      "apiPath": "API Path"
+    },
+    "frostPanel": {
+      "details": "FROST Server Details",
+      "serverName": "Server Name",
+      "serverUrl": "Server URL",
+      "version": "Version"
+    },
+    "mappingPanel": {
+      "hint": "Define your data transformation mapping using YAML or JSON format.",
+      "mappingCode": "Mapping Code",
+      "loadingEditor": "Loading editor...",
+      "status": "Status",
+      "mappingConfigured": "Mapping configured",
+      "noMappingDefined": "No mapping defined"
+    },
+    "entitySelector": {
+      "selectEntity": "Select an entity...",
+      "errorLoading": "Error loading entities",
+      "clearSelection": "Clear selection"
+    },
+    "validation": {
+      "results": "Validation Results",
+      "pipelineValid": "Pipeline is valid",
+      "allChecksPassed": "All validation checks passed. You can save the pipeline.",
+      "errors": "Errors ({count})",
+      "warnings": "Warnings ({count})",
+      "fixErrors": "Fix the errors above before saving the pipeline.",
+      "hasWarnings": "Pipeline has warnings but can be saved.",
+      "messages": {
+        "startNodeRequired": "Pipeline must have at least one Start node",
+        "endNodeRequired": "Pipeline must have at least one End node",
+        "apiPairing": "API Request node requires an API Response node in the pipeline",
+        "nodeNotConfigured": "{label} is not configured",
+        "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
+        "orphanNode": "{label} is not connected to any other node"
+      }
+    },
+    "toolbar": {
+      "unsavedChanges": "(unsaved changes)",
+      "validateBeforeSave": "Click Validate before saving",
+      "validate": "Validate",
+      "save": "Save",
+      "saving": "Saving..."
+    },
+    "tabs": {
+      "closeTab": "Close tab",
+      "newPipeline": "New pipeline",
+      "untitledPipeline": "Untitled Pipeline"
+    },
+    "nodeLabels": {
+      "notConfigured": "Not configured"
+    },
+    "lines": "{count, plural, one {# line} other {# lines}}"
   }
 }

@@ -11,9 +11,20 @@
 
 import { Info } from 'lucide-react'
 import dynamic from 'next/dynamic'
+import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
 import type { MappingNodeData } from '../../../_types/nodes'
+
+// Loading fallback component for Monaco Editor
+const LoadingFallback = () => {
+  const t = useTranslations('pipelineEditor')
+  return (
+    <div className="flex h-[200px] items-center justify-center bg-muted/30">
+      <span className="text-sm text-muted-foreground">{t('mappingPanel.loadingEditor')}</span>
+    </div>
+  )
+}
 
 // Dynamically import Monaco Editor to avoid slow compilation
 // Monaco Editor is ~8MB and importing it synchronously causes massive build overhead
@@ -27,11 +38,7 @@ const MonacoEditor = dynamic(
     }),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex h-[200px] items-center justify-center bg-muted/30">
-        <span className="text-sm text-muted-foreground">Loading editor...</span>
-      </div>
-    ),
+    loading: () => <LoadingFallback />,
   },
 )
 
@@ -41,6 +48,8 @@ interface MappingPanelProps {
 }
 
 export const MappingPanel: React.FC<MappingPanelProps> = ({ data, onUpdate }) => {
+  const t = useTranslations('pipelineEditor')
+
   const handleCodeChange = useCallback(
     (value: string | undefined) => {
       const code = value || ''
@@ -56,13 +65,11 @@ export const MappingPanel: React.FC<MappingPanelProps> = ({ data, onUpdate }) =>
     <div className="flex h-full flex-col space-y-4 p-4">
       <div className="flex items-start gap-2 rounded-md bg-muted/50 p-3">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          Define your data transformation mapping using YAML or JSON format.
-        </p>
+        <p className="text-sm text-muted-foreground">{t('mappingPanel.hint')}</p>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-foreground">Mapping Code</label>
+        <label className="text-sm font-medium text-foreground">{t('mappingPanel.mappingCode')}</label>
         <div className="overflow-hidden rounded-md border border-border">
           <MonacoEditor
             height="200px"
@@ -86,7 +93,9 @@ export const MappingPanel: React.FC<MappingPanelProps> = ({ data, onUpdate }) =>
       </div>
 
       <div className="space-y-2">
-        <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</h4>
+        <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {t('mappingPanel.status')}
+        </h4>
         <div
           className={`rounded-md p-2 text-sm ${
             data.configured
@@ -94,7 +103,7 @@ export const MappingPanel: React.FC<MappingPanelProps> = ({ data, onUpdate }) =>
               : 'bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200'
           }`}
         >
-          {data.configured ? 'Mapping configured' : 'No mapping defined'}
+          {data.configured ? t('mappingPanel.mappingConfigured') : t('mappingPanel.noMappingDefined')}
         </div>
       </div>
     </div>

@@ -72,7 +72,8 @@ export interface PipelineValidationError {
   id: string
   type: 'node' | 'edge' | 'structure'
   elementId?: string
-  message: string
+  messageKey: string
+  messageParams?: Record<string, string | number>
   severity: 'error'
 }
 
@@ -80,7 +81,8 @@ export interface PipelineValidationWarning {
   id: string
   type: 'node' | 'edge' | 'structure'
   elementId?: string
-  message: string
+  messageKey: string
+  messageParams?: Record<string, string | number>
   severity: 'warning'
 }
 
@@ -143,7 +145,7 @@ const validateStartNode: ValidationRule = {
           {
             id: crypto.randomUUID(),
             type: 'structure',
-            message: 'Pipeline must have at least one Start node',
+            messageKey: 'validation.messages.startNodeRequired',
             severity: 'error',
           },
         ],
@@ -171,7 +173,7 @@ const validateEndNode: ValidationRule = {
           {
             id: crypto.randomUUID(),
             type: 'structure',
-            message: 'Pipeline must have at least one End node',
+            messageKey: 'validation.messages.endNodeRequired',
             severity: 'error',
           },
         ],
@@ -203,7 +205,7 @@ const validateApiPairing: ValidationRule = {
           id: crypto.randomUUID(),
           type: 'node',
           elementId: node.id,
-          message: 'API Request node requires an API Response node in the pipeline',
+          messageKey: 'validation.messages.apiPairing',
           severity: 'error',
         })
       })
@@ -227,11 +229,13 @@ const validateNodeConfiguration: ValidationRule = {
 
     pipeline.nodes.forEach(node => {
       if (entityNodeTypes.includes(node.type) && !node.data.configured) {
+        const label = node.data.label || node.type
         errors.push({
           id: crypto.randomUUID(),
           type: 'node',
           elementId: node.id,
-          message: `${node.data.label || node.type} is not configured`,
+          messageKey: 'validation.messages.nodeNotConfigured',
+          messageParams: { label },
           severity: 'error',
         })
       }
@@ -255,11 +259,13 @@ const validateCronExpression: ValidationRule = {
       if (node.type === PIPELINE_NODE_TYPES.Cron && isCronNodeData(node.data)) {
         const expression = node.data.cronExpression?.trim()
         if (expression && !isValidQuartzCron(expression)) {
+          const label = node.data.label || 'CRON'
           errors.push({
             id: crypto.randomUUID(),
             type: 'node',
             elementId: node.id,
-            message: `${node.data.label || 'CRON'} has an invalid cron expression. Must be a 6-field Quartz syntax.`,
+            messageKey: 'validation.messages.invalidCronExpression',
+            messageParams: { label },
             severity: 'error',
           })
         }
@@ -291,11 +297,13 @@ const validateOrphanNodes: ValidationRule = {
     if (pipeline.nodes.length > 1) {
       pipeline.nodes.forEach(node => {
         if (!connectedNodeIds.has(node.id)) {
+          const label = node.data.label || node.type
           errors.push({
             id: crypto.randomUUID(),
             type: 'node',
             elementId: node.id,
-            message: `${node.data.label || node.type} is not connected to any other node`,
+            messageKey: 'validation.messages.orphanNode',
+            messageParams: { label },
             severity: 'error',
           })
         }
@@ -374,7 +382,7 @@ export const validatePipelineWithNodeStatus = (pipeline: Pipeline): ValidationRe
       const status = nodeStatuses.get(error.elementId)
       if (status) {
         status.hasError = true
-        status.messages.push(error.message)
+        // Note: messages array is kept empty as translations are handled in UI components
       }
     }
   })
@@ -385,7 +393,7 @@ export const validatePipelineWithNodeStatus = (pipeline: Pipeline): ValidationRe
       const status = nodeStatuses.get(warning.elementId)
       if (status) {
         status.hasWarning = true
-        status.messages.push(warning.message)
+        // Note: messages array is kept empty as translations are handled in UI components
       }
     }
   })
