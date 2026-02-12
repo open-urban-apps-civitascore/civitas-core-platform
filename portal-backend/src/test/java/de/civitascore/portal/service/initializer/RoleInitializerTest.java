@@ -300,6 +300,44 @@ class RoleInitializerTest {
     assertThat(permissionNames).containsExactlyInAnyOrder("DATASET_READ", "DATASET_PAYLOAD_READ");
   }
 
+  @Test
+  @DisplayName("Should remove obsolete readonly roles not in standard definitions")
+  void shouldRemoveObsoleteReadonlyRoles() {
+    // given
+    when(permissionRepository.findAll()).thenReturn(allPermissions);
+    List<Role> existingRoles = new ArrayList<>(allMatchingRoles());
+    Role obsoleteRole = new Role();
+    obsoleteRole.setName("Obsolete Role");
+    obsoleteRole.setReadonly(true);
+    existingRoles.add(obsoleteRole);
+    when(roleRepository.findAll()).thenReturn(existingRoles);
+
+    // when
+    roleInitializer.initialize();
+
+    // then
+    verify(roleRepository).deleteAll(List.of(obsoleteRole));
+  }
+
+  @Test
+  @DisplayName("Should not remove non-readonly roles that are not in standard definitions")
+  void shouldNotRemoveNonReadonlyRoles() {
+    // given
+    when(permissionRepository.findAll()).thenReturn(allPermissions);
+    List<Role> existingRoles = new ArrayList<>(allMatchingRoles());
+    Role customRole = new Role();
+    customRole.setName("Custom User Role");
+    customRole.setReadonly(false);
+    existingRoles.add(customRole);
+    when(roleRepository.findAll()).thenReturn(existingRoles);
+
+    // when
+    roleInitializer.initialize();
+
+    // then
+    verify(roleRepository, never()).deleteAll(anyList());
+  }
+
   private Role findRole(List<Role> roles, String name) {
     return roles.stream()
         .filter(r -> r.getName().equals(name))

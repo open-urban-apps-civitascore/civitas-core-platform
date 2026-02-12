@@ -7,6 +7,7 @@ import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.repository.PermissionRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +36,15 @@ public class RoleInitializer {
         roleRepository.findAll().stream()
             .collect(Collectors.toMap(Role::getName, Function.identity()));
 
+    Set<String> standardRoleNames =
+        Arrays.stream(StandardRole.values()).map(sr -> sr.roleName).collect(Collectors.toSet());
+
     List<Role> toCreate = new ArrayList<>();
     List<Role> toUpdate = new ArrayList<>();
+    List<Role> toRemove =
+        existingRolesByName.values().stream()
+            .filter(role -> role.isReadonly() && !standardRoleNames.contains(role.getName()))
+            .collect(Collectors.toCollection(ArrayList::new));
 
     for (StandardRole standardRole : StandardRole.values()) {
       Set<Permission> expectedPermissions =
@@ -66,7 +74,11 @@ public class RoleInitializer {
       roleRepository.saveAll(toUpdate);
       log.info("Updated {} existing roles", toUpdate.size());
     }
-    if (toCreate.isEmpty() && toUpdate.isEmpty()) {
+    if (!toRemove.isEmpty()) {
+      roleRepository.deleteAll(toRemove);
+      log.info("Removed {} obsolete readonly roles", toRemove.size());
+    }
+    if (toCreate.isEmpty() && toUpdate.isEmpty() && toRemove.isEmpty()) {
       log.info("All {} roles are up to date", StandardRole.values().length);
     }
   }
