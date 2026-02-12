@@ -27,7 +27,7 @@ const UsersPage = async ({ searchParams }: Props) => {
 
   const { data, totalElements } = await getUsers(apiParams)
 
-  const users = mapListUsers(data, [])
+  const users = mapListUsers(data)
   const totalCount = Number(totalElements) || 0
   const totalPages = Math.ceil(totalCount / pageSize) || 1
 

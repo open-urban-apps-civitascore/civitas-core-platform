@@ -11,107 +11,63 @@ export type Contact = {
 
 export type UserGroup = Item
 
-export type Authority = Item & {
-  departments: Item[]
-}
-
-export type UserAuthority = {
-  id: string
-  department: {
-    id: string
-  } | null
-} | null
-
-export type User = {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  phone: string
-  title: TitleType
-  authority: UserAuthority | null
-  groups: string[]
-  active: boolean
-  positionDescription: string | null
-}
-
-export type CreateUserData = Omit<User, 'id'>
-export type UpdateUserData = User
-export type PatchUserData = Partial<CreateUserData> & WithId
-
-export type ListUser = {
-  id: string
-  fullName: string
-  authority: string
-  department: string
-  email: string
-  isActive: boolean
-}
-
-export type GroupListUser = Omit<ListUser, 'roles'> & {
-  assignedAt: string
-}
-
-export type GroupAssignmentUser = {
-  id: string
-  fullName: string
-  email: string
-  isActive: boolean
-}
-
-export type GroupUser = {
-  id: string
-  fullName: string
-  email: string
-  authority: UserAuthority | null
-  isActive: boolean
-}
-
 export const TitleSchema = z.enum(['MR', 'MS', 'OTHER'])
 
 export type TitleType = z.infer<typeof TitleSchema>
 
-export const PhoneSchema = z.string().superRefine((value, ctx) => {
-  const phoneNumber = parsePhoneNumberFromString(value, 'DE')
-  if (!phoneNumber) return z.NEVER
-  if (!phoneNumber?.isValid()) {
-    ctx.addIssue({
-      code: 'custom',
-      message: 'common.errors.invalidPhone',
-    })
-    return z.NEVER
-  }
-})
+export const PhoneSchema = z
+  .string()
+  .transform(value => (value === '' ? undefined : value))
+  .refine(value => !value || /^[0-9+()\s-]+$/.test(value), { message: 'common.errors.invalidPhone' })
+  .superRefine((value, ctx) => {
+    if (!value) return
 
-export const UserFormSchema = z.object({
+    const phoneNumber = parsePhoneNumberFromString(value, 'DE')
+    if (!phoneNumber || !phoneNumber.isValid()) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'common.errors.invalidPhone',
+      })
+    }
+  })
+
+export const UserSchema = z.object({
   id: z.string(),
   title: TitleSchema,
   firstName: z.string().min(2, {
     message: 'common.errors.atLeast2',
   }),
-
   lastName: z.string().min(2, {
     message: 'common.errors.atLeast2',
   }),
   email: z.email({
     message: 'common.errors.invalidEmail',
   }),
-  authority: z.string(),
-  department: z.string(),
-  phone: PhoneSchema,
+  phone: PhoneSchema.nullable(),
   active: z.boolean(),
-  positionDescription: z
-    .string()
-    .min(10, {
-      message: 'common.errors.atLeast10',
-    })
-    .or(z.literal('')),
+  groups: z.array(z.string()),
+})
+
+export type User = z.infer<typeof UserSchema>
+
+export type ListUser = {
+  id: string
+  fullName: string
+  email: string
+  active: boolean
+}
+
+export type GroupListUser = ListUser & {
+  assignedAt: string
+}
+
+export const UserFormSchema = UserSchema.omit({
+  groups: true,
+}).extend({
+  phone: PhoneSchema.optional(),
 })
 
 export type UserFormData = z.infer<typeof UserFormSchema>
 
-export const UserUpdateFormSchema = UserFormSchema.extend({
-  id: z.string(),
-})
-
-export type UserUpdateFormData = z.infer<typeof UserUpdateFormSchema>
+export type CreateUserData = Omit<User, 'id'>
+export type UpdateUserData = Partial<CreateUserData> & WithId

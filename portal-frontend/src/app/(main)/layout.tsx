@@ -1,9 +1,8 @@
-import { Toaster } from 'sonner'
-
 import { auth } from '@/auth'
 import { AppHeader } from '@/components/appHeader/AppHeader'
 import { AppSidebar } from '@/components/appSidebar/AppSidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { Toaster } from '@/components/ui/sonner'
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -23,7 +22,14 @@ const MainLayout = async (props: MainLayoutProps) => {
         <div className="h-[calc(100%-var(--header-height))] [--title-height:calc(--spacing(30))] [--page-padding:calc(--spacing(4))]">
           {children}
         </div>
-        <Toaster />
+        <Toaster
+          toastOptions={{
+            style: {
+              background: 'var(--popover-dark)',
+              color: 'var(--popover-foreground-dark)',
+            },
+          }}
+        />
       </SidebarInset>
     </SidebarProvider>
   )

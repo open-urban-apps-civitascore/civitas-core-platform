@@ -14,7 +14,9 @@
       "add": "Add",
       "edit": "Edit",
       "editBase": "Edit base",
-      "open": "open"
+      "open": "open",
+      "saveAndContinue": "Save and continue",
+      "exit": "Exit"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
@@ -25,6 +27,8 @@
       "atLeast10": "The input must be at least 10 characters.",
       "atLeast1Value": "At least 1 value is required.",
       "minChar": "The input has to be at least {amount} characters.",
+      "itemsNotFound": "No {items} found",
+      "itemNotFound": "{item} not found",
       "notFound": "No {items} found",
       "loadingError": "Error while loading data",
       "unexpectedError": "An unexpected error occurred. Please try again.",
@@ -148,7 +152,6 @@
     "newUser": "Create User",
     "createUser": "Create User",
     "searchUsers": "Filter...",
-    "notFound": "User not found",
     "info": {
       "header": "User Information",
       "subheader": "Personal details and general information.",
@@ -161,26 +164,18 @@
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
-      "position": "Position",
-      "description": "Activity Description",
       "status": {
         "title": "Status",
         "active": "Active",
         "inactive": "Inactive"
-      }
+      },
+      "selectTitle": "Select title..."
     },
     "detailsTabs": {
       "userData": "User Data",
       "roles": "Roles",
       "groups": "Groups",
-      "dataspaces": "Data Spaces and Datasets",
       "account": "Account"
-    },
-    "form": {
-      "selectTitle": "Select titel...",
-      "selectAuthority": "Select authority...",
-      "selectDepartment": "Select department...",
-      "selectGroup": "Select group..."
     },
     "roles": {
       "title": "Overview: Roles",
@@ -201,6 +196,10 @@
       "contact": "Contact",
       "description": "Description",
       "roles": "Roles"
+    },
+    "messages": {
+      "createSuccess": "User has been successfully created.",
+      "updateSuccess": "User has been successfully updated."
     }
   },
   "groups": {
@@ -423,10 +422,6 @@
       "tagsPlaceholder": "Add tag...",
       "tagsSearch": "Search tag...",
       "noTagsFound": "No tags found"
-    },
-    "actions": {
-      "saveAndContinue": "Save and continue",
-      "exit": "Exit"
     },
     "exitModal": {
       "title": "Save before exiting?",

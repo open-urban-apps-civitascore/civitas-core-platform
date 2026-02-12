@@ -50,7 +50,7 @@ const UsersTable = (props: UsersTableProps) => {
       header: t('info.email'),
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor('isActive', {
+    columnHelper.accessor('active', {
       header: t('info.status.title'),
       cell: info => (
         <ActivityBadge

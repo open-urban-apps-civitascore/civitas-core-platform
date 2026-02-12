@@ -8,6 +8,7 @@ import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
+import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -28,7 +29,6 @@ import { pickDirtyValues } from '@/utils/form'
 
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
-import { ExitWarningModal } from './ExitWarningModal'
 import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'
 import { StatusDropdown } from './StatusDropdown'
 
@@ -215,7 +215,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
               onClick={handleExit}
               disabled={isLoading}
             >
-              {t('actions.exit')}
+              {tCommon('actions.exit')}
             </Button>
             <Button
               data-testid="saveButton"
