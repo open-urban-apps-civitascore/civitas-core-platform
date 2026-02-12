@@ -35,20 +35,20 @@ public class CatalogDcatMapper extends DcatMapper<CatalogOutputDTO> {
                     model.createLiteral(description, "de")));
 
     dto.getChildCatalogs().stream()
-        .map(childCatalog -> model.createResource(childCatalog.getId()))
+        .map(childCatalog -> model.createResource(childCatalog.getId().toString()))
         .forEach(
             childCatalogRes ->
                 catalogResource.addProperty(model.createProperty(DCT, "hasPart"), childCatalogRes));
 
     dto.getParentCatalogs().stream()
-        .map(parentCatalog -> model.createResource(parentCatalog.getId()))
+        .map(parentCatalog -> model.createResource(parentCatalog.getId().toString()))
         .forEach(
             parentCatalogRes ->
                 catalogResource.addProperty(
                     model.createProperty(DCT, "isPartOf"), parentCatalogRes));
 
     dto.getDataSets().stream()
-        .map(dataSet -> model.createResource(dataSet.getId()))
+        .map(dataSet -> model.createResource(dataSet.getId().toString()))
         .forEach(
             dataSetRes ->
                 catalogResource.addProperty(model.createProperty(DCAT, "dataset"), dataSetRes));

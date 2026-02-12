@@ -5,7 +5,7 @@ import { UseFormReturn } from 'react-hook-form'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { Select } from '@/components/form/fields/Select'
+import { FormSelect } from '@/components/form/fields/FormSelect'
 import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -64,7 +64,7 @@ export const UserBasicInfoTab = (props: UserBasicInfoTabProps) => {
                   />
                 </DetailsFieldContainer>
                 <DetailsFieldContainer>
-                  <Select
+                  <FormSelect
                     id="title-select"
                     label={t('info.title.title')}
                     options={titleOptions}

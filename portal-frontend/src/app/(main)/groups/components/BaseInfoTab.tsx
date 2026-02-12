@@ -12,7 +12,7 @@ import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { AutoComplete, SelectItem } from '@/components/form/fields/AutoComplete'
-import { TextArea } from '@/components/form/fields/TextArea'
+import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { Form } from '@/components/ui/form'
 import { useDebounce } from '@/hooks/use-debounce'
@@ -148,7 +148,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           </DetailsFieldContainer>
 
           <DetailsFieldContainer>
-            <TextArea
+            <FormTextArea
               className="max-w-lg my-12"
               form={form}
               label={t('details.description')}

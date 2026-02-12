@@ -1,25 +1,24 @@
+/* eslint-disable react/boolean-prop-naming */
 import { DetailedHTMLProps, HTMLAttributes } from 'react'
 import { FieldValues, Path, UseFormReturn } from 'react-hook-form'
 
+import { Checkbox } from '@/components/ui/checkbox'
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-import { InputPropsWithoutForm } from '@/types/common'
 
-interface TextFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
+interface FormCheckboxProps<T extends FieldValues> {
   form: UseFormReturn<T>
   name: Path<T>
-  placeholder: string
   label: string
-  // eslint-disable-next-line react/boolean-prop-naming
   required?: boolean
   formItemProps?: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>
-  shouldShowErrors?: boolean
+  disabled?: boolean
+  className?: string
 }
 
-export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
-  const { form, name, placeholder, label, required = false, formItemProps, disabled, shouldShowErrors = true } = props
+export const FormCheckbox = <T extends FieldValues>(props: FormCheckboxProps<T>) => {
+  const { form, name, label, required = false, formItemProps, disabled, className } = props
   const isMobile = useIsMobile()
   return (
     <FormField
@@ -38,16 +37,19 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
           </FormLabel>
           <div>
             <FormControl>
-              <Input
-                data-testid={`${name}TextField`}
+              <Checkbox
+                data-testid={`${name}Checkbox`}
                 data-test-element="formField"
-                className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
-                placeholder={placeholder}
-                {...field}
+                className={cn(
+                  'disabled:opacity-100 disabled:text-muted-foreground disabled:border-hidden disabled:shadow-none disabled:h-4 disabled:py-0',
+                  className,
+                )}
+                checked={!!field.value}
+                onCheckedChange={checked => field.onChange(checked)}
                 disabled={disabled}
               />
             </FormControl>
-            {shouldShowErrors && <FormMessage data-testid={`${name}FormMessage`} className="mt-2" />}
+            <FormMessage data-testid={`${name}FormMessage`} className="mt-2" />
           </div>
         </FormItem>
       )}
