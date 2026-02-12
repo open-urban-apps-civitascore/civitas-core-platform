@@ -40,7 +40,7 @@ class PermissionInitializerTest {
     when(permissionRepository.findAll()).thenReturn(List.of());
 
     // when
-    permissionInitializer.run(null);
+    permissionInitializer.initialize();
 
     // then
     verify(permissionRepository).saveAll(permissionsCaptor.capture());
@@ -56,7 +56,7 @@ class PermissionInitializerTest {
     when(permissionRepository.findAll()).thenReturn(existing);
 
     // when
-    permissionInitializer.run(null);
+    permissionInitializer.initialize();
 
     // then
     verify(permissionRepository, never()).saveAll(anyList());
@@ -70,7 +70,7 @@ class PermissionInitializerTest {
     when(permissionRepository.findAll()).thenReturn(List.of(existingPermission));
 
     // when
-    permissionInitializer.run(null);
+    permissionInitializer.initialize();
 
     // then
     verify(permissionRepository).saveAll(permissionsCaptor.capture());
@@ -86,7 +86,7 @@ class PermissionInitializerTest {
     when(permissionRepository.findAll()).thenReturn(List.of());
 
     // when
-    permissionInitializer.run(null);
+    permissionInitializer.initialize();
 
     // then
     verify(permissionRepository).saveAll(permissionsCaptor.capture());
@@ -107,7 +107,7 @@ class PermissionInitializerTest {
     when(permissionRepository.findAll()).thenReturn(List.of());
 
     // when
-    permissionInitializer.run(null);
+    permissionInitializer.initialize();
 
     // then
     verify(permissionRepository).saveAll(permissionsCaptor.capture());
@@ -131,7 +131,7 @@ class PermissionInitializerTest {
     when(permissionRepository.findAll()).thenReturn(List.of());
 
     // when - first run
-    permissionInitializer.run(null);
+    permissionInitializer.initialize();
 
     // then - first run creates all
     verify(permissionRepository).saveAll(permissionsCaptor.capture());
@@ -142,7 +142,7 @@ class PermissionInitializerTest {
     when(permissionRepository.findAll()).thenReturn(allPermissionsFromEnum());
 
     // when - second run
-    permissionInitializer.run(null);
+    permissionInitializer.initialize();
 
     // then - no additional saves (saveAll was only called once total)
     verify(permissionRepository).saveAll(anyList());
@@ -155,7 +155,7 @@ class PermissionInitializerTest {
     when(permissionRepository.findAll()).thenReturn(List.of());
 
     // when
-    permissionInitializer.run(null);
+    permissionInitializer.initialize();
 
     // then
     verify(permissionRepository).saveAll(permissionsCaptor.capture());

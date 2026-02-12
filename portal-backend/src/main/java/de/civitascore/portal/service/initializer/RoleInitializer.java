@@ -15,24 +15,17 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
-@Order(2)
 @RequiredArgsConstructor
-public class RoleInitializer implements ApplicationRunner {
+public class RoleInitializer {
 
   private final RoleRepository roleRepository;
   private final PermissionRepository permissionRepository;
 
-  @Override
-  @Transactional
-  public void run(ApplicationArguments args) {
+  public void initialize() {
     Map<String, Permission> permissionsByNameAndSource =
         permissionRepository.findAll().stream()
             .collect(Collectors.toMap(p -> p.getName() + ":" + p.getSource(), Function.identity()));

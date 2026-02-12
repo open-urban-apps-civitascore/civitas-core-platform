@@ -9,23 +9,16 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.ApplicationArguments;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
-@Order(1)
 @RequiredArgsConstructor
-public class PermissionInitializer implements ApplicationRunner {
+public class PermissionInitializer {
 
   private final PermissionRepository permissionRepository;
 
-  @Override
-  @Transactional
-  public void run(ApplicationArguments args) {
+  public void initialize() {
     Set<String> existingKeys =
         permissionRepository.findAll().stream()
             .map(p -> p.getName() + ":" + p.getSource())

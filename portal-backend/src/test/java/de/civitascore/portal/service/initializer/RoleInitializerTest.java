@@ -62,7 +62,7 @@ class RoleInitializerTest {
     when(roleRepository.findAll()).thenReturn(List.of());
 
     // when
-    roleInitializer.run(null);
+    roleInitializer.initialize();
 
     // then
     verify(roleRepository).saveAll(rolesCaptor.capture());
@@ -84,7 +84,7 @@ class RoleInitializerTest {
     when(roleRepository.findAll()).thenReturn(existingRoles);
 
     // when
-    roleInitializer.run(null);
+    roleInitializer.initialize();
 
     // then
     verify(roleRepository, never()).saveAll(anyList());
@@ -96,17 +96,17 @@ class RoleInitializerTest {
     // given
     when(permissionRepository.findAll()).thenReturn(allPermissions);
     Role existingRole = new Role();
-    existingRole.setName("Platform Admin");
+    existingRole.setName("Tenant Admin");
     when(roleRepository.findAll()).thenReturn(List.of(existingRole));
 
     // when
-    roleInitializer.run(null);
+    roleInitializer.initialize();
 
     // then
     verify(roleRepository).saveAll(rolesCaptor.capture());
     List<Role> created = rolesCaptor.getValue();
     assertThat(created).hasSize(StandardRole.values().length - 1);
-    assertThat(created).noneMatch(r -> r.getName().equals("Platform Admin"));
+    assertThat(created).noneMatch(r -> r.getName().equals("Tenant Admin"));
   }
 
   @Test
@@ -117,7 +117,7 @@ class RoleInitializerTest {
     when(roleRepository.findAll()).thenReturn(List.of());
 
     // when
-    roleInitializer.run(null);
+    roleInitializer.initialize();
 
     // then
     verify(roleRepository).saveAll(rolesCaptor.capture());
@@ -133,13 +133,12 @@ class RoleInitializerTest {
     when(roleRepository.findAll()).thenReturn(List.of());
 
     // when
-    roleInitializer.run(null);
+    roleInitializer.initialize();
 
     // then
     verify(roleRepository).saveAll(rolesCaptor.capture());
     List<Role> created = rolesCaptor.getValue();
 
-    assertThat(findRole(created, "Platform Admin").getRoleType()).isEqualTo(RoleType.SYSTEM);
     assertThat(findRole(created, "Tenant Admin").getRoleType()).isEqualTo(RoleType.SYSTEM);
     assertThat(findRole(created, "Data Architect").getRoleType()).isEqualTo(RoleType.DATA);
     assertThat(findRole(created, "Data Consumer").getRoleType()).isEqualTo(RoleType.DATA);
@@ -149,18 +148,18 @@ class RoleInitializerTest {
   }
 
   @Test
-  @DisplayName("Should assign all tenant administration permissions to Platform Admin")
-  void shouldAssignAllTenantAdminPermissionsToPlatformAdmin() {
+  @DisplayName("Should assign all tenant administration permissions to Tenant Admin")
+  void shouldAssignAllTenantAdminPermissionsToTenantAdmin() {
     // given
     when(permissionRepository.findAll()).thenReturn(allPermissions);
     when(roleRepository.findAll()).thenReturn(List.of());
 
     // when
-    roleInitializer.run(null);
+    roleInitializer.initialize();
 
     // then
     verify(roleRepository).saveAll(rolesCaptor.capture());
-    Role platformAdmin = findRole(rolesCaptor.getValue(), "Platform Admin");
+    Role tenantAdmin = findRole(rolesCaptor.getValue(), "Tenant Admin");
 
     List<String> expectedPermissions =
         allPermissions.stream()
@@ -169,7 +168,7 @@ class RoleInitializerTest {
             .toList();
 
     List<String> actualPermissions =
-        platformAdmin.getPermissions().stream().map(Permission::getName).toList();
+        tenantAdmin.getPermissions().stream().map(Permission::getName).toList();
 
     assertThat(actualPermissions).containsExactlyInAnyOrderElementsOf(expectedPermissions);
   }
@@ -182,7 +181,7 @@ class RoleInitializerTest {
     when(roleRepository.findAll()).thenReturn(List.of());
 
     // when
-    roleInitializer.run(null);
+    roleInitializer.initialize();
 
     // then
     verify(roleRepository).saveAll(rolesCaptor.capture());
@@ -202,7 +201,7 @@ class RoleInitializerTest {
     when(roleRepository.findAll()).thenReturn(List.of());
 
     // when
-    roleInitializer.run(null);
+    roleInitializer.initialize();
 
     // then
     verify(roleRepository).saveAll(rolesCaptor.capture());
@@ -223,7 +222,7 @@ class RoleInitializerTest {
     when(roleRepository.findAll()).thenReturn(List.of());
 
     // when
-    roleInitializer.run(null);
+    roleInitializer.initialize();
 
     // then
     verify(roleRepository).saveAll(rolesCaptor.capture());
@@ -251,7 +250,7 @@ class RoleInitializerTest {
     when(roleRepository.findAll()).thenReturn(List.of());
 
     // when - first run
-    roleInitializer.run(null);
+    roleInitializer.initialize();
 
     // then - first run creates all
     verify(roleRepository).saveAll(rolesCaptor.capture());
@@ -267,7 +266,7 @@ class RoleInitializerTest {
     when(roleRepository.findAll()).thenReturn(existingRoles);
 
     // when - second run
-    roleInitializer.run(null);
+    roleInitializer.initialize();
 
     // then - no additional saves (saveAll was only called once total)
     verify(roleRepository).saveAll(anyList());
