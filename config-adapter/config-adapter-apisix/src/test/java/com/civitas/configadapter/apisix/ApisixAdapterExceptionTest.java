@@ -62,7 +62,7 @@ class ApisixAdapterExceptionTest {
     adapter = new ApisixAdapter();
     mockConfig = mock(AdapterConfig.class);
 
-    when(mockConfig.getProperty("apisix.topics")).thenReturn("core.civitas.api.backend.created");
+    when(mockConfig.getProperty("apisix.topics")).thenReturn("de.civitascore.api.backend.created");
     when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
         .thenReturn("http://localhost:9180");
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("test-api-key");

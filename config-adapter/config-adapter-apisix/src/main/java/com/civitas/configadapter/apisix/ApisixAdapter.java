@@ -40,9 +40,9 @@ import org.slf4j.LoggerFactory;
  * <p>Supported route events:
  *
  * <ul>
- *   <li>core.civitas.api.route.created - Create a new route
- *   <li>core.civitas.api.route.updated - Update an existing route
- *   <li>core.civitas.api.route.deleted - Delete a route
+ *   <li>de.civitascore.api.route.created - Create a new route
+ *   <li>de.civitascore.api.route.updated - Update an existing route
+ *   <li>de.civitascore.api.route.deleted - Delete a route
  * </ul>
  *
  * <p>Routes support the following plugins (as per CIVITAS/CORE V1):
@@ -72,7 +72,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   private static final String ADMIN_URL_PROPERTY_KEY = "admin.url";
   private static final String ADMIN_KEY_PROPERTY_KEY = "admin.key";
 
-  private static final String APISIX_RESULT_TYPE = "core.civitas.api.processing.result";
+  private static final String APISIX_RESULT_TYPE = "de.civitascore.api.processing.result";
   private static final String APISIX_SOURCE = "civitas.config-adapter.apisix";
 
   // Constants for exception messages

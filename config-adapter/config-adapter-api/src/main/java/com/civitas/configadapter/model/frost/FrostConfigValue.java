@@ -68,7 +68,7 @@ import java.util.Objects;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class FrostConfigValue implements ConfigValue {
 
-  public static final String FROST_RESULT_TYPE = "core.civitas.data.processing.result";
+  public static final String FROST_RESULT_TYPE = "de.civitascore.data.processing.result";
 
   private final Map<String, Object> data;
 

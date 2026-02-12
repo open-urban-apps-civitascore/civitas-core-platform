@@ -47,7 +47,7 @@ class ApisixAdapterResponseRewriteTest extends AbstractApisixAdapterTest {
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
-    adapter.processConfigEvent("core.civitas.api.route.created", event);
+    adapter.processConfigEvent("de.civitascore.api.route.created", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
@@ -70,7 +70,7 @@ class ApisixAdapterResponseRewriteTest extends AbstractApisixAdapterTest {
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
-    adapter.processConfigEvent("core.civitas.api.route.created", event);
+    adapter.processConfigEvent("de.civitascore.api.route.created", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
@@ -93,7 +93,7 @@ class ApisixAdapterResponseRewriteTest extends AbstractApisixAdapterTest {
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
-    adapter.processConfigEvent("core.civitas.api.route.created", event);
+    adapter.processConfigEvent("de.civitascore.api.route.created", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
@@ -117,7 +117,7 @@ class ApisixAdapterResponseRewriteTest extends AbstractApisixAdapterTest {
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
-    adapter.processConfigEvent("core.civitas.api.route.created", event);
+    adapter.processConfigEvent("de.civitascore.api.route.created", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
@@ -148,7 +148,7 @@ class ApisixAdapterResponseRewriteTest extends AbstractApisixAdapterTest {
     ConfigEvent event =
         ApisixTestFixtures.routeEvent(Operation.UPDATE, "routes/test-route-id", routeConfig);
 
-    adapter.processConfigEvent("core.civitas.api.route.updated", event);
+    adapter.processConfigEvent("de.civitascore.api.route.updated", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());

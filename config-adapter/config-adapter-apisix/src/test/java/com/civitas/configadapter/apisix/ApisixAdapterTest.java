@@ -44,21 +44,21 @@ class ApisixAdapterTest {
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("edd1c9f034335f136f87ad84b625c8f1");
     when(mockConfig.getProperty("apisix.topics"))
         .thenReturn(
-            "core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted");
+            "de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted");
 
     adapter.initialize(mockConfig);
 
     List<String> subscribedTopics = adapter.getSubscribedTopics();
     assertNotNull(subscribedTopics);
     assertEquals(3, subscribedTopics.size());
-    assertTrue(subscribedTopics.contains("core.civitas.api.backend.created"));
-    assertTrue(subscribedTopics.contains("core.civitas.api.backend.updated"));
-    assertTrue(subscribedTopics.contains("core.civitas.api.backend.deleted"));
+    assertTrue(subscribedTopics.contains("de.civitascore.api.backend.created"));
+    assertTrue(subscribedTopics.contains("de.civitascore.api.backend.updated"));
+    assertTrue(subscribedTopics.contains("de.civitascore.api.backend.deleted"));
   }
 
   @Test
   void testInitializationWithCustomAdminUrl() {
-    when(mockConfig.getProperty("apisix.topics")).thenReturn("core.civitas.api.backend.created");
+    when(mockConfig.getProperty("apisix.topics")).thenReturn("de.civitascore.api.backend.created");
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("edd1c9f034335f136f87ad84b625c8f1");
     when(mockConfig.getProperty("apisix.admin.url")).thenReturn("http://custom-apisix:9180");
 
@@ -70,7 +70,7 @@ class ApisixAdapterTest {
 
   @Test
   void testInitializationWithOutAdminKey() {
-    when(mockConfig.getProperty("apisix.topics")).thenReturn("core.civitas.api.backend.created");
+    when(mockConfig.getProperty("apisix.topics")).thenReturn("de.civitascore.api.backend.created");
 
     try {
       adapter.initialize(mockConfig);
@@ -85,7 +85,7 @@ class ApisixAdapterTest {
 
   @Test
   void testCloseAdapter() {
-    when(mockConfig.getProperty("apisix.topics")).thenReturn("core.civitas.api.backend.created");
+    when(mockConfig.getProperty("apisix.topics")).thenReturn("de.civitascore.api.backend.created");
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("edd1c9f034335f136f87ad84b625c8f1");
 
     adapter.initialize(mockConfig);

@@ -46,7 +46,7 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
     ConfigEvent event =
         ApisixTestFixtures.upstreamEvent(Operation.CREATE, "upstreams", upstreamConfig);
 
-    adapter.processConfigEvent("core.civitas.api.backend.created", event);
+    adapter.processConfigEvent("de.civitascore.api.backend.created", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
@@ -64,7 +64,7 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
     FatalAdapterException exception =
         assertThrows(
             FatalAdapterException.class,
-            () -> adapter.processConfigEvent("core.civitas.api.backend.created", event));
+            () -> adapter.processConfigEvent("de.civitascore.api.backend.created", event));
 
     assertEquals(AdapterErrorCode.APISIX_UPSTREAM_ERROR, exception.getErrorCode());
     assertTrue(exception.getMessage().contains("HTTP 400"));
@@ -82,7 +82,7 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
     RetryableAdapterException exception =
         assertThrows(
             RetryableAdapterException.class,
-            () -> adapter.processConfigEvent("core.civitas.api.backend.created", event));
+            () -> adapter.processConfigEvent("de.civitascore.api.backend.created", event));
 
     assertEquals(AdapterErrorCode.NETWORK_ERROR, exception.getErrorCode());
   }
@@ -97,7 +97,7 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
         ApisixTestFixtures.upstreamEvent(
             Operation.UPDATE, "upstreams/test-upstream-id", upstreamConfig);
 
-    adapter.processConfigEvent("core.civitas.api.backend.updated", event);
+    adapter.processConfigEvent("de.civitascore.api.backend.updated", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
@@ -111,7 +111,7 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
     ConfigEvent event =
         ApisixTestFixtures.upstreamEvent(Operation.DELETE, "upstreams/test-upstream-id", null);
 
-    adapter.processConfigEvent("core.civitas.api.backend.deleted", event);
+    adapter.processConfigEvent("de.civitascore.api.backend.deleted", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
@@ -127,7 +127,7 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
     FatalAdapterException exception =
         assertThrows(
             FatalAdapterException.class,
-            () -> adapter.processConfigEvent("core.civitas.api.backend.created", event));
+            () -> adapter.processConfigEvent("de.civitascore.api.backend.created", event));
 
     assertEquals(AdapterErrorCode.INVALID_RESOURCE_TYPE, exception.getErrorCode());
   }
@@ -142,7 +142,7 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
         ApisixTestFixtures.upstreamEvent(Operation.CREATE, "upstreams", upstreamConfig);
 
     // Should not throw even without publisher
-    adapter.processConfigEvent("core.civitas.api.backend.created", event);
+    adapter.processConfigEvent("de.civitascore.api.backend.created", event);
   }
 
   @Test
@@ -161,7 +161,7 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
             new Config(null, new ApisixConfigValue(upstreamConfig)));
     ConfigEvent event = new ConfigEvent(metadata, payload);
 
-    adapter.processConfigEvent("core.civitas.api.backend.created", event);
+    adapter.processConfigEvent("de.civitascore.api.backend.created", event);
 
     verify(mockPublisher, never()).publish(any(String.class), any(ConfigResultEvent.class));
   }

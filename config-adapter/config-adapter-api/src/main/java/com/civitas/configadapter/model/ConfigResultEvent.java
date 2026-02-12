@@ -49,7 +49,7 @@ public record ConfigResultEvent(
    * @param targetResource the target resource path
    * @param source the source identifier (e.g., "civitas.config-adapter.keycloak")
    * @param resultType the CloudEvent type for this result (e.g.,
-   *     "core.civitas.idm.processing.result")
+   *     "de.civitascore.idm.processing.result")
    * @return a success ConfigResultEvent
    */
   public static ConfigResultEvent success(
@@ -86,7 +86,7 @@ public record ConfigResultEvent(
    * @param targetResource the target resource path
    * @param source the source identifier (e.g., "civitas.config-adapter.keycloak")
    * @param resultType the CloudEvent type for this result (e.g.,
-   *     "core.civitas.idm.processing.result")
+   *     "de.civitascore.idm.processing.result")
    * @return a failure ConfigResultEvent
    */
   public static ConfigResultEvent failure(

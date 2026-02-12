@@ -40,7 +40,7 @@ public class DummyLogAdapter extends AbstractConfigAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(DummyLogAdapter.class);
 
-  private static final String DUMMY_LOG_RESULT_TYPE = "core.civitas.processing.result";
+  private static final String DUMMY_LOG_RESULT_TYPE = "de.civitascore.processing.result";
   private static final String DUMMY_LOG_SOURCE = "civitas.config-adapter.dummy-log";
 
   public static final String ADAPTER_NAME = "dummylog";

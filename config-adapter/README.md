@@ -137,9 +137,9 @@ Production implementation of APISIX adapter for managing API Gateway upstreams.
 - DELETE - Delete APISIX upstreams
 
 **Subscribed Topics:**
-- `core.civitas.api.backend.created`
-- `core.civitas.api.backend.updated`
-- `core.civitas.api.backend.deleted`
+- `de.civitascore.api.backend.created`
+- `de.civitascore.api.backend.updated`
+- `de.civitascore.api.backend.deleted`
 
 **Configuration Properties:**
 ```properties
@@ -150,7 +150,7 @@ apisix.admin.url=http://localhost:9180
 apisix.admin.key=edd1c9f034335f136f87ad84b625c8f1
 
 # Topics to subscribe to
-apisix.topics=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted
+apisix.topics=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
 ```
 
 **Usage:** Production-ready adapter that integrates with Apache APISIX API Gateway for managing upstream backend services.
@@ -228,10 +228,10 @@ keycloak.client.id=admin-cli
 # APISIX settings
 apisix.admin.url=http://localhost:9180
 apisix.admin.key=edd1c9f034335f136f87ad84b625c8f1
-apisix.topics=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted
+apisix.topics=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
 
 # DummyLogAdapter topic configuration
-dummylog.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.user.deleted
+dummylog.topics=de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted
 ```
 
 ### Topic Subscription Example
@@ -302,7 +302,7 @@ public class MyServiceAdapter extends AbstractConfigAdapter {
 
     @Override
     public List<String> getSubscribedTopics() {
-        // Read topics from config (e.g., myservice.topics=core.civitas.idm.user.created,...)
+        // Read topics from config (e.g., myservice.topics=de.civitascore.idm.user.created,...)
         return getTopicsFromConfig(ADAPTER_NAME + ".topics");
     }
 
@@ -373,7 +373,7 @@ kafka.bootstrap.servers=localhost:9092
 kafka.group.id=config-adapter-group
 
 # Your Service Configuration
-myservice.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated
+myservice.topics=de.civitascore.idm.user.created,de.civitascore.idm.user.updated
 myservice.url=http://localhost:8080
 myservice.api.key=your-api-key
 ```
@@ -461,14 +461,14 @@ The Application class will automatically:
 
 ### Event Type Convention
 
-Events follow the pattern: `core.civitas.idm.{resource}.{action}`
+Events follow the pattern: `de.civitascore.idm.{resource}.{action}`
 
 Examples (from `Topics` constants):
-- `core.civitas.idm.user.created`
-- `core.civitas.idm.user.updated`
-- `core.civitas.idm.user.deleted`
-- `core.civitas.idm.realm.created`
-- `core.civitas.idm.client.updated`
+- `de.civitascore.idm.user.created`
+- `de.civitascore.idm.user.updated`
+- `de.civitascore.idm.user.deleted`
+- `de.civitascore.idm.realm.created`
+- `de.civitascore.idm.client.updated`
 
 All available topic constants are defined in `com.civitas.configadapter.Topics`.
 
@@ -509,7 +509,7 @@ This pattern is useful when:
 ```json
 {
   "ce_specversion": "1.0",
-  "ce_type": "core.civitas.idm.user.created",
+  "ce_type": "de.civitascore.idm.user.created",
   "ce_source": "manual.test",
   "ce_id": "msg-123",
   "ce_time": "2026-01-15T10:35:00+00:00",
@@ -521,7 +521,7 @@ This pattern is useful when:
       "source": "idm.service",
       "correlationId": "corr-456",
       "configVersion": "1.0",
-      "resultTopic": "core.civitas.idm.processing.result"
+      "resultTopic": "de.civitascore.idm.processing.result"
     },
     "payload": {
       "targetComponent": "user",
@@ -566,7 +566,7 @@ Result events are published as CloudEvents with extension attributes for correla
 {
   "specversion": "1.0",
   "id": "result-uuid-123",
-  "type": "core.civitas.idm.processing.result",
+  "type": "de.civitascore.idm.processing.result",
   "source": "civitas.config-adapter.keycloak",
   "time": "2026-01-15T10:35:01+00:00",
   "datacontenttype": "application/json",
@@ -597,7 +597,7 @@ Result events are published as CloudEvents with extension attributes for correla
 {
   "specversion": "1.0",
   "id": "result-uuid-456",
-  "type": "core.civitas.idm.processing.result",
+  "type": "de.civitascore.idm.processing.result",
   "source": "civitas.config-adapter.keycloak",
   "time": "2026-01-15T10:35:01+00:00",
   "datacontenttype": "application/json",
@@ -878,7 +878,7 @@ kafka.group.id=config-adapter-group
 kafka.publish.timeout.ms=5000              # Timeout for synchronous publish (default: 5000ms)
 kafka.retry.max.attempts=3                 # Max retry attempts before DLQ (default: 3)
 kafka.retry.initial.backoff.ms=1000        # Initial backoff between retries (default: 1000ms)
-kafka.dlq.topic=core.civitas.idm.dlq       # Dead Letter Queue topic (default: core.civitas.idm.dlq)
+kafka.dlq.topic=de.civitascore.idm.dlq       # Dead Letter Queue topic (default: de.civitascore.idm.dlq)
 ```
 
 Note: Individual topics are not configured in properties. Each adapter declares its own topics via `getSubscribedTopics()`.
@@ -1005,61 +1005,61 @@ All topics are defined in `com.civitas.configadapter.Topics` and validated at st
 
 | Topic Constant | Topic Value |
 |----------------|-------------|
-| `USER_CREATED` | `core.civitas.idm.user.created` |
-| `USER_UPDATED` | `core.civitas.idm.user.updated` |
-| `USER_DELETED` | `core.civitas.idm.user.deleted` |
-| `USER_LOCKED` | `core.civitas.idm.user.locked` |
-| `USER_UNLOCKED` | `core.civitas.idm.user.unlocked` |
-| `USER_PASSWORD_CHANGED` | `core.civitas.idm.user.password.changed` |
-| `USER_PASSWORD_RESET` | `core.civitas.idm.user.password.reset` |
+| `USER_CREATED` | `de.civitascore.idm.user.created` |
+| `USER_UPDATED` | `de.civitascore.idm.user.updated` |
+| `USER_DELETED` | `de.civitascore.idm.user.deleted` |
+| `USER_LOCKED` | `de.civitascore.idm.user.locked` |
+| `USER_UNLOCKED` | `de.civitascore.idm.user.unlocked` |
+| `USER_PASSWORD_CHANGED` | `de.civitascore.idm.user.password.changed` |
+| `USER_PASSWORD_RESET` | `de.civitascore.idm.user.password.reset` |
 
 #### Realm Events
 
 | Topic Constant | Topic Value |
 |----------------|-------------|
-| `REALM_CREATED` | `core.civitas.idm.realm.created` |
-| `REALM_UPDATED` | `core.civitas.idm.realm.updated` |
-| `REALM_DELETED` | `core.civitas.idm.realm.deleted` |
+| `REALM_CREATED` | `de.civitascore.idm.realm.created` |
+| `REALM_UPDATED` | `de.civitascore.idm.realm.updated` |
+| `REALM_DELETED` | `de.civitascore.idm.realm.deleted` |
 
 #### Client Events
 
 | Topic Constant | Topic Value |
 |----------------|-------------|
-| `CLIENT_CREATED` | `core.civitas.idm.client.created` |
-| `CLIENT_UPDATED` | `core.civitas.idm.client.updated` |
-| `CLIENT_DELETED` | `core.civitas.idm.client.deleted` |
+| `CLIENT_CREATED` | `de.civitascore.idm.client.created` |
+| `CLIENT_UPDATED` | `de.civitascore.idm.client.updated` |
+| `CLIENT_DELETED` | `de.civitascore.idm.client.deleted` |
 
 #### Group Events
 
 | Topic Constant | Topic Value |
 |----------------|-------------|
-| `GROUP_CREATED` | `core.civitas.idm.group.created` |
-| `GROUP_UPDATED` | `core.civitas.idm.group.updated` |
-| `GROUP_DELETED` | `core.civitas.idm.group.deleted` |
+| `GROUP_CREATED` | `de.civitascore.idm.group.created` |
+| `GROUP_UPDATED` | `de.civitascore.idm.group.updated` |
+| `GROUP_DELETED` | `de.civitascore.idm.group.deleted` |
 
 #### Role Events
 
 | Topic Constant | Topic Value |
 |----------------|-------------|
-| `ROLE_CREATED` | `core.civitas.idm.role.created` |
-| `ROLE_UPDATED` | `core.civitas.idm.role.updated` |
-| `ROLE_DELETED` | `core.civitas.idm.role.deleted` |
+| `ROLE_CREATED` | `de.civitascore.idm.role.created` |
+| `ROLE_UPDATED` | `de.civitascore.idm.role.updated` |
+| `ROLE_DELETED` | `de.civitascore.idm.role.deleted` |
 
 #### Backend Events (APISIX)
 
 | Topic Constant | Topic Value |
 |----------------|-------------|
-| `BACKEND_CREATED` | `core.civitas.api.backend.created` |
-| `BACKEND_UPDATED` | `core.civitas.api.backend.updated` |
-| `BACKEND_DELETED` | `core.civitas.api.backend.deleted` |
+| `BACKEND_CREATED` | `de.civitascore.api.backend.created` |
+| `BACKEND_UPDATED` | `de.civitascore.api.backend.updated` |
+| `BACKEND_DELETED` | `de.civitascore.api.backend.deleted` |
 
 #### Route Events (APISIX)
 
 | Topic Constant | Topic Value |
 |----------------|-------------|
-| `ROUTE_CREATED` | `core.civitas.api.route.created` |
-| `ROUTE_UPDATED` | `core.civitas.api.route.updated` |
-| `ROUTE_DELETED` | `core.civitas.api.route.deleted` |
+| `ROUTE_CREATED` | `de.civitascore.api.route.created` |
+| `ROUTE_UPDATED` | `de.civitascore.api.route.updated` |
+| `ROUTE_DELETED` | `de.civitascore.api.route.deleted` |
 
 **Topic Validation:**
 - Topics are validated using `Topics.isValidTopic(String)` method
@@ -1084,7 +1084,7 @@ keycloak.realm=master
 keycloak.username=admin
 keycloak.password=admin
 keycloak.client.id=admin-cli
-keycloak.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.realm.created
+keycloak.topics=de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.realm.created
 ```
 
 ### Example: Multiple Adapters Configuration
@@ -1104,10 +1104,10 @@ keycloak.realm=master
 keycloak.username=admin
 keycloak.password=admin
 keycloak.client.id=admin-cli
-keycloak.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated
+keycloak.topics=de.civitascore.idm.user.created,de.civitascore.idm.user.updated
 
 # DummyLogAdapter topic configuration
-dummylog.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.user.deleted
+dummylog.topics=de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted
 ```
 
 ## Testing
