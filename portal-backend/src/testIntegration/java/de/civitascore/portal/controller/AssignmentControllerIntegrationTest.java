@@ -4,31 +4,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.Catalog;
+import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSpace;
+import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
-import de.civitascore.portal.model.input.CatalogInputDTO;
-import de.civitascore.portal.model.input.DataSetInputDTO;
-import de.civitascore.portal.model.input.DataSpaceInputDTO;
-import de.civitascore.portal.model.input.GroupInputDTO;
-import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
-import de.civitascore.portal.model.output.CatalogOutputDTO;
-import de.civitascore.portal.model.output.DataSetOutputDTO;
-import de.civitascore.portal.model.output.DataSpaceOutputDTO;
-import de.civitascore.portal.model.output.GroupOutputDTO;
-import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.CatalogRepository;
+import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSpaceRepository;
+import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -39,6 +37,11 @@ class AssignmentControllerIntegrationTest
   private final String ASSIGNMENTS_ENDPOINT = "/assignments";
 
   @Autowired private AssignmentRepository assignmentRepository;
+  @Autowired private GroupRepository groupRepository;
+  @Autowired private RoleRepository roleRepository;
+  @Autowired private DataSpaceRepository dataSpaceRepository;
+  @Autowired private DataSetRepository dataSetRepository;
+  @Autowired private CatalogRepository catalogRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -88,103 +91,41 @@ class AssignmentControllerIntegrationTest
   }
 
   private UUID createTestGroup() {
-    GroupInputDTO groupInput = new GroupInputDTO();
-    groupInput.setName("Test Group " + System.currentTimeMillis());
-    groupInput.setDescription("Test group for assignment");
-
-    HttpHeaders headers = createAuthHeaders();
-    HttpEntity<GroupInputDTO> request = new HttpEntity<>(groupInput, headers);
-    ResponseEntity<GroupOutputDTO> response =
-        restTemplate.exchange(
-            "/groups",
-            HttpMethod.POST,
-            request,
-            new ParameterizedTypeReference<GroupOutputDTO>() {});
-
-    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId();
-    }
-    throw new IllegalStateException("Failed to create test group");
+    Group group = new Group();
+    group.setName("Test Group " + System.currentTimeMillis());
+    group.setDescription("Test group for assignment");
+    return groupRepository.save(group).getId();
   }
 
   private UUID createTestRole() {
-    RoleInputDTO roleInput = new RoleInputDTO();
-    roleInput.setName("test_role_" + System.currentTimeMillis());
-    roleInput.setName("Test Role " + System.currentTimeMillis());
-    roleInput.setDescription("Test role for assignment");
-    roleInput.setRoleType(RoleType.DATA);
-
-    HttpHeaders headers = createAuthHeaders();
-    HttpEntity<RoleInputDTO> request = new HttpEntity<>(roleInput, headers);
-    ResponseEntity<RoleOutputDTO> response =
-        restTemplate.exchange(
-            "/roles", HttpMethod.POST, request, new ParameterizedTypeReference<RoleOutputDTO>() {});
-
-    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId();
-    }
-    throw new IllegalStateException("Failed to create test role");
+    Role role = new Role();
+    role.setName("Test Role " + System.currentTimeMillis());
+    role.setDescription("Test role for assignment");
+    role.setRoleType(RoleType.DATA);
+    return roleRepository.save(role).getId();
   }
 
   private UUID createTestDataSpace() {
-    DataSpaceInputDTO input = new DataSpaceInputDTO();
-    input.setName("Test DataSpace " + System.currentTimeMillis());
-    input.setDescription("Test dataspace for assignment");
-
-    HttpHeaders headers = createAuthHeaders();
-    HttpEntity<DataSpaceInputDTO> request = new HttpEntity<>(input, headers);
-    ResponseEntity<DataSpaceOutputDTO> response =
-        restTemplate.exchange(
-            "/dataspaces",
-            HttpMethod.POST,
-            request,
-            new ParameterizedTypeReference<DataSpaceOutputDTO>() {});
-
-    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId();
-    }
-    throw new IllegalStateException("Failed to create test dataspace");
+    DataSpace dataSpace = new DataSpace();
+    dataSpace.setName("Test DataSpace " + System.currentTimeMillis());
+    dataSpace.setDescription("Test dataspace for assignment");
+    return dataSpaceRepository.save(dataSpace).getId();
   }
 
   private UUID createTestDataSet(UUID dataSpaceId) {
-    DataSetInputDTO input = new DataSetInputDTO();
-    input.setName("Test DataSet " + System.currentTimeMillis());
-    input.setDescription("Test dataset for assignment");
-    input.setDataSpaceIds(List.of(dataSpaceId));
-
-    HttpHeaders headers = createAuthHeaders();
-    HttpEntity<DataSetInputDTO> request = new HttpEntity<>(input, headers);
-    ResponseEntity<DataSetOutputDTO> response =
-        restTemplate.exchange(
-            "/datasets",
-            HttpMethod.POST,
-            request,
-            new ParameterizedTypeReference<DataSetOutputDTO>() {});
-
-    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId();
-    }
-    throw new IllegalStateException("Failed to create test dataset");
+    DataSpace dataSpace = dataSpaceRepository.findById(dataSpaceId).orElseThrow();
+    DataSet dataSet = new DataSet();
+    dataSet.setName("Test DataSet " + System.currentTimeMillis());
+    dataSet.setDescription("Test dataset for assignment");
+    dataSet.setDataSpaces(Set.of(dataSpace));
+    return dataSetRepository.save(dataSet).getId();
   }
 
   private UUID createTestCatalog() {
-    CatalogInputDTO input = new CatalogInputDTO();
-    input.setName("Test Catalog " + System.currentTimeMillis());
-    input.setDescription("Test catalog for assignment");
-
-    HttpHeaders headers = createAuthHeaders();
-    HttpEntity<CatalogInputDTO> request = new HttpEntity<>(input, headers);
-    ResponseEntity<CatalogOutputDTO> response =
-        restTemplate.exchange(
-            "/catalogs",
-            HttpMethod.POST,
-            request,
-            new ParameterizedTypeReference<CatalogOutputDTO>() {});
-
-    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId();
-    }
-    throw new IllegalStateException("Failed to create test catalog");
+    Catalog catalog = new Catalog();
+    catalog.setName("Test Catalog " + System.currentTimeMillis());
+    catalog.setDescription("Test catalog for assignment");
+    return catalogRepository.save(catalog).getId();
   }
 
   private UUID getScopeIdForType(ScopeType scopeType) {
