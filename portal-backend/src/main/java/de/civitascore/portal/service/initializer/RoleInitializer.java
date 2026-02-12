@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -30,30 +31,56 @@ public class RoleInitializer {
         permissionRepository.findAll().stream()
             .collect(Collectors.toMap(p -> p.getName() + ":" + p.getSource(), Function.identity()));
 
-    Set<String> existingRoleNames =
-        roleRepository.findAll().stream().map(Role::getName).collect(Collectors.toSet());
+    Map<String, Role> existingRolesByName =
+        roleRepository.findAll().stream()
+            .collect(Collectors.toMap(Role::getName, Function.identity()));
 
     List<Role> toCreate = new ArrayList<>();
+    List<Role> toUpdate = new ArrayList<>();
 
     for (StandardRole standardRole : StandardRole.values()) {
-      if (!existingRoleNames.contains(standardRole.roleName)) {
+      Set<Permission> expectedPermissions =
+          resolvePermissions(standardRole.permissions, permissionsByNameAndSource);
+      Role existing = existingRolesByName.get(standardRole.roleName);
+
+      if (existing == null) {
         Role role = new Role();
         role.setName(standardRole.roleName);
         role.setDescription(standardRole.description);
         role.setRoleType(standardRole.roleType);
         role.setReadonly(true);
-        role.setPermissions(
-            resolvePermissions(standardRole.permissions, permissionsByNameAndSource));
+        role.setPermissions(expectedPermissions);
         toCreate.add(role);
+      } else if (needsUpdate(existing, standardRole, expectedPermissions)) {
+        existing.setDescription(standardRole.description);
+        existing.setPermissions(expectedPermissions);
+        toUpdate.add(existing);
       }
     }
 
     if (!toCreate.isEmpty()) {
       roleRepository.saveAll(toCreate);
       log.info("Initialized {} new roles", toCreate.size());
-    } else {
-      log.info("All {} roles already exist", StandardRole.values().length);
     }
+    if (!toUpdate.isEmpty()) {
+      roleRepository.saveAll(toUpdate);
+      log.info("Updated {} existing roles", toUpdate.size());
+    }
+    if (toCreate.isEmpty() && toUpdate.isEmpty()) {
+      log.info("All {} roles are up to date", StandardRole.values().length);
+    }
+  }
+
+  private boolean needsUpdate(
+      Role existing, StandardRole standardRole, Set<Permission> expectedPermissions) {
+    if (!Objects.equals(existing.getDescription(), standardRole.description)) {
+      return true;
+    }
+    Set<String> existingPermissionNames =
+        existing.getPermissions().stream().map(Permission::getName).collect(Collectors.toSet());
+    Set<String> expectedPermissionNames =
+        expectedPermissions.stream().map(Permission::getName).collect(Collectors.toSet());
+    return !existingPermissionNames.equals(expectedPermissionNames);
   }
 
   private Set<Permission> resolvePermissions(
@@ -62,14 +89,15 @@ public class RoleInitializer {
     for (PermissionName name : names) {
       String key = name.name() + ":" + name.getSource();
       Permission permission = permissionsByNameAndSource.get(key);
-      if (permission != null) {
-        permissions.add(permission);
-      } else {
-        log.warn(
-            "Permission {} with source {} not found in database, skipping",
-            name.name(),
-            name.getSource());
+      if (permission == null) {
+        throw new IllegalStateException(
+            "Permission "
+                + name.name()
+                + " with source "
+                + name.getSource()
+                + " not found in database");
       }
+      permissions.add(permission);
     }
     return permissions;
   }

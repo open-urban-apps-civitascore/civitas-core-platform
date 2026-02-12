@@ -15,8 +15,13 @@ import de.civitascore.portal.repository.PermissionRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.service.initializer.RoleInitializer.StandardRole;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -71,17 +76,11 @@ class RoleInitializerTest {
   }
 
   @Test
-  @DisplayName("Should not create duplicates when all roles already exist")
-  void shouldNotCreateDuplicatesWhenAllRolesExist() {
+  @DisplayName("Should not create or update when all roles already match")
+  void shouldNotCreateOrUpdateWhenAllRolesMatch() {
     // given
     when(permissionRepository.findAll()).thenReturn(allPermissions);
-    List<Role> existingRoles = new ArrayList<>();
-    for (StandardRole std : StandardRole.values()) {
-      Role role = new Role();
-      role.setName(std.roleName);
-      existingRoles.add(role);
-    }
-    when(roleRepository.findAll()).thenReturn(existingRoles);
+    when(roleRepository.findAll()).thenReturn(allMatchingRoles());
 
     // when
     roleInitializer.initialize();
@@ -95,8 +94,7 @@ class RoleInitializerTest {
   void shouldOnlyAddMissingRoles() {
     // given
     when(permissionRepository.findAll()).thenReturn(allPermissions);
-    Role existingRole = new Role();
-    existingRole.setName("Tenant Admin");
+    Role existingRole = buildMatchingRole(StandardRole.TENANT_ADMIN);
     when(roleRepository.findAll()).thenReturn(List.of(existingRole));
 
     // when
@@ -256,14 +254,8 @@ class RoleInitializerTest {
     verify(roleRepository).saveAll(rolesCaptor.capture());
     assertThat(rolesCaptor.getValue()).hasSize(StandardRole.values().length);
 
-    // given - second run with all roles already in database
-    List<Role> existingRoles = new ArrayList<>();
-    for (StandardRole std : StandardRole.values()) {
-      Role role = new Role();
-      role.setName(std.roleName);
-      existingRoles.add(role);
-    }
-    when(roleRepository.findAll()).thenReturn(existingRoles);
+    // given - second run with all roles matching
+    when(roleRepository.findAll()).thenReturn(allMatchingRoles());
 
     // when - second run
     roleInitializer.initialize();
@@ -272,10 +264,73 @@ class RoleInitializerTest {
     verify(roleRepository).saveAll(anyList());
   }
 
+  @Test
+  @DisplayName("Should update existing role when description changes")
+  void shouldUpdateExistingRoleWhenDescriptionChanges() {
+    // given
+    when(permissionRepository.findAll()).thenReturn(allPermissions);
+    Role existingRole = buildMatchingRole(StandardRole.DATA_CONSUMER);
+    existingRole.setDescription("Outdated description");
+    when(roleRepository.findAll()).thenReturn(List.of(existingRole));
+
+    // when
+    roleInitializer.initialize();
+
+    // then - two saveAll calls: one for new roles, one for updated roles
+    verify(roleRepository).saveAll(List.of(existingRole));
+    assertThat(existingRole.getDescription()).isEqualTo(StandardRole.DATA_CONSUMER.description);
+  }
+
+  @Test
+  @DisplayName("Should update existing role when permissions change")
+  void shouldUpdateExistingRoleWhenPermissionsChange() {
+    // given
+    when(permissionRepository.findAll()).thenReturn(allPermissions);
+    Role existingRole = buildMatchingRole(StandardRole.DATA_CONSUMER);
+    existingRole.setPermissions(new HashSet<>()); // empty permissions
+    when(roleRepository.findAll()).thenReturn(List.of(existingRole));
+
+    // when
+    roleInitializer.initialize();
+
+    // then
+    verify(roleRepository).saveAll(List.of(existingRole));
+    Set<String> permissionNames =
+        existingRole.getPermissions().stream().map(Permission::getName).collect(Collectors.toSet());
+    assertThat(permissionNames).containsExactlyInAnyOrder("DATASET_READ", "DATASET_PAYLOAD_READ");
+  }
+
   private Role findRole(List<Role> roles, String name) {
     return roles.stream()
         .filter(r -> r.getName().equals(name))
         .findFirst()
         .orElseThrow(() -> new AssertionError("Role not found: " + name));
+  }
+
+  private Role buildMatchingRole(StandardRole standardRole) {
+    Map<String, Permission> permissionsByName =
+        allPermissions.stream().collect(Collectors.toMap(Permission::getName, Function.identity()));
+    Role role = new Role();
+    role.setName(standardRole.roleName);
+    role.setDescription(standardRole.description);
+    role.setRoleType(standardRole.roleType);
+    role.setReadonly(true);
+    Set<Permission> permissions = new HashSet<>();
+    for (PermissionName pn : standardRole.permissions) {
+      Permission p = permissionsByName.get(pn.name());
+      if (p != null) {
+        permissions.add(p);
+      }
+    }
+    role.setPermissions(permissions);
+    return role;
+  }
+
+  private List<Role> allMatchingRoles() {
+    List<Role> roles = new ArrayList<>();
+    for (StandardRole std : StandardRole.values()) {
+      roles.add(buildMatchingRole(std));
+    }
+    return roles;
   }
 }
