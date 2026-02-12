@@ -218,6 +218,19 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
     echo
 fi
 
+# Build portal-model (shared JPA entities required by portal-backend)
+if [ "$backend_option" = "1" ]; then
+    echo "Building Portal Model..."
+    cd "$SCRIPT_DIR/../portal-model"
+    mvn clean install -DskipTests
+    if [ $? -ne 0 ]; then
+        echo "ERROR: Portal Model build failed"
+        exit 1
+    fi
+    echo "  Portal Model built successfully"
+    echo
+fi
+
 # Build portal-backend if command line option selected
 if [ "$backend_option" = "1" ]; then
     echo "Building Portal Backend (config-adapter version: $DEV_VERSION)..."
@@ -325,6 +338,7 @@ else
     echo "======================================================"
     echo
     echo "Build first (if not already done):"
+    echo "  cd portal-model && mvn clean install -DskipTests && cd .."
     echo "  cd portal-backend"
     echo "  mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION"
     echo
