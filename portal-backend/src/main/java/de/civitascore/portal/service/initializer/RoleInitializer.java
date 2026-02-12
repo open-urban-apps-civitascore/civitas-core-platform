@@ -83,29 +83,6 @@ public class RoleInitializer implements ApplicationRunner {
 
   /** Standard role definitions as described in the Authorization Data Model documentation. */
   enum StandardRole {
-    PLATFORM_ADMIN(
-        "Platform Admin",
-        "Management rights for the configuration of tenants and basic system parameters.",
-        RoleType.SYSTEM,
-        new PermissionName[] {
-          PermissionName.USER_CREATE,
-          PermissionName.USER_READ,
-          PermissionName.USER_UPDATE,
-          PermissionName.USER_DELETE,
-          PermissionName.ROLE_CREATE,
-          PermissionName.ROLE_READ,
-          PermissionName.ROLE_UPDATE,
-          PermissionName.ROLE_DELETE,
-          PermissionName.ASSIGNMENT_CREATE,
-          PermissionName.ASSIGNMENT_READ,
-          PermissionName.ASSIGNMENT_DELETE,
-          PermissionName.GROUP_CREATE,
-          PermissionName.GROUP_READ,
-          PermissionName.GROUP_UPDATE,
-          PermissionName.GROUP_DELETE,
-          PermissionName.PERMISSION_READ,
-        }),
-
     TENANT_ADMIN(
         "Tenant Admin",
         "Tenant-wide permissions to manage users, roles and permissions as well as tenant"
