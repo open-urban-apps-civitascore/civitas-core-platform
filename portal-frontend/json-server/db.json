@@ -6746,7 +6746,10 @@
         "31"
       ],
       "createdAt": "2025-11-21T13:52:15.279Z",
-      "groups": [],
+      "groups": [
+        "76f44a4f-09f3-480e-be4c-f69e967b71fc",
+        "49873f79-9dc5-4764-917f-2056f120a26a"
+      ],
       "name": "Test1",
       "description": "Diese Rolle kann irgendwas super Tolles.",
       "roleOrigin": "custom",

@@ -3,7 +3,6 @@ import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
-import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -12,45 +11,52 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Group, UserGroupsListData } from '@/types/groups'
+import { User } from '@/types/users'
+import { mapGroupsApiToListData } from '@/utils/groups'
 
+import { GroupAssignmentModal } from './GroupAssignmentModal'
 import GroupsTable from './GroupsTable'
 
 interface GroupsTabProps {
-  userId: string
+  user: User
 }
 
-const transformGroupsToListData = (groups: Group[]): UserGroupsListData[] =>
-  groups.map(group => ({
-    id: group.id,
-    name: group.name,
-    description: group.description,
-    membersCount: group.members?.length || 0,
-    contactUser: group.contactUser,
-  }))
-
 export const GroupsTab = (props: GroupsTabProps) => {
-  const { userId } = props
+  const { user } = props
+  const userId = user.id
+  const groupIds = user.groups
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
   const [searchString, setSearchString] = useState('')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
   const [sorting, setSorting] = useState<SortingState>([{ id: 'title', desc: false }])
+  const [isGroupAssignmentModalOpen, setIsGroupAssignmentModalOpen] = useState(false)
 
-  const { data: groupsData, isFetching: isLoadingGroups, error: groupsError } = useGetGroups()
-  const { data: rolesData, isFetching: isLoadingRoles, error: rolesError } = useGetRoles()
+  const getGroupsRequestParams = () => {
+    const params = new URLSearchParams()
+    groupIds.forEach(group => {
+      params.append('id', group)
+    })
+    return params
+  }
+
+  const {
+    data: groupsData,
+    isFetching: isLoadingGroups,
+    error: groupsError,
+  } = useGetGroups({ isEnabled: groupIds.length > 0, params: getGroupsRequestParams() })
 
   const groups = useMemo(() => {
-    if (groupsData && rolesData && userId) {
+    if (groupsData && userId) {
       const userGroups = groupsData?.data.filter(
         group => group?.members && group.members.filter(user => user?.id === userId).length > 0,
       )
-      return transformGroupsToListData(userGroups)
+      return mapGroupsApiToListData(userGroups)
     } else {
       return []
     }
-  }, [groupsData, rolesData, userId])
+  }, [groupsData, userId])
 
   const filteredGroups = useMemo(() => {
     if (searchString) {
@@ -68,8 +74,8 @@ export const GroupsTab = (props: GroupsTabProps) => {
   const rowCount = groups.length
   const totalPages = Math.ceil(rowCount / pageSize) || 1
 
-  const isLoading = isLoadingGroups || isLoadingRoles
-  const error = groupsError || rolesError
+  const isLoading = isLoadingGroups
+  const error = groupsError
 
   const handlePagination = (newPagination: PaginationState) => {
     setPageIndex(newPagination.pageIndex)
@@ -78,7 +84,9 @@ export const GroupsTab = (props: GroupsTabProps) => {
 
   const handleDelete = (id: string) => {}
 
-  const CustomElement = <Button>{t('groupsTab.addGroup')}</Button>
+  const handleUpdateGroups = () => {}
+
+  const CustomElement = <Button onClick={() => setIsGroupAssignmentModalOpen(true)}>{t('groupsTab.addGroup')}</Button>
   return (
     <PageBackground>
       <ContentCard className={cn(!error && !isLoading ? 'h-full' : 'h-50')}>
@@ -102,6 +110,12 @@ export const GroupsTab = (props: GroupsTabProps) => {
             </TableContainer>
           </>
         )}
+        <GroupAssignmentModal
+          open={isGroupAssignmentModalOpen}
+          userName={`${user.firstName} ${user.lastName}`}
+          originalGroups={groupIds}
+          onUpdateGroups={handleUpdateGroups}
+        />
         {isLoading && <LoadingSpinner className="h-full" />}
         {error && <p className="h-full flex items-center justify-center">{tCommon('errors.loadingError')}</p>}
       </ContentCard>

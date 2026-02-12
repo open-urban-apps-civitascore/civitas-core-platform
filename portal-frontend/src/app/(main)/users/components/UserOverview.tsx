@@ -140,7 +140,7 @@ export const UserOverview = (props: UserOverviewProps) => {
   const renderTabContent = () => {
     switch (subTabValue) {
       case tabValues.groups.value:
-        return <GroupsTab userId={userData.id} />
+        return <GroupsTab user={userData} />
       case tabValues.roles.value:
         return <RolesTab groupIds={userData.groups} />
       case tabValues.userData.value:
