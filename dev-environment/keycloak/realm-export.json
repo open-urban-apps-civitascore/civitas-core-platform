@@ -391,6 +391,24 @@
     }
   },
   "groups": [],
+  "users": [
+    {
+      "username": "dev@civitas.local",
+      "email": "dev@civitas.local",
+      "firstName": "Developer",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["default-roles-civitas-core"]
+    }
+  ],
   "defaultRole": {
     "id": "780aaa23-3059-444f-ba87-5cc1d782a67b",
     "name": "default-roles-civitas-core",
