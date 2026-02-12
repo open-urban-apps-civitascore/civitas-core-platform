@@ -52,8 +52,8 @@ abstract class AbstractApisixAdapterTest {
 
     when(mockConfig.getProperty("apisix.topics"))
         .thenReturn(
-            "core.civitas.api.backend.created,core.civitas.api.backend.updated,"
-                + "core.civitas.api.backend.deleted");
+            "de.civitascore.api.backend.created,de.civitascore.api.backend.updated,"
+                + "de.civitascore.api.backend.deleted");
     when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
         .thenReturn("http://localhost:9180");
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("edd1c9f034335f136f87ad84b625c8f1");

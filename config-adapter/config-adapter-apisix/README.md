@@ -71,14 +71,14 @@ The APISIX adapter integrates with Apache APISIX API Gateway's Admin API to mana
 The adapter subscribes to backend and route lifecycle events:
 
 **Backend Topics:**
-- `core.civitas.api.backend.created` - New backend services
-- `core.civitas.api.backend.updated` - Backend updates
-- `core.civitas.api.backend.deleted` - Backend removal
+- `de.civitascore.api.backend.created` - New backend services
+- `de.civitascore.api.backend.updated` - Backend updates
+- `de.civitascore.api.backend.deleted` - Backend removal
 
 **Route Topics:**
-- `core.civitas.api.route.created` - New routes
-- `core.civitas.api.route.updated` - Route updates
-- `core.civitas.api.route.deleted` - Route removal
+- `de.civitascore.api.route.created` - New routes
+- `de.civitascore.api.route.updated` - Route updates
+- `de.civitascore.api.route.deleted` - Route removal
 
 ## Configuration
 
@@ -92,7 +92,7 @@ apisix.admin.url=http://localhost:9180
 apisix.admin.key=edd1c9f034335f136f87ad84b625c8f1
 
 # Topics to subscribe to (backend and route events)
-apisix.topics=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted,core.civitas.api.route.created,core.civitas.api.route.updated,core.civitas.api.route.deleted
+apisix.topics=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted,de.civitascore.api.route.created,de.civitascore.api.route.updated,de.civitascore.api.route.deleted
 ```
 
 ### Environment Variables
@@ -102,7 +102,7 @@ All properties can be overridden with environment variables:
 ```bash
 APISIX_ADMIN_URL=http://apisix:9180
 APISIX_ADMIN_KEY=your-api-key
-APISIX_TOPICS=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted,core.civitas.api.route.created,core.civitas.api.route.updated,core.civitas.api.route.deleted
+APISIX_TOPICS=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted,de.civitascore.api.route.created,de.civitascore.api.route.updated,de.civitascore.api.route.deleted
 ```
 
 ### Docker Compose Example
@@ -118,7 +118,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       APISIX_ADMIN_URL: http://apisix:9180
       APISIX_ADMIN_KEY: ${APISIX_API_KEY}
-      APISIX_TOPICS: core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted,core.civitas.api.route.created,core.civitas.api.route.updated,core.civitas.api.route.deleted
+      APISIX_TOPICS: de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted,de.civitascore.api.route.created,de.civitascore.api.route.updated,de.civitascore.api.route.deleted
     depends_on:
       - kafka
       - apisix
@@ -131,7 +131,7 @@ services:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.api.backend.created",
+  "type": "de.civitascore.api.backend.created",
   "source": "civitas.api.provisioning",
   "id": "event-123",
   "datacontenttype": "application/json",
@@ -535,7 +535,7 @@ Routes define how requests are matched and forwarded to upstreams. The adapter s
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.api.route.created",
+  "type": "de.civitascore.api.route.created",
   "source": "civitas.api.provisioning",
   "id": "event-route-123",
   "datacontenttype": "application/json",
@@ -1176,7 +1176,7 @@ Complete CloudEvent for creating a route with `proxy-rewrite`:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.api.route.created",
+  "type": "de.civitascore.api.route.created",
   "source": "civitas.api.provisioning",
   "id": "event-proxy-rewrite-001",
   "datacontenttype": "application/json",

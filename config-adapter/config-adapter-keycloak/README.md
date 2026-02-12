@@ -65,33 +65,33 @@ The Keycloak adapter integrates with Keycloak's Admin REST API to manage identit
 The adapter subscribes to all IDM lifecycle events:
 
 **User Events (7):**
-- `core.civitas.idm.user.created`
-- `core.civitas.idm.user.updated`
-- `core.civitas.idm.user.deleted`
-- `core.civitas.idm.user.locked`
-- `core.civitas.idm.user.unlocked`
-- `core.civitas.idm.user.password.changed`
-- `core.civitas.idm.user.password.reset`
+- `de.civitascore.idm.user.created`
+- `de.civitascore.idm.user.updated`
+- `de.civitascore.idm.user.deleted`
+- `de.civitascore.idm.user.locked`
+- `de.civitascore.idm.user.unlocked`
+- `de.civitascore.idm.user.password.changed`
+- `de.civitascore.idm.user.password.reset`
 
 **Realm Events (3):**
-- `core.civitas.idm.realm.created`
-- `core.civitas.idm.realm.updated`
-- `core.civitas.idm.realm.deleted`
+- `de.civitascore.idm.realm.created`
+- `de.civitascore.idm.realm.updated`
+- `de.civitascore.idm.realm.deleted`
 
 **Client Events (3):**
-- `core.civitas.idm.client.created`
-- `core.civitas.idm.client.updated`
-- `core.civitas.idm.client.deleted`
+- `de.civitascore.idm.client.created`
+- `de.civitascore.idm.client.updated`
+- `de.civitascore.idm.client.deleted`
 
 **Role Events (3):**
-- `core.civitas.idm.role.created`
-- `core.civitas.idm.role.updated`
-- `core.civitas.idm.role.deleted`
+- `de.civitascore.idm.role.created`
+- `de.civitascore.idm.role.updated`
+- `de.civitascore.idm.role.deleted`
 
 **Group Events (3):**
-- `core.civitas.idm.group.created`
-- `core.civitas.idm.group.updated`
-- `core.civitas.idm.group.deleted`
+- `de.civitascore.idm.group.created`
+- `de.civitascore.idm.group.updated`
+- `de.civitascore.idm.group.deleted`
 
 ## Configuration
 
@@ -112,7 +112,7 @@ keycloak.password=admin
 keycloak.client.id=admin-cli
 
 # Topics to subscribe to (comma-separated)
-keycloak.topics=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.user.deleted,core.civitas.idm.realm.created,core.civitas.idm.realm.updated,core.civitas.idm.realm.deleted,core.civitas.idm.client.created,core.civitas.idm.client.updated,core.civitas.idm.client.deleted,core.civitas.idm.role.created,core.civitas.idm.role.updated,core.civitas.idm.role.deleted,core.civitas.idm.group.created,core.civitas.idm.group.updated,core.civitas.idm.group.deleted
+keycloak.topics=de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted,de.civitascore.idm.realm.created,de.civitascore.idm.realm.updated,de.civitascore.idm.realm.deleted,de.civitascore.idm.client.created,de.civitascore.idm.client.updated,de.civitascore.idm.client.deleted,de.civitascore.idm.role.created,de.civitascore.idm.role.updated,de.civitascore.idm.role.deleted,de.civitascore.idm.group.created,de.civitascore.idm.group.updated,de.civitascore.idm.group.deleted
 ```
 
 ### Environment Variables
@@ -125,7 +125,7 @@ KEYCLOAK_REALM=master
 KEYCLOAK_USERNAME=admin
 KEYCLOAK_PASSWORD=secure-password
 KEYCLOAK_CLIENT_ID=admin-cli
-KEYCLOAK_TOPICS=core.civitas.idm.user.created,core.civitas.idm.user.updated
+KEYCLOAK_TOPICS=de.civitascore.idm.user.created,de.civitascore.idm.user.updated
 ```
 
 ### Docker Compose Example
@@ -144,7 +144,7 @@ services:
       KEYCLOAK_USERNAME: admin
       KEYCLOAK_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KEYCLOAK_CLIENT_ID: admin-cli
-      KEYCLOAK_TOPICS: core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.user.deleted
+      KEYCLOAK_TOPICS: de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted
     depends_on:
       - kafka
       - keycloak
@@ -159,7 +159,7 @@ services:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.idm.user.created",
+  "type": "de.civitascore.idm.user.created",
   "source": "civitas.idm.provisioning",
   "id": "event-123",
   "datacontenttype": "application/json",
@@ -170,7 +170,7 @@ services:
       "source": "idm.service",
       "correlationId": "corr-789",
       "configVersion": "1.0",
-      "resultTopic": "core.civitas.idm.processing.result"
+      "resultTopic": "de.civitascore.idm.processing.result"
     },
     "payload": {
       "targetComponent": "user",
@@ -201,14 +201,14 @@ services:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.idm.realm.created",
+  "type": "de.civitascore.idm.realm.created",
   "source": "civitas.idm.provisioning",
   "id": "event-456",
   "data": {
     "metadata": {
       "messageId": "msg-789",
       "correlationId": "corr-012",
-      "resultTopic": "core.civitas.idm.processing.result"
+      "resultTopic": "de.civitascore.idm.processing.result"
     },
     "payload": {
       "targetComponent": "realm",
@@ -234,14 +234,14 @@ services:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.idm.role.created",
+  "type": "de.civitascore.idm.role.created",
   "source": "civitas.idm.provisioning",
   "id": "event-789",
   "data": {
     "metadata": {
       "messageId": "msg-012",
       "correlationId": "corr-345",
-      "resultTopic": "core.civitas.idm.processing.result"
+      "resultTopic": "de.civitascore.idm.processing.result"
     },
     "payload": {
       "targetComponent": "role",
@@ -267,14 +267,14 @@ services:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.idm.group.created",
+  "type": "de.civitascore.idm.group.created",
   "source": "civitas.idm.provisioning",
   "id": "event-012",
   "data": {
     "metadata": {
       "messageId": "msg-345",
       "correlationId": "corr-678",
-      "resultTopic": "core.civitas.idm.processing.result"
+      "resultTopic": "de.civitascore.idm.processing.result"
     },
     "payload": {
       "targetComponent": "group",
@@ -302,7 +302,7 @@ services:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.idm.processing.result",
+  "type": "de.civitascore.idm.processing.result",
   "source": "civitas.config-adapter.keycloak",
   "id": "result-123",
   "datacontenttype": "application/json",

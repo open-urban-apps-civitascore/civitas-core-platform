@@ -30,10 +30,10 @@ echo "Starting the Keycloak Config Adapter..."
 # export KEYCLOAK_USERNAME=admin
 # export KEYCLOAK_PASSWORD=admin
 # export KEYCLOAK_CLIENT_ID=admin-cli
-# export KEYCLOAK_TOPICS=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.user.deleted
+# export KEYCLOAK_TOPICS=de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted
 
 # DummyLogAdapter Configuration
-# export DUMMYLOG_TOPICS=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.user.deleted
+# export DUMMYLOG_TOPICS=de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted
 
 export HEALTHCHECK_PORT=8089
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092

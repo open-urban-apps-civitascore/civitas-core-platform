@@ -48,7 +48,7 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
-    adapter.processConfigEvent("core.civitas.api.route.created", event);
+    adapter.processConfigEvent("de.civitascore.api.route.created", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
@@ -65,7 +65,7 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
     FatalAdapterException exception =
         assertThrows(
             FatalAdapterException.class,
-            () -> adapter.processConfigEvent("core.civitas.api.route.created", event));
+            () -> adapter.processConfigEvent("de.civitascore.api.route.created", event));
 
     assertEquals(AdapterErrorCode.APISIX_ROUTE_ERROR, exception.getErrorCode());
     assertTrue(exception.getMessage().contains("HTTP 400"));
@@ -89,7 +89,7 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
     ConfigEvent event =
         ApisixTestFixtures.routeEvent(Operation.UPDATE, "routes/test-route-id", routeConfig);
 
-    adapter.processConfigEvent("core.civitas.api.route.updated", event);
+    adapter.processConfigEvent("de.civitascore.api.route.updated", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
@@ -108,7 +108,7 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
     FatalAdapterException exception =
         assertThrows(
             FatalAdapterException.class,
-            () -> adapter.processConfigEvent("core.civitas.api.route.updated", event));
+            () -> adapter.processConfigEvent("de.civitascore.api.route.updated", event));
 
     assertEquals(AdapterErrorCode.APISIX_ROUTE_ERROR, exception.getErrorCode());
     assertTrue(exception.getMessage().contains("HTTP 404"));
@@ -121,7 +121,7 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
     ConfigEvent event =
         ApisixTestFixtures.routeEvent(Operation.DELETE, "routes/test-route-id", null);
 
-    adapter.processConfigEvent("core.civitas.api.route.deleted", event);
+    adapter.processConfigEvent("de.civitascore.api.route.deleted", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
@@ -139,7 +139,7 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
     FatalAdapterException exception =
         assertThrows(
             FatalAdapterException.class,
-            () -> adapter.processConfigEvent("core.civitas.api.route.deleted", event));
+            () -> adapter.processConfigEvent("de.civitascore.api.route.deleted", event));
 
     assertEquals(AdapterErrorCode.APISIX_ROUTE_ERROR, exception.getErrorCode());
     assertTrue(exception.getMessage().contains("HTTP 404"));
@@ -181,7 +181,7 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
-    adapter.processConfigEvent("core.civitas.api.route.created", event);
+    adapter.processConfigEvent("de.civitascore.api.route.created", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
@@ -198,7 +198,7 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
     RetryableAdapterException exception =
         assertThrows(
             RetryableAdapterException.class,
-            () -> adapter.processConfigEvent("core.civitas.api.route.created", event));
+            () -> adapter.processConfigEvent("de.civitascore.api.route.created", event));
 
     assertEquals(AdapterErrorCode.NETWORK_ERROR, exception.getErrorCode());
     assertTrue(exception.isRetryable());
@@ -214,7 +214,7 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
 
     ConfigEvent event = ApisixTestFixtures.upstreamEvent(Operation.CREATE, "routes", routeConfig);
 
-    adapter.processConfigEvent("core.civitas.api.route.created", event);
+    adapter.processConfigEvent("de.civitascore.api.route.created", event);
 
     ConfigResultEvent result = capturePublishedResult();
     assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
