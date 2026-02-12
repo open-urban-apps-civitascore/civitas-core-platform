@@ -11,6 +11,7 @@
       "submit": "Speichern",
       "cancel": "Abbrechen",
       "delete": "Löschen",
+      "deleteItem": "{item} löschen",
       "add": "Hinzufügen",
       "edit": "Bearbeiten",
       "editBase": "Basis bearbeiten",
@@ -39,6 +40,7 @@
       "users": "Users",
       "user": "User",
       "groups": "Gruppen",
+      "group": "Gruppe",
       "roles": "Rollen",
       "datasets": "Datensätze",
       "dataspaces": "Datenräume",
@@ -194,10 +196,9 @@
       "title": "Gruppenmitgliedschaft",
       "addGroup": "Gruppe hinzufügen",
       "name": "Name",
-      "memberSince": "Mitglied seit",
+      "membersCount": "Anzahl User",
       "contact": "Ansprechpartner",
-      "description": "Beschreibung",
-      "roles": "Rollen"
+      "description": "Beschreibung"
     },
     "messages": {
       "createSuccess": "User wurde erfolgreich angelegt.",

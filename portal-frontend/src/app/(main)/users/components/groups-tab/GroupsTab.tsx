@@ -12,8 +12,7 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Group } from '@/types/groups'
-import { Role } from '@/types/roles'
+import { Group, UserGroupsListData } from '@/types/groups'
 
 import GroupsTable from './GroupsTable'
 
@@ -21,12 +20,12 @@ interface GroupsTabProps {
   userId: string
 }
 
-const transformGroupsToListData = (groups: Group[], roles: Role[]) =>
+const transformGroupsToListData = (groups: Group[]): UserGroupsListData[] =>
   groups.map(group => ({
     id: group.id,
     name: group.name,
     description: group.description,
-    roles: group.roles?.flatMap(groupRole => (roles.find(role => role.id === groupRole.id) ? groupRole : [])) || [],
+    membersCount: group.members?.length || 0,
     contactUser: group.contactUser,
   }))
 
@@ -47,7 +46,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
       const userGroups = groupsData?.data.filter(
         group => group?.members && group.members.filter(user => user?.id === userId).length > 0,
       )
-      return transformGroupsToListData(userGroups, rolesData.data)
+      return transformGroupsToListData(userGroups)
     } else {
       return []
     }
@@ -77,6 +76,8 @@ export const GroupsTab = (props: GroupsTabProps) => {
     setPageSize(newPagination.pageSize)
   }
 
+  const handleDelete = (id: string) => {}
+
   const CustomElement = <Button>{t('groupsTab.addGroup')}</Button>
   return (
     <PageBackground>
@@ -96,6 +97,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
                 onSortingChange={setSorting}
                 totalPages={totalPages}
                 isLoading={isLoading}
+                onDelete={handleDelete}
               />
             </TableContainer>
           </>

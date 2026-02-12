@@ -11,6 +11,7 @@
       "submit": "Save",
       "cancel": "Cancel",
       "delete": "Delete",
+      "deleteItem": "Delete {item}",
       "add": "Add",
       "edit": "Edit",
       "editBase": "Edit base",
@@ -40,6 +41,7 @@
       "users": "Users",
       "user": "User",
       "groups": "Groups",
+      "group": "Group",
       "roles": "Roles",
       "datasets": "Datasets",
       "dataspaces": "Dataspaces",
@@ -192,10 +194,9 @@
       "title": "Group Membership",
       "addGroup": "Add Group",
       "name": "Name",
-      "memberSince": "Member since",
+      "membersCount": "Users count",
       "contact": "Contact",
-      "description": "Description",
-      "roles": "Roles"
+      "description": "Description"
     },
     "messages": {
       "createSuccess": "User has been successfully created.",

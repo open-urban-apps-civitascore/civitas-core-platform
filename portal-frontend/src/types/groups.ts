@@ -23,7 +23,9 @@ export const GroupApiResponseSchema = z.object({
 
 export type Group = z.infer<typeof GroupApiResponseSchema>
 
-export type UserGroupsListData = Omit<Group, 'members' | 'createdAt' | 'modifiedAt'>
+export type UserGroupsListData = Pick<Group, 'id' | 'name' | 'description' | 'contactUser'> & {
+  membersCount: number
+}
 
 export const GroupApiDataSchema = z.object({
   id: z.string(),

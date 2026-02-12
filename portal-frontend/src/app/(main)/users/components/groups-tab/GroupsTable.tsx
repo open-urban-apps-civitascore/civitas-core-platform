@@ -1,7 +1,7 @@
-import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
-import { useLocale, useTranslations } from 'next-intl'
+import { createColumnHelper, getCoreRowModel, getSortedRowModel, Row, useReactTable } from '@tanstack/react-table'
+import { useTranslations } from 'next-intl'
 
-import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/BadgesWithTooltip'
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { UserGroupsListData } from '@/types/groups'
@@ -10,6 +10,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface GroupsTableProps extends TableProps<UserGroupsListData> {
   groups: UserGroupsListData[]
+  onDelete: (id: string) => void
 }
 
 const GroupsTable = (props: GroupsTableProps) => {
@@ -24,10 +25,11 @@ const GroupsTable = (props: GroupsTableProps) => {
     onRowClick,
     onPaginationChange,
     onSortingChange,
+    onDelete,
     isLoading,
   } = props
   const t = useTranslations('users')
-  const locale = useLocale()
+  const tCommon = useTranslations('common')
   const columnHelper = createColumnHelper<UserGroupsListData>()
 
   const columns = [
@@ -46,6 +48,10 @@ const GroupsTable = (props: GroupsTableProps) => {
         },
       },
     }),
+    columnHelper.accessor('membersCount', {
+      header: t('groupsTab.membersCount'),
+      cell: info => info.getValue() || 0,
+    }),
     columnHelper.accessor('contactUser', {
       header: t('groupsTab.contact'),
       cell: info => info.getValue()?.name || '-',
@@ -62,10 +68,19 @@ const GroupsTable = (props: GroupsTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('roles', {
-      header: t('groupsTab.roles'),
-      cell: info => <BadgesWithTooltip items={info.getValue()?.map(role => role.name) || []} minVisibleBadges={2} />,
-    }),
+    {
+      id: 'actions',
+      cell: ({ row }: { row: Row<UserGroupsListData> }) => (
+        <TableDropdownMenu
+          menuItems={[
+            {
+              label: tCommon('actions.deleteItem', { item: tCommon('items.group') }),
+              onClick: () => onDelete(row.original.id),
+            },
+          ]}
+        />
+      ),
+    },
   ]
 
   const table = useReactTable({
