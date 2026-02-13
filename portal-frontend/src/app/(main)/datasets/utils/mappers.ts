@@ -6,6 +6,5 @@ export const mapDatasetToFormData = (dataset: Dataset) => {
     name: dataset.name,
     dataspace: dataset.dataspace?.id || '',
     description: dataset.description,
-    tags: dataset.tags,
   }
 }

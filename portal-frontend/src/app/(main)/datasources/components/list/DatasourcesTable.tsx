@@ -3,13 +3,11 @@ import { formatDistanceStrict } from 'date-fns'
 import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
-import { ActivityBadge } from '@/components/activity-badge/ActivityBadge'
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
-import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/BadgesWithTooltip'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { CONNECTION_TYPES, CONNECTOR_TYPE_KEYS, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPE_KEYS, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
 import { Datasource } from '@/types/datasources'
 import { TableProps } from '@/types/table'
@@ -52,7 +50,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
 
       meta: {
         style: {
-          width: '20%',
+          width: '25%',
           minWidth: '200px',
           color: 'var(--foreground)',
           fontWeight: '500',
@@ -64,7 +62,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
       cell: info => info.getValue(),
       meta: {
         style: {
-          width: '25%',
+          width: '30%',
           minWidth: '200px',
         },
       },
@@ -77,31 +75,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
       },
       meta: {
         style: {
-          width: '10%',
-          minWidth: '100px',
-        },
-      },
-    }),
-    columnHelper.accessor('connection', {
-      header: t('tableHeaders.connection'),
-      cell: info => {
-        const connection = info.getValue()
-        let isActive: boolean | undefined
-        switch (connection) {
-          case CONNECTION_TYPES.INACTIVE:
-            isActive = false
-            break
-          case CONNECTION_TYPES.ACTIVE:
-            isActive = true
-            break
-          default:
-            break
-        }
-        return connection ? <ActivityBadge isActive={isActive} title={connection} /> : '-'
-      },
-      meta: {
-        style: {
-          width: '10%',
+          width: '15%',
           minWidth: '100px',
         },
       },
@@ -112,16 +86,6 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
         const interval = formatDistanceStrict(new Date(), new Date(info.getValue()), { locale: DATE_LOCALES[locale] })
         return interval
       },
-      meta: {
-        style: {
-          width: '10%',
-          minWidth: '100px',
-        },
-      },
-    }),
-    columnHelper.accessor('tags', {
-      header: t('tableHeaders.tags'),
-      cell: info => <BadgesWithTooltip items={info.getValue()} minVisibleBadges={2} />,
       meta: {
         style: {
           width: '15%',
@@ -146,7 +110,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
       },
       meta: {
         style: {
-          width: '10%',
+          width: '15%',
           minWidth: '120px',
         },
       },
