@@ -1,0 +1,99 @@
+package de.civitascore.portal.service;
+
+import de.civitascore.portal.mapper.PipelineMapper;
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.input.PipelineInputDTO;
+import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.Optional;
+import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Slf4j
+@Service
+public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
+
+  private final PipelineRepository pipelineRepository;
+  private final PipelineMapper pipelineMapper;
+  private final DataSetRepository dataSetRepository;
+
+  public PipelineService(
+      PipelineRepository pipelineRepository,
+      PipelineMapper pipelineMapper,
+      DataSetRepository dataSetRepository) {
+    this.pipelineRepository = pipelineRepository;
+    this.pipelineMapper = pipelineMapper;
+    this.dataSetRepository = dataSetRepository;
+  }
+
+  @Override
+  protected PipelineRepository getRepository() {
+    return pipelineRepository;
+  }
+
+  @Override
+  protected PipelineMapper getMapper() {
+    return pipelineMapper;
+  }
+
+  @Override
+  protected String getEntityName() {
+    return Pipeline.class.getSimpleName();
+  }
+
+  @Override
+  protected Pipeline postConvertToEntity(Pipeline entity, PipelineInputDTO input) {
+    // Set the DataSet relationship
+    Optional.ofNullable(input.getDataSetId())
+        .flatMap(dataSetRepository::findById)
+        .ifPresentOrElse(
+            entity::setDataSet,
+            () -> {
+              throw new ResourceNotFoundException(
+                  DataSet.class.getSimpleName(), input.getDataSetId());
+            });
+
+    return super.postConvertToEntity(entity, input);
+  }
+
+  @Override
+  protected Pipeline preSave(Pipeline entity) {
+    validateUniqueName(entity);
+    return super.preSave(entity);
+  }
+
+  private void validateUniqueName(Pipeline entity) {
+    pipelineRepository
+        .findByName(entity.getName())
+        .ifPresent(
+            existing -> {
+              if (!existing.getId().equals(entity.getId())) {
+                throw new UniqueConstraintViolationException(
+                    Pipeline.class.getSimpleName(), "name", entity.getName());
+              }
+            });
+  }
+
+  @Transactional
+  public void delete(UUID id) {
+    Pipeline pipeline =
+        pipelineRepository
+            .findByIdWithDataSet(id)
+            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+
+    if (pipeline.getDataSet() != null
+        && pipeline.getDataSet().getDataSetStatus() != DataSetStatus.DRAFT) {
+      throw new IllegalStateException(
+          "Cannot delete pipeline associated with a dataset that is not in DRAFT status.");
+    }
+
+    pipelineRepository.delete(pipeline);
+    log.info("Deleted pipeline with id: {}", id);
+  }
+}
