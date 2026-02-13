@@ -14,6 +14,7 @@
         - portal-model/**/* # Backend depends on portal-model, so run when model changes too
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
+        - .gitlab/ci/portal-model.yml # Also run when portal-model changes since backend depends on it
 
 # Generate maven dependency graph JSON for license scanning
 # This must always run (needs: []) to ensure dependency scanning has the graph
@@ -107,24 +108,21 @@ test-backend:
         - portal-backend/pom.xml
     paths:
       - .m2/repository
-  script:
+  before_script:
     - cd portal-backend
+  script:
     # Run tests using published portal-model from GitLab Maven repository
     - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report -s ci_settings.xml -Dportal-model.version=$REVISION
-    # To print coverage, picked up by coverage regex
-    - cat target/site/jacoco/index.html| grep -o '<tfoot>.*</tfoot>'
-  coverage: '/Total.*?([0-9]{1,3})%/'
   artifacts:
     when: always
     expire_in: 1 month
     paths:
+      - portal-backend/target/classes/
       - portal-backend/target/surefire-reports/
       - portal-backend/target/site/jacoco/
+      - portal-backend/target/jacoco.exec
     reports:
       junit: portal-backend/target/surefire-reports/TEST-*.xml
-      coverage_report:
-        coverage_format: jacoco
-        path: portal-backend/target/site/jacoco/jacoco.xml
 
 integration-test-backend:
   extends: .only-backend-changes
@@ -149,24 +147,45 @@ integration-test-backend:
         - portal-backend/pom.xml
     paths:
       - .m2/repository
-  script:
+  before_script:
     - cd portal-backend
+  script:
     # Run integration tests only, skipping unit tests
     - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent-integration verify jacoco:report-integration -DskipUnitTests=true -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$REVISION
-    # Print coverage, picked up by coverage regex
-    - cat target/site/jacoco-it/index.html | grep -o '<tfoot>.*</tfoot>'
-  coverage: '/Total.*?([0-9]{1,3})%/'
   artifacts:
     when: always
     expire_in: 1 month
     paths:
       - portal-backend/target/failsafe-reports/
       - portal-backend/target/site/jacoco-it/
+      - portal-backend/target/jacoco-it.exec
     reports:
       junit: portal-backend/target/failsafe-reports/TEST-*.xml
+
+report-test-backend:
+  extends: .only-backend-changes
+  image: maven:3.9-eclipse-temurin-21
+  stage: test
+  dependencies:
+    - test-backend
+    - integration-test-backend
+  needs: ['test-backend', 'integration-test-backend']
+  before_script:
+    - cd portal-backend
+  script:
+    - mvn jacoco:merge jacoco:report
+    - cat target/site/jacoco/index.html | grep -o 'Total[^%]*%' || true
+  coverage: '/Total.*?([0-9]{1,3})%/'
+  artifacts:
+    when: always
+    expire_in: 1 month
+    paths:
+      - portal-backend/target/*
+    reports:
+      junit: portal-backend/target/surefire-reports/TEST-*.xml
       coverage_report:
         coverage_format: jacoco
-        path: portal-backend/target/site/jacoco-it/jacoco.xml
+        path: portal-backend/target/site/jacoco/jacoco.xml
 
 build-backend:
   extends: .only-backend-changes
