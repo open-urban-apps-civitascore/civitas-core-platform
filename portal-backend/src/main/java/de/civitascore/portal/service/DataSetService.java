@@ -7,6 +7,7 @@ import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.AgentRepository;
 import de.civitascore.portal.repository.CatalogRepository;
@@ -163,6 +164,13 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
         throw new InvalidInputException(
             "name", existingEntity.getId(), "Name cannot be null or blank");
       }
+
+      // Prevent changes to persistenceId and pipelineIds if status is not DRAFT
+      if (existingEntity.getDataSetStatus() != DataSetStatus.DRAFT) {
+        input.setPersistenceId(existingEntity.getPersistenceId());
+        input.setPipelineIds(existingEntity.getPipelines().stream().map(Pipeline::getId).toList());
+      }
+
     } catch (InvalidInputException e) {
       throw e;
     } catch (Exception e) {

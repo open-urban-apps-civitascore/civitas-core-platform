@@ -17,10 +17,14 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.Size;
+
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -115,4 +119,14 @@ public class DataSet extends NamedEntity {
 
   @OneToMany(mappedBy = "dataset", fetch = FetchType.LAZY)
   private Set<Assignment> assignments = new HashSet<>();
+
+  public void setDistributions(Collection<Distribution> newDistributions) {
+    this.distributions.clear();
+    Optional.ofNullable(newDistributions).ifPresent(distributions::addAll);
+  }
+
+  public void setPipelines(Collection<Pipeline> newPipelines) {
+    this.pipelines.clear();
+    Optional.ofNullable(newPipelines).ifPresent(pipelines::addAll);
+  }
 }
