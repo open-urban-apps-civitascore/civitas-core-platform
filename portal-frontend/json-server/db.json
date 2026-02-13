@@ -6878,5 +6878,25 @@
       "lastActive": "2026-02-04T12:11:34.305Z",
       "id": "8"
     }
+  ],
+  "datastructures": [
+    {
+      "id": "1",
+      "name": "Test Datastructure 1",
+      "description": "Description 1",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": [
+        {
+          "id": "1",
+          "name": "Test Version 1",
+          "description": "Version Description 1",
+          "versionNumber": "1.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        }
+      ]
+    }
   ]
 }
