@@ -163,4 +163,17 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
     }
     return super.preProcessUpdateInput(input, existingEntity);
   }
+
+  @Override
+  protected DataSet preProcessDelete(UUID id) {
+    DataSet dataSet = super.preProcessDelete(id);
+    if (dataSet != null && dataSet.getDataSetStatus() != DataSetStatus.DRAFT) {
+      throw new InvalidInputException(
+          "dataSetStatus",
+          id,
+          "DataSet can only be deleted when in DRAFT status. Current status: "
+              + dataSet.getDataSetStatus());
+    }
+    return dataSet;
+  }
 }
