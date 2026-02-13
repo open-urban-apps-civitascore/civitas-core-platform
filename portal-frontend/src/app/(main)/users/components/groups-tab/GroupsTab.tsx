@@ -101,7 +101,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
     <Button onClick={() => setIsGroupAssignmentModalOpen(true)}>{t('groupsTab.addGroup')}</Button>
   )
   return (
-    <PageBackground>
+    <PageBackground hasBackground={!isReadOnly}>
       <ContentCard className={cn(!error && !isLoading ? 'h-full' : 'h-50')}>
         {!error && !isLoading && (
           <>
