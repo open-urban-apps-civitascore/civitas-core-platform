@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 
 import { useCreateUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
-import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
+import { ExitWarningModal, WarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -25,8 +25,8 @@ import { GroupsTab } from './groups-tab/GroupsTab'
 import { RolesTab } from './roles-tab/RolesTab'
 
 interface UserOverviewProps {
-  title: string
   userData: User
+  title: string
   isCreateMode?: boolean
   testId?: string
 }
@@ -48,6 +48,7 @@ export const UserOverview = (props: UserOverviewProps) => {
   const onError = () => {
     toast.error(tCommon('errors.unexpectedError'))
   }
+  const originalGroupIds = useMemo(() => userData.groups?.map(group => group.id) || [], [userData])
 
   const tabValues: Record<'userData' | 'roles' | 'groups', Tab> = {
     userData: {
@@ -80,10 +81,9 @@ export const UserOverview = (props: UserOverviewProps) => {
   })
 
   const watch = form.watch()
-  const groupWatch = form.watch('groups')
+  const groupWatch = form.watch('groupIds')
 
   const isFormDirty = useMemo(() => {
-    console.log(watch)
     const dirtyFields = form.formState.dirtyFields
     const isPhoneFieldDirty =
       dirtyFields.phone && form.getValues('phone')?.replace(/\s+/g, '') !== defaultUserData?.phone?.replace(/\s+/g, '')
@@ -100,7 +100,12 @@ export const UserOverview = (props: UserOverviewProps) => {
     console.log('handleAssignGroups')
     const selectedgroupIds = Object.keys(groupSelection).filter(key => groupSelection[key])
     const updateGroupData = selectedgroupIds.concat(groupWatch || [])
-    form.setValue('groups', updateGroupData)
+    form.setValue('groupIds', updateGroupData, { shouldDirty: true })
+  }
+
+  const handleRemoveGroup = (id: string) => {
+    const currentGroups = groupWatch.filter(group => group !== id)
+    form.setValue('groupIds', currentGroups, { shouldDirty: true })
   }
 
   const handleExit = () => {
@@ -158,9 +163,17 @@ export const UserOverview = (props: UserOverviewProps) => {
   const renderTabContent = () => {
     switch (subTabValue) {
       case tabValues.groups.value:
-        return <GroupsTab user={watch} onAssignGroups={handleAssignGroups} />
+        return (
+          <GroupsTab
+            formValues={watch}
+            originalGroupIds={originalGroupIds}
+            isReadOnly={isReadOnly}
+            onAssignGroups={handleAssignGroups}
+            onRemoveGroup={handleRemoveGroup}
+          />
+        )
       case tabValues.roles.value:
-        return <RolesTab groupIds={userData.groups || []} />
+        return <RolesTab groupIds={groupWatch} />
       case tabValues.userData.value:
       default:
         return <UserBasicInfoTab userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
@@ -199,10 +212,10 @@ export const UserOverview = (props: UserOverviewProps) => {
       />
       {renderTabContent()}
       <ExitWarningModal
-        isOpen={isExitModalOpen}
-        onClose={() => setIsExitModalOpen(false)}
+        open={isExitModalOpen}
+        onOpenChange={setIsExitModalOpen}
         onDiscard={handleExit}
-        onSave={handleSave}
+        onConfirm={handleSave}
         isLoading={isLoading}
       />
     </PageContainer>

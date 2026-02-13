@@ -12,6 +12,7 @@
       "cancel": "Cancel",
       "delete": "Delete",
       "deleteItem": "Delete {item}",
+      "remove": "Remove",
       "add": "Add",
       "edit": "Edit",
       "editBase": "Edit base",
@@ -53,6 +54,11 @@
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "commaSeparated": "comma-separated",
       "requiredInAvailable": "This field is required in the available mode."
+    },
+    "exitModal": {
+      "title": "Vor dem Beenden speichern?",
+      "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
+      "discard": "Verwerfen"
     }
   },
   "languages": {
@@ -244,7 +250,11 @@
       "toGroup": "to group",
       "assignedAt": "Member since",
       "noUsers": "No Users",
-      "noUsersSub": "No users assigned to this group"
+      "noUsersSub": "No users assigned to this group",
+      "removeUserModal": {
+        "title": "Remove User from Group?",
+        "description": "This action removes the association between the user, the group, and their role assignment."
+      }
     }
   },
   "pagination": {

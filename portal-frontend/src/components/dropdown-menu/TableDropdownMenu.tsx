@@ -32,7 +32,7 @@ export const TableDropdownMenu = (props: TableDropdownMenuProps) => {
       <DropdownMenuContent className="w-40" align="end">
         <DropdownMenuGroup>
           {menuItems.map(item => (
-            <DropdownMenuItem key={item.label} onSelect={item.onClick}>
+            <DropdownMenuItem key={item.label} onSelect={item.onClick} className="hover:cursor-pointer">
               {item.label}
             </DropdownMenuItem>
           ))}

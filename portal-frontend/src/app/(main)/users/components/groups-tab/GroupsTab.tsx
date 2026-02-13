@@ -16,23 +16,28 @@ import { mapGroupsApiToListData } from '@/utils/groups'
 
 import { GroupAssignmentModal } from './GroupAssignmentModal'
 import GroupsTable from './GroupsTable'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 
 interface GroupsTabProps {
-  user: UserFormData
+  originalGroupIds: string[]
+  formValues: UserFormData
+  isReadOnly: boolean
   onAssignGroups: (groupSelection: RowSelectionState) => void
+  onRemoveGroup: (id: string) => void
 }
 
 export const GroupsTab = (props: GroupsTabProps) => {
-  const { user, onAssignGroups } = props
-  console.log('USER', user)
-  const originalGroupIds = user.groups || []
+  const { formValues, originalGroupIds, isReadOnly, onAssignGroups, onRemoveGroup } = props
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
+  const tGroups = useTranslations('groups')
   const [searchString, setSearchString] = useState('')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
   const [sorting, setSorting] = useState<SortingState>([{ id: 'title', desc: false }])
   const [isGroupAssignmentModalOpen, setIsGroupAssignmentModalOpen] = useState(false)
+  const [groupToRemove, setGroupToRemove] = useState<string | null>(null)
+  const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
 
   const getGroupsRequestParams = () => {
     const params = new URLSearchParams()
@@ -46,16 +51,16 @@ export const GroupsTab = (props: GroupsTabProps) => {
     data: groupsData,
     isFetching: isLoadingGroups,
     error: groupsError,
-  } = useGetGroups({ isEnabled: originalGroupIds?.length > 0, params: getGroupsRequestParams() })
+  } = useGetGroups({ isEnabled: formValues.groupIds.length > 0, params: getGroupsRequestParams() })
 
   const groups = useMemo(() => {
-    if (groupsData && user.id) {
-      const userGroups = groupsData?.data.filter(group => user.groups?.includes(group.id))
+    if (groupsData && formValues.id) {
+      const userGroups = groupsData?.data.filter(group => formValues.groupIds?.includes(group.id))
       return mapGroupsApiToListData(userGroups)
     } else {
       return []
     }
-  }, [groupsData, user])
+  }, [groupsData, formValues])
 
   const filteredGroups = useMemo(() => {
     if (searchString) {
@@ -81,15 +86,26 @@ export const GroupsTab = (props: GroupsTabProps) => {
     setPageSize(newPagination.pageSize)
   }
 
-  const handleDelete = (id: string) => {}
+  const handleRemoveGroupClick = (id: string) => {
+    setGroupToRemove(id)
+    setIsWarningModalOpen(true)
+  }
 
-  const CustomElement = <Button onClick={() => setIsGroupAssignmentModalOpen(true)}>{t('groupsTab.addGroup')}</Button>
+  const handleWarningModalConfirm = () => {
+    if (groupToRemove) onRemoveGroup(groupToRemove)
+    setGroupToRemove(null)
+    setIsWarningModalOpen(false)
+  }
+
+  const GroupsAssignmentButton = (
+    <Button onClick={() => setIsGroupAssignmentModalOpen(true)}>{t('groupsTab.addGroup')}</Button>
+  )
   return (
     <PageBackground>
       <ContentCard className={cn(!error && !isLoading ? 'h-full' : 'h-50')}>
         {!error && !isLoading && (
           <>
-            <SubHeader title={t('groupsTab.title')} customElement={CustomElement} />
+            <SubHeader title={t('groupsTab.title')} customElement={!isReadOnly ? GroupsAssignmentButton : undefined} />
             <SearchHeader searchString={searchString} onChangeSearchString={setSearchString} className="my-2" />
             <TableContainer className="[--search-height:calc(--spacing(30))]">
               <GroupsTable
@@ -102,17 +118,26 @@ export const GroupsTab = (props: GroupsTabProps) => {
                 onSortingChange={setSorting}
                 totalPages={totalPages}
                 isLoading={isLoading}
-                onDelete={handleDelete}
+                onRemoveGroupClick={handleRemoveGroupClick}
               />
             </TableContainer>
           </>
         )}
         <GroupAssignmentModal
           open={isGroupAssignmentModalOpen}
-          userName={`${user.firstName} ${user.lastName}`}
-          originalGroups={originalGroupIds}
+          userName={`${formValues.firstName} ${formValues.lastName}`}
+          assignedGroups={formValues.groupIds}
           onAssignGroups={onAssignGroups}
           onOpenChange={setIsGroupAssignmentModalOpen}
+        />
+        <WarningModal
+          title={tGroups('users.removeUserModal.title')}
+          description={tGroups('users.removeUserModal.description')}
+          open={isWarningModalOpen}
+          confirmButtonTitle={tCommon('actions.remove')}
+          onOpenChange={setIsWarningModalOpen}
+          onDiscard={() => setIsWarningModalOpen(false)}
+          onConfirm={handleWarningModalConfirm}
         />
         {isLoading && <LoadingSpinner className="h-full" />}
         {error && <p className="h-full flex items-center justify-center">{tCommon('errors.loadingError')}</p>}

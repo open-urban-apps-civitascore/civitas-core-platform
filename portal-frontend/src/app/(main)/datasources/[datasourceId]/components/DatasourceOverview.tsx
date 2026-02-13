@@ -8,7 +8,7 @@ import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
-import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
+import { ExitWarningModal, WarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -254,11 +254,11 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       </PageBackground>
 
       <ExitWarningModal
-        isOpen={isExitModalOpen}
-        onClose={() => setIsExitModalOpen(false)}
-        onDiscard={handleDiscardAndExit}
-        onSave={handleSaveAndExit}
+        open={isExitModalOpen}
         isLoading={isLoading}
+        onOpenChange={setIsExitModalOpen}
+        onDiscard={handleDiscardAndExit}
+        onConfirm={handleSaveAndExit}
       />
     </PageContainer>
   )

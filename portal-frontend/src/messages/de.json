@@ -12,6 +12,7 @@
       "cancel": "Abbrechen",
       "delete": "Löschen",
       "deleteItem": "{item} löschen",
+      "remove": "Entfernen",
       "add": "Hinzufügen",
       "edit": "Bearbeiten",
       "editBase": "Basis bearbeiten",
@@ -52,6 +53,11 @@
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus."
+    },
+    "exitModal": {
+      "title": "Vor dem Beenden speichern?",
+      "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
+      "discard": "Verwerfen"
     }
   },
   "languages": {
@@ -246,7 +252,11 @@
       "toGroup": "zur Gruppe",
       "assignedAt": "Mitglied seit",
       "noUsers": "Keine User",
-      "noUsersSub": "Keine User in dieser Gruppe enthalten"
+      "noUsersSub": "Keine User in dieser Gruppe enthalten",
+      "removeUserModal": {
+        "title": "User aus Gruppe entfernen?",
+        "description": "Diese Aktion löst die Zuordnung zwischen dem User, der Gruppe und ihre Rollen-Zuordnung auf."
+      }
     }
   },
   "pagination": {
@@ -428,11 +438,6 @@
       "dataStructure": "Datenstruktur",
       "accessPermissions": "Zugriffsberechtigungen",
       "dataspaces": "Datenräume"
-    },
-    "exitModal": {
-      "title": "Vor dem Beenden speichern?",
-      "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
-      "discard": "Verwerfen"
     },
     "connectorTab": {
       "title1": "Konnektor",

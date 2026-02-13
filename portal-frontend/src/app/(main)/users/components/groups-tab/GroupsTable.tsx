@@ -10,7 +10,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface GroupsTableProps extends TableProps<UserGroupsListData> {
   groups: UserGroupsListData[]
-  onDelete: (id: string) => void
+  onRemoveGroupClick: (id: string) => void
 }
 
 const GroupsTable = (props: GroupsTableProps) => {
@@ -25,7 +25,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     onRowClick,
     onPaginationChange,
     onSortingChange,
-    onDelete,
+    onRemoveGroupClick,
     isLoading,
   } = props
   const t = useTranslations('users')
@@ -75,7 +75,7 @@ const GroupsTable = (props: GroupsTableProps) => {
           menuItems={[
             {
               label: tCommon('actions.deleteItem', { item: tCommon('items.group') }),
-              onClick: () => onDelete(row.original.id),
+              onClick: () => onRemoveGroupClick(row.original.id),
             },
           ]}
         />

@@ -28,14 +28,14 @@ import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
 export type UserSelection = { selectAll: boolean; selectedIds: string[]; excludedIds: string[] }
 
 interface GroupAssignmentModalProps extends DialogProps {
-  originalGroups: string[]
+  assignedGroups: string[]
   userName: string
   onAssignGroups: (groupSelection: RowSelectionState) => void
   isUpdating?: boolean
 }
 
 export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
-  const { originalGroups, userName, open, onOpenChange = () => {}, onAssignGroups, isUpdating = false } = props
+  const { assignedGroups, userName, open, onOpenChange = () => {}, onAssignGroups, isUpdating = false } = props
   const tCommon = useTranslations('common')
   const t = useTranslations('users')
   const [pageIndex, setPageIndex] = useState(0)
@@ -53,10 +53,10 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
   const groups = useMemo(() => {
     if (groupsData?.data && groupsData?.data.length > 0) {
       const allUsers = mapGroupsApiToListData(groupsData?.data)
-      const unassignedGroups = allUsers.filter(group => !originalGroups.find(original => original === group.id))
+      const unassignedGroups = allUsers.filter(group => !assignedGroups.find(original => original === group.id))
       return unassignedGroups
     } else return []
-  }, [groupsData?.data, originalGroups])
+  }, [groupsData?.data, assignedGroups])
 
   const rowCount = groupsData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)
