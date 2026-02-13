@@ -1,6 +1,7 @@
 package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.entity.Group;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -20,4 +21,23 @@ public interface GroupRepository extends NamedEntityRepository<Group, UUID> {
   @EntityGraph(attributePaths = {"contactUser", "parentGroup"})
   @Query("SELECT g FROM Group g WHERE g.id = :id")
   Optional<Group> findByIdWithRelations(@Param("id") UUID id);
+
+  /**
+   * Find groups by IDs with members eagerly fetched.
+   *
+   * @param ids the group IDs
+   * @return the groups with eagerly fetched members
+   */
+  @EntityGraph(attributePaths = {"members"})
+  @Query("SELECT g FROM Group g WHERE g.id IN :ids")
+  List<Group> findAllByIdWithMembers(@Param("ids") List<UUID> ids);
+
+  /**
+   * Count groups by IDs.
+   *
+   * @param ids the group IDs
+   * @return the count of groups found
+   */
+  @Query("SELECT COUNT(g) FROM Group g WHERE g.id IN :ids")
+  long countByIdIn(@Param("ids") List<UUID> ids);
 }
