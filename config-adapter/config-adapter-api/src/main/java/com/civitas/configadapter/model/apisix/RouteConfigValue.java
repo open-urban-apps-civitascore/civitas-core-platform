@@ -10,12 +10,11 @@
  */
 package com.civitas.configadapter.model.apisix;
 
+import com.civitas.configadapter.model.AbstractApiModel;
 import com.civitas.configadapter.model.ConfigValue;
-import com.fasterxml.jackson.annotation.JsonAnyGetter;
-import com.fasterxml.jackson.annotation.JsonAnySetter;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.civitas.configadapter.model.apisix.plugins.RoutePlugins;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -74,166 +73,148 @@ import java.util.Objects;
  * }
  * }</pre>
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public final class RouteConfigValue implements ConfigValue {
+public final class RouteConfigValue extends AbstractApiModel implements ConfigValue {
 
-  private final Map<String, Object> data;
+  private String uri;
+  private List<String> uris;
+  private List<String> methods;
 
-  @JsonCreator
-  public RouteConfigValue() {
-    this.data = new LinkedHashMap<>();
-  }
+  @JsonProperty("upstream_id")
+  private String upstreamId;
 
-  public RouteConfigValue(Map<String, Object> data) {
-    this.data = data != null ? new LinkedHashMap<>(data) : new LinkedHashMap<>();
-  }
+  private ApisixConfigValue upstream;
+  private RoutePlugins plugins;
+  private Integer priority;
+  private Integer status;
+  private String host;
+  private List<String> hosts;
 
-  @JsonAnyGetter
-  public Map<String, Object> data() {
-    return data;
-  }
+  @JsonProperty("service_id")
+  private String serviceId;
 
-  @JsonAnySetter
-  public void setProperty(String key, Object value) {
-    data.put(key, value);
-  }
+  @JsonProperty("enable_websocket")
+  private Boolean enableWebsocket;
 
-  /**
-   * Get a property value by key.
-   *
-   * @param key the property key
-   * @return the property value, or null if not present
-   */
-  public Object get(String key) {
-    return data.get(key);
-  }
+  public RouteConfigValue() {}
 
-  /**
-   * Check if a property exists.
-   *
-   * @param key the property key
-   * @return true if the property exists
-   */
-  public boolean has(String key) {
-    return data.containsKey(key);
-  }
-
-  /**
-   * Get the route URI.
-   *
-   * @return the URI path, or null if not specified
-   */
-  @JsonIgnore
   public String getUri() {
-    return (String) data.get("uri");
+    return uri;
   }
 
-  /**
-   * Get the route URIs array.
-   *
-   * @return list of URIs, or null if not specified
-   */
-  @JsonIgnore
-  @SuppressWarnings("unchecked")
+  public void setUri(String uri) {
+    this.uri = uri;
+  }
+
   public List<String> getUris() {
-    return (List<String>) data.get("uris");
+    return uris;
   }
 
-  /**
-   * Get the HTTP methods this route matches.
-   *
-   * @return list of HTTP methods, or null if not specified
-   */
-  @JsonIgnore
-  @SuppressWarnings("unchecked")
+  public void setUris(List<String> uris) {
+    this.uris = uris;
+  }
+
   public List<String> getMethods() {
-    return (List<String>) data.get("methods");
+    return methods;
   }
 
-  /**
-   * Get the upstream ID for this route.
-   *
-   * @return the upstream ID, or null if not specified
-   */
-  @JsonIgnore
+  public void setMethods(List<String> methods) {
+    this.methods = methods;
+  }
+
   public String getUpstreamId() {
-    return (String) data.get("upstream_id");
+    return upstreamId;
   }
 
-  /**
-   * Get the inline upstream configuration.
-   *
-   * @return map of upstream configuration, or null if not specified
-   */
-  @JsonIgnore
-  @SuppressWarnings("unchecked")
-  public Map<String, Object> getUpstream() {
-    return (Map<String, Object>) data.get("upstream");
+  public void setUpstreamId(String upstreamId) {
+    this.upstreamId = upstreamId;
   }
 
-  /**
-   * Get the plugins configuration.
-   *
-   * @return map of plugin configurations, or null if not specified
-   */
-  @JsonIgnore
-  @SuppressWarnings("unchecked")
-  public Map<String, Object> getPlugins() {
-    return (Map<String, Object>) data.get("plugins");
+  public ApisixConfigValue getUpstream() {
+    return upstream;
   }
 
-  /**
-   * Get a specific plugin configuration.
-   *
-   * @param pluginName the name of the plugin
-   * @return the plugin configuration, or null if not present
-   */
-  @SuppressWarnings("unchecked")
-  public Map<String, Object> getPlugin(String pluginName) {
-    Map<String, Object> plugins = getPlugins();
-    if (plugins == null) {
-      return null;
-    }
-    return (Map<String, Object>) plugins.get(pluginName);
+  public void setUpstream(ApisixConfigValue upstream) {
+    this.upstream = upstream;
   }
 
-  /**
-   * Check if a specific plugin is configured.
-   *
-   * @param pluginName the name of the plugin
-   * @return true if the plugin is configured
-   */
-  public boolean hasPlugin(String pluginName) {
-    Map<String, Object> plugins = getPlugins();
-    return plugins != null && plugins.containsKey(pluginName);
+  public RoutePlugins getPlugins() {
+    return plugins;
   }
 
-  /**
-   * Get the route priority.
-   *
-   * @return the priority value, or null if not specified
-   */
-  @JsonIgnore
+  public void setPlugins(RoutePlugins plugins) {
+    this.plugins = plugins;
+  }
+
   public Integer getPriority() {
-    Object priority = data.get("priority");
-    if (priority instanceof Number) {
-      return ((Number) priority).intValue();
-    }
-    return null;
+    return priority;
+  }
+
+  public void setPriority(Integer priority) {
+    this.priority = priority;
+  }
+
+  public Integer getStatus() {
+    return status;
+  }
+
+  public void setStatus(Integer status) {
+    this.status = status;
+  }
+
+  public String getHost() {
+    return host;
+  }
+
+  public void setHost(String host) {
+    this.host = host;
+  }
+
+  public List<String> getHosts() {
+    return hosts;
+  }
+
+  public void setHosts(List<String> hosts) {
+    this.hosts = hosts;
+  }
+
+  public String getServiceId() {
+    return serviceId;
+  }
+
+  public void setServiceId(String serviceId) {
+    this.serviceId = serviceId;
+  }
+
+  public Boolean getEnableWebsocket() {
+    return enableWebsocket;
+  }
+
+  public void setEnableWebsocket(Boolean enableWebsocket) {
+    this.enableWebsocket = enableWebsocket;
   }
 
   /**
-   * Get the route status.
+   * Converts typed fields and additional properties to a plain map for the APISIX Admin API.
    *
-   * @return 1 for enabled, 0 for disabled, or null if not specified
+   * @return an unmodifiable map of configuration key-value pairs
    */
-  @JsonIgnore
-  public Integer getStatus() {
-    Object status = data.get("status");
-    if (status instanceof Number) {
-      return ((Number) status).intValue();
-    }
-    return null;
+  @Override
+  public Map<String, Object> toApiMap() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    if (uri != null) map.put("uri", uri);
+    if (uris != null) map.put("uris", uris);
+    if (methods != null) map.put("methods", methods);
+    if (upstreamId != null) map.put("upstream_id", upstreamId);
+    if (upstream != null) map.put("upstream", upstream.toApiMap());
+    if (plugins != null) map.put("plugins", plugins.toApiMap());
+    if (priority != null) map.put("priority", priority);
+    if (status != null) map.put("status", status);
+    if (host != null) map.put("host", host);
+    if (hosts != null) map.put("hosts", hosts);
+    if (serviceId != null) map.put("service_id", serviceId);
+    if (enableWebsocket != null) map.put("enable_websocket", enableWebsocket);
+    additionalProperties().forEach(map::putIfAbsent);
+    return Collections.unmodifiableMap(map);
   }
 
   @Override
@@ -241,16 +222,68 @@ public final class RouteConfigValue implements ConfigValue {
     if (obj == this) return true;
     if (obj == null || obj.getClass() != this.getClass()) return false;
     var that = (RouteConfigValue) obj;
-    return Objects.equals(this.data, that.data);
+    return Objects.equals(this.uri, that.uri)
+        && Objects.equals(this.uris, that.uris)
+        && Objects.equals(this.methods, that.methods)
+        && Objects.equals(this.upstreamId, that.upstreamId)
+        && Objects.equals(this.upstream, that.upstream)
+        && Objects.equals(this.plugins, that.plugins)
+        && Objects.equals(this.priority, that.priority)
+        && Objects.equals(this.status, that.status)
+        && Objects.equals(this.host, that.host)
+        && Objects.equals(this.hosts, that.hosts)
+        && Objects.equals(this.serviceId, that.serviceId)
+        && Objects.equals(this.enableWebsocket, that.enableWebsocket)
+        && Objects.equals(this.additionalProperties(), that.additionalProperties());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(data);
+    return Objects.hash(
+        uri,
+        uris,
+        methods,
+        upstreamId,
+        upstream,
+        plugins,
+        priority,
+        status,
+        host,
+        hosts,
+        serviceId,
+        enableWebsocket,
+        additionalProperties());
   }
 
   @Override
   public String toString() {
-    return "RouteConfigValue[" + "data=" + data + ']';
+    return "RouteConfigValue["
+        + "uri="
+        + uri
+        + ", uris="
+        + uris
+        + ", methods="
+        + methods
+        + ", upstreamId="
+        + upstreamId
+        + ", upstream="
+        + upstream
+        + ", plugins="
+        + plugins
+        + ", priority="
+        + priority
+        + ", status="
+        + status
+        + ", host="
+        + host
+        + ", hosts="
+        + hosts
+        + ", serviceId="
+        + serviceId
+        + ", enableWebsocket="
+        + enableWebsocket
+        + ", additionalProperties="
+        + additionalProperties().keySet()
+        + ']';
   }
 }

@@ -375,7 +375,7 @@ public class ApisixAdapter extends AbstractConfigAdapter {
   private Object extractUpstreamConfig(ConfigEvent event) {
     ConfigValue configValue = event.payload().config().value();
     if (configValue instanceof ApisixConfigValue apisixValue) {
-      return apisixValue.data();
+      return apisixValue.toApiMap();
     }
     return configValue;
   }
@@ -446,9 +446,9 @@ public class ApisixAdapter extends AbstractConfigAdapter {
    */
   private Object extractRouteConfig(ConfigValue configValue) {
     if (configValue instanceof RouteConfigValue routeValue) {
-      return routeValue.data();
+      return routeValue.toApiMap();
     } else if (configValue instanceof ApisixConfigValue apisixValue) {
-      return apisixValue.data();
+      return apisixValue.toApiMap();
     }
     return configValue;
   }

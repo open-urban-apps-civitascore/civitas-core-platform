@@ -22,6 +22,11 @@ import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.apisix.RouteConfigValue;
+import com.civitas.configadapter.model.apisix.plugins.ProxyRewritePlugin;
+import com.civitas.configadapter.model.apisix.plugins.ResponseRewritePlugin;
+import com.civitas.configadapter.model.apisix.plugins.RewriteHeaders;
+import com.civitas.configadapter.model.apisix.plugins.RoutePlugins;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.List;
@@ -35,11 +40,17 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
   void createRouteWithProxyRewriteStaticUri() throws Exception {
     String upstreamId = createDefaultUpstream("proxy-rewrite-uri");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/users/*");
-    routeConfig.put("methods", List.of("GET", "POST"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put("plugins", Map.of("proxy-rewrite", Map.of("uri", "/users")));
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setUri("/users");
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setProxyRewrite(proxyRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/users/*");
+    routeConfig.setMethods(List.of("GET", "POST"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -53,12 +64,17 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
   void createRouteWithProxyRewriteRegexUri() throws Exception {
     String upstreamId = createDefaultUpstream("proxy-rewrite-regex");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/*");
-    routeConfig.put("methods", List.of("GET", "POST", "PUT", "DELETE"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins", Map.of("proxy-rewrite", Map.of("regex_uri", List.of("^/api/v1/(.*)", "/$1"))));
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setRegexUri(List.of("^/api/v1/(.*)", "/$1"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setProxyRewrite(proxyRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/*");
+    routeConfig.setMethods(List.of("GET", "POST", "PUT", "DELETE"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -74,12 +90,17 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
     // Incoming: /api/v1/users -> Upstream: /users
     String upstreamId = createDefaultUpstream("path-stripping");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/*");
-    routeConfig.put("methods", List.of("GET", "POST", "PUT", "DELETE"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins", Map.of("proxy-rewrite", Map.of("regex_uri", List.of("^/api/v1/(.*)", "/$1"))));
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setRegexUri(List.of("^/api/v1/(.*)", "/$1"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setProxyRewrite(proxyRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/*");
+    routeConfig.setMethods(List.of("GET", "POST", "PUT", "DELETE"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -93,20 +114,22 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
   void createRouteWithProxyRewriteHeaders() throws Exception {
     String upstreamId = createDefaultUpstream("proxy-rewrite-headers");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/data/*");
-    routeConfig.put("methods", List.of("GET", "POST"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "proxy-rewrite",
-            Map.of(
-                "headers",
-                Map.of(
-                    "set", Map.of("X-Forwarded-Prefix", "/api/v1/data"),
-                    "add", Map.of("X-Request-Source", "gateway"),
-                    "remove", List.of("X-Internal-Token")))));
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Forwarded-Prefix", "/api/v1/data"));
+    headers.setAdd(Map.of("X-Request-Source", "gateway"));
+    headers.setRemove(List.of("X-Internal-Token"));
+
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setHeaders(headers);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setProxyRewrite(proxyRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/data/*");
+    routeConfig.setMethods(List.of("GET", "POST"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -127,19 +150,21 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
     initialRouteConfig.put("upstream_id", upstreamId);
     createRouteDirectly(routeId, initialRouteConfig);
 
-    Map<String, Object> updatedRouteConfig = new HashMap<>();
-    updatedRouteConfig.put("uri", "/api/v1/update-proxy/*");
-    updatedRouteConfig.put("methods", List.of("GET", "POST", "PUT"));
-    updatedRouteConfig.put("upstream_id", upstreamId);
-    updatedRouteConfig.put(
-        "plugins",
-        Map.of(
-            "proxy-rewrite",
-            Map.of(
-                "regex_uri",
-                List.of("^/api/v1/update-proxy/(.*)", "/$1"),
-                "headers",
-                Map.of("set", Map.of("X-Updated-Via", "proxy-rewrite")))));
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Updated-Via", "proxy-rewrite"));
+
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setRegexUri(List.of("^/api/v1/update-proxy/(.*)", "/$1"));
+    proxyRewrite.setHeaders(headers);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setProxyRewrite(proxyRewrite);
+
+    RouteConfigValue updatedRouteConfig = new RouteConfigValue();
+    updatedRouteConfig.setUri("/api/v1/update-proxy/*");
+    updatedRouteConfig.setMethods(List.of("GET", "POST", "PUT"));
+    updatedRouteConfig.setUpstreamId(upstreamId);
+    updatedRouteConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds(
@@ -154,10 +179,10 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
             () -> {
               JsonNode route = getRouteFromApisix(routeId);
               assertNotNull(route);
-              JsonNode proxyRewrite = route.get("value").get("plugins").get("proxy-rewrite");
-              assertNotNull(proxyRewrite, "proxy-rewrite plugin should exist");
-              assertTrue(proxyRewrite.has("regex_uri"), "proxy-rewrite should have regex_uri");
-              assertTrue(proxyRewrite.has("headers"), "proxy-rewrite should have headers");
+              JsonNode proxyRewriteNode = route.get("value").get("plugins").get("proxy-rewrite");
+              assertNotNull(proxyRewriteNode, "proxy-rewrite plugin should exist");
+              assertTrue(proxyRewriteNode.has("regex_uri"), "proxy-rewrite should have regex_uri");
+              assertTrue(proxyRewriteNode.has("headers"), "proxy-rewrite should have headers");
             });
 
     assertEquals(1, eventPublisher.getPublishedEvents().size());
@@ -169,11 +194,17 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
   void createRouteWithProxyRewriteHost() throws Exception {
     String upstreamId = createDefaultUpstream("proxy-rewrite-host");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/external/*");
-    routeConfig.put("methods", List.of("GET", "POST"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put("plugins", Map.of("proxy-rewrite", Map.of("host", "internal-backend.local")));
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setHost("internal-backend.local");
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setProxyRewrite(proxyRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/external/*");
+    routeConfig.setMethods(List.of("GET", "POST"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -187,21 +218,24 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
   void createRouteWithProxyRewriteFullConfig() throws Exception {
     String upstreamId = createDefaultUpstream("proxy-rewrite-full");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/full-proxy/*");
-    routeConfig.put("methods", List.of("GET", "POST", "PUT", "DELETE"));
-    routeConfig.put("upstream_id", upstreamId);
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Forwarded-Prefix", "/api/v1/full-proxy", "X-Real-IP", "$remote_addr"));
+    headers.setAdd(Map.of("X-Request-ID", "$request_id"));
+    headers.setRemove(List.of("X-Internal-Token", "X-Debug-Mode"));
 
-    Map<String, Object> proxyRewriteConfig = new HashMap<>();
-    proxyRewriteConfig.put("regex_uri", List.of("^/api/v1/full-proxy/(.*)", "/$1"));
-    proxyRewriteConfig.put("host", "internal-backend.local");
-    proxyRewriteConfig.put(
-        "headers",
-        Map.of(
-            "set", Map.of("X-Forwarded-Prefix", "/api/v1/full-proxy", "X-Real-IP", "$remote_addr"),
-            "add", Map.of("X-Request-ID", "$request_id"),
-            "remove", List.of("X-Internal-Token", "X-Debug-Mode")));
-    routeConfig.put("plugins", Map.of("proxy-rewrite", proxyRewriteConfig));
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setRegexUri(List.of("^/api/v1/full-proxy/(.*)", "/$1"));
+    proxyRewrite.setHost("internal-backend.local");
+    proxyRewrite.setHeaders(headers);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setProxyRewrite(proxyRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/full-proxy/*");
+    routeConfig.setMethods(List.of("GET", "POST", "PUT", "DELETE"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -215,23 +249,29 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
   void createRouteWithProxyRewriteAndOtherPlugins() throws Exception {
     String upstreamId = createDefaultUpstream("proxy-rewrite-combo");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/combo/*");
-    routeConfig.put("methods", List.of("GET", "POST"));
-    routeConfig.put("upstream_id", upstreamId);
+    RewriteHeaders proxyHeaders = new RewriteHeaders();
+    proxyHeaders.setSet(Map.of("X-Forwarded-Prefix", "/api/v1/combo"));
 
-    Map<String, Object> plugins = new HashMap<>();
-    plugins.put("prometheus", Map.of());
-    plugins.put(
-        "proxy-rewrite",
-        Map.of(
-            "regex_uri",
-            List.of("^/api/v1/combo/(.*)", "/$1"),
-            "headers",
-            Map.of("set", Map.of("X-Forwarded-Prefix", "/api/v1/combo"))));
-    plugins.put(
-        "response-rewrite", Map.of("headers", Map.of("set", Map.of("X-Processed", "true"))));
-    routeConfig.put("plugins", plugins);
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setRegexUri(List.of("^/api/v1/combo/(.*)", "/$1"));
+    proxyRewrite.setHeaders(proxyHeaders);
+
+    RewriteHeaders responseHeaders = new RewriteHeaders();
+    responseHeaders.setSet(Map.of("X-Processed", "true"));
+
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setHeaders(responseHeaders);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setProxyRewrite(proxyRewrite);
+    plugins.setResponseRewrite(responseRewrite);
+    plugins.handleUnknownPlugin("prometheus", Map.of());
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/combo/*");
+    routeConfig.setMethods(List.of("GET", "POST"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -245,12 +285,18 @@ class ApisixProxyRewriteIntegrationTest extends AbstractApisixIntegrationTest {
   void createRouteWithInvalidProxyRewrite() throws Exception {
     String upstreamId = createDefaultUpstream("invalid-proxy-rewrite");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/invalid-proxy/*");
-    routeConfig.put("methods", List.of("GET"));
-    routeConfig.put("upstream_id", upstreamId);
     // regex_uri with only one element (should have two: pattern and replacement)
-    routeConfig.put("plugins", Map.of("proxy-rewrite", Map.of("regex_uri", List.of("^/api/v1/"))));
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setRegexUri(List.of("^/api/v1/"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setProxyRewrite(proxyRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/invalid-proxy/*");
+    routeConfig.setMethods(List.of("GET"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
