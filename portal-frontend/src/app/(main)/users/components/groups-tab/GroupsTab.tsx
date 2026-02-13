@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { SearchHeader } from '@/components/search-area/SearchArea'
@@ -16,7 +17,6 @@ import { mapGroupsApiToListData } from '@/utils/groups'
 
 import { GroupAssignmentModal } from './GroupAssignmentModal'
 import GroupsTable from './GroupsTable'
-import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 
 interface GroupsTabProps {
   originalGroupIds: string[]

@@ -1,6 +1,6 @@
 'use client'
 
-import { Trash2 } from 'lucide-react'
+import { DialogProps } from '@radix-ui/react-dialog'
 import { useTranslations } from 'next-intl'
 
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { DialogProps } from '@radix-ui/react-dialog'
 
 interface WarningModalProps extends DialogProps {
   title: string

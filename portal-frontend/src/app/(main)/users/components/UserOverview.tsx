@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 
 import { useCreateUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
-import { ExitWarningModal, WarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
+import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -89,6 +89,7 @@ export const UserOverview = (props: UserOverviewProps) => {
       dirtyFields.phone && form.getValues('phone')?.replace(/\s+/g, '') !== defaultUserData?.phone?.replace(/\s+/g, '')
     const isNonPhoneFieldDirty = Object.keys(dirtyFields).find(field => field !== 'phone')
     return isNonPhoneFieldDirty || isPhoneFieldDirty
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watch, form, defaultUserData?.phone])
 
   useEffect(() => {

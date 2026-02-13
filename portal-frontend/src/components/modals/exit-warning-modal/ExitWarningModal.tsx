@@ -1,5 +1,6 @@
 'use client'
 
+import { DialogProps } from '@radix-ui/react-dialog'
 import { Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
@@ -12,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { DialogProps } from '@radix-ui/react-dialog'
 
 interface ExotWarningModalProps extends DialogProps {
   isLoading?: boolean
