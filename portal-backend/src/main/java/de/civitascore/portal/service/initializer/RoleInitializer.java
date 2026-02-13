@@ -1,7 +1,7 @@
 package de.civitascore.portal.service.initializer;
 
 import de.civitascore.portal.model.embedded.PermissionName;
-import de.civitascore.portal.model.embedded.RoleType;
+import de.civitascore.portal.model.embedded.RoleDefault;
 import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.repository.PermissionRepository;
@@ -37,7 +37,9 @@ public class RoleInitializer {
             .collect(Collectors.toMap(Role::getName, Function.identity()));
 
     Set<String> standardRoleNames =
-        Arrays.stream(StandardRole.values()).map(sr -> sr.roleName).collect(Collectors.toSet());
+        Arrays.stream(RoleDefault.values())
+            .map(RoleDefault::getRoleName)
+            .collect(Collectors.toSet());
 
     List<Role> toCreate = new ArrayList<>();
     List<Role> toUpdate = new ArrayList<>();
@@ -46,21 +48,21 @@ public class RoleInitializer {
             .filter(role -> role.isReadonly() && !standardRoleNames.contains(role.getName()))
             .collect(Collectors.toCollection(ArrayList::new));
 
-    for (StandardRole standardRole : StandardRole.values()) {
+    for (RoleDefault standardRole : RoleDefault.values()) {
       Set<Permission> expectedPermissions =
-          resolvePermissions(standardRole.permissions, permissionsByNameAndSource);
-      Role existing = existingRolesByName.get(standardRole.roleName);
+          resolvePermissions(standardRole.getPermissions(), permissionsByNameAndSource);
+      Role existing = existingRolesByName.get(standardRole.getRoleName());
 
       if (existing == null) {
         Role role = new Role();
-        role.setName(standardRole.roleName);
-        role.setDescription(standardRole.description);
-        role.setRoleType(standardRole.roleType);
+        role.setName(standardRole.getRoleName());
+        role.setDescription(standardRole.getDescription());
+        role.setRoleType(standardRole.getRoleType());
         role.setReadonly(true);
         role.setPermissions(expectedPermissions);
         toCreate.add(role);
       } else if (needsUpdate(existing, standardRole, expectedPermissions)) {
-        existing.setDescription(standardRole.description);
+        existing.setDescription(standardRole.getDescription());
         existing.setPermissions(expectedPermissions);
         toUpdate.add(existing);
       }
@@ -79,13 +81,13 @@ public class RoleInitializer {
       log.info("Removed {} obsolete readonly roles", toRemove.size());
     }
     if (toCreate.isEmpty() && toUpdate.isEmpty() && toRemove.isEmpty()) {
-      log.info("All {} roles are up to date", StandardRole.values().length);
+      log.info("All {} roles are up to date", RoleDefault.values().length);
     }
   }
 
   private boolean needsUpdate(
-      Role existing, StandardRole standardRole, Set<Permission> expectedPermissions) {
-    if (!Objects.equals(existing.getDescription(), standardRole.description)) {
+      Role existing, RoleDefault standardRole, Set<Permission> expectedPermissions) {
+    if (!Objects.equals(existing.getDescription(), standardRole.getDescription())) {
       return true;
     }
     Set<String> existingPermissionNames =
@@ -112,136 +114,5 @@ public class RoleInitializer {
       permissions.add(permission);
     }
     return permissions;
-  }
-
-  /** Standard role definitions as described in the Authorization Data Model documentation. */
-  enum StandardRole {
-    TENANT_ADMIN(
-        "Tenant Admin",
-        "Tenant-wide permissions to manage users, roles and permissions as well as tenant"
-            + " parameters.",
-        RoleType.SYSTEM,
-        new PermissionName[] {
-          PermissionName.USER_CREATE,
-          PermissionName.USER_READ,
-          PermissionName.USER_UPDATE,
-          PermissionName.USER_DELETE,
-          PermissionName.ROLE_CREATE,
-          PermissionName.ROLE_READ,
-          PermissionName.ROLE_UPDATE,
-          PermissionName.ROLE_DELETE,
-          PermissionName.ASSIGNMENT_CREATE,
-          PermissionName.ASSIGNMENT_READ,
-          PermissionName.ASSIGNMENT_DELETE,
-          PermissionName.GROUP_CREATE,
-          PermissionName.GROUP_READ,
-          PermissionName.GROUP_UPDATE,
-          PermissionName.GROUP_DELETE,
-          PermissionName.PERMISSION_READ,
-        }),
-
-    DATA_ARCHITECT(
-        "Data Architect",
-        "Management rights for all aspects of data ingestion, data processing, data storage and"
-            + " data output.",
-        RoleType.DATA,
-        new PermissionName[] {
-          PermissionName.DATASET_CREATE,
-          PermissionName.DATASET_READ,
-          PermissionName.DATASET_UPDATE,
-          PermissionName.DATASET_DELETE,
-          PermissionName.DATASOURCE_CREATE,
-          PermissionName.DATASOURCE_READ,
-          PermissionName.DATASOURCE_UPDATE,
-          PermissionName.DATASOURCE_DELETE,
-          PermissionName.DATASTRUCTURE_CREATE,
-          PermissionName.DATASTRUCTURE_READ,
-          PermissionName.DATASTRUCTURE_UPDATE,
-          PermissionName.DATASTRUCTURE_DELETE,
-        }),
-
-    DATA_CONSUMER(
-        "Data Consumer",
-        "Read access to published data products.",
-        RoleType.DATA,
-        new PermissionName[] {
-          PermissionName.DATASET_READ, PermissionName.DATASET_PAYLOAD_READ,
-        }),
-
-    DATA_STEWARD(
-        "Data Steward",
-        "Responsibility for the life-cycle of domain specific data in a data space.",
-        RoleType.DATA,
-        new PermissionName[] {
-          PermissionName.DATASET_CREATE,
-          PermissionName.DATASET_READ,
-          PermissionName.DATASET_UPDATE,
-          PermissionName.DATASET_DELETE,
-          PermissionName.DATASET_PAYLOAD_CREATE,
-          PermissionName.DATASET_PAYLOAD_READ,
-          PermissionName.DATASET_PAYLOAD_UPDATE,
-          PermissionName.DATASET_PAYLOAD_DELETE,
-          PermissionName.DATASOURCE_CREATE,
-          PermissionName.DATASOURCE_READ,
-          PermissionName.DATASOURCE_UPDATE,
-          PermissionName.DATASOURCE_DELETE,
-          PermissionName.DATASTRUCTURE_CREATE,
-          PermissionName.DATASTRUCTURE_READ,
-          PermissionName.DATASTRUCTURE_UPDATE,
-          PermissionName.DATASTRUCTURE_DELETE,
-        }),
-
-    DATA_OWNER(
-        "Data Owner",
-        "Business responsibility for one or several domains.",
-        RoleType.DATA,
-        new PermissionName[] {
-          PermissionName.DATASET_CREATE,
-          PermissionName.DATASET_READ,
-          PermissionName.DATASET_UPDATE,
-          PermissionName.DATASET_DELETE,
-          PermissionName.DATASET_RELEASE,
-          PermissionName.DATASET_PAYLOAD_CREATE,
-          PermissionName.DATASET_PAYLOAD_READ,
-          PermissionName.DATASET_PAYLOAD_UPDATE,
-          PermissionName.DATASET_PAYLOAD_DELETE,
-          PermissionName.DATASOURCE_CREATE,
-          PermissionName.DATASOURCE_READ,
-          PermissionName.DATASOURCE_UPDATE,
-          PermissionName.DATASOURCE_DELETE,
-          PermissionName.DATASOURCE_RELEASE,
-          PermissionName.DATASTRUCTURE_CREATE,
-          PermissionName.DATASTRUCTURE_READ,
-          PermissionName.DATASTRUCTURE_UPDATE,
-          PermissionName.DATASTRUCTURE_DELETE,
-          PermissionName.DATASTRUCTURE_RELEASE,
-        }),
-
-    DATA_GATEKEEPER(
-        "Data Gatekeeper",
-        "Responsibility for data protection and data governance.",
-        RoleType.GOVERNANCE,
-        new PermissionName[] {
-          PermissionName.DATASET_READ,
-          PermissionName.DATASET_RELEASE,
-          PermissionName.DATASET_PAYLOAD_READ,
-          PermissionName.DATASOURCE_READ,
-          PermissionName.DATASOURCE_RELEASE,
-          PermissionName.DATASTRUCTURE_READ,
-          PermissionName.DATASTRUCTURE_RELEASE,
-        });
-
-    final String roleName;
-    final String description;
-    final RoleType roleType;
-    final PermissionName[] permissions;
-
-    StandardRole(
-        String roleName, String description, RoleType roleType, PermissionName[] permissions) {
-      this.roleName = roleName;
-      this.description = description;
-      this.roleType = roleType;
-      this.permissions = permissions;
-    }
   }
 }
