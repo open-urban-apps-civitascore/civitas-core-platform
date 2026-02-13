@@ -42,7 +42,9 @@
       "roles": "Rollen",
       "datasets": "Datensätze",
       "dataspaces": "Datenräume",
-      "permissions": "Berechtigungen"
+      "permissions": "Berechtigungen",
+      "datasources": "Datenquellen",
+      "datasource": "Datenquelle"
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
@@ -108,9 +110,7 @@
         "dataspace": "Datenraum",
         "selectDataspace": "Datenraum wählen...",
         "name": "Name des Datensatzes",
-        "description": "Beschreibung",
-        "tags": "Tags",
-        "typeTag": "Tag eingeben..."
+        "description": "Beschreibung"
       },
       "completion": {
         "title": "Erstellungsfortschritt",
@@ -381,7 +381,6 @@
       "connector": "Konnektor",
       "connection": "Verbindung",
       "lastActive": "Aktivität vor",
-      "tags": "Tags",
       "status": "Status",
       "action": "Aktion"
     },
@@ -412,12 +411,7 @@
       "name": "Name",
       "namePlaceholder": "Name der Datenquelle",
       "description": "Beschreibung",
-      "descriptionHint": "max. 150 Zeichen",
-      "tags": "Tags",
-      "tagsOptional": "(optional)",
-      "tagsPlaceholder": "Tag hinzufügen...",
-      "tagsSearch": "Tag suchen ...",
-      "noTagsFound": "Keine Tags gefunden"
+      "descriptionHint": "max. 150 Zeichen"
     },
     "tabs": {
       "basicInfo": "Basisinformationen",

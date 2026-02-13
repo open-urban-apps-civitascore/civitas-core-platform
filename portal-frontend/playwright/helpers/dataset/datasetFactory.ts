@@ -13,7 +13,6 @@ export const getMockDatasetData = (overrides: Partial<Dataset> = {}): Dataset =>
     issued: new Date().toISOString(),
     lastUpdated: new Date().toISOString(),
     dataspace: { id: `test-dataspace-${crypto.randomUUID()}`, name: 'Test Dataspace' },
-    tags: ['testTag1', 'testTag2'],
     access: true,
     status: 'draft',
     ...overrides,

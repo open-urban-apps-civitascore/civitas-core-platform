@@ -43,7 +43,9 @@
       "roles": "Roles",
       "datasets": "Datasets",
       "dataspaces": "Dataspaces",
-      "permissions": "Permissions"
+      "permissions": "Permissions",
+      "datasources": "Datasources",
+      "datasource": "Datasource"
     },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
@@ -109,9 +111,7 @@
         "dataspace": "Data Space",
         "selectDataspace": "Select Data Space...",
         "name": "Name of the Dataset",
-        "description": "Description",
-        "tags": "Tags",
-        "typeTag": "Type tag..."
+        "description": "Description"
       },
       "completion": {
         "title": "Creation Progress",
@@ -378,7 +378,6 @@
       "connector": "Connector",
       "connection": "Connection",
       "lastActive": "Last active",
-      "tags": "Tags",
       "status": "Status",
       "action": "Action"
     },
@@ -416,12 +415,7 @@
       "name": "Name",
       "namePlaceholder": "Name of the data source",
       "description": "Description",
-      "descriptionHint": "max. 150 characters",
-      "tags": "Tags",
-      "tagsOptional": "(optional)",
-      "tagsPlaceholder": "Add tag...",
-      "tagsSearch": "Search tag...",
-      "noTagsFound": "No tags found"
+      "descriptionHint": "max. 150 characters"
     },
     "exitModal": {
       "title": "Save before exiting?",
