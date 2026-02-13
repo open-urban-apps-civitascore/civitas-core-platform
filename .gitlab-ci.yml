@@ -49,10 +49,10 @@ workflow:
 
 stages: [
     lint, # Lints all code
-    qa, # License sanning, SAST, Secret detection for all code
-    test-package, # Test only config adpater
-    build-package, # Build config adpater and portal-model
-    deploy-package, # Deploy config adpater and portal-model (which is required for backend test/build)
+    qa, # License scanning, SAST, Secret detection for all code
+    test-package, # Test only config adapter
+    build-package, # Build config adapter and portal-model
+    deploy-package, # Deploy config adapter and portal-model (which is required for backend test/build)
     test, # Test backend & frontend
     build, # Build backend & frontend
     container-qa, # Container scanning for built images
