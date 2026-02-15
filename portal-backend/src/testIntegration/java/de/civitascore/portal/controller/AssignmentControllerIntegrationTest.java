@@ -176,9 +176,7 @@ class AssignmentControllerIntegrationTest
       assertThat(output.getScopeType())
           .as("Scope type should match input")
           .isEqualTo(input.getScopeType());
-      assertThat(output.getScope())
-          .as("Scope should be null for TENANT assignments")
-          .isNull();
+      assertThat(output.getScope()).as("Scope should be null for TENANT assignments").isNull();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -428,10 +426,8 @@ class AssignmentControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getScopeType()).isEqualTo(ScopeType.DATASPACE);
       assertThat(response.getBody().getScope()).isNotNull();
-      assertThat(response.getBody().getScope().getId())
-          .isEqualTo(dataSpace.getId().toString());
-      assertThat(response.getBody().getScope().getName())
-          .isEqualTo(dataSpace.getName());
+      assertThat(response.getBody().getScope().getId()).isEqualTo(dataSpace.getId().toString());
+      assertThat(response.getBody().getScope().getName()).isEqualTo(dataSpace.getName());
     }
 
     @Test
@@ -492,10 +488,8 @@ class AssignmentControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getScopeType()).isEqualTo(ScopeType.DATASET);
       assertThat(response.getBody().getScope()).isNotNull();
-      assertThat(response.getBody().getScope().getId())
-          .isEqualTo(dataSet.getId().toString());
-      assertThat(response.getBody().getScope().getName())
-          .isEqualTo(dataSet.getName());
+      assertThat(response.getBody().getScope().getId()).isEqualTo(dataSet.getId().toString());
+      assertThat(response.getBody().getScope().getName()).isEqualTo(dataSet.getName());
     }
   }
 
