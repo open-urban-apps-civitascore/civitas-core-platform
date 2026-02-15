@@ -25,6 +25,7 @@ public interface AssignmentMapper
 
   @Mapping(target = "group", ignore = true)
   @Mapping(target = "role", ignore = true)
+  @Mapping(target = "scope", ignore = true)
   @Override
   AssignmentOutputDTO toOutput(Assignment entity);
 

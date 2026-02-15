@@ -18,6 +18,7 @@ import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.RestPage;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -106,10 +107,14 @@ class AssignmentControllerIntegrationTest
   }
 
   private UUID createTestDataSpace() {
+    return createTestDataSpaceEntity().getId();
+  }
+
+  private DataSpace createTestDataSpaceEntity() {
     DataSpace dataSpace = new DataSpace();
     dataSpace.setName("Test DataSpace " + System.currentTimeMillis());
     dataSpace.setDescription("Test dataspace for assignment");
-    return dataSpaceRepository.save(dataSpace).getId();
+    return dataSpaceRepository.save(dataSpace);
   }
 
   private UUID createTestDataSet(UUID dataSpaceId) {
@@ -119,6 +124,15 @@ class AssignmentControllerIntegrationTest
     dataSet.setDescription("Test dataset for assignment");
     dataSet.setDataSpaces(Set.of(dataSpace));
     return dataSetRepository.save(dataSet).getId();
+  }
+
+  private DataSet createTestDataSetEntity() {
+    DataSpace dataSpace = createTestDataSpaceEntity();
+    DataSet dataSet = new DataSet();
+    dataSet.setName("Test DataSet " + System.currentTimeMillis());
+    dataSet.setDescription("Test dataset for assignment");
+    dataSet.setDataSpaces(Set.of(dataSpace));
+    return dataSetRepository.save(dataSet);
   }
 
   private UUID createTestCatalog() {
@@ -162,6 +176,9 @@ class AssignmentControllerIntegrationTest
       assertThat(output.getScopeType())
           .as("Scope type should match input")
           .isEqualTo(input.getScopeType());
+      assertThat(output.getScope())
+          .as("Scope should be null for TENANT assignments")
+          .isNull();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -213,18 +230,25 @@ class AssignmentControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should create assignment with scope ID")
-    void shouldCreateAssignmentWithScopeId() {
-      UUID dataSpaceId = createTestDataSpace();
+    @DisplayName("Should create assignment with dataspace scope and return scope summary")
+    void shouldCreateAssignmentWithDataspaceScope() {
+      DataSpace dataSpace = createTestDataSpaceEntity();
+
       AssignmentInputDTO input = createValidInput();
       input.setScopeType(ScopeType.DATASPACE);
-      input.setScopeId(dataSpaceId);
+      input.setScopeId(dataSpace.getId());
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getScopeId()).isEqualTo(dataSpaceId);
+      assertThat(response.getBody().getScope()).as("Scope summary should be set").isNotNull();
+      assertThat(response.getBody().getScope().getId())
+          .as("Scope ID should match dataspace ID")
+          .isEqualTo(dataSpace.getId().toString());
+      assertThat(response.getBody().getScope().getName())
+          .as("Scope name should match dataspace name")
+          .isEqualTo(dataSpace.getName());
     }
 
     @Test
@@ -348,6 +372,134 @@ class AssignmentControllerIntegrationTest
   }
 
   @Nested
+  @DisplayName("Update Assignment Tests")
+  class UpdateAssignmentTests {
+
+    @Test
+    @DisplayName("Should update assignment successfully with PUT")
+    void shouldUpdateAssignmentWithPut() {
+      UUID assignmentId = createTestEntity();
+
+      AssignmentInputDTO updateInput = createUpdateInput();
+      ResponseEntity<AssignmentOutputDTO> response = performUpdate(assignmentId, updateInput);
+
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+
+      assertThat(response.getBody()).as("Response body should not be null").isNotNull();
+
+      AssignmentOutputDTO output = response.getBody();
+      assertThat(output.getId()).as("ID should remain the same").isEqualTo(assignmentId);
+      assertThat(output.getScopeType())
+          .as("Scope type should be updated")
+          .isEqualTo(updateInput.getScopeType());
+      assertThat(output.getModifiedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Should partially update assignment with PATCH - scope type")
+    void shouldPartiallyUpdateAssignmentWithPatch() {
+      UUID assignmentId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("scopeType", "TENANT");
+
+      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
+
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getScopeType())
+          .as("ScopeType should be updated")
+          .isEqualTo(ScopeType.TENANT);
+    }
+
+    @Test
+    @DisplayName("Should update scope with PATCH and return scope summary")
+    void shouldUpdateScopeWithPatch() {
+      DataSpace dataSpace = createTestDataSpaceEntity();
+
+      UUID assignmentId = createTestEntity();
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("scopeType", "DATASPACE");
+      patchMap.put("scopeId", dataSpace.getId().toString());
+
+      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
+
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getScopeType()).isEqualTo(ScopeType.DATASPACE);
+      assertThat(response.getBody().getScope()).isNotNull();
+      assertThat(response.getBody().getScope().getId())
+          .isEqualTo(dataSpace.getId().toString());
+      assertThat(response.getBody().getScope().getName())
+          .isEqualTo(dataSpace.getName());
+    }
+
+    @Test
+    @DisplayName("Should handle empty PATCH (no changes)")
+    void shouldHandleEmptyPatch() {
+      UUID assignmentId = createTestEntity();
+
+      ResponseEntity<AssignmentOutputDTO> initialResponse = performGetById(assignmentId);
+      AssignmentOutputDTO initialAssignment = initialResponse.getBody();
+
+      Map<String, Object> patchMap = new HashMap<>();
+
+      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getScopeType()).isEqualTo(initialAssignment.getScopeType());
+    }
+
+    @Test
+    @DisplayName("Should fail to update non-existent assignment")
+    void shouldFailToUpdateNonExistentAssignment() {
+      AssignmentInputDTO updateInput = createUpdateInput();
+
+      ResponseEntity<AssignmentOutputDTO> response = performUpdate(UUID.randomUUID(), updateInput);
+
+      assertThat(response.getStatusCode())
+          .as("Should return NOT_FOUND status")
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should fail to update assignment without authentication")
+    void shouldFailToUpdateAssignmentWithoutAuth() {
+      UUID assignmentId = createTestEntity();
+
+      ResponseEntity<String> response =
+          performRequestWithoutAuth("/" + assignmentId, org.springframework.http.HttpMethod.PUT);
+
+      assertThat(response.getStatusCode())
+          .as("Should return UNAUTHORIZED status")
+          .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("Should update assignment scope with PUT")
+    void shouldUpdateAssignmentScope() {
+      DataSet dataSet = createTestDataSetEntity();
+      UUID assignmentId = createTestEntity();
+
+      AssignmentInputDTO updateInput = createUpdateInput();
+      updateInput.setScopeType(ScopeType.DATASET);
+      updateInput.setScopeId(dataSet.getId());
+
+      ResponseEntity<AssignmentOutputDTO> response = performUpdate(assignmentId, updateInput);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getScopeType()).isEqualTo(ScopeType.DATASET);
+      assertThat(response.getBody().getScope()).isNotNull();
+      assertThat(response.getBody().getScope().getId())
+          .isEqualTo(dataSet.getId().toString());
+      assertThat(response.getBody().getScope().getName())
+          .isEqualTo(dataSet.getName());
+    }
+  }
+
+  @Nested
   @DisplayName("Delete Assignment Tests")
   class DeleteAssignmentTests {
 
@@ -408,6 +560,9 @@ class AssignmentControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getScopeType()).isEqualTo(ScopeType.TENANT);
+      assertThat(response.getBody().getScope())
+          .as("Scope should be null for TENANT assignments")
+          .isNull();
     }
 
     @Test

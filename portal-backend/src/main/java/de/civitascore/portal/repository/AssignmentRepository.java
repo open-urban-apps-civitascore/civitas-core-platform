@@ -18,9 +18,18 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
    * read operations (GET/UPDATE) instead of regular findById.
    *
    * @param id the assignment ID
-   * @return the assignment with eagerly fetched group, and role
+   * @return the assignment with eagerly fetched group, role, and scope entities
    */
-  @EntityGraph(attributePaths = {"group", "role"})
+  @EntityGraph(
+      attributePaths = {
+        "group",
+        "role",
+        "dataSpace",
+        "dataset",
+        "catalog",
+        "dataSource",
+        "dataStructure"
+      })
   @Query("SELECT a FROM Assignment a WHERE a.id = :id")
   Optional<Assignment> findByIdWithRelations(@Param("id") UUID id);
 
