@@ -44,8 +44,7 @@ public class AssignmentAssembler implements BaseAssembler<Assignment, Assignment
     ScopeType scopeType = entity.getScopeType();
     NamedEntity scopeEntity = entity.getScope();
 
-    boolean scopeRequired =
-        scopeType != null && scopeType != ScopeType.TENANT;
+    boolean scopeRequired = scopeType != null && scopeType != ScopeType.TENANT;
 
     if (scopeRequired && scopeEntity == null) {
       throw new IllegalStateException(
