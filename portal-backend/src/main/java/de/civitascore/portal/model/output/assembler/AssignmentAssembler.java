@@ -3,6 +3,7 @@ package de.civitascore.portal.model.output.assembler;
 import de.civitascore.portal.mapper.AssignmentMapper;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.mapper.RoleMapper;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.base.NamedEntity;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
@@ -40,7 +41,20 @@ public class AssignmentAssembler implements BaseAssembler<Assignment, Assignment
   }
 
   private DataEntitySummaryDTO resolveScopeSummary(Assignment entity) {
+    ScopeType scopeType = entity.getScopeType();
     NamedEntity scopeEntity = entity.getScope();
+
+    boolean scopeRequired =
+        scopeType != null && scopeType != ScopeType.TENANT;
+
+    if (scopeRequired && scopeEntity == null) {
+      throw new IllegalStateException(
+          "Assignment "
+              + entity.getId()
+              + " has scopeType "
+              + scopeType
+              + " but no scope entity. The referenced scope may have been deleted.");
+    }
 
     if (scopeEntity == null) {
       return null;
