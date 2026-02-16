@@ -130,12 +130,7 @@ public final class SagaDefinitions {
         SagaType.DATASET_DELETE,
         List.of(
             SagaStepDefinition.conditional(
-                "delete-pipelines",
-                "redpanda",
-                "DELETE_PIPELINES",
-                null,
-                REDPANDA_EXECUTE,
-                null),
+                "delete-pipelines", "redpanda", "DELETE_PIPELINES", null, REDPANDA_EXECUTE, null),
             SagaStepDefinition.mandatory(
                 "delete-route", "apisix", "DELETE_ROUTE", null, APISIX_EXECUTE, null),
             SagaStepDefinition.mandatory(

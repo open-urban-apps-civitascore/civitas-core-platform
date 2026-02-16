@@ -43,46 +43,112 @@ public record SagaStep(
 
   /** Creates a new step in PENDING status with no result data. */
   public static SagaStep pending(String stepId, String adapter, String operation) {
-    return new SagaStep(stepId, adapter, operation, SagaStepStatus.PENDING, Map.of(), Map.of(), null, null, null);
+    return new SagaStep(
+        stepId, adapter, operation, SagaStepStatus.PENDING, Map.of(), Map.of(), null, null, null);
   }
 
   /** Returns a copy of this step with the given status. */
   public SagaStep withStatus(SagaStepStatus newStatus) {
-    return new SagaStep(stepId, adapter, operation, newStatus, result, compensationData, error, startedAt, completedAt);
+    return new SagaStep(
+        stepId,
+        adapter,
+        operation,
+        newStatus,
+        result,
+        compensationData,
+        error,
+        startedAt,
+        completedAt);
   }
 
   /** Returns a copy of this step transitioned to IN_PROGRESS. */
   public SagaStep asInProgress(Instant now) {
-    return new SagaStep(stepId, adapter, operation, SagaStepStatus.IN_PROGRESS, result, compensationData, error, now, null);
+    return new SagaStep(
+        stepId,
+        adapter,
+        operation,
+        SagaStepStatus.IN_PROGRESS,
+        result,
+        compensationData,
+        error,
+        now,
+        null);
   }
 
   /** Returns a copy of this step transitioned to SUCCESS with result data. */
-  public SagaStep asSucceeded(Map<String, Object> resultData, Map<String, Object> compData, Instant now) {
-    return new SagaStep(stepId, adapter, operation, SagaStepStatus.SUCCESS, resultData, compData, null, startedAt, now);
+  public SagaStep asSucceeded(
+      Map<String, Object> resultData, Map<String, Object> compData, Instant now) {
+    return new SagaStep(
+        stepId,
+        adapter,
+        operation,
+        SagaStepStatus.SUCCESS,
+        resultData,
+        compData,
+        null,
+        startedAt,
+        now);
   }
 
   /** Returns a copy of this step transitioned to FAILED. */
   public SagaStep asFailed(String errorMessage, Instant now) {
-    return new SagaStep(stepId, adapter, operation, SagaStepStatus.FAILED, result, compensationData, errorMessage, startedAt, now);
+    return new SagaStep(
+        stepId,
+        adapter,
+        operation,
+        SagaStepStatus.FAILED,
+        result,
+        compensationData,
+        errorMessage,
+        startedAt,
+        now);
   }
 
   /** Returns a copy of this step transitioned to SKIPPED. */
   public SagaStep asSkipped() {
-    return new SagaStep(stepId, adapter, operation, SagaStepStatus.SKIPPED, Map.of(), Map.of(), null, null, null);
+    return new SagaStep(
+        stepId, adapter, operation, SagaStepStatus.SKIPPED, Map.of(), Map.of(), null, null, null);
   }
 
   /** Returns a copy of this step transitioned to COMPENSATING. */
   public SagaStep asCompensating(Instant now) {
-    return new SagaStep(stepId, adapter, operation, SagaStepStatus.COMPENSATING, result, compensationData, error, now, null);
+    return new SagaStep(
+        stepId,
+        adapter,
+        operation,
+        SagaStepStatus.COMPENSATING,
+        result,
+        compensationData,
+        error,
+        now,
+        null);
   }
 
   /** Returns a copy of this step transitioned to COMPENSATED. */
   public SagaStep asCompensated(Instant now) {
-    return new SagaStep(stepId, adapter, operation, SagaStepStatus.COMPENSATED, result, compensationData, null, startedAt, now);
+    return new SagaStep(
+        stepId,
+        adapter,
+        operation,
+        SagaStepStatus.COMPENSATED,
+        result,
+        compensationData,
+        null,
+        startedAt,
+        now);
   }
 
   /** Returns a copy of this step transitioned to COMPENSATION_FAILED. */
   public SagaStep asCompensationFailed(String errorMessage, Instant now) {
-    return new SagaStep(stepId, adapter, operation, SagaStepStatus.COMPENSATION_FAILED, result, compensationData, errorMessage, startedAt, now);
+    return new SagaStep(
+        stepId,
+        adapter,
+        operation,
+        SagaStepStatus.COMPENSATION_FAILED,
+        result,
+        compensationData,
+        errorMessage,
+        startedAt,
+        now);
   }
 }

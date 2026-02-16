@@ -16,7 +16,9 @@ public enum SagaType {
   /** Dataset provisioning: FROST → APISIX → Redpanda (conditional). */
   DATASET_CREATE("dataset-create"),
 
-  /** Dataset update: FROST → APISIX → Redpanda (conditional). Compensation restores previous state. */
+  /**
+   * Dataset update: FROST → APISIX → Redpanda (conditional). Compensation restores previous state.
+   */
   DATASET_UPDATE("dataset-update"),
 
   /**

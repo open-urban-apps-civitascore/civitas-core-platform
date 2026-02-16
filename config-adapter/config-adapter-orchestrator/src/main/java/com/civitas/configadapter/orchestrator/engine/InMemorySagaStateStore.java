@@ -10,12 +10,11 @@
  */
 package com.civitas.configadapter.orchestrator.engine;
 
+import com.civitas.configadapter.model.saga.SagaContext;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-
-import com.civitas.configadapter.model.saga.SagaContext;
 
 /**
  * In-memory implementation of {@link SagaStateStore} backed by a {@link ConcurrentHashMap}. Used
@@ -50,8 +49,7 @@ public class InMemorySagaStateStore implements SagaStateStore {
   @Override
   public boolean existsForDataset(String datasetId) {
     return store.values().stream()
-        .anyMatch(
-            saga -> datasetId.equals(saga.datasetId()) && !saga.status().isTerminal());
+        .anyMatch(saga -> datasetId.equals(saga.datasetId()) && !saga.status().isTerminal());
   }
 
   /** Returns the total number of sagas in the store (including terminal). For testing only. */

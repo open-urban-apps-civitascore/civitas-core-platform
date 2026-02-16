@@ -35,9 +35,7 @@ public class SagaEngine {
   private final SagaActionDispatcher dispatcher;
 
   public SagaEngine(
-      SagaStateMachine stateMachine,
-      SagaStateStore stateStore,
-      SagaActionDispatcher dispatcher) {
+      SagaStateMachine stateMachine, SagaStateStore stateStore, SagaActionDispatcher dispatcher) {
     this.stateMachine = stateMachine;
     this.stateStore = stateStore;
     this.dispatcher = dispatcher;
@@ -170,8 +168,7 @@ public class SagaEngine {
 
     SagaDefinition definition = SagaDefinitions.forType(context.sagaType());
     SagaTransitionResult result =
-        stateMachine.handleCompensationFailed(
-            context, definition, stepId, error, Instant.now());
+        stateMachine.handleCompensationFailed(context, definition, stepId, error, Instant.now());
 
     processActions(result);
   }

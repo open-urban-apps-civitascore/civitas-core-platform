@@ -117,9 +117,7 @@ public class KafkaSagaStateRecovery {
             }
           } catch (IOException e) {
             LOG.warn(
-                "Failed to deserialize saga state for key {}, skipping",
-                Encode.forJava(sagaId),
-                e);
+                "Failed to deserialize saga state for key {}, skipping", Encode.forJava(sagaId), e);
           }
         }
       }

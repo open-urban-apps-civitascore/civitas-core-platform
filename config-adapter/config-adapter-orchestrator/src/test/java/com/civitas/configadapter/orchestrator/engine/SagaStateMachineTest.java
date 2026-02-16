@@ -17,20 +17,18 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Predicate;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-
 import com.civitas.configadapter.model.saga.SagaContext;
 import com.civitas.configadapter.model.saga.SagaStatus;
 import com.civitas.configadapter.model.saga.SagaStepStatus;
 import com.civitas.configadapter.model.saga.SagaType;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 
 /**
  * Comprehensive tests for {@link SagaStateMachine}. Covers all combinations of success, failure,
@@ -74,18 +72,26 @@ class SagaStateMachineTest {
 
   private Map<String, Object> triggerWithPipelines() {
     return Map.of(
-        "id", DATASET_ID,
-        "name", "Test Dataset",
-        "openDataAccess", true,
-        "dataPipelines", List.of(Map.of("id", "pl-001", "action", "ADD")));
+        "id",
+        DATASET_ID,
+        "name",
+        "Test Dataset",
+        "openDataAccess",
+        true,
+        "dataPipelines",
+        List.of(Map.of("id", "pl-001", "action", "ADD")));
   }
 
   private Map<String, Object> triggerWithoutPipelines() {
     return Map.of(
-        "id", DATASET_ID,
-        "name", "Test Dataset",
-        "openDataAccess", true,
-        "dataPipelines", List.of());
+        "id",
+        DATASET_ID,
+        "name",
+        "Test Dataset",
+        "openDataAccess",
+        true,
+        "dataPipelines",
+        List.of());
   }
 
   private Map<String, Object> deleteTriggerWithPipelines() {
@@ -133,15 +139,21 @@ class SagaStateMachineTest {
       assertEquals("create-project", r.context().currentStepId());
       assertNotNull(findAction(r.actions(), SagaAction.ExecuteStep.class));
 
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       assertEquals(SagaStatus.EXECUTING, r.context().status());
       assertEquals("create-route", r.context().currentStepId());
 
-      r = sm.handleStepCompleted(r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
       assertEquals(SagaStatus.EXECUTING, r.context().status());
       assertEquals("deploy-pipelines", r.context().currentStepId());
 
-      r = sm.handleStepCompleted(r.context(), def, "deploy-pipelines", REDPANDA_RESULT, REDPANDA_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "deploy-pipelines", REDPANDA_RESULT, REDPANDA_COMP_DATA, NOW);
       assertEquals(SagaStatus.COMPLETED, r.context().status());
       assertNotNull(findAction(r.actions(), SagaAction.CompleteSaga.class));
 
@@ -157,10 +169,14 @@ class SagaStateMachineTest {
       var r = sm.startSaga(def, DATASET_ID, triggerWithoutPipelines(), NOW);
       assertEquals("create-project", r.context().currentStepId());
 
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       assertEquals("create-route", r.context().currentStepId());
 
-      r = sm.handleStepCompleted(r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
       assertEquals(SagaStatus.COMPLETED, r.context().status());
 
       assertEquals(SagaStepStatus.SUCCESS, stepStatus(r.context(), "create-project"));
@@ -190,7 +206,9 @@ class SagaStateMachineTest {
     @DisplayName("6.5: Failure at step 2 (APISIX) — compensate FROST → COMPENSATED")
     void handleStepFailed_createStep2_shouldCompensateFrost() {
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       r = sm.handleStepFailed(r.context(), def, "create-route", "Connection refused", NOW);
 
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
@@ -215,9 +233,15 @@ class SagaStateMachineTest {
     @DisplayName("6.6: Failure at step 3 (Redpanda) — compensate APISIX → FROST → COMPENSATED")
     void handleStepFailed_createStep3_shouldCompensateApisixThenFrost() {
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
-      r = sm.handleStepFailed(r.context(), def, "deploy-pipelines", "Schema registry unavailable", NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
+      r =
+          sm.handleStepFailed(
+              r.context(), def, "deploy-pipelines", "Schema registry unavailable", NOW);
 
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
 
@@ -245,11 +269,16 @@ class SagaStateMachineTest {
     // ─── 6.7: Compensation Failure Combinations ──────────────────────────
 
     @Test
-    @DisplayName("6.7a: Compensation failure — APISIX comp fails, FROST comp succeeds → COMPENSATION_FAILED")
+    @DisplayName(
+        "6.7a: Compensation failure — APISIX comp fails, FROST comp succeeds → COMPENSATION_FAILED")
     void handleCompensationFailed_apisixFails_shouldReportStaleApisixCleanedFrost() {
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
       r = sm.handleStepFailed(r.context(), def, "deploy-pipelines", "Error", NOW);
 
       // Compensate APISIX → FAILS
@@ -276,11 +305,16 @@ class SagaStateMachineTest {
     }
 
     @Test
-    @DisplayName("6.7b: Compensation failure — APISIX comp succeeds, FROST comp fails → COMPENSATION_FAILED")
+    @DisplayName(
+        "6.7b: Compensation failure — APISIX comp succeeds, FROST comp fails → COMPENSATION_FAILED")
     void handleCompensationFailed_frostFails_shouldReportStaleFrostCleanedApisix() {
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
       r = sm.handleStepFailed(r.context(), def, "deploy-pipelines", "Error", NOW);
 
       // Compensate APISIX → succeeds
@@ -303,8 +337,12 @@ class SagaStateMachineTest {
     @DisplayName("6.7c: All compensations fail → COMPENSATION_FAILED, both stale")
     void handleCompensationFailed_allFail_shouldReportAllStale() {
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
       r = sm.handleStepFailed(r.context(), def, "deploy-pipelines", "Error", NOW);
 
       r = sm.handleCompensationFailed(r.context(), def, "create-route", "APISIX down", NOW);
@@ -321,7 +359,9 @@ class SagaStateMachineTest {
     @DisplayName("6.7d: Step 2 fails, single compensation (FROST) fails → COMPENSATION_FAILED")
     void handleCompensationFailed_step2FailsSingleComp_shouldReportStaleFrost() {
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       r = sm.handleStepFailed(r.context(), def, "create-route", "Error", NOW);
 
       // Only FROST to compensate, and it fails
@@ -351,7 +391,9 @@ class SagaStateMachineTest {
     @DisplayName("6.8b: Timeout at step 2 (APISIX) — compensate FROST")
     void handleStepTimeout_createStep2_shouldCompensateFrost() {
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       r = sm.handleStepTimeout(r.context(), def, "create-route", NOW);
 
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
@@ -369,8 +411,12 @@ class SagaStateMachineTest {
     @DisplayName("6.8c: Timeout at step 3 (Redpanda) — compensate APISIX → FROST")
     void handleStepTimeout_createStep3_shouldCompensateApisixThenFrost() {
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
       r = sm.handleStepTimeout(r.context(), def, "deploy-pipelines", NOW);
 
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
@@ -395,12 +441,18 @@ class SagaStateMachineTest {
     @DisplayName("6.8d: Timeout during APISIX compensation — best-effort, continue to FROST")
     void handleCompensationFailed_timeout_shouldContinueBestEffort() {
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
       r = sm.handleStepFailed(r.context(), def, "deploy-pipelines", "Error", NOW);
 
       // APISIX compensation times out (treated as compensation failure)
-      r = sm.handleCompensationFailed(r.context(), def, "create-route", "Compensation timeout", NOW);
+      r =
+          sm.handleCompensationFailed(
+              r.context(), def, "create-route", "Compensation timeout", NOW);
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
 
       // Should still try FROST compensation
@@ -418,7 +470,9 @@ class SagaStateMachineTest {
     @DisplayName("Create without pipelines: failure at step 2 → compensate FROST only")
     void handleStepFailed_noPipelinesStep2_shouldCompensateFrostOnly() {
       var r = sm.startSaga(def, DATASET_ID, triggerWithoutPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       r = sm.handleStepFailed(r.context(), def, "create-route", "Error", NOW);
 
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
@@ -446,7 +500,9 @@ class SagaStateMachineTest {
     @DisplayName("Create without pipelines: timeout at step 2 → compensate FROST")
     void handleStepTimeout_noPipelinesStep2_shouldCompensateFrost() {
       var r = sm.startSaga(def, DATASET_ID, triggerWithoutPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       r = sm.handleStepTimeout(r.context(), def, "create-route", NOW);
 
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
@@ -470,18 +526,26 @@ class SagaStateMachineTest {
 
     private Map<String, Object> updateTriggerWithPipelines() {
       return Map.of(
-          "id", DATASET_ID,
-          "name", "Updated Dataset",
-          "openDataAccess", false,
-          "dataPipelines", List.of(Map.of("id", "pl-001", "action", "UPDATE")));
+          "id",
+          DATASET_ID,
+          "name",
+          "Updated Dataset",
+          "openDataAccess",
+          false,
+          "dataPipelines",
+          List.of(Map.of("id", "pl-001", "action", "UPDATE")));
     }
 
     private Map<String, Object> updateTriggerWithoutPipelines() {
       return Map.of(
-          "id", DATASET_ID,
-          "name", "Updated Dataset",
-          "openDataAccess", false,
-          "dataPipelines", List.of());
+          "id",
+          DATASET_ID,
+          "name",
+          "Updated Dataset",
+          "openDataAccess",
+          false,
+          "dataPipelines",
+          List.of());
     }
 
     // ─── Success Scenarios ────────────────────────────────────────────────
@@ -492,16 +556,29 @@ class SagaStateMachineTest {
       var r = sm.startSaga(def, DATASET_ID, updateTriggerWithPipelines(), NOW);
       assertEquals("update-project", r.context().currentStepId());
 
-      r = sm.handleStepCompleted(r.context(), def, "update-project",
-          FROST_RESULT, Map.of("previousName", "Old Name"), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(),
+              def,
+              "update-project",
+              FROST_RESULT,
+              Map.of("previousName", "Old Name"),
+              NOW);
       assertEquals("update-route", r.context().currentStepId());
 
-      r = sm.handleStepCompleted(r.context(), def, "update-route",
-          APISIX_RESULT, Map.of("previousOpenDataAccess", true), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(),
+              def,
+              "update-route",
+              APISIX_RESULT,
+              Map.of("previousOpenDataAccess", true),
+              NOW);
       assertEquals("update-pipelines", r.context().currentStepId());
 
-      r = sm.handleStepCompleted(r.context(), def, "update-pipelines",
-          REDPANDA_RESULT, Map.of(), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "update-pipelines", REDPANDA_RESULT, Map.of(), NOW);
       assertEquals(SagaStatus.COMPLETED, r.context().status());
     }
 
@@ -533,8 +610,14 @@ class SagaStateMachineTest {
     @DisplayName("7.3: Failure at step 2 (APISIX) — revert FROST (RESTORE_PROJECT)")
     void handleStepFailed_updateStep2_shouldCompensateFrost() {
       var r = sm.startSaga(def, DATASET_ID, updateTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "update-project",
-          FROST_RESULT, Map.of("previousName", "Old Name"), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(),
+              def,
+              "update-project",
+              FROST_RESULT,
+              Map.of("previousName", "Old Name"),
+              NOW);
       r = sm.handleStepFailed(r.context(), def, "update-route", "Error", NOW);
 
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
@@ -548,13 +631,21 @@ class SagaStateMachineTest {
     }
 
     @Test
-    @DisplayName("7.4: Failure at step 3 (Redpanda) — revert APISIX (RESTORE_ROUTE) → FROST (RESTORE_PROJECT)")
+    @DisplayName(
+        "7.4: Failure at step 3 (Redpanda) — revert APISIX (RESTORE_ROUTE) → FROST (RESTORE_PROJECT)")
     void handleStepFailed_updateStep3_shouldCompensateApisixThenFrost() {
       var r = sm.startSaga(def, DATASET_ID, updateTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "update-project",
-          FROST_RESULT, Map.of("previousName", "Old"), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "update-route",
-          APISIX_RESULT, Map.of("previousOpenDataAccess", false), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "update-project", FROST_RESULT, Map.of("previousName", "Old"), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(),
+              def,
+              "update-route",
+              APISIX_RESULT,
+              Map.of("previousOpenDataAccess", false),
+              NOW);
       r = sm.handleStepFailed(r.context(), def, "update-pipelines", "Error", NOW);
 
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
@@ -591,7 +682,9 @@ class SagaStateMachineTest {
     @DisplayName("7.5b: Timeout at step 2 (APISIX) — revert FROST")
     void handleStepTimeout_updateStep2_shouldCompensateFrost() {
       var r = sm.startSaga(def, DATASET_ID, updateTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "update-project", FROST_RESULT, Map.of("previousName", "Old"), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "update-project", FROST_RESULT, Map.of("previousName", "Old"), NOW);
       r = sm.handleStepTimeout(r.context(), def, "update-route", NOW);
 
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
@@ -609,8 +702,12 @@ class SagaStateMachineTest {
     @DisplayName("7.5c: Timeout at step 3 (Redpanda) — revert APISIX → FROST")
     void handleStepTimeout_updateStep3_shouldCompensateApisixThenFrost() {
       var r = sm.startSaga(def, DATASET_ID, updateTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "update-project", FROST_RESULT, Map.of("previousName", "Old"), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "update-route", APISIX_RESULT, Map.of("previousODA", true), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "update-project", FROST_RESULT, Map.of("previousName", "Old"), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "update-route", APISIX_RESULT, Map.of("previousODA", true), NOW);
       r = sm.handleStepTimeout(r.context(), def, "update-pipelines", NOW);
 
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
@@ -629,8 +726,12 @@ class SagaStateMachineTest {
     @DisplayName("7.6a: Update step 3 fails, APISIX compensation fails → COMPENSATION_FAILED")
     void handleCompensationFailed_updateApisixFails_shouldReportStale() {
       var r = sm.startSaga(def, DATASET_ID, updateTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "update-project", FROST_RESULT, Map.of("prev", "x"), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "update-route", APISIX_RESULT, Map.of("prev", "y"), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "update-project", FROST_RESULT, Map.of("prev", "x"), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "update-route", APISIX_RESULT, Map.of("prev", "y"), NOW);
       r = sm.handleStepFailed(r.context(), def, "update-pipelines", "Error", NOW);
 
       // APISIX compensation fails
@@ -650,7 +751,9 @@ class SagaStateMachineTest {
     @DisplayName("7.6b: Update step 2 fails, FROST compensation also fails → COMPENSATION_FAILED")
     void handleCompensationFailed_step2FailsFrostComp_shouldReportStaleFrost() {
       var r = sm.startSaga(def, DATASET_ID, updateTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "update-project", FROST_RESULT, Map.of("prev", "x"), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "update-project", FROST_RESULT, Map.of("prev", "x"), NOW);
       r = sm.handleStepFailed(r.context(), def, "update-route", "Error", NOW);
 
       r = sm.handleCompensationFailed(r.context(), def, "update-project", "FROST unreachable", NOW);
@@ -668,11 +771,15 @@ class SagaStateMachineTest {
     @DisplayName("7.7: Timeout during FROST compensation → COMPENSATION_FAILED")
     void handleCompensationFailed_updateTimeout_shouldContinueBestEffort() {
       var r = sm.startSaga(def, DATASET_ID, updateTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "update-project", FROST_RESULT, Map.of("prev", "x"), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "update-project", FROST_RESULT, Map.of("prev", "x"), NOW);
       r = sm.handleStepFailed(r.context(), def, "update-route", "Error", NOW);
 
       // FROST compensation times out (treated as comp failure)
-      r = sm.handleCompensationFailed(r.context(), def, "update-project", "Compensation timeout", NOW);
+      r =
+          sm.handleCompensationFailed(
+              r.context(), def, "update-project", "Compensation timeout", NOW);
       assertEquals(SagaStatus.COMPENSATION_FAILED, r.context().status());
 
       assertNotNull(findAction(r.actions(), SagaAction.PublishManualIntervention.class));
@@ -684,7 +791,9 @@ class SagaStateMachineTest {
     @DisplayName("Update without pipelines: timeout at step 2 → compensate FROST")
     void handleStepTimeout_noPipelinesUpdateStep2_shouldCompensateFrost() {
       var r = sm.startSaga(def, DATASET_ID, updateTriggerWithoutPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "update-project", FROST_RESULT, Map.of("prev", "x"), NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "update-project", FROST_RESULT, Map.of("prev", "x"), NOW);
       r = sm.handleStepTimeout(r.context(), def, "update-route", NOW);
 
       assertEquals(SagaStatus.COMPENSATING, r.context().status());
@@ -711,7 +820,9 @@ class SagaStateMachineTest {
       var r = sm.startSaga(def, DATASET_ID, deleteTriggerWithPipelines(), NOW);
       assertEquals("delete-pipelines", r.context().currentStepId());
 
-      r = sm.handleStepCompleted(r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
       assertEquals("delete-route", r.context().currentStepId());
 
       r = sm.handleStepCompleted(r.context(), def, "delete-route", EMPTY_RESULT, EMPTY_COMP, NOW);
@@ -747,7 +858,8 @@ class SagaStateMachineTest {
       var exec = findAction(r.actions(), SagaAction.ExecuteStep.class);
       assertNotNull(exec, "Delete saga must continue after step failure");
       assertEquals("delete-route", exec.stepId());
-      assertNull(findAction(r.actions(), SagaAction.CompensateStep.class),
+      assertNull(
+          findAction(r.actions(), SagaAction.CompensateStep.class),
           "Delete saga must NOT compensate");
 
       r = sm.handleStepCompleted(r.context(), def, "delete-route", EMPTY_RESULT, EMPTY_COMP, NOW);
@@ -765,7 +877,9 @@ class SagaStateMachineTest {
     @DisplayName("8.3: Failure at step 2 (APISIX) — continue with FROST → partial FAILED")
     void handleStepFailed_deleteStep2_shouldContinueNextStep() {
       var r = sm.startSaga(def, DATASET_ID, deleteTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
 
       r = sm.handleStepFailed(r.context(), def, "delete-route", "APISIX unreachable", NOW);
 
@@ -787,7 +901,9 @@ class SagaStateMachineTest {
     @DisplayName("8.4: Failure at step 3 (FROST) — steps 1+2 deleted, FROST stale")
     void handleStepFailed_deleteStep3_shouldReportPartialFailure() {
       var r = sm.startSaga(def, DATASET_ID, deleteTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
       r = sm.handleStepCompleted(r.context(), def, "delete-route", EMPTY_RESULT, EMPTY_COMP, NOW);
       r = sm.handleStepFailed(r.context(), def, "delete-project", "FROST unavailable", NOW);
 
@@ -842,7 +958,9 @@ class SagaStateMachineTest {
     @DisplayName("8.5c: Step 1 succeeds, steps 2+3 fail → FAILED, 2 stale + 1 cleaned")
     void handleStepFailed_deleteStep1OkSteps2And3Fail_shouldReportPartial() {
       var r = sm.startSaga(def, DATASET_ID, deleteTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
       r = sm.handleStepFailed(r.context(), def, "delete-route", "APISIX down", NOW);
       r = sm.handleStepFailed(r.context(), def, "delete-project", "FROST down", NOW);
 
@@ -879,7 +997,9 @@ class SagaStateMachineTest {
     @DisplayName("8.6b: Timeout at step 2 (APISIX) — continue with FROST")
     void handleStepTimeout_deleteStep2_shouldContinueNextStep() {
       var r = sm.startSaga(def, DATASET_ID, deleteTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
       r = sm.handleStepTimeout(r.context(), def, "delete-route", NOW);
 
       var exec = findAction(r.actions(), SagaAction.ExecuteStep.class);
@@ -894,7 +1014,9 @@ class SagaStateMachineTest {
     @DisplayName("8.6c: Timeout at step 3 (FROST) — steps 1+2 deleted, FROST stale")
     void handleStepTimeout_deleteStep3_shouldReportPartialTimeout() {
       var r = sm.startSaga(def, DATASET_ID, deleteTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
       r = sm.handleStepCompleted(r.context(), def, "delete-route", EMPTY_RESULT, EMPTY_COMP, NOW);
       r = sm.handleStepTimeout(r.context(), def, "delete-project", NOW);
 
@@ -923,7 +1045,9 @@ class SagaStateMachineTest {
     @DisplayName("8.7b: Step 1 success, step 2 timeout, step 3 timeout → 2 stale, 1 cleaned")
     void handleStepTimeout_deleteTwoTimeouts_shouldReportPartial() {
       var r = sm.startSaga(def, DATASET_ID, deleteTriggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
       r = sm.handleStepTimeout(r.context(), def, "delete-route", NOW);
       r = sm.handleStepTimeout(r.context(), def, "delete-project", NOW);
 
@@ -1001,7 +1125,9 @@ class SagaStateMachineTest {
     void handleStepCompleted_anyStep_shouldPersistStateBeforeNextDispatch() {
       var def = SagaDefinitions.forType(SagaType.DATASET_CREATE);
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       assertInstanceOf(SagaAction.PersistState.class, r.actions().get(0));
     }
 
@@ -1010,7 +1136,9 @@ class SagaStateMachineTest {
     void handleStepFailed_anyStep_shouldPersistStateBeforeCompensation() {
       var def = SagaDefinitions.forType(SagaType.DATASET_CREATE);
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       r = sm.handleStepFailed(r.context(), def, "create-route", "Error", NOW);
       assertInstanceOf(SagaAction.PersistState.class, r.actions().get(0));
     }
@@ -1020,7 +1148,9 @@ class SagaStateMachineTest {
     void handleCompensationCompleted_anyStep_shouldPersistStateBeforeNextCompensation() {
       var def = SagaDefinitions.forType(SagaType.DATASET_CREATE);
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       r = sm.handleStepFailed(r.context(), def, "create-route", "Error", NOW);
       // Compensation completed
       r = sm.handleCompensationCompleted(r.context(), def, "create-project", NOW);
@@ -1032,7 +1162,8 @@ class SagaStateMachineTest {
     void startSaga_anyType_shouldAlwaysSetSagaId() {
       for (SagaType type : SagaType.values()) {
         var def = SagaDefinitions.forType(type);
-        var trigger = type == SagaType.DATASET_DELETE ? deleteTriggerWithPipelines() : triggerWithPipelines();
+        var trigger =
+            type == SagaType.DATASET_DELETE ? deleteTriggerWithPipelines() : triggerWithPipelines();
         var r = sm.startSaga(def, DATASET_ID, trigger, NOW);
         assertNotNull(r.context().sagaId());
         assertFalse(r.context().sagaId().isEmpty());
@@ -1046,7 +1177,9 @@ class SagaStateMachineTest {
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
       assertEquals(DATASET_ID, r.context().datasetId());
 
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       assertEquals(DATASET_ID, r.context().datasetId());
 
       r = sm.handleStepFailed(r.context(), def, "create-route", "Error", NOW);
@@ -1065,7 +1198,9 @@ class SagaStateMachineTest {
       var r = sm.startSaga(def, DATASET_ID, trigger, NOW);
       assertEquals(trigger, r.context().triggerPayload());
 
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       assertEquals(trigger, r.context().triggerPayload());
     }
 
@@ -1095,16 +1230,28 @@ class SagaStateMachineTest {
     @Test
     @DisplayName("All three saga types produce correct initial step counts")
     void startSaga_anyType_shouldHaveCorrectStepCounts() {
-      var createR = sm.startSaga(SagaDefinitions.forType(SagaType.DATASET_CREATE),
-          DATASET_ID, triggerWithPipelines(), NOW);
+      var createR =
+          sm.startSaga(
+              SagaDefinitions.forType(SagaType.DATASET_CREATE),
+              DATASET_ID,
+              triggerWithPipelines(),
+              NOW);
       assertEquals(3, createR.context().steps().size());
 
-      var updateR = sm.startSaga(SagaDefinitions.forType(SagaType.DATASET_UPDATE),
-          DATASET_ID, triggerWithPipelines(), NOW);
+      var updateR =
+          sm.startSaga(
+              SagaDefinitions.forType(SagaType.DATASET_UPDATE),
+              DATASET_ID,
+              triggerWithPipelines(),
+              NOW);
       assertEquals(3, updateR.context().steps().size());
 
-      var deleteR = sm.startSaga(SagaDefinitions.forType(SagaType.DATASET_DELETE),
-          DATASET_ID, deleteTriggerWithPipelines(), NOW);
+      var deleteR =
+          sm.startSaga(
+              SagaDefinitions.forType(SagaType.DATASET_DELETE),
+              DATASET_ID,
+              deleteTriggerWithPipelines(),
+              NOW);
       assertEquals(3, deleteR.context().steps().size());
     }
 
@@ -1113,8 +1260,12 @@ class SagaStateMachineTest {
     void handleStepCompleted_allSteps_shouldContainResourceIds() {
       var def = SagaDefinitions.forType(SagaType.DATASET_CREATE);
       var r = sm.startSaga(def, DATASET_ID, triggerWithoutPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-route", APISIX_RESULT, APISIX_COMP_DATA, NOW);
 
       var complete = findAction(r.actions(), SagaAction.CompleteSaga.class);
       assertNotNull(complete);
@@ -1137,7 +1288,9 @@ class SagaStateMachineTest {
 
       // Failure at step 2
       r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       r = sm.handleStepFailed(r.context(), def, "create-route", "Error", NOW);
       r = sm.handleCompensationCompleted(r.context(), def, "create-project", NOW);
       fail = findAction(r.actions(), SagaAction.FailSaga.class);
@@ -1150,7 +1303,9 @@ class SagaStateMachineTest {
       // COMPENSATION_FAILED
       var def = SagaDefinitions.forType(SagaType.DATASET_CREATE);
       var r = sm.startSaga(def, DATASET_ID, triggerWithPipelines(), NOW);
-      r = sm.handleStepCompleted(r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "create-project", FROST_RESULT, FROST_COMP_DATA, NOW);
       r = sm.handleStepFailed(r.context(), def, "create-route", "Error", NOW);
       r = sm.handleCompensationFailed(r.context(), def, "create-project", "Comp failed", NOW);
 
@@ -1160,8 +1315,12 @@ class SagaStateMachineTest {
       var delDef = SagaDefinitions.forType(SagaType.DATASET_DELETE);
       r = sm.startSaga(delDef, DATASET_ID, deleteTriggerWithPipelines(), NOW);
       r = sm.handleStepFailed(r.context(), delDef, "delete-pipelines", "Error", NOW);
-      r = sm.handleStepCompleted(r.context(), delDef, "delete-route", EMPTY_RESULT, EMPTY_COMP, NOW);
-      r = sm.handleStepCompleted(r.context(), delDef, "delete-project", EMPTY_RESULT, EMPTY_COMP, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), delDef, "delete-route", EMPTY_RESULT, EMPTY_COMP, NOW);
+      r =
+          sm.handleStepCompleted(
+              r.context(), delDef, "delete-project", EMPTY_RESULT, EMPTY_COMP, NOW);
 
       assertNotNull(findAction(r.actions(), SagaAction.PublishManualIntervention.class));
     }

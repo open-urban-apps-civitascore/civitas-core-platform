@@ -31,7 +31,10 @@ public enum SagaStatus {
   /** All steps completed successfully. Terminal state. */
   COMPLETED,
 
-  /** A step failed and no completed steps exist to compensate (or delete best-effort done). Terminal state. */
+  /**
+   * A step failed and no completed steps exist to compensate (or delete best-effort done). Terminal
+   * state.
+   */
   FAILED,
 
   /** A step failed; compensation of completed steps is in progress. */
@@ -40,11 +43,17 @@ public enum SagaStatus {
   /** All completed steps were successfully compensated. Terminal state. */
   COMPENSATED,
 
-  /** Compensation was attempted but at least one compensation step failed. Requires manual intervention. Terminal state. */
+  /**
+   * Compensation was attempted but at least one compensation step failed. Requires manual
+   * intervention. Terminal state.
+   */
   COMPENSATION_FAILED;
 
   /** Returns true if this is a terminal state (no further transitions possible). */
   public boolean isTerminal() {
-    return this == COMPLETED || this == FAILED || this == COMPENSATED || this == COMPENSATION_FAILED;
+    return this == COMPLETED
+        || this == FAILED
+        || this == COMPENSATED
+        || this == COMPENSATION_FAILED;
   }
 }

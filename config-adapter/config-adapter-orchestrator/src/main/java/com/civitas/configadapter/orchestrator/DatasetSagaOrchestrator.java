@@ -14,8 +14,8 @@ import com.civitas.configadapter.model.saga.SagaContext;
 import com.civitas.configadapter.model.saga.SagaType;
 import com.civitas.configadapter.orchestrator.engine.SagaActionDispatcher;
 import com.civitas.configadapter.orchestrator.engine.SagaEngine;
-import com.civitas.configadapter.orchestrator.engine.SagaStateStore;
 import com.civitas.configadapter.orchestrator.engine.SagaStateMachine;
+import com.civitas.configadapter.orchestrator.engine.SagaStateStore;
 import com.civitas.configadapter.orchestrator.kafka.KafkaSagaActionDispatcher;
 import com.civitas.configadapter.orchestrator.kafka.KafkaSagaStateRecovery;
 import com.civitas.configadapter.orchestrator.kafka.KafkaSagaStateStore;
@@ -167,7 +167,8 @@ public class DatasetSagaOrchestrator {
     props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
     props.put(ConsumerConfig.GROUP_ID_CONFIG, "saga-orchestrator-recovery-" + System.nanoTime());
     props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+    props.put(
+        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
     props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
     return new KafkaConsumer<>(props);
@@ -178,7 +179,8 @@ public class DatasetSagaOrchestrator {
     props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
     props.put(ConsumerConfig.GROUP_ID_CONFIG, "saga-orchestrator");
     props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+    props.put(
+        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
     props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
     return new KafkaConsumer<>(props);

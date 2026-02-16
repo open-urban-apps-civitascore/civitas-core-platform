@@ -20,8 +20,8 @@ import java.util.Map;
  * Full saga context maintained by the orchestrator. This is the single source of truth for a saga's
  * current state.
  *
- * <p>Immutable — all mutation methods return a new instance. Serialized to the Kafka compacted state
- * topic for crash recovery.
+ * <p>Immutable — all mutation methods return a new instance. Serialized to the Kafka compacted
+ * state topic for crash recovery.
  *
  * @param sagaId unique saga identifier
  * @param sagaType the workflow type (DATASET_CREATE, DATASET_UPDATE, DATASET_DELETE)
@@ -50,19 +50,46 @@ public record SagaContext(
   /** Returns a copy with the given status and updated timestamp. */
   public SagaContext withStatus(SagaStatus newStatus, Instant now) {
     return new SagaContext(
-        sagaId, sagaType, datasetId, currentStepId, newStatus, steps, failure, triggerPayload, createdAt, now);
+        sagaId,
+        sagaType,
+        datasetId,
+        currentStepId,
+        newStatus,
+        steps,
+        failure,
+        triggerPayload,
+        createdAt,
+        now);
   }
 
   /** Returns a copy with the given current step ID. */
   public SagaContext withCurrentStep(String stepId, Instant now) {
     return new SagaContext(
-        sagaId, sagaType, datasetId, stepId, status, steps, failure, triggerPayload, createdAt, now);
+        sagaId,
+        sagaType,
+        datasetId,
+        stepId,
+        status,
+        steps,
+        failure,
+        triggerPayload,
+        createdAt,
+        now);
   }
 
   /** Returns a copy with the given failure information. */
   public SagaContext withFailure(SagaFailure sagaFailure, Instant now) {
     return new SagaContext(
-        sagaId, sagaType, datasetId, currentStepId, status, steps, sagaFailure, triggerPayload, createdAt, now);
+        sagaId,
+        sagaType,
+        datasetId,
+        currentStepId,
+        status,
+        steps,
+        sagaFailure,
+        triggerPayload,
+        createdAt,
+        now);
   }
 
   /** Returns a copy with the step at the given index replaced. */
@@ -70,6 +97,15 @@ public record SagaContext(
     var newSteps = new ArrayList<>(steps);
     newSteps.set(index, newStep);
     return new SagaContext(
-        sagaId, sagaType, datasetId, currentStepId, status, List.copyOf(newSteps), failure, triggerPayload, createdAt, now);
+        sagaId,
+        sagaType,
+        datasetId,
+        currentStepId,
+        status,
+        List.copyOf(newSteps),
+        failure,
+        triggerPayload,
+        createdAt,
+        now);
   }
 }

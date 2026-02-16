@@ -15,17 +15,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.model.saga.SagaType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import com.civitas.configadapter.model.saga.SagaType;
 
 /**
  * Integration tests for {@link SagaEngine}. Uses {@link InMemorySagaStateStore} and a collecting
@@ -55,18 +53,26 @@ class SagaEngineTest {
 
   private Map<String, Object> triggerWithPipelines() {
     return Map.of(
-        "id", DATASET_ID,
-        "name", "Test Dataset",
-        "openDataAccess", true,
-        "dataPipelines", List.of(Map.of("id", "pl-001", "action", "ADD")));
+        "id",
+        DATASET_ID,
+        "name",
+        "Test Dataset",
+        "openDataAccess",
+        true,
+        "dataPipelines",
+        List.of(Map.of("id", "pl-001", "action", "ADD")));
   }
 
   private Map<String, Object> triggerWithoutPipelines() {
     return Map.of(
-        "id", DATASET_ID,
-        "name", "Test Dataset",
-        "openDataAccess", true,
-        "dataPipelines", List.of());
+        "id",
+        DATASET_ID,
+        "name",
+        "Test Dataset",
+        "openDataAccess",
+        true,
+        "dataPipelines",
+        List.of());
   }
 
   private Map<String, Object> deleteTrigger() {
@@ -99,7 +105,9 @@ class SagaEngineTest {
 
       // FROST succeeds
       dispatcher.clear();
-      engine.handleStepCompleted(sagaId, "create-project",
+      engine.handleStepCompleted(
+          sagaId,
+          "create-project",
           Map.of("projectId", "proj-123", "baseUrl", "http://frost/proj-123"),
           Map.of("projectId", "proj-123"));
 
@@ -108,16 +116,16 @@ class SagaEngineTest {
 
       // APISIX succeeds
       dispatcher.clear();
-      engine.handleStepCompleted(sagaId, "create-route",
-          Map.of("routeId", "r-456"), Map.of("routeId", "r-456"));
+      engine.handleStepCompleted(
+          sagaId, "create-route", Map.of("routeId", "r-456"), Map.of("routeId", "r-456"));
 
       exec = dispatcher.lastOfType(SagaAction.ExecuteStep.class);
       assertEquals("deploy-pipelines", exec.stepId());
 
       // Redpanda succeeds
       dispatcher.clear();
-      engine.handleStepCompleted(sagaId, "deploy-pipelines",
-          Map.of("pipelineIds", List.of("pl-001")), Map.of());
+      engine.handleStepCompleted(
+          sagaId, "deploy-pipelines", Map.of("pipelineIds", List.of("pl-001")), Map.of());
 
       var complete = dispatcher.lastOfType(SagaAction.CompleteSaga.class);
       assertNotNull(complete);
@@ -133,10 +141,9 @@ class SagaEngineTest {
       var ctx = engine.startSaga(SagaType.DATASET_CREATE, DATASET_ID, triggerWithoutPipelines());
       String sagaId = ctx.get().sagaId();
 
-      engine.handleStepCompleted(sagaId, "create-project",
-          Map.of("projectId", "proj-123"), Map.of());
-      engine.handleStepCompleted(sagaId, "create-route",
-          Map.of("routeId", "r-456"), Map.of());
+      engine.handleStepCompleted(
+          sagaId, "create-project", Map.of("projectId", "proj-123"), Map.of());
+      engine.handleStepCompleted(sagaId, "create-route", Map.of("routeId", "r-456"), Map.of());
 
       assertNotNull(dispatcher.lastOfType(SagaAction.CompleteSaga.class));
       assertFalse(stateStore.findById(sagaId).isPresent());
@@ -169,8 +176,11 @@ class SagaEngineTest {
       var ctx = engine.startSaga(SagaType.DATASET_CREATE, DATASET_ID, triggerWithPipelines());
       String sagaId = ctx.get().sagaId();
 
-      engine.handleStepCompleted(sagaId, "create-project",
-          Map.of("projectId", "proj-123"), Map.of("projectId", "proj-123"));
+      engine.handleStepCompleted(
+          sagaId,
+          "create-project",
+          Map.of("projectId", "proj-123"),
+          Map.of("projectId", "proj-123"));
 
       dispatcher.clear();
       engine.handleStepFailed(sagaId, "create-route", "Connection refused");
@@ -193,15 +203,19 @@ class SagaEngineTest {
     }
 
     @Test
-    @DisplayName("Create step 3 fails, compensation also fails → COMPENSATION_FAILED, manual intervention")
+    @DisplayName(
+        "Create step 3 fails, compensation also fails → COMPENSATION_FAILED, manual intervention")
     void handleCompensationFailed_createStep3Fails_shouldReportCompensationFailed() {
       var ctx = engine.startSaga(SagaType.DATASET_CREATE, DATASET_ID, triggerWithPipelines());
       String sagaId = ctx.get().sagaId();
 
-      engine.handleStepCompleted(sagaId, "create-project",
-          Map.of("projectId", "proj-123"), Map.of("projectId", "proj-123"));
-      engine.handleStepCompleted(sagaId, "create-route",
-          Map.of("routeId", "r-456"), Map.of("routeId", "r-456"));
+      engine.handleStepCompleted(
+          sagaId,
+          "create-project",
+          Map.of("projectId", "proj-123"),
+          Map.of("projectId", "proj-123"));
+      engine.handleStepCompleted(
+          sagaId, "create-route", Map.of("routeId", "r-456"), Map.of("routeId", "r-456"));
 
       engine.handleStepFailed(sagaId, "deploy-pipelines", "Error");
 
@@ -276,8 +290,11 @@ class SagaEngineTest {
       var ctx = engine.startSaga(SagaType.DATASET_CREATE, DATASET_ID, triggerWithPipelines());
       String sagaId = ctx.get().sagaId();
 
-      engine.handleStepCompleted(sagaId, "create-project",
-          Map.of("projectId", "proj-123"), Map.of("projectId", "proj-123"));
+      engine.handleStepCompleted(
+          sagaId,
+          "create-project",
+          Map.of("projectId", "proj-123"),
+          Map.of("projectId", "proj-123"));
 
       dispatcher.clear();
       engine.handleStepTimeout(sagaId, "create-route");
@@ -367,8 +384,19 @@ class SagaEngineTest {
     void recoverActiveSagas_withOneActive_shouldReturnOne() {
       // Start two sagas, complete one
       engine.startSaga(SagaType.DATASET_CREATE, "ds-001", triggerWithoutPipelines());
-      var second = engine.startSaga(SagaType.DATASET_CREATE, "ds-002",
-          Map.of("id", "ds-002", "name", "Second", "openDataAccess", false, "dataPipelines", List.of()));
+      var second =
+          engine.startSaga(
+              SagaType.DATASET_CREATE,
+              "ds-002",
+              Map.of(
+                  "id",
+                  "ds-002",
+                  "name",
+                  "Second",
+                  "openDataAccess",
+                  false,
+                  "dataPipelines",
+                  List.of()));
       String secondId = second.get().sagaId();
 
       engine.handleStepCompleted(secondId, "create-project", Map.of("projectId", "p2"), Map.of());

@@ -22,10 +22,10 @@ import com.civitas.configadapter.orchestrator.engine.SagaAction;
 import com.civitas.configadapter.orchestrator.engine.SagaActionDispatcher;
 import com.civitas.configadapter.orchestrator.engine.SagaEngine;
 import com.civitas.configadapter.orchestrator.engine.SagaStateMachine;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -61,8 +61,8 @@ import org.testcontainers.kafka.KafkaContainer;
 /**
  * Kafka integration tests for the Saga Orchestrator using Testcontainers.
  *
- * <p>These tests verify that saga state is correctly persisted and recovered via Kafka, and that the
- * action dispatcher correctly publishes messages to the expected topics.
+ * <p>These tests verify that saga state is correctly persisted and recovered via Kafka, and that
+ * the action dispatcher correctly publishes messages to the expected topics.
  */
 @Testcontainers
 class SagaKafkaIT {
@@ -77,8 +77,7 @@ class SagaKafkaIT {
         return pipelines instanceof List<?> list && !list.isEmpty();
       };
 
-  @Container
-  static final KafkaContainer kafka = new KafkaContainer("apache/kafka:3.8.0");
+  @Container static final KafkaContainer kafka = new KafkaContainer("apache/kafka:3.8.0");
 
   private ObjectMapper objectMapper;
   private KafkaProducer<String, byte[]> producer;
@@ -181,8 +180,7 @@ class SagaKafkaIT {
               () -> {
                 ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(500));
                 assertTrue(
-                    records.count() > 0,
-                    "Expected at least one message on frost execute topic");
+                    records.count() > 0, "Expected at least one message on frost execute topic");
 
                 var record = records.iterator().next();
                 Map<String, Object> message = objectMapper.readValue(record.value(), MAP_TYPE);
@@ -255,8 +253,7 @@ class SagaKafkaIT {
       adapterResponse.put("sagaId", sagaId);
       adapterResponse.put("stepId", "create-project");
       adapterResponse.put(
-          "resultData",
-          Map.of("projectId", "proj-it-123", "baseUrl", "http://frost/proj-it-123"));
+          "resultData", Map.of("projectId", "proj-it-123", "baseUrl", "http://frost/proj-it-123"));
       adapterResponse.put("compensationData", Map.of("projectId", "proj-it-123"));
 
       byte[] json = objectMapper.writeValueAsBytes(adapterResponse);
@@ -297,10 +294,14 @@ class SagaKafkaIT {
             SagaType.DATASET_CREATE,
             tombstoneDatasetId,
             Map.of(
-                "id", tombstoneDatasetId,
-                "name", "Test",
-                "openDataAccess", true,
-                "dataPipelines", List.of()));
+                "id",
+                tombstoneDatasetId,
+                "name",
+                "Test",
+                "openDataAccess",
+                true,
+                "dataPipelines",
+                List.of()));
     String sagaId = ctx.get().sagaId();
 
     engine.handleStepCompleted(sagaId, "create-project", Map.of("projectId", "p1"), Map.of());
@@ -314,8 +315,7 @@ class SagaKafkaIT {
       var recovery = new KafkaSagaStateRecovery(recoveryConsumer);
       Map<String, SagaContext> recovered = recovery.recover();
       assertFalse(
-          recovered.containsKey(sagaId),
-          "Completed (tombstoned) saga should not be recovered");
+          recovered.containsKey(sagaId), "Completed (tombstoned) saga should not be recovered");
     }
   }
 
@@ -323,10 +323,14 @@ class SagaKafkaIT {
 
   private Map<String, Object> triggerWithPipelines() {
     return Map.of(
-        "id", DATASET_ID,
-        "name", "IT Test Dataset",
-        "openDataAccess", true,
-        "dataPipelines", List.of(Map.of("id", "pl-001", "action", "ADD")));
+        "id",
+        DATASET_ID,
+        "name",
+        "IT Test Dataset",
+        "openDataAccess",
+        true,
+        "dataPipelines",
+        List.of(Map.of("id", "pl-001", "action", "ADD")));
   }
 
   private AdminClient createAdminClient() {

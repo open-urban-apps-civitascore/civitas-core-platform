@@ -80,7 +80,8 @@ public final class SagaContextHelper {
   public static Optional<SagaStep> getNextStepToCompensate(SagaContext saga) {
     return saga.steps().stream()
         .filter(s -> s.status() == SagaStepStatus.SUCCESS)
-        .reduce((first, second) -> second); // last SUCCESS step = next to compensate (reverse order)
+        .reduce(
+            (first, second) -> second); // last SUCCESS step = next to compensate (reverse order)
   }
 
   /** Returns true if all compensation-eligible steps have been processed. */

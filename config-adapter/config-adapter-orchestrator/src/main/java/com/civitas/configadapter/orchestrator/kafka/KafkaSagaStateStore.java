@@ -92,11 +92,8 @@ public class KafkaSagaStateStore implements SagaStateStore {
           context.status());
     } catch (JsonProcessingException e) {
       LOG.error(
-          "CRITICAL: Failed to serialize saga state for {}.",
-          Encode.forJava(context.sagaId()),
-          e);
-      throw new IllegalStateException(
-          "Failed to serialize saga state for " + context.sagaId(), e);
+          "CRITICAL: Failed to serialize saga state for {}.", Encode.forJava(context.sagaId()), e);
+      throw new IllegalStateException("Failed to serialize saga state for " + context.sagaId(), e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IllegalStateException(
@@ -106,8 +103,7 @@ public class KafkaSagaStateStore implements SagaStateStore {
           "CRITICAL: Failed to persist saga state for {}. Saga may be in inconsistent state.",
           Encode.forJava(context.sagaId()),
           e);
-      throw new IllegalStateException(
-          "Failed to persist saga state for " + context.sagaId(), e);
+      throw new IllegalStateException("Failed to persist saga state for " + context.sagaId(), e);
     }
   }
 
@@ -123,10 +119,7 @@ public class KafkaSagaStateStore implements SagaStateStore {
       LOG.debug("Removed saga state (tombstone): sagaId={}", Encode.forJava(sagaId));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      LOG.error(
-          "Interrupted while sending tombstone for saga {}.",
-          Encode.forJava(sagaId),
-          e);
+      LOG.error("Interrupted while sending tombstone for saga {}.", Encode.forJava(sagaId), e);
     } catch (ExecutionException | TimeoutException e) {
       LOG.error(
           "Failed to send tombstone for saga {}. State will be cleaned up by compaction eventually.",

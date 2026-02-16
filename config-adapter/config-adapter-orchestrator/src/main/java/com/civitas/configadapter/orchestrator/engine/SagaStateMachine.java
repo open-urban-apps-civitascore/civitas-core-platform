@@ -61,7 +61,10 @@ public class SagaStateMachine {
    * step.
    */
   public SagaTransitionResult startSaga(
-      SagaDefinition definition, String datasetId, Map<String, Object> triggerPayload, Instant now) {
+      SagaDefinition definition,
+      String datasetId,
+      Map<String, Object> triggerPayload,
+      Instant now) {
 
     String sagaId = UUID.randomUUID().toString();
 
@@ -124,11 +127,7 @@ public class SagaStateMachine {
    * For delete sagas, continues with the next step (best-effort).
    */
   public SagaTransitionResult handleStepFailed(
-      SagaContext context,
-      SagaDefinition definition,
-      String stepId,
-      String error,
-      Instant now) {
+      SagaContext context, SagaDefinition definition, String stepId, String error, Instant now) {
 
     int stepIndex = SagaContextHelper.findStepIndex(context, stepId);
     if (stepIndex < 0) {
@@ -155,7 +154,8 @@ public class SagaStateMachine {
   /** Handle a step timeout (treated as failure). */
   public SagaTransitionResult handleStepTimeout(
       SagaContext context, SagaDefinition definition, String stepId, Instant now) {
-    return handleStepFailed(context, definition, stepId, "Timeout waiting for adapter response", now);
+    return handleStepFailed(
+        context, definition, stepId, "Timeout waiting for adapter response", now);
   }
 
   /** Handle a compensation step completing successfully. */
@@ -176,11 +176,7 @@ public class SagaStateMachine {
 
   /** Handle a compensation step failing. Continues with next compensation (best-effort). */
   public SagaTransitionResult handleCompensationFailed(
-      SagaContext context,
-      SagaDefinition definition,
-      String stepId,
-      String error,
-      Instant now) {
+      SagaContext context, SagaDefinition definition, String stepId, String error, Instant now) {
 
     int stepIndex = SagaContextHelper.findStepIndex(context, stepId);
     if (stepIndex < 0) {
@@ -230,7 +226,8 @@ public class SagaStateMachine {
     for (int i = fromIndex; i < definition.stepCount(); i++) {
       SagaStepDefinition stepDef = definition.stepAt(i);
 
-      if (stepDef.conditional() && !conditionalStepPredicate.test(currentContext.triggerPayload())) {
+      if (stepDef.conditional()
+          && !conditionalStepPredicate.test(currentContext.triggerPayload())) {
         // Skip conditional step
         int stepIdx = SagaContextHelper.findStepIndex(currentContext, stepDef.stepId());
         SagaStep skippedStep = currentContext.steps().get(stepIdx).asSkipped();
@@ -264,17 +261,14 @@ public class SagaStateMachine {
     currentContext = currentContext.withStatus(SagaStatus.COMPLETED, now);
     actions.add(0, new SagaAction.PersistState(currentContext));
     actions.add(
-        new SagaAction.CompleteSaga(
-            currentContext.sagaId(), aggregateResults(currentContext)));
+        new SagaAction.CompleteSaga(currentContext.sagaId(), aggregateResults(currentContext)));
 
     return new SagaTransitionResult(currentContext, actions);
   }
 
   // ─── Delete Best-Effort Forward ─────────────────────────────────────────────
 
-  /**
-   * Continue delete saga after a step failure. Records failure and moves to next step.
-   */
+  /** Continue delete saga after a step failure. Records failure and moves to next step. */
   private SagaTransitionResult advanceDeleteAfterFailure(
       SagaContext context, SagaDefinition definition, int fromIndex, Instant now) {
 
@@ -284,7 +278,8 @@ public class SagaStateMachine {
     for (int i = fromIndex; i < definition.stepCount(); i++) {
       SagaStepDefinition stepDef = definition.stepAt(i);
 
-      if (stepDef.conditional() && !conditionalStepPredicate.test(currentContext.triggerPayload())) {
+      if (stepDef.conditional()
+          && !conditionalStepPredicate.test(currentContext.triggerPayload())) {
         int stepIdx = SagaContextHelper.findStepIndex(currentContext, stepDef.stepId());
         SagaStep skippedStep = currentContext.steps().get(stepIdx).asSkipped();
         currentContext = currentContext.withStepReplaced(stepIdx, skippedStep, now);
@@ -341,8 +336,7 @@ public class SagaStateMachine {
               false,
               stale,
               cleaned));
-      actions.add(
-          new SagaAction.PublishManualIntervention(failedContext.sagaId(), failedContext));
+      actions.add(new SagaAction.PublishManualIntervention(failedContext.sagaId(), failedContext));
 
       return new SagaTransitionResult(failedContext, actions);
     }
@@ -350,15 +344,16 @@ public class SagaStateMachine {
     SagaContext completedContext = context.withStatus(SagaStatus.COMPLETED, now);
     actions.add(new SagaAction.PersistState(completedContext));
     actions.add(
-        new SagaAction.CompleteSaga(
-            completedContext.sagaId(), aggregateResults(completedContext)));
+        new SagaAction.CompleteSaga(completedContext.sagaId(), aggregateResults(completedContext)));
 
     return new SagaTransitionResult(completedContext, actions);
   }
 
   // ─── Compensation ───────────────────────────────────────────────────────────
 
-  /** Begin compensation: transition to COMPENSATING and start compensating the last SUCCESS step. */
+  /**
+   * Begin compensation: transition to COMPENSATING and start compensating the last SUCCESS step.
+   */
   private SagaTransitionResult beginCompensation(
       SagaContext context, SagaDefinition definition, Instant now) {
 
@@ -434,8 +429,7 @@ public class SagaStateMachine {
               false,
               stale,
               cleaned));
-      actions.add(
-          new SagaAction.PublishManualIntervention(failedContext.sagaId(), failedContext));
+      actions.add(new SagaAction.PublishManualIntervention(failedContext.sagaId(), failedContext));
 
       return new SagaTransitionResult(failedContext, actions);
     }
@@ -445,9 +439,7 @@ public class SagaStateMachine {
     actions.add(
         new SagaAction.FailSaga(
             compensatedContext.sagaId(),
-            compensatedContext.failure() != null
-                ? compensatedContext.failure().stepId()
-                : null,
+            compensatedContext.failure() != null ? compensatedContext.failure().stepId() : null,
             compensatedContext.failure() != null
                 ? compensatedContext.failure().error()
                 : "Step failed",

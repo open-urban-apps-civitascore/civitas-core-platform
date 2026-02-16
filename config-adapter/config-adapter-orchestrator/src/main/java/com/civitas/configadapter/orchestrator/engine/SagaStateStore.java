@@ -15,8 +15,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Abstraction for saga state persistence. Every state transition is persisted before the next action
- * is taken, ensuring crash recovery.
+ * Abstraction for saga state persistence. Every state transition is persisted before the next
+ * action is taken, ensuring crash recovery.
  *
  * <p>Implementations: {@link InMemorySagaStateStore} (unit tests), {@code KafkaSagaStateStore}
  * (production — Kafka compacted topic).
