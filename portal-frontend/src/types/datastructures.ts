@@ -12,7 +12,7 @@ export const SourceEnum = enumFromConst(SOURCE)
 
 export type Source = (typeof SOURCE)[keyof typeof SOURCE]
 
-export const DatastructureVersionApiSchema = z.object({
+export const DatastructureVersionApiResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   versionNumber: z.string(),
@@ -23,20 +23,20 @@ export const DatastructureVersionApiSchema = z.object({
   inUse: z.boolean(),
 })
 
-export const DatastructureVersionSummaryApiSchema = DatastructureVersionApiSchema.omit({
+export const DatastructureVersionSummaryApiResponseSchema = DatastructureVersionApiResponseSchema.omit({
   umlModelData: true,
   inUse: true,
 })
 
-export const DatastructureApiSchema = DatastructureVersionApiSchema.omit({
+export const DatastructureApiResponseSchema = DatastructureVersionApiResponseSchema.omit({
   umlModelData: true,
   versionNumber: true,
 }).extend({
-  versions: z.array(DatastructureVersionSummaryApiSchema),
+  versions: z.array(DatastructureVersionSummaryApiResponseSchema),
 })
 
-export type DatastructureVersion = z.infer<typeof DatastructureVersionApiSchema>
-export type DatastructureVersionSummary = z.infer<typeof DatastructureVersionSummaryApiSchema>
-export type Datastructure = z.infer<typeof DatastructureApiSchema>
+export type DatastructureVersion = z.infer<typeof DatastructureVersionApiResponseSchema>
+export type DatastructureVersionSummary = z.infer<typeof DatastructureVersionSummaryApiResponseSchema>
+export type Datastructure = z.infer<typeof DatastructureApiResponseSchema>
 
 export type DatastructuresListData = DatastructureVersionSummary & { versions: DatastructuresListData[] }
