@@ -50,7 +50,11 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       // TODO: Implement cell click for navigation to datastructure
       cell: ({ row }: CellContext<DatastructuresListData, unknown>) => (
         <ExpanderCell row={row} className="font-medium">
-          <LinkCell href={`datastructures/${row.original.id}`}>{row.original.name}</LinkCell>
+          {row.depth > 0 ? (
+            row.original.name
+          ) : (
+            <LinkCell href={`datastructures/${row.original.id}`}>{row.original.name}</LinkCell>
+          )}
         </ExpanderCell>
       ),
       meta: {

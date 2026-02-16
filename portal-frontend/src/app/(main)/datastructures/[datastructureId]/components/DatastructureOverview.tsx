@@ -25,6 +25,8 @@ import {
   DatastructureTab,
 } from '@/types/datastructures'
 
+import { BasicInfoTab } from './basic-info/BasicInfoTab'
+
 const tabs: Tab<DatastructureTab>[] = [
   {
     value: 'basicInfo',
@@ -39,6 +41,8 @@ const tabs: Tab<DatastructureTab>[] = [
     label: 'datastructures.tabs.accessPermissions',
   },
 ]
+
+const disabledTabs: DatastructureTab[] = ['versions', 'accessPermissions']
 
 interface DatastructureOverviewProps {
   datastructure: Datastructure
@@ -171,12 +175,8 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
   const renderTabContent = () => {
     switch (selectedTab) {
-      // case 'basicInfo':
-      //   return <BasicInfoTab form={form} />
-      // case 'connector':
-      //   return <ConnectorTab form={form} isDraftMode={isDraftMode} onConnectorTypeChange={updateConnectorConfig} />
-      // case 'dataStructure':
-      // case 'accessPermissions':
+      case 'basicInfo':
+        return <BasicInfoTab form={form} />
       default:
         return null
     }
@@ -223,7 +223,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             selectedTab={selectedTab}
             onTabChange={setSelectedTab}
             completedTabs={completedTabs}
-            disabledTabs={[]}
+            disabledTabs={disabledTabs}
           />
         </div>
       </div>

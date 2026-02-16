@@ -13,7 +13,8 @@ export const useCreateDatastructure = () =>
 
 export const useUpdateDatastructure = () =>
   useUpdateMutation<Datastructure, DatastructureUpdateData>({
-    method: 'PUT',
+    //TODO: switch to PUT method when API is connected
+    method: 'PATCH',
     key,
     errorMessage: 'An error occurred while updating datastructure',
   })
