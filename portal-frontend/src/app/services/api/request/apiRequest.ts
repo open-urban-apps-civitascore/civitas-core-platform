@@ -60,7 +60,6 @@ export const apiRequest = async <TResponse, TBody = unknown>({
         ...requestHeaders,
         /* eslint-disable @typescript-eslint/naming-convention */
         'Cache-Control': 'no-store',
-        /* eslint-enable @typescript-eslint/naming-convention */
       },
       method,
       data,
