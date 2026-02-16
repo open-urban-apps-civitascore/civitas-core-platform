@@ -1,9 +1,9 @@
 # Saga Orchestrator — Implementation Plan
 
-> **Status**: Phase 1 abgeschlossen — Phase 2 (Adapter-Integration) in Planung
+> **Status**: Phase 1 + Phase 2 abgeschlossen — Phase 3 (Backend-Integration) in Planung
 > **Module**: `config-adapter-orchestrator`, `config-adapter-api`
 > **Quellen**: [ADR 030](./adr30-saga.md), [Dataset Use Cases](./SAGA-DATASET-USE-CASES.md), [Saga Design Proposal](./saga.md)
-> **Letztes Update**: 2026-02-17
+> **Letztes Update**: 2026-02-16
 
 ---
 
@@ -87,167 +87,102 @@ Typisierte POJOs für die Dataset-CloudEvent-Payload:
 
 ---
 
-## Phase 2 — Adapter-Integration (nächste Schritte)
+## Phase 2 — Adapter-Integration (abgeschlossen)
 
-### Überblick: Command Building Flow
+> 6 Commits, 33 neue Tests (784 Tests gesamt), alle grün.
 
-Der Orchestrator empfängt ein `Dataset`-JSON vom Portal Backend und muss daraus adapter-spezifische Commands bauen. Jeder Adapter bekommt nur die Informationen, die er braucht.
+### Architektur
 
-```
-Portal Backend
-    │
-    ▼  CloudEvent (data: Dataset JSON)
-┌─────────────────────────────────────────────┐
-│  Orchestrator                                │
-│                                              │
-│  Dataset JSON → DatasetCommandBuilder        │
-│    ├── FROST:   datasetId, name, description │
-│    ├── APISIX:  datasetId, baseUrl (von      │
-│    │            FROST), openDataAccess        │
-│    └── Redpanda: dataPipelines, datasources, │
-│                  targetUrl (von FROST)        │
-└──┬──────────────┬───────────────┬────────────┘
-   │              │               │
-   ▼              ▼               ▼
- FROST          APISIX         Redpanda
- Result:        Result:        Result:
- projectId      routeId        pipelineIds
- baseUrl        serviceId
-                publicUrl
-   │              │               │
-   └──────────────┴───────────────┘
-                  │
-                  ▼
-   Orchestrator aggregiert alle Results
-   → ConfigResultEvent ans Portal Backend
-   → properties[] für Update/Delete-Roundtrip
-```
-
-### Task: DatasetCommandBuilder mit typisierten POJOs
-
-**Aktueller Stand**: `DatasetCommandBuilder` arbeitet auf `Map<String, Object>` (untypisiert). Der `triggerPayload` im `SagaContext` ist `Map<String, Object>`.
-
-**Ziel**: Der `DatasetCommandBuilder` soll die neuen `Dataset`/`Datasource`/`DataPipeline`-POJOs nutzen, um typsicher auf die Payload-Felder zuzugreifen. Aktuell passiert z.B.:
-
-```java
-// Vorher (untypisiert):
-payload.put("datasetName", trigger.get("name"));
-payload.put("openDataAccess", trigger.getOrDefault("openDataAccess", false));
-
-// Nachher (typisiert — zu evaluieren):
-Dataset dataset = objectMapper.convertValue(trigger, Dataset.class);
-payload.put("datasetName", dataset.name());
-payload.put("openDataAccess", dataset.openDataAccess());
-```
-
-**Offene Frage**: `SagaContext.triggerPayload()` ist `Map<String, Object>`. Soll das geändert werden, oder deserialisiert der `DatasetCommandBuilder` intern?
-
-### Task: FROST Adapter — Saga-Handler
-
-**Was FROST für `CREATE_PROJECT` braucht:**
-- `datasetId` → wird als Projekt-Name verwendet
-- `name` → Projekt-Beschreibung (Display Name)
-
-**Was FROST zurückliefert:**
-- `projectId` — die FROST-interne Projekt-ID
-- `baseUrl` — vollständiger Pfad zum Projekt-Endpunkt (z.B. `http://frost:8080/FROST-Server/v1.1/projects/proj-123`)
-
-**Compensation**: `DELETE_PROJECT` mit `projectId`
-
-**Implementierung**:
-1. `FrostSagaHandler` im `config-adapter-frost` Modul
-2. Routing in `FrostAdapter.doProcessConfigEvent()` über Topic-Check
-3. FROST REST API Call: `POST /projects` → projectId + baseUrl
-
-### Task: APISIX Adapter — Saga-Handler
-
-**Entscheidung**: Ein Step im Orchestrator (Option A). Der APISIX-Adapter handelt Service + Route + Plugin-Config-Referenz intern in einem Aufruf ab. Bestätigt durch API-Analyse: Die APISIX Admin API unterstützt `plugin_config_id` als Feld im Route-Objekt — kein separater Request nötig.
-
-**Was APISIX für `CREATE_ROUTE` braucht:**
-- `datasetId` → wird zum URI-Segment (`/api/dataspace/{datasetId}/*`)
-- `upstreamUrl` — die FROST `baseUrl` aus Step 1
-- `openDataAccess` — steuert die Plugin-Konfiguration
-
-**APISIX erstellt pro Dataset:**
-1. **Service** (Upstream-Ziel auf FROST) — muss vor Route existieren
-2. **Route** (URL-Mapping auf Service) — eine pro Dataset, mit/ohne `plugin_config_id`
-
-**openDataAccess-Logik:**
+Adapter erhalten Saga-Commands als **raw JSON** (nicht CloudEvents) über dedizierte Topics. Ein separater `KafkaSagaCommandConsumer` (parallel zum bestehenden `KafkaEventHandler`) routet Commands an registrierte `SagaCommandHandler`-Implementierungen.
 
 ```
-openDataAccess: false (protected)     openDataAccess: true (public)
-┌──────────────────────────────┐     ┌──────────────────────────────┐
-│ Route: /api/dataspace/ds-1/* │     │ Route: /api/dataspace/ds-1/* │
-│   service_id: svc-frost      │     │   service_id: svc-frost      │
-│   plugin_config_id: 1 ← auth │     │   (kein plugin_config_id)    │
-└──────────────────────────────┘     │   priority: 1 ← bei URI-     │
-         │                            │   Überlappung mit protected  │
-         ▼                            └──────────────────────────────┘
-┌────────────────────────────┐
-│ Plugin Config (id: 1)      │
-│   openid-connect (JWT)     │
-│   opa (with_service: true) │
-│   request-id               │
-└────────────────────────────┘
+Orchestrator                          Adapter-Seite
+KafkaSagaActionDispatcher             KafkaSagaCommandConsumer
+  │                                      │
+  │  raw JSON                            │  ServiceLoader
+  ├──► *.frost.execute    ──────────►    ├──► FrostSagaHandler
+  ├──► *.frost.compensate ──────────►    │
+  ├──► *.apisix.execute   ──────────►    ├──► ApisixSagaHandler
+  ├──► *.apisix.compensate ─────────►    │
+  │                                      │
+  │◄── *.frost.result     ◄─────────    ├──► publishResult()
+  │◄── *.apisix.result    ◄─────────    │
 ```
 
-Plugin Config 1 ist **vorprovisioniert** (nicht vom Adapter verwaltet).
+### Erledigte Commits
 
-**Update-Szenarien (`UPDATE_ROUTE`):**
+| # | Commit | Modul | Neue Tests |
+|---|--------|-------|------------|
+| 0 | DatasetCommandBuilder POJO-Integration | `config-adapter-orchestrator` | — (bestehende Tests grün) |
+| 1 | SagaCommandHandler Interface + SagaCommandMessage/Result | `config-adapter-api` | 12 |
+| 2 | FrostSagaHandler | `config-adapter-frost` | 12 |
+| 3 | ApisixSagaHandler | `config-adapter-apisix` | 12 |
+| 4 | KafkaSagaCommandConsumer | `event-handler-kafka` | 9 |
+| 5 | Application Wiring (ServiceLoader + META-INF/services) | `config-adapter-application` | — |
 
-| Übergang | Adapter-Aktion |
-|----------|----------------|
-| `openDataAccess` unverändert | Route-Felder aktualisieren (name, upstream, etc.) |
-| `false → true` (protected → public) | `plugin_config_id` entfernen, ggf. `priority: 1` setzen |
-| `true → false` (public → protected) | `plugin_config_id: 1` setzen, `priority` entfernen |
+### Neue Klassen
 
-Der Adapter speichert den vorherigen `openDataAccess`-Wert als **Compensation-Data**, damit bei fehlgeschlagenem Update der ursprüngliche Zustand wiederhergestellt werden kann (`RESTORE_ROUTE`).
+| Klasse | Package | Beschreibung |
+|--------|---------|--------------|
+| `SagaCommandHandler` | `adapter` | Interface: `adapter()`, `initialize(AdapterConfig)`, `handle(SagaCommandMessage)`, extends `AutoCloseable` |
+| `SagaCommandMessage` | `adapter` | Record: Eingehende Saga-Commands mit `fromMap()` (trennt Envelope von Payload) |
+| `SagaCommandResult` | `adapter` | Record: Ergebnis mit Factory-Methoden `success()`, `failure()`, `compensationSuccess()`, `compensationFailure()` |
+| `FrostSagaHandler` | `frost` | CREATE/UPDATE/DELETE_PROJECT via FROST REST API (JAX-RS) |
+| `ApisixSagaHandler` | `apisix` | CREATE/UPDATE/DELETE_ROUTE via APISIX Admin API, deterministische IDs (datasetId), `plugin_config_id` für Auth |
+| `KafkaSagaCommandConsumer` | `event.handler.kafka` | Consumer für raw JSON Saga-Messages, Virtual Thread, `ByteArrayDeserializer` |
 
-**Was APISIX zurückliefert:**
-- `routeId`, `serviceId`, `publicUrl`
+### Design-Entscheidungen
 
-**Compensation:**
-
-| Saga-Typ | Compensation |
-|----------|-------------|
-| Create fehlgeschlagen | `DELETE_ROUTE` — Route löschen (+ Service wenn ungenutzt) |
-| Update fehlgeschlagen | `RESTORE_ROUTE` — vorherigen `plugin_config_id`-Zustand wiederherstellen |
-
-**API-Model-Änderung (erledigt):**
-`RouteConfigValue` um `plugin_config_id`-Feld erweitert (`Object`-Typ, da APISIX Integer und String akzeptiert). Tests: 32 grün, inkl. protected/public Deserialisierung und Update-Szenarien.
-
-**Implementierung:**
-1. `ApisixSagaHandler` im `config-adapter-apisix` Modul
-2. Routing in `ApisixAdapter.doProcessConfigEvent()` über Topic-Check
-3. `CREATE_ROUTE`: Service anlegen → Route mit/ohne `plugin_config_id` anlegen
-4. `UPDATE_ROUTE`: Route aktualisieren, `plugin_config_id` je nach `openDataAccess` setzen/entfernen
-5. `DELETE_ROUTE`: Route löschen, Service löschen wenn keine weiteren Routen
-
-### Task: DatasetCommandBuilder — Dataset-POJOs integrieren
-
-Den `DatasetCommandBuilder` erweitern, um:
-1. `triggerPayload` als `Dataset`-POJO zu deserialisieren
-2. Für FROST: `dataset.name()` + `dataset.id()` extrahieren
-3. Für APISIX: `dataset.openDataAccess()` + `baseUrl` aus FROST-Result
-4. Für Redpanda: `dataset.datapipelines()` + `dataset.datasources()` durchreichen
-
-**Hinweis APISIX-Update**: Der `DatasetCommandBuilder` liefert `openDataAccess` bereits im APISIX-Payload. Der APISIX-Adapter vergleicht intern den aktuellen Routenzustand mit dem neuen `openDataAccess`-Wert und entscheidet, ob `plugin_config_id` gesetzt oder entfernt werden muss. Der Orchestrator muss dafür keinen Unterschied zwischen Create und Update kennen — die Logik liegt im Adapter.
-
-### Task: Adapter-Subscription und Topic-Konfiguration
-
-- FROST Adapter: `dataset.frost.execute` + `dataset.frost.compensate` zu Topics hinzufügen
-- APISIX Adapter: `dataset.apisix.execute` + `dataset.apisix.compensate` zu Topics hinzufügen
-- `application.properties` aktualisieren
+- **Eigener Consumer statt Erweiterung von `KafkaEventHandler`**: `KafkaEventHandler` nutzt `CloudEventDeserializer` — inkompatibel mit dem raw JSON Format des Orchestrators
+- **Eigene Consumer-Group** (`config-adapter-group-saga`): Unabhängig von der CloudEvents-Group, unabhängiges Offset-Management
+- **Deterministische IDs bei APISIX**: `PUT /routes/{datasetId}` statt `POST` — idempotent bei Kafka at-least-once
+- **`SagaCommandHandler` extends `AutoCloseable`**: Adapter verwalten HTTP-Clients (Jersey `Client`), die bei Shutdown geschlossen werden müssen
+- **`SagaCommandMessage.fromMap()`**: Der Orchestrator flacht Payload-Felder in die Top-Level-JSON-Struktur ein. `fromMap()` trennt Envelope-Keys von Payload-Keys
 
 ---
 
-## Phase 3 — Weitere offene Punkte
+## Phase 3 — Backend-Integration & offene Punkte
+
+### TODO: Ressourcen-IDs im Update-Trigger-Payload
+
+**Problem**: Bei `DATASET_UPDATE` und `DATASET_DELETE` brauchen die Adapter die Ressourcen-IDs aus der initialen Provisionierung (CREATE). Diese IDs existieren aktuell nur im Saga-Result des CREATE-Durchlaufs.
+
+**Betroffene IDs:**
+
+| Adapter | CREATE liefert | UPDATE/DELETE braucht |
+|---------|---------------|----------------------|
+| FROST | `projectId`, `baseUrl` | `projectId` (für PATCH/DELETE) |
+| APISIX | `routeId`, `serviceId`, `publicUrl` | `routeId`, `serviceId` (für PUT/DELETE) |
+
+**Lösung**: Das Portal-Backend muss die bei CREATE erhaltenen Ressourcen-IDs (aus dem `ConfigResultEvent.properties`) persistent speichern (z.B. im `DataSet`-Entity) und bei UPDATE/DELETE im Trigger-Payload mitschicken:
+
+```json
+{
+  "type": "DATASET_UPDATE",
+  "datasetId": "ds-001",
+  "name": "Updated Name",
+  "openDataAccess": true,
+  "provisioning": {
+    "frost": { "projectId": "42", "baseUrl": "http://frost:8080/v1.1/Projects(42)" },
+    "apisix": { "routeId": "ds-001", "serviceId": "ds-001", "publicUrl": "http://..." }
+  }
+}
+```
+
+Der `DatasetCommandBuilder` liest diese IDs aus dem `provisioning`-Objekt und fügt sie in die Adapter-Commands ein. Ohne diese Daten kann der Orchestrator die Update/Delete-Steps nicht korrekt befüllen.
+
+**Offene Punkte Backend-Seite:**
+- `DataSet`-Entity im `portal-model` um `provisioningData` (JSON) erweitern
+- `DataSetService` speichert CREATE-Results in `provisioningData`
+- `EventPublishingService` liest `provisioningData` und fügt es dem Trigger-Payload hinzu
+
+### Weitere offene Punkte
 
 | Bereich | Status | Beschreibung |
 |---------|--------|--------------|
+| **Provisioning-Daten im Trigger** | **TODO** | Backend muss Ressourcen-IDs bei UPDATE/DELETE mitschicken (s.o.) |
 | Recovery Re-dispatch | Offen | IN_PROGRESS Steps nach Crash erneut dispatchen |
 | Timeout Scheduler | Offen | `ScheduledExecutorService` für Step-Timeouts |
-| Application.java Integration | Offen | ServiceLoader-Discovery des Orchestrators |
 | Redpanda Adapter | Wartet | Kollege implementiert nach Contract-Spec |
 
 ---

@@ -339,7 +339,7 @@ Where `{adapter}` is one of: `frost`, `apisix`, `redpanda`.
 
 | Scenario | Behavior |
 |----------|----------|
-| Crash after `PersistState`, before `ExecuteStep` | Recovery finds the saga in `EXECUTING` with the step in `IN_PROGRESS`. The adapter never received the command. **Requires re-dispatch** (not yet implemented — see Section 8). |
+| Crash after `PersistState`, before `ExecuteStep` | Recovery finds the saga in `EXECUTING` with the step in `IN_PROGRESS`. The adapter never received the command. **Requires re-dispatch** (not yet implemented — see Section 11). |
 | Crash after `ExecuteStep`, before adapter responds | Same as above from the orchestrator's perspective. The adapter may have received and processed the command. Adapters must be **idempotent**. |
 | Crash after adapter responds, before `PersistState` of next transition | The adapter result is lost. Recovery finds the saga in the state before the response. The adapter result topic still contains the message — re-consuming it will trigger the transition again. |
 | Crash after `CompleteSaga` / `FailSaga` | The saga is terminal. `stateStore.remove()` may not have been called. Recovery skips terminal sagas. The tombstone will be written on next startup if needed. |
@@ -472,9 +472,80 @@ sequenceDiagram
 
 ---
 
-## 8. Model Classes (config-adapter-api)
+## 8. Adapter-Side — Saga Command Handling (Phase 2)
 
-All model classes live in `com.civitas.configadapter.model.saga` in the `config-adapter-api` module, so they are available to both the orchestrator and the adapters.
+### 8.1 Architecture
+
+Adapters erhalten Saga-Commands über einen eigenen `KafkaSagaCommandConsumer`, der parallel zum bestehenden `KafkaEventHandler` (CloudEvents) läuft. Die Kommunikation erfolgt als **raw JSON** (nicht CloudEvents).
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  config-adapter-application (Application.java)               │
+│                                                              │
+│  ┌────────────────────────────┐  ┌─────────────────────────┐ │
+│  │ KafkaEventHandler (×N)     │  │ KafkaSagaCommandConsumer│ │
+│  │ CloudEvents, per adapter   │  │ raw JSON, all adapters  │ │
+│  │ Group: config-adapter-group│  │ Group: ...-group-saga   │ │
+│  └────────────────────────────┘  └──────────┬──────────────┘ │
+│                                              │                │
+│              ServiceLoader discovery         │                │
+│         ┌────────────────────────────────────┤                │
+│         │                                    │                │
+│  ┌──────▼──────┐  ┌──────────────┐  ┌───────▼──────┐        │
+│  │ FrostSaga-  │  │ ApisixSaga-  │  │ (Redpanda-   │        │
+│  │ Handler     │  │ Handler      │  │  Handler)    │        │
+│  └─────────────┘  └──────────────┘  └──────────────┘        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 8.2 SagaCommandHandler Interface
+
+```java
+public interface SagaCommandHandler extends AutoCloseable {
+    String adapter();                                // "frost", "apisix"
+    void initialize(AdapterConfig config);           // connection setup
+    SagaCommandResult handle(SagaCommandMessage cmd); // execute or compensate
+}
+```
+
+Discovered via `ServiceLoader<SagaCommandHandler>` in `Application.java`. Registrierung in `META-INF/services/com.civitas.configadapter.adapter.SagaCommandHandler`.
+
+### 8.3 Message Format
+
+**Incoming** (Orchestrator → Adapter, auf `*.execute` / `*.compensate` Topics):
+```json
+{"type":"EXECUTE_STEP", "messageId":"msg-1", "sagaId":"saga-1",
+ "stepId":"create-project", "adapter":"frost", "operation":"CREATE_PROJECT",
+ "datasetName":"Test", "description":"A test dataset"}
+```
+
+`SagaCommandMessage.fromMap()` trennt die Envelope-Keys (`type`, `messageId`, `sagaId`, `stepId`, `adapter`, `operation`) vom Rest (→ `payload`).
+
+**Outgoing** (Adapter → Orchestrator, auf `*.result` Topic):
+```json
+{"type":"STEP_COMPLETED", "sagaId":"saga-1", "stepId":"create-project",
+ "resultData":{"projectId":"42","baseUrl":"http://..."},
+ "compensationData":{"projectId":"42"}, "error":null}
+```
+
+### 8.4 Adapter-Operationen
+
+| Adapter | Operation | HTTP | Ergebnis |
+|---------|-----------|------|----------|
+| FROST | `CREATE_PROJECT` | `POST /Projects` | `{projectId, baseUrl}` |
+| FROST | `UPDATE_PROJECT` | `PATCH /Projects({id})` | `{projectId, baseUrl}` |
+| FROST | `DELETE_PROJECT` | `DELETE /Projects({id})` | `{}` |
+| APISIX | `CREATE_ROUTE` | `PUT /upstreams/{id}` + `PUT /routes/{id}` | `{routeId, serviceId, publicUrl}` |
+| APISIX | `UPDATE_ROUTE` | `PUT /routes/{id}` | `{routeId, serviceId}` |
+| APISIX | `DELETE_ROUTE` | `DELETE /routes/{id}` + `DELETE /upstreams/{id}` | `{}` |
+
+APISIX verwendet **deterministische IDs** (= `datasetId`) für idempotente PUT-Operationen.
+
+---
+
+## 9. Model Classes (config-adapter-api)
+
+All saga model classes live in `com.civitas.configadapter.model.saga` in the `config-adapter-api` module. The adapter interfaces (`SagaCommandHandler`, `SagaCommandMessage`, `SagaCommandResult`) live in `com.civitas.configadapter.adapter`, so they are available to both the orchestrator and the adapters.
 
 | Class | Type | Purpose |
 |-------|------|---------|
@@ -488,15 +559,21 @@ All model classes live in `com.civitas.configadapter.model.saga` in the `config-
 
 ---
 
-## 9. Testing Strategy
+## 10. Testing Strategy (784 Tests gesamt)
 
 ### 9.1 Layer Separation
 
-| Test Class | Tests | What It Tests | Infrastructure |
-|------------|-------|---------------|----------------|
-| `SagaStateMachineTest` | 57 | Pure state transitions for all saga types, all step positions, all event types (success, failure, timeout), compensation, conditional skipping | None — pure unit test |
-| `SagaEngineTest` | 14 | Engine facade: duplicate detection, state persistence, dispatcher routing, terminal cleanup, recovery | `InMemorySagaStateStore` + `CollectingDispatcher` (no mocks) |
-| `SagaKafkaIT` | 5 | Kafka round-trips: state store write/read, recovery, dispatcher publishing, result consumer routing | Testcontainers (real Kafka broker) |
+| Test Class | Module | Tests | What It Tests | Infrastructure |
+|------------|--------|-------|---------------|----------------|
+| `SagaStateMachineTest` | orchestrator | 57 | Pure state transitions for all saga types, all step positions, all event types (success, failure, timeout), compensation, conditional skipping | None — pure unit test |
+| `SagaEngineTest` | orchestrator | 14 | Engine facade: duplicate detection, state persistence, dispatcher routing, terminal cleanup, recovery | `InMemorySagaStateStore` + `CollectingDispatcher` (no mocks) |
+| `DatasetCommandBuilderTest` | orchestrator | 20 | FROST/APISIX/Redpanda payload building, property extraction, result aggregation | None — pure unit test |
+| `SagaKafkaIT` | orchestrator | 5 | Kafka round-trips: state store write/read, recovery, dispatcher publishing, result consumer routing | Testcontainers (real Kafka broker) |
+| `SagaCommandMessageTest` | api | 6 | `fromMap()` envelope/payload separation, JSON round-trip | None |
+| `SagaCommandResultTest` | api | 6 | Factory methods, JSON serialization matching `SagaResultConsumer` format | None |
+| `FrostSagaHandlerTest` | frost | 12 | CREATE/UPDATE/DELETE_PROJECT, HTTP errors, network errors, compensation | Mocked JAX-RS Client |
+| `ApisixSagaHandlerTest` | apisix | 12 | CREATE/UPDATE/DELETE_ROUTE, plugin_config_id, HTTP errors, compensation | Mocked JAX-RS Client |
+| `KafkaSagaCommandConsumerTest` | event-handler-kafka | 9 | Topic subscription, command routing, result publishing, error resilience | Mocked KafkaConsumer/Producer |
 
 ### 9.2 StateMachine Test Coverage
 
@@ -529,12 +606,21 @@ mvn test -pl config-adapter-orchestrator -am \
 
 ---
 
-## 10. Known Limitations & Future Work
+## 11. Known Limitations & Future Work
+
+### 11.1 Erledigt (Phase 2)
+
+| Area | Erledigt |
+|------|----------|
+| ~~**Adapter saga handlers**~~ | `FrostSagaHandler`, `ApisixSagaHandler` implementiert. `SagaCommandHandler`-Interface, `SagaCommandMessage`/`SagaCommandResult`-Records, `KafkaSagaCommandConsumer` (raw JSON, eigene Consumer-Group). |
+| ~~**Application.java integration**~~ | `SagaCommandHandler`-Discovery via ServiceLoader, `KafkaSagaCommandConsumer` in `Application.run()` integriert. META-INF/services für FROST + APISIX. |
+
+### 11.2 Offen
 
 | Area | Current State | Planned |
 |------|--------------|---------|
+| **Provisioning-Daten im Update/Delete-Trigger** | Bei `DATASET_UPDATE`/`DATASET_DELETE` benötigen die Adapter die bei CREATE erzeugten Ressourcen-IDs (FROST `projectId`, APISIX `routeId`/`serviceId`). Diese sind aktuell nicht im Trigger-Payload enthalten. | Das Portal-Backend speichert die CREATE-Results (aus `ConfigResultEvent.properties`) im `DataSet`-Entity und schickt sie bei UPDATE/DELETE als `provisioning`-Objekt im Trigger-Payload mit. Der `DatasetCommandBuilder` liest die IDs aus `provisioning.{adapter}` und fügt sie in die Adapter-Commands ein. |
 | **Recovery re-dispatch** | Recovered sagas are counted but not re-dispatched. The adapter never receives the command if the crash happened between `PersistState` and `ExecuteStep`. | Inspect `currentStepId` + step status on recovery and re-dispatch `IN_PROGRESS` steps. |
 | **Timeout scheduler** | `handleStepTimeout()` exists in the engine but no scheduler invokes it. Timeouts must currently be triggered externally. | `ScheduledExecutorService` that checks step timestamps against configurable timeout durations. |
 | **2-arg StateStore constructor** | `KafkaSagaStateStore(producer, timeout)` creates an empty in-memory map. If used without prior recovery, all persisted sagas are invisible to the read path. | Remove or mark as `@VisibleForTesting`. Enforce recovery-first initialization. |
-| **Adapter saga handlers** | Adapters don't yet have saga-aware handlers that understand the orchestrator's message format. | Each adapter gets a `*SagaHandler` class that deserializes saga commands and publishes structured results with `sagaId`/`stepId`. |
-| **Application.java integration** | The orchestrator is not yet discovered via ServiceLoader in the main application bootstrap. | Register `DatasetSagaOrchestrator` via ServiceLoader, integrate into `Application.run()`. |
+| **Redpanda Adapter** | Kein `RedpandaSagaHandler` vorhanden. | Kollege implementiert nach Contract-Spec. `META-INF/services`-Registrierung + ServiceLoader-Discovery funktioniert automatisch. |
