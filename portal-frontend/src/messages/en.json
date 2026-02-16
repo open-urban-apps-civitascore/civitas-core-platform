@@ -46,11 +46,16 @@
       "permissions": "Permissions",
       "datasources": "Datasources",
       "datasource": "Datasource"
+      "datastructures": "Datastructures"
     },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "commaSeparated": "comma-separated",
       "requiredInAvailable": "This field is required in the available mode."
+    },
+    "status": {
+      "DRAFT": "Draft",
+      "AVAILABLE": "Available"
     }
   },
   "languages": {
@@ -81,7 +86,8 @@
     "table-editor": "Table Editor",
     "pipeline-editor": "Pipeline Editor",
     "data-management": "Data-Management",
-    "datasources": "Datasources"
+    "datasources": "Datasources",
+    "datastructures": "Datastructures"
   },
   "datasets": {
     "title": "Datasets",
@@ -428,6 +434,21 @@
       "type": "Type",
       "connection": "Connection",
       "establishConnection": "Establish Connection"
+    }
+  },
+  "datastructures": {
+    "title": "Overview: Data Structures",
+    "subtitle": "All data sources available in our tenant.",
+    "newDatasource": "Create Data Structure",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Description",
+      "source": "Source",
+      "versionNumber": "Version",
+      "status": "Status"
+    },
+    "source": {
+      "OWN": "Own"
     }
   }
 }

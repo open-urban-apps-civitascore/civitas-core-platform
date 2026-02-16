@@ -45,11 +45,16 @@
       "permissions": "Berechtigungen",
       "datasources": "Datenquellen",
       "datasource": "Datenquelle"
+      "datastructures": "Datenstrukturen"
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus."
+    },
+    "status": {
+      "DRAFT": "Entwurf",
+      "AVAILABLE": "Verfügbar"
     }
   },
   "languages": {
@@ -80,7 +85,8 @@
     "table-editor": "Table Editor",
     "pipeline-editor": "Pipeline Editor",
     "data-management": "Daten-Management",
-    "datasources": "Datenquellen"
+    "datasources": "Datenquellen",
+    "datastructures": "Datenstrukturen"
   },
   "datasets": {
     "title": "Datensätze",
@@ -431,6 +437,21 @@
       "type": "Typ",
       "connection": "Verbindung",
       "establishConnection": "Verbindung herstellen"
+    }
+  },
+  "datastructures": {
+    "title": "Übersicht: Datenstrukturen",
+    "subtitle": "Alle Datenstrukturen, die in unserem Mandanten verfügbar sind.",
+    "newDatasource": "Datenstruktur erstellen",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "source": "Quelle",
+      "versionNumber": "Version",
+      "status": "Status"
+    },
+    "source": {
+      "OWN": "Eigene"
     }
   }
 }
