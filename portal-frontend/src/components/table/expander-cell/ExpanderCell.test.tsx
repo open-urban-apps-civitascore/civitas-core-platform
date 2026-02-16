@@ -14,7 +14,7 @@ describe('ExpanderCell', () => {
   it('renders value text when row can expand', () => {
     const mockRow = createMockRow({ canExpand: true })
 
-    render(<ExpanderCell row={mockRow as never} value="Test Value" />)
+    render(<ExpanderCell row={mockRow as never}>Test Value</ExpanderCell>)
 
     expect(screen.getByText('Test Value')).toBeInTheDocument()
   })
@@ -22,7 +22,7 @@ describe('ExpanderCell', () => {
   it('renders value text when row cannot expand', () => {
     const mockRow = createMockRow({ canExpand: false })
 
-    render(<ExpanderCell row={mockRow as never} value="Non-expandable Value" />)
+    render(<ExpanderCell row={mockRow as never}>Non-expandible Test</ExpanderCell>)
 
     expect(screen.getByText('Non-expandable Value')).toBeInTheDocument()
   })
@@ -30,7 +30,7 @@ describe('ExpanderCell', () => {
   it('shows ChevronDown icon when row is expanded', () => {
     const mockRow = createMockRow({ canExpand: true, isExpanded: true })
 
-    render(<ExpanderCell row={mockRow as never} value="Test" />)
+    render(<ExpanderCell row={mockRow as never}>Test</ExpanderCell>)
 
     const button = screen.getByRole('button')
     const svgIcon = button.querySelector('svg')
@@ -41,7 +41,7 @@ describe('ExpanderCell', () => {
   it('shows ChevronRight icon when row is not expanded', () => {
     const mockRow = createMockRow({ canExpand: true, isExpanded: false })
 
-    render(<ExpanderCell row={mockRow as never} value="Test" />)
+    render(<ExpanderCell row={mockRow as never}>Test</ExpanderCell>)
 
     const button = screen.getByRole('button')
     const svgIcon = button.querySelector('svg')
@@ -52,7 +52,7 @@ describe('ExpanderCell', () => {
   it('calls row.toggleExpanded() when button is clicked', () => {
     const mockRow = createMockRow({ canExpand: true })
 
-    render(<ExpanderCell row={mockRow as never} value="Test" />)
+    render(<ExpanderCell row={mockRow as never}>Test</ExpanderCell>)
 
     fireEvent.click(screen.getByRole('button'))
 
@@ -65,7 +65,7 @@ describe('ExpanderCell', () => {
 
     render(
       <div onClick={parentClickHandler}>
-        <ExpanderCell row={mockRow as never} value="Test" />
+        <ExpanderCell row={mockRow as never}>Test</ExpanderCell>
       </div>,
     )
 
@@ -77,7 +77,7 @@ describe('ExpanderCell', () => {
   it('does not render expand button when row cannot expand', () => {
     const mockRow = createMockRow({ canExpand: false })
 
-    render(<ExpanderCell row={mockRow as never} value="Test" />)
+    render(<ExpanderCell row={mockRow as never}>Test</ExpanderCell>)
 
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
@@ -85,7 +85,11 @@ describe('ExpanderCell', () => {
   it('applies custom className to container', () => {
     const mockRow = createMockRow()
 
-    const { container } = render(<ExpanderCell row={mockRow as never} value="Test" className="custom-class" />)
+    const { container } = render(
+      <ExpanderCell row={mockRow as never} className="custom-class">
+        Test
+      </ExpanderCell>,
+    )
 
     const containerDiv = container.firstChild as HTMLElement
     expect(containerDiv).toHaveClass('custom-class')

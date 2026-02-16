@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
+import { useUpdateDatastructure } from '@/app/services/api/datastructures/clientRequests'
 import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -17,68 +17,56 @@ import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { Status, STATUS_TYPES } from '@/types/common'
-import { ConnectorApiToFormSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
-  Datasource,
-  DatasourceFormAvailableSchema,
-  DatasourceFormDraft,
-  DatasourceFormDraftSchema,
-  DatasourceFormToApiSchema,
-  DatasourceTab,
-} from '@/types/datasources'
-import { getConnectorFormData } from '@/utils/connectors'
-import { pickDirtyValues } from '@/utils/form'
+  Datastructure,
+  DatastructureFormAvailableSchema,
+  DatastructureFormDraft,
+  DatastructureFormDraftSchema,
+  DatastructureTab,
+} from '@/types/datastructures'
 
-import { BasicInfoTab } from './basic-info/BasicInfoTab'
-import { ConnectorTab } from './connector-tab/ConnectorTab'
-
-interface DatasourceOverviewProps {
-  datasource: Datasource
-}
-
-const tabs: Tab<DatasourceTab>[] = [
+const tabs: Tab<DatastructureTab>[] = [
   {
     value: 'basicInfo',
-    label: 'datasources.tabs.basicInfo',
+    label: 'datastructures.tabs.basicInfo',
   },
   {
-    value: 'connector',
-    label: 'datasources.tabs.connector',
-  },
-  {
-    value: 'dataStructure',
-    label: 'datasources.tabs.dataStructure',
+    value: 'versions',
+    label: 'datastructures.tabs.versions',
   },
   {
     value: 'accessPermissions',
-    label: 'datasources.tabs.accessPermissions',
+    label: 'datastructures.tabs.accessPermissions',
   },
 ]
 
-export const DatasourceOverview = (props: DatasourceOverviewProps) => {
-  const { datasource } = props
-  const t = useTranslations('datasources')
+interface DatastructureOverviewProps {
+  datastructure: Datastructure
+}
+
+export const DatastructureOverview = (props: DatastructureOverviewProps) => {
+  const { datastructure } = props
+  const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
 
-  const defaultValues: DatasourceFormDraft = {
-    id: datasource.id,
-    name: datasource.name ?? '',
-    description: datasource.description ?? '',
-    status: datasource.status ?? STATUS_TYPES.DRAFT,
-    connector: ConnectorApiToFormSchema.safeParse(datasource.connector).data ?? null,
+  const defaultValues: DatastructureFormDraft = {
+    id: datastructure.id,
+    name: datastructure.name ?? '',
+    description: datastructure.description ?? '',
+    status: datastructure.status ?? STATUS_TYPES.DRAFT,
   }
 
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
+  const [selectedTab, setSelectedTab] = useState<DatastructureTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
-  const updateDatasource = useUpdateDatasource()
-  const isLoading = updateDatasource.isPending
+  const updateDatastructure = useUpdateDatastructure()
+  const isLoading = updateDatastructure.isPending
 
-  const form = useForm<DatasourceFormDraft>({
-    resolver: zodResolver(DatasourceFormDraftSchema),
+  const form = useForm<DatastructureFormDraft>({
+    resolver: zodResolver(DatastructureFormDraftSchema),
     mode: 'onChange',
     defaultValues,
   })
@@ -86,23 +74,19 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   useEffect(() => {
     form.reset(defaultValues)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasource])
+  }, [datastructure])
 
   const formValues = useWatch({ control: form.control })
   const statusWatch = form.watch('status')
   const nameWatch = form.watch('name')
   const descriptionWatch = form.watch('description')
-  const connectorTypeWatch = form.watch('connector.type')
 
   const isDraftMode = statusWatch === STATUS_TYPES.DRAFT
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
-    return DatasourceFormAvailableSchema.safeParse(formValues).success
+    return DatastructureFormAvailableSchema.safeParse(formValues).success
   }, [formValues])
-
-  const updateConnectorConfig = (connectorType: ConnectorType) =>
-    form.setValue('connector', getConnectorFormData(connectorType, defaultValues.connector), { shouldDirty: true })
 
   const revalidateForm = () => {
     if (!isDraftMode) {
@@ -118,108 +102,91 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   useEffect(() => {
-    if (!connectorTypeWatch) return
-    updateConnectorConfig(connectorTypeWatch)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectorTypeWatch])
-
-  useEffect(() => {
     if (isDraftMode) {
       form.clearErrors()
     } else {
       revalidateForm()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectorTypeWatch, isDraftMode])
+  }, [isDraftMode])
 
   useEffect(() => {
     revalidateDraftMode()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canSetAvailable, statusWatch])
 
-  const completedTabs = useMemo((): DatasourceTab[] => {
-    const completed: DatasourceTab[] = []
+  const completedTabs = useMemo((): DatastructureTab[] => {
+    const completed: DatastructureTab[] = []
     if (nameWatch.length > 0 && descriptionWatch.length > 0) {
       completed.push('basicInfo')
     }
-    if (ConnectorStrictSchema.safeParse(formValues.connector).success) completed.push('connector')
     return completed
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
-
-  // Tabs that are disabled (for future implementation)
-  const disabledTabs: DatasourceTab[] = ['dataStructure', 'accessPermissions']
 
   const handleStatusChange = (newStatus: Status) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
 
-  const submitDatasource = (onSuccess?: () => void) => {
+  const submitDatastructure = (onSuccess?: () => void) => {
     const values = form.getValues()
     const parsed = isDraftMode
-      ? DatasourceFormToApiSchema.safeParse(values)
-      : DatasourceFormAvailableSchema.safeParse(values)
+      ? DatastructureFormDraftSchema.safeParse(values)
+      : DatastructureFormAvailableSchema.safeParse(values)
     if (!parsed.success) {
       console.error(parsed.error)
       toast.error('Form data invalid')
       return
     }
 
-    const dirtyFields = form.formState.dirtyFields
-    const updateData = pickDirtyValues(parsed.data, dirtyFields)
+    // eslint-disable-next-line unused-imports/no-unused-vars
+    const { status, ...updateData } = parsed.data
 
-    // use this implementation once json-server is not used anymore.
-    // json-server can not patch nested values, so patching the connector config does not work with json-server
-    // if (updateData.connector && !defaultValues.connector) {
-    // updateData.connector = parsed.data.connector
-    // }
-    updateData.connector = parsed.data.connector
-
-    updateDatasource.mutate({ ...updateData, id: values.id }, { onSuccess: () => onSuccess?.() })
+    updateDatastructure.mutate({ ...updateData, id: values.id }, { onSuccess: () => onSuccess?.() })
   }
 
   const handleSave = () => {
-    submitDatasource(() => router.refresh())
+    submitDatastructure(() => router.refresh())
   }
 
   const handleExit = () => {
     if (form.formState.isDirty) {
       setIsExitModalOpen(true)
     } else {
-      router.push(`/datasources?${searchParams.toString()}`)
+      router.push(`/datastructures?${searchParams.toString()}`)
     }
   }
 
   const handleDiscardAndExit = () => {
     setIsExitModalOpen(false)
-    router.push(`/datasources?${searchParams.toString()}`)
+    router.push(`/datastructures?${searchParams.toString()}`)
   }
 
   const handleSaveAndExit = () => {
-    submitDatasource(() => {
+    submitDatastructure(() => {
       setIsExitModalOpen(false)
-      router.push(`/datasources?${searchParams.toString()}`)
+      router.push(`/datastructures?${searchParams.toString()}`)
     })
   }
 
   const renderTabContent = () => {
     switch (selectedTab) {
-      case 'basicInfo':
-        return <BasicInfoTab form={form} />
-      case 'connector':
-        return <ConnectorTab form={form} isDraftMode={isDraftMode} onConnectorTypeChange={updateConnectorConfig} />
-      case 'dataStructure':
-      case 'accessPermissions':
+      // case 'basicInfo':
+      //   return <BasicInfoTab form={form} />
+      // case 'connector':
+      //   return <ConnectorTab form={form} isDraftMode={isDraftMode} onConnectorTypeChange={updateConnectorConfig} />
+      // case 'dataStructure':
+      // case 'accessPermissions':
       default:
         return null
     }
   }
 
   return (
-    <PageContainer testId="datasourceOverviewPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
+    <PageContainer testId="datastructureOverviewPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <div className="w-full flex flex-col h-[var(--title-height)] py-[var(--layout-padding)] border-b-1">
         <div className="flex items-center justify-between px-[var(--layout-padding)]">
-          <h1 className="text-3xl font-bold truncate max-w-full min-w-0">{datasource.name}</h1>
+          <h1 className="text-3xl font-bold truncate max-w-full min-w-0">{datastructure.name}</h1>
           <div className="flex items-center gap-4">
             <StatusDropdown
               status={statusWatch}
@@ -256,14 +223,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             selectedTab={selectedTab}
             onTabChange={setSelectedTab}
             completedTabs={completedTabs}
-            disabledTabs={disabledTabs}
+            disabledTabs={[]}
           />
         </div>
       </div>
       <PageBackground className="overflow-y-auto">
         <Form {...form}>
           <form
-            data-testid="datasourceEditForm"
+            data-testid="datastructureEditForm"
             aria-label={`${tCommon('form')} ${t('edit.basicInfo.title')}`}
             onSubmit={e => e.preventDefault()}
           >

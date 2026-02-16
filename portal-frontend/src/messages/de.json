@@ -44,7 +44,7 @@
       "dataspaces": "Datenräume",
       "permissions": "Berechtigungen",
       "datasources": "Datenquellen",
-      "datasource": "Datenquelle"
+      "datasource": "Datenquelle",
       "datastructures": "Datenstrukturen"
     },
     "info": {
@@ -452,6 +452,31 @@
     },
     "source": {
       "OWN": "Eigene"
+    },
+    "create": {
+      "title": "Neue Datenstruktur",
+      "subtitle": "Neue Datenstrukturen sind nur intern sichtbar.",
+      "basicInfo": {
+        "title": "Basisinformation",
+        "subtitle": "Der Name kann später angepasst werden."
+      }
+    },
+    "form": {
+      "name": "Name",
+      "namePlaceholder": "Name der Datenstruktur",
+      "description": "Beschreibung",
+      "descriptionHint": "max. 150 Zeichen"
+    },
+    "tabs": {
+      "basicInfo": "Basisinformationen",
+      "accessPermissions": "Zugriffsberechtigungen",
+      "versions": "Versionen"
+    },
+    "edit": {
+      "basicInfo": {
+        "title": "Basisinformationen",
+        "subtitle": "Basisinformationen können auch später noch mal angepasst werden."
+      }
     }
   }
 }

@@ -45,7 +45,7 @@
       "dataspaces": "Dataspaces",
       "permissions": "Permissions",
       "datasources": "Datasources",
-      "datasource": "Datasource"
+      "datasource": "Datasource",
       "datastructures": "Datastructures"
     },
     "info": {
@@ -449,6 +449,31 @@
     },
     "source": {
       "OWN": "Own"
+    },
+    "create": {
+      "title": "New Data Structure",
+      "subtitle": "New data structures are only visible internally.",
+      "basicInfo": {
+        "title": "Base Information",
+        "subtitle": "The name can be changed later."
+      }
+    },
+    "form": {
+      "name": "Name",
+      "namePlaceholder": "Name of the data structure",
+      "description": "Description",
+      "descriptionHint": "max. 150 characters"
+    },
+    "tabs": {
+      "basicInfo": "Base Information",
+      "accessPermissions": "Access Permissions",
+      "versions": "Versions"
+    },
+    "edit": {
+      "basicInfo": {
+        "title": "Base Information",
+        "subtitle": "Base information can be changed later."
+      }
     }
   }
 }

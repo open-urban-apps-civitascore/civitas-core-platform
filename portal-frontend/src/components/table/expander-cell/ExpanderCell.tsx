@@ -1,6 +1,6 @@
 import { Row, RowData } from '@tanstack/react-table'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { HTMLAttributes, MouseEvent } from 'react'
+import { HTMLAttributes, MouseEvent, ReactNode } from 'react'
 
 import { Button, ButtonProps } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -8,10 +8,10 @@ import { cn } from '@/lib/utils'
 interface ExpanderCellProps<T extends RowData> extends HTMLAttributes<HTMLDivElement> {
   row: Row<T>
   buttonProps?: ButtonProps
-  value: string
+  children: ReactNode
 }
 export const ExpanderCell = <T,>(props: ExpanderCellProps<T>) => {
-  const { row, value, buttonProps, className, ...divProps } = props
+  const { row, children, buttonProps, className, ...divProps } = props
   const expanderWidth = `${1.75 + row.depth}rem`
 
   const handleExpanderClick = (e: MouseEvent<HTMLButtonElement>, row: Row<T>) => {
@@ -41,10 +41,10 @@ export const ExpanderCell = <T,>(props: ExpanderCellProps<T>) => {
               {row.getIsExpanded() ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </Button>
           </div>{' '}
-          <span>{value}</span>
+          <div>{children}</div>
         </>
       ) : (
-        <span style={{ paddingLeft: expanderWidth }}>{value}</span>
+        <span style={{ paddingLeft: expanderWidth }}>{children}</span>
       )}
     </div>
   )

@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { STATUS_TYPES } from '@/types/common'
 import { DatastructuresListData } from '@/types/datastructures'
@@ -48,7 +49,9 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
       // TODO: Implement cell click for navigation to datastructure
       cell: ({ row }: CellContext<DatastructuresListData, unknown>) => (
-        <ExpanderCell row={row} value={row.original.name} className="font-medium" />
+        <ExpanderCell row={row} className="font-medium">
+          <LinkCell href={`datastructures/${row.original.id}`}>{row.original.name}</LinkCell>
+        </ExpanderCell>
       ),
       meta: {
         style: {
@@ -71,7 +74,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     columnHelper.accessor('source', {
       header: t('tableHeaders.source'),
-      cell: info => t(`source.${info.getValue()}`),
+      cell: info => (info.getValue() ? t(`source.${info.getValue()}`) : '-'),
       meta: {
         style: {
           width: '10%',
@@ -81,7 +84,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     columnHelper.accessor('versionNumber', {
       header: t('tableHeaders.versionNumber'),
-      cell: info => info.getValue(),
+      cell: info => info.getValue() || '-',
       meta: {
         style: {
           width: '10%',

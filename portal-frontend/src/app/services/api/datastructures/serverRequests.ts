@@ -11,3 +11,11 @@ export const getDatastructures = async (params?: URLSearchParams) =>
     headers: await getServerRequestHeaders(),
     errorMessage: 'An error occurred while fetching datastructures.',
   })
+
+export const getDatastructure = async (id: string) =>
+  apiRequest<Datastructure[]>({
+    endpoint: `/datastructures/${id}`,
+    method: 'GET',
+    headers: await getServerRequestHeaders(),
+    errorMessage: 'An error occurred while fetching datastructure.',
+  })
