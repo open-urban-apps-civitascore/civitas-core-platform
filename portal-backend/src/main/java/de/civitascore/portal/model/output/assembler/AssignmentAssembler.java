@@ -8,7 +8,6 @@ import de.civitascore.portal.model.entity.base.NamedEntity;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.summary.DataEntitySummaryDTO;
 import java.util.UUID;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -41,16 +40,7 @@ public class AssignmentAssembler implements BaseAssembler<Assignment, Assignment
   }
 
   private DataEntitySummaryDTO resolveScopeSummary(Assignment entity) {
-    NamedEntity scopeEntity =
-        Stream.of(
-                entity.getDataSpace(),
-                entity.getDataset(),
-                entity.getCatalog(),
-                entity.getDataSource(),
-                entity.getDataStructure())
-            .filter(e -> e != null)
-            .findFirst()
-            .orElse(null);
+    NamedEntity scopeEntity = entity.getScope();
 
     if (scopeEntity == null) {
       return null;

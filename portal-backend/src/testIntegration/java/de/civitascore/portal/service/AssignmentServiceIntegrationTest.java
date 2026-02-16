@@ -601,12 +601,12 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   @Nested
-  @DisplayName("AssignmentOutputDTO scopeId Mapping Tests")
-  class ScopeIdMappingTests {
+  @DisplayName("Assignment scope Mapping Tests")
+  class ScopeMappingTests {
 
     @Test
-    @DisplayName("Should map scopeId to dataset ID when scopeType is DATASET")
-    void shouldMapScopeIdToDatasetId() {
+    @DisplayName("Should map scope to dataset when scopeType is DATASET")
+    void shouldMapScopeToDataset() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
@@ -615,15 +615,15 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       Assignment assignment = assignmentService.create(input);
 
-      assertThat(assignment.getScopeId()).isNotNull();
-      assertThat(assignment.getScopeId()).isEqualTo(testDataSet.getId());
+      assertThat(assignment.getScope()).isNotNull();
+      assertThat(assignment.getScope().getId()).isEqualTo(testDataSet.getId());
       assertThat(assignment.getDataset()).isNotNull();
       assertThat(assignment.getDataset().getId()).isEqualTo(testDataSet.getId());
     }
 
     @Test
-    @DisplayName("Should map scopeId to dataspace ID when scopeType is DATASPACE")
-    void shouldMapScopeIdToDataspaceId() {
+    @DisplayName("Should map scope to dataspace when scopeType is DATASPACE")
+    void shouldMapScopeToDataspace() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
@@ -632,15 +632,15 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       Assignment assignment = assignmentService.create(input);
 
-      assertThat(assignment.getScopeId()).isNotNull();
-      assertThat(assignment.getScopeId()).isEqualTo(testDataSpace.getId());
+      assertThat(assignment.getScope()).isNotNull();
+      assertThat(assignment.getScope().getId()).isEqualTo(testDataSpace.getId());
       assertThat(assignment.getDataSpace()).isNotNull();
       assertThat(assignment.getDataSpace().getId()).isEqualTo(testDataSpace.getId());
     }
 
     @Test
-    @DisplayName("Should map scopeId to catalog ID when scopeType is CATALOG")
-    void shouldMapScopeIdToCatalogId() {
+    @DisplayName("Should map scope to catalog when scopeType is CATALOG")
+    void shouldMapScopeToCatalog() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
@@ -649,15 +649,15 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       Assignment assignment = assignmentService.create(input);
 
-      assertThat(assignment.getScopeId()).isNotNull();
-      assertThat(assignment.getScopeId()).isEqualTo(testCatalog.getId());
+      assertThat(assignment.getScope()).isNotNull();
+      assertThat(assignment.getScope().getId()).isEqualTo(testCatalog.getId());
       assertThat(assignment.getCatalog()).isNotNull();
       assertThat(assignment.getCatalog().getId()).isEqualTo(testCatalog.getId());
     }
 
     @Test
-    @DisplayName("Should have null scopeId when scopeType is TENANT")
-    void shouldHaveNullScopeIdForTenantScope() {
+    @DisplayName("Should have null scope when scopeType is TENANT")
+    void shouldHaveNullScopeForTenantScope() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
@@ -665,15 +665,15 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       Assignment assignment = assignmentService.create(input);
 
-      assertThat(assignment.getScopeId()).isNull();
+      assertThat(assignment.getScope()).isNull();
       assertThat(assignment.getDataset()).isNull();
       assertThat(assignment.getDataSpace()).isNull();
       assertThat(assignment.getCatalog()).isNull();
     }
 
     @Test
-    @DisplayName("Should have null scopeId when scopeType is null (SYSTEM role)")
-    void shouldHaveNullScopeIdForSystemRole() {
+    @DisplayName("Should have null scope when scopeType is null (SYSTEM role)")
+    void shouldHaveNullScopeForSystemRole() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testSystemRole.getId());
@@ -681,7 +681,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       Assignment assignment = assignmentService.create(input);
 
-      assertThat(assignment.getScopeId()).isNull();
+      assertThat(assignment.getScope()).isNull();
       assertThat(assignment.getScopeType()).isNull();
       assertThat(assignment.getDataset()).isNull();
       assertThat(assignment.getDataSpace()).isNull();
@@ -689,8 +689,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should retrieve scopeId correctly after persisting and reloading")
-    void shouldRetrieveScopeIdAfterPersist() {
+    @DisplayName("Should retrieve scope correctly after persisting and reloading")
+    void shouldRetrieveScopeAfterPersist() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
@@ -703,8 +703,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       // Retrieve the assignment from database
       Assignment retrieved = assignmentService.findByIdOrThrow(assignmentId);
 
-      assertThat(retrieved.getScopeId()).isNotNull();
-      assertThat(retrieved.getScopeId()).isEqualTo(testDataSet.getId());
+      assertThat(retrieved.getScope()).isNotNull();
+      assertThat(retrieved.getScope().getId()).isEqualTo(testDataSet.getId());
       assertThat(retrieved.getDataset()).isNotNull();
       assertThat(retrieved.getDataset().getId()).isEqualTo(testDataSet.getId());
     }
