@@ -960,9 +960,9 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   public static class KeycloakOperationException extends Exception {
     /** serialVersionUID */
-	private static final long serialVersionUID = -8977227116700940716L;
+    private static final long serialVersionUID = -8977227116700940716L;
 
-	public KeycloakOperationException(String message) {
+    public KeycloakOperationException(String message) {
       super(message);
     }
   }

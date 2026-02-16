@@ -47,6 +47,7 @@ import org.testcontainers.utility.MountableFile;
  * Base class for ApisixAdapter integration tests. Uses the singleton container pattern so etcd and
  * APISIX start only once per JVM.
  */
+@SuppressWarnings("resource")
 abstract class AbstractApisixIntegrationTest {
 
   protected static final String ADMIN_API_KEY = "edd1c9f034335f136f87ad84b625c8f1";

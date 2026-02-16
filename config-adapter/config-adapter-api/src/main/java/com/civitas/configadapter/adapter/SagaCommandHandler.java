@@ -9,16 +9,20 @@
  */
 package com.civitas.configadapter.adapter;
 
+import com.civitas.configadapter.configuration.AdapterConfig;
+
 /**
  * Handler for saga commands dispatched by the orchestrator. Each adapter module provides an
  * implementation that knows how to execute forward operations and compensations for its domain.
  *
  * <p>Discovered at runtime via {@link java.util.ServiceLoader}, analogous to {@link ConfigAdapter}.
+ * Lifecycle: ServiceLoader creates the instance (no-arg constructor), then {@link
+ * #initialize(AdapterConfig)} is called before any commands are dispatched.
  *
- * <p>Implementations must be stateless and thread-safe — a single instance handles all saga
- * commands for the adapter.
+ * <p>Implementations must be thread-safe — a single instance handles all saga commands for the
+ * adapter.
  */
-public interface SagaCommandHandler {
+public interface SagaCommandHandler extends AutoCloseable {
 
   /**
    * Returns the adapter name this handler is responsible for (e.g. {@code "frost"}, {@code
@@ -26,6 +30,15 @@ public interface SagaCommandHandler {
    * SagaCommandMessage}.
    */
   String adapter();
+
+  /**
+   * Initializes the handler with adapter configuration. Called once after ServiceLoader discovery,
+   * before any commands are dispatched. Implementations should read their connection parameters
+   * (URLs, API keys, etc.) from the config using the adapter name as prefix.
+   *
+   * @param config the adapter configuration
+   */
+  void initialize(AdapterConfig config);
 
   /**
    * Handles a saga command (execute or compensate) and returns the result. Implementations should
@@ -36,4 +49,7 @@ public interface SagaCommandHandler {
    * @return the result to publish back to the orchestrator
    */
   SagaCommandResult handle(SagaCommandMessage command);
+
+  @Override
+  default void close() {}
 }

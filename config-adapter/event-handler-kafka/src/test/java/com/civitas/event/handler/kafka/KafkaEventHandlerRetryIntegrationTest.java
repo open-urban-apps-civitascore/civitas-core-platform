@@ -78,6 +78,7 @@ import org.testcontainers.utility.DockerImageName;
 @Testcontainers
 class KafkaEventHandlerRetryIntegrationTest {
 
+  @SuppressWarnings("resource")
   @Container
   static ConfluentKafkaContainer kafka =
       new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.3"))
