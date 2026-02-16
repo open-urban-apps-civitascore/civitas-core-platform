@@ -29,6 +29,7 @@
 		<module>config-adapter-apisix</module>
 		<module>config-adapter-examples</module>
 		<module>config-adapter-frost</module>
+		<module>config-adapter-orchestrator</module>
 	</modules>
 
 	<properties>
