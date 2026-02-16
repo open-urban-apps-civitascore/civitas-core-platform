@@ -84,6 +84,33 @@
 			<artifactId>awaitility</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- E2E integration test: adapter modules for real handler execution -->
+		<dependency>
+			<groupId>com.civitas</groupId>
+			<artifactId>config-adapter-frost</artifactId>
+			<version>${revision}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.civitas</groupId>
+			<artifactId>config-adapter-apisix</artifactId>
+			<version>${revision}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.civitas</groupId>
+			<artifactId>event-handler-kafka</artifactId>
+			<version>${revision}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Testcontainers generic (for PostGIS + FROST containers) -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -91,6 +118,10 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-failsafe-plugin</artifactId>
+				<configuration>
+					<!-- JDK 21+ requires add-opens for Jersey PATCH method support via reflection -->
+					<argLine>@{argLine} --add-opens java.base/java.net=ALL-UNNAMED</argLine>
+				</configuration>
 				<executions>
 					<execution>
 						<goals>

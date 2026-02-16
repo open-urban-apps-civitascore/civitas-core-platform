@@ -464,6 +464,9 @@ public class SagaStateMachine {
         payload.putAll(step.result());
       }
     }
+    // Saga envelope fields needed by command handlers to correlate results
+    payload.put("sagaId", context.sagaId());
+    payload.put("datasetId", context.datasetId());
     payload.put("_operation", stepDef.operation());
     payload.put("_stepId", stepDef.stepId());
     return Map.copyOf(payload);
@@ -478,6 +481,8 @@ public class SagaStateMachine {
     if (step.result() != null) {
       payload.putAll(step.result());
     }
+    payload.put("sagaId", context.sagaId());
+    payload.put("datasetId", context.datasetId());
     payload.put("_operation", step.operation());
     payload.put("_stepId", step.stepId());
     return Map.copyOf(payload);
