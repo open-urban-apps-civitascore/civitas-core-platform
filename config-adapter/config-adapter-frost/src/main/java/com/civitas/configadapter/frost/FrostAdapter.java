@@ -308,7 +308,7 @@ public class FrostAdapter extends AbstractConfigAdapter {
   private Object extractEntityConfig(ConfigEvent event) {
     ConfigValue configValue = event.payload().config().value();
     if (configValue instanceof FrostConfigValue frostValue) {
-      return frostValue.data();
+      return frostValue.toApiMap();
     }
     return configValue;
   }

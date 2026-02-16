@@ -23,6 +23,11 @@ import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.apisix.RouteConfigValue;
+import com.civitas.configadapter.model.apisix.plugins.ResponseFilter;
+import com.civitas.configadapter.model.apisix.plugins.ResponseRewritePlugin;
+import com.civitas.configadapter.model.apisix.plugins.RewriteHeaders;
+import com.civitas.configadapter.model.apisix.plugins.RoutePlugins;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.List;
@@ -36,21 +41,20 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
   void createRouteWithResponseRewriteSetHeaders() throws Exception {
     String upstreamId = createDefaultUpstream("response-rewrite-set");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/response-set/*");
-    routeConfig.put("methods", List.of("GET", "POST"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "response-rewrite",
-            Map.of(
-                "headers",
-                Map.of(
-                    "set",
-                    Map.of(
-                        "X-Server-Id", "server-1",
-                        "X-Environment", "production")))));
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Server-Id", "server-1", "X-Environment", "production"));
+
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setHeaders(headers);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setResponseRewrite(responseRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-set/*");
+    routeConfig.setMethods(List.of("GET", "POST"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -64,15 +68,20 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
   void createRouteWithResponseRewriteRemoveHeaders() throws Exception {
     String upstreamId = createDefaultUpstream("response-rewrite-remove");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/response-remove/*");
-    routeConfig.put("methods", List.of("GET"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "response-rewrite",
-            Map.of("headers", Map.of("remove", List.of("X-Internal-Header", "X-Debug-Info")))));
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setRemove(List.of("X-Internal-Header", "X-Debug-Info"));
+
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setHeaders(headers);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setResponseRewrite(responseRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-remove/*");
+    routeConfig.setMethods(List.of("GET"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -86,11 +95,17 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
   void createRouteWithResponseRewriteStatusCode() throws Exception {
     String upstreamId = createDefaultUpstream("response-rewrite-status");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/response-status/*");
-    routeConfig.put("methods", List.of("POST"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put("plugins", Map.of("response-rewrite", Map.of("status_code", 201)));
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setStatusCode(201);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setResponseRewrite(responseRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-status/*");
+    routeConfig.setMethods(List.of("POST"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -104,13 +119,17 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
   void createRouteWithResponseRewriteBody() throws Exception {
     String upstreamId = createDefaultUpstream("response-rewrite-body");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/response-body/*");
-    routeConfig.put("methods", List.of("GET"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of("response-rewrite", Map.of("body", "{\"status\":\"ok\",\"processed\":true}")));
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setBody("{\"status\":\"ok\",\"processed\":true}");
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setResponseRewrite(responseRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-body/*");
+    routeConfig.setMethods(List.of("GET"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -126,12 +145,19 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
 
     // Base64 of: {"result":"encoded"}
     String base64Body = "eyJyZXN1bHQiOiJlbmNvZGVkIn0=";
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/response-base64/*");
-    routeConfig.put("methods", List.of("GET"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins", Map.of("response-rewrite", Map.of("body", base64Body, "body_base64", true)));
+
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setBody(base64Body);
+    responseRewrite.setBodyBase64(true);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setResponseRewrite(responseRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-base64/*");
+    routeConfig.setMethods(List.of("GET"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -145,19 +171,25 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
   void createRouteWithResponseRewriteFilters() throws Exception {
     String upstreamId = createDefaultUpstream("response-rewrite-filters");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/response-filters/*");
-    routeConfig.put("methods", List.of("GET"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "response-rewrite",
-            Map.of(
-                "filters",
-                List.of(
-                    Map.of("regex", "old_text", "replace", "new_text"),
-                    Map.of("regex", "internal_value", "replace", "public_value")))));
+    ResponseFilter filter1 = new ResponseFilter();
+    filter1.setRegex("old_text");
+    filter1.setReplace("new_text");
+
+    ResponseFilter filter2 = new ResponseFilter();
+    filter2.setRegex("internal_value");
+    filter2.setReplace("public_value");
+
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setFilters(List.of(filter1, filter2));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setResponseRewrite(responseRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-filters/*");
+    routeConfig.setMethods(List.of("GET"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -171,21 +203,20 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
   void createRouteWithResponseRewriteVars() throws Exception {
     String upstreamId = createDefaultUpstream("response-rewrite-vars");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/response-vars/*");
-    routeConfig.put("methods", List.of("GET"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "response-rewrite",
-            Map.of(
-                "headers",
-                Map.of(
-                    "set",
-                    Map.of(
-                        "X-Upstream-Status", "$upstream_status",
-                        "X-Request-Id", "$request_id")))));
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Upstream-Status", "$upstream_status", "X-Request-Id", "$request_id"));
+
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setHeaders(headers);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setResponseRewrite(responseRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-vars/*");
+    routeConfig.setMethods(List.of("GET"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -206,14 +237,20 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
     initialRouteConfig.put("upstream_id", upstreamId);
     createRouteDirectly(routeId, initialRouteConfig);
 
-    Map<String, Object> updatedRouteConfig = new HashMap<>();
-    updatedRouteConfig.put("uri", "/api/v1/add-response-rewrite/*");
-    updatedRouteConfig.put("methods", List.of("GET", "POST"));
-    updatedRouteConfig.put("upstream_id", upstreamId);
-    updatedRouteConfig.put(
-        "plugins",
-        Map.of(
-            "response-rewrite", Map.of("headers", Map.of("set", Map.of("X-Added-Via", "UPDATE")))));
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Added-Via", "UPDATE"));
+
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setHeaders(headers);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setResponseRewrite(responseRewrite);
+
+    RouteConfigValue updatedRouteConfig = new RouteConfigValue();
+    updatedRouteConfig.setUri("/api/v1/add-response-rewrite/*");
+    updatedRouteConfig.setMethods(List.of("GET", "POST"));
+    updatedRouteConfig.setUpstreamId(upstreamId);
+    updatedRouteConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds(
@@ -228,9 +265,10 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
             () -> {
               JsonNode route = getRouteFromApisix(routeId);
               assertNotNull(route);
-              JsonNode responseRewrite = route.get("value").get("plugins").get("response-rewrite");
-              assertNotNull(responseRewrite, "response-rewrite plugin should exist");
-              JsonNode headersSet = responseRewrite.path("headers").path("set");
+              JsonNode responseRewriteNode =
+                  route.get("value").get("plugins").get("response-rewrite");
+              assertNotNull(responseRewriteNode, "response-rewrite plugin should exist");
+              JsonNode headersSet = responseRewriteNode.path("headers").path("set");
               assertTrue(headersSet.has("X-Added-Via"), "headers.set should contain X-Added-Via");
             });
 
@@ -243,20 +281,23 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
   void createRouteWithResponseRewriteFullConfig() throws Exception {
     String upstreamId = createDefaultUpstream("response-rewrite-full");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/response-full/*");
-    routeConfig.put("methods", List.of("GET", "POST", "PUT"));
-    routeConfig.put("upstream_id", upstreamId);
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Processed", "true", "Content-Type", "application/json"));
+    headers.setRemove(List.of("X-Internal", "X-Debug"));
 
-    Map<String, Object> responseRewriteConfig = new HashMap<>();
-    responseRewriteConfig.put("status_code", 200);
-    responseRewriteConfig.put(
-        "headers",
-        Map.of(
-            "set", Map.of("X-Processed", "true", "Content-Type", "application/json"),
-            "remove", List.of("X-Internal", "X-Debug")));
-    responseRewriteConfig.put("body", "{\"result\":\"success\",\"processed\":true}");
-    routeConfig.put("plugins", Map.of("response-rewrite", responseRewriteConfig));
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setStatusCode(200);
+    responseRewrite.setHeaders(headers);
+    responseRewrite.setBody("{\"result\":\"success\",\"processed\":true}");
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setResponseRewrite(responseRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-full/*");
+    routeConfig.setMethods(List.of("GET", "POST", "PUT"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -270,12 +311,18 @@ class ApisixResponseRewriteIntegrationTest extends AbstractApisixIntegrationTest
   void createRouteWithInvalidResponseRewriteConfig() throws Exception {
     String upstreamId = createDefaultUpstream("invalid-response-rewrite");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/invalid-response-rewrite/*");
-    routeConfig.put("methods", List.of("GET"));
-    routeConfig.put("upstream_id", upstreamId);
     // status_code must be between 200-598, using 999 should be invalid
-    routeConfig.put("plugins", Map.of("response-rewrite", Map.of("status_code", 999)));
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setStatusCode(999);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setResponseRewrite(responseRewrite);
+
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/invalid-response-rewrite/*");
+    routeConfig.setMethods(List.of("GET"));
+    routeConfig.setUpstreamId(upstreamId);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);

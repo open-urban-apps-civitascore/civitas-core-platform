@@ -17,8 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.model.apisix.plugins.ProxyRewritePlugin;
+import com.civitas.configadapter.model.apisix.plugins.RoutePlugins;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,166 +36,194 @@ class RouteConfigValueTest {
   }
 
   @Test
-  void constructor_whenNoArgs_shouldCreateEmptyData() {
+  void constructor_whenNoArgs_shouldHaveNullFields() {
     RouteConfigValue value = new RouteConfigValue();
-    assertNotNull(value.data());
-    assertTrue(value.data().isEmpty());
+    assertNull(value.getUri());
+    assertNull(value.getUris());
+    assertNull(value.getMethods());
+    assertNull(value.getUpstreamId());
+    assertNull(value.getUpstream());
+    assertNull(value.getPlugins());
+    assertNull(value.getPriority());
+    assertNull(value.getStatus());
+    assertNotNull(value.getAdditionalProperties());
+    assertTrue(value.getAdditionalProperties().isEmpty());
   }
 
   @Test
-  void constructor_whenValidMap_shouldPopulateData() {
-    Map<String, Object> data =
-        Map.of(
-            "uri", "/api/v1/users/*",
-            "methods", List.of("GET", "POST"),
-            "upstream_id", "backend-users");
+  void setters_whenCalled_shouldStoreValues() {
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUri("/api/v1/users/*");
+    value.setMethods(List.of("GET", "POST"));
+    value.setUpstreamId("backend-users");
 
-    RouteConfigValue value = new RouteConfigValue(data);
-    assertNotNull(value.data());
     assertEquals("/api/v1/users/*", value.getUri());
     assertEquals(List.of("GET", "POST"), value.getMethods());
     assertEquals("backend-users", value.getUpstreamId());
   }
 
   @Test
-  void constructor_whenNullMap_shouldCreateEmptyData() {
-    RouteConfigValue value = new RouteConfigValue(null);
-    assertNotNull(value.data());
-    assertTrue(value.data().isEmpty());
-  }
-
-  @Test
-  void setProperty_whenCalled_shouldStoreValue() {
-    RouteConfigValue value = new RouteConfigValue();
-    value.setProperty("uri", "/api/v1/test");
-    value.setProperty("methods", List.of("GET"));
-
-    assertEquals("/api/v1/test", value.get("uri"));
-    assertEquals(List.of("GET"), value.get("methods"));
-  }
-
-  @Test
   void getUri_whenUriExists_shouldReturnUri() {
-    RouteConfigValue value = new RouteConfigValue(Map.of("uri", "/api/v1/users/*"));
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUri("/api/v1/users/*");
     assertEquals("/api/v1/users/*", value.getUri());
   }
 
   @Test
   void getUris_whenUrisExist_shouldReturnUris() {
     List<String> uris = List.of("/api/v1/users/*", "/api/v1/admin/*");
-    RouteConfigValue value = new RouteConfigValue(Map.of("uris", uris));
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUris(uris);
     assertEquals(uris, value.getUris());
   }
 
   @Test
   void getMethods_whenMethodsExist_shouldReturnMethods() {
     List<String> methods = List.of("GET", "POST", "PUT", "DELETE");
-    RouteConfigValue value = new RouteConfigValue(Map.of("methods", methods));
+    RouteConfigValue value = new RouteConfigValue();
+    value.setMethods(methods);
     assertEquals(methods, value.getMethods());
   }
 
   @Test
   void getUpstreamId_whenUpstreamIdExists_shouldReturnUpstreamId() {
-    RouteConfigValue value = new RouteConfigValue(Map.of("upstream_id", "my-upstream"));
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUpstreamId("my-upstream");
     assertEquals("my-upstream", value.getUpstreamId());
   }
 
   @Test
   void getUpstream_whenUpstreamExists_shouldReturnUpstream() {
-    Map<String, Object> upstream = Map.of("type", "roundrobin", "nodes", Map.of("backend:8080", 1));
-    RouteConfigValue value = new RouteConfigValue(Map.of("upstream", upstream));
+    ApisixConfigValue upstream = new ApisixConfigValue();
+    upstream.setType("roundrobin");
+    upstream.setNodes(UpstreamNodes.ofMap(Map.of("backend:8080", 1)));
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUpstream(upstream);
     assertEquals(upstream, value.getUpstream());
   }
 
   @Test
+  void toApiMap_whenUpstreamSet_shouldSerializeViaToApiMap() {
+    ApisixConfigValue upstream = new ApisixConfigValue();
+    upstream.setType("roundrobin");
+    upstream.setNodes(UpstreamNodes.ofMap(Map.of("backend:8080", 1)));
+
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUri("/test");
+    value.setUpstream(upstream);
+
+    Map<String, Object> map = value.toApiMap();
+    assertNotNull(map.get("upstream"));
+    @SuppressWarnings("unchecked")
+    Map<String, Object> upstreamMap = (Map<String, Object>) map.get("upstream");
+    assertEquals("roundrobin", upstreamMap.get("type"));
+    assertEquals(Map.of("backend:8080", 1), upstreamMap.get("nodes"));
+  }
+
+  @Test
   void getPlugins_whenPluginsExist_shouldReturnPlugins() {
-    Map<String, Object> plugins =
-        Map.of(
-            "prometheus", Map.of(),
-            "openid-connect", Map.of("client_id", "api-gateway"));
-    RouteConfigValue value = new RouteConfigValue(Map.of("plugins", plugins));
-    assertEquals(plugins, value.getPlugins());
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.handleUnknownPlugin("prometheus", Map.of());
+    plugins.handleUnknownPlugin("openid-connect", Map.of("client_id", "api-gateway"));
+
+    RouteConfigValue value = new RouteConfigValue();
+    value.setPlugins(plugins);
+    assertNotNull(value.getPlugins());
+    assertTrue(value.getPlugins().hasPlugin("prometheus"));
+    assertTrue(value.getPlugins().hasPlugin("openid-connect"));
   }
 
   @Test
-  void getPlugin_whenPluginExists_shouldReturnPluginConfig() {
-    Map<String, Object> openidConfig =
-        Map.of(
-            "client_id", "api-gateway",
-            "discovery", "https://keycloak.example.com/.well-known/openid-configuration");
-    Map<String, Object> plugins = Map.of("openid-connect", openidConfig, "prometheus", Map.of());
-    RouteConfigValue value = new RouteConfigValue(Map.of("plugins", plugins));
+  void getPlugins_whenTypedPluginSet_shouldReturnPluginConfig() {
+    RoutePlugins plugins = new RoutePlugins();
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setUri("/users");
+    plugins.setProxyRewrite(proxyRewrite);
 
-    assertEquals(openidConfig, value.getPlugin("openid-connect"));
-    assertEquals(Map.of(), value.getPlugin("prometheus"));
-    assertNull(value.getPlugin("nonexistent"));
+    RouteConfigValue value = new RouteConfigValue();
+    value.setPlugins(plugins);
+
+    assertNotNull(value.getPlugins().getProxyRewrite());
+    assertEquals("/users", value.getPlugins().getProxyRewrite().getUri());
   }
 
   @Test
-  void hasPlugin_whenPluginExists_shouldReturnTrue() {
-    Map<String, Object> plugins = Map.of("prometheus", Map.of(), "loki", Map.of());
-    RouteConfigValue value = new RouteConfigValue(Map.of("plugins", plugins));
+  void plugins_hasPlugin_whenPluginExists_shouldReturnTrue() {
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.handleUnknownPlugin("prometheus", Map.of());
+    plugins.handleUnknownPlugin("loki", Map.of());
 
-    assertTrue(value.hasPlugin("prometheus"));
-    assertTrue(value.hasPlugin("loki"));
-    assertFalse(value.hasPlugin("openid-connect"));
-  }
+    RouteConfigValue value = new RouteConfigValue();
+    value.setPlugins(plugins);
 
-  @Test
-  void hasPlugin_whenNoPlugins_shouldReturnFalse() {
-    RouteConfigValue value = new RouteConfigValue(Map.of("uri", "/test"));
-    assertFalse(value.hasPlugin("prometheus"));
+    assertTrue(value.getPlugins().hasPlugin("prometheus"));
+    assertTrue(value.getPlugins().hasPlugin("loki"));
+    assertFalse(value.getPlugins().hasPlugin("openid-connect"));
   }
 
   @Test
   void getPriority_whenPriorityExists_shouldReturnPriority() {
-    RouteConfigValue value = new RouteConfigValue(Map.of("priority", 100));
+    RouteConfigValue value = new RouteConfigValue();
+    value.setPriority(100);
     assertEquals(100, value.getPriority());
   }
 
   @Test
   void getPriority_whenPriorityNotSet_shouldReturnNull() {
-    RouteConfigValue value = new RouteConfigValue(Map.of("uri", "/test"));
+    RouteConfigValue value = new RouteConfigValue();
     assertNull(value.getPriority());
   }
 
   @Test
   void getStatus_whenStatusExists_shouldReturnStatus() {
-    RouteConfigValue enabledValue = new RouteConfigValue(Map.of("status", 1));
+    RouteConfigValue enabledValue = new RouteConfigValue();
+    enabledValue.setStatus(1);
     assertEquals(1, enabledValue.getStatus());
 
-    RouteConfigValue disabledValue = new RouteConfigValue(Map.of("status", 0));
+    RouteConfigValue disabledValue = new RouteConfigValue();
+    disabledValue.setStatus(0);
     assertEquals(0, disabledValue.getStatus());
   }
 
   @Test
   void getStatus_whenStatusNotSet_shouldReturnNull() {
-    RouteConfigValue value = new RouteConfigValue(Map.of("uri", "/test"));
+    RouteConfigValue value = new RouteConfigValue();
     assertNull(value.getStatus());
   }
 
   @Test
-  void has_whenKeyExists_shouldReturnTrue() {
-    RouteConfigValue value =
-        new RouteConfigValue(Map.of("uri", "/test", "methods", List.of("GET")));
-    assertTrue(value.has("uri"));
-    assertTrue(value.has("methods"));
-    assertFalse(value.has("upstream_id"));
+  void toApiMap_whenFieldsSet_shouldContainAllFields() {
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUri("/test");
+    value.setMethods(List.of("GET"));
+    value.setUpstreamId("backend");
+
+    Map<String, Object> map = value.toApiMap();
+    assertEquals("/test", map.get("uri"));
+    assertEquals(List.of("GET"), map.get("methods"));
+    assertEquals("backend", map.get("upstream_id"));
   }
 
   @Test
-  void get_whenKeyExists_shouldReturnValue() {
-    RouteConfigValue value = new RouteConfigValue(Map.of("uri", "/test", "priority", 50));
-    assertEquals("/test", value.get("uri"));
-    assertEquals(50, value.get("priority"));
-    assertNull(value.get("nonexistent"));
+  void toApiMap_whenPluginsSet_shouldIncludePlugins() {
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUri("/test");
+    RoutePlugins plugins = new RoutePlugins();
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setUri("/rewritten");
+    plugins.setProxyRewrite(proxyRewrite);
+    value.setPlugins(plugins);
+
+    Map<String, Object> map = value.toApiMap();
+    assertNotNull(map.get("plugins"));
   }
 
   @Test
   void equals_whenSameData_shouldReturnTrue() {
-    Map<String, Object> data = Map.of("uri", "/test");
-    RouteConfigValue value1 = new RouteConfigValue(data);
-    RouteConfigValue value2 = new RouteConfigValue(data);
+    RouteConfigValue value1 = new RouteConfigValue();
+    value1.setUri("/test");
+    RouteConfigValue value2 = new RouteConfigValue();
+    value2.setUri("/test");
 
     assertEquals(value1, value2);
     assertEquals(value1.hashCode(), value2.hashCode());
@@ -202,15 +231,18 @@ class RouteConfigValueTest {
 
   @Test
   void equals_whenDifferentData_shouldReturnFalse() {
-    RouteConfigValue value1 = new RouteConfigValue(Map.of("uri", "/test1"));
-    RouteConfigValue value2 = new RouteConfigValue(Map.of("uri", "/test2"));
+    RouteConfigValue value1 = new RouteConfigValue();
+    value1.setUri("/test1");
+    RouteConfigValue value2 = new RouteConfigValue();
+    value2.setUri("/test2");
 
     assertNotEquals(value1, value2);
   }
 
   @Test
   void toString_whenCalled_shouldContainClassName() {
-    RouteConfigValue value = new RouteConfigValue(Map.of("uri", "/test"));
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUri("/test");
     String str = value.toString();
     assertTrue(str.contains("RouteConfigValue"));
     assertTrue(str.contains("uri"));
@@ -219,13 +251,13 @@ class RouteConfigValueTest {
 
   @Test
   void jsonSerialization_whenValidData_shouldProduceValidJson() throws Exception {
-    Map<String, Object> data = new HashMap<>();
-    data.put("uri", "/api/v1/users/*");
-    data.put("methods", List.of("GET", "POST"));
-    data.put("upstream_id", "backend-users");
-    data.put("plugins", Map.of("prometheus", Map.of()));
-
-    RouteConfigValue value = new RouteConfigValue(data);
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUri("/api/v1/users/*");
+    value.setMethods(List.of("GET", "POST"));
+    value.setUpstreamId("backend-users");
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.handleUnknownPlugin("prometheus", Map.of());
+    value.setPlugins(plugins);
 
     String json = objectMapper.writeValueAsString(value);
     assertNotNull(json);
@@ -253,7 +285,8 @@ class RouteConfigValueTest {
     assertEquals("/api/v1/users/*", value.getUri());
     assertEquals(List.of("GET", "POST"), value.getMethods());
     assertEquals("backend-users", value.getUpstreamId());
-    assertTrue(value.hasPlugin("prometheus"));
+    assertNotNull(value.getPlugins());
+    assertTrue(value.getPlugins().hasPlugin("prometheus"));
   }
 
   @Test
@@ -280,7 +313,9 @@ class RouteConfigValueTest {
                       "functions": ["return function() end"]
                     },
                     "response-rewrite": {
-                      "headers": {"X-Custom-Header": "value"}
+                      "headers": {
+                        "set": {"X-Custom-Header": "value"}
+                      }
                     },
                     "proxy-rewrite": {
                       "regex_uri": ["/api/v1/(.*)", "/$1"]
@@ -295,17 +330,21 @@ class RouteConfigValueTest {
 
     RouteConfigValue value = objectMapper.readValue(json, RouteConfigValue.class);
 
-    // Verify all CIVITAS/CORE V1 plugins are present
-    assertTrue(value.hasPlugin("openid-connect"));
-    assertTrue(value.hasPlugin("serverless-pre-function"));
-    assertTrue(value.hasPlugin("serverless-post-function"));
-    assertTrue(value.hasPlugin("response-rewrite"));
-    assertTrue(value.hasPlugin("proxy-rewrite"));
-    assertTrue(value.hasPlugin("prometheus"));
-    assertTrue(value.hasPlugin("loki"));
+    // Verify typed plugins
+    assertNotNull(value.getPlugins());
+    assertNotNull(value.getPlugins().getServerlessPreFunction());
+    assertNotNull(value.getPlugins().getServerlessPostFunction());
+    assertNotNull(value.getPlugins().getResponseRewrite());
+    assertNotNull(value.getPlugins().getProxyRewrite());
+
+    // Verify untyped plugins in additionalPlugins
+    assertTrue(value.getPlugins().hasPlugin("openid-connect"));
+    assertTrue(value.getPlugins().hasPlugin("prometheus"));
+    assertTrue(value.getPlugins().hasPlugin("loki"));
 
     // Verify plugin configuration
-    Map<String, Object> openidConnect = value.getPlugin("openid-connect");
+    Map<String, Object> openidConnect = value.getPlugins().getAdditionalPlugin("openid-connect");
+    assertNotNull(openidConnect);
     assertEquals("api-gateway", openidConnect.get("client_id"));
   }
 }

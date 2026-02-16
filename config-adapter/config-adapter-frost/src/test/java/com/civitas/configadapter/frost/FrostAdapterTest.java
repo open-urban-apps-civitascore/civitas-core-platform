@@ -568,12 +568,9 @@ class FrostAdapterTest {
 
       Metadata metadata =
           new Metadata("msg-123", OffsetDateTime.now(), "test-source", "corr-123", "v1.0.0", null);
-      Payload payload =
-          new Payload(
-              "frost",
-              "Things",
-              Operation.CREATE,
-              new Config(null, new FrostConfigValue(Map.of("name", "Test"))));
+      FrostConfigValue fv = new FrostConfigValue();
+      fv.setName("Test");
+      Payload payload = new Payload("frost", "Things", Operation.CREATE, new Config(null, fv));
       ConfigEvent event = new ConfigEvent(metadata, payload);
 
       adapter.processConfigEvent("de.civitascore.data.thing.created", event);
@@ -740,7 +737,7 @@ class FrostAdapterTest {
             "v1.0.0",
             "test-result-topic");
 
-    FrostConfigValue frostValue = new FrostConfigValue(configValue);
+    FrostConfigValue frostValue = FrostTestFixtures.buildFrostConfigValue(configValue);
 
     Payload payload = new Payload("frost", targetResource, operation, new Config(null, frostValue));
     return new ConfigEvent(metadata, payload);

@@ -23,6 +23,11 @@ import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.apisix.RouteConfigValue;
+import com.civitas.configadapter.model.apisix.plugins.ResponseRewritePlugin;
+import com.civitas.configadapter.model.apisix.plugins.RewriteHeaders;
+import com.civitas.configadapter.model.apisix.plugins.RoutePlugins;
+import com.civitas.configadapter.model.apisix.plugins.ServerlessFunctionPlugin;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.List;
@@ -40,20 +45,19 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
   void createRouteWithServerlessPostFunction() throws Exception {
     String upstreamId = createDefaultUpstream("serverless-post");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/serverless-post/*");
-    routeConfig.put("methods", List.of("GET", "POST"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "serverless-post-function",
-            Map.of(
-                "phase",
-                "log",
-                "functions",
-                List.of(
-                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Post-function executed') end"))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/serverless-post/*");
+    routeConfig.setMethods(List.of("GET", "POST"));
+    routeConfig.setUpstreamId(upstreamId);
+
+    ServerlessFunctionPlugin sfp = new ServerlessFunctionPlugin();
+    sfp.setPhase("log");
+    sfp.setFunctions(
+        List.of("return function(conf, ctx) ngx.log(ngx.INFO, 'Post-function executed') end"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPostFunction(sfp);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -67,20 +71,19 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
   void createRouteWithServerlessPostFunctionHeaderFilter() throws Exception {
     String upstreamId = createDefaultUpstream("serverless-header-filter");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/header-filter/*");
-    routeConfig.put("methods", List.of("GET"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "serverless-post-function",
-            Map.of(
-                "phase",
-                "header_filter",
-                "functions",
-                List.of(
-                    "return function(conf, ctx) ngx.header['X-Custom-Post-Header'] = 'processed' end"))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/header-filter/*");
+    routeConfig.setMethods(List.of("GET"));
+    routeConfig.setUpstreamId(upstreamId);
+
+    ServerlessFunctionPlugin sfp = new ServerlessFunctionPlugin();
+    sfp.setPhase("header_filter");
+    sfp.setFunctions(
+        List.of("return function(conf, ctx) ngx.header['X-Custom-Post-Header'] = 'processed' end"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPostFunction(sfp);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -101,19 +104,19 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
     initialRouteConfig.put("upstream_id", upstreamId);
     createRouteDirectly(routeId, initialRouteConfig);
 
-    Map<String, Object> updatedRouteConfig = new HashMap<>();
-    updatedRouteConfig.put("uri", "/api/v1/add-serverless/*");
-    updatedRouteConfig.put("methods", List.of("GET", "POST"));
-    updatedRouteConfig.put("upstream_id", upstreamId);
-    updatedRouteConfig.put(
-        "plugins",
-        Map.of(
-            "serverless-post-function",
-            Map.of(
-                "phase",
-                "log",
-                "functions",
-                List.of("return function(conf, ctx) ngx.log(ngx.INFO, 'Added via UPDATE') end"))));
+    RouteConfigValue updatedRouteConfig = new RouteConfigValue();
+    updatedRouteConfig.setUri("/api/v1/add-serverless/*");
+    updatedRouteConfig.setMethods(List.of("GET", "POST"));
+    updatedRouteConfig.setUpstreamId(upstreamId);
+
+    ServerlessFunctionPlugin sfp = new ServerlessFunctionPlugin();
+    sfp.setPhase("log");
+    sfp.setFunctions(
+        List.of("return function(conf, ctx) ngx.log(ngx.INFO, 'Added via UPDATE') end"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPostFunction(sfp);
+    updatedRouteConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds(
@@ -147,21 +150,21 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
   void createRouteWithMultipleServerlessFunctions() throws Exception {
     String upstreamId = createDefaultUpstream("multi-serverless");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/multi-serverless/*");
-    routeConfig.put("methods", List.of("GET", "POST", "PUT"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "serverless-post-function",
-            Map.of(
-                "phase",
-                "log",
-                "functions",
-                List.of(
-                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 1') end",
-                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 2') end"))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/multi-serverless/*");
+    routeConfig.setMethods(List.of("GET", "POST", "PUT"));
+    routeConfig.setUpstreamId(upstreamId);
+
+    ServerlessFunctionPlugin sfp = new ServerlessFunctionPlugin();
+    sfp.setPhase("log");
+    sfp.setFunctions(
+        List.of(
+            "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 1') end",
+            "return function(conf, ctx) ngx.log(ngx.INFO, 'Function 2') end"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPostFunction(sfp);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -175,24 +178,28 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
   void createRouteWithServerlessPostFunctionAndOtherPlugins() throws Exception {
     String upstreamId = createDefaultUpstream("serverless-combo");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/serverless-combo/*");
-    routeConfig.put("methods", List.of("GET", "POST"));
-    routeConfig.put("upstream_id", upstreamId);
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/serverless-combo/*");
+    routeConfig.setMethods(List.of("GET", "POST"));
+    routeConfig.setUpstreamId(upstreamId);
 
-    Map<String, Object> plugins = new HashMap<>();
-    plugins.put("prometheus", Map.of());
-    plugins.put(
-        "response-rewrite", Map.of("headers", Map.of("set", Map.of("X-Processed-By", "apisix"))));
-    plugins.put(
-        "serverless-post-function",
-        Map.of(
-            "phase",
-            "log",
-            "functions",
-            List.of(
-                "return function(conf, ctx) ngx.log(ngx.INFO, 'Request processed: ' .. ngx.var.uri) end")));
-    routeConfig.put("plugins", plugins);
+    ServerlessFunctionPlugin sfp = new ServerlessFunctionPlugin();
+    sfp.setPhase("log");
+    sfp.setFunctions(
+        List.of(
+            "return function(conf, ctx) ngx.log(ngx.INFO, 'Request processed: ' .. ngx.var.uri) end"));
+
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Processed-By", "apisix"));
+
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setHeaders(headers);
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPostFunction(sfp);
+    plugins.setResponseRewrite(responseRewrite);
+    plugins.handleUnknownPlugin("prometheus", Map.of());
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -207,15 +214,18 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
   void createRouteWithInvalidLuaInServerlessPostFunction() throws Exception {
     String upstreamId = createDefaultUpstream("invalid-lua-post");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/invalid-lua-post/*");
-    routeConfig.put("methods", List.of("GET"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "serverless-post-function",
-            Map.of("phase", "log", "functions", List.of("this is not valid lua syntax !!!"))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/invalid-lua-post/*");
+    routeConfig.setMethods(List.of("GET"));
+    routeConfig.setUpstreamId(upstreamId);
+
+    ServerlessFunctionPlugin sfp = new ServerlessFunctionPlugin();
+    sfp.setPhase("log");
+    sfp.setFunctions(List.of("this is not valid lua syntax !!!"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPostFunction(sfp);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -234,20 +244,20 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
   void createRouteWithServerlessPreFunction() throws Exception {
     String upstreamId = createDefaultUpstream("serverless-pre");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/serverless-pre/*");
-    routeConfig.put("methods", List.of("GET", "POST"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "serverless-pre-function",
-            Map.of(
-                "phase",
-                "rewrite",
-                "functions",
-                List.of(
-                    "return function(conf, ctx) ngx.req.set_header('X-Request-ID', ngx.var.request_id) end"))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/serverless-pre/*");
+    routeConfig.setMethods(List.of("GET", "POST"));
+    routeConfig.setUpstreamId(upstreamId);
+
+    ServerlessFunctionPlugin sfp = new ServerlessFunctionPlugin();
+    sfp.setPhase("rewrite");
+    sfp.setFunctions(
+        List.of(
+            "return function(conf, ctx) ngx.req.set_header('X-Request-ID', ngx.var.request_id) end"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPreFunction(sfp);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -261,20 +271,19 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
   void createRouteWithServerlessPreFunctionAccessPhase() throws Exception {
     String upstreamId = createDefaultUpstream("serverless-pre-access");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/pre-access/*");
-    routeConfig.put("methods", List.of("GET"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "serverless-pre-function",
-            Map.of(
-                "phase",
-                "access",
-                "functions",
-                List.of(
-                    "return function(conf, ctx) ngx.log(ngx.INFO, 'Pre-access check passed') end"))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/pre-access/*");
+    routeConfig.setMethods(List.of("GET"));
+    routeConfig.setUpstreamId(upstreamId);
+
+    ServerlessFunctionPlugin sfp = new ServerlessFunctionPlugin();
+    sfp.setPhase("access");
+    sfp.setFunctions(
+        List.of("return function(conf, ctx) ngx.log(ngx.INFO, 'Pre-access check passed') end"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPreFunction(sfp);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -295,20 +304,19 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
     initialRouteConfig.put("upstream_id", upstreamId);
     createRouteDirectly(routeId, initialRouteConfig);
 
-    Map<String, Object> updatedRouteConfig = new HashMap<>();
-    updatedRouteConfig.put("uri", "/api/v1/add-serverless-pre/*");
-    updatedRouteConfig.put("methods", List.of("GET", "POST"));
-    updatedRouteConfig.put("upstream_id", upstreamId);
-    updatedRouteConfig.put(
-        "plugins",
-        Map.of(
-            "serverless-pre-function",
-            Map.of(
-                "phase",
-                "rewrite",
-                "functions",
-                List.of(
-                    "return function(conf, ctx) ngx.req.set_header('X-Added-Via', 'UPDATE') end"))));
+    RouteConfigValue updatedRouteConfig = new RouteConfigValue();
+    updatedRouteConfig.setUri("/api/v1/add-serverless-pre/*");
+    updatedRouteConfig.setMethods(List.of("GET", "POST"));
+    updatedRouteConfig.setUpstreamId(upstreamId);
+
+    ServerlessFunctionPlugin sfp = new ServerlessFunctionPlugin();
+    sfp.setPhase("rewrite");
+    sfp.setFunctions(
+        List.of("return function(conf, ctx) ngx.req.set_header('X-Added-Via', 'UPDATE') end"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPreFunction(sfp);
+    updatedRouteConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds(
@@ -343,21 +351,21 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
   void createRouteWithMultipleServerlessPreFunctions() throws Exception {
     String upstreamId = createDefaultUpstream("multi-serverless-pre");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/multi-serverless-pre/*");
-    routeConfig.put("methods", List.of("GET", "POST", "PUT"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "serverless-pre-function",
-            Map.of(
-                "phase",
-                "rewrite",
-                "functions",
-                List.of(
-                    "return function(conf, ctx) ngx.req.set_header('X-Pre-Func-1', 'value1') end",
-                    "return function(conf, ctx) ngx.req.set_header('X-Pre-Func-2', 'value2') end"))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/multi-serverless-pre/*");
+    routeConfig.setMethods(List.of("GET", "POST", "PUT"));
+    routeConfig.setUpstreamId(upstreamId);
+
+    ServerlessFunctionPlugin sfp = new ServerlessFunctionPlugin();
+    sfp.setPhase("rewrite");
+    sfp.setFunctions(
+        List.of(
+            "return function(conf, ctx) ngx.req.set_header('X-Pre-Func-1', 'value1') end",
+            "return function(conf, ctx) ngx.req.set_header('X-Pre-Func-2', 'value2') end"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPreFunction(sfp);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -371,29 +379,26 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
   void createRouteWithServerlessPreAndPostFunctions() throws Exception {
     String upstreamId = createDefaultUpstream("pre-and-post");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/pre-and-post/*");
-    routeConfig.put("methods", List.of("GET", "POST"));
-    routeConfig.put("upstream_id", upstreamId);
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/pre-and-post/*");
+    routeConfig.setMethods(List.of("GET", "POST"));
+    routeConfig.setUpstreamId(upstreamId);
 
-    Map<String, Object> plugins = new HashMap<>();
-    plugins.put(
-        "serverless-pre-function",
-        Map.of(
-            "phase",
-            "rewrite",
-            "functions",
-            List.of(
-                "return function(conf, ctx) ngx.req.set_header('X-Request-Start', ngx.now()) end")));
-    plugins.put(
-        "serverless-post-function",
-        Map.of(
-            "phase",
-            "log",
-            "functions",
-            List.of(
-                "return function(conf, ctx) ngx.log(ngx.INFO, 'Request completed: ' .. ngx.var.uri) end")));
-    routeConfig.put("plugins", plugins);
+    ServerlessFunctionPlugin preFunction = new ServerlessFunctionPlugin();
+    preFunction.setPhase("rewrite");
+    preFunction.setFunctions(
+        List.of("return function(conf, ctx) ngx.req.set_header('X-Request-Start', ngx.now()) end"));
+
+    ServerlessFunctionPlugin postFunction = new ServerlessFunctionPlugin();
+    postFunction.setPhase("log");
+    postFunction.setFunctions(
+        List.of(
+            "return function(conf, ctx) ngx.log(ngx.INFO, 'Request completed: ' .. ngx.var.uri) end"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPreFunction(preFunction);
+    plugins.setServerlessPostFunction(postFunction);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -408,15 +413,18 @@ class ApisixServerlessFunctionIntegrationTest extends AbstractApisixIntegrationT
   void createRouteWithInvalidLuaInServerlessPreFunction() throws Exception {
     String upstreamId = createDefaultUpstream("invalid-lua-pre");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/invalid-lua-pre/*");
-    routeConfig.put("methods", List.of("GET"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put(
-        "plugins",
-        Map.of(
-            "serverless-pre-function",
-            Map.of("phase", "rewrite", "functions", List.of("this is not valid lua syntax !!!"))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/invalid-lua-pre/*");
+    routeConfig.setMethods(List.of("GET"));
+    routeConfig.setUpstreamId(upstreamId);
+
+    ServerlessFunctionPlugin sfp = new ServerlessFunctionPlugin();
+    sfp.setPhase("rewrite");
+    sfp.setFunctions(List.of("this is not valid lua syntax !!!"));
+
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.setServerlessPreFunction(sfp);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);

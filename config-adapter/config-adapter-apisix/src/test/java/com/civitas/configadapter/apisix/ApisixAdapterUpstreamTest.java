@@ -28,6 +28,7 @@ import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
 import com.civitas.configadapter.model.apisix.ApisixConfigValue;
+import com.civitas.configadapter.model.apisix.UpstreamNodes;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Entity;
 import java.time.OffsetDateTime;
@@ -41,8 +42,9 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
   void testCreateSuccess() throws FatalAdapterException, RetryableAdapterException {
     givenMockPostReturns(200, "{\"success\":true}");
 
-    Map<String, Object> upstreamConfig =
-        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1, "backend2:8080", 1));
+    ApisixConfigValue upstreamConfig = new ApisixConfigValue();
+    upstreamConfig.setType("roundrobin");
+    upstreamConfig.setNodes(UpstreamNodes.ofMap(Map.of("backend1:8080", 1, "backend2:8080", 1)));
     ConfigEvent event =
         ApisixTestFixtures.upstreamEvent(Operation.CREATE, "upstreams", upstreamConfig);
 
@@ -57,7 +59,8 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
   void testCreateFailureHttpError() {
     givenMockPostReturns(400, "{\"error\":\"Invalid configuration\"}");
 
-    Map<String, Object> upstreamConfig = Map.of("type", "invalid");
+    ApisixConfigValue upstreamConfig = new ApisixConfigValue();
+    upstreamConfig.setType("invalid");
     ConfigEvent event =
         ApisixTestFixtures.upstreamEvent(Operation.CREATE, "upstreams", upstreamConfig);
 
@@ -75,7 +78,8 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
     when(mockBuilder.post(any(Entity.class)))
         .thenThrow(new ProcessingException("Connection refused"));
 
-    Map<String, Object> upstreamConfig = Map.of("type", "roundrobin");
+    ApisixConfigValue upstreamConfig = new ApisixConfigValue();
+    upstreamConfig.setType("roundrobin");
     ConfigEvent event =
         ApisixTestFixtures.upstreamEvent(Operation.CREATE, "upstreams", upstreamConfig);
 
@@ -91,8 +95,9 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
   void testUpdateSuccess() throws FatalAdapterException, RetryableAdapterException {
     givenMockPutReturns(200, "{\"success\":true}");
 
-    Map<String, Object> upstreamConfig =
-        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 2, "backend2:8080", 1));
+    ApisixConfigValue upstreamConfig = new ApisixConfigValue();
+    upstreamConfig.setType("roundrobin");
+    upstreamConfig.setNodes(UpstreamNodes.ofMap(Map.of("backend1:8080", 2, "backend2:8080", 1)));
     ConfigEvent event =
         ApisixTestFixtures.upstreamEvent(
             Operation.UPDATE, "upstreams/test-upstream-id", upstreamConfig);
@@ -109,7 +114,8 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
     givenMockDeleteReturns(200, "{\"success\":true}");
 
     ConfigEvent event =
-        ApisixTestFixtures.upstreamEvent(Operation.DELETE, "upstreams/test-upstream-id", null);
+        ApisixTestFixtures.upstreamEvent(
+            Operation.DELETE, "upstreams/test-upstream-id", (ApisixConfigValue) null);
 
     adapter.processConfigEvent("de.civitascore.api.backend.deleted", event);
 
@@ -120,7 +126,8 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
 
   @Test
   void testUnknownResourceType() {
-    Map<String, Object> config = Map.of("key", "value");
+    ApisixConfigValue config = new ApisixConfigValue();
+    config.setType("roundrobin");
     ConfigEvent event =
         ApisixTestFixtures.upstreamEvent(Operation.CREATE, "services/test-service", config);
 
@@ -137,7 +144,8 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
     adapter.setEventPublisher(null);
     givenMockPostReturns(200, "{\"success\":true}");
 
-    Map<String, Object> upstreamConfig = Map.of("type", "roundrobin");
+    ApisixConfigValue upstreamConfig = new ApisixConfigValue();
+    upstreamConfig.setType("roundrobin");
     ConfigEvent event =
         ApisixTestFixtures.upstreamEvent(Operation.CREATE, "upstreams", upstreamConfig);
 
@@ -149,16 +157,13 @@ class ApisixAdapterUpstreamTest extends AbstractApisixAdapterTest {
   void testWithNullResultTopic() throws FatalAdapterException, RetryableAdapterException {
     givenMockPostReturns(200, "{\"success\":true}");
 
-    Map<String, Object> upstreamConfig = Map.of("type", "roundrobin");
+    ApisixConfigValue upstreamConfig = new ApisixConfigValue();
+    upstreamConfig.setType("roundrobin");
 
     Metadata metadata =
         new Metadata("msg-123", OffsetDateTime.now(), "test-source", "corr-123", "v1.0.0", null);
     Payload payload =
-        new Payload(
-            "apisix",
-            "upstreams",
-            Operation.CREATE,
-            new Config(null, new ApisixConfigValue(upstreamConfig)));
+        new Payload("apisix", "upstreams", Operation.CREATE, new Config(null, upstreamConfig));
     ConfigEvent event = new ConfigEvent(metadata, payload);
 
     adapter.processConfigEvent("de.civitascore.api.backend.created", event);

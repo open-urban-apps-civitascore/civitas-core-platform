@@ -17,6 +17,10 @@ import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.apisix.RouteConfigValue;
+import com.civitas.configadapter.model.apisix.plugins.ProxyRewritePlugin;
+import com.civitas.configadapter.model.apisix.plugins.RewriteHeaders;
+import com.civitas.configadapter.model.apisix.plugins.RoutePlugins;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -29,14 +33,14 @@ class ApisixAdapterProxyRewriteTest extends AbstractApisixAdapterTest {
       throws FatalAdapterException, RetryableAdapterException {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/users/*",
-            "upstream_id",
-            "backend-service",
-            "plugins",
-            Map.of("proxy-rewrite", Map.of("uri", "/users")));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/users/*");
+    routeConfig.setUpstreamId("backend-service");
+    RoutePlugins plugins = new RoutePlugins();
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setUri("/users");
+    plugins.setProxyRewrite(proxyRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
@@ -53,16 +57,15 @@ class ApisixAdapterProxyRewriteTest extends AbstractApisixAdapterTest {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
     // Path stripping: /api/v1/users -> /users
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/*",
-            "methods",
-            List.of("GET", "POST", "PUT", "DELETE"),
-            "upstream_id",
-            "backend-service",
-            "plugins",
-            Map.of("proxy-rewrite", Map.of("regex_uri", List.of("^/api/v1/(.*)", "/$1"))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/*");
+    routeConfig.setMethods(List.of("GET", "POST", "PUT", "DELETE"));
+    routeConfig.setUpstreamId("backend-service");
+    RoutePlugins plugins = new RoutePlugins();
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setRegexUri(List.of("^/api/v1/(.*)", "/$1"));
+    plugins.setProxyRewrite(proxyRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
@@ -77,14 +80,14 @@ class ApisixAdapterProxyRewriteTest extends AbstractApisixAdapterTest {
       throws FatalAdapterException, RetryableAdapterException {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/external/*",
-            "upstream_id",
-            "backend-service",
-            "plugins",
-            Map.of("proxy-rewrite", Map.of("host", "internal-backend.local")));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/external/*");
+    routeConfig.setUpstreamId("backend-service");
+    RoutePlugins plugins = new RoutePlugins();
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setHost("internal-backend.local");
+    plugins.setProxyRewrite(proxyRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
@@ -99,21 +102,18 @@ class ApisixAdapterProxyRewriteTest extends AbstractApisixAdapterTest {
       throws FatalAdapterException, RetryableAdapterException {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/data/*",
-            "upstream_id",
-            "backend-service",
-            "plugins",
-            Map.of(
-                "proxy-rewrite",
-                Map.of(
-                    "headers",
-                    Map.of(
-                        "set", Map.of("X-Forwarded-Prefix", "/api/v1/data"),
-                        "add", Map.of("X-Request-Source", "gateway"),
-                        "remove", List.of("X-Internal-Token")))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/data/*");
+    routeConfig.setUpstreamId("backend-service");
+    RoutePlugins plugins = new RoutePlugins();
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Forwarded-Prefix", "/api/v1/data"));
+    headers.setAdd(Map.of("X-Request-Source", "gateway"));
+    headers.setRemove(List.of("X-Internal-Token"));
+    proxyRewrite.setHeaders(headers);
+    plugins.setProxyRewrite(proxyRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
@@ -127,14 +127,15 @@ class ApisixAdapterProxyRewriteTest extends AbstractApisixAdapterTest {
   void testRouteUpdateAddProxyRewrite() throws FatalAdapterException, RetryableAdapterException {
     givenMockPutReturns(200, "{\"key\":\"routes/test-route-id\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/users/*",
-            "upstream_id",
-            "backend-service",
-            "plugins",
-            Map.of("prometheus", Map.of(), "proxy-rewrite", Map.of("uri", "/users")));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/users/*");
+    routeConfig.setUpstreamId("backend-service");
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.handleUnknownPlugin("prometheus", Map.of());
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setUri("/users");
+    plugins.setProxyRewrite(proxyRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEvent(Operation.UPDATE, "routes/test-route-id", routeConfig);
@@ -151,20 +152,17 @@ class ApisixAdapterProxyRewriteTest extends AbstractApisixAdapterTest {
   void testRouteUpdateModifyProxyRewrite() throws FatalAdapterException, RetryableAdapterException {
     givenMockPutReturns(200, "{\"key\":\"routes/test-route-id\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v2/*",
-            "upstream_id",
-            "backend-service-v2",
-            "plugins",
-            Map.of(
-                "proxy-rewrite",
-                Map.of(
-                    "regex_uri",
-                    List.of("^/api/v2/(.*)", "/$1"),
-                    "headers",
-                    Map.of("set", Map.of("X-API-Version", "v2")))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v2/*");
+    routeConfig.setUpstreamId("backend-service-v2");
+    RoutePlugins plugins = new RoutePlugins();
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setRegexUri(List.of("^/api/v2/(.*)", "/$1"));
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-API-Version", "v2"));
+    proxyRewrite.setHeaders(headers);
+    plugins.setProxyRewrite(proxyRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEvent(Operation.UPDATE, "routes/test-route-id", routeConfig);
@@ -182,30 +180,21 @@ class ApisixAdapterProxyRewriteTest extends AbstractApisixAdapterTest {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
     // Full proxy-rewrite configuration with all options
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/data/*",
-            "methods",
-            List.of("GET", "POST", "PUT", "DELETE"),
-            "upstream_id",
-            "backend-service",
-            "plugins",
-            Map.of(
-                "proxy-rewrite",
-                Map.of(
-                    "regex_uri",
-                    List.of("^/api/v1/data/(.*)", "/$1"),
-                    "host",
-                    "internal-backend.local",
-                    "headers",
-                    Map.of(
-                        "set",
-                        Map.of("X-Forwarded-Prefix", "/api/v1/data", "X-Real-IP", "$remote_addr"),
-                        "add",
-                        Map.of("X-Request-ID", "$request_id"),
-                        "remove",
-                        List.of("X-Internal-Token", "X-Debug-Mode")))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/data/*");
+    routeConfig.setMethods(List.of("GET", "POST", "PUT", "DELETE"));
+    routeConfig.setUpstreamId("backend-service");
+    RoutePlugins plugins = new RoutePlugins();
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setRegexUri(List.of("^/api/v1/data/(.*)", "/$1"));
+    proxyRewrite.setHost("internal-backend.local");
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Forwarded-Prefix", "/api/v1/data", "X-Real-IP", "$remote_addr"));
+    headers.setAdd(Map.of("X-Request-ID", "$request_id"));
+    headers.setRemove(List.of("X-Internal-Token", "X-Debug-Mode"));
+    proxyRewrite.setHeaders(headers);
+    plugins.setProxyRewrite(proxyRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
