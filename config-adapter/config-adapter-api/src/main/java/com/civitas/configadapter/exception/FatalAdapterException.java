@@ -46,6 +46,9 @@ import com.civitas.configadapter.model.AdapterErrorCode;
  */
 public class FatalAdapterException extends AdapterException {
 
+  /** serialVersionUID */
+  private static final long serialVersionUID = 5657530422661119481L;
+
   /**
    * Creates a fatal adapter exception with the specified error code and message arguments.
    *

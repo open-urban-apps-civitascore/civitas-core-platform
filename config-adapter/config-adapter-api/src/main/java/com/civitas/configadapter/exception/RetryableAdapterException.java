@@ -42,6 +42,9 @@ import com.civitas.configadapter.model.AdapterErrorCode;
  */
 public class RetryableAdapterException extends AdapterException {
 
+  /** serialVersionUID */
+  private static final long serialVersionUID = 4666417867349267452L;
+
   /**
    * Creates a retryable adapter exception with the specified error code and message arguments.
    *

@@ -9,6 +9,7 @@
  */
 package com.civitas.configadapter.model.saga;
 
+import com.civitas.configadapter.util.PayloadConverter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -45,6 +46,20 @@ public record SagaContext(
     Map<String, Object> triggerPayload,
     Instant createdAt,
     Instant updatedAt) {
+
+  /**
+   * Converts the trigger payload map to a typed object. Useful for type-safe access to well-known
+   * payload structures like {@link com.civitas.configadapter.model.dataset.Dataset}.
+   *
+   * <p>Example: {@code context.triggerPayloadAs(Dataset.class).name()}
+   *
+   * @param <T> the target type
+   * @param type the target class
+   * @return the converted payload
+   */
+  public <T> T triggerPayloadAs(Class<T> type) {
+    return PayloadConverter.fromValue(triggerPayload, type);
+  }
 
   /** Returns a copy with the given status and updated timestamp. */
   public SagaContext withStatus(SagaStatus newStatus, Instant now) {

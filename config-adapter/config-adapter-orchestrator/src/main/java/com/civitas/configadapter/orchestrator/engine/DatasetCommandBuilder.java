@@ -9,6 +9,7 @@
  */
 package com.civitas.configadapter.orchestrator.engine;
 
+import com.civitas.configadapter.model.dataset.Dataset;
 import com.civitas.configadapter.model.saga.SagaContext;
 import com.civitas.configadapter.model.saga.SagaStep;
 import com.civitas.configadapter.model.saga.SagaStepStatus;
@@ -76,19 +77,20 @@ public final class DatasetCommandBuilder {
   private static Map<String, Object> buildFrostPayload(
       SagaContext context, SagaStepDefinition stepDef) {
     var trigger = context.triggerPayload();
+    var dataset = context.triggerPayloadAs(Dataset.class);
     var payload = new HashMap<String, Object>();
     payload.put("operation", stepDef.operation());
     payload.put("datasetId", context.datasetId());
 
     return switch (stepDef.operation()) {
       case "CREATE_PROJECT" -> {
-        payload.put("datasetName", trigger.get("name"));
+        payload.put("datasetName", dataset.name());
         payload.put("description", trigger.getOrDefault("description", ""));
         yield Map.copyOf(payload);
       }
       case "UPDATE_PROJECT" -> {
         payload.put("projectId", getProperty(trigger, "projectId"));
-        payload.put("datasetName", trigger.get("name"));
+        payload.put("datasetName", dataset.name());
         payload.put("description", trigger.getOrDefault("description", ""));
         yield Map.copyOf(payload);
       }
@@ -119,6 +121,7 @@ public final class DatasetCommandBuilder {
   private static Map<String, Object> buildApisixPayload(
       SagaContext context, SagaStepDefinition stepDef) {
     var trigger = context.triggerPayload();
+    var dataset = context.triggerPayloadAs(Dataset.class);
     var payload = new HashMap<String, Object>();
     payload.put("operation", stepDef.operation());
     payload.put("datasetId", context.datasetId());
@@ -129,7 +132,7 @@ public final class DatasetCommandBuilder {
       payload.put("upstreamUrl", baseUrl);
     }
 
-    payload.put("openDataAccess", trigger.getOrDefault("openDataAccess", false));
+    payload.put("openDataAccess", dataset.openDataAccess());
 
     return switch (stepDef.operation()) {
       case "CREATE_ROUTE" -> Map.copyOf(payload);

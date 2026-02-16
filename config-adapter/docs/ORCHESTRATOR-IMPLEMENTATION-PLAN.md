@@ -1,242 +1,254 @@
 # Saga Orchestrator — Implementation Plan
 
-> **Status**: ABGESCHLOSSEN (14/14 Tasks erledigt, 76 Tests grün)
-> **Module**: `config-adapter-orchestrator` (neu)
+> **Status**: Phase 1 abgeschlossen — Phase 2 (Adapter-Integration) in Planung
+> **Module**: `config-adapter-orchestrator`, `config-adapter-api`
 > **Quellen**: [ADR 030](./adr30-saga.md), [Dataset Use Cases](./SAGA-DATASET-USE-CASES.md), [Saga Design Proposal](./saga.md)
-> **Letztes Update**: 2026-02-16
+> **Letztes Update**: 2026-02-17
 
 ---
 
-## Design-Prinzip
+## Phase 1 — Orchestrator Engine (abgeschlossen)
 
-Die Kern-Architektur trennt **pure Logik** von **I/O**:
+> 14/14 Tasks, 76 Tests grün. Vollständige Umsetzung der Orchestrator-Engine mit Kafka-Integration.
+
+### Design-Prinzip
+
+Trennung **pure Logik** (Kafka-frei, JUnit-testbar) von **I/O** (Kafka-Integration):
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Schicht 1–5: Kafka-frei, JUnit-testbar                │
-│                                                         │
-│   SagaStateMachine (pure Funktion)                      │
-│     Input:  SagaContext + Event                         │
-│     Output: SagaContext + List<SagaAction>              │
-│                                                         │
-│   SagaEngine (Fassade)                                  │
-│     Verbindet StateMachine + StateStore + Dispatcher    │
-│     Testbar mit InMemorySagaStateStore + TestDispatcher │
-│                                                         │
-├─────────────────────────────────────────────────────────┤
-│  Schicht 6–7: Kafka-Integration                         │
-│                                                         │
-│   KafkaSagaStateStore (compacted topic)                 │
-│   KafkaSagaStateRecovery (startup replay)               │
-│   KafkaSagaActionDispatcher (JSON auf Topics)           │
-│   SagaResultConsumer (Adapter Results → Engine)         │
-│   SagaTriggerConsumer (Portal Trigger → Engine)         │
-│   DatasetSagaOrchestrator (Entry-Point + Wiring)        │
-└─────────────────────────────────────────────────────────┘
+Engine-Schicht (Kafka-frei):
+  SagaStateMachine → pure (State + Event) → (State + Actions)
+  SagaEngine       → Fassade: StateMachine + StateStore + Dispatcher
+  DatasetCommandBuilder → Adapter-spezifische Payloads
+
+Kafka-Schicht:
+  KafkaSagaStateStore + Recovery → compacted topic
+  KafkaSagaActionDispatcher → Actions → Kafka Messages
+  SagaResultConsumer / SagaTriggerConsumer → Event-Routing
+  DatasetSagaOrchestrator → Entry-Point + Wiring
 ```
 
-Die `SagaStateMachine` hat **keine Dependencies** auf Kafka, Jackson, etc. — nur auf die Model-Klassen. Alle Szenarien aus dem Use-Cases-Dokument sind als pure Unit Tests abbildbar.
+### Erledigte Tasks (Kurzform)
+
+| # | Task | Ergebnis |
+|---|------|----------|
+| 2 | Maven-Modul anlegen | `config-adapter-orchestrator` mit pom.xml, Parent-Integration |
+| 3 | Saga Model-Klassen | `SagaContext`, `SagaStep`, `SagaStatus`, `SagaStepStatus`, `SagaFailure`, `SagaType`, `SagaContextHelper` in `config-adapter-api` |
+| 4 | StepDefinition + SagaDefinition | Factory-Methoden `mandatory()`, `conditional()`, Registry `SagaDefinitions` |
+| 5 | SagaStateMachine | Sealed `SagaAction` (7 Varianten), Create/Update Compensation, Delete best-effort |
+| 6 | DatasetCommandBuilder | FROST/APISIX/Redpanda Payloads, Compensation, Result-Aggregation |
+| 7 | SagaStateStore + InMemory | ConcurrentHashMap-basiert, Terminal-Status-Filtering |
+| 8 | SagaEngine | Fassade, Duplicate-Check, Terminal-Cleanup, `processActions()` |
+| 9 | StateMachine Tests | **57 Tests**: Create (16), Update (12), Delete (16), Structural (13) |
+| 10 | Engine Tests | **14 Tests**: Happy Path, Failure, Compensation, Timeout, Recovery |
+| 11 | KafkaSagaStateStore + Recovery | Compacted topic, sync writes, startup replay |
+| 12 | KafkaDispatcher + Routing | Action dispatch, Result/Trigger consumers |
+| 13 | DatasetSagaOrchestrator | Entry-Point, Lifecycle, Virtual Threads |
+| 14 | ConfigEvent API-Erweiterung | **Übersprungen** — Orchestrator nutzt eigenes JSON-Format |
+| 15 | Kafka IT Tests | **5 Tests**: State round-trip, Dispatcher, Recovery (Testcontainers) |
 
 ---
 
-## Package-Struktur
+## Zwischenarbeiten — Java 25, Code-Style, Dataset POJOs
 
-```
-config-adapter-orchestrator/
-  src/main/java/com/civitas/configadapter/orchestrator/
-    ├── engine/                        # Kafka-freier Kern
-    │   ├── SagaStateMachine.java      # Pure (State + Event) → (State + Actions)
-    │   ├── SagaTransitionResult.java  # Rückgabetyp: Context + Actions
-    │   ├── SagaAction.java            # Sealed interface: ExecuteStep, CompensateStep, ...
-    │   ├── SagaEngine.java            # Fassade: StateMachine + Store + Dispatcher
-    │   ├── SagaStepDefinition.java    # Blueprint für einen Step
-    │   ├── SagaDefinition.java        # Blueprint für eine Saga
-    │   ├── SagaDefinitions.java       # Registry: DATASET_CREATE/UPDATE/DELETE
-    │   ├── SagaActionDispatcher.java  # Interface (Kafka-Impl in .kafka)
-    │   ├── SagaStateStore.java        # Interface (InMemory + Kafka Impls)
-    │   ├── InMemorySagaStateStore.java
-    │   └── DatasetCommandBuilder.java # Baut adapter-spezifische Payloads
-    ├── kafka/                         # Kafka-Integration
-    │   ├── KafkaSagaStateStore.java   # State-Persistenz auf compacted topic
-    │   ├── KafkaSagaStateRecovery.java # Startup-Replay des State-Topics
-    │   ├── KafkaSagaActionDispatcher.java # Actions → Kafka Messages
-    │   ├── SagaResultConsumer.java    # Adapter Results → SagaEngine
-    │   └── SagaTriggerConsumer.java   # Portal Trigger → SagaEngine
-    └── DatasetSagaOrchestrator.java   # Entry-Point + Wiring
-  src/test/java/com/civitas/configadapter/orchestrator/
-    └── engine/
-        ├── SagaStateMachineTest.java  # 57 Tests (alle Kombinationen)
-        └── SagaEngineTest.java        # 14 Tests (Integration)
-```
+### Java 25 Anpassungen
 
----
+- Spotless/Google Java Format Plugin auf aktuelle Version aktualisiert (Java 25 Kompatibilität)
+- Mockito auf Version 4 (Java 25 kompatibel) aktualisiert
+- Formatter-Settings angepasst
 
-## Tasks
+### Code-Style Refinements
 
-### Schicht 1 — Fundament
+- Code-Formatierung mit `mvn spotless:apply` durchgesetzt
+- Spotless-Check in Build-Pipeline integriert
 
-- [x] **#2** Maven-Modul `config-adapter-orchestrator` anlegen ✅
-  - pom.xml mit Parent config-adapter-parent, Dependencies auf config-adapter-api, kafka-clients, jackson, OWASP encoder
-  - Root POM: Modul hinzugefügt
+### Test-Ergänzungen
 
-### Schicht 2 — Model (in config-adapter-api)
+- `DatasetCommandBuilderTest` hinzugefügt (Unit Tests für FROST/APISIX/Redpanda Payload-Building)
 
-- [x] **#3** Saga Model-Klassen (Records/Enums) implementieren ✅
-  - Enums: `SagaType`, `SagaStatus` (mit isTerminal()), `SagaStepStatus`
-  - Records: `SagaStep` (mit Transition-Methoden), `SagaFailure`, `SagaContext` (mit with-Methoden)
-  - Helper: `SagaContextHelper`
+### Dataset Jackson POJOs (`config-adapter-api`)
 
-- [x] **#14** ConfigEvent + EventPublisher API-Erweiterungen — **ÜBERSPRUNGEN** ✅
-  - Der Orchestrator verwendet eigenes JSON-Nachrichtenformat auf dedizierten Saga-Topics
-  - Kein Eingriff in bestehende ConfigEvent-Struktur nötig → kein Backwards-Compatibility-Risiko
+Typisierte POJOs für die Dataset-CloudEvent-Payload:
 
-### Schicht 3 — Engine-Bausteine (Kafka-frei)
+| Klasse | Typ | Beschreibung |
+|--------|-----|--------------|
+| `Dataset` | Record | id, name, openDataAccess, datasources, datapipelines |
+| `Datasource` | Klasse | Gemeinsame Felder (id, type, name, host, port) + `@JsonAnySetter`/`@JsonAnyGetter` für type-spezifische Properties (ssl_mode, pool, topics, tls, etc.) |
+| `DataPipeline` | Record | id, version, action, data (`Map<String, Object>`) |
 
-- [x] **#4** SagaStepDefinition + SagaDefinition ✅
-  - Factory-Methoden: `mandatory()`, `conditional()`
-  - `SagaDefinitions` Registry: 3 Workflows mit Topic-Konstanten
+**Package**: `com.civitas.configadapter.model.dataset`
 
-- [x] **#7** SagaStateStore Interface + InMemory-Impl ✅
-  - ConcurrentHashMap-basiert, filtert Terminal-Status
+**Tests**: `DatasetSerializationTest` (8 Tests) — Deserialisierung aus `dataset-event.json`, Round-Trip, alle Datasource-Typen (PostgreSQL, MQTT), beide Pipeline-Aktionen (ADD, DELETE).
 
-### Schicht 4 — Kern-Logik (Pure State Machine)
-
-- [x] **#5** SagaStateMachine ✅
-  - Sealed interface `SagaAction` mit 7 Varianten
-  - Create/Update: Compensation in reverse order, best-effort
-  - Delete: Forward best-effort, keine Compensation
-  - `skipRemainingPendingSteps()` bei Compensation-Eintritt (nur Create/Update)
-  - `hasPriorFailure()` Check für Delete-Sagas
-
-- [x] **#6** DatasetCommandBuilder ✅
-  - Adapter-spezifische Payloads: FROST, APISIX, Redpanda
-  - Forward + Compensation Payloads
-  - Result-Aggregation mit properties[] Array
-
-- [x] **#9** JUnit Tests für SagaStateMachine — **57 Tests**, alle grün ✅
-  - Dataset Create: 16 Tests (Success, Failure at each step, Timeout at each step, Compensation failures, Timeout during compensation, Without-pipelines)
-  - Dataset Update: 12 Tests (Success, Failure, Timeout, RESTORE operations)
-  - Dataset Delete: 16 Tests (Best-effort forward, Multiple failures, Timeouts, Mixed timeout+failure, Without-pipelines)
-  - Structural Guarantees: 13 Tests (PersistState ordering, ID preservation, Unknown stepId, etc.)
-
-### Schicht 5 — Engine-Fassade
-
-- [x] **#8** SagaEngine ✅
-  - Fassade: StateMachine + StateStore + Dispatcher
-  - Duplicate-Check, Terminal-State Cleanup
-  - `processActions()`: PersistState intern, Rest an Dispatcher
-
-- [x] **#10** JUnit Tests für SagaEngine — **14 Tests**, alle grün ✅
-  - Happy Path (Create 3 Steps, Without Pipelines, Delete)
-  - Failure + Compensation, Compensation Failure
-  - Delete Best-Effort (partial, all fail)
-  - Timeout (Create, Delete)
-  - Duplicate Rejection, Unknown Saga
-  - Startup Recovery
-  - Test-Double: `CollectingDispatcher` (kein Mockito)
-
-### Schicht 6 — Kafka-Integration
-
-- [x] **#11** KafkaSagaStateStore + Recovery ✅
-  - `KafkaSagaStateStore`: ConcurrentHashMap + Kafka compacted topic, sync writes, tombstone removes
-  - `KafkaSagaStateRecovery`: Startup replay, terminal state filtering, partition-based consumption
-
-- [x] **#12** KafkaSagaActionDispatcher + Event-Routing ✅
-  - `KafkaSagaActionDispatcher`: Pattern-matched dispatch per Action-Typ, JSON messages
-  - `SagaResultConsumer`: Adapter result topics → SagaEngine callbacks
-  - `SagaTriggerConsumer`: Portal trigger topic → orchestrator.startSaga()
-  - Topics: `core.civitas.saga.result`, `core.civitas.saga.manual-intervention`, `core.civitas.dataset.saga.trigger`
-
-### Schicht 7 — Wiring
-
-- [x] **#13** DatasetSagaOrchestrator (Entry-Point) ✅
-  - Wiring: Kafka clients, Recovery, Engine, Consumers
-  - Lifecycle: initialize() → start() → startSaga() → stop()
-  - Shared Kafka producer (idempotent, acks=all)
-  - Virtual threads für Consumer-Loops
-
-- [x] **#15** Kafka Integration Tests (Testcontainers) ✅
-  - 5 Tests: State Store Round-Trip, Dispatcher Execute, Dispatcher Complete, Result Consumer Routing, Tombstone Recovery
-  - Testcontainers `apache/kafka:3.8.0`, Awaitility
-  - Echte Kafka-Broker, Topic-Erstellung, Producer/Consumer
+**Design-Entscheidungen**:
+- `Datasource` als Klasse statt Record — wegen `@JsonAnySetter` für variable type-spezifische Felder (analog `AbstractApiModel`)
+- `DataPipeline.data` als `Map<String, Object>` — Redpanda Connect Pipeline Definition wird durchgereicht
+- Kein `ConfigValue`-Interface — Dataset-POJOs sind Payload-Modelle, keine Adapter-Konfigurationen
 
 ---
 
-## Fortschritt
+## Phase 2 — Adapter-Integration (nächste Schritte)
+
+### Überblick: Command Building Flow
+
+Der Orchestrator empfängt ein `Dataset`-JSON vom Portal Backend und muss daraus adapter-spezifische Commands bauen. Jeder Adapter bekommt nur die Informationen, die er braucht.
 
 ```
-Erledigt:  14 von 14 Tasks (100%) ✅
-Tests:     76 Tests (57 StateMachine + 14 Engine + 5 Kafka IT), alle grün
+Portal Backend
+    │
+    ▼  CloudEvent (data: Dataset JSON)
+┌─────────────────────────────────────────────┐
+│  Orchestrator                                │
+│                                              │
+│  Dataset JSON → DatasetCommandBuilder        │
+│    ├── FROST:   datasetId, name, description │
+│    ├── APISIX:  datasetId, baseUrl (von      │
+│    │            FROST), openDataAccess        │
+│    └── Redpanda: dataPipelines, datasources, │
+│                  targetUrl (von FROST)        │
+└──┬──────────────┬───────────────┬────────────┘
+   │              │               │
+   ▼              ▼               ▼
+ FROST          APISIX         Redpanda
+ Result:        Result:        Result:
+ projectId      routeId        pipelineIds
+ baseUrl        serviceId
+                publicUrl
+   │              │               │
+   └──────────────┴───────────────┘
+                  │
+                  ▼
+   Orchestrator aggregiert alle Results
+   → ConfigResultEvent ans Portal Backend
+   → properties[] für Update/Delete-Roundtrip
 ```
 
-### Erstellte Dateien
+### Task: DatasetCommandBuilder mit typisierten POJOs
 
-**config-adapter-api** (Model-Klassen):
-- `src/main/java/.../model/saga/SagaType.java`
-- `src/main/java/.../model/saga/SagaStatus.java`
-- `src/main/java/.../model/saga/SagaStepStatus.java`
-- `src/main/java/.../model/saga/SagaStep.java`
-- `src/main/java/.../model/saga/SagaFailure.java`
-- `src/main/java/.../model/saga/SagaContext.java`
-- `src/main/java/.../model/saga/SagaContextHelper.java`
+**Aktueller Stand**: `DatasetCommandBuilder` arbeitet auf `Map<String, Object>` (untypisiert). Der `triggerPayload` im `SagaContext` ist `Map<String, Object>`.
 
-**config-adapter-orchestrator** (Engine — Kafka-frei):
-- `pom.xml`
-- `src/main/java/.../orchestrator/engine/SagaStepDefinition.java`
-- `src/main/java/.../orchestrator/engine/SagaDefinition.java`
-- `src/main/java/.../orchestrator/engine/SagaDefinitions.java`
-- `src/main/java/.../orchestrator/engine/SagaAction.java`
-- `src/main/java/.../orchestrator/engine/SagaTransitionResult.java`
-- `src/main/java/.../orchestrator/engine/SagaStateMachine.java`
-- `src/main/java/.../orchestrator/engine/SagaStateStore.java`
-- `src/main/java/.../orchestrator/engine/InMemorySagaStateStore.java`
-- `src/main/java/.../orchestrator/engine/SagaActionDispatcher.java`
-- `src/main/java/.../orchestrator/engine/SagaEngine.java`
-- `src/main/java/.../orchestrator/engine/DatasetCommandBuilder.java`
+**Ziel**: Der `DatasetCommandBuilder` soll die neuen `Dataset`/`Datasource`/`DataPipeline`-POJOs nutzen, um typsicher auf die Payload-Felder zuzugreifen. Aktuell passiert z.B.:
 
-**config-adapter-orchestrator** (Kafka-Integration):
-- `src/main/java/.../orchestrator/kafka/KafkaSagaStateStore.java`
-- `src/main/java/.../orchestrator/kafka/KafkaSagaStateRecovery.java`
-- `src/main/java/.../orchestrator/kafka/KafkaSagaActionDispatcher.java`
-- `src/main/java/.../orchestrator/kafka/SagaResultConsumer.java`
-- `src/main/java/.../orchestrator/kafka/SagaTriggerConsumer.java`
-- `src/main/java/.../orchestrator/DatasetSagaOrchestrator.java`
+```java
+// Vorher (untypisiert):
+payload.put("datasetName", trigger.get("name"));
+payload.put("openDataAccess", trigger.getOrDefault("openDataAccess", false));
 
-**config-adapter-orchestrator** (Tests):
-- `src/test/java/.../orchestrator/engine/SagaStateMachineTest.java` (57 Tests)
-- `src/test/java/.../orchestrator/engine/SagaEngineTest.java` (14 Tests)
-- `src/test/java/.../orchestrator/kafka/SagaKafkaIT.java` (5 Kafka Integration Tests)
+// Nachher (typisiert — zu evaluieren):
+Dataset dataset = objectMapper.convertValue(trigger, Dataset.class);
+payload.put("datasetName", dataset.name());
+payload.put("openDataAccess", dataset.openDataAccess());
+```
+
+**Offene Frage**: `SagaContext.triggerPayload()` ist `Map<String, Object>`. Soll das geändert werden, oder deserialisiert der `DatasetCommandBuilder` intern?
+
+### Task: FROST Adapter — Saga-Handler
+
+**Was FROST für `CREATE_PROJECT` braucht:**
+- `datasetId` → wird als Projekt-Name verwendet
+- `name` → Projekt-Beschreibung (Display Name)
+
+**Was FROST zurückliefert:**
+- `projectId` — die FROST-interne Projekt-ID
+- `baseUrl` — vollständiger Pfad zum Projekt-Endpunkt (z.B. `http://frost:8080/FROST-Server/v1.1/projects/proj-123`)
+
+**Compensation**: `DELETE_PROJECT` mit `projectId`
+
+**Implementierung**:
+1. `FrostSagaHandler` im `config-adapter-frost` Modul
+2. Routing in `FrostAdapter.doProcessConfigEvent()` über Topic-Check
+3. FROST REST API Call: `POST /projects` → projectId + baseUrl
+
+### Task: APISIX Adapter — Saga-Handler
+
+**Entscheidung**: Ein Step im Orchestrator (Option A). Der APISIX-Adapter handelt Service + Route + Plugin-Config-Referenz intern in einem Aufruf ab. Bestätigt durch API-Analyse: Die APISIX Admin API unterstützt `plugin_config_id` als Feld im Route-Objekt — kein separater Request nötig.
+
+**Was APISIX für `CREATE_ROUTE` braucht:**
+- `datasetId` → wird zum URI-Segment (`/api/dataspace/{datasetId}/*`)
+- `upstreamUrl` — die FROST `baseUrl` aus Step 1
+- `openDataAccess` — steuert die Plugin-Konfiguration
+
+**APISIX erstellt pro Dataset:**
+1. **Service** (Upstream-Ziel auf FROST) — muss vor Route existieren
+2. **Route** (URL-Mapping auf Service) — eine pro Dataset, mit/ohne `plugin_config_id`
+
+**openDataAccess-Logik:**
+
+```
+openDataAccess: false (protected)     openDataAccess: true (public)
+┌──────────────────────────────┐     ┌──────────────────────────────┐
+│ Route: /api/dataspace/ds-1/* │     │ Route: /api/dataspace/ds-1/* │
+│   service_id: svc-frost      │     │   service_id: svc-frost      │
+│   plugin_config_id: 1 ← auth │     │   (kein plugin_config_id)    │
+└──────────────────────────────┘     │   priority: 1 ← bei URI-     │
+         │                            │   Überlappung mit protected  │
+         ▼                            └──────────────────────────────┘
+┌────────────────────────────┐
+│ Plugin Config (id: 1)      │
+│   openid-connect (JWT)     │
+│   opa (with_service: true) │
+│   request-id               │
+└────────────────────────────┘
+```
+
+Plugin Config 1 ist **vorprovisioniert** (nicht vom Adapter verwaltet).
+
+**Update-Szenarien (`UPDATE_ROUTE`):**
+
+| Übergang | Adapter-Aktion |
+|----------|----------------|
+| `openDataAccess` unverändert | Route-Felder aktualisieren (name, upstream, etc.) |
+| `false → true` (protected → public) | `plugin_config_id` entfernen, ggf. `priority: 1` setzen |
+| `true → false` (public → protected) | `plugin_config_id: 1` setzen, `priority` entfernen |
+
+Der Adapter speichert den vorherigen `openDataAccess`-Wert als **Compensation-Data**, damit bei fehlgeschlagenem Update der ursprüngliche Zustand wiederhergestellt werden kann (`RESTORE_ROUTE`).
+
+**Was APISIX zurückliefert:**
+- `routeId`, `serviceId`, `publicUrl`
+
+**Compensation:**
+
+| Saga-Typ | Compensation |
+|----------|-------------|
+| Create fehlgeschlagen | `DELETE_ROUTE` — Route löschen (+ Service wenn ungenutzt) |
+| Update fehlgeschlagen | `RESTORE_ROUTE` — vorherigen `plugin_config_id`-Zustand wiederherstellen |
+
+**API-Model-Änderung (erledigt):**
+`RouteConfigValue` um `plugin_config_id`-Feld erweitert (`Object`-Typ, da APISIX Integer und String akzeptiert). Tests: 32 grün, inkl. protected/public Deserialisierung und Update-Szenarien.
+
+**Implementierung:**
+1. `ApisixSagaHandler` im `config-adapter-apisix` Modul
+2. Routing in `ApisixAdapter.doProcessConfigEvent()` über Topic-Check
+3. `CREATE_ROUTE`: Service anlegen → Route mit/ohne `plugin_config_id` anlegen
+4. `UPDATE_ROUTE`: Route aktualisieren, `plugin_config_id` je nach `openDataAccess` setzen/entfernen
+5. `DELETE_ROUTE`: Route löschen, Service löschen wenn keine weiteren Routen
+
+### Task: DatasetCommandBuilder — Dataset-POJOs integrieren
+
+Den `DatasetCommandBuilder` erweitern, um:
+1. `triggerPayload` als `Dataset`-POJO zu deserialisieren
+2. Für FROST: `dataset.name()` + `dataset.id()` extrahieren
+3. Für APISIX: `dataset.openDataAccess()` + `baseUrl` aus FROST-Result
+4. Für Redpanda: `dataset.datapipelines()` + `dataset.datasources()` durchreichen
+
+**Hinweis APISIX-Update**: Der `DatasetCommandBuilder` liefert `openDataAccess` bereits im APISIX-Payload. Der APISIX-Adapter vergleicht intern den aktuellen Routenzustand mit dem neuen `openDataAccess`-Wert und entscheidet, ob `plugin_config_id` gesetzt oder entfernt werden muss. Der Orchestrator muss dafür keinen Unterschied zwischen Create und Update kennen — die Logik liegt im Adapter.
+
+### Task: Adapter-Subscription und Topic-Konfiguration
+
+- FROST Adapter: `dataset.frost.execute` + `dataset.frost.compensate` zu Topics hinzufügen
+- APISIX Adapter: `dataset.apisix.execute` + `dataset.apisix.compensate` zu Topics hinzufügen
+- `application.properties` aktualisieren
 
 ---
 
-## Dependency-Graph
+## Phase 3 — Weitere offene Punkte
 
-```
-#2 Maven-Modul ✅
- ├── #3 Model-Klassen ✅
- │    ├── #4 StepDefinition + SagaDefinition ✅
- │    │    ├── #5 SagaStateMachine ✅ ────── #9 StateMachine Tests (57) ✅
- │    │    └── #6 DatasetCommandBuilder ✅
- │    ├── #7 SagaStateStore + InMemory ✅ ── #11 KafkaSagaStateStore ✅
- │    └── #14 ConfigEvent API (übersprungen) ✅
- │
- #5 ✅ + #6 ✅ + #7 ✅
- └── #8 SagaEngine ✅ ──────────────────── #10 Engine Tests (14) ✅
-      #8 ✅ + #11 ✅
-      └── #12 KafkaDispatcher + Routing ✅
-           └── #13 DatasetSagaOrchestrator ✅
-                └── #15 Kafka Integration Tests (5) ✅
-```
-
----
-
-## Hinweise
-
-- **Spotless/Google Java Format** funktioniert aktuell nicht (Java 25 Inkompatibilität mit dem Plugin). Code kompiliert sauber.
-- **Mockito-Tests in config-adapter-api** haben 6 vorbestehende Fehler (Java 25 Inkompatibilität). Nicht durch unsere Änderungen verursacht.
-- **Build-Tipp**: `mvn compile -pl config-adapter-api,config-adapter-orchestrator` für schnelle Validierung
-- **Alle Tests**: `mvn test -pl config-adapter-orchestrator -am -Dtest="SagaStateMachineTest,SagaEngineTest,SagaKafkaIT" -Dsurefire.failIfNoSpecifiedTests=false`
-- **Architektur-Entscheidung**: Orchestrator verwendet eigenes JSON-Nachrichtenformat statt ConfigEvent. Adapters erhalten Saga-Commands auf dedizierten Topics und antworten mit sagaId/stepId.
+| Bereich | Status | Beschreibung |
+|---------|--------|--------------|
+| Recovery Re-dispatch | Offen | IN_PROGRESS Steps nach Crash erneut dispatchen |
+| Timeout Scheduler | Offen | `ScheduledExecutorService` für Step-Timeouts |
+| Application.java Integration | Offen | ServiceLoader-Discovery des Orchestrators |
+| Redpanda Adapter | Wartet | Kollege implementiert nach Contract-Spec |
 
 ---
 
@@ -244,4 +256,5 @@ Tests:     76 Tests (57 StateMachine + 14 Engine + 5 Kafka IT), alle grün
 
 - [ADR 030: Orchestrated Saga](./adr30-saga.md) — Architektur-Entscheidung
 - [Saga Dataset Use Cases](./SAGA-DATASET-USE-CASES.md) — Alle Szenarien (Create/Update/Delete, Failure, Compensation, Timeout)
-- [Saga Design Proposal](./saga.md) — Technisches Design (Interfaces, Model-Klassen, Topic-Struktur)
+- [Saga Design Proposal](./saga.md) — Technisches Design
+- [Orchestrator Architecture](./SAGA-ORCHESTRATOR-ARCHITECTURE.md) — Detailed Architecture & Developer Guide

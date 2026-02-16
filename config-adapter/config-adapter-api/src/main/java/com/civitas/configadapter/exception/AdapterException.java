@@ -33,6 +33,9 @@ import com.civitas.configadapter.model.AdapterErrorCode;
  */
 public abstract class AdapterException extends Exception {
 
+  /** serialVersionUID */
+  private static final long serialVersionUID = 4733953678711945607L;
+
   private final AdapterErrorCode errorCode;
   private final String internalMessage;
 

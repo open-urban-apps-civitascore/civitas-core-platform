@@ -198,7 +198,6 @@ class HealthCheckTest {
   // ===== JSON round-trip =====
 
   @Test
-  @SuppressWarnings("unchecked")
   void jsonDeserialization_fromApisixExample_shouldParseComplete() throws Exception {
     String json =
         """
