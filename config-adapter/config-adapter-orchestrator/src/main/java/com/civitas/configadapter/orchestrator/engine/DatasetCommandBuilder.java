@@ -105,7 +105,7 @@ public final class DatasetCommandBuilder {
     var payload = new HashMap<String, Object>();
     payload.put("operation", stepDef.compensationOperation());
 
-    if (step.result() != null) {
+    if (step.result() != null && step.result().containsKey("projectId")) {
       payload.put("projectId", step.result().get("projectId"));
     }
     if (step.compensationData() != null) {
@@ -153,8 +153,12 @@ public final class DatasetCommandBuilder {
     payload.put("operation", stepDef.compensationOperation());
 
     if (step.result() != null) {
-      payload.put("routeId", step.result().get("routeId"));
-      payload.put("serviceId", step.result().get("serviceId"));
+      if (step.result().containsKey("routeId")) {
+        payload.put("routeId", step.result().get("routeId"));
+      }
+      if (step.result().containsKey("serviceId")) {
+        payload.put("serviceId", step.result().get("serviceId"));
+      }
     }
     if (step.compensationData() != null) {
       payload.putAll(step.compensationData());
@@ -197,7 +201,7 @@ public final class DatasetCommandBuilder {
     payload.put("operation", stepDef.compensationOperation());
     payload.put("datasetId", context.datasetId());
 
-    if (step.result() != null) {
+    if (step.result() != null && step.result().containsKey("pipelineIds")) {
       payload.put("pipelineIds", step.result().get("pipelineIds"));
     }
     if (step.compensationData() != null) {

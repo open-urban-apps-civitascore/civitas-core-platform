@@ -33,7 +33,8 @@ import java.util.Objects;
  *   <li>upstream_id - Reference to an upstream for backend routing
  *   <li>upstream - Inline upstream configuration
  *   <li>service_id - Reference to a service
- *   <li>plugins - Map of plugin configurations
+ *   <li>plugin_config_id - Reference to a shared plugin configuration (e.g., auth plugins)
+ *   <li>plugins - Map of plugin configurations (inline, merged with plugin_config if both present)
  *   <li>priority - Route priority for matching order
  *   <li>enable_websocket - Enable WebSocket support
  *   <li>status - Route status (1 = enabled, 0 = disabled)
@@ -90,6 +91,9 @@ public final class RouteConfigValue extends AbstractApiModel implements ConfigVa
 
   @JsonProperty("service_id")
   private String serviceId;
+
+  @JsonProperty("plugin_config_id")
+  private Object pluginConfigId;
 
   @JsonProperty("enable_websocket")
   private Boolean enableWebsocket;
@@ -184,6 +188,14 @@ public final class RouteConfigValue extends AbstractApiModel implements ConfigVa
     this.serviceId = serviceId;
   }
 
+  public Object getPluginConfigId() {
+    return pluginConfigId;
+  }
+
+  public void setPluginConfigId(Object pluginConfigId) {
+    this.pluginConfigId = pluginConfigId;
+  }
+
   public Boolean getEnableWebsocket() {
     return enableWebsocket;
   }
@@ -211,6 +223,7 @@ public final class RouteConfigValue extends AbstractApiModel implements ConfigVa
     if (host != null) map.put("host", host);
     if (hosts != null) map.put("hosts", hosts);
     if (serviceId != null) map.put("service_id", serviceId);
+    if (pluginConfigId != null) map.put("plugin_config_id", pluginConfigId);
     if (enableWebsocket != null) map.put("enable_websocket", enableWebsocket);
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
@@ -232,6 +245,7 @@ public final class RouteConfigValue extends AbstractApiModel implements ConfigVa
         && Objects.equals(this.host, that.host)
         && Objects.equals(this.hosts, that.hosts)
         && Objects.equals(this.serviceId, that.serviceId)
+        && Objects.equals(this.pluginConfigId, that.pluginConfigId)
         && Objects.equals(this.enableWebsocket, that.enableWebsocket)
         && Objects.equals(this.additionalProperties(), that.additionalProperties());
   }
@@ -250,6 +264,7 @@ public final class RouteConfigValue extends AbstractApiModel implements ConfigVa
         host,
         hosts,
         serviceId,
+        pluginConfigId,
         enableWebsocket,
         additionalProperties());
   }
@@ -279,6 +294,8 @@ public final class RouteConfigValue extends AbstractApiModel implements ConfigVa
         + hosts
         + ", serviceId="
         + serviceId
+        + ", pluginConfigId="
+        + pluginConfigId
         + ", enableWebsocket="
         + enableWebsocket
         + ", additionalProperties="
