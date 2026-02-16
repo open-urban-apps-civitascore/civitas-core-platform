@@ -30,6 +30,7 @@ export const DatastructureVersionSummaryApiSchema = DatastructureVersionApiSchem
 
 export const DatastructureApiSchema = DatastructureVersionApiSchema.omit({
   umlModelData: true,
+  versionNumber: true,
 }).extend({
   versions: z.array(DatastructureVersionSummaryApiSchema),
 })

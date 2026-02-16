@@ -6881,7 +6881,7 @@
   ],
   "datastructures": [
     {
-      "id": "1",
+      "id": "ds1",
       "name": "Test Datastructure 1",
       "description": "Description 1",
       "source": "OWN",
@@ -6889,9 +6889,53 @@
       "status": "DRAFT",
       "versions": [
         {
-          "id": "1",
+          "id": "v1",
           "name": "Test Version 1",
           "description": "Version Description 1",
+          "versionNumber": "1.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        }
+      ]
+    },
+    {
+      "id": "ds2",
+      "name": "Test Datastructure 2",
+      "description": "Description 2",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": [
+        {
+          "id": "v2",
+          "name": "Test Version 2",
+          "description": "Version Description 2",
+          "versionNumber": "1.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        }
+      ]
+    },
+    {
+      "id": "ds3",
+      "name": "Test Datastructure 3",
+      "description": "Description 3",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": [
+        {
+          "id": "v3",
+          "name": "Test Version 3",
+          "description": "Version Description 3",
+          "versionNumber": "1.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        },
+        {
+          "id": "v4",
+          "name": "Test Version 4",
+          "description": "Version Description 4",
           "versionNumber": "1.0",
           "source": "OWN",
           "status": "DRAFT"
