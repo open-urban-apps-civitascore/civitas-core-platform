@@ -74,11 +74,6 @@ test_endpoint() {
 
     echo -n "  Testing: $name ... "
 
-    local auth_header=""
-    if [ -n "$token" ]; then
-        auth_header="-H \"Authorization: Bearer $token\""
-    fi
-
     # Make request (use -s without -f to capture HTTP status codes for errors)
     local response
     if [ -n "$token" ]; then

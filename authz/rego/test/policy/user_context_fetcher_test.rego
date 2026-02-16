@@ -303,6 +303,55 @@ test_custom_request_timeout if {
     timeout == "10s"
 }
 
+# Test: Default cache_duration_seconds is 0 (disabled)
+test_default_cache_duration_seconds if {
+    dur := user_context_fetcher.cache_duration_seconds with input as {}
+    dur == 0
+}
+
+# Test: Custom cache_duration_seconds from data.config
+test_custom_cache_duration_seconds if {
+    dur := user_context_fetcher.cache_duration_seconds with input as {} with data.config as {
+        "authz_cache_duration_seconds": 30
+    }
+    dur == 30
+}
+
+# Test: Fetch works with caching disabled (default, cache_duration_seconds == 0)
+test_fetch_uncached_path if {
+    ctx := user_context_fetcher.user_context
+        with http.send as mock_http_send_success
+        with data.config as mock_http.mock_config
+        with input as {
+            "request": {
+                "method": "GET",
+                "path": "/v2/users",
+                "headers": {
+                    "x-userinfo": mock_http.encode_userinfo("keycloak-sub-123")
+                }
+            }
+        }
+    ctx.userId == "user-123"
+}
+
+# Test: Fetch works with caching enabled (cache_duration_seconds > 0)
+test_fetch_cached_path if {
+    cached_config := object.union(mock_http.mock_config, {"authz_cache_duration_seconds": 30})
+    ctx := user_context_fetcher.user_context
+        with http.send as mock_http_send_success
+        with data.config as cached_config
+        with input as {
+            "request": {
+                "method": "GET",
+                "path": "/v2/users",
+                "headers": {
+                    "x-userinfo": mock_http.encode_userinfo("keycloak-sub-123")
+                }
+            }
+        }
+    ctx.userId == "user-123"
+}
+
 # =============================================================================
 # DEBUG INFO TESTS
 # =============================================================================

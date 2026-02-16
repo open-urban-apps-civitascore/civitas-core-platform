@@ -9,7 +9,8 @@
 #
 # The start-dev.sh script handles this automatically.
 
-FROM eclipse-temurin:21-jre-alpine
+# Pinned: eclipse-temurin:21-jre-alpine (2026-02-16). Update digest on base image updates.
+FROM eclipse-temurin:21-jre-alpine@sha256:6ad8ed080d9be96b61438ec3ce99388e294af216ed57356000c06070e85c5d5d
 
 WORKDIR /app
 

@@ -70,6 +70,17 @@ request_timeout := data.config.authz_request_timeout if {
     data.config.authz_request_timeout
 }
 
+# Cache duration for AuthZ Repository responses (seconds).
+# Default 0 = disabled (every OPA evaluation fetches fresh data).
+# When > 0, OPA's http.send() caches the response for this duration.
+# This is a production lifeline — enable by setting authz_cache_duration_seconds
+# in opa-config.json and restarting OPA. No code change required.
+default cache_duration_seconds := 0
+
+cache_duration_seconds := data.config.authz_cache_duration_seconds if {
+    data.config.authz_cache_duration_seconds
+}
+
 # =============================================================================
 # X-USERINFO HEADER DECODING
 # =============================================================================
@@ -111,9 +122,13 @@ external_id := decoded_userinfo.sub if {
 # Fetch user context from AuthZ Repository using the external ID
 # Returns the response body (user_context) if successful
 #
-# The http.send() call is memoized by OPA - multiple evaluations in the same
-# request will reuse the cached response.
+# The http.send() call is memoized by OPA within a single evaluation.
+# When cache_duration_seconds > 0, OPA also caches across evaluations
+# using force_cache/force_cache_duration_seconds.
+
+# Uncached path (default): fresh fetch every evaluation
 fetched_user_context := response.body if {
+    cache_duration_seconds == 0
     external_id
     url := concat("", [authz_repository_url, "/", external_id])
     response := http.send({
@@ -123,6 +138,24 @@ fetched_user_context := response.body if {
         "headers": {
             "Accept": "application/json"
         }
+    })
+    response.status_code == 200
+}
+
+# Cached path: reuse response across evaluations for cache_duration_seconds
+fetched_user_context := response.body if {
+    cache_duration_seconds > 0
+    external_id
+    url := concat("", [authz_repository_url, "/", external_id])
+    response := http.send({
+        "method": "GET",
+        "url": url,
+        "timeout": request_timeout,
+        "headers": {
+            "Accept": "application/json"
+        },
+        "force_cache": true,
+        "force_cache_duration_seconds": cache_duration_seconds
     })
     response.status_code == 200
 }

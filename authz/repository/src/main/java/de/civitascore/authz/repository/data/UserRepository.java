@@ -8,6 +8,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+/**
+ * Read-only repository for user authorization context lookups.
+ *
+ * <p>Uses a single JOIN FETCH query to eagerly load the full entity graph (User → Groups →
+ * Assignments → Roles → Permissions) needed for OPA policy evaluation.
+ */
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
 

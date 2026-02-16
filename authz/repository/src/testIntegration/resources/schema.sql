@@ -64,15 +64,18 @@ CREATE TABLE IF NOT EXISTS assignments
 (
     id                   UUID                        NOT NULL,
     scope_type           VARCHAR(255)                NOT NULL,
-    scope_id             VARCHAR(255),
     created_at           TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     modified_at          TIMESTAMP WITHOUT TIME ZONE,
     created_by           UUID,
     modified_by          UUID,
     group_id             UUID                        NOT NULL,
     role_id              UUID                        NOT NULL,
-    is_inherited         BOOLEAN                     NOT NULL,
     parent_assignment_id UUID,
+    data_structure_id    UUID,
+    data_source_id       UUID,
+    dataset_id           UUID,
+    data_space_id        UUID,
+    catalog_id           UUID,
     CONSTRAINT pk_assignments PRIMARY KEY (id)
 );
 

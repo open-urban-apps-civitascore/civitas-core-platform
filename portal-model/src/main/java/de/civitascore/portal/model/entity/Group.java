@@ -16,7 +16,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import lombok.AccessLevel;
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -81,6 +80,10 @@ public class Group extends NamedEntity {
    *
    * @return a set of all child groups
    */
+  // TODO SECURITY (low): No cycle detection — a cycle in parentGroup/childGroups
+  // (e.g. from data corruption) causes unbounded recursion (StackOverflowError).
+  // Also triggers N+1 lazy-loading queries per recursion level. Consider adding a
+  // visited-set or depth limit if group hierarchies grow.
   public Set<Group> getChildGroupsRecursive() {
     Set<Group> allChildGroups = new HashSet<>(childGroups);
     for (Group child : childGroups) {

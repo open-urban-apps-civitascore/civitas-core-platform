@@ -31,9 +31,9 @@ VALUES
 -- Create test users
 INSERT INTO users (id, external_id, email, first_name, last_name, active, created_at)
 VALUES
-  ('d1111111-1111-1111-1111-111111111111', 'test-user-001', 'reader@test.com', 'Test', 'Reader', true, NOW()),
-  ('d2222222-2222-2222-2222-222222222222', 'test-user-002', 'editor@test.com', 'Test', 'Editor', true, NOW()),
-  ('d3333333-3333-3333-3333-333333333333', 'test-user-003', 'nogroups@test.com', 'No', 'Groups', true, NOW());
+  ('d1111111-1111-1111-1111-111111111111', 'e0000001-0000-0000-0000-000000000001', 'reader@test.com', 'Test', 'Reader', true, NOW()),
+  ('d2222222-2222-2222-2222-222222222222', 'e0000002-0000-0000-0000-000000000002', 'editor@test.com', 'Test', 'Editor', true, NOW()),
+  ('d3333333-3333-3333-3333-333333333333', 'e0000003-0000-0000-0000-000000000003', 'nogroups@test.com', 'No', 'Groups', true, NOW());
 
 -- Add users to groups
 INSERT INTO group_members (user_id, group_id)
@@ -43,11 +43,13 @@ VALUES
   ('d2222222-2222-2222-2222-222222222222', 'c2222222-2222-2222-2222-222222222222');
 
 -- Create assignments (role + scope assignments for groups)
-INSERT INTO assignments (id, group_id, role_id, scope_type, scope_id, is_inherited, created_at)
+-- Note: TENANT-scoped assignments have no scope entity (getScopeId() returns null).
+-- DATASPACE-scoped assignments use data_space_id FK column.
+INSERT INTO assignments (id, group_id, role_id, scope_type, data_space_id, created_at)
 VALUES
-  ('e1111111-1111-1111-1111-111111111111', 'c1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111', 'TENANT', 'tenant-001', false, NOW()),
-  ('e2222222-2222-2222-2222-222222222222', 'c2222222-2222-2222-2222-222222222222', 'b2222222-2222-2222-2222-222222222222', 'DATASPACE', 'dataspace-001', false, NOW()),
-  ('e3333333-3333-3333-3333-333333333333', 'c2222222-2222-2222-2222-222222222222', 'b3333333-3333-3333-3333-333333333333', 'TENANT', 'tenant-001', false, NOW());
+  ('e1111111-1111-1111-1111-111111111111', 'c1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111', 'TENANT', NULL, NOW()),
+  ('e2222222-2222-2222-2222-222222222222', 'c2222222-2222-2222-2222-222222222222', 'b2222222-2222-2222-2222-222222222222', 'DATASPACE', 'f2222222-2222-2222-2222-222222222222', NOW()),
+  ('e3333333-3333-3333-3333-333333333333', 'c2222222-2222-2222-2222-222222222222', 'b3333333-3333-3333-3333-333333333333', 'TENANT', NULL, NOW());
 
 -- ============================================
 -- Edge case test data
@@ -66,7 +68,7 @@ VALUES
 -- User in group with no assignments
 INSERT INTO users (id, external_id, email, first_name, last_name, active, created_at)
 VALUES
-  ('d4444444-4444-4444-4444-444444444444', 'test-user-004', 'empty-assignments@test.com', 'Empty', 'Assignments', true, NOW());
+  ('d4444444-4444-4444-4444-444444444444', 'e0000004-0000-0000-0000-000000000004', 'empty-assignments@test.com', 'Empty', 'Assignments', true, NOW());
 
 INSERT INTO group_members (user_id, group_id)
 VALUES
@@ -75,7 +77,7 @@ VALUES
 -- User with role that has no permissions
 INSERT INTO users (id, external_id, email, first_name, last_name, active, created_at)
 VALUES
-  ('d5555555-5555-5555-5555-555555555555', 'test-user-005', 'empty-perms@test.com', 'Empty', 'Permissions', true, NOW());
+  ('d5555555-5555-5555-5555-555555555555', 'e0000005-0000-0000-0000-000000000005', 'empty-perms@test.com', 'Empty', 'Permissions', true, NOW());
 
 INSERT INTO groups (id, name, description, created_at)
 VALUES
@@ -85,9 +87,9 @@ INSERT INTO group_members (user_id, group_id)
 VALUES
   ('d5555555-5555-5555-5555-555555555555', 'c4444444-4444-4444-4444-444444444444');
 
-INSERT INTO assignments (id, group_id, role_id, scope_type, scope_id, is_inherited, created_at)
+INSERT INTO assignments (id, group_id, role_id, scope_type, created_at)
 VALUES
-  ('e4444444-4444-4444-4444-444444444444', 'c4444444-4444-4444-4444-444444444444', 'b4444444-4444-4444-4444-444444444444', 'TENANT', 'tenant-002', false, NOW());
+  ('e4444444-4444-4444-4444-444444444444', 'c4444444-4444-4444-4444-444444444444', 'b4444444-4444-4444-4444-444444444444', 'TENANT', NOW());
 
 -- User with many permissions (10+) for sorting test
 INSERT INTO permissions (id, name, description, permission_type, created_at)
@@ -122,7 +124,7 @@ VALUES
 
 INSERT INTO users (id, external_id, email, first_name, last_name, active, created_at)
 VALUES
-  ('d6666666-6666-6666-6666-666666666666', 'test-user-006', 'many-perms@test.com', 'Many', 'Permissions', true, NOW());
+  ('d6666666-6666-6666-6666-666666666666', 'e0000006-0000-0000-0000-000000000006', 'many-perms@test.com', 'Many', 'Permissions', true, NOW());
 
 INSERT INTO groups (id, name, description, created_at)
 VALUES
@@ -132,14 +134,14 @@ INSERT INTO group_members (user_id, group_id)
 VALUES
   ('d6666666-6666-6666-6666-666666666666', 'c5555555-5555-5555-5555-555555555555');
 
-INSERT INTO assignments (id, group_id, role_id, scope_type, scope_id, is_inherited, created_at)
+INSERT INTO assignments (id, group_id, role_id, scope_type, created_at)
 VALUES
-  ('e5555555-5555-5555-5555-555555555555', 'c5555555-5555-5555-5555-555555555555', 'b5555555-5555-5555-5555-555555555555', 'TENANT', 'tenant-003', false, NOW());
+  ('e5555555-5555-5555-5555-555555555555', 'c5555555-5555-5555-5555-555555555555', 'b5555555-5555-5555-5555-555555555555', 'TENANT', NOW());
 
 -- User with same role at different scopes
 INSERT INTO users (id, external_id, email, first_name, last_name, active, created_at)
 VALUES
-  ('d7777777-7777-7777-7777-777777777777', 'test-user-007', 'multi-scope@test.com', 'Multi', 'Scope', true, NOW());
+  ('d7777777-7777-7777-7777-777777777777', 'e0000007-0000-0000-0000-000000000007', 'multi-scope@test.com', 'Multi', 'Scope', true, NOW());
 
 INSERT INTO groups (id, name, description, created_at)
 VALUES
@@ -149,7 +151,7 @@ INSERT INTO group_members (user_id, group_id)
 VALUES
   ('d7777777-7777-7777-7777-777777777777', 'c6666666-6666-6666-6666-666666666666');
 
-INSERT INTO assignments (id, group_id, role_id, scope_type, scope_id, is_inherited, created_at)
+INSERT INTO assignments (id, group_id, role_id, scope_type, data_space_id, created_at)
 VALUES
-  ('e6666666-6666-6666-6666-666666666666', 'c6666666-6666-6666-6666-666666666666', 'b1111111-1111-1111-1111-111111111111', 'TENANT', 'tenant-A', false, NOW()),
-  ('e7777777-7777-7777-7777-777777777777', 'c6666666-6666-6666-6666-666666666666', 'b1111111-1111-1111-1111-111111111111', 'DATASPACE', 'dataspace-B', false, NOW());
+  ('e6666666-6666-6666-6666-666666666666', 'c6666666-6666-6666-6666-666666666666', 'b1111111-1111-1111-1111-111111111111', 'TENANT', NULL, NOW()),
+  ('e7777777-7777-7777-7777-777777777777', 'c6666666-6666-6666-6666-666666666666', 'b1111111-1111-1111-1111-111111111111', 'DATASPACE', 'f7777777-7777-7777-7777-777777777777', NOW());

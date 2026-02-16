@@ -47,7 +47,24 @@ allow if {
 # DECISION EVALUATION
 # =============================================================================
 
-# Priority order: null-permission → permission check → deny
+# IMPORTANT: These rules use Rego incremental definitions for the same variable
+# (evaluate_request). They MUST be mutually exclusive — if two rules fire with
+# different values, OPA raises a runtime conflict error, not a priority-based
+# resolution. The "priority" numbering below is for human readability only.
+#
+# Mutual exclusivity is guaranteed by these conditions:
+#   - Rules 1,2 require is_null_permission_endpoint; rules 3,4,5 require NOT
+#   - Rules 1 vs 2: is_authenticated vs not is_authenticated
+#   - Rules 4 vs 5: has_permission vs not has_permission
+#   - Rules 3 vs 4,5: not has_user_context vs has_user_context
+#   - Rule 6: backend == "unknown" (rules 3,7 require backend != "unknown";
+#     rules 1,2,4,5 require is_known_endpoint which is false when backend is unknown)
+#   - Rule 7: not is_known_endpoint (rules 1-5 require is_known_endpoint or
+#     is_null_permission_endpoint, which implies is_known_endpoint)
+#
+# If adding new rules or providers, verify mutual exclusivity is preserved.
+# Consider refactoring to an `else` chain if the conditions become harder to
+# reason about — that would give true priority ordering enforced by OPA.
 
 # 1. Null-permission endpoints (auth required, no specific permission)
 # No scope header needed - these endpoints don't have permission-based filtering

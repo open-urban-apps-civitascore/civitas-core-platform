@@ -1,4 +1,4 @@
-# M5: Full AuthZ Integration Stack
+# M5: Full AuthZ Integration Stack (standalone development)
 #
 # Complete authorization chain: APISIX -> OPA -> AuthZ Repository
 #
@@ -11,6 +11,10 @@
 #   - PostgreSQL (civitas-postgres-portal) must be running with portal_backend DB
 #   - Keycloak (civitas-keycloak) must be running
 #   - Portal Backend (port 8089) should be running for actual API requests
+#
+# NOTE: This stack and dev-environment/apisix/docker-compose.yml define the same
+# OPA and AuthZ Repository services (same container names and ports). They are
+# mutually exclusive — do not run both simultaneously.
 #
 # Usage:
 #   docker compose up -d
@@ -28,8 +32,8 @@ services:
     restart: always
     environment:
       DATABASE_URL: jdbc:postgresql://civitas-postgres-portal:5432/portal_backend
-      DATABASE_USERNAME: admin
-      DATABASE_PASSWORD: admin
+      DATABASE_USERNAME: ${POSTGRES_USER:-admin}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       SERVER_PORT: 8091
     ports:
       - "8091:8091"

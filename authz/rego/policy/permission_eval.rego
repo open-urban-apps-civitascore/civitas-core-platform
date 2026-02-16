@@ -10,7 +10,7 @@
 # User context is obtained via user_context_fetcher, which handles:
 #   - Decoding X-Userinfo header from APISIX
 #   - Fetching from AuthZ Repository via http.send()
-#   - Fallback to input.user_context for testing
+#   - Tests mock http.send() using OPA's `with http.send as mock_fn` syntax
 #
 # main.rego uses these rules to produce final allow/deny decisions with reasons.
 # Public endpoints are handled at APISIX level (never reach OPA).

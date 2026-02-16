@@ -66,7 +66,7 @@ create_user() {
 
     if [ -n "$EXISTING_USER" ]; then
         echo "  User already exists with ID: $EXISTING_USER"
-        eval "$var_name='$EXISTING_USER'"
+        printf -v "$var_name" '%s' "$EXISTING_USER"
         return
     fi
 
@@ -99,7 +99,7 @@ create_user() {
         | jq -r '.[0].id')
 
     echo "  Created with ID: $USER_ID"
-    eval "$var_name='$USER_ID'"
+    printf -v "$var_name" '%s' "$USER_ID"
 }
 
 # Create test users

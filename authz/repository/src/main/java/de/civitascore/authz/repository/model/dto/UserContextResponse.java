@@ -5,6 +5,13 @@ import java.util.UUID;
 import lombok.Builder;
 import lombok.Data;
 
+/**
+ * DTO representing a user's full authorization context.
+ *
+ * <p>Returned by the {@code /api/v1/user-context/{externalId}} endpoint. Contains the user's group
+ * memberships, role assignments (with scope), and flattened permission names. OPA consumes this to
+ * make authorization decisions.
+ */
 @Data
 @Builder
 public class UserContextResponse {

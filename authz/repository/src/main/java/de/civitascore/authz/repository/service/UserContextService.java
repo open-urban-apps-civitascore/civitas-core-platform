@@ -7,14 +7,22 @@ import de.civitascore.authz.repository.model.dto.UserContextResponse.GroupContex
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Permission;
+import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.entity.User;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Service for building user authorization context from the portal database.
+ *
+ * <p>Maps the JPA entity graph (User → Groups → Assignments → Roles → Permissions) into a flat DTO
+ * suitable for OPA policy evaluation via the AuthZ Repository REST API.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -24,9 +32,16 @@ public class UserContextService {
 
   @Transactional(readOnly = true)
   public Optional<UserContextResponse> getUserContext(String externalId) {
-    log.debug("Fetching user context for externalId: {}", externalId);
+    log.debug("Fetching user context for externalId: {}", maskUuid(Encode.forJava(externalId)));
 
     return userRepository.findByExternalIdWithContext(externalId).map(this::mapToResponse);
+  }
+
+  private static String maskUuid(String uuid) {
+    if (uuid == null || uuid.length() < 8) {
+      return "***";
+    }
+    return uuid.substring(0, 4) + "****" + uuid.substring(uuid.length() - 4);
   }
 
   private UserContextResponse mapToResponse(User user) {
@@ -56,7 +71,7 @@ public class UserContextService {
   }
 
   private AssignmentContext mapAssignmentContext(Assignment assignment) {
-    var role = assignment.getRole();
+    Role role = assignment.getRole();
     List<String> permissionNames =
         role == null || role.getPermissions() == null
             ? List.of()

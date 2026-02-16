@@ -199,6 +199,27 @@ test_malformed_user_context_allows_null_permission if {
     result.reason == "authenticated_endpoint"
 }
 
+# Test: Known path but unsupported HTTP method is denied (e.g., POST /v2/permissions — only GET defined)
+# Path matches but method has no permission mapping → is_known_endpoint=false → "unknown_endpoint"
+test_unsupported_method_on_known_path_denied if {
+    result := authz.decision
+        with http.send as mock_send_admin
+        with data.config as mock_http.mock_config
+        with input as portal_request("POST", "/v2/permissions")
+    result.allow == false
+    result.reason == "unknown_endpoint"
+}
+
+# Test: DELETE on permissions endpoint (only GET defined) is also denied
+test_delete_on_readonly_endpoint_denied if {
+    result := authz.decision
+        with http.send as mock_send_admin
+        with data.config as mock_http.mock_config
+        with input as portal_request("DELETE", "/v2/permissions/perm-123")
+    result.allow == false
+    result.reason == "unknown_endpoint"
+}
+
 # Test: Unknown endpoint path results in denial
 test_unknown_endpoint_denied if {
     result := authz.decision

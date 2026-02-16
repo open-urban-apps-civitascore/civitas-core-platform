@@ -1,5 +1,6 @@
 {
   "config": {
-    "authz_repository_url": "http://civitas-authz-repository:8091/api/v1/user-context"
+    "authz_repository_url": "http://civitas-authz-repository:8091/api/v1/user-context",
+    "authz_cache_duration_seconds": 0
   }
 }

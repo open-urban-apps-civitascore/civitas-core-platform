@@ -57,7 +57,7 @@ class UserContextControllerIT {
   @Test
   void getUserContext_withValidExternalId_returnsUserContext() {
     ResponseEntity<UserContextResponse> response =
-        restTemplate.getForEntity("/api/v1/user-context/test-user-001", UserContextResponse.class);
+        restTemplate.getForEntity("/api/v1/user-context/e0000001-0000-0000-0000-000000000001", UserContextResponse.class);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isNotNull();
@@ -65,7 +65,7 @@ class UserContextControllerIT {
     UserContextResponse body = response.getBody();
     assertThat(body.getUserId())
         .isEqualTo(UUID.fromString("d1111111-1111-1111-1111-111111111111"));
-    assertThat(body.getExternalId()).isEqualTo("test-user-001");
+    assertThat(body.getExternalId()).isEqualTo("e0000001-0000-0000-0000-000000000001");
     assertThat(body.getGroups()).hasSize(1);
 
     GroupContext group = body.getGroups().get(0);
@@ -76,20 +76,20 @@ class UserContextControllerIT {
     assertThat(assignment.getRoleName()).isEqualTo("DataReader");
     assertThat(assignment.getRoleType()).isEqualTo("DATA");
     assertThat(assignment.getScopeType()).isEqualTo("TENANT");
-    assertThat(assignment.getScopeId()).isEqualTo("tenant-001");
+    assertThat(assignment.getScopeId()).isNull(); // TENANT scope has no scope entity
     assertThat(assignment.getPermissions()).containsExactly("dataset:read");
   }
 
   @Test
   void getUserContext_withMultipleGroups_returnsAllGroupsAndAssignments() {
     ResponseEntity<UserContextResponse> response =
-        restTemplate.getForEntity("/api/v1/user-context/test-user-002", UserContextResponse.class);
+        restTemplate.getForEntity("/api/v1/user-context/e0000002-0000-0000-0000-000000000002", UserContextResponse.class);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isNotNull();
 
     UserContextResponse body = response.getBody();
-    assertThat(body.getExternalId()).isEqualTo("test-user-002");
+    assertThat(body.getExternalId()).isEqualTo("e0000002-0000-0000-0000-000000000002");
     assertThat(body.getGroups()).hasSize(2);
 
     List<String> groupNames = body.getGroups().stream().map(GroupContext::getName).toList();
@@ -110,13 +110,13 @@ class UserContextControllerIT {
   @Test
   void getUserContext_withNoGroups_returnsEmptyGroups() {
     ResponseEntity<UserContextResponse> response =
-        restTemplate.getForEntity("/api/v1/user-context/test-user-003", UserContextResponse.class);
+        restTemplate.getForEntity("/api/v1/user-context/e0000003-0000-0000-0000-000000000003", UserContextResponse.class);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isNotNull();
 
     UserContextResponse body = response.getBody();
-    assertThat(body.getExternalId()).isEqualTo("test-user-003");
+    assertThat(body.getExternalId()).isEqualTo("e0000003-0000-0000-0000-000000000003");
     assertThat(body.getGroups()).isEmpty();
   }
 
@@ -124,13 +124,22 @@ class UserContextControllerIT {
   void getUserContext_withNonExistentExternalId_returns404() {
     ResponseEntity<UserContextResponse> response =
         restTemplate.getForEntity(
-            "/api/v1/user-context/non-existent-user", UserContextResponse.class);
+            "/api/v1/user-context/00000000-0000-0000-0000-000000000000",
+            UserContextResponse.class);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
   }
 
   @Test
-  void healthEndpoint_returnsUp() {
+  void getUserContext_withInvalidExternalIdFormat_returns400() {
+    ResponseEntity<String> response =
+        restTemplate.getForEntity("/api/v1/user-context/not-a-uuid", String.class);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+  }
+
+  @Test
+  void healthEndpoint_called_returnsUp() {
     ResponseEntity<String> response = restTemplate.getForEntity("/actuator/health", String.class);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -144,13 +153,13 @@ class UserContextControllerIT {
   @Test
   void getUserContext_withGroupButNoAssignments_returnsEmptyAssignmentsList() {
     ResponseEntity<UserContextResponse> response =
-        restTemplate.getForEntity("/api/v1/user-context/test-user-004", UserContextResponse.class);
+        restTemplate.getForEntity("/api/v1/user-context/e0000004-0000-0000-0000-000000000004", UserContextResponse.class);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isNotNull();
 
     UserContextResponse body = response.getBody();
-    assertThat(body.getExternalId()).isEqualTo("test-user-004");
+    assertThat(body.getExternalId()).isEqualTo("e0000004-0000-0000-0000-000000000004");
     assertThat(body.getGroups()).hasSize(1);
 
     GroupContext group = body.getGroups().get(0);
@@ -161,13 +170,13 @@ class UserContextControllerIT {
   @Test
   void getUserContext_withRoleHavingNoPermissions_returnsEmptyPermissionsList() {
     ResponseEntity<UserContextResponse> response =
-        restTemplate.getForEntity("/api/v1/user-context/test-user-005", UserContextResponse.class);
+        restTemplate.getForEntity("/api/v1/user-context/e0000005-0000-0000-0000-000000000005", UserContextResponse.class);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isNotNull();
 
     UserContextResponse body = response.getBody();
-    assertThat(body.getExternalId()).isEqualTo("test-user-005");
+    assertThat(body.getExternalId()).isEqualTo("e0000005-0000-0000-0000-000000000005");
     assertThat(body.getGroups()).hasSize(1);
 
     GroupContext group = body.getGroups().get(0);
@@ -181,13 +190,13 @@ class UserContextControllerIT {
   @Test
   void getUserContext_withManyPermissions_returnsAllPermissionsSorted() {
     ResponseEntity<UserContextResponse> response =
-        restTemplate.getForEntity("/api/v1/user-context/test-user-006", UserContextResponse.class);
+        restTemplate.getForEntity("/api/v1/user-context/e0000006-0000-0000-0000-000000000006", UserContextResponse.class);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isNotNull();
 
     UserContextResponse body = response.getBody();
-    assertThat(body.getExternalId()).isEqualTo("test-user-006");
+    assertThat(body.getExternalId()).isEqualTo("e0000006-0000-0000-0000-000000000006");
 
     GroupContext group = body.getGroups().get(0);
     AssignmentContext assignment = group.getAssignments().get(0);
@@ -213,13 +222,13 @@ class UserContextControllerIT {
   @Test
   void getUserContext_withSameRoleAtDifferentScopes_returnsBothAssignments() {
     ResponseEntity<UserContextResponse> response =
-        restTemplate.getForEntity("/api/v1/user-context/test-user-007", UserContextResponse.class);
+        restTemplate.getForEntity("/api/v1/user-context/e0000007-0000-0000-0000-000000000007", UserContextResponse.class);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isNotNull();
 
     UserContextResponse body = response.getBody();
-    assertThat(body.getExternalId()).isEqualTo("test-user-007");
+    assertThat(body.getExternalId()).isEqualTo("e0000007-0000-0000-0000-000000000007");
 
     GroupContext group = body.getGroups().get(0);
     assertThat(group.getName()).isEqualTo("Multi Scope Group");
@@ -235,9 +244,21 @@ class UserContextControllerIT {
         group.getAssignments().stream().map(AssignmentContext::getScopeType).toList();
     assertThat(scopeTypes).containsExactlyInAnyOrder("TENANT", "DATASPACE");
 
-    // Different scope IDs
-    List<String> scopeIds =
-        group.getAssignments().stream().map(AssignmentContext::getScopeId).toList();
-    assertThat(scopeIds).containsExactlyInAnyOrder("tenant-A", "dataspace-B");
+    // TENANT assignment has no scope entity (scopeId is null)
+    AssignmentContext tenantAssignment =
+        group.getAssignments().stream()
+            .filter(a -> "TENANT".equals(a.getScopeType()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(tenantAssignment.getScopeId()).isNull();
+
+    // DATASPACE assignment has scopeId from data_space_id FK column
+    AssignmentContext dataspaceAssignment =
+        group.getAssignments().stream()
+            .filter(a -> "DATASPACE".equals(a.getScopeType()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(dataspaceAssignment.getScopeId())
+        .isEqualTo("f7777777-7777-7777-7777-777777777777");
   }
 }

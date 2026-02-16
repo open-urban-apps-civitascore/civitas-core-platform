@@ -8,6 +8,10 @@
 #
 # Included by dev-environment/backend/docker-compose.yml — team 2 gets
 # authorization automatically when starting their dev environment.
+#
+# NOTE: This stack and dev-environment/authz/docker-compose.yml define the same
+# OPA and AuthZ Repository services (same container names and ports). They are
+# mutually exclusive — do not run both simultaneously.
 
 services:
   # AuthZ Repository - serves user context to OPA
@@ -19,8 +23,8 @@ services:
     restart: always
     environment:
       DATABASE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
-      DATABASE_USERNAME: admin
-      DATABASE_PASSWORD: admin
+      DATABASE_USERNAME: ${POSTGRES_USER:-admin}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       SERVER_PORT: 8091
     ports:
       - "8091:8091"
@@ -80,13 +84,15 @@ services:
     volumes:
       - ./seed-dev-admin.sql:/seed-dev-admin.sql:ro
     command: >
-      psql -h postgres-portal -U admin -d portal_backend -f /seed-dev-admin.sql
+      psql -h postgres-portal -U ${POSTGRES_USER:-admin} -d portal_backend -f /seed-dev-admin.sql
     environment:
-      PGPASSWORD: admin
+      PGPASSWORD: ${POSTGRES_PASSWORD:-admin}
     networks:
       - civitas-network
     depends_on:
       portal-backend:
+        condition: service_healthy
+      authz-repository:
         condition: service_healthy
 
   # APISIX - API Gateway with JWT validation + OPA authorization

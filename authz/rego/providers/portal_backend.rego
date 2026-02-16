@@ -60,9 +60,10 @@ path_parts := restmapper.parse_path(input.request.path)
 # for scope enforcement on resource endpoints.
 #
 # Scope model (without inheritance):
-#   - TENANT resources: users, groups, roles, permissions, assignments, catalogs
-#   - DATASPACE resources: dataspaces
+#   - TENANT resources: users, groups, roles, permissions, assignments
 #   - DATASET resources: datasets
+#   - DATASOURCE resources: datasources
+#   - DATASTRUCTURE resources: datastructures
 #
 # For resource endpoints (/v2/resource/{id}), the {id} IS the scopeId.
 # TENANT-scoped resources don't require specific scopeId matching (Q-005 pending).
@@ -74,8 +75,6 @@ resource_scope_type := {
 	"roles": "TENANT",
 	"permissions": "TENANT",
 	"assignments": "TENANT",
-	"catalogs": "TENANT",
-	"dataspaces": "DATASPACE",
 	"datasets": "DATASET",
 	"datasources": "DATASOURCE",
 	"datastructures": "DATASTRUCTURE",

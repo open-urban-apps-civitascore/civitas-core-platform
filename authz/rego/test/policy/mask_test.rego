@@ -14,6 +14,10 @@ test_masks_access_token if {
 	"/input/request/headers/X-Access-Token" in log.mask
 }
 
+test_masks_access_token_lowercase if {
+	"/input/request/headers/x-access-token" in log.mask
+}
+
 test_masks_userinfo if {
 	"/input/request/headers/X-Userinfo" in log.mask
 }
@@ -27,5 +31,5 @@ test_masks_authorization_titlecase if {
 }
 
 test_mask_count if {
-	count(log.mask) == 4
+	count(log.mask) == 5
 }

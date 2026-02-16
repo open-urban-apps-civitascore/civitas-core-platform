@@ -34,7 +34,7 @@ class UserContextServiceTest {
 
   @InjectMocks private UserContextService userContextService;
 
-  private static final String EXTERNAL_ID = "test-external-id";
+  private static final String EXTERNAL_ID = "e0000000-0000-0000-0000-000000000001";
   private static final UUID USER_ID = UUID.randomUUID();
   private static final UUID SCOPE_ID_1 = UUID.randomUUID();
   private static final UUID SCOPE_ID_2 = UUID.randomUUID();
@@ -45,7 +45,7 @@ class UserContextServiceTest {
 
     @Test
     @DisplayName("returns empty when user not found")
-    void returnsEmptyWhenUserNotFound() {
+    void getUserContext_userNotFound_returnsEmpty() {
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.empty());
 
       Optional<UserContextResponse> result = userContextService.getUserContext(EXTERNAL_ID);
@@ -55,7 +55,7 @@ class UserContextServiceTest {
 
     @Test
     @DisplayName("returns user with basic info when found")
-    void returnsUserWithBasicInfo() {
+    void getUserContext_userFound_returnsBasicInfo() {
       User user = createUser();
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
 
@@ -68,7 +68,7 @@ class UserContextServiceTest {
 
     @Test
     @DisplayName("returns empty groups list when user has no groups")
-    void returnsEmptyGroupsWhenNoGroups() {
+    void getUserContext_userHasNoGroups_returnsEmptyGroupsList() {
       User user = createUser();
       // createUser already returns empty groups set
       when(userRepository.findByExternalIdWithContext(EXTERNAL_ID)).thenReturn(Optional.of(user));
@@ -81,7 +81,7 @@ class UserContextServiceTest {
 
     @Test
     @DisplayName("maps group with no assignments to empty assignments list")
-    void mapsGroupWithNoAssignments() {
+    void getUserContext_groupWithNoAssignments_returnsEmptyAssignmentsList() {
       User user = createUser();
       Group group = createGroup("Empty Group");
       // createGroup already returns empty assignments set
@@ -99,7 +99,7 @@ class UserContextServiceTest {
 
     @Test
     @DisplayName("maps role with no permissions to empty permissions list")
-    void mapsRoleWithNoPermissions() {
+    void getUserContext_roleWithNoPermissions_returnsEmptyPermissionsList() {
       User user = createUser();
       Group group = createGroup("Test Group");
       Role role = createRole("Empty Role", RoleType.SYSTEM);
@@ -119,7 +119,7 @@ class UserContextServiceTest {
 
     @Test
     @DisplayName("handles assignment with null scopeId")
-    void handlesNullScopeId() {
+    void getUserContext_nullScopeId_returnsScopeIdAsNull() {
       User user = createUser();
       Group group = createGroup("Test Group");
       Role role = createRole("Admin Role", RoleType.SYSTEM);
@@ -140,7 +140,7 @@ class UserContextServiceTest {
 
     @Test
     @DisplayName("sorts permissions alphabetically")
-    void sortsPermissionsAlphabetically() {
+    void getUserContext_multiplePermissions_returnsSortedAlphabetically() {
       User user = createUser();
       Group group = createGroup("Test Group");
       Role role = createRole("Multi-Permission Role", RoleType.SYSTEM);
@@ -165,7 +165,7 @@ class UserContextServiceTest {
 
     @Test
     @DisplayName("maps all assignment fields correctly")
-    void mapsAllAssignmentFields() {
+    void getUserContext_completeAssignment_mapsAllFieldsCorrectly() {
       User user = createUser();
       Group group = createGroup("Test Group");
       UUID roleId = UUID.randomUUID();
@@ -191,7 +191,7 @@ class UserContextServiceTest {
 
     @Test
     @DisplayName("maps multiple groups correctly")
-    void mapsMultipleGroups() {
+    void getUserContext_multipleGroups_returnsAllGroups() {
       User user = createUser();
       Group group1 = createGroup("Group A");
       Group group2 = createGroup("Group B");
@@ -210,7 +210,7 @@ class UserContextServiceTest {
 
     @Test
     @DisplayName("maps multiple assignments per group")
-    void mapsMultipleAssignmentsPerGroup() {
+    void getUserContext_multipleAssignmentsPerGroup_returnsAllAssignments() {
       User user = createUser();
       Group group = createGroup("Multi-Role Group");
       Role role1 = createRole("Reader", RoleType.SYSTEM);

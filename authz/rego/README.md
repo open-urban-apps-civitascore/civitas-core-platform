@@ -53,7 +53,7 @@ OPA needs user context (groups, roles, permissions) to evaluate authorization. T
 1. **JWT claims from Keycloak**: Contains system roles and group memberships
 2. **AuthZ Repository lookup**: Maps Keycloak `sub` (externalId) to internal userId and fetches full permission hierarchy from database
 
-**M5 Integration** (not yet implemented):
+**M5 Integration**:
 - APISIX validates JWT and passes claims to OPA via the OPA plugin
 - OPA extracts `sub` from JWT claims
 - OPA calls AuthZ Repository (`http.send`) to get user's permissions: `GET /api/v1/user-context/{externalId}`
@@ -116,7 +116,7 @@ backends/frost_server/data.json    →  data.backends.frost_server.endpoints
 ./run-tests.sh
 ```
 
-Runs all 111 unit tests via Docker (no local OPA installation required).
+Runs all unit tests via Docker (no local OPA installation required).
 
 ### Building a Bundle
 
@@ -135,8 +135,8 @@ Output: `bundle.tar.gz` containing compiled policies and data.
 ### Testing Manually
 
 ```bash
-# Start OPA server
-cd dev-environment/opa && docker compose up -d
+# Start AuthZ stack (OPA + APISIX + AuthZ Repository)
+cd dev-environment/authz && docker compose up -d
 
 # Query a decision
 curl -X POST http://localhost:8181/v1/data/civitas/authz/decision \
@@ -213,5 +213,5 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision \
 
 ## Related Documentation
 
-- [ADR-001: Collection Endpoint Filtering](../../docs/architecture/ADR-001-collection-endpoint-filtering.md) - Scope-based filtering design
-- [AuthZ Deployment Guide](../../docs/handoff/TEAM3-AUTHZ-DEPLOYMENT.md) - Deployment and operations
+- ADR-001: Collection Endpoint Filtering — see official ADR repository
+- AuthZ Deployment Guide — see MR comments (Team 3)

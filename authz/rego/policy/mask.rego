@@ -16,6 +16,7 @@ import rego.v1
 
 # Raw JWT bearer token — never needed in logs
 mask contains "/input/request/headers/X-Access-Token"
+mask contains "/input/request/headers/x-access-token"
 
 # Base64-encoded user claims (contains sub, email, name) — PII
 mask contains "/input/request/headers/X-Userinfo"

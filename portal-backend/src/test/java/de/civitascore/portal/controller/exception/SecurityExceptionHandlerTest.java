@@ -42,7 +42,7 @@ class SecurityExceptionHandlerTest {
 
   @Test
   @DisplayName("Authentication exception should return 401 with correct error message")
-  void testCommenceReturns401WithCorrectMessage() throws IOException {
+  void commence_authenticationException_returns401WithErrorMessage() throws IOException {
     // given
     AuthenticationException authException = mock(AuthenticationException.class);
     when(authException.getMessage()).thenReturn("Invalid credentials");
@@ -68,7 +68,7 @@ class SecurityExceptionHandlerTest {
 
   @Test
   @DisplayName("Access denied exception should return 403 with correct error message")
-  void testHandleReturns403WithCorrectMessage() throws IOException {
+  void handle_accessDeniedException_returns403WithErrorMessage() throws IOException {
     // given
     AccessDeniedException accessDeniedException = new AccessDeniedException("Access is denied");
     StringWriter stringWriter = new StringWriter();
@@ -93,7 +93,7 @@ class SecurityExceptionHandlerTest {
 
   @Test
   @DisplayName("JWT exception should return 401 with invalid token error")
-  void testHandleJwtExceptionReturns401() {
+  void handleJwtException_tokenExpired_returns401WithInvalidToken() {
     // given
     JwtException jwtException = new JwtException("Token expired");
 
@@ -110,7 +110,7 @@ class SecurityExceptionHandlerTest {
 
   @Test
   @DisplayName("JWT exception with null message should return valid response")
-  void testHandleJwtExceptionWithNullMessage() {
+  void handleJwtException_nullMessage_returnsValidResponse() {
     // given
     JwtException jwtException = new JwtException(null);
 

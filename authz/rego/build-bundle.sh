@@ -34,7 +34,7 @@ echo ""
 # chmod 755 ensures OPA container (non-root user) can read the files
 BUNDLE_DIR=$(mktemp -d)
 chmod 755 "${BUNDLE_DIR}"
-trap "rm -rf ${BUNDLE_DIR}" EXIT
+trap 'rm -rf "${BUNDLE_DIR}"' EXIT
 
 # =============================================================================
 # PRE-FLIGHT CHECKS

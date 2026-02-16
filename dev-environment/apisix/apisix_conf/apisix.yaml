@@ -61,6 +61,8 @@ plugin_configs:
         discovery: "http://civitas-keycloak:8080/realms/civitas-core/.well-known/openid-configuration"
         bearer_only: true
         use_jwks: true
+        # DEV-ONLY: ssl_verify disabled for local HTTP Keycloak.
+        # PRODUCTION MUST use ssl_verify: true (see TEAM3-AUTHZ-DEPLOYMENT.md).
         ssl_verify: false
         # Pass decoded JWT claims to OPA via X-Userinfo header
         set_userinfo_header: true
@@ -77,7 +79,16 @@ plugin_configs:
         send_headers_upstream:
           - "X-Allowed-Scope-Ids"
 
-      # 3. Request ID for tracing
+      # 3. Strip client-supplied scope headers before OPA sets them.
+      # APISIX forwards all client headers by default — without this, a
+      # malicious client could send X-Allowed-Scope-Ids: * and bypass
+      # collection-level authorization filtering in the backend.
+      proxy-rewrite:
+        headers:
+          remove:
+            - "X-Allowed-Scope-Ids"
+
+      # 4. Request ID for tracing
       request-id:
         include_in_response: true
 

@@ -1,0 +1,143 @@
+openapi: 3.0.3
+info:
+  title: AuthZ Repository API
+  description: |
+    Internal service providing user authorization context for OPA policy evaluation.
+
+    This API is consumed exclusively by OPA (Open Policy Agent) during authorization
+    decisions. It maps a Keycloak external ID to the user's groups, role assignments,
+    and permissions.
+
+    **Security**: No application-level authentication. Access is restricted via
+    Kubernetes NetworkPolicy and Linkerd mTLS — only OPA pods can reach this service.
+  version: 1.0.0
+  contact:
+    name: CIVITAS CORE InfoSec Team
+
+servers:
+  - url: http://authz-repository:8091
+    description: Internal Kubernetes service
+
+paths:
+  /api/v1/user-context/{externalId}:
+    get:
+      summary: Get user authorization context
+      description: |
+        Returns the full authorization context for a user identified by their
+        Keycloak external ID (JWT `sub` claim). The response includes group
+        memberships, role assignments with scope information, and flattened
+        permission names.
+
+        OPA calls this endpoint during every authorization decision to resolve
+        the user's permissions for policy evaluation.
+      operationId: getUserContext
+      parameters:
+        - name: externalId
+          in: path
+          required: true
+          description: Keycloak subject ID (UUID format)
+          schema:
+            type: string
+            format: uuid
+            example: "d1111111-1111-1111-1111-111111111111"
+      responses:
+        "200":
+          description: User context found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserContextResponse"
+        "400":
+          description: Invalid externalId format (not a valid UUID)
+        "404":
+          description: No user found with the given externalId
+
+  /actuator/health:
+    get:
+      summary: Health check
+      description: Kubernetes readiness/liveness probe endpoint.
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "UP"
+
+components:
+  schemas:
+    UserContextResponse:
+      type: object
+      description: Full authorization context for a user
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Internal database user ID
+          example: "d1111111-1111-1111-1111-111111111111"
+        externalId:
+          type: string
+          description: Keycloak subject ID
+          example: "d1111111-1111-1111-1111-111111111111"
+        groups:
+          type: array
+          description: Groups the user belongs to
+          items:
+            $ref: "#/components/schemas/GroupContext"
+
+    GroupContext:
+      type: object
+      description: Group membership with role assignments
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Group ID
+        name:
+          type: string
+          description: Group display name
+          example: "Readers Group"
+        assignments:
+          type: array
+          description: Role assignments within this group
+          items:
+            $ref: "#/components/schemas/AssignmentContext"
+
+    AssignmentContext:
+      type: object
+      description: Role assignment with scope and permissions
+      properties:
+        roleId:
+          type: string
+          format: uuid
+          description: Role ID
+        roleName:
+          type: string
+          description: Role display name
+          example: "DataReader"
+        roleType:
+          type: string
+          description: Role category
+          enum: [SYSTEM, DATA]
+          example: "DATA"
+        scopeType:
+          type: string
+          description: Authorization scope level
+          enum: [TENANT, DATASPACE, DATASET]
+          example: "TENANT"
+        scopeId:
+          type: string
+          description: Scope identifier (null for TENANT scope)
+          nullable: true
+          example: "tenant-001"
+        permissions:
+          type: array
+          description: Flattened permission names (alphabetically sorted)
+          items:
+            type: string
+          example: ["dataset:read", "dataset:write"]
