@@ -1,20 +1,26 @@
 import { getTranslations } from 'next-intl/server'
 
-import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 
+import { PipelineEditorWrapper } from './_components/layout/PipelineEditorWrapper'
+
+/**
+ * Pipeline Editor Page
+ *
+ * Entry point for the visual pipeline editor.
+ * Uses UML activity diagram style for defining data processing pipelines.
+ *
+ */
 const PipelineEditorPage = async () => {
   const t = await getTranslations('datasets')
 
   return (
     <PageContainer headerType="onlyTitle">
       <PageHeader title={t('dataMode.pipelineEditor')} />
-      <PageBackground>
-        <div className="flex h-full items-center justify-center">
-          <p className="text-muted-foreground">{t('dataMode.pipelineEditor')}</p>
-        </div>
-      </PageBackground>
+      <div className="h-[calc(100vh-12rem)] w-full overflow-hidden rounded-xl border bg-background">
+        <PipelineEditorWrapper />
+      </div>
     </PageContainer>
   )
 }
