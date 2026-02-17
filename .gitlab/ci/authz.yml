@@ -93,9 +93,11 @@ bundle-authz:
     - cd authz/rego
     - echo "Building OPA bundle (revision ${REVISION:-$CI_COMMIT_SHORT_SHA})..."
     # Create bundle directory structure
-    - mkdir -p /tmp/bundle/data
+    # Note: backends go at /tmp/bundle/backends/ (not data/backends/) because
+    # OPA bundles treat data/ as a special prefix that conflicts with manifest roots
+    - mkdir -p /tmp/bundle/backends
     - cp -r policy lib providers /tmp/bundle/
-    - cp -r data/backends /tmp/bundle/data/
+    - cp -r data/backends/* /tmp/bundle/backends/
     # Create manifest with revision
     - |
       cat > /tmp/bundle/.manifest << EOF
