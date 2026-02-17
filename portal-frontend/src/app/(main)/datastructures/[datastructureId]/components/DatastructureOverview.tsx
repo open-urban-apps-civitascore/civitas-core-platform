@@ -95,7 +95,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const canSetAvailable = useMemo(() => {
     return (
       DatastructureFormAvailableSchema.safeParse(formValues).success &&
-      datastructure.versions.find(version => version.status === STATUS_TYPES.AVAILABLE)
+      !!datastructure.versions.find(version => version.status === STATUS_TYPES.AVAILABLE)
     )
   }, [formValues])
 
@@ -230,7 +230,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
         }}
         customElement={isReadOnly ? EditButton : ActionButtonsAndStatusSwitch}
       />
-      <PageBackground className="overflow-y-auto">
+      <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
         <Form {...form}>
           <form
             data-testid="datastructureEditForm"
