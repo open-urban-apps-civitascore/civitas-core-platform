@@ -542,7 +542,7 @@ class GroupControllerIntegrationTest
       assertThat(response.getBody().getParentGroup()).as("Parent group should be set").isNotNull();
       assertThat(response.getBody().getParentGroup().getId())
           .as("Parent group ID should match")
-          .isEqualTo(parentId.toString());
+          .isEqualTo(parentId);
     }
 
     @Test

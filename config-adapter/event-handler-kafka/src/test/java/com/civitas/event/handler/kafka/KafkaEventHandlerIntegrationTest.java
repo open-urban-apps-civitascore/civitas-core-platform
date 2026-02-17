@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -15,9 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.Constants;
 import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AppConfig;
+import com.civitas.configadapter.exception.AdapterException;
+import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
+import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
@@ -163,7 +168,8 @@ class KafkaEventHandlerIntegrationTest {
                     null,
                     event.payload().operation(),
                     event.payload().targetResource(),
-                    "test.adapter");
+                    "test.adapter",
+                    "de.civitascore.test.processing.result");
             testAdapter.eventPublisher.publish(event.metadata().resultTopic(), resultEvent);
             publishedEvents.add(resultEvent);
             publishLatch.countDown();
@@ -244,7 +250,9 @@ class KafkaEventHandlerIntegrationTest {
   }
 
   @Test
-  void shouldNotLoseMessage_WhenProcessingFails() throws Exception {
+  void shouldRetryAndSucceed_WhenProcessingFailsOnce() throws Exception {
+    // Test renamed and updated to work with new retry logic
+    // With retry logic, the event is retried (not requiring consumer restart)
     String topic = "user.resilience-test";
     testAdapter.setSubscribedTopics(List.of(topic));
     testAdapter.setShouldFailOnce(true);
@@ -265,26 +273,14 @@ class KafkaEventHandlerIntegrationTest {
     testProducer.send(new ProducerRecord<>(topic, "key", cloudEvent)).get();
     testProducer.flush();
 
-    await().atMost(5, TimeUnit.SECONDS).until(() -> testAdapter.getAttemptCount() >= 1);
+    // With retry logic, the event should be automatically retried and succeed
+    boolean success = successLatch.await(30, TimeUnit.SECONDS);
+    assertTrue(success, "Event should be processed successfully after retry");
 
-    assertEquals(1, testAdapter.getAttemptCount(), "Should be tried once.");
-    assertEquals(0, testAdapter.getProcessedEvents().size(), "Should not be processed.");
-
-    handler.close();
-    handler = new KafkaEventHandler();
-    handler.initialize(config, testAdapter);
-    handler.start();
-
-    await()
-        .atMost(30, TimeUnit.SECONDS)
-        .pollInterval(100, TimeUnit.MILLISECONDS)
-        .until(() -> handler.isReady());
-
-    boolean success = successLatch.await(10, TimeUnit.SECONDS);
-    assertTrue(success, "Event should be processed successfully");
-
-    assertEquals(2, testAdapter.getAttemptCount(), "Should be tried two times.");
-    assertEquals(1, testAdapter.getProcessedEvents().size(), "Should be processed now.");
+    // Should have 2 attempts: 1 failure + 1 success
+    assertEquals(
+        2, testAdapter.getAttemptCount(), "Should be tried twice (1 failure + 1 success).");
+    assertEquals(1, testAdapter.getProcessedEvents().size(), "Should be processed.");
   }
 
   // Helper methods
@@ -318,7 +314,7 @@ class KafkaEventHandlerIntegrationTest {
         .withId(UUID.randomUUID().toString())
         .withSource(URI.create("test.producer"))
         .withType("user.created")
-        .withDataContentType("application/json")
+        .withDataContentType(Constants.CONTENT_TYPE_JSON)
         .withData(jsonData.getBytes())
         .build();
   }
@@ -358,11 +354,13 @@ class KafkaEventHandlerIntegrationTest {
     }
 
     @Override
-    public void processConfigEvent(String topic, ConfigEvent event) {
+    public void processConfigEvent(String topic, ConfigEvent event)
+        throws RetryableAdapterException, FatalAdapterException {
       int currentAttempt = attemptCount.incrementAndGet();
 
       if (shouldFailOnce && currentAttempt == 1) {
-        throw new RuntimeException("Simulated DB Crash at first try!");
+        // Throw RetryableAdapterException to trigger retry logic
+        throw new RetryableAdapterException(AdapterErrorCode.CONNECTION_TIMEOUT, "test-service");
       }
 
       processedEvents.add(event);
@@ -386,6 +384,11 @@ class KafkaEventHandlerIntegrationTest {
     }
 
     @Override
+    public void publishFailureResult(ConfigEvent event, AdapterException exception) {
+      // Not needed for this test
+    }
+
+    @Override
     public void close() {
       // No cleanup needed
     }
@@ -393,6 +396,7 @@ class KafkaEventHandlerIntegrationTest {
 
   @FunctionalInterface
   interface ProcessCallback {
-    void onProcess(String topic, ConfigEvent event);
+    void onProcess(String topic, ConfigEvent event)
+        throws FatalAdapterException, RetryableAdapterException;
   }
 }

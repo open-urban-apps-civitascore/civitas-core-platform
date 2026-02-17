@@ -1,7 +1,6 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { useLocale, useTranslations } from 'next-intl'
 
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
@@ -14,7 +13,7 @@ interface UsersTableProps extends TableProps<GroupListUser> {
   users: GroupListUser[]
 }
 
-const UsersTable = (props: UsersTableProps) => {
+export const UsersTable = (props: UsersTableProps) => {
   const {
     users,
     rowCount,
@@ -49,14 +48,6 @@ const UsersTable = (props: UsersTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('authority', {
-      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.authority')} />,
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor('department', {
-      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.department')} />,
-      cell: info => info.getValue(),
-    }),
     columnHelper.accessor('email', {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.email')} />,
       cell: info => info.getValue(),
@@ -65,7 +56,7 @@ const UsersTable = (props: UsersTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('users.assignedAt')} />,
       cell: info => formatDate(info.getValue(), locale),
     }),
-    columnHelper.accessor('isActive', {
+    columnHelper.accessor('active', {
       header: tUsers('info.status.active'),
       cell: info => <StatusLabel isChecked={info.getValue()} />,
     }),
@@ -92,10 +83,6 @@ const UsersTable = (props: UsersTableProps) => {
     onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
   })
 
-  if (isLoading) {
-    return <LoadingSpinner className="h-full" />
-  }
-
   return (
     <DataTable
       table={table}
@@ -103,8 +90,7 @@ const UsersTable = (props: UsersTableProps) => {
       pageSize={pageSize}
       totalPages={totalPages}
       onRowClick={onRowClick}
+      isLoading={isLoading}
     />
   )
 }
-
-export default UsersTable

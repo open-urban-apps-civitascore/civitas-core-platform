@@ -10,14 +10,15 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 interface ErrorPageProps {
   title: string
   errorText?: string
+  testId?: string
 }
 
 export const ErrorPage = (props: ErrorPageProps) => {
-  const { title, errorText } = props
+  const { title, errorText, testId } = props
   const t = useTranslations()
 
   return (
-    <PageContainer headerType="onlyTitle" testId="usersErrorPage">
+    <PageContainer headerType="onlyTitle" testId={testId}>
       <PageHeader title={title || t('common.errors.loadingError', { item: t('users.user') })} />
       <PageBackground>
         <ContentCard className="p-10">

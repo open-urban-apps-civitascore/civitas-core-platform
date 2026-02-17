@@ -7,10 +7,10 @@ import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -48,13 +48,13 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
   protected Group postConvertToEntity(Group entity, GroupInputDTO input) {
     // Use getReferenceById for ManyToOne relationships to avoid unnecessary SELECT queries
     if (input.getContactUserId() != null) {
-      entity.setContactUser(userService.findById(input.getContactUserId()));
+      entity.setContactUser(userService.findByIdOrThrow(input.getContactUserId()));
     } else {
       entity.setContactUser(null);
     }
 
     if (input.getParentGroupId() != null) {
-      entity.setParentGroup(findById(input.getParentGroupId()));
+      entity.setParentGroup(findByIdOrThrow(input.getParentGroupId()));
     } else {
       entity.setParentGroup(null);
     }
@@ -99,12 +99,8 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
    * Group along with contactUser, parentGroup, members and roles in a single JOIN query
    */
   @Override
-  public Group findById(UUID id) {
-    preProcessLoad(id);
-    Group entity =
-        groupRepository
-            .findByIdWithRelations(id)
-            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+  public Optional<Group> findById(UUID id) {
+    Optional<Group> entity = groupRepository.findByIdWithRelations(id);
     return postLoad(entity);
   }
 

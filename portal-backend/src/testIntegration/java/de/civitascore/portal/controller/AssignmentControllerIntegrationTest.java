@@ -4,25 +4,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.Catalog;
+import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSpace;
+import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
-import de.civitascore.portal.model.input.GroupInputDTO;
-import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
-import de.civitascore.portal.model.output.GroupOutputDTO;
-import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.CatalogRepository;
+import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSpaceRepository;
+import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.RestPage;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -33,6 +37,11 @@ class AssignmentControllerIntegrationTest
   private final String ASSIGNMENTS_ENDPOINT = "/assignments";
 
   @Autowired private AssignmentRepository assignmentRepository;
+  @Autowired private GroupRepository groupRepository;
+  @Autowired private RoleRepository roleRepository;
+  @Autowired private DataSpaceRepository dataSpaceRepository;
+  @Autowired private DataSetRepository dataSetRepository;
+  @Autowired private CatalogRepository catalogRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -53,7 +62,6 @@ class AssignmentControllerIntegrationTest
     input.setGroupId(groupId);
     input.setRoleId(roleId);
     input.setScopeType(ScopeType.TENANT);
-    input.setIsInherited(false);
     return input;
   }
 
@@ -64,15 +72,7 @@ class AssignmentControllerIntegrationTest
 
   @Override
   protected AssignmentInputDTO createUpdateInput() {
-    UUID groupId = createTestGroup();
-    UUID roleId = createTestRole();
-
-    AssignmentInputDTO input = new AssignmentInputDTO();
-    input.setGroupId(groupId);
-    input.setRoleId(roleId);
-    input.setScopeType(ScopeType.TENANT);
-    input.setIsInherited(false);
-    return input;
+    return createValidInput();
   }
 
   @Override
@@ -91,42 +91,51 @@ class AssignmentControllerIntegrationTest
   }
 
   private UUID createTestGroup() {
-    GroupInputDTO groupInput = new GroupInputDTO();
-    groupInput.setName("Test Group " + System.currentTimeMillis());
-    groupInput.setDescription("Test group for assignment");
-
-    HttpHeaders headers = createAuthHeaders();
-    HttpEntity<GroupInputDTO> request = new HttpEntity<>(groupInput, headers);
-    ResponseEntity<GroupOutputDTO> response =
-        restTemplate.exchange(
-            "/groups",
-            HttpMethod.POST,
-            request,
-            new ParameterizedTypeReference<GroupOutputDTO>() {});
-
-    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId();
-    }
-    throw new IllegalStateException("Failed to create test group");
+    Group group = new Group();
+    group.setName("Test Group " + System.currentTimeMillis());
+    group.setDescription("Test group for assignment");
+    return groupRepository.save(group).getId();
   }
 
   private UUID createTestRole() {
-    RoleInputDTO roleInput = new RoleInputDTO();
-    roleInput.setName("test_role_" + System.currentTimeMillis());
-    roleInput.setName("Test Role " + System.currentTimeMillis());
-    roleInput.setDescription("Test role for assignment");
-    roleInput.setRoleType(RoleType.DATA);
+    Role role = new Role();
+    role.setName("Test Role " + System.currentTimeMillis());
+    role.setDescription("Test role for assignment");
+    role.setRoleType(RoleType.DATA);
+    return roleRepository.save(role).getId();
+  }
 
-    HttpHeaders headers = createAuthHeaders();
-    HttpEntity<RoleInputDTO> request = new HttpEntity<>(roleInput, headers);
-    ResponseEntity<RoleOutputDTO> response =
-        restTemplate.exchange(
-            "/roles", HttpMethod.POST, request, new ParameterizedTypeReference<RoleOutputDTO>() {});
+  private UUID createTestDataSpace() {
+    DataSpace dataSpace = new DataSpace();
+    dataSpace.setName("Test DataSpace " + System.currentTimeMillis());
+    dataSpace.setDescription("Test dataspace for assignment");
+    return dataSpaceRepository.save(dataSpace).getId();
+  }
 
-    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId();
-    }
-    throw new IllegalStateException("Failed to create test role");
+  private UUID createTestDataSet(UUID dataSpaceId) {
+    DataSpace dataSpace = dataSpaceRepository.findById(dataSpaceId).orElseThrow();
+    DataSet dataSet = new DataSet();
+    dataSet.setName("Test DataSet " + System.currentTimeMillis());
+    dataSet.setDescription("Test dataset for assignment");
+    dataSet.setDataSpaces(Set.of(dataSpace));
+    return dataSetRepository.save(dataSet).getId();
+  }
+
+  private UUID createTestCatalog() {
+    Catalog catalog = new Catalog();
+    catalog.setName("Test Catalog " + System.currentTimeMillis());
+    catalog.setDescription("Test catalog for assignment");
+    return catalogRepository.save(catalog).getId();
+  }
+
+  private UUID getScopeIdForType(ScopeType scopeType) {
+    return switch (scopeType) {
+      case TENANT -> null;
+      case DATASPACE -> createTestDataSpace();
+      case DATASET -> createTestDataSet(createTestDataSpace());
+      case CATALOG -> createTestCatalog();
+      case DATASOURCE, DATASTRUCTURE -> null;
+    };
   }
 
   @Nested
@@ -182,7 +191,8 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should create assignment with different scope types")
     void shouldCreateAssignmentWithDifferentScopeTypes() {
-      for (ScopeType scopeType : ScopeType.values()) {
+      for (ScopeType scopeType :
+          List.of(ScopeType.TENANT, ScopeType.DATASPACE, ScopeType.DATASET, ScopeType.CATALOG)) {
         UUID groupId = createTestGroup();
         UUID roleId = createTestRole();
 
@@ -190,12 +200,13 @@ class AssignmentControllerIntegrationTest
         input.setGroupId(groupId);
         input.setRoleId(roleId);
         input.setScopeType(scopeType);
-        input.setScopeId("testId-" + scopeType.name());
-        input.setIsInherited(false);
+        input.setScopeId(getScopeIdForType(scopeType));
 
         ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getStatusCode())
+            .as("Should create assignment with scope type " + scopeType)
+            .isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getScopeType()).isEqualTo(scopeType);
       }
@@ -204,42 +215,28 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should create assignment with scope ID")
     void shouldCreateAssignmentWithScopeId() {
+      UUID dataSpaceId = createTestDataSpace();
       AssignmentInputDTO input = createValidInput();
       input.setScopeType(ScopeType.DATASPACE);
-      input.setScopeId("dataspace-123");
+      input.setScopeId(dataSpaceId);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getScopeId()).isEqualTo("dataspace-123");
-    }
-
-    @Test
-    @DisplayName("Should create inherited assignment")
-    void shouldCreateInheritedAssignment() {
-      AssignmentInputDTO input = createValidInput();
-      input.setIsInherited(true);
-
-      ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getIsInherited()).isTrue();
+      assertThat(response.getBody().getScopeId()).isEqualTo(dataSpaceId);
     }
 
     @Test
     @DisplayName("Should create assignment with metadata")
     void shouldCreateAssignmentWithMetadata() {
       AssignmentInputDTO input = createValidInput();
-      input.setIsInherited(true);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getCreatedAt()).isNotNull();
-      assertThat(response.getBody().getIsInherited()).isTrue();
     }
 
     @Test
@@ -249,7 +246,6 @@ class AssignmentControllerIntegrationTest
       input.setGroupId(UUID.randomUUID());
       input.setRoleId(createTestRole());
       input.setScopeType(ScopeType.TENANT);
-      input.setIsInherited(false);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
@@ -352,199 +348,6 @@ class AssignmentControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Update Assignment Tests")
-  class UpdateAssignmentTests {
-
-    @Test
-    @DisplayName("Should update assignment successfully with PUT")
-    void shouldUpdateAssignmentWithPut() {
-      UUID assignmentId = createTestEntity();
-
-      AssignmentInputDTO updateInput = createUpdateInput();
-      ResponseEntity<AssignmentOutputDTO> response = performUpdate(assignmentId, updateInput);
-
-      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
-
-      assertThat(response.getBody()).as("Response body should not be null").isNotNull();
-
-      AssignmentOutputDTO output = response.getBody();
-      assertThat(output.getId()).as("ID should remain the same").isEqualTo(assignmentId);
-      assertThat(output.getScopeType())
-          .as("Scope type should be updated")
-          .isEqualTo(updateInput.getScopeType());
-      assertThat(output.getModifiedAt()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("Should partially update assignment with PATCH - single field")
-    void shouldPartiallyUpdateAssignmentWithPatch() {
-      UUID assignmentId = createTestEntity();
-
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("isInherited", true);
-
-      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
-
-      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getIsInherited()).as("IsInherited should be updated").isTrue();
-    }
-
-    @Test
-    @DisplayName("Should update multiple fields with PATCH")
-    void shouldUpdateMultipleFieldsWithPatch() {
-      UUID assignmentId = createTestEntity();
-
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("isInherited", true);
-      patchMap.put("scopeId", "new-scope-id");
-
-      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
-
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getIsInherited()).isTrue();
-      assertThat(response.getBody().getScopeId()).isEqualTo("new-scope-id");
-    }
-
-    @Test
-    @DisplayName("Should set scopeId to null with PATCH")
-    void shouldSetScopeIdToNullWithPatch() {
-      UUID assignmentId = createTestEntity();
-
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("scopeId", null);
-
-      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
-
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getScopeId()).as("ScopeId should be set to null").isNull();
-    }
-
-    @Test
-    @DisplayName("Should leave omitted fields unchanged with PATCH")
-    void shouldLeaveOmittedFieldsUnchangedWithPatch() {
-      UUID assignmentId = createTestEntity();
-
-      ResponseEntity<AssignmentOutputDTO> initialResponse = performGetById(assignmentId);
-      AssignmentOutputDTO initialAssignment = initialResponse.getBody();
-
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("isInherited", true);
-
-      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
-
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getIsInherited()).isTrue();
-      assertThat(response.getBody().getScopeType())
-          .as("ScopeType should remain unchanged")
-          .isEqualTo(initialAssignment.getScopeType());
-      assertThat(response.getBody().getScopeId())
-          .as("ScopeId should remain unchanged")
-          .isEqualTo(initialAssignment.getScopeId());
-    }
-
-    @Test
-    @DisplayName("Should set parentAssignment to null with PATCH")
-    void shouldSetParentAssignmentToNullWithPatch() {
-      UUID parentAssignmentId = createTestEntity();
-      UUID childAssignmentId = createTestEntity();
-
-      // Set parent
-      Map<String, Object> setParentMap = new HashMap<>();
-      setParentMap.put("parentAssignmentId", parentAssignmentId);
-      performPatch(childAssignmentId, setParentMap);
-
-      // Remove parent
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("parentAssignmentId", null);
-
-      ResponseEntity<AssignmentOutputDTO> response = performPatch(childAssignmentId, patchMap);
-
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getParentAssignment())
-          .as("ParentAssignment should be set to null")
-          .isNull();
-    }
-
-    @Test
-    @DisplayName("Should handle empty PATCH (no changes)")
-    void shouldHandleEmptyPatch() {
-      UUID assignmentId = createTestEntity();
-
-      ResponseEntity<AssignmentOutputDTO> initialResponse = performGetById(assignmentId);
-      AssignmentOutputDTO initialAssignment = initialResponse.getBody();
-
-      Map<String, Object> patchMap = new HashMap<>();
-
-      ResponseEntity<AssignmentOutputDTO> response = performPatch(assignmentId, patchMap);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getScopeType()).isEqualTo(initialAssignment.getScopeType());
-      assertThat(response.getBody().getIsInherited()).isEqualTo(initialAssignment.getIsInherited());
-    }
-
-    @Test
-    @DisplayName("Should be idempotent with PATCH")
-    void shouldBeIdempotentWithPatch() {
-      UUID assignmentId = createTestEntity();
-
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("isInherited", true);
-
-      ResponseEntity<AssignmentOutputDTO> firstResponse = performPatch(assignmentId, patchMap);
-      ResponseEntity<AssignmentOutputDTO> secondResponse = performPatch(assignmentId, patchMap);
-
-      assertThat(firstResponse.getBody()).isNotNull();
-      assertThat(secondResponse.getBody()).isNotNull();
-      assertThat(firstResponse.getBody().getIsInherited())
-          .isEqualTo(secondResponse.getBody().getIsInherited());
-    }
-
-    @Test
-    @DisplayName("Should fail to update non-existent assignment")
-    void shouldFailToUpdateNonExistentAssignment() {
-      AssignmentInputDTO updateInput = createUpdateInput();
-
-      ResponseEntity<AssignmentOutputDTO> response = performUpdate(UUID.randomUUID(), updateInput);
-
-      assertThat(response.getStatusCode())
-          .as("Should return NOT_FOUND status")
-          .isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    @Test
-    @DisplayName("Should fail to update assignment without authentication")
-    void shouldFailToUpdateAssignmentWithoutAuth() {
-      UUID assignmentId = createTestEntity();
-
-      ResponseEntity<String> response =
-          performRequestWithoutAuth("/" + assignmentId, org.springframework.http.HttpMethod.PUT);
-
-      assertThat(response.getStatusCode())
-          .as("Should return UNAUTHORIZED status")
-          .isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-
-    @Test
-    @DisplayName("Should update assignment scope")
-    void shouldUpdateAssignmentScope() {
-      UUID assignmentId = createTestEntity();
-
-      AssignmentInputDTO updateInput = createUpdateInput();
-      updateInput.setScopeType(ScopeType.DATASET);
-      updateInput.setScopeId("dataset-456");
-
-      ResponseEntity<AssignmentOutputDTO> response = performUpdate(assignmentId, updateInput);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getScopeType()).isEqualTo(ScopeType.DATASET);
-      assertThat(response.getBody().getScopeId()).isEqualTo("dataset-456");
-    }
-  }
-
-  @Nested
   @DisplayName("Delete Assignment Tests")
   class DeleteAssignmentTests {
 
@@ -594,20 +397,6 @@ class AssignmentControllerIntegrationTest
   class BusinessLogicTests {
 
     @Test
-    @DisplayName("Should handle assignment with parent assignment")
-    void shouldHandleAssignmentWithParent() {
-      UUID parentId = createTestEntity();
-
-      AssignmentInputDTO childInput = createValidInput();
-      childInput.setParentAssignmentId(parentId);
-
-      ResponseEntity<AssignmentOutputDTO> response = performCreate(childInput);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-    }
-
-    @Test
     @DisplayName("Should handle global scope assignment")
     void shouldHandleGlobalScopeAssignment() {
       AssignmentInputDTO input = createValidInput();
@@ -649,17 +438,13 @@ class AssignmentControllerIntegrationTest
       AssignmentInputDTO input1 = new AssignmentInputDTO();
       input1.setGroupId(groupId);
       input1.setRoleId(role1Id);
-      input1.setIsInherited(false);
-      input1.setScopeId("test-tenant" + System.currentTimeMillis());
-
       input1.setScopeType(ScopeType.TENANT);
 
       AssignmentInputDTO input2 = new AssignmentInputDTO();
       input2.setGroupId(groupId);
       input2.setRoleId(role2Id);
       input2.setScopeType(ScopeType.DATASPACE);
-      input2.setScopeId("test-dataspace" + System.currentTimeMillis());
-      input2.setIsInherited(false);
+      input2.setScopeId(createTestDataSpace());
 
       ResponseEntity<AssignmentOutputDTO> response1 = performCreate(input1);
       ResponseEntity<AssignmentOutputDTO> response2 = performCreate(input2);

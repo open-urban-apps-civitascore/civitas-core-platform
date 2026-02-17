@@ -7,8 +7,8 @@ import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -44,12 +44,8 @@ public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> 
    * problems that would occur with lazy loading.
    */
   @Override
-  public DataSpace findById(UUID id) {
-    preProcessLoad(id);
-    DataSpace entity =
-        dataSpaceRepository
-            .findByIdWithRelations(id)
-            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+  public Optional<DataSpace> findById(UUID id) {
+    Optional<DataSpace> entity = dataSpaceRepository.findByIdWithRelations(id);
     return postLoad(entity);
   }
 
@@ -57,13 +53,13 @@ public class DataSpaceService extends BaseService<DataSpace, DataSpaceInputDTO> 
   protected DataSpace postConvertToEntity(DataSpace entity, DataSpaceInputDTO input) {
     // Use getReferenceById for ManyToOne relationships to avoid unnecessary SELECT queries
     if (input.getOwnerUserId() != null) {
-      entity.setOwner(userService.findById(input.getOwnerUserId()));
+      entity.setOwner(userService.findByIdOrThrow(input.getOwnerUserId()));
     } else {
       entity.setOwner(null);
     }
 
     if (input.getParentDataSpaceId() != null) {
-      entity.setParentDataSpace(findById(input.getParentDataSpaceId()));
+      entity.setParentDataSpace(findByIdOrThrow(input.getParentDataSpaceId()));
     } else {
       entity.setParentDataSpace(null);
     }

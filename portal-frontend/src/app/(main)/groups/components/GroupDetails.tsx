@@ -5,12 +5,11 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo } from 'react'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { useQueryParams } from '@/hooks/useQueryParams'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
 
 import Icon from '../../../../../public/svg/info.svg'
@@ -20,10 +19,10 @@ import { UsersTab } from './users-tab/UsersTab'
 
 interface GroupDetailsProps {
   title: string
-  groupData: Group | null
+  groupData: Group
   isEditMode?: boolean
 }
-const GroupDetails = (props: GroupDetailsProps) => {
+export const GroupDetails = (props: GroupDetailsProps) => {
   const { title, groupData, isEditMode = false } = props
   const { subTabValue, setSubTabValueParam } = useQueryParams()
 
@@ -63,26 +62,22 @@ const GroupDetails = (props: GroupDetailsProps) => {
     }
   }, [subTabValue, tabs, setSubTabValueParam, isBlockedTab])
 
-  let Content = <LoadingSpinner className="h-full" />
-  if (!groupData) {
-    Content = <ContentCard>No data</ContentCard>
-  } else if (!isBlockedTab) {
-    switch (subTabValue) {
-      case tabValues.info.value:
-        Content = <BaseInfoTab isEditMode={isEditMode} groupData={groupData} />
-        break
-      case tabValues.roles.value:
-        Content = <RolesTab groupData={groupData} />
-        break
-      case tabValues.users.value:
-        Content = <UsersTab groupData={groupData} />
-        break
-      case tabValues.subgroups.value:
-        Content = <ContentCard>{tabValues[subTabValue as keyof typeof tabValues].label}</ContentCard>
-        break
-      default:
-        break
-    }
+  let Content = <BaseInfoTab isEditMode={isEditMode} groupData={groupData} />
+  switch (subTabValue) {
+    case tabValues.info.value:
+      Content = <BaseInfoTab isEditMode={isEditMode} groupData={groupData} />
+      break
+    case tabValues.roles.value:
+      Content = <RolesTab groupData={groupData} />
+      break
+    case tabValues.users.value:
+      Content = <UsersTab groupData={groupData} />
+      break
+    case tabValues.subgroups.value:
+      Content = <ContentCard>{tabValues[subTabValue as keyof typeof tabValues].label}</ContentCard>
+      break
+    default:
+      break
   }
 
   return (
@@ -100,5 +95,3 @@ const GroupDetails = (props: GroupDetailsProps) => {
     </PageContainer>
   )
 }
-
-export default GroupDetails

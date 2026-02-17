@@ -28,15 +28,10 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
 
     const searchParamsString = searchParams ? `?${searchParams}` : ''
 
-    // Determine which backend to route to
-    const isUsersEndpoint = pathString === 'users' && method === 'GET'
-    const isModelsEndpoint = pathString.startsWith('models')
-    const shouldUseApiUrl = isUsersEndpoint || isModelsEndpoint
-
-    const url = `${shouldUseApiUrl ? API_URL : JSON_SERVER_URL}/${pathString}${searchParamsString}`
-
     // Forward all original headers from the request
     const headers = new Headers(request.headers)
+
+    const url = `${headers.get('x-api-request') === 'true' ? API_URL : JSON_SERVER_URL}/${pathString}${searchParamsString}`
 
     headers.set('Authorization', `Bearer ${token.access_token}`)
 
@@ -54,6 +49,7 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     // This can be removed once json-server is not used anymore
     if (['POST', 'PUT', 'PATCH'].includes(method) && url.includes(`${JSON_SERVER_URL}`)) {
       const req = await request.json()
+
       const body = req.body ?? req
       fetchOptions.body = JSON.stringify(body)
     }

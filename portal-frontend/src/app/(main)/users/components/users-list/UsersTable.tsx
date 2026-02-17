@@ -1,7 +1,7 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 
-import { StatusLabel } from '@/components/status-label/StatusLabel'
+import { ActivityBadge } from '@/components/activity-badge/ActivityBadge'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { TableProps } from '@/types/table'
@@ -46,28 +46,18 @@ const UsersTable = (props: UsersTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('authority', {
-      header: t('info.authority'),
-      cell: info => info.getValue(),
-      meta: {
-        style: {
-          width: '18%',
-          color: 'var(--foreground)',
-          fontWeight: '500',
-        },
-      },
-    }),
-    columnHelper.accessor('department', {
-      header: t('info.department'),
-      cell: info => info.getValue(),
-    }),
     columnHelper.accessor('email', {
       header: t('info.email'),
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor('isActive', {
+    columnHelper.accessor('active', {
       header: t('info.status.title'),
-      cell: info => <StatusLabel isChecked={info.getValue()} />,
+      cell: info => (
+        <ActivityBadge
+          isActive={info.getValue()}
+          title={info.getValue() ? `${t('info.status.active')}` : `${t('info.status.inactive')}`}
+        />
+      ),
     }),
   ]
 

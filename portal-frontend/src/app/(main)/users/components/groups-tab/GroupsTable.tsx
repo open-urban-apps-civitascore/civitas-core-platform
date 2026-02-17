@@ -1,10 +1,9 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
 import { useLocale, useTranslations } from 'next-intl'
 
+import { BadgesWithTooltip } from '@/components/table/badges-with-tooltip/BadgesWithTooltip'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { BasicTooltip } from '@/components/tooltip/Tooltip'
-import { Badge } from '@/components/ui/badge'
 import { UserGroupsListData } from '@/types/groups'
 import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
@@ -70,41 +69,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('roles', {
       header: t('groupsTab.roles'),
-      cell: info => {
-        const roles = info.getValue()
-        if (!roles || roles.length === 0) return '-'
-        const tooltipContent = (
-          <div className="flex flex-wrap gap-2">
-            {' '}
-            {roles.slice(2, roles.length).map(role => (
-              <Badge key={role} variant="secondary">
-                {role}
-              </Badge>
-            ))}
-          </div>
-        )
-        const badges = (
-          <>
-            {roles.slice(0, 2).map(role => (
-              <Badge key={role} variant="secondary">
-                {role}
-              </Badge>
-            ))}
-            {roles.length > 2 && (
-              <BasicTooltip tooltipContent={tooltipContent}>
-                <Badge variant="outline">+{roles.length - 2}</Badge>
-              </BasicTooltip>
-            )}
-          </>
-        )
-        return <div className="flex flex-wrap gap-1">{badges}</div>
-      },
-      meta: {
-        style: {
-          width: '22.22%',
-          minWidth: '200px',
-        },
-      },
+      cell: info => <BadgesWithTooltip items={info.getValue()} minVisibleBadges={2} />,
     }),
   ]
 

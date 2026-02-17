@@ -23,16 +23,20 @@ type ActionButtonsProps = (FormButtonProps | ConfirmButtons) & {
   isConfirmButtonDisabled?: boolean
   hasCard?: boolean
   confirmButtonTitle?: string
+  cancelButtonTitle?: string
+  wrapperClassname?: string
 }
 
 export const ActionButtons = (props: ActionButtonsProps) => {
   const {
     confirmButtonTitle,
+    cancelButtonTitle,
     confirmButtonType,
     onCancelClick,
     isConfirmButtonDisabled = false,
     isCancelButtonDisabled = false,
     className,
+    wrapperClassname,
     hasCard = true,
   } = props
   const t = useTranslations('common')
@@ -46,7 +50,7 @@ export const ActionButtons = (props: ActionButtonsProps) => {
         onClick={onCancelClick}
         disabled={isCancelButtonDisabled}
       >
-        {t('actions.cancel')}
+        {cancelButtonTitle || t('actions.cancel')}
       </Button>
       <Button
         data-testid="confirmButton"
@@ -59,11 +63,11 @@ export const ActionButtons = (props: ActionButtonsProps) => {
     </>
   )
   return (
-    <div className={cn('flex w-full justify-end', className)}>
+    <div className={cn('flex w-full justify-end', wrapperClassname)}>
       {hasCard ? (
-        <ContentCard className="flex gap-4 p-3">{Buttons}</ContentCard>
+        <ContentCard className={cn('flex gap-4 py-3', className)}>{Buttons}</ContentCard>
       ) : (
-        <div className="flex gap-4 py-3">{Buttons}</div>
+        <div className={cn('flex gap-4 py-3', className)}>{Buttons}</div>
       )}
     </div>
   )

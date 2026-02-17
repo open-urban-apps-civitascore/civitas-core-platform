@@ -1,7 +1,5 @@
-import { apiRequest } from '@/app/services/api/request/apiRequest'
-import { getServerRequestHeaders } from '@/app/services/api/request/getServerRequestHeaders'
-import { DatasetResponse } from '@/types/datasets'
-import { DataSpace } from '@/types/dataspaces'
+import { getDataset } from '@/app/services/api/datasets/serverRequests'
+import { getDataspaces } from '@/app/services/api/dataspaces/serverRequests'
 
 import { DatasetOverview } from '../components/overview/DatasetOverview'
 import { mapDatasetToFormData } from '../utils/mappers'
@@ -15,20 +13,10 @@ const DatasetPage = async (props: DatasetPageProps) => {
 
   const getData = async () => {
     try {
-      const headers = await getServerRequestHeaders()
-      const datasetRequest = apiRequest<DatasetResponse>({
-        endpoint: `/datasets/${datasetId}`,
-        method: 'GET',
-        headers,
-        errorMessage: 'An error occurred while fetching dataset.',
-      })
-      const dataspacesRequest = apiRequest<DataSpace[]>({
-        endpoint: `/dataspaces`,
-        method: 'GET',
-        headers,
-        errorMessage: 'An error occurred while fetching dataspaces.',
-      })
-      const [{ data: datasetData }, { data: dataspacesData }] = await Promise.all([datasetRequest, dataspacesRequest])
+      const [{ data: datasetData }, { data: dataspacesData }] = await Promise.all([
+        getDataset(datasetId),
+        getDataspaces(),
+      ])
       return {
         dataset: mapDatasetToFormData(datasetData),
         dataspaces: dataspacesData.map(dataspace => ({ value: dataspace.id, label: dataspace.name })),

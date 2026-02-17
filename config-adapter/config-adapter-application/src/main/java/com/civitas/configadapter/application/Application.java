@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -20,12 +20,15 @@ import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.configuration.ApplicationConfig;
+import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.messaging.EventConsumer;
 import com.civitas.configadapter.messaging.EventPublisher;
+import com.civitas.configadapter.model.AdapterErrorCode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +69,7 @@ public class Application {
 
   private static final Logger logger = LoggerFactory.getLogger(Application.class);
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws FatalAdapterException {
     logger.info("Starting Civitas Config Adapter...");
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> logger.info("Shutdown signal received")));
@@ -84,9 +87,10 @@ public class Application {
    * @param configFileName the name of the properties file to load from the classpath, must not be
    *     null
    * @throws NullPointerException if configFileName is null
-   * @throws RuntimeException if configuration is invalid or required components cannot be created
+   * @throws FatalAdapterException if configuration is invalid or required components cannot be
+   *     created
    */
-  public Application(String configFileName) {
+  public Application(String configFileName) throws FatalAdapterException {
     appConfig = new AppConfig(requireNonNull(configFileName));
     consumers = createConsumers(appConfig);
   }
@@ -95,9 +99,10 @@ public class Application {
    * Creates a new Application instance using the default configuration file
    * "application.properties".
    *
-   * @throws RuntimeException if configuration is invalid or required components cannot be created
+   * @throws com.civitas.configadapter.exception.FatalAdapterException if configuration is invalid
+   *     or required components cannot be created
    */
-  public Application() {
+  public Application() throws FatalAdapterException {
     this("application.properties");
   }
 
@@ -144,100 +149,132 @@ public class Application {
     }
   }
 
-  private List<EventConsumer> createConsumers(AppConfig config) {
+  private List<EventConsumer> createConsumers(AppConfig config) throws FatalAdapterException {
     List<String> adapterNames = config.getAdapterNames();
-
     if (adapterNames.isEmpty()) {
-      throw new RuntimeException(
+      throw new FatalAdapterException(
+          AdapterErrorCode.CONFIGURATION_ERROR,
           "No adapters configured. Please specify 'adapters' or 'adapter.class' property");
     }
 
-    // Determine configuration mode: combined or separate consumer/publisher
-    String eventHandlerName = config.getEventHandlerName();
-    String eventConsumerName = config.getEventConsumerName();
-    String eventPublisherName = config.getEventPublisherName();
-
-    if (nonNull(eventHandlerName) && (nonNull(eventConsumerName) || nonNull(eventPublisherName))) {
-      throw new RuntimeException(
-          "Configuration error: Cannot specify both 'eventhandler.name' and separate 'eventconsumer.name' or 'eventpublisher.name'");
-    }
-
-    if (nonNull(eventHandlerName)) {
-      logger.info("Using combined event handler: {}", eventHandlerName);
-      eventConsumerName = eventHandlerName;
-      eventPublisherName = eventHandlerName;
-    } else {
-      if (isNull(eventConsumerName)) {
-        throw new RuntimeException(
-            "No event consumer configured. Please specify 'eventhandler.name' or 'eventconsumer.name'");
-      }
-      logger.info(
-          "Using separate consumer: {} and publisher: {}",
-          eventConsumerName,
-          eventPublisherName != null ? eventPublisherName : "none");
-    }
-
+    EventHandlerNames handlerNames = resolveEventHandlerNames(config);
     logger.info("Creating {} adapter(s)", adapterNames.size());
 
     List<EventConsumer> consumers = new ArrayList<>();
-
     for (String adapterName : adapterNames) {
-      try {
-        logger.info("Loading adapter: {}", adapterName);
-
-        ConfigAdapter adapter = createAdapter(config, adapterName);
-        List<String> topics = adapter.getSubscribedTopics();
-
-        if (topics.isEmpty()) {
-          logger.warn("Adapter {} has no subscribed topics, skipping", adapterName);
-          continue;
-        }
-
-        logger.info(
-            "Adapter {} subscribes to {} topic(s): {}",
-            adapter.getClass().getSimpleName(),
-            topics.size(),
-            topics);
-
-        // Create optional publisher first if configured
-        EventPublisher publisher = null;
-        if (nonNull(eventPublisherName)) {
-          publisher = createPublisher(config, eventPublisherName, adapter);
-          if (nonNull(publisher)) {
-            adapter.setEventPublisher(publisher);
-          } else {
-            logger.warn(
-                "Event publisher '{}' not found via ServiceLoader, continuing without publisher",
-                eventPublisherName);
-          }
-        }
-
-        // Create mandatory consumer
-        EventConsumer consumer = createConsumer(config, eventConsumerName, adapter);
-        if (isNull(consumer)) {
-          throw new RuntimeException(
-              "Event consumer '" + eventConsumerName + "' not found via ServiceLoader");
-        }
-
+      EventConsumer consumer = createConsumerForAdapter(config, adapterName, handlerNames);
+      if (consumer != null) {
         consumers.add(consumer);
-
-        logger.info("Successfully created consumer for adapter: {}", adapterName);
-
-      } catch (Exception e) {
-        logger.error("Failed to create consumer for adapter: {}", adapterName, e);
-        throw new RuntimeException("Failed to create consumer for adapter: " + adapterName, e);
       }
     }
 
     if (consumers.isEmpty()) {
-      throw new RuntimeException("No valid consumers created. Check adapter topic configurations.");
+      throw new FatalAdapterException(
+          AdapterErrorCode.CONFIGURATION_ERROR,
+          "No valid consumers created. Check adapter topic configurations.");
     }
 
     return consumers;
   }
 
+  private EventHandlerNames resolveEventHandlerNames(AppConfig config)
+      throws FatalAdapterException {
+    String eventHandlerName = config.getEventHandlerName();
+    String eventConsumerName = config.getEventConsumerName();
+    String eventPublisherName = config.getEventPublisherName();
+
+    if (nonNull(eventHandlerName) && (nonNull(eventConsumerName) || nonNull(eventPublisherName))) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.CONFIGURATION_ERROR,
+          "Configuration error: Cannot specify both 'eventhandler.name' and separate 'eventconsumer.name' or 'eventpublisher.name'");
+    }
+
+    if (nonNull(eventHandlerName)) {
+      logger.info("Using combined event handler: {}", Encode.forJava(eventHandlerName));
+      return new EventHandlerNames(eventHandlerName, eventHandlerName);
+    }
+
+    if (isNull(eventConsumerName)) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.CONFIGURATION_ERROR,
+          "No event consumer configured. Please specify 'eventhandler.name' or 'eventconsumer.name'");
+    }
+
+    logger.info(
+        "Using separate consumer: {} and publisher: {}",
+        Encode.forJava(eventConsumerName),
+        eventPublisherName != null ? Encode.forJava(eventPublisherName) : "none");
+    return new EventHandlerNames(eventConsumerName, eventPublisherName);
+  }
+
+  private EventConsumer createConsumerForAdapter(
+      AppConfig config, String adapterName, EventHandlerNames handlerNames)
+      throws FatalAdapterException {
+    try {
+      logger.info("Loading adapter: {}", Encode.forJava(adapterName));
+
+      ConfigAdapter adapter = createAdapter(config, adapterName);
+      if (adapter == null) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.CONFIGURATION_ERROR,
+            "Adapter '" + adapterName + "' not found via ServiceLoader");
+      }
+
+      List<String> topics = adapter.getSubscribedTopics();
+      if (topics.isEmpty()) {
+        logger.warn("Adapter {} has no subscribed topics, skipping", Encode.forJava(adapterName));
+        return null;
+      }
+
+      logger.info(
+          "Adapter {} subscribes to {} topic(s): {}",
+          adapter.getClass().getSimpleName(),
+          topics.size(),
+          Encode.forJava(String.valueOf(topics)));
+
+      configurePublisher(config, adapter, handlerNames.publisherName());
+
+      EventConsumer consumer = createConsumer(config, handlerNames.consumerName(), adapter);
+      if (isNull(consumer)) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.CONFIGURATION_ERROR,
+            "Event consumer '" + handlerNames.consumerName() + "' not found via ServiceLoader");
+      }
+
+      logger.info("Successfully created consumer for adapter: {}", Encode.forJava(adapterName));
+      return consumer;
+    } catch (FatalAdapterException e) {
+      throw e;
+    } catch (Exception e) {
+      logger.error("Failed to create consumer for adapter: {}", Encode.forJava(adapterName), e);
+      throw new FatalAdapterException(
+          AdapterErrorCode.CONFIGURATION_ERROR,
+          e,
+          "Failed to create consumer for adapter: " + adapterName);
+    }
+  }
+
+  private void configurePublisher(AppConfig config, ConfigAdapter adapter, String publisherName)
+      throws FatalAdapterException {
+    if (isNull(publisherName)) {
+      return;
+    }
+
+    EventPublisher publisher = createPublisher(config, publisherName, adapter);
+    if (nonNull(publisher)) {
+      adapter.setEventPublisher(publisher);
+    } else {
+      logger.warn(
+          "Event publisher '{}' not found via ServiceLoader, continuing without publisher",
+          Encode.forJava(publisherName));
+    }
+  }
+
+  private record EventHandlerNames(String consumerName, String publisherName) {}
+
   private EventConsumer createConsumer(
-      ApplicationConfig config, String consumerName, ConfigAdapter adapter) {
+      ApplicationConfig config, String consumerName, ConfigAdapter adapter)
+      throws FatalAdapterException {
     Optional<EventConsumer> consumerOpt =
         getInstanceByFilter(EventConsumer.class, ec -> Objects.equals(consumerName, ec.getName()));
     if (consumerOpt.isPresent()) {
@@ -249,7 +286,8 @@ public class Application {
   }
 
   private EventPublisher createPublisher(
-      ApplicationConfig config, String publisherName, ConfigAdapter adapter) {
+      ApplicationConfig config, String publisherName, ConfigAdapter adapter)
+      throws FatalAdapterException {
     Optional<EventPublisher> publisherOpt =
         getInstanceByFilter(
             EventPublisher.class, ep -> Objects.equals(publisherName, ep.getName()));

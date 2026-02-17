@@ -6,11 +6,12 @@ import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.repository.RoleRepository;
+import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -45,12 +46,8 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
    * Role along with all Permissions in a single JOIN query, preventing N+1 query problems.
    */
   @Override
-  public Role findById(UUID id) {
-    preProcessLoad(id);
-    Role entity =
-        roleRepository
-            .findByIdWithRelations(id)
-            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+  public Optional<Role> findById(UUID id) {
+    Optional<Role> entity = roleRepository.findByIdWithRelations(id);
     return postLoad(entity);
   }
 
@@ -88,6 +85,11 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
 
   @Override
   protected RoleInputDTO preProcessUpdateInput(RoleInputDTO input, Role existingEntity) {
+    if (existingEntity.isReadonly()) {
+      throw new ForbiddenException(
+          "role", existingEntity.getId(), "Readonly roles cannot be modified");
+    }
+
     try {
       String inputJson = objectMapper.writeValueAsString(input);
       JsonNode jsonNode = objectMapper.readTree(inputJson);
@@ -106,5 +108,17 @@ public class RoleService extends BaseService<Role, RoleInputDTO> {
       throw new RuntimeException("Failed to process update input", e);
     }
     return super.preProcessUpdateInput(input, existingEntity);
+  }
+
+  @Override
+  protected Role preProcessDelete(UUID id) {
+    Role existingEntity = super.preProcessDelete(id);
+
+    if (existingEntity != null && existingEntity.isReadonly()) {
+      throw new ForbiddenException(
+          "role", existingEntity.getId(), "Readonly roles cannot be deleted");
+    }
+
+    return existingEntity;
   }
 }

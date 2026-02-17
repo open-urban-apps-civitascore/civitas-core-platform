@@ -2,14 +2,14 @@ import { useTranslations } from 'next-intl'
 import { type JSX, useMemo } from 'react'
 
 import { BasicSelect } from '@/components/basicSelect/BasicSelect'
-import { RoleResponse } from '@/types/roles'
+import { Role } from '@/types/roles'
 
-type Props = {
+interface RoleTemplateSelectProps {
   setRoleTemplate: (roleId: string) => void
-  allRoles: RoleResponse[]
+  allRoles: Role[]
 }
 
-export const RoleTemplateSelect = (props: Props): JSX.Element => {
+export const RoleTemplateSelect = (props: RoleTemplateSelectProps): JSX.Element => {
   const { setRoleTemplate, allRoles } = props
   const t = useTranslations('roles.permissionsTab')
 

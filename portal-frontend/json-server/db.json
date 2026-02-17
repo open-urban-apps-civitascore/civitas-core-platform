@@ -4,17 +4,14 @@
       "id": "1",
       "name": "Bebauungspläne der Stadt Musterstadt (XPlanung)",
       "description": "",
-      "contact":
-        {
-          "id": "1",
-          "firstName": "Maximilian",
-          "lastName": "Müller"
-        }
-      ,
+      "contact": {
+        "id": "1",
+        "firstName": "Maximilian",
+        "lastName": "Müller"
+      },
       "issued": "2023-09-10T08:00:00Z",
       "lastUpdated": "2023-09-10T08:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -27,17 +24,14 @@
       "id": "2",
       "name": "Spielplätze",
       "description": "",
-      "contact":
-        {
-          "id": "2",
-          "firstName": "Sophie",
-          "lastName": "Schneider"
-        }
-      ,
+      "contact": {
+        "id": "2",
+        "firstName": "Sophie",
+        "lastName": "Schneider"
+      },
       "issued": "2023-01-01T08:00:00Z",
       "lastUpdated": "2023-01-01T08:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "2",
         "format": "DOCX",
@@ -55,17 +49,14 @@
       "id": "3",
       "name": "Spielplätze",
       "description": "",
-      "contact":
-        {
-          "id": "3",
-          "firstName": "Leonard",
-          "lastName": "Fischer"
-        }
-      ,
+      "contact": {
+        "id": "3",
+        "firstName": "Leonard",
+        "lastName": "Fischer"
+      },
       "issued": "2023-02-15T08:00:00Z",
       "lastUpdated": "2023-02-15T08:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "3",
         "format": "GML",
@@ -83,17 +74,14 @@
       "id": "4",
       "name": "Versorgungsleitungen – Trinkwasser",
       "description": "",
-      "contact":
-        {
-          "id": "4",
-          "firstName": "Anna",
-          "lastName": "Weber"
-        }
-      ,
+      "contact": {
+        "id": "4",
+        "firstName": "Anna",
+        "lastName": "Weber"
+      },
       "issued": "2023-03-30T08:00:00Z",
       "lastUpdated": "2023-03-30T08:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "4",
         "format": "PDF",
@@ -111,17 +99,14 @@
       "id": "5",
       "name": "Gewerberegister – öffentlich einsehbare Betriebe",
       "description": "",
-      "contact":
-        {
-          "id": "5",
-          "firstName": "Lukas",
-          "lastName": "Hoffmann"
-        }
-      ,
+      "contact": {
+        "id": "5",
+        "firstName": "Lukas",
+        "lastName": "Hoffmann"
+      },
       "issued": "2023-04-12T08:00:00Z",
       "lastUpdated": "2023-04-12T08:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -134,17 +119,14 @@
       "id": "6",
       "name": "Lärmkartierung – Hauptverkehrsstraßen (Tag/Nacht)",
       "description": "",
-      "contact":
-        {
-          "id": "6",
-          "firstName": "Marie",
-          "lastName": "Koch"
-        }
-      ,
+      "contact": {
+        "id": "6",
+        "firstName": "Marie",
+        "lastName": "Koch"
+      },
       "issued": "2023-05-05T08:00:00Z",
       "lastUpdated": "2023-05-05T08:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "6",
         "format": "GeoJSON",
@@ -162,17 +144,14 @@
       "id": "7",
       "name": "Echtzeit-Positionen Busse und Straßenbahnen",
       "description": "",
-      "contact":
-        {
-          "id": "7",
-          "firstName": "Felix",
-          "lastName": "Richter"
-        }
-      ,
+      "contact": {
+        "id": "7",
+        "firstName": "Felix",
+        "lastName": "Richter"
+      },
       "issued": "2023-06-20T08:00:00Z",
       "lastUpdated": "2023-06-20T08:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -185,17 +164,14 @@
       "id": "8",
       "name": "Bevölkerungsstatistik – Altersgruppen nach Stadtteilen",
       "description": "",
-      "contact":
-        {
-          "id": "8",
-          "firstName": "Laura",
-          "lastName": "Braun"
-        }
-      ,
+      "contact": {
+        "id": "8",
+        "firstName": "Laura",
+        "lastName": "Braun"
+      },
       "issued": "2023-07-10T08:00:00Z",
       "lastUpdated": "2023-07-10T08:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "8",
         "format": "zip",
@@ -213,17 +189,14 @@
       "id": "9",
       "name": "Tourismuszahlen Besucherzähler",
       "description": "",
-      "contact":
-        {
-          "id": "9",
-          "firstName": "Hannah",
-          "lastName": "Keller"
-        }
-      ,
+      "contact": {
+        "id": "9",
+        "firstName": "Hannah",
+        "lastName": "Keller"
+      },
       "issued": "2023-01-05T00:00:00Z",
       "lastUpdated": "2025-11-20T15:11:29.431Z",
       "status": "published",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -236,17 +209,14 @@
       "id": "10",
       "name": "Unfallstatistik Sensorerfassung",
       "description": "",
-      "contact":
-        {
-          "id": "10",
-          "firstName": "Noah",
-          "lastName": "Schulz"
-        }
-      ,
+      "contact": {
+        "id": "10",
+        "firstName": "Noah",
+        "lastName": "Schulz"
+      },
       "issued": "2023-09-04T00:00:00Z",
       "lastUpdated": "2023-09-26T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "10",
         "format": "JSON",
@@ -264,17 +234,14 @@
       "id": "11",
       "name": "Lärmpegel an Hauptverkehrsstraßen",
       "description": "",
-      "contact":
-        {
-          "id": "11",
-          "firstName": "Nina",
-          "lastName": "Hoffmann"
-        }
-      ,
+      "contact": {
+        "id": "11",
+        "firstName": "Nina",
+        "lastName": "Hoffmann"
+      },
       "issued": "2023-07-01T00:00:00Z",
       "lastUpdated": "2023-07-08T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -287,17 +254,14 @@
       "id": "12",
       "name": "Krankenhaus Bettenauslastung",
       "description": "",
-      "contact":
-        {
-          "id": "12",
-          "firstName": "Sophie",
-          "lastName": "Schneider"
-        }
-      ,
+      "contact": {
+        "id": "12",
+        "firstName": "Sophie",
+        "lastName": "Schneider"
+      },
       "issued": "2023-06-12T00:00:00Z",
       "lastUpdated": "2023-06-26T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "12",
         "format": "XML",
@@ -315,17 +279,14 @@
       "id": "13",
       "name": "Lärmkartierung Bahnhöfe",
       "description": "",
-      "contact":
-        {
-          "id": "13",
-          "firstName": "Nina",
-          "lastName": "Müller"
-        }
-      ,
+      "contact": {
+        "id": "13",
+        "firstName": "Nina",
+        "lastName": "Müller"
+      },
       "issued": "2023-10-16T00:00:00Z",
       "lastUpdated": "2023-10-29T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "13",
         "format": "XML",
@@ -343,17 +304,14 @@
       "id": "14",
       "name": "Krankenhaus Bettenauslastung",
       "description": "",
-      "contact":
-        {
-          "id": "14",
-          "firstName": "Lea",
-          "lastName": "Schmidt"
-        }
-      ,
+      "contact": {
+        "id": "14",
+        "firstName": "Lea",
+        "lastName": "Schmidt"
+      },
       "issued": "2023-02-26T00:00:00Z",
       "lastUpdated": "2023-03-11T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -366,17 +324,14 @@
       "id": "15",
       "name": "Echtzeitdaten – Busse",
       "description": "",
-      "contact":
-        {
-          "id": "15",
-          "firstName": "Emma",
-          "lastName": "Wolf"
-        }
-      ,
+      "contact": {
+        "id": "15",
+        "firstName": "Emma",
+        "lastName": "Wolf"
+      },
       "issued": "2023-03-26T00:00:00Z",
       "lastUpdated": "2023-03-29T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "15",
         "format": "PDF",
@@ -394,17 +349,14 @@
       "id": "16",
       "name": "Rettungsdienste – Einsatzzeiten",
       "description": "",
-      "contact":
-        {
-          "id": "16",
-          "firstName": "Jannik",
-          "lastName": "Wolf"
-        }
-      ,
+      "contact": {
+        "id": "16",
+        "firstName": "Jannik",
+        "lastName": "Wolf"
+      },
       "issued": "2023-04-26T00:00:00Z",
       "lastUpdated": "2023-05-10T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -417,17 +369,14 @@
       "id": "17",
       "name": "Wasserqualität – Flüsse",
       "description": "",
-      "contact":
-        {
-          "id": "17",
-          "firstName": "Paul",
-          "lastName": "Schneider"
-        }
-      ,
+      "contact": {
+        "id": "17",
+        "firstName": "Paul",
+        "lastName": "Schneider"
+      },
       "issued": "2023-10-20T00:00:00Z",
       "lastUpdated": "2023-10-28T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "17",
         "format": "PDF",
@@ -445,17 +394,14 @@
       "id": "18",
       "name": "Straßenbeleuchtung – Defektmeldungen",
       "description": "",
-      "contact":
-        {
-          "id": "18",
-          "firstName": "Emma",
-          "lastName": "Lang"
-        }
-      ,
+      "contact": {
+        "id": "18",
+        "firstName": "Emma",
+        "lastName": "Lang"
+      },
       "issued": "2023-01-19T00:00:00Z",
       "lastUpdated": "2023-01-30T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "18",
         "format": "ZIP",
@@ -473,17 +419,14 @@
       "id": "19",
       "name": "Luftqualität – NO2-Messungen",
       "description": "",
-      "contact":
-        {
-          "id": "19",
-          "firstName": "Elias",
-          "lastName": "Lang"
-        }
-      ,
+      "contact": {
+        "id": "19",
+        "firstName": "Elias",
+        "lastName": "Lang"
+      },
       "issued": "2023-09-19T00:00:00Z",
       "lastUpdated": "2023-10-13T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "19",
         "format": "GeoJSON",
@@ -501,17 +444,14 @@
       "id": "20",
       "name": "Wasserqualität – Flüsse",
       "description": "",
-      "contact":
-        {
-          "id": "20",
-          "firstName": "Finn",
-          "lastName": "Zimmermann"
-        }
-      ,
+      "contact": {
+        "id": "20",
+        "firstName": "Finn",
+        "lastName": "Zimmermann"
+      },
       "issued": "2023-04-05T00:00:00Z",
       "lastUpdated": "2023-04-08T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "20",
         "format": "CSV",
@@ -529,17 +469,14 @@
       "id": "21",
       "name": "Defibrillator Nutzungshäufigkeit",
       "description": "",
-      "contact":
-        {
-          "id": "21",
-          "firstName": "Miriam",
-          "lastName": "Wolf"
-        }
-      ,
+      "contact": {
+        "id": "21",
+        "firstName": "Miriam",
+        "lastName": "Wolf"
+      },
       "issued": "2023-10-08T00:00:00Z",
       "lastUpdated": "2023-10-10T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "21",
         "format": "XML",
@@ -557,17 +494,14 @@
       "id": "22",
       "name": "Krankenhaus Bettenauslastung",
       "description": "",
-      "contact":
-        {
-          "id": "22",
-          "firstName": "Jannik",
-          "lastName": "Braun"
-        }
-      ,
+      "contact": {
+        "id": "22",
+        "firstName": "Jannik",
+        "lastName": "Braun"
+      },
       "issued": "2023-07-01T00:00:00Z",
       "lastUpdated": "2023-07-10T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "22",
         "format": "GeoJSON",
@@ -585,17 +519,14 @@
       "id": "23",
       "name": "Echtzeitdaten – Busse",
       "description": "",
-      "contact":
-        {
-          "id": "23",
-          "firstName": "Ben",
-          "lastName": "Lehmann"
-        }
-      ,
+      "contact": {
+        "id": "23",
+        "firstName": "Ben",
+        "lastName": "Lehmann"
+      },
       "issued": "2023-05-23T00:00:00Z",
       "lastUpdated": "2023-05-28T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "23",
         "format": "JSON",
@@ -613,17 +544,14 @@
       "id": "24",
       "name": "Rettungsdienste – Einsatzzeiten",
       "description": "",
-      "contact":
-        {
-          "id": "24",
-          "firstName": "Maximilian",
-          "lastName": "Keller"
-        }
-      ,
+      "contact": {
+        "id": "24",
+        "firstName": "Maximilian",
+        "lastName": "Keller"
+      },
       "issued": "2023-06-03T00:00:00Z",
       "lastUpdated": "2023-06-30T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "24",
         "format": "PDF",
@@ -641,17 +569,14 @@
       "id": "25",
       "name": "Echtzeitdaten – Straßenbahnen",
       "description": "",
-      "contact":
-        {
-          "id": "25",
-          "firstName": "Sarah",
-          "lastName": "Peters"
-        }
-      ,
+      "contact": {
+        "id": "25",
+        "firstName": "Sarah",
+        "lastName": "Peters"
+      },
       "issued": "2023-08-27T00:00:00Z",
       "lastUpdated": "2023-09-20T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "25",
         "format": "XLSX",
@@ -669,17 +594,14 @@
       "id": "26",
       "name": "Unfallstatistik Sensorerfassung",
       "description": "",
-      "contact":
-        {
-          "id": "26",
-          "firstName": "Jonas",
-          "lastName": "Schulz"
-        }
-      ,
+      "contact": {
+        "id": "26",
+        "firstName": "Jonas",
+        "lastName": "Schulz"
+      },
       "issued": "2023-07-23T00:00:00Z",
       "lastUpdated": "2023-08-16T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "26",
         "format": "CSV",
@@ -697,17 +619,14 @@
       "id": "27",
       "name": "Wasserqualität – Flüsse",
       "description": "",
-      "contact":
-        {
-          "id": "27",
-          "firstName": "Miriam",
-          "lastName": "Weber"
-        }
-      ,
+      "contact": {
+        "id": "27",
+        "firstName": "Miriam",
+        "lastName": "Weber"
+      },
       "issued": "2023-02-12T00:00:00Z",
       "lastUpdated": "2023-03-12T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "27",
         "format": "XLSX",
@@ -725,17 +644,14 @@
       "id": "28",
       "name": "Krankenhaus Bettenauslastung",
       "description": "",
-      "contact":
-        {
-          "id": "28",
-          "firstName": "Hannah",
-          "lastName": "Schmidt"
-        }
-      ,
+      "contact": {
+        "id": "28",
+        "firstName": "Hannah",
+        "lastName": "Schmidt"
+      },
       "issued": "2023-05-01T00:00:00Z",
       "lastUpdated": "2023-05-30T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -748,17 +664,14 @@
       "id": "29",
       "name": "Echtzeitdaten – Straßenbahnen",
       "description": "",
-      "contact":
-        {
-          "id": "29",
-          "firstName": "Isabell",
-          "lastName": "Weber"
-        }
-      ,
+      "contact": {
+        "id": "29",
+        "firstName": "Isabell",
+        "lastName": "Weber"
+      },
       "issued": "2023-08-13T00:00:00Z",
       "lastUpdated": "2023-08-18T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -771,17 +684,14 @@
       "id": "30",
       "name": "Straßenbeleuchtung – Defektmeldungen",
       "description": "",
-      "contact":
-        {
-          "id": "30",
-          "firstName": "Miriam",
-          "lastName": "Meier"
-        }
-      ,
+      "contact": {
+        "id": "30",
+        "firstName": "Miriam",
+        "lastName": "Meier"
+      },
       "issued": "2023-01-13T00:00:00Z",
       "lastUpdated": "2023-02-08T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "30",
         "format": "XLSX",
@@ -799,17 +709,14 @@
       "id": "31",
       "name": "Luftqualität – Feinstaub PM10",
       "description": "",
-      "contact":
-        {
-          "id": "31",
-          "firstName": "Mila",
-          "lastName": "Keller"
-        }
-      ,
+      "contact": {
+        "id": "31",
+        "firstName": "Mila",
+        "lastName": "Keller"
+      },
       "issued": "2023-07-18T00:00:00Z",
       "lastUpdated": "2023-08-17T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "31",
         "format": "JSON",
@@ -827,17 +734,14 @@
       "id": "32",
       "name": "Parkplatzauslastung Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "32",
-          "firstName": "Paul",
-          "lastName": "Keller"
-        }
-      ,
+      "contact": {
+        "id": "32",
+        "firstName": "Paul",
+        "lastName": "Keller"
+      },
       "issued": "2023-05-07T00:00:00Z",
       "lastUpdated": "2023-05-27T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "32",
         "format": "XML",
@@ -855,20 +759,14 @@
       "id": "33",
       "name": "Straßenbeleuchtung – Defektmeldungen",
       "description": "",
-      "contact":
-        {
-          "id": "33",
-          "firstName": "David",
-          "lastName": "Zimmermann"
-        }
-      ,
+      "contact": {
+        "id": "33",
+        "firstName": "David",
+        "lastName": "Zimmermann"
+      },
       "issued": "2023-04-11T00:00:00Z",
       "lastUpdated": "2025-11-20T19:58:56.644Z",
       "status": "draft",
-      "tags": [
-        "Licht",
-        "Nacht"
-      ],
       "distribution": {
         "id": "33",
         "format": "PDF",
@@ -886,17 +784,14 @@
       "id": "34",
       "name": "Niederschlagsmengen Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "34",
-          "firstName": "Leonard",
-          "lastName": "Werner"
-        }
-      ,
+      "contact": {
+        "id": "34",
+        "firstName": "Leonard",
+        "lastName": "Werner"
+      },
       "issued": "2023-04-14T00:00:00Z",
       "lastUpdated": "2023-04-23T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "34",
         "format": "XML",
@@ -914,17 +809,14 @@
       "id": "35",
       "name": "Echtzeitdaten – Straßenbahnen",
       "description": "",
-      "contact":
-        {
-          "id": "35",
-          "firstName": "Clara",
-          "lastName": "Hartmann"
-        }
-      ,
+      "contact": {
+        "id": "35",
+        "firstName": "Clara",
+        "lastName": "Hartmann"
+      },
       "issued": "2023-06-14T00:00:00Z",
       "lastUpdated": "2023-07-10T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "35",
         "format": "PDF",
@@ -942,17 +834,14 @@
       "id": "36",
       "name": "Fahrgastzahlen U-Bahn",
       "description": "",
-      "contact":
-        {
-          "id": "36",
-          "firstName": "Jonas",
-          "lastName": "Keller"
-        }
-      ,
+      "contact": {
+        "id": "36",
+        "firstName": "Jonas",
+        "lastName": "Keller"
+      },
       "issued": "2023-01-15T00:00:00Z",
       "lastUpdated": "2023-02-13T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "36",
         "format": "PDF",
@@ -970,17 +859,14 @@
       "id": "37",
       "name": "Luftqualität – Feinstaub PM10",
       "description": "",
-      "contact":
-        {
-          "id": "37",
-          "firstName": "Laura",
-          "lastName": "Zimmermann"
-        }
-      ,
+      "contact": {
+        "id": "37",
+        "firstName": "Laura",
+        "lastName": "Zimmermann"
+      },
       "issued": "2023-07-13T00:00:00Z",
       "lastUpdated": "2025-11-20T15:46:49.282Z",
       "status": "published",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -993,17 +879,14 @@
       "id": "38",
       "name": "Luftqualität – Ozonwerte",
       "description": "",
-      "contact":
-        {
-          "id": "38",
-          "firstName": "Jonas",
-          "lastName": "Schneider"
-        }
-      ,
+      "contact": {
+        "id": "38",
+        "firstName": "Jonas",
+        "lastName": "Schneider"
+      },
       "issued": "2023-03-13T00:00:00Z",
       "lastUpdated": "2023-03-28T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "38",
         "format": "PDF",
@@ -1021,17 +904,14 @@
       "id": "39",
       "name": "Luftfeuchtigkeit Innenstadt",
       "description": "",
-      "contact":
-        {
-          "id": "39",
-          "firstName": "Nina",
-          "lastName": "Koch"
-        }
-      ,
+      "contact": {
+        "id": "39",
+        "firstName": "Nina",
+        "lastName": "Koch"
+      },
       "issued": "2023-06-05T00:00:00Z",
       "lastUpdated": "2023-06-11T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "39",
         "format": "CSV",
@@ -1049,17 +929,14 @@
       "id": "40",
       "name": "Unfallstatistik Sensorerfassung",
       "description": "",
-      "contact":
-        {
-          "id": "40",
-          "firstName": "Moritz",
-          "lastName": "Krause"
-        }
-      ,
+      "contact": {
+        "id": "40",
+        "firstName": "Moritz",
+        "lastName": "Krause"
+      },
       "issued": "2023-01-22T00:00:00Z",
       "lastUpdated": "2023-02-03T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -1072,17 +949,14 @@
       "id": "41",
       "name": "Fahrgastzahlen U-Bahn",
       "description": "",
-      "contact":
-        {
-          "id": "41",
-          "firstName": "Miriam",
-          "lastName": "Keller"
-        }
-      ,
+      "contact": {
+        "id": "41",
+        "firstName": "Miriam",
+        "lastName": "Keller"
+      },
       "issued": "2023-05-18T00:00:00Z",
       "lastUpdated": "2023-05-25T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "41",
         "format": "PDF",
@@ -1100,17 +974,14 @@
       "id": "42",
       "name": "Luftqualität – NO2-Messungen",
       "description": "",
-      "contact":
-        {
-          "id": "42",
-          "firstName": "Clara",
-          "lastName": "Zimmermann"
-        }
-      ,
+      "contact": {
+        "id": "42",
+        "firstName": "Clara",
+        "lastName": "Zimmermann"
+      },
       "issued": "2023-04-10T00:00:00Z",
       "lastUpdated": "2023-05-07T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "42",
         "format": "XML",
@@ -1128,17 +999,14 @@
       "id": "43",
       "name": "Echtzeitdaten – Busse",
       "description": "",
-      "contact":
-        {
-          "id": "43",
-          "firstName": "Emma",
-          "lastName": "Wolf"
-        }
-      ,
+      "contact": {
+        "id": "43",
+        "firstName": "Emma",
+        "lastName": "Wolf"
+      },
       "issued": "2023-09-01T00:00:00Z",
       "lastUpdated": "2023-09-12T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "43",
         "format": "XLSX",
@@ -1156,17 +1024,14 @@
       "id": "44",
       "name": "Luftqualität – Ozonwerte",
       "description": "",
-      "contact":
-        {
-          "id": "44",
-          "firstName": "Marie",
-          "lastName": "Fischer"
-        }
-      ,
+      "contact": {
+        "id": "44",
+        "firstName": "Marie",
+        "lastName": "Fischer"
+      },
       "issued": "2023-04-25T00:00:00Z",
       "lastUpdated": "2023-04-26T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "44",
         "format": "JSON",
@@ -1184,17 +1049,14 @@
       "id": "45",
       "name": "Rettungsdienste – Einsatzzeiten",
       "description": "",
-      "contact":
-        {
-          "id": "45",
-          "firstName": "Leonard",
-          "lastName": "Braun"
-        }
-      ,
+      "contact": {
+        "id": "45",
+        "firstName": "Leonard",
+        "lastName": "Braun"
+      },
       "issued": "2023-01-30T00:00:00Z",
       "lastUpdated": "2023-02-27T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -1207,17 +1069,14 @@
       "id": "46",
       "name": "Radweg-Nutzungssensoren",
       "description": "",
-      "contact":
-        {
-          "id": "46",
-          "firstName": "Julian",
-          "lastName": "Krüger"
-        }
-      ,
+      "contact": {
+        "id": "46",
+        "firstName": "Julian",
+        "lastName": "Krüger"
+      },
       "issued": "2023-04-14T00:00:00Z",
       "lastUpdated": "2023-05-06T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "46",
         "format": "GeoJSON",
@@ -1235,17 +1094,14 @@
       "id": "47",
       "name": "Notfallmeldungen – Brandmelder",
       "description": "",
-      "contact":
-        {
-          "id": "47",
-          "firstName": "Hannah",
-          "lastName": "Schneider"
-        }
-      ,
+      "contact": {
+        "id": "47",
+        "firstName": "Hannah",
+        "lastName": "Schneider"
+      },
       "issued": "2023-09-14T00:00:00Z",
       "lastUpdated": "2023-10-11T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "47",
         "format": "XLSX",
@@ -1263,17 +1119,14 @@
       "id": "48",
       "name": "Lärmkartierung Bahnhöfe",
       "description": "",
-      "contact":
-        {
-          "id": "48",
-          "firstName": "Clara",
-          "lastName": "Wagner"
-        }
-      ,
+      "contact": {
+        "id": "48",
+        "firstName": "Clara",
+        "lastName": "Wagner"
+      },
       "issued": "2023-07-14T00:00:00Z",
       "lastUpdated": "2023-08-05T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "48",
         "format": "ZIP",
@@ -1291,17 +1144,14 @@
       "id": "49",
       "name": "Luftfeuchtigkeit Innenstadt",
       "description": "",
-      "contact":
-        {
-          "id": "49",
-          "firstName": "Hannah",
-          "lastName": "Becker"
-        }
-      ,
+      "contact": {
+        "id": "49",
+        "firstName": "Hannah",
+        "lastName": "Becker"
+      },
       "issued": "2023-09-11T00:00:00Z",
       "lastUpdated": "2023-09-27T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "49",
         "format": "XLSX",
@@ -1319,17 +1169,14 @@
       "id": "50",
       "name": "Energieverbrauch – öffentl. Gebäude",
       "description": "",
-      "contact":
-        {
-          "id": "50",
-          "firstName": "Mila",
-          "lastName": "Hartmann"
-        }
-      ,
+      "contact": {
+        "id": "50",
+        "firstName": "Mila",
+        "lastName": "Hartmann"
+      },
       "issued": "2023-09-06T00:00:00Z",
       "lastUpdated": "2023-10-04T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "50",
         "format": "XML",
@@ -1347,17 +1194,14 @@
       "id": "51",
       "name": "Echtzeitdaten – Busse",
       "description": "",
-      "contact":
-        {
-          "id": "51",
-          "firstName": "Miriam",
-          "lastName": "Lehmann"
-        }
-      ,
+      "contact": {
+        "id": "51",
+        "firstName": "Miriam",
+        "lastName": "Lehmann"
+      },
       "issued": "2023-09-03T00:00:00Z",
       "lastUpdated": "2023-09-17T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "51",
         "format": "CSV",
@@ -1375,17 +1219,14 @@
       "id": "52",
       "name": "Parkplatzauslastung Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "52",
-          "firstName": "Clara",
-          "lastName": "Hartmann"
-        }
-      ,
+      "contact": {
+        "id": "52",
+        "firstName": "Clara",
+        "lastName": "Hartmann"
+      },
       "issued": "2023-02-23T00:00:00Z",
       "lastUpdated": "2023-02-24T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "52",
         "format": "XLSX",
@@ -1403,17 +1244,14 @@
       "id": "53",
       "name": "Grundwasserpegel Monitoring",
       "description": "",
-      "contact":
-        {
-          "id": "53",
-          "firstName": "Philipp",
-          "lastName": "Werner"
-        }
-      ,
+      "contact": {
+        "id": "53",
+        "firstName": "Philipp",
+        "lastName": "Werner"
+      },
       "issued": "2023-03-02T00:00:00Z",
       "lastUpdated": "2023-03-24T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "53",
         "format": "GeoJSON",
@@ -1431,17 +1269,14 @@
       "id": "54",
       "name": "Müllbehälter Füllstände",
       "description": "",
-      "contact":
-        {
-          "id": "54",
-          "firstName": "Julian",
-          "lastName": "Schulz"
-        }
-      ,
+      "contact": {
+        "id": "54",
+        "firstName": "Julian",
+        "lastName": "Schulz"
+      },
       "issued": "2023-10-21T00:00:00Z",
       "lastUpdated": "2023-11-11T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -1454,17 +1289,14 @@
       "id": "55",
       "name": "Verkehrsdichte an Kreuzungen",
       "description": "",
-      "contact":
-        {
-          "id": "55",
-          "firstName": "Clara",
-          "lastName": "Braun"
-        }
-      ,
+      "contact": {
+        "id": "55",
+        "firstName": "Clara",
+        "lastName": "Braun"
+      },
       "issued": "2023-04-16T00:00:00Z",
       "lastUpdated": "2023-04-19T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "55",
         "format": "XML",
@@ -1482,17 +1314,14 @@
       "id": "56",
       "name": "Echtzeitdaten – Busse",
       "description": "",
-      "contact":
-        {
-          "id": "56",
-          "firstName": "Amelie",
-          "lastName": "Hartmann"
-        }
-      ,
+      "contact": {
+        "id": "56",
+        "firstName": "Amelie",
+        "lastName": "Hartmann"
+      },
       "issued": "2023-09-23T00:00:00Z",
       "lastUpdated": "2023-09-29T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "56",
         "format": "PDF",
@@ -1510,17 +1339,14 @@
       "id": "57",
       "name": "Unfallstatistik Sensorerfassung",
       "description": "",
-      "contact":
-        {
-          "id": "57",
-          "firstName": "Miriam",
-          "lastName": "Hoffmann"
-        }
-      ,
+      "contact": {
+        "id": "57",
+        "firstName": "Miriam",
+        "lastName": "Hoffmann"
+      },
       "issued": "2023-08-11T00:00:00Z",
       "lastUpdated": "2023-08-29T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "57",
         "format": "JSON",
@@ -1538,17 +1364,14 @@
       "id": "58",
       "name": "Verkehrsdichte an Kreuzungen",
       "description": "",
-      "contact":
-        {
-          "id": "58",
-          "firstName": "Amelie",
-          "lastName": "Müller"
-        }
-      ,
+      "contact": {
+        "id": "58",
+        "firstName": "Amelie",
+        "lastName": "Müller"
+      },
       "issued": "2023-07-02T00:00:00Z",
       "lastUpdated": "2023-07-15T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -1561,17 +1384,14 @@
       "id": "59",
       "name": "Bevölkerungsbewegungen – anonyme Zählung",
       "description": "",
-      "contact":
-        {
-          "id": "59",
-          "firstName": "Noah",
-          "lastName": "Huber"
-        }
-      ,
+      "contact": {
+        "id": "59",
+        "firstName": "Noah",
+        "lastName": "Huber"
+      },
       "issued": "2023-05-13T00:00:00Z",
       "lastUpdated": "2023-05-19T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -1584,17 +1404,14 @@
       "id": "60",
       "name": "Niederschlagsmengen Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "60",
-          "firstName": "Amelie",
-          "lastName": "Huber"
-        }
-      ,
+      "contact": {
+        "id": "60",
+        "firstName": "Amelie",
+        "lastName": "Huber"
+      },
       "issued": "2023-05-24T00:00:00Z",
       "lastUpdated": "2023-06-16T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "60",
         "format": "PDF",
@@ -1612,17 +1429,14 @@
       "id": "61",
       "name": "Lärmkartierung Bahnhöfe",
       "description": "",
-      "contact":
-        {
-          "id": "61",
-          "firstName": "Maximilian",
-          "lastName": "Becker"
-        }
-      ,
+      "contact": {
+        "id": "61",
+        "firstName": "Maximilian",
+        "lastName": "Becker"
+      },
       "issued": "2023-03-14T00:00:00Z",
       "lastUpdated": "2023-04-07T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "61",
         "format": "PDF",
@@ -1640,17 +1454,14 @@
       "id": "62",
       "name": "Niederschlagsmengen Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "62",
-          "firstName": "Amelie",
-          "lastName": "Richter"
-        }
-      ,
+      "contact": {
+        "id": "62",
+        "firstName": "Amelie",
+        "lastName": "Richter"
+      },
       "issued": "2023-02-18T00:00:00Z",
       "lastUpdated": "2023-03-03T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "62",
         "format": "JSON",
@@ -1668,17 +1479,14 @@
       "id": "63",
       "name": "Defibrillator Nutzungshäufigkeit",
       "description": "",
-      "contact":
-        {
-          "id": "63",
-          "firstName": "Emma",
-          "lastName": "Zimmermann"
-        }
-      ,
+      "contact": {
+        "id": "63",
+        "firstName": "Emma",
+        "lastName": "Zimmermann"
+      },
       "issued": "2023-06-08T00:00:00Z",
       "lastUpdated": "2023-06-14T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "63",
         "format": "GeoJSON",
@@ -1696,17 +1504,14 @@
       "id": "64",
       "name": "Lärmpegel an Hauptverkehrsstraßen",
       "description": "",
-      "contact":
-        {
-          "id": "64",
-          "firstName": "Jonas",
-          "lastName": "Huber"
-        }
-      ,
+      "contact": {
+        "id": "64",
+        "firstName": "Jonas",
+        "lastName": "Huber"
+      },
       "issued": "2023-10-24T00:00:00Z",
       "lastUpdated": "2023-11-07T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -1719,17 +1524,14 @@
       "id": "65",
       "name": "Luftqualität – Ozonwerte",
       "description": "",
-      "contact":
-        {
-          "id": "65",
-          "firstName": "Sarah",
-          "lastName": "Hoffmann"
-        }
-      ,
+      "contact": {
+        "id": "65",
+        "firstName": "Sarah",
+        "lastName": "Hoffmann"
+      },
       "issued": "2023-01-18T00:00:00Z",
       "lastUpdated": "2023-02-06T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "65",
         "format": "JSON",
@@ -1747,17 +1549,14 @@
       "id": "66",
       "name": "Niederschlagsmengen Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "66",
-          "firstName": "Miriam",
-          "lastName": "Fischer"
-        }
-      ,
+      "contact": {
+        "id": "66",
+        "firstName": "Miriam",
+        "lastName": "Fischer"
+      },
       "issued": "2023-04-15T00:00:00Z",
       "lastUpdated": "2023-04-29T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -1770,17 +1569,14 @@
       "id": "67",
       "name": "E-Ladestationen – Belegung",
       "description": "",
-      "contact":
-        {
-          "id": "67",
-          "firstName": "Mila",
-          "lastName": "Müller"
-        }
-      ,
+      "contact": {
+        "id": "67",
+        "firstName": "Mila",
+        "lastName": "Müller"
+      },
       "issued": "2023-10-16T00:00:00Z",
       "lastUpdated": "2023-11-04T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "67",
         "format": "CSV",
@@ -1798,17 +1594,14 @@
       "id": "68",
       "name": "Radweg-Nutzungssensoren",
       "description": "",
-      "contact":
-        {
-          "id": "68",
-          "firstName": "Jonas",
-          "lastName": "Müller"
-        }
-      ,
+      "contact": {
+        "id": "68",
+        "firstName": "Jonas",
+        "lastName": "Müller"
+      },
       "issued": "2023-09-26T00:00:00Z",
       "lastUpdated": "2023-09-26T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -1821,17 +1614,14 @@
       "id": "69",
       "name": "Unfallstatistik Sensorerfassung",
       "description": "",
-      "contact":
-        {
-          "id": "69",
-          "firstName": "Maximilian",
-          "lastName": "Keller"
-        }
-      ,
+      "contact": {
+        "id": "69",
+        "firstName": "Maximilian",
+        "lastName": "Keller"
+      },
       "issued": "2023-04-30T00:00:00Z",
       "lastUpdated": "2023-05-19T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "69",
         "format": "JSON",
@@ -1849,17 +1639,14 @@
       "id": "70",
       "name": "Temperatur an Wetterstationen",
       "description": "",
-      "contact":
-        {
-          "id": "70",
-          "firstName": "Anna",
-          "lastName": "Schmidt"
-        }
-      ,
+      "contact": {
+        "id": "70",
+        "firstName": "Anna",
+        "lastName": "Schmidt"
+      },
       "issued": "2023-07-11T00:00:00Z",
       "lastUpdated": "2023-08-09T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -1872,17 +1659,14 @@
       "id": "71",
       "name": "Windgeschwindigkeit Stadtgebiet",
       "description": "",
-      "contact":
-        {
-          "id": "71",
-          "firstName": "Finn",
-          "lastName": "Lang"
-        }
-      ,
+      "contact": {
+        "id": "71",
+        "firstName": "Finn",
+        "lastName": "Lang"
+      },
       "issued": "2023-09-14T00:00:00Z",
       "lastUpdated": "2023-10-14T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "71",
         "format": "JSON",
@@ -1900,17 +1684,14 @@
       "id": "72",
       "name": "Niederschlagsmengen Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "72",
-          "firstName": "Amelie",
-          "lastName": "Lehmann"
-        }
-      ,
+      "contact": {
+        "id": "72",
+        "firstName": "Amelie",
+        "lastName": "Lehmann"
+      },
       "issued": "2023-09-18T00:00:00Z",
       "lastUpdated": "2023-10-17T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "72",
         "format": "ZIP",
@@ -1928,17 +1709,14 @@
       "id": "73",
       "name": "Energieverbrauch – öffentl. Gebäude",
       "description": "",
-      "contact":
-        {
-          "id": "73",
-          "firstName": "Finn",
-          "lastName": "Lang"
-        }
-      ,
+      "contact": {
+        "id": "73",
+        "firstName": "Finn",
+        "lastName": "Lang"
+      },
       "issued": "2023-03-06T00:00:00Z",
       "lastUpdated": "2023-03-28T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "73",
         "format": "PDF",
@@ -1956,17 +1734,14 @@
       "id": "74",
       "name": "Luftfeuchtigkeit Innenstadt",
       "description": "",
-      "contact":
-        {
-          "id": "74",
-          "firstName": "Hannah",
-          "lastName": "Hoffmann"
-        }
-      ,
+      "contact": {
+        "id": "74",
+        "firstName": "Hannah",
+        "lastName": "Hoffmann"
+      },
       "issued": "2023-03-13T00:00:00Z",
       "lastUpdated": "2023-04-01T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "74",
         "format": "PDF",
@@ -1984,17 +1759,14 @@
       "id": "75",
       "name": "Tourismuszahlen Besucherzähler",
       "description": "",
-      "contact":
-        {
-          "id": "75",
-          "firstName": "Felix",
-          "lastName": "Meier"
-        }
-      ,
+      "contact": {
+        "id": "75",
+        "firstName": "Felix",
+        "lastName": "Meier"
+      },
       "issued": "2023-09-08T00:00:00Z",
       "lastUpdated": "2023-09-17T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "75",
         "format": "XLSX",
@@ -2012,17 +1784,14 @@
       "id": "76",
       "name": "Niederschlagsmengen Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "76",
-          "firstName": "Jonas",
-          "lastName": "Fischer"
-        }
-      ,
+      "contact": {
+        "id": "76",
+        "firstName": "Jonas",
+        "lastName": "Fischer"
+      },
       "issued": "2023-02-25T00:00:00Z",
       "lastUpdated": "2023-03-12T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "76",
         "format": "GeoJSON",
@@ -2040,17 +1809,14 @@
       "id": "77",
       "name": "Windgeschwindigkeit Stadtgebiet",
       "description": "",
-      "contact":
-        {
-          "id": "77",
-          "firstName": "Lea",
-          "lastName": "Zimmermann"
-        }
-      ,
+      "contact": {
+        "id": "77",
+        "firstName": "Lea",
+        "lastName": "Zimmermann"
+      },
       "issued": "2023-04-26T00:00:00Z",
       "lastUpdated": "2023-04-30T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "77",
         "format": "ZIP",
@@ -2068,17 +1834,14 @@
       "id": "78",
       "name": "Lärmkartierung Bahnhöfe",
       "description": "",
-      "contact":
-        {
-          "id": "78",
-          "firstName": "Lina",
-          "lastName": "Schulz"
-        }
-      ,
+      "contact": {
+        "id": "78",
+        "firstName": "Lina",
+        "lastName": "Schulz"
+      },
       "issued": "2023-10-27T00:00:00Z",
       "lastUpdated": "2023-11-16T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "78",
         "format": "GeoJSON",
@@ -2096,17 +1859,14 @@
       "id": "79",
       "name": "Parkplatzauslastung Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "79",
-          "firstName": "Julian",
-          "lastName": "Lang"
-        }
-      ,
+      "contact": {
+        "id": "79",
+        "firstName": "Julian",
+        "lastName": "Lang"
+      },
       "issued": "2023-03-10T00:00:00Z",
       "lastUpdated": "2023-04-09T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -2119,17 +1879,14 @@
       "id": "80",
       "name": "Lärmpegel an Hauptverkehrsstraßen",
       "description": "",
-      "contact":
-        {
-          "id": "80",
-          "firstName": "Emma",
-          "lastName": "Fischer"
-        }
-      ,
+      "contact": {
+        "id": "80",
+        "firstName": "Emma",
+        "lastName": "Fischer"
+      },
       "issued": "2023-08-09T00:00:00Z",
       "lastUpdated": "2023-08-14T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "80",
         "format": "CSV",
@@ -2147,17 +1904,14 @@
       "id": "81",
       "name": "Luftqualität – Ozonwerte",
       "description": "",
-      "contact":
-        {
-          "id": "81",
-          "firstName": "Miriam",
-          "lastName": "Müller"
-        }
-      ,
+      "contact": {
+        "id": "81",
+        "firstName": "Miriam",
+        "lastName": "Müller"
+      },
       "issued": "2023-08-04T00:00:00Z",
       "lastUpdated": "2023-08-18T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "81",
         "format": "PDF",
@@ -2175,17 +1929,14 @@
       "id": "82",
       "name": "Lärmkartierung Bahnhöfe",
       "description": "",
-      "contact":
-        {
-          "id": "82",
-          "firstName": "Felix",
-          "lastName": "Schulz"
-        }
-      ,
+      "contact": {
+        "id": "82",
+        "firstName": "Felix",
+        "lastName": "Schulz"
+      },
       "issued": "2023-09-17T00:00:00Z",
       "lastUpdated": "2023-09-25T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "82",
         "format": "ZIP",
@@ -2203,17 +1954,14 @@
       "id": "83",
       "name": "Straßenbeleuchtung – Defektmeldungen",
       "description": "",
-      "contact":
-        {
-          "id": "83",
-          "firstName": "Miriam",
-          "lastName": "Richter"
-        }
-      ,
+      "contact": {
+        "id": "83",
+        "firstName": "Miriam",
+        "lastName": "Richter"
+      },
       "issued": "2023-08-15T00:00:00Z",
       "lastUpdated": "2023-08-24T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "83",
         "format": "CSV",
@@ -2231,17 +1979,14 @@
       "id": "84",
       "name": "Temperatur an Wetterstationen",
       "description": "",
-      "contact":
-        {
-          "id": "84",
-          "firstName": "Sophie",
-          "lastName": "Koch"
-        }
-      ,
+      "contact": {
+        "id": "84",
+        "firstName": "Sophie",
+        "lastName": "Koch"
+      },
       "issued": "2023-08-09T00:00:00Z",
       "lastUpdated": "2023-08-31T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "84",
         "format": "XML",
@@ -2259,17 +2004,14 @@
       "id": "85",
       "name": "Luftqualität – NO2-Messungen",
       "description": "",
-      "contact":
-        {
-          "id": "85",
-          "firstName": "David",
-          "lastName": "Hoffmann"
-        }
-      ,
+      "contact": {
+        "id": "85",
+        "firstName": "David",
+        "lastName": "Hoffmann"
+      },
       "issued": "2023-02-21T00:00:00Z",
       "lastUpdated": "2023-03-19T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "85",
         "format": "ZIP",
@@ -2287,17 +2029,14 @@
       "id": "86",
       "name": "Bevölkerungsbewegungen – anonyme Zählung",
       "description": "",
-      "contact":
-        {
-          "id": "86",
-          "firstName": "Philipp",
-          "lastName": "Weber"
-        }
-      ,
+      "contact": {
+        "id": "86",
+        "firstName": "Philipp",
+        "lastName": "Weber"
+      },
       "issued": "2023-02-19T00:00:00Z",
       "lastUpdated": "2023-02-24T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -2310,17 +2049,14 @@
       "id": "87",
       "name": "Verkehrsdichte an Kreuzungen",
       "description": "",
-      "contact":
-        {
-          "id": "87",
-          "firstName": "Paul",
-          "lastName": "Zimmermann"
-        }
-      ,
+      "contact": {
+        "id": "87",
+        "firstName": "Paul",
+        "lastName": "Zimmermann"
+      },
       "issued": "2023-06-29T00:00:00Z",
       "lastUpdated": "2023-07-20T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "87",
         "format": "XLSX",
@@ -2338,17 +2074,14 @@
       "id": "88",
       "name": "Straßenbeleuchtung – Defektmeldungen",
       "description": "",
-      "contact":
-        {
-          "id": "88",
-          "firstName": "Lea",
-          "lastName": "Zimmermann"
-        }
-      ,
+      "contact": {
+        "id": "88",
+        "firstName": "Lea",
+        "lastName": "Zimmermann"
+      },
       "issued": "2023-08-21T00:00:00Z",
       "lastUpdated": "2023-09-05T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "88",
         "format": "JSON",
@@ -2366,17 +2099,14 @@
       "id": "89",
       "name": "Defibrillator Nutzungshäufigkeit",
       "description": "",
-      "contact":
-        {
-          "id": "89",
-          "firstName": "Lina",
-          "lastName": "Weber"
-        }
-      ,
+      "contact": {
+        "id": "89",
+        "firstName": "Lina",
+        "lastName": "Weber"
+      },
       "issued": "2023-07-15T00:00:00Z",
       "lastUpdated": "2023-08-14T00:00:00Z",
       "status": "ready",
-      "tags": [],
       "distribution": {
         "id": "89",
         "format": "JSON",
@@ -2394,17 +2124,14 @@
       "id": "90",
       "name": "Rettungsdienste – Einsatzzeiten",
       "description": "",
-      "contact":
-        {
-          "id": "90",
-          "firstName": "Clara",
-          "lastName": "Wolf"
-        }
-      ,
+      "contact": {
+        "id": "90",
+        "firstName": "Clara",
+        "lastName": "Wolf"
+      },
       "issued": "2023-02-25T00:00:00Z",
       "lastUpdated": "2023-03-23T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -2417,17 +2144,14 @@
       "id": "91",
       "name": "Grundwasserpegel Monitoring",
       "description": "",
-      "contact":
-        {
-          "id": "91",
-          "firstName": "David",
-          "lastName": "Wagner"
-        }
-      ,
+      "contact": {
+        "id": "91",
+        "firstName": "David",
+        "lastName": "Wagner"
+      },
       "issued": "2023-06-01T00:00:00Z",
       "lastUpdated": "2023-06-21T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "91",
         "format": "CSV",
@@ -2445,17 +2169,14 @@
       "id": "92",
       "name": "Luftqualität – NO2-Messungen",
       "description": "",
-      "contact":
-        {
-          "id": "92",
-          "firstName": "Clara",
-          "lastName": "Keller"
-        }
-      ,
+      "contact": {
+        "id": "92",
+        "firstName": "Clara",
+        "lastName": "Keller"
+      },
       "issued": "2023-02-15T00:00:00Z",
       "lastUpdated": "2023-03-13T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": null,
       "catalog": ["1"],
       "dataspace": {
@@ -2468,17 +2189,14 @@
       "id": "93",
       "name": "Tourismuszahlen Besucherzähler",
       "description": "",
-      "contact":
-        {
-          "id": "93",
-          "firstName": "Maximilian",
-          "lastName": "Krause"
-        }
-      ,
+      "contact": {
+        "id": "93",
+        "firstName": "Maximilian",
+        "lastName": "Krause"
+      },
       "issued": "2023-02-04T00:00:00Z",
       "lastUpdated": "2023-02-08T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "93",
         "format": "XLSX",
@@ -2496,17 +2214,14 @@
       "id": "94",
       "name": "Rettungsdienste – Einsatzzeiten",
       "description": "",
-      "contact":
-        {
-          "id": "94",
-          "firstName": "Hannah",
-          "lastName": "Richter"
-        }
-      ,
+      "contact": {
+        "id": "94",
+        "firstName": "Hannah",
+        "lastName": "Richter"
+      },
       "issued": "2023-06-15T00:00:00Z",
       "lastUpdated": "2023-06-19T00:00:00Z",
       "status": "draft",
-      "tags": [],
       "distribution": {
         "id": "94",
         "format": "JSON",
@@ -2524,17 +2239,14 @@
       "id": "95",
       "name": "Parkplatzauslastung Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "95",
-          "firstName": "Ben",
-          "lastName": "Schneider"
-        }
-      ,
+      "contact": {
+        "id": "95",
+        "firstName": "Ben",
+        "lastName": "Schneider"
+      },
       "issued": "2023-01-27T00:00:00Z",
       "lastUpdated": "2023-02-06T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "95",
         "format": "XLSX",
@@ -2552,26 +2264,21 @@
       "id": "96",
       "name": "Parkplatzauslastung Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "96",
-          "firstName": "Clara",
-          "lastName": "Richter"
-        }
-      ,
+      "contact": {
+        "id": "96",
+        "firstName": "Clara",
+        "lastName": "Richter"
+      },
       "issued": "2023-05-26T00:00:00Z",
       "lastUpdated": "2023-05-28T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "96",
         "format": "XLSX",
         "name": "Messdaten",
         "url": "https://sensors.example/96"
       },
-      "catalog": [
-        "1"
-      ],
+      "catalog": ["1"],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -2585,17 +2292,14 @@
       "id": "97",
       "name": "Energieverbrauch – Straßenbeleuchtung",
       "description": "",
-      "contact":
-        {
-          "id": "97",
-          "firstName": "Ben",
-          "lastName": "Lang"
-        }
-      ,
+      "contact": {
+        "id": "97",
+        "firstName": "Ben",
+        "lastName": "Lang"
+      },
       "issued": "2023-05-04T00:00:00Z",
       "lastUpdated": "2023-05-14T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "97",
         "format": "PDF",
@@ -2613,17 +2317,14 @@
       "id": "98",
       "name": "Tourismuszahlen Besucherzähler",
       "description": "",
-      "contact":
-        {
-          "id": "98",
-          "firstName": "Mila",
-          "lastName": "Meier"
-        }
-      ,
+      "contact": {
+        "id": "98",
+        "firstName": "Mila",
+        "lastName": "Meier"
+      },
       "issued": "2023-08-31T00:00:00Z",
       "lastUpdated": "2023-09-07T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "98",
         "format": "CSV",
@@ -2641,17 +2342,14 @@
       "id": "99",
       "name": "Müllbehälter Füllstände",
       "description": "",
-      "contact":
-        {
-          "id": "99",
-          "firstName": "Jannik",
-          "lastName": "Wolf"
-        }
-      ,
+      "contact": {
+        "id": "99",
+        "firstName": "Jannik",
+        "lastName": "Wolf"
+      },
       "issued": "2023-07-28T00:00:00Z",
       "lastUpdated": "2023-08-06T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "99",
         "format": "PDF",
@@ -2669,17 +2367,14 @@
       "id": "100",
       "name": "Niederschlagsmengen Sensoren",
       "description": "",
-      "contact":
-        {
-          "id": "100",
-          "firstName": "Lukas",
-          "lastName": "Zimmermann"
-        }
-      ,
+      "contact": {
+        "id": "100",
+        "firstName": "Lukas",
+        "lastName": "Zimmermann"
+      },
       "issued": "2023-02-15T00:00:00Z",
       "lastUpdated": "2023-02-16T00:00:00Z",
       "status": "published",
-      "tags": [],
       "distribution": {
         "id": "100",
         "format": "ZIP",
@@ -5982,7 +5677,6 @@
       "name": "Global Data Assignment",
       "description": "Beschreibungstext",
       "id": "KERWOWP",
-
       "lastUpdated": "2024-06-01T12:00:00Z",
       "updatedBy": null,
       "roleOrigin": "custom"
@@ -6024,6 +5718,89 @@
       "description": "Das hier ist eine Governancerolle",
       "roleOrigin": "custom",
       "id": "_8UNR6J"
+    }
+  ],
+  "datasources": [
+    {
+      "name": "Datasource 1",
+      "description": "Description of Datasource",
+      "connector": null,
+      "connection": "inactive",
+      "lastActive": "2025-01-01T00:00:00",
+      "status": "draft",
+      "id": "1"
+    },
+    {
+      "name": "Datasource 2",
+      "description": "Description of Datasource",
+      "connector": null,
+      "connection": "active",
+      "lastActive": "2025-05-01T00:00:00",
+      "status": "draft",
+      "id": "2"
+    },
+    {
+      "name": "Datasource 3",
+      "description": "Description of Datasource",
+      "connector": null,
+      "connection": "static",
+      "lastActive": "2026-01-15T00:00:00",
+      "status": "available",
+      "id": "3"
+    },
+    {
+      "name": "Datasource 4",
+      "description": "Description of Datasource",
+      "connector": null,
+      "connection": "active",
+      "lastActive": "2025-12-14T00:00:00",
+      "status": "available",
+      "id": "4"
+    },
+    {
+      "name": "Datasource 5",
+      "description": "Description of Datasource",
+      "connector": null,
+      "connection": "inactive",
+      "lastActive": "2026-01-21T00:00:00",
+      "status": "draft",
+      "id": "5"
+    },
+    {
+      "name": "Datasource 6",
+      "description": "Description of Datasource",
+      "connector": null,
+      "connection": "inactive",
+      "lastActive": "2025-01-25T00:00:00",
+      "status": "available",
+      "id": "6"
+    },
+    {
+      "name": "Test Datasource",
+      "description": "sdasd",
+      "status": "draft",
+      "connector": {
+        "type": "sql",
+        "config": {
+          "driver": "postgres",
+          "dsn": "",
+          "table": "sdasd",
+          "columns": ["*"],
+          "where": "",
+          "args_mapping": "",
+          "prefix": "",
+          "suffix": "",
+          "init_files": [],
+          "init_statement": "",
+          "conn_max_idle_time": "",
+          "conn_max_life_time": "",
+          "conn_max_idle": 2,
+          "conn_max_open": 0
+        }
+      },
+      "connection": "inactive",
+      "lastActive": "2026-02-04T12:11:34.305Z",
+      "id": "8"
     }
   ]
 }

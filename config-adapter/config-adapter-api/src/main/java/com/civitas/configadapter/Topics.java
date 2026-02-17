@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -15,38 +15,65 @@ import java.util.Optional;
 
 public enum Topics {
   // --- User Events ---
-  USER_CREATED("core.civitas.idm.user.created"),
-  USER_UPDATED("core.civitas.idm.user.updated"),
-  USER_DELETED("core.civitas.idm.user.deleted"),
-  USER_LOCKED("core.civitas.idm.user.locked"),
-  USER_UNLOCKED("core.civitas.idm.user.unlocked"),
-  USER_PASSWORD_CHANGED("core.civitas.idm.user.password.changed"),
-  USER_PASSWORD_RESET("core.civitas.idm.user.password.reset"),
+  USER_CREATED("de.civitascore.idm.user.created"),
+  USER_UPDATED("de.civitascore.idm.user.updated"),
+  USER_DELETED("de.civitascore.idm.user.deleted"),
+  USER_LOCKED("de.civitascore.idm.user.locked"),
+  USER_UNLOCKED("de.civitascore.idm.user.unlocked"),
+  USER_PASSWORD_CHANGED("de.civitascore.idm.user.password.changed"),
+  USER_PASSWORD_RESET("de.civitascore.idm.user.password.reset"),
 
   // --- Realm Events ---
-  REALM_CREATED("core.civitas.idm.realm.created"),
-  REALM_UPDATED("core.civitas.idm.realm.updated"),
-  REALM_DELETED("core.civitas.idm.realm.deleted"),
+  REALM_CREATED("de.civitascore.idm.realm.created"),
+  REALM_UPDATED("de.civitascore.idm.realm.updated"),
+  REALM_DELETED("de.civitascore.idm.realm.deleted"),
 
   // Client events
-  CLIENT_CREATED("core.civitas.idm.client.created"),
-  CLIENT_UPDATED("core.civitas.idm.client.updated"),
-  CLIENT_DELETED("core.civitas.idm.client.deleted"),
+  CLIENT_CREATED("de.civitascore.idm.client.created"),
+  CLIENT_UPDATED("de.civitascore.idm.client.updated"),
+  CLIENT_DELETED("de.civitascore.idm.client.deleted"),
 
   // Group events
-  GROUP_CREATED("core.civitas.idm.group.created"),
-  GROUP_UPDATED("core.civitas.idm.group.updated"),
-  GROUP_DELETED("core.civitas.idm.group.deleted"),
+  GROUP_CREATED("de.civitascore.idm.group.created"),
+  GROUP_UPDATED("de.civitascore.idm.group.updated"),
+  GROUP_DELETED("de.civitascore.idm.group.deleted"),
 
   // Role events
-  ROLE_CREATED("core.civitas.idm.role.created"),
-  ROLE_UPDATED("core.civitas.idm.role.updated"),
-  ROLE_DELETED("core.civitas.idm.role.deleted"),
+  ROLE_CREATED("de.civitascore.idm.role.created"),
+  ROLE_UPDATED("de.civitascore.idm.role.updated"),
+  ROLE_DELETED("de.civitascore.idm.role.deleted"),
 
   // --- Backend Events ---
-  BACKEND_CREATED("core.civitas.api.backend.created"),
-  BACKEND_UPDATED("core.civitas.api.backend.updated"),
-  BACKEND_DELETED("core.civitas.api.backend.deleted");
+  BACKEND_CREATED("de.civitascore.api.backend.created"),
+  BACKEND_UPDATED("de.civitascore.api.backend.updated"),
+  BACKEND_DELETED("de.civitascore.api.backend.deleted"),
+
+  // --- Route Events ---
+  ROUTE_CREATED("de.civitascore.api.route.created"),
+  ROUTE_UPDATED("de.civitascore.api.route.updated"),
+  ROUTE_DELETED("de.civitascore.api.route.deleted"),
+
+  // --- FROST SensorThings API Events ---
+  THING_CREATED("de.civitascore.data.thing.created"),
+  THING_UPDATED("de.civitascore.data.thing.updated"),
+  THING_DELETED("de.civitascore.data.thing.deleted"),
+  LOCATION_CREATED("de.civitascore.data.location.created"),
+  LOCATION_UPDATED("de.civitascore.data.location.updated"),
+  LOCATION_DELETED("de.civitascore.data.location.deleted"),
+  SENSOR_CREATED("de.civitascore.data.sensor.created"),
+  SENSOR_UPDATED("de.civitascore.data.sensor.updated"),
+  SENSOR_DELETED("de.civitascore.data.sensor.deleted"),
+  OBSERVED_PROPERTY_CREATED("de.civitascore.data.observedproperty.created"),
+  OBSERVED_PROPERTY_UPDATED("de.civitascore.data.observedproperty.updated"),
+  OBSERVED_PROPERTY_DELETED("de.civitascore.data.observedproperty.deleted"),
+  DATASTREAM_CREATED("de.civitascore.data.datastream.created"),
+  DATASTREAM_UPDATED("de.civitascore.data.datastream.updated"),
+  DATASTREAM_DELETED("de.civitascore.data.datastream.deleted"),
+
+  // --- FROST Projects Events ---
+  FROST_PROJECT_CREATED("de.civitascore.data.project.created"),
+  FROST_PROJECT_UPDATED("de.civitascore.data.project.updated"),
+  FROST_PROJECT_DELETED("de.civitascore.data.project.deleted");
 
   private final String value;
 

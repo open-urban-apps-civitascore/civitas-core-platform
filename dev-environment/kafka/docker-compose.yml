@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   zookeeper:
@@ -76,5 +75,7 @@ services:
 
 networks:
   civitas-network:
+    name: civitas-network
     driver: bridge
+    external: true
 

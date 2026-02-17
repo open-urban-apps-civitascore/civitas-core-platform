@@ -1,25 +1,23 @@
 import { getTranslations } from 'next-intl/server'
 
-import { TitleType, UserResponse } from '@/types/users'
+import { User } from '@/types/users'
 
-import { UserDetails } from '../components/UserDetails'
+import { UserOverview } from '../components/UserOverview'
 
-export const defaultFormUser: UserResponse = {
+export const defaultFormUser: User = {
   id: '',
   firstName: '',
   lastName: '',
-  title: 'male' as TitleType,
+  title: 'MR',
   email: '',
   active: false,
-  authority: null,
   groups: [],
   phone: '',
-  positionDescription: '',
 }
 
 const CreateUserPage = async () => {
   const t = await getTranslations('users')
-  return <UserDetails testId="createUserPage" userData={defaultFormUser} title={t('newUser')} />
+  return <UserOverview testId="createUserPage" userData={defaultFormUser} title={t('newUser')} isCreateMode />
 }
 
 export default CreateUserPage

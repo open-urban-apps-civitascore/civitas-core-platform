@@ -14,18 +14,26 @@
       "add": "Hinzufügen",
       "edit": "Bearbeiten",
       "editBase": "Basis bearbeiten",
-      "open": "öffnen"
+      "open": "öffnen",
+      "saveAndContinue": "Erstellen und weiter",
+      "exit": "Beenden"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
       "invalidEmail": "Ungültige E-Mail Adresse",
+      "invalidNumber": "Bitte geben Sie eine gültige Zahl ein",
       "required": "Dieses Feld ist erforderlich",
       "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
       "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
+      "atLeast1Value": "Mindestens ein Wert ist erforderlich.",
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
-      "notFound": "Keine {items} gefunden",
+      "itemsNotFound": "Keine {items} gefunden",
+      "itemNotFound": "{item} nicht gefunden",
       "loadingError": "Fehler beim Laden der Daten",
-      "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+      "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+      "nameRequired": "Name ist erforderlich",
+      "descriptionRequired": "Beschreibung ist erforderlich",
+      "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein"
     },
     "items": {
       "users": "Users",
@@ -34,7 +42,14 @@
       "roles": "Rollen",
       "datasets": "Datensätze",
       "dataspaces": "Datenräume",
-      "permissions": "Berechtigungen" 
+      "permissions": "Berechtigungen",
+      "datasources": "Datenquellen",
+      "datasource": "Datenquelle"
+    },
+    "info": {
+      "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
+      "commaSeparated": "durch Kommas getrennt",
+      "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus."
     }
   },
   "languages": {
@@ -63,7 +78,9 @@
     "uml-modeler": "UML Modeler",
     "data": "Daten",
     "table-editor": "Table Editor",
-    "pipeline-editor": "Pipeline Editor"
+    "pipeline-editor": "Pipeline Editor",
+    "data-management": "Daten-Management",
+    "datasources": "Datenquellen"
   },
   "datasets": {
     "title": "Datensätze",
@@ -93,9 +110,7 @@
         "dataspace": "Datenraum",
         "selectDataspace": "Datenraum wählen...",
         "name": "Name des Datensatzes",
-        "description": "Beschreibung",
-        "tags": "Tags",
-        "typeTag": "Tag eingeben..."
+        "description": "Beschreibung"
       },
       "completion": {
         "title": "Erstellungsfortschritt",
@@ -136,44 +151,34 @@
   },
   "users": {
     "title": "Übersicht: User",
+    "subtitle": "Alle User, die in unserem Mandanten verfügbar sind.",
     "newUser": "User erstellen",
     "createUser": "User erstellen",
     "searchUsers": "Filtern...",
-    "notFound": "User nicht gefunden",
-    "detailsTabs": {
-      "userData": "Benutzerdaten",
-      "roles": "Rollen",
-      "groups": "Gruppen",
-      "dataspaces": "Datenräume und -sätze",
-      "account": "Account"
-    },
     "info": {
       "header": "User Informationen",
       "subheader": "Persönliche Angaben und allgemeine Informationen.",
       "id": "ID",
-      "displayName": "Anzeigename",
+      "displayName": "Name",
       "title": { "title": "Anrede", "mr": "Herr", "ms": "Frau", "other": "Keine Angabe" },
       "firstName": "Vorname",
       "lastName": "Name",
-      "authority": "Amt",
-      "department": "Abteilung",
       "role": "Systemrolle",
       "phone": "Telefonnummer",
       "email": "E-Mail",
       "group": "Gruppe",
-      "position": "Position",
-      "description": "Tätigkeitsbeschreibung",
       "status": {
         "title": "Status",
         "active": "Aktiv",
         "inactive": "Inaktiv"
-      }
+      },
+      "selectTitle": "Titel wählen..."
     },
-    "form": {
-      "selectTitle": "Titel wählen...",
-      "selectAuthority": "Amt wählen...",
-      "selectDepartment": "Abteilung wählen...",
-      "selectGroup": "Gruppe wählen..."
+    "detailsTabs": {
+      "userData": "Benutzerdaten",
+      "roles": "Rollen",
+      "groups": "Gruppen",
+      "account": "Account"
     },
     "roles": {
       "title": "Übersicht: Rollen",
@@ -193,6 +198,10 @@
       "contact": "Ansprechpartner",
       "description": "Beschreibung",
       "roles": "Rollen"
+    },
+    "messages": {
+      "createSuccess": "User wurde erfolgreich angelegt.",
+      "updateSuccess": "User wurde erfolgreich aktualisiert."
     }
   },
   "groups": {
@@ -360,6 +369,68 @@
           "description": "Beschreibung"
         }
       }
+    }
+  },
+  "datasources": {
+    "title": "Übersicht: Datenquellen",
+    "subtitle": "Alle Datenquellen, die in unserem Mandanten verfügbar sind.",
+    "newDatasource": "Datenquelle erstellen",
+    "tableHeaders": {
+      "name": "Name",
+      "description": "Beschreibung",
+      "connector": "Konnektor",
+      "connection": "Verbindung",
+      "lastActive": "Aktivität vor",
+      "status": "Status",
+      "action": "Aktion"
+    },
+    "status": {
+      "draft": "Entwurf",
+      "available": "Verfügbar"
+    },
+    "connection": {
+      "active": "aktiv",
+      "inactive": "inaktiv",
+      "static": "statisch"
+    },
+    "create": {
+      "title": "Neue Datenquelle",
+      "subtitle": "Neue Datenquellen sind nur intern sichtbar.",
+      "basicInfo": {
+        "title": "Basisinformation",
+        "subtitle": "Der Name kann später angepasst werden."
+      }
+    },
+    "edit": {
+      "basicInfo": {
+        "title": "Basisinformationen",
+        "subtitle": "Basisinformationen können auch später noch mal angepasst werden."
+      }
+    },
+    "form": {
+      "name": "Name",
+      "namePlaceholder": "Name der Datenquelle",
+      "description": "Beschreibung",
+      "descriptionHint": "max. 150 Zeichen"
+    },
+    "tabs": {
+      "basicInfo": "Basisinformationen",
+      "connector": "Konnektor",
+      "dataStructure": "Datenstruktur",
+      "accessPermissions": "Zugriffsberechtigungen",
+      "dataspaces": "Datenräume"
+    },
+    "exitModal": {
+      "title": "Vor dem Beenden speichern?",
+      "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
+      "discard": "Verwerfen"
+    },
+    "connectorTab": {
+      "title1": "Konnektor",
+      "title2": "Konfiguration",
+      "type": "Typ",
+      "connection": "Verbindung",
+      "establishConnection": "Verbindung herstellen"
     }
   }
 }

@@ -1,0 +1,49 @@
+{
+  "specversion": "1.0",
+  "type": "de.civitascore.api.route.created",
+  "source": "civitas.api.provisioning",
+  "id": "event-proxy-rewrite-full-001",
+  "datacontenttype": "application/json",
+  "data": {
+    "metadata": {
+      "messageId": "msg-proxy-rewrite-full-001",
+      "timestamp": "2025-01-23T10:00:00Z",
+      "source": "api.service",
+      "correlationId": "corr-proxy-rewrite-full-001",
+      "configVersion": "1.0",
+      "resultTopic": "api.results"
+    },
+    "payload": {
+      "targetComponent": "apisix",
+      "targetResource": "routes/my-full-proxy-rewrite-route",
+      "operation": "CREATE",
+      "config": {
+        "path": "routes/my-full-proxy-rewrite-route",
+        "value": {
+          "uri": "/api/v1/data/*",
+          "methods": ["GET", "POST", "PUT", "DELETE"],
+          "upstream_id": "my-backend-upstream",
+          "plugins": {
+            "proxy-rewrite": {
+              "regex_uri": ["^/api/v1/data/(.*)", "/$1"],
+              "host": "internal-backend.local",
+              "headers": {
+                "set": {
+                  "X-Forwarded-Prefix": "/api/v1/data",
+                  "X-Real-IP": "$remote_addr",
+                  "Host": "internal-backend.local"
+                },
+                "add": {
+                  "X-Request-ID": "$request_id",
+                  "X-Request-Source": "civitas-gateway"
+                },
+                "remove": ["X-Internal-Token", "X-Debug-Mode", "X-Sensitive-Data"]
+              }
+            },
+            "prometheus": {}
+          }
+        }
+      }
+    }
+  }
+}

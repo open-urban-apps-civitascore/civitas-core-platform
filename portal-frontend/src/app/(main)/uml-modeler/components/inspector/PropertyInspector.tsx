@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight, Settings } from 'lucide-react'
 import { useState } from 'react'
 
-import { useActiveDiagram } from '../../hooks/useActiveDiagram'
+import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { EdgePropertyEditor } from './EdgePropertyEditor'
 import { NodePropertyEditor } from './NodePropertyEditor'
 

@@ -1,42 +1,30 @@
-import { Group } from '@/types/groups'
+'use client'
 
-import GroupDetails from '../components/GroupDetails'
+import { useParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
-const URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
+import { useGetGroup } from '@/app/services/api/groups/clientRequests'
+import { ErrorPage } from '@/components/error-page/ErrorPage'
+import LoadingPage from '@/components/loading-page/LoadingPage'
 
-interface UpdateGroupPageProps {
-  params: Promise<{ groupId: string }>
-}
+import { GroupDetails } from '../components/GroupDetails'
 
-const UpdateGroupPage = async (props: UpdateGroupPageProps) => {
-  const { params } = props
-  const { groupId } = await params
+const EditGroupPage = () => {
+  const params = useParams<{ groupId: string }>()
+  const { groupId } = params
+  const t = useTranslations('common')
 
-  const getGroupData = async () => {
-    try {
-      const groupResponse = await fetch(`${URL}/groups/${groupId}`, {
-        cache: 'no-store',
-      })
+  const { data: groupData, isLoading, error } = useGetGroup({ id: groupId })
 
-      if (!groupResponse) {
-        throw new Error('An error occurred while loading form data')
-      }
-
-      const groupData: Group = await groupResponse.json()
-
-      if (!groupData || Object.keys(groupData).length === 0) {
-        throw new Error('Group not found')
-      }
-      return groupData
-    } catch (error) {
-      console.error(error)
-      throw new Error('An error occurred while loading form data')
-    }
+  if (isLoading) {
+    return <LoadingPage testId="editGroupLoadingPage" title={t('loadingItems', { item: t('items.groups') })} />
   }
 
-  const groupData = await getGroupData()
+  if (error || !groupData?.data) {
+    return <ErrorPage testId="editGroupErrorPage" title={t('errors.loadingError', { item: t('items.groups') })} />
+  }
 
-  return <GroupDetails title={groupData?.title || ''} groupData={groupData} isEditMode />
+  return <GroupDetails title={groupData?.data.title || ''} groupData={groupData?.data} isEditMode />
 }
 
-export default UpdateGroupPage
+export default EditGroupPage

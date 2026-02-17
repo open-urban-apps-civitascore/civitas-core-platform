@@ -113,41 +113,11 @@ test-frontend:
         coverage_format: cobertura
         path: portal-frontend/coverage/cobertura-coverage.xml
 
-sbom-frontend:
-  extends: .only-frontend-changes
-  image: node:22
-  stage: qa
-  needs: []
-  variables:
-    PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
-  cache:
-    key:
-      prefix: frontend-pnpm
-      files:
-        - portal-frontend/pnpm-lock.yaml
-    paths:
-      - portal-frontend/.pnpm-store
-  script:
-    - cd portal-frontend
-    - set -euo pipefail
-    - corepack enable >/dev/null 2>&1 || true
-    - pnpm config set store-dir $PNPM_STORE_DIR
-    - pnpm install --frozen-lockfile
-    - mkdir -p sbom
-    - pnpm dlx cyclonedx-bom -o sbom/portal-frontend.cdx.json -f json
-  artifacts:
-    when: always
-    expire_in: 1 month
-    paths:
-      - portal-frontend/sbom/
-    reports:
-      cyclonedx: portal-frontend/sbom/portal-frontend.cdx.json
-
 build-frontend:
   extends: .only-frontend-changes
   image: node:22
   stage: build
-  needs: ['lint-frontend', 'dependency-prune-frontend', 'test-frontend', 'secret_detection', 'gitlab-advanced-sast', 'dependency-scanning']
+  needs: ['lint-frontend', 'dependency-prune-frontend', 'test-frontend']
   variables:
     NODE_ENV: production
     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
@@ -175,7 +145,10 @@ build-frontend-image:
   extends: .only-frontend-changes
   image: docker:27-dind
   stage: build
-  needs: ['build-frontend']
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: build-frontend
   services:
     - docker:27-dind
   variables:
@@ -191,8 +164,7 @@ build-frontend-image:
   script:
     - cd portal-frontend
     - |
-      export IMAGE_TAG=$(git describe --tags --always)
-      export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/frontend-portal:${IMAGE_TAG}-scan
+      export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/frontend-portal:${REVISION}-scan
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
         --tag $SCAN_IMAGE_TAG \
@@ -205,17 +177,19 @@ container-scan-frontend:
   extends: .only-frontend-changes
   image:
     name: aquasec/trivy:0.55.1
-    entrypoint: [""]
+    entrypoint: ['']
   stage: container-qa
-  needs: ['build-frontend-image']
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: build-frontend-image
   variables:
     TRIVY_USERNAME: $CI_REGISTRY_USER
     TRIVY_PASSWORD: $CI_REGISTRY_PASSWORD
   script:
     - apk add --no-cache curl >/dev/null
     - curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/gitlab.tpl -o gitlab.tpl
-    - export IMAGE_TAG=$(git describe --tags --always)
-    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/frontend-portal:${IMAGE_TAG}-scan
+    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/frontend-portal:${REVISION}-scan
     - trivy image --scanners vuln --format template --template "@gitlab.tpl" --output gl-container-scanning-report.json $SCAN_IMAGE_TAG
   artifacts:
     when: always
@@ -227,7 +201,10 @@ deploy-frontend:
   extends: .only-frontend-changes
   image: docker:27-dind
   stage: deploy
-  needs: ['container-scan-frontend']
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: container-scan-frontend
   services:
     - docker:27-dind
   variables:
@@ -237,16 +214,18 @@ deploy-frontend:
     - docker info
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
-    - export IMAGE_TAG=$(git describe --tags --always)
-    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/frontend-portal:${IMAGE_TAG}-scan
-    - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/frontend-portal:$IMAGE_TAG
+    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/frontend-portal:${REVISION}-scan
+    - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/frontend-portal:$REVISION
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
 
 sbom-frontend-image:
   extends: .only-frontend-changes
   image: docker:27-dind
   stage: report
-  needs: ['deploy-frontend']
+  needs:
+    - job: setup-version
+      artifacts: true
+    - job: deploy-frontend
   services:
     - docker:27-dind
   variables:
@@ -260,12 +239,13 @@ sbom-frontend-image:
   script:
     - cd portal-frontend
     - mkdir -p sbom
-    - export IMAGE_TAG=$(git describe --tags --always)
-    - syft registry:$CI_REGISTRY_IMAGE/frontend-portal:$IMAGE_TAG -o cyclonedx-json > sbom/portal-frontend-image.cdx.json
+    - syft registry:$CI_REGISTRY_IMAGE/frontend-portal:$REVISION -o cyclonedx-json > sbom/portal-frontend-image.cdx.json
   artifacts:
     when: always
     expire_in: 1 month
     paths:
       - portal-frontend/sbom/portal-frontend-image.cdx.json
-    reports:
-      cyclonedx: portal-frontend/sbom/portal-frontend-image.cdx.json
+    # TODO: https://gitlab.com/civitas-connect/civitas-core/civitas-core-v2/civitas-core-platform/-/issues/728
+    # Fix license name resolution
+    # reports:
+    #   cyclonedx: portal-frontend/sbom/portal-frontend-image.cdx.json

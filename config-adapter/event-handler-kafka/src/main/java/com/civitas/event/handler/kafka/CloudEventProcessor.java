@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -14,6 +14,7 @@ import com.civitas.configadapter.adapter.ConfigAdapter;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;
+import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,23 +38,23 @@ public class CloudEventProcessor {
     try {
       logger.info(
           "Received CloudEvent - ID: {}, Type: {}, Source: {}",
-          cloudEvent.getId(),
-          cloudEvent.getType(),
-          cloudEvent.getSource());
+          Encode.forJava(cloudEvent.getId()),
+          Encode.forJava(cloudEvent.getType()),
+          Encode.forJava(String.valueOf(cloudEvent.getSource())));
 
       if (cloudEvent.getData() == null) {
-        logger.warn("CloudEvent has no data, skipping: {}", cloudEvent.getId());
+        logger.warn("CloudEvent has no data, skipping: {}", Encode.forJava(cloudEvent.getId()));
         return;
       }
 
       String jsonData = new String(cloudEvent.getData().toBytes());
-      logger.debug("CloudEvent data: {}", jsonData);
+      logger.debug("CloudEvent data: {}", Encode.forJava(jsonData));
 
       ConfigEvent configEvent = objectMapper.readValue(jsonData, ConfigEvent.class);
       configAdapter.processConfigEvent(topic, configEvent);
 
     } catch (Exception e) {
-      logger.error("Error processing CloudEvent: {}", cloudEvent.getId(), e);
+      logger.error("Error processing CloudEvent: {}", Encode.forJava(cloudEvent.getId()), e);
       throw e;
     }
   }

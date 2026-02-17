@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -20,21 +21,17 @@ public class CustomJwtAuthenticationConverter
   private static final String CLAIM_SUB = "sub";
   private static final String CLAIM_PREFERRED_USERNAME = "preferred_username";
   private static final String CLAIM_EMAIL = "email";
-  private static final String CLAIM_TENANT_ID = "tenantId";
   private static final String CLAIM_GIVEN_NAME = "given_name";
   private static final String CLAIM_FAMILY_NAME = "family_name";
   private static final String CLAIM_REALM_ACCESS = "realm_access";
   private static final String CLAIM_ROLES = "roles";
-  private static final String ISSUER_REALMS_MARKER = "/realms/";
   private static final String ROLE_PREFIX = "ROLE_";
-  private static final String DEFAULT_TENANT = "default";
 
   @Override
   public AbstractAuthenticationToken convert(Jwt jwt) {
-    String userId = jwt.getClaimAsString(CLAIM_SUB);
+    UUID userId = extractUserId(jwt);
     String username = jwt.getClaimAsString(CLAIM_PREFERRED_USERNAME);
     String email = jwt.getClaimAsString(CLAIM_EMAIL);
-    String tenant = extractTenantId(jwt);
     String givenName = jwt.getClaimAsString(CLAIM_GIVEN_NAME);
     String familyName = jwt.getClaimAsString(CLAIM_FAMILY_NAME);
 
@@ -45,7 +42,6 @@ public class CustomJwtAuthenticationConverter
             .userId(userId)
             .username(username)
             .email(email)
-            .tenantId(tenant)
             .givenName(givenName)
             .familyName(familyName)
             .authorities(authorities)
@@ -54,23 +50,20 @@ public class CustomJwtAuthenticationConverter
     return new CustomJwtAuthenticationToken(jwt, authorities, dto);
   }
 
-  private String extractTenantId(Jwt jwt) {
-    // Try to get tenantId as a String claim first
-    Object tenantIdClaim = jwt.getClaim(CLAIM_TENANT_ID);
+  private UUID extractUserId(Jwt jwt) {
+    String subClaim = jwt.getClaimAsString(CLAIM_SUB);
 
-    if (tenantIdClaim instanceof String) {
-      return (String) tenantIdClaim;
+    if (subClaim == null || subClaim.isEmpty()) {
+      log.warn("Missing sub claim in JWT token. Token may be from service account.");
+      return null;
     }
 
-    // Fallback: extract from issuer
-    if (jwt.getIssuer() != null) {
-      String iss = jwt.getIssuer().toString();
-      int idx = iss.indexOf(ISSUER_REALMS_MARKER);
-      if (idx >= 0) {
-        return iss.substring(idx + ISSUER_REALMS_MARKER.length());
-      }
+    try {
+      return UUID.fromString(subClaim);
+    } catch (IllegalArgumentException e) {
+      log.warn("Invalid UUID format in sub claim: '{}'. Error: {}", subClaim, e.getMessage());
+      return null;
     }
-    return DEFAULT_TENANT;
   }
 
   private Set<SimpleGrantedAuthority> extractAuthorities(Jwt jwt) {

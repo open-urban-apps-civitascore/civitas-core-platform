@@ -8,12 +8,17 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: validate
     show-sql: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    clean-disabled: false
 
   # Kafka Test Configuration
   # Note: spring.embedded.kafka.brokers is only available in tests with @EmbeddedKafka
@@ -62,3 +67,7 @@ logging:
     kafka: WARN
     org.hibernate: WARN
 
+model-atlas:
+  baseUrl: "http://model-atlas:8080"
+  scope: default
+  stage: draft

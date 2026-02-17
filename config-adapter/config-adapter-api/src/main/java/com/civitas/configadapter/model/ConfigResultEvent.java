@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -29,7 +29,8 @@ public record ConfigResultEvent(
     @JsonProperty("targetResource") String targetResource,
     @JsonProperty("errorCode") String errorCode,
     @JsonProperty("timestamp") OffsetDateTime timestamp,
-    @JsonProperty("source") String source) {
+    @JsonProperty("source") String source,
+    @JsonProperty("resultType") String resultType) {
 
   /** Status of the configuration operation. */
   public enum Status {
@@ -47,6 +48,8 @@ public record ConfigResultEvent(
    * @param operation the operation that was performed
    * @param targetResource the target resource path
    * @param source the source identifier (e.g., "civitas.config-adapter.keycloak")
+   * @param resultType the CloudEvent type for this result (e.g.,
+   *     "de.civitascore.idm.processing.result")
    * @return a success ConfigResultEvent
    */
   public static ConfigResultEvent success(
@@ -56,7 +59,8 @@ public record ConfigResultEvent(
       String resourceId,
       Operation operation,
       String targetResource,
-      String source) {
+      String source,
+      String resultType) {
     return new ConfigResultEvent(
         correlationId,
         originalMessageId,
@@ -67,7 +71,8 @@ public record ConfigResultEvent(
         targetResource,
         null,
         OffsetDateTime.now(),
-        source);
+        source,
+        resultType);
   }
 
   /**
@@ -80,6 +85,8 @@ public record ConfigResultEvent(
    * @param operation the operation that was attempted
    * @param targetResource the target resource path
    * @param source the source identifier (e.g., "civitas.config-adapter.keycloak")
+   * @param resultType the CloudEvent type for this result (e.g.,
+   *     "de.civitascore.idm.processing.result")
    * @return a failure ConfigResultEvent
    */
   public static ConfigResultEvent failure(
@@ -89,7 +96,8 @@ public record ConfigResultEvent(
       String errorMessage,
       Operation operation,
       String targetResource,
-      String source) {
+      String source,
+      String resultType) {
     return new ConfigResultEvent(
         correlationId,
         originalMessageId,
@@ -100,6 +108,7 @@ public record ConfigResultEvent(
         targetResource,
         errorCode,
         OffsetDateTime.now(),
-        source);
+        source,
+        resultType);
   }
 }

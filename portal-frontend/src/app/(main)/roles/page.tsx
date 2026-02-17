@@ -4,29 +4,25 @@ import { Row, RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
+import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
-import { useQueryParams } from '@/hooks/useQueryParams'
-import { ROLE_TYPES, RoleResponse } from '@/types/roles'
+import { useQueryParams } from '@/hooks/use-query-params'
+import { Role, ROLE_TYPES, RoleType } from '@/types/roles'
 
 import { RolesTable } from './components/RolesTable'
 
-const URL = `${process.env.NEXT_PUBLIC_JSON_SERVER_HOST}:${process.env.NEXT_PUBLIC_JSON_SERVER_PORT}`
-
-export const DEFAULT_TAB = ROLE_TYPES.SYSTEM
+export const DEFAULT_TAB: RoleType = ROLE_TYPES.SYSTEM
 
 const RolesPage = () => {
   const t = useTranslations('roles')
   const router = useRouter()
-  const [listRoles, setListRoles] = useState<RoleResponse[] | []>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [rowCount, setRowCount] = useState(0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const tabsValues = {
@@ -51,44 +47,18 @@ const RolesPage = () => {
     totalPages,
   } = useQueryParams()
 
-  useEffect(() => {
-    if (totalPages && totalPages > 0 && pageIndex + 1 > totalPages) {
-      setPaginationParams({ pageIndex: totalPages - 1, pageSize: pageSize })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalPages, pageIndex, pageSize])
-
   const [selectedRoleType, setSelectedRoleType] = useState<string>(tabValue || DEFAULT_TAB)
 
-  const getRoles = useCallback(async () => {
-    const params = getApiRequestParamsByUrl()
+  const requestParams = new URLSearchParams(`type=${selectedRoleType}&${getApiRequestParamsByUrl()}`)
 
-    try {
-      setIsLoading(true)
+  const { data: rolesData, isFetching } = useGetRoles({ params: requestParams })
 
-      const rolesResponse = await fetch(`${URL}/roles?type=${selectedRoleType}&${params.toString()}`)
-      const rolesData: RoleResponse[] = await rolesResponse.json()
-      setListRoles(rolesData)
-
-      const totalCount = Number(rolesResponse.headers.get('X-Total-Count')) || 0
-      if (rowCount !== totalCount) {
-        setRowCount(totalCount)
-      }
-      setTotalPages(Math.ceil(totalCount / pageSize) || 1)
-      setIsLoading(false)
-    } catch (error) {
-      console.error(error)
-
-      setIsLoading(false)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getApiRequestParamsByUrl, selectedRoleType, rowCount, pageSize])
-
+  const rowCount = rolesData?.totalElements || 0
   useEffect(() => {
-    getRoles()
-  }, [getRoles, sorting, rowCount, pageIndex, pageSize, selectedRoleType])
+    setTotalPages(Math.ceil(rowCount / pageSize))
+  }, [rowCount, setTotalPages, pageSize])
 
-  const handleRowClick = (row: Row<RoleResponse>) => {
+  const handleRowClick = (row: Row<Role>) => {
     router.push(`/roles/${row.original.id}?_tab=${selectedRoleType}`)
   }
 
@@ -117,8 +87,8 @@ const RolesPage = () => {
         />
         <TableContainer>
           <RolesTable
-            roles={listRoles}
-            isLoading={isLoading}
+            roles={rolesData?.data && !isFetching ? rolesData?.data : []}
+            isLoading={isFetching}
             rowCount={rowCount}
             pageIndex={pageIndex}
             pageSize={pageSize}

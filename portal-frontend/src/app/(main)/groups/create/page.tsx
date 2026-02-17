@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server'
 
 import { Group } from '@/types/groups'
 
-import GroupDetails from '../components/GroupDetails'
+import { GroupDetails } from '../components/GroupDetails'
 
 const defaultGroup: Group = {
   id: '',

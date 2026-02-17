@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -12,11 +12,18 @@ package com.civitas.configadapter.adapter;
 
 import com.civitas.configadapter.Topics;
 import com.civitas.configadapter.configuration.AdapterConfig;
+import com.civitas.configadapter.exception.AdapterException;
+import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.messaging.EventPublisher;
+import com.civitas.configadapter.model.AdapterErrorCode;
+import com.civitas.configadapter.model.ConfigEvent;
+import com.civitas.configadapter.model.ConfigResultEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +34,11 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractConfigAdapter implements ConfigAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(AbstractConfigAdapter.class);
+
+  protected static final String UNKNOWN_RESOURCE_TYPE_CODE = "UNKNOWN_RESOURCE_TYPE";
+  protected static final String UNKNOWN_RESOURCE_TYPE_MSG = "Unknown resource type: ";
+  protected static final String UNSUPPORTED_OPERATION_CODE = "UNSUPPORTED_OPERATION";
+  protected static final String UNSUPPORTED_OPERATION_MSG = "Unknown operation: ";
 
   protected AdapterConfig config;
   protected EventPublisher eventPublisher;
@@ -79,7 +91,7 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
     String topicsProperty = config.getProperty(configKey);
 
     if (topicsProperty == null || topicsProperty.trim().isEmpty()) {
-      logger.warn("No topics configured for key: {}", configKey);
+      logger.warn("No topics configured for key: {}", Encode.forJava(configKey));
       return List.of();
     }
 
@@ -102,8 +114,8 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
     logger.info(
         "Parsed and validated {} topic(s) from configuration key '{}': {}",
         topics.size(),
-        configKey,
-        topics);
+        Encode.forJava(configKey),
+        Encode.forJava(String.valueOf(topics)));
 
     return List.copyOf(topics);
   }
@@ -135,5 +147,90 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
    */
   protected AdapterConfig getConfig() {
     return config;
+  }
+
+  /**
+   * Template method that delegates to {@link #doProcessConfigEvent} and centralizes error handling.
+   * Catches {@link FatalAdapterException} to publish a failure result event before re-throwing.
+   * Catches unexpected exceptions, wraps them as {@link FatalAdapterException}, publishes a failure
+   * result event, and re-throws. {@link RetryableAdapterException} is passed through unchanged.
+   */
+  @Override
+  public final void processConfigEvent(String topic, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException {
+    try {
+      doProcessConfigEvent(topic, event);
+    } catch (RetryableAdapterException e) {
+      throw e;
+    } catch (FatalAdapterException e) {
+      publishFailureResult(event, e);
+      throw e;
+    } catch (Exception e) {
+      FatalAdapterException wrapped =
+          new FatalAdapterException(AdapterErrorCode.UNKNOWN_ERROR, e, e.getMessage());
+      publishFailureResult(event, wrapped);
+      throw wrapped;
+    }
+  }
+
+  /**
+   * Processes a configuration event. Subclasses implement their adapter-specific logic here.
+   *
+   * @param topic the Kafka topic the event was received on
+   * @param event the configuration event to process
+   * @throws FatalAdapterException for permanent errors
+   * @throws RetryableAdapterException for transient errors that should be retried
+   */
+  protected abstract void doProcessConfigEvent(String topic, ConfigEvent event)
+      throws FatalAdapterException, RetryableAdapterException;
+
+  /**
+   * Returns the CloudEvent result type for this adapter (e.g.,
+   * "de.civitascore.idm.processing.result").
+   *
+   * @return the result type string
+   */
+  protected abstract String getResultType();
+
+  /**
+   * Returns the source identifier for result events. Default implementation returns {@code
+   * "civitas.config-adapter." + getName()}.
+   *
+   * @return the source identifier
+   */
+  protected String getAdapterSource() {
+    return "civitas.config-adapter." + getName();
+  }
+
+  @Override
+  public void publishFailureResult(ConfigEvent event, AdapterException exception) {
+    if (event == null
+        || getEventPublisher() == null
+        || event.metadata() == null
+        || event.metadata().resultTopic() == null) {
+      return;
+    }
+
+    try {
+      ConfigResultEvent failureResult =
+          ConfigResultEvent.failure(
+              event.metadata().correlationId(),
+              event.metadata().messageId(),
+              exception.getFullErrorIdentifier(),
+              exception.getSafeExternalMessage(),
+              event.payload() != null ? event.payload().operation() : null,
+              event.payload() != null ? event.payload().targetResource() : null,
+              getAdapterSource(),
+              getResultType());
+
+      getEventPublisher().publish(event.metadata().resultTopic(), failureResult);
+      logger.debug(
+          "Published FAILURE result to topic: {}", Encode.forJava(event.metadata().resultTopic()));
+    } catch (Exception e) {
+      logger.warn(
+          "Failed to publish failure result for event {}: {}",
+          Encode.forJava(event.metadata().messageId()),
+          Encode.forJava(String.valueOf(e.getMessage())));
+    }
   }
 }

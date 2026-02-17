@@ -20,7 +20,7 @@ interface GroupsTableProps extends TableProps<Group> {
   groups: Group[]
 }
 
-const GroupsTable = (props: GroupsTableProps) => {
+export const GroupsTable = (props: GroupsTableProps) => {
   const {
     groups,
     rowCount,
@@ -120,5 +120,3 @@ const GroupsTable = (props: GroupsTableProps) => {
     />
   )
 }
-
-export default GroupsTable

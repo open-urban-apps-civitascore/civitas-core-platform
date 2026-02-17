@@ -1,17 +1,17 @@
 'use client'
 
-import { PaginationState, RowSelectionState, SortingState, Updater } from '@tanstack/react-table'
+import { PaginationState, Row, RowSelectionState, SortingState, Updater } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
-import { SearchHeader } from '@/components/search-field-area/SearchArea'
+import { SearchHeader } from '@/components/search-area/SearchArea'
 import { Button } from '@/components/ui/button'
 import { ListUser } from '@/types/users'
 
 import UsersTable from './UsersTable'
 
-type Props = {
+interface UsersListContentProps {
   users: ListUser[]
   totalCount: number
   pageIndex: number
@@ -31,19 +31,16 @@ export const UsersListContent = ({
   totalPages,
   search,
   newUserLabel,
-}: Props) => {
+}: UsersListContentProps) => {
   const router = useRouter()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
-  // handleRowClick is disabled for now as users list is working with api and detail page with json-server
-  // has to be enabled again, when other requests are working with api as well
-
-  // const handleRowClick = (row: Row<ListUser>) => {
-  //   if (row.id) {
-  //     const params = new URLSearchParams(window.location.search)
-  //     router.push(`users/${row.id}?${params.toString()}`)
-  //   }
-  // }
+  const handleRowClick = (row: Row<ListUser>) => {
+    if (row.id) {
+      const params = new URLSearchParams(window.location.search)
+      router.push(`users/${row.id}?${params.toString()}`)
+    }
+  }
 
   const handleSortingChange = (updater: Updater<SortingState>) => {
     const newSorting = typeof updater === 'function' ? updater(initialSorting) : updater
@@ -111,8 +108,7 @@ export const UsersListContent = ({
         totalPages={totalPages}
         rowSelection={rowSelection}
         setRowSelection={setRowSelection}
-        // disabled for now as users list is working with api and detail page with json-server
-        // onRowClick={handleRowClick}
+        onRowClick={handleRowClick}
         onSortingChange={handleSortingChange}
         onPaginationChange={handlePaginationChange}
       />

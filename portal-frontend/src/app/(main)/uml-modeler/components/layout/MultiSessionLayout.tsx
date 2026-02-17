@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react'
 
-import { useMultiSessionManager } from '../../hooks/useMultiSessionManager'
+import { useMultiSessionManager } from '../../hooks/use-multi-session-manager'
 import { PropertyInspector } from '../inspector/PropertyInspector'
 import { ElementPalette } from '../palette/ElementPalette'
 import { ActiveDiagramProviderComponent } from '../providers/ActiveDiagramProvider'

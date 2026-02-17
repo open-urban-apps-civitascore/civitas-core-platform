@@ -2,7 +2,7 @@ import { useTranslations } from 'next-intl'
 import { InputHTMLAttributes, useEffect, useRef, useState } from 'react'
 
 import { Input } from '@/components/ui/input'
-import { useDebounce } from '@/hooks/useDebounce'
+import { useDebounce } from '@/hooks/use-debounce'
 
 export interface SearchFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   searchString: string

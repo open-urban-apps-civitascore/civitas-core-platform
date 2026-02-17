@@ -1,4 +1,4 @@
-import { BookOpen, Building2, LucideProps, SquareMenu, SquareTerminal, User } from 'lucide-react'
+import { BookOpen, Building2, GitPullRequestArrow, LucideProps, SquareMenu, SquareTerminal, User } from 'lucide-react'
 import { ForwardRefExoticComponent, ReactNode, RefAttributes } from 'react'
 
 export interface NavItem {
@@ -41,6 +41,17 @@ export const appSidebarNavItems = [
       {
         title: 'dataspaces',
         url: '/dataspaces',
+      },
+    ],
+  },
+  {
+    title: 'data-management',
+    url: '#',
+    icon: GitPullRequestArrow,
+    items: [
+      {
+        title: 'datasources',
+        url: '/datasources',
       },
     ],
   },

@@ -1,8 +1,8 @@
-import { UserResponse } from '@/types/users'
+import { User } from '@/types/users'
 
 import { TEST_ENV } from '../../playwright.config'
 
-export const getMockUserData = (overrides: Partial<UserResponse> = {}): UserResponse => {
+export const getMockUserData = (overrides: Partial<User> = {}): User => {
   const id = crypto.randomUUID()
   const firstName = `E2EUserFirstName-${TEST_ENV}-${id}`
   const lastName = 'E2EUserLastName'
@@ -12,11 +12,9 @@ export const getMockUserData = (overrides: Partial<UserResponse> = {}): UserResp
     firstName: firstName,
     lastName: lastName,
     email: `${firstName}@e2e.test`,
-    authority: null,
     groups: [],
     phone: '+49 157 11111111',
     active: true,
-    positionDescription: 'Test Description',
     ...overrides,
   }
 }

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { mappedDatasets } from '@/__mocks__/datasets/mappedDatasets.mock'
 import messages from '@/messages/de.json'
 
-import DatasetsTable from './DatasetsTable'
+import { DatasetsTable } from './DatasetsTable'
 
 describe('DatasetsTable', () => {
   beforeEach(() => {

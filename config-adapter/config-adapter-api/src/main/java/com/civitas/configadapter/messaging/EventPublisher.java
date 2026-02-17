@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -10,6 +10,8 @@
  */
 package com.civitas.configadapter.messaging;
 
+import com.civitas.configadapter.exception.FatalAdapterException;
+import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.model.ConfigResultEvent;
 
 /**
@@ -25,5 +27,6 @@ public interface EventPublisher extends EventBase {
    * @param topic the topic to publish to
    * @param resultEvent the configuration result event to publish
    */
-  void publish(String topic, ConfigResultEvent resultEvent);
+  void publish(String topic, ConfigResultEvent resultEvent)
+      throws RetryableAdapterException, FatalAdapterException;
 }

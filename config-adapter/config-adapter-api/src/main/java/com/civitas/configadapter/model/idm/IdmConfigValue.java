@@ -1,6 +1,6 @@
 /**
  * This work and the accompanying materials are made available under the terms of the European Union
- * Public License License (EU-PL) 1.2 which is available at
+ * Public License (EU-PL) 1.2 which is available at
  * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
@@ -33,4 +33,7 @@ import com.civitas.configadapter.model.ConfigValue;
  * property in JSON.
  */
 public sealed interface IdmConfigValue extends ConfigValue
-    permits RealmConfig, UserConfig, ClientConfig, RoleConfig {}
+    permits ClientConfig, GroupConfig, RealmConfig, RoleConfig, UserConfig {
+
+  static final String IDM_RESULT_TYPE = "de.civitascore.idm.processing.result";
+}
