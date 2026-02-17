@@ -20,7 +20,7 @@ export const TabsSection = (props: TabSectionProps) => {
     <div
       data-testid={testId}
       role="tablist"
-      className={cn('px-[calc(var(--layout-padding))] max-w-full self-start mb-1 mt-2 border-b-1 w-full')}
+      className={cn('px-[calc(var(--layout-padding))] max-w-full self-start border-b-1 w-full')}
     >
       <div
         className={cn(
