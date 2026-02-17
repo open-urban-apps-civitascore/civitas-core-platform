@@ -119,7 +119,7 @@ public class KafkaSagaCommandConsumer implements AutoCloseable {
               consumer.commitSync();
             } catch (IOException e) {
               LOG.error(
-                  "Failed to deserialize saga command from topic {}: {}",
+                  "Failed to process saga command from topic {}: {}",
                   Encode.forJava(record.topic()),
                   Encode.forJava(String.valueOf(e.getMessage())),
                   e);
@@ -170,7 +170,11 @@ public class KafkaSagaCommandConsumer implements AutoCloseable {
     publishResult(adapter, result);
   }
 
-  private void publishResult(String adapter, SagaCommandResult result) {
+  /**
+   * Publishes the saga command result to the adapter's result topic. Throws on failure so that the
+   * calling record is NOT committed — it will be redelivered on the next poll.
+   */
+  private void publishResult(String adapter, SagaCommandResult result) throws IOException {
     String resultTopic = TOPIC_PREFIX + adapter + ".result";
     try {
       byte[] json = PayloadConverter.writeValueAsBytes(result);
@@ -186,15 +190,9 @@ public class KafkaSagaCommandConsumer implements AutoCloseable {
           Encode.forJava(result.stepId()));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      LOG.error("Interrupted while publishing result to {}", Encode.forJava(resultTopic));
+      throw new IOException("Interrupted while publishing result to " + resultTopic, e);
     } catch (ExecutionException | TimeoutException e) {
-      LOG.error(
-          "Failed to publish result to {}: {}",
-          Encode.forJava(resultTopic),
-          Encode.forJava(String.valueOf(e.getMessage())),
-          e);
-    } catch (IOException e) {
-      LOG.error("Failed to serialize saga result: {}", Encode.forJava(e.getMessage()), e);
+      throw new IOException("Failed to publish result to " + resultTopic, e);
     }
   }
 
