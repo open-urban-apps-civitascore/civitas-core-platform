@@ -93,7 +93,10 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
-    return DatastructureFormAvailableSchema.safeParse(formValues).success
+    return (
+      DatastructureFormAvailableSchema.safeParse(formValues).success &&
+      datastructure.versions.find(version => version.status === STATUS_TYPES.AVAILABLE)
+    )
   }, [formValues])
 
   const revalidateForm = () => {
