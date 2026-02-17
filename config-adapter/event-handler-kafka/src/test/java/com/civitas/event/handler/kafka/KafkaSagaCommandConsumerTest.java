@@ -9,9 +9,12 @@
  */
 package com.civitas.event.handler.kafka;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -145,12 +148,10 @@ class KafkaSagaCommandConsumerTest {
       try (KafkaSagaCommandConsumer consumer =
           new KafkaSagaCommandConsumer(mockConsumer, mockProducer, Map.of("frost", frostHandler))) {
         consumer.start();
-        // Give the virtual thread time to process
-        Thread.sleep(200);
+        await().atMost(2, SECONDS).untilAsserted(() -> verify(frostHandler).handle(any()));
         consumer.stop();
       }
 
-      // Verify handler was called
       ArgumentCaptor<SagaCommandMessage> cmdCaptor =
           ArgumentCaptor.forClass(SagaCommandMessage.class);
       verify(frostHandler).handle(cmdCaptor.capture());
@@ -198,7 +199,9 @@ class KafkaSagaCommandConsumerTest {
       try (KafkaSagaCommandConsumer consumer =
           new KafkaSagaCommandConsumer(mockConsumer, mockProducer, Map.of("frost", frostHandler))) {
         consumer.start();
-        Thread.sleep(200);
+        await()
+            .atMost(2, SECONDS)
+            .untilAsserted(() -> verify(mockConsumer, atLeast(2)).poll(any(Duration.class)));
         consumer.stop();
       }
 
@@ -231,7 +234,9 @@ class KafkaSagaCommandConsumerTest {
       try (KafkaSagaCommandConsumer consumer =
           new KafkaSagaCommandConsumer(mockConsumer, mockProducer, Map.of("frost", frostHandler))) {
         consumer.start();
-        Thread.sleep(200);
+        await()
+            .atMost(2, SECONDS)
+            .untilAsserted(() -> verify(mockConsumer, atLeast(2)).poll(any(Duration.class)));
         consumer.stop();
       }
 
@@ -272,11 +277,9 @@ class KafkaSagaCommandConsumerTest {
       try (KafkaSagaCommandConsumer consumer =
           new KafkaSagaCommandConsumer(mockConsumer, mockProducer, Map.of("frost", frostHandler))) {
         consumer.start();
-        Thread.sleep(200);
+        await().atMost(2, SECONDS).untilAsserted(() -> verify(mockConsumer).commitSync());
         consumer.stop();
       }
-
-      verify(mockConsumer).commitSync();
     }
 
     @Test
@@ -298,7 +301,9 @@ class KafkaSagaCommandConsumerTest {
       try (KafkaSagaCommandConsumer consumer =
           new KafkaSagaCommandConsumer(mockConsumer, mockProducer, Map.of("frost", frostHandler))) {
         consumer.start();
-        Thread.sleep(200);
+        await()
+            .atMost(2, SECONDS)
+            .untilAsserted(() -> verify(mockConsumer, atLeast(2)).poll(any(Duration.class)));
         consumer.stop();
       }
 
@@ -345,7 +350,7 @@ class KafkaSagaCommandConsumerTest {
       try (KafkaSagaCommandConsumer consumer =
           new KafkaSagaCommandConsumer(mockConsumer, mockProducer, Map.of("frost", frostHandler))) {
         consumer.start();
-        Thread.sleep(200);
+        await().atMost(2, SECONDS).untilAsserted(() -> verify(mockProducer).send(any()));
         consumer.stop();
       }
 
