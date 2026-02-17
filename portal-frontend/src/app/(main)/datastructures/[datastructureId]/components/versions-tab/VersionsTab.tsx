@@ -16,6 +16,7 @@ import { DatastructuresListData, DatastructureVersionsListData } from '@/types/d
 
 import { DatastructuresTable } from './DatastructuresTable'
 import { VersionsTable } from './VersionsTable'
+import { ContentCard } from '@/components/content-card/ContentCard'
 
 interface VersionsTabProps {
   versions: DatastructureVersionsListData[]
@@ -41,30 +42,25 @@ export const VersionsTab = (props: VersionsTabProps) => {
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
   const CustomElement = (
-    <Button data-testid="addDatasourceButton" onClick={() => router.push('datastructures/create')}>
+    <Button data-testid="addVersionButton" onClick={() => router.push('datastructures/versions/create')}>
       <Plus />
-      {t('newDatasource')}
+      {t('newVersion')}
     </Button>
   )
 
   return (
-    <PageContainer headerType="onlyTitle" testId="datastructuresPage">
-      <PageHeader title={t('title')} />
-      <PageBackground>
-        <TableContainer>
-          <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />
-          <VersionsTable
-            versions={versions}
-            rowCount={rowCount}
-            pageIndex={pageIndex}
-            pageSize={pageSize}
-            sorting={sorting}
-            totalPages={totalPages}
-            onPaginationChange={setPaginationParams}
-            onSortingChange={setSortingParams}
-          />
-        </TableContainer>
-      </PageBackground>
-    </PageContainer>
+    <TableContainer>
+      <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />
+      <VersionsTable
+        versions={versions}
+        rowCount={rowCount}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        sorting={sorting}
+        totalPages={totalPages}
+        onPaginationChange={setPaginationParams}
+        onSortingChange={setSortingParams}
+      />
+    </TableContainer>
   )
 }

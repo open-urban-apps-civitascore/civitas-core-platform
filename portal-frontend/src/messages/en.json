@@ -441,6 +441,8 @@
     "title": "Overview: Data Structures",
     "subtitle": "All data sources available in our tenant.",
     "newDatasource": "Create Data Structure",
+    "newVersion": "Create version",
+
     "tableHeaders": {
       "name": "Name",
       "description": "Description",

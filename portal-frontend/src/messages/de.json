@@ -444,6 +444,7 @@
     "title": "Übersicht: Datenstrukturen",
     "subtitle": "Alle Datenstrukturen, die in unserem Mandanten verfügbar sind.",
     "newDatasource": "Datenstruktur erstellen",
+    "newVersion": "Version anlegen",
     "tableHeaders": {
       "name": "Name",
       "description": "Beschreibung",
