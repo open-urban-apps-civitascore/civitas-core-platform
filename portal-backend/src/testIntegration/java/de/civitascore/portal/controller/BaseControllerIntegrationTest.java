@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
+import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.util.RestPage;
 import java.net.URI;
 import java.util.Map;
@@ -68,6 +69,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
     headers.setBearerAuth(token);
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.setAccept(MediaType.parseMediaTypes("application/json"));
+    headers.set(AllowedScopesFilter.HEADER_NAME, "*");
     return headers;
   }
 

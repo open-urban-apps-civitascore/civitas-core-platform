@@ -8,6 +8,7 @@ import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.DataSpaceOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSpaceRepository;
+import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.util.RestPage;
 import java.net.URI;
 import java.util.List;
@@ -132,25 +133,25 @@ class ScopeFilteringIntegrationTest
     }
 
     @Test
-    @DisplayName("Single scope ID filters to matching dataspaces only")
+    @DisplayName("Single scope ID filters to matching dataset only")
     void singleScopeFilters() {
       UUID dsA = createDataSetInSpace("DS-A1", dataSpaceA);
       createDataSetInSpace("DS-B1", dataSpaceB);
 
-      RestPage<DataSetOutputDTO> page = getAllDataSets(dataSpaceA.toString());
+      RestPage<DataSetOutputDTO> page = getAllDataSets(dsA.toString());
 
       assertThat(page.getContent()).hasSize(1);
       assertThat(page.getContent().get(0).getId()).isEqualTo(dsA);
     }
 
     @Test
-    @DisplayName("Multiple scope IDs filter to union of matching dataspaces")
+    @DisplayName("Multiple scope IDs filter to union of matching datasets")
     void multipleScopesFilterUnion() {
       UUID dsA = createDataSetInSpace("DS-A1", dataSpaceA);
       UUID dsB = createDataSetInSpace("DS-B1", dataSpaceB);
       createDataSetInSpace("DS-C1", dataSpaceC);
 
-      RestPage<DataSetOutputDTO> page = getAllDataSets(dataSpaceA + "," + dataSpaceB);
+      RestPage<DataSetOutputDTO> page = getAllDataSets(dsA + "," + dsB);
 
       assertThat(page.getContent()).hasSize(2);
       assertThat(page.getContent())
@@ -180,40 +181,35 @@ class ScopeFilteringIntegrationTest
     }
 
     @Test
-    @DisplayName("Missing scope header returns all datasets (direct backend access)")
-    void noHeaderReturnsAll() {
+    @DisplayName("Missing scope header returns 403 Forbidden")
+    void noHeaderReturnsForbidden() {
       createDataSetInSpace("DS-A1", dataSpaceA);
-      createDataSetInSpace("DS-B1", dataSpaceB);
 
-      ResponseEntity<RestPage<DataSetOutputDTO>> response = performGetAll();
+      HttpHeaders headers = createAuthHeaders();
+      headers.remove(AllowedScopesFilter.HEADER_NAME);
+      HttpEntity<Void> request = new HttpEntity<>(headers);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody().getContent()).hasSize(2);
-    }
+      ResponseEntity<String> response =
+          restTemplate.exchange(DATASETS_ENDPOINT, HttpMethod.GET, request, String.class);
 
-    @Test
-    @DisplayName("Dataset in multiple dataspaces appears once with matching scope")
-    void datasetInMultipleSpacesNoDuplicates() {
-      UUID dsId = createDataSetInSpaces("DS-Multi", List.of(dataSpaceA, dataSpaceB));
-
-      RestPage<DataSetOutputDTO> page = getAllDataSets(dataSpaceA + "," + dataSpaceB);
-
-      assertThat(page.getContent()).hasSize(1);
-      assertThat(page.getContent().get(0).getId()).isEqualTo(dsId);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     @Test
     @DisplayName("Scope filtering composes with query parameter filters")
     void scopeComposesWithQueryParams() {
-      createDataSetInSpace("Sensor Data", dataSpaceA);
-      createDataSetInSpace("Weather Data", dataSpaceA);
-      createDataSetInSpace("Sensor Data B", dataSpaceB);
+      UUID dsSensor = createDataSetInSpace("Sensor Data", dataSpaceA);
+      UUID dsWeather = createDataSetInSpace("Weather Data", dataSpaceA);
+      UUID dsSensorB = createDataSetInSpace("Sensor Data B", dataSpaceB);
 
       RestPage<DataSetOutputDTO> page =
-          getAllDataSetsWithParams(dataSpaceA.toString(), Map.of("name", "Sensor"));
+          getAllDataSetsWithParams(
+              dsSensor + "," + dsWeather + "," + dsSensorB, Map.of("name", "Sensor"));
 
-      assertThat(page.getContent()).hasSize(1);
-      assertThat(page.getContent().get(0).getName()).isEqualTo("Sensor Data");
+      assertThat(page.getContent()).hasSize(2);
+      assertThat(page.getContent())
+          .extracting(DataSetOutputDTO::getName)
+          .containsExactlyInAnyOrder("Sensor Data", "Sensor Data B");
     }
   }
 
@@ -262,7 +258,7 @@ class ScopeFilteringIntegrationTest
     void invalidUuidSkipped() {
       UUID dsA = createDataSetInSpace("DS-A1", dataSpaceA);
 
-      RestPage<DataSetOutputDTO> page = getAllDataSets("not-a-uuid," + dataSpaceA);
+      RestPage<DataSetOutputDTO> page = getAllDataSets("not-a-uuid," + dsA);
 
       assertThat(page.getContent()).hasSize(1);
       assertThat(page.getContent().get(0).getId()).isEqualTo(dsA);
@@ -354,7 +350,7 @@ class ScopeFilteringIntegrationTest
   /** Get a fresh auth token with the scope header added. Avoids token expiration issues. */
   private HttpHeaders freshAuthHeadersWithScope(String scopeHeaderValue) {
     HttpHeaders headers = createAuthHeaders();
-    headers.add(SCOPE_HEADER, scopeHeaderValue);
+    headers.set(SCOPE_HEADER, scopeHeaderValue);
     return headers;
   }
 }

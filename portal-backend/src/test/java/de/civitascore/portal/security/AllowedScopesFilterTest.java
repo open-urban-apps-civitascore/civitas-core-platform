@@ -44,20 +44,20 @@ class AllowedScopesFilterTest {
 
   @Test
   @DisplayName("Should set wildcard when header is *")
-  void doFilterInternal_headerIsStar_setsWildcard() throws Exception {
+  void shouldSetWildcardWhenHeaderIsStar() throws Exception {
     setupScopesProvider();
     when(request.getHeader(AllowedScopesFilter.HEADER_NAME)).thenReturn("*");
 
     filter.doFilterInternal(request, response, filterChain);
 
-    assertThat(allowedScopes.isActive()).isTrue();
+    assertThat(allowedScopes.isHeaderPresent()).isTrue();
     assertThat(allowedScopes.isWildcard()).isTrue();
     verify(filterChain).doFilter(request, response);
   }
 
   @Test
   @DisplayName("Should parse comma-separated UUIDs")
-  void doFilterInternal_commaSeparatedUuids_parsesAll() throws Exception {
+  void shouldParseCommaSeparatedUuids() throws Exception {
     setupScopesProvider();
     UUID id1 = UUID.randomUUID();
     UUID id2 = UUID.randomUUID();
@@ -65,7 +65,7 @@ class AllowedScopesFilterTest {
 
     filter.doFilterInternal(request, response, filterChain);
 
-    assertThat(allowedScopes.isActive()).isTrue();
+    assertThat(allowedScopes.isHeaderPresent()).isTrue();
     assertThat(allowedScopes.isWildcard()).isFalse();
     assertThat(allowedScopes.getScopeIds()).containsExactlyInAnyOrder(id1, id2);
     verify(filterChain).doFilter(request, response);
@@ -73,21 +73,21 @@ class AllowedScopesFilterTest {
 
   @Test
   @DisplayName("Should handle single UUID")
-  void doFilterInternal_singleUuid_parsesSingleId() throws Exception {
+  void shouldHandleSingleUuid() throws Exception {
     setupScopesProvider();
     UUID id = UUID.randomUUID();
     when(request.getHeader(AllowedScopesFilter.HEADER_NAME)).thenReturn(id.toString());
 
     filter.doFilterInternal(request, response, filterChain);
 
-    assertThat(allowedScopes.isActive()).isTrue();
+    assertThat(allowedScopes.isHeaderPresent()).isTrue();
     assertThat(allowedScopes.isWildcard()).isFalse();
     assertThat(allowedScopes.getScopeIds()).containsExactly(id);
   }
 
   @Test
   @DisplayName("Should trim whitespace around UUIDs")
-  void doFilterInternal_whitespaceAroundUuids_trimsAndParses() throws Exception {
+  void shouldTrimWhitespaceAroundUuids() throws Exception {
     setupScopesProvider();
     UUID id1 = UUID.randomUUID();
     UUID id2 = UUID.randomUUID();
@@ -101,7 +101,7 @@ class AllowedScopesFilterTest {
 
   @Test
   @DisplayName("Should skip invalid UUIDs and keep valid ones")
-  void doFilterInternal_mixedValidAndInvalidUuids_skipsInvalidKeepsValid() throws Exception {
+  void shouldSkipInvalidUuids() throws Exception {
     setupScopesProvider();
     UUID validId = UUID.randomUUID();
     when(request.getHeader(AllowedScopesFilter.HEADER_NAME))
@@ -109,13 +109,13 @@ class AllowedScopesFilterTest {
 
     filter.doFilterInternal(request, response, filterChain);
 
-    assertThat(allowedScopes.isActive()).isTrue();
+    assertThat(allowedScopes.isHeaderPresent()).isTrue();
     assertThat(allowedScopes.getScopeIds()).containsExactly(validId);
   }
 
   @Test
   @DisplayName("Should handle empty string between commas")
-  void doFilterInternal_emptyStringBetweenCommas_skipsEmpty() throws Exception {
+  void shouldHandleEmptyStringBetweenCommas() throws Exception {
     setupScopesProvider();
     UUID id = UUID.randomUUID();
     when(request.getHeader(AllowedScopesFilter.HEADER_NAME)).thenReturn(id + ",,");
@@ -127,24 +127,24 @@ class AllowedScopesFilterTest {
 
   @Test
   @DisplayName("Should not activate scopes when header is missing")
-  void doFilterInternal_headerMissing_doesNotActivateScopes() throws Exception {
+  void shouldNotActivateWhenHeaderMissing() throws Exception {
     when(request.getHeader(AllowedScopesFilter.HEADER_NAME)).thenReturn(null);
 
     filter.doFilterInternal(request, response, filterChain);
 
-    assertThat(allowedScopes.isActive()).isFalse();
+    assertThat(allowedScopes.isHeaderPresent()).isFalse();
     verify(filterChain).doFilter(request, response);
   }
 
   @Test
   @DisplayName("Should activate with empty scopes when header is blank (fail-secure)")
-  void doFilterInternal_headerBlank_activatesWithEmptyScopes() throws Exception {
+  void shouldActivateWithEmptyScopesWhenHeaderBlank() throws Exception {
     setupScopesProvider();
     when(request.getHeader(AllowedScopesFilter.HEADER_NAME)).thenReturn("   ");
 
     filter.doFilterInternal(request, response, filterChain);
 
-    assertThat(allowedScopes.isActive()).isTrue();
+    assertThat(allowedScopes.isHeaderPresent()).isTrue();
     assertThat(allowedScopes.isWildcard()).isFalse();
     assertThat(allowedScopes.getScopeIds()).isEmpty();
     verify(filterChain).doFilter(request, response);
@@ -152,13 +152,13 @@ class AllowedScopesFilterTest {
 
   @Test
   @DisplayName("Should set empty scope IDs when all UUIDs are invalid")
-  void doFilterInternal_allUuidsInvalid_setsEmptyScopeIds() throws Exception {
+  void shouldSetEmptyScopeIdsWhenAllInvalid() throws Exception {
     setupScopesProvider();
     when(request.getHeader(AllowedScopesFilter.HEADER_NAME)).thenReturn("invalid,also-invalid");
 
     filter.doFilterInternal(request, response, filterChain);
 
-    assertThat(allowedScopes.isActive()).isTrue();
+    assertThat(allowedScopes.isHeaderPresent()).isTrue();
     assertThat(allowedScopes.isWildcard()).isFalse();
     assertThat(allowedScopes.getScopeIds()).isEmpty();
   }

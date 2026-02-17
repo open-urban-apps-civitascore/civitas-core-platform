@@ -36,7 +36,7 @@ public class AllowedScopes {
    * Whether scope filtering is active for this request. False means no X-Allowed-Scope-Ids header
    * was present (direct backend access without APISIX/OPA).
    */
-  private boolean active = false;
+  private boolean headerPresent = false;
 
   /** Whether user has wildcard (TENANT) access - skip filtering. */
   private boolean wildcard = false;
@@ -46,7 +46,7 @@ public class AllowedScopes {
 
   /** Set wildcard access (user has TENANT scope). */
   public void setWildcard() {
-    this.active = true;
+    this.headerPresent = true;
     this.wildcard = true;
   }
 
@@ -56,7 +56,7 @@ public class AllowedScopes {
    * @param ids the authorized scope IDs, or empty set for no access
    */
   public void setScopeIds(Set<UUID> ids) {
-    this.active = true;
+    this.headerPresent = true;
     this.wildcard = false;
     this.scopeIds = ids != null ? ids : Set.of();
   }
