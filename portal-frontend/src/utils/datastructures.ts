@@ -13,7 +13,11 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       versionNumber: highestVersion.versionNumber,
       source: highestVersion.source,
       // add versions field to versions for showing subrows in table
-      versions: datastructure.versions.map(version => ({ ...version, versions: [] })),
+      versions: datastructure.versions.map(version => ({
+        ...version,
+        versions: [],
+        name: `Version ${version.versionNumber}`,
+      })),
     }
   })
 }

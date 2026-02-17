@@ -6890,8 +6890,7 @@
       "versions": [
         {
           "id": "v1",
-          "name": "Test Version 1",
-          "description": "Version Description 1",
+          "description": "Version Description 1.0",
           "versionNumber": "1.0",
           "source": "OWN",
           "status": "DRAFT"
@@ -6908,16 +6907,14 @@
       "versions": [
         {
           "id": "v2",
-          "name": "Test Version 2",
-          "description": "Version Description 2",
+          "description": "Version Description 1.0",
           "versionNumber": "1.0",
           "source": "OWN",
           "status": "DRAFT"
         },
         {
           "id": "v3",
-          "name": "Test Version 3",
-          "description": "Version Description 3",
+          "description": "Version Description 1.1",
           "versionNumber": "1.1",
           "source": "OWN",
           "status": "DRAFT"
@@ -6934,24 +6931,21 @@
       "versions": [
         {
           "id": "v4",
-          "name": "Test Version 4",
-          "description": "Version Description 4",
+          "description": "Version Description 1.0",
           "versionNumber": "1.0",
           "source": "OWN",
           "status": "DRAFT"
         },
         {
           "id": "v5",
-          "name": "Test Version 5",
-          "description": "Version Description 5",
+          "description": "Version Description 1.1",
           "versionNumber": "1.1",
           "source": "OWN",
           "status": "DRAFT"
         },
         {
           "id": "v6",
-          "name": "Test Version 6",
-          "description": "Version Description 6",
+          "description": "Version Description 2.0",
           "versionNumber": "2.0",
           "source": "OWN",
           "status": "DRAFT"
