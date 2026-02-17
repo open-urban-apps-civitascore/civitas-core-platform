@@ -75,7 +75,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   }
 
   @Override
-  protected User postSave(User entity, UserInputDTO input) {
+  protected User prePublish(User entity, UserInputDTO input) {
     List<UUID> groupUUIDs = input.getGroupIds();
     // Handle group membership updates after the user has been saved
     if (groupUUIDs != null) {
@@ -86,7 +86,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
       entity.setGroups(newGroups);
     }
 
-    return super.postSave(entity, input);
+    return super.prePublish(entity, input);
   }
 
   private UserConfig buildUserConfig(User entity) {
