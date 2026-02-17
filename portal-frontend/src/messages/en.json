@@ -34,7 +34,8 @@
       "unexpectedError": "An unexpected error occurred. Please try again.",
       "nameRequired": "Name is required",
       "descriptionRequired": "Description is required",
-      "descriptionMaxLength": "Description must be 150 characters or less"
+      "descriptionMaxLength": "Description must be 150 characters or less",
+      "formInvalid": "All required information must be provided correctly."
     },
     "items": {
       "users": "Users",
@@ -474,6 +475,10 @@
         "title": "Base Information",
         "subtitle": "Base information can be changed later."
       }
+    },
+    "messages": {
+      "createSuccess": "Data structure has been successfully created.",
+      "updateSuccess": "Data structure  has been successfully updated."
     }
   }
 }

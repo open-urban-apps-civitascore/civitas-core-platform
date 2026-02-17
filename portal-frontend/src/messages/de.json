@@ -33,7 +33,8 @@
       "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
       "nameRequired": "Name ist erforderlich",
       "descriptionRequired": "Beschreibung ist erforderlich",
-      "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein"
+      "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
+      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden"
     },
     "items": {
       "users": "Users",
@@ -477,6 +478,10 @@
         "title": "Basisinformationen",
         "subtitle": "Basisinformationen können auch später noch mal angepasst werden."
       }
+    },
+    "messages": {
+      "createSuccess": "Datenstruktur wurde erfolgreich angelegt.",
+      "updateSuccess": "Datenstruktur wurde erfolgreich aktualisiert."
     }
   }
 }

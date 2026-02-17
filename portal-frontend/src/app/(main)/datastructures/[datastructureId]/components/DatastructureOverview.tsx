@@ -143,17 +143,17 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       : DatastructureFormAvailableSchema.safeParse(values)
     if (!parsed.success) {
       console.error(parsed.error)
-      toast.error('Form data invalid')
+      toast.error(tCommon('errors.formInvalid'))
       return
     }
 
     updateDatastructure.mutate(parsed.data, {
       onSuccess: () => {
-        toast.success('Successfully updated datastructure.')
+        toast.success(t('messages.updateSuccess'))
         setIsExitModalOpen(false)
         router.refresh()
       },
-      onError: () => toast.error('An error occurred while updateing datastructure.'),
+      onError: () => toast.error(tCommon('errors.unexpectedError')),
     })
   }
 

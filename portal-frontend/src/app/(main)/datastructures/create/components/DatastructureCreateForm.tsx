@@ -41,10 +41,10 @@ export const DatastructureCreateForm = () => {
     const datastructureCreateData = formData
     createDatastructure.mutate(mapdatastructureFormToApiData(datastructureCreateData), {
       onSuccess: ({ data }) => {
-        toast.success('Successfully created datastructure.')
+        toast.success(t('messages.createSuccess'))
         router.push(`/datastructures/${data.id}?mode=edit`)
       },
-      onError: () => toast.error('An error occurred while creating datastructure.'),
+      onError: () => toast.error(tCommon('errors.unexpectedError')),
     })
   }
 
