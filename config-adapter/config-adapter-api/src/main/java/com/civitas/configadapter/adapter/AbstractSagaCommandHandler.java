@@ -167,6 +167,27 @@ public abstract class AbstractSagaCommandHandler implements SagaCommandHandler {
         : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
   }
 
+  /**
+   * Extracts a required String value from the command payload. Throws {@link
+   * IllegalArgumentException} if the key is missing or not a String.
+   */
+  protected static String requireString(SagaCommandMessage command, String key) {
+    Object value = command.payload().get(key);
+    if (value == null) {
+      throw new IllegalArgumentException(
+          command.operation() + " payload missing required field: " + key);
+    }
+    if (!(value instanceof String s)) {
+      throw new IllegalArgumentException(
+          command.operation()
+              + " payload field '"
+              + key
+              + "' is not a String: "
+              + value.getClass());
+    }
+    return s;
+  }
+
   /** Config property helper: reads "{adapterName}.{key}". */
   protected String getProperty(String key) {
     return config.getProperty(adapterName + "." + key);

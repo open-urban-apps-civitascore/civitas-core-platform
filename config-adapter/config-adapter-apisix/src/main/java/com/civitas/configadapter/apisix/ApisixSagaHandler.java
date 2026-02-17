@@ -82,8 +82,8 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleCreateRoute(SagaCommandMessage command) {
-    String datasetId = (String) command.payload().get("datasetId");
-    String upstreamUrl = (String) command.payload().get("upstreamUrl");
+    String datasetId = requireString(command, "datasetId");
+    String upstreamUrl = requireString(command, "upstreamUrl");
     Object openDataAccess = command.payload().getOrDefault("openDataAccess", false);
 
     // 1. Create upstream (PUT with deterministic ID)
@@ -109,8 +109,8 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleUpdateRoute(SagaCommandMessage command) {
-    String routeId = (String) command.payload().get("routeId");
-    String serviceId = (String) command.payload().get("serviceId");
+    String routeId = requireString(command, "routeId");
+    String serviceId = requireString(command, "serviceId");
     Object openDataAccess = command.payload().getOrDefault("openDataAccess", false);
 
     // Read current route state before updating (needed for compensation)
@@ -136,8 +136,8 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleDeleteRoute(SagaCommandMessage command) {
-    String routeId = (String) command.payload().get("routeId");
-    String serviceId = (String) command.payload().get("serviceId");
+    String routeId = requireString(command, "routeId");
+    String serviceId = requireString(command, "serviceId");
 
     // 1. Delete route first (route depends on upstream)
     deleteResource(ROUTES_PATH + routeId, "DELETE route");
@@ -156,8 +156,8 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleRestoreRoute(SagaCommandMessage command) {
-    String routeId = (String) command.payload().get("routeId");
-    String serviceId = (String) command.payload().get("serviceId");
+    String routeId = requireString(command, "routeId");
+    String serviceId = requireString(command, "serviceId");
     Object previousOpenDataAccess = command.payload().getOrDefault("previousOpenDataAccess", false);
 
     Map<String, Object> routeBody = buildRouteBody(serviceId, previousOpenDataAccess);

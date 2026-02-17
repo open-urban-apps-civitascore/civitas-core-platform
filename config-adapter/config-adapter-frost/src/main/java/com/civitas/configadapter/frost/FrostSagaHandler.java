@@ -79,7 +79,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleCreateProject(SagaCommandMessage command) {
-    String datasetName = (String) command.payload().get("datasetName");
+    String datasetName = requireString(command, "datasetName");
     String description = (String) command.payload().getOrDefault("description", "");
 
     Map<String, Object> body = new HashMap<>();
@@ -113,8 +113,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleUpdateProject(SagaCommandMessage command) {
-    String projectId = (String) command.payload().get("projectId");
-    String datasetName = (String) command.payload().get("datasetName");
+    String projectId = requireString(command, "projectId");
+    String datasetName = requireString(command, "datasetName");
     String description = (String) command.payload().getOrDefault("description", "");
 
     // Read current state before updating (needed for compensation)
@@ -167,7 +167,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleDeleteProject(SagaCommandMessage command) {
-    String projectId = (String) command.payload().get("projectId");
+    String projectId = requireString(command, "projectId");
 
     try (Response response =
         client()
@@ -191,8 +191,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private SagaCommandResult handleRestoreProject(SagaCommandMessage command) {
-    String projectId = (String) command.payload().get("projectId");
-    String previousName = (String) command.payload().get("previousName");
+    String projectId = requireString(command, "projectId");
+    String previousName = requireString(command, "previousName");
     String previousDescription = (String) command.payload().getOrDefault("previousDescription", "");
 
     Map<String, Object> body = new HashMap<>();
