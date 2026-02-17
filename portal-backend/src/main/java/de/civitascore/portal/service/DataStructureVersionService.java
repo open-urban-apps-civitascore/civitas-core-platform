@@ -9,6 +9,7 @@ import de.civitascore.portal.util.InvalidInputException;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,6 +21,7 @@ public class DataStructureVersionService
   private final DataStructureVersionMapper dataStructureVersionMapper;
 
   private final DataStructureService dataStructureService;
+  private final ModelService modelService;
 
   @Override
   protected DataStructureVersionRepository getRepository() {
@@ -48,6 +50,20 @@ public class DataStructureVersionService
     return postLoad(entity);
   }
 
+  public Optional<String> findModelForDataStructureVersion(DataStructureVersion entity) {
+    if (StringUtils.isNotBlank(entity.getModelAtlasUri())) {
+      try {
+        String modelContent =
+            modelService.downloadModel(entity.getModelAtlasUri(), "application/xml");
+        return Optional.ofNullable(modelContent);
+      } catch (Exception e) {
+        // error has already been logged in ModelRestClientRequestService, so just return empty here
+        return Optional.empty();
+      }
+    }
+    return Optional.empty();
+  }
+
   @Override
   protected DataStructureVersion postConvertToEntity(
       DataStructureVersion entity, DataStructureVersionInputDTO input) {
@@ -70,5 +86,22 @@ public class DataStructureVersionService
     input.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
 
     return super.preProcessCreateInput(input);
+  }
+
+  @Override
+  protected DataStructureVersion postSave(
+      DataStructureVersion entity, DataStructureVersionInputDTO input) {
+    if (StringUtils.isNotBlank(input.getModel())
+        && StringUtils.isNotBlank(input.getModelAtlasUri())) {
+      try {
+        modelService.uploadModelString(input.getModel(), input.getModelAtlasUri());
+      } catch (Exception e) {
+        throw new RuntimeException(
+            "Failed to upload model to Model Atlas for modelAtlasUri: " + input.getModelAtlasUri(),
+            e);
+      }
+    }
+
+    return super.postSave(entity, input);
   }
 }

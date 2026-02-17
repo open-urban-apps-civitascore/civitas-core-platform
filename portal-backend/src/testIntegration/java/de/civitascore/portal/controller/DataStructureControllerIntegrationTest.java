@@ -16,7 +16,7 @@ import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
-import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
+import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -320,7 +320,7 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
           .hasSize(2);
 
       // Verify version details
-      DataStructureVersionOutputDTO version1 = output.getDataStructureVersions().getFirst();
+      DataStructureVersionSummaryDTO version1 = output.getDataStructureVersions().getFirst();
       assertThat(version1.getId()).as("Version should have an ID").isNotNull();
       assertThat(version1.getVersion()).as("Version should have a version string").isNotNull();
       assertThat(version1.getDataStructureVersionStatus())
@@ -329,11 +329,6 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
       assertThat(version1.getDataStructureVersionSource())
           .as("Version should have a source")
           .isNotNull();
-      assertThat(version1.getModelAtlasUri())
-          .as("Version should have a model atlas URI")
-          .isNotNull();
-      assertThat(version1.getModelName()).as("Version should have a model name").isNotNull();
-      assertThat(version1.getStyles()).as("Version should have styles").isNotNull();
 
       // Check Assignments
       assertThat(output.getAssignments()).as("Should have assignments field").isNotNull();
