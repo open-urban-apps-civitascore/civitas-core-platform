@@ -125,15 +125,6 @@ class AssignmentControllerIntegrationTest
     return dataSetRepository.save(dataSet).getId();
   }
 
-  private DataSet createTestDataSetEntity() {
-    DataSpace dataSpace = createTestDataSpaceEntity();
-    DataSet dataSet = new DataSet();
-    dataSet.setName("Test DataSet " + System.currentTimeMillis());
-    dataSet.setDescription("Test dataset for assignment");
-    dataSet.setDataSpaces(Set.of(dataSpace));
-    return dataSetRepository.save(dataSet);
-  }
-
   private UUID createTestCatalog() {
     Catalog catalog = new Catalog();
     catalog.setName("Test Catalog " + System.currentTimeMillis());
