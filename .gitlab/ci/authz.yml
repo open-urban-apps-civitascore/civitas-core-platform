@@ -18,8 +18,15 @@
         - .gitlab/ci/authz.yml
 
 # Common OPA configuration
+# Uses alpine + OPA binary because the static image has no shell,
+# which GitLab CI requires to execute script commands.
 .opa-common:
-  image: openpolicyagent/opa:1.4.2-static
+  image: alpine:latest
+  variables:
+    OPA_VERSION: "1.4.2"
+  before_script:
+    - wget -q -O /usr/local/bin/opa "https://openpolicyagent.org/downloads/v${OPA_VERSION}/opa_linux_$(uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')_static"
+    - chmod +x /usr/local/bin/opa
 
 # =============================================================================
 # Lint Stage
@@ -34,9 +41,7 @@ lint-authz:
   needs: []
   script:
     - cd authz/rego
-    - echo "Checking Rego formatting..."
-    - opa fmt --diff policy lib providers
-    - echo "Formatting check passed"
+    - opa fmt --fail --diff policy lib providers
 
 # =============================================================================
 # QA Stage
@@ -51,15 +56,14 @@ check-authz:
   needs: []
   script:
     - cd authz/rego
-    - echo "Running strict type checking..."
     - opa check --strict policy lib providers
-    - echo "Type check passed"
 
 # =============================================================================
 # Test Stage
 # =============================================================================
 
 # Run Rego unit tests
+# backends data lives under data/backends/ so OPA resolves data.backends.* directly
 test-authz:
   extends:
     - .only-authz-changes
@@ -68,18 +72,7 @@ test-authz:
   needs: []
   script:
     - cd authz/rego
-    - echo "Running Rego unit tests..."
-    # Note: backends must be under data/ for data.backends.* to resolve
-    - mkdir -p /tmp/rego/data
-    - cp -r policy lib providers test /tmp/rego/
-    - cp -r backends /tmp/rego/data/
-    - cd /tmp/rego
-    - |
-      if ! opa test policy lib providers test data -v; then
-        echo "Tests failed"
-        exit 1
-      fi
-    - echo "All tests passed"
+    - opa test policy lib providers test data -v
 
 # =============================================================================
 # Build Stage
@@ -102,7 +95,7 @@ bundle-authz:
     # Create bundle directory structure
     - mkdir -p /tmp/bundle/data
     - cp -r policy lib providers /tmp/bundle/
-    - cp -r backends /tmp/bundle/data/
+    - cp -r data/backends /tmp/bundle/data/
     # Create manifest with revision
     - |
       cat > /tmp/bundle/.manifest << EOF

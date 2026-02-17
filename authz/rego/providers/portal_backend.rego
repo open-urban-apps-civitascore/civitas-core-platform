@@ -17,7 +17,7 @@ import data.civitas.authz.lib.restmapper
 # =============================================================================
 
 # Endpoints map from data file
-# The data file is at backends/portal_backend/data.json
+# The data file is at data/backends/portal_backend/data.json
 endpoints := data.backends.portal_backend.endpoints if {
 	data.backends.portal_backend.endpoints
 }

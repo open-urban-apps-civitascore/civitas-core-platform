@@ -70,7 +70,7 @@ if docker run --rm \
   -v "${SCRIPT_DIR}/policy:/rego/policy:ro" \
   -v "${SCRIPT_DIR}/lib:/rego/lib:ro" \
   -v "${SCRIPT_DIR}/providers:/rego/providers:ro" \
-  -v "${SCRIPT_DIR}/backends:/rego/data/backends:ro" \
+  -v "${SCRIPT_DIR}/data/backends:/rego/data/backends:ro" \
   ${OPA_IMAGE} \
   check --strict /rego/policy /rego/lib /rego/providers > /dev/null 2>&1; then
     echo "OK"
@@ -81,7 +81,7 @@ else
       -v "${SCRIPT_DIR}/policy:/rego/policy:ro" \
       -v "${SCRIPT_DIR}/lib:/rego/lib:ro" \
       -v "${SCRIPT_DIR}/providers:/rego/providers:ro" \
-      -v "${SCRIPT_DIR}/backends:/rego/data/backends:ro" \
+      -v "${SCRIPT_DIR}/data/backends:/rego/data/backends:ro" \
       ${OPA_IMAGE} \
       check --strict /rego/policy /rego/lib /rego/providers
     exit 1
@@ -93,7 +93,7 @@ if docker run --rm \
   -v "${SCRIPT_DIR}/policy:/rego/policy:ro" \
   -v "${SCRIPT_DIR}/lib:/rego/lib:ro" \
   -v "${SCRIPT_DIR}/providers:/rego/providers:ro" \
-  -v "${SCRIPT_DIR}/backends:/rego/data/backends:ro" \
+  -v "${SCRIPT_DIR}/data/backends:/rego/data/backends:ro" \
   -v "${SCRIPT_DIR}/test:/rego/test:ro" \
   ${OPA_IMAGE} \
   test /rego/policy /rego/lib /rego/providers /rego/test /rego/data > /dev/null 2>&1; then
@@ -105,7 +105,7 @@ else
       -v "${SCRIPT_DIR}/policy:/rego/policy:ro" \
       -v "${SCRIPT_DIR}/lib:/rego/lib:ro" \
       -v "${SCRIPT_DIR}/providers:/rego/providers:ro" \
-      -v "${SCRIPT_DIR}/backends:/rego/data/backends:ro" \
+      -v "${SCRIPT_DIR}/data/backends:/rego/data/backends:ro" \
       -v "${SCRIPT_DIR}/test:/rego/test:ro" \
       ${OPA_IMAGE} \
       test /rego/policy /rego/lib /rego/providers /rego/test /rego/data -v
@@ -123,7 +123,7 @@ echo "=== Building bundle ==="
 # Copy source files to bundle directory
 # Bundle structure:
 #   policy/*.rego, lib/*.rego, providers/*.rego -> Rego policies (package civitas.authz.*)
-#   backends/*/data.json -> Data files (data.backends.*)
+#   data/backends/*/data.json -> Data files (data.backends.*)
 mkdir -p "${BUNDLE_DIR}/policy"
 mkdir -p "${BUNDLE_DIR}/lib"
 mkdir -p "${BUNDLE_DIR}/providers"
@@ -132,7 +132,7 @@ mkdir -p "${BUNDLE_DIR}/backends"
 cp policy/*.rego "${BUNDLE_DIR}/policy/"
 cp lib/*.rego "${BUNDLE_DIR}/lib/"
 cp providers/*.rego "${BUNDLE_DIR}/providers/"
-cp -r backends/* "${BUNDLE_DIR}/backends/"
+cp -r data/backends/* "${BUNDLE_DIR}/backends/"
 
 # Ensure OPA container (non-root user) can read all files
 chmod -R a+rX "${BUNDLE_DIR}"

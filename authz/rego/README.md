@@ -28,11 +28,12 @@ authz/rego/
 │   ├── portal_backend.rego      # Portal Backend API (REST)
 │   └── frost_server.rego        # FROST Server stub (OData - F-005)
 │
-├── backends/                    # Data files (endpoint → permission mappings)
-│   ├── portal_backend/
-│   │   └── data.json            # → data.backends.portal_backend.endpoints
-│   └── frost_server/
-│       └── data.json            # → data.backends.frost_server.endpoints
+├── data/                        # OPA data directory (data.* namespace)
+│   └── backends/                # Endpoint → permission mappings (data.backends.*)
+│       ├── portal_backend/
+│       │   └── data.json        # → data.backends.portal_backend.endpoints
+│       └── frost_server/
+│           └── data.json        # → data.backends.frost_server.endpoints
 │
 ├── test/                        # Unit tests (mirrors source structure)
 │   ├── lib/
@@ -101,11 +102,11 @@ OPA reads `input.service.name` to dispatch to the correct provider.
 
 ### Data Path Convention
 
-Backend data files must be at `backends/{backend_id}/data.json` to resolve as `data.backends.{backend_id}.*`:
+Backend data files must be at `data/backends/{backend_id}/data.json` to resolve as `data.backends.{backend_id}.*`:
 
 ```
-backends/portal_backend/data.json  →  data.backends.portal_backend.endpoints
-backends/frost_server/data.json    →  data.backends.frost_server.endpoints
+data/backends/portal_backend/data.json  →  data.backends.portal_backend.endpoints
+data/backends/frost_server/data.json    →  data.backends.frost_server.endpoints
 ```
 
 ## Usage
@@ -165,7 +166,7 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision \
    path_pattern := restmapper.match_pattern(input.request.path, endpoints)
    ```
 
-2. **Create data file** at `backends/{backend_id}/data.json`:
+2. **Create data file** at `data/backends/{backend_id}/data.json`:
    ```json
    {
      "_version": "1.0.0",
@@ -209,7 +210,7 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision \
 | `policy/permission_eval.rego` | Checks if user has required permission |
 | `policy/resource_mapping.rego` | Identifies backend, dispatches to provider |
 | `lib/genericrestmapper.rego` | Path validation, `/version/resource/{id}` matching |
-| `backends/*/data.json` | Endpoint → permission mappings per backend |
+| `data/backends/*/data.json` | Endpoint → permission mappings per backend |
 
 ## Related Documentation
 

@@ -60,7 +60,7 @@ services:
       - ../../authz/rego/policy:/policies:ro
       - ../../authz/rego/lib:/lib:ro
       - ../../authz/rego/providers:/providers:ro
-      - ../../authz/rego/backends:/data/backends:ro
+      - ../../authz/rego/data/backends:/data/backends:ro
       - ./opa-config.json:/data/config.json:ro
     ports:
       - "8181:8181"

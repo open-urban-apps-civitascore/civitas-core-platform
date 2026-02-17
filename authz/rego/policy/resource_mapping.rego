@@ -8,7 +8,7 @@
 # Backend identification:
 #   APISIX sends service metadata to OPA via with_service=true in the OPA plugin.
 #   OPA reads input.service.name to determine the backend (source of truth).
-#   Each backend provides its own mappings file in backends/{backend_id}/data.json
+#   Each backend provides its own mappings file in data/backends/{backend_id}/data.json
 #
 # Provider architecture:
 #   - lib/genericrestmapper.rego: Shared path validation and pattern matching
