@@ -22,17 +22,20 @@ final class FrostUtils {
    * http://host/v1.1/EntityType(id)}, and this method returns the {@code id} portion.
    *
    * @param locationHeader the Location header value
-   * @return the extracted ID, or {@code null} if the header is blank or malformed
+   * @return the extracted ID
+   * @throws IllegalStateException if the header is blank or does not contain a parseable ID
    */
   static String extractIdFromLocation(String locationHeader) {
     if (locationHeader == null || locationHeader.isBlank()) {
-      return null;
+      throw new IllegalStateException(
+          "FROST response missing Location header — cannot extract entity ID");
     }
     int start = locationHeader.lastIndexOf('(');
     int end = locationHeader.lastIndexOf(')');
     if (start >= 0 && end > start) {
       return locationHeader.substring(start + 1, end);
     }
-    return null;
+    throw new IllegalStateException(
+        "FROST Location header has unexpected format: " + locationHeader);
   }
 }
