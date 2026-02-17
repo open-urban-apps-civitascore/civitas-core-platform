@@ -6792,10 +6792,10 @@
     {
       "id": "ds3",
       "name": "Test Datastructure 3",
-      "description": "Test Description",
+      "description": "Description 3",
       "source": "OWN",
       "inUse": false,
-      "status": "DRAFT",
+      "status": "AVAILABLE",
       "versions": [
         {
           "id": "v4",
@@ -6819,15 +6819,6 @@
           "status": "DRAFT"
         }
       ]
-    },
-    {
-      "name": "Test",
-      "description": "Test Description",
-      "source": "OWN",
-      "status": "DRAFT",
-      "inUse": false,
-      "versions": [],
-      "id": "MxU97NA"
     }
   ]
 }

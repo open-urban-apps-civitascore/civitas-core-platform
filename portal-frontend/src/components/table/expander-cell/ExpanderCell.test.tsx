@@ -22,7 +22,7 @@ describe('ExpanderCell', () => {
   it('renders value text when row cannot expand', () => {
     const mockRow = createMockRow({ canExpand: false })
 
-    render(<ExpanderCell row={mockRow as never}>Non-expandible Test</ExpanderCell>)
+    render(<ExpanderCell row={mockRow as never}>Non-expandable Value</ExpanderCell>)
 
     expect(screen.getByText('Non-expandable Value')).toBeInTheDocument()
   })
