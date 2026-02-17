@@ -17,7 +17,6 @@ import com.civitas.configadapter.model.saga.SagaStep;
 import com.civitas.configadapter.model.saga.SagaStepStatus;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -251,7 +250,7 @@ public class SagaStateMachine {
               stepDef.adapter(),
               stepDef.operation(),
               stepDef.executeTopic(),
-              buildStepPayload(currentContext, stepDef)));
+              SagaPayloadBuilder.buildStepPayload(currentContext, stepDef)));
 
       return new SagaTransitionResult(currentContext, actions);
     }
@@ -260,7 +259,8 @@ public class SagaStateMachine {
     currentContext = currentContext.withStatus(SagaStatus.COMPLETED, now);
     actions.add(0, new SagaAction.PersistState(currentContext));
     actions.add(
-        new SagaAction.CompleteSaga(currentContext.sagaId(), aggregateResults(currentContext)));
+        new SagaAction.CompleteSaga(
+            currentContext.sagaId(), SagaPayloadBuilder.aggregateResults(currentContext)));
 
     return new SagaTransitionResult(currentContext, actions);
   }
@@ -301,7 +301,7 @@ public class SagaStateMachine {
               stepDef.adapter(),
               stepDef.operation(),
               stepDef.executeTopic(),
-              buildStepPayload(currentContext, stepDef)));
+              SagaPayloadBuilder.buildStepPayload(currentContext, stepDef)));
 
       return new SagaTransitionResult(currentContext, actions);
     }
@@ -323,7 +323,7 @@ public class SagaStateMachine {
 
       var stale = new ArrayList<SagaAction.StaleResource>();
       var cleaned = new ArrayList<SagaAction.CleanedResource>();
-      collectDeleteResults(failedContext, stale, cleaned);
+      SagaPayloadBuilder.collectDeleteResults(failedContext, stale, cleaned);
 
       actions.add(
           new SagaAction.FailSaga(
@@ -343,7 +343,8 @@ public class SagaStateMachine {
     SagaContext completedContext = context.withStatus(SagaStatus.COMPLETED, now);
     actions.add(new SagaAction.PersistState(completedContext));
     actions.add(
-        new SagaAction.CompleteSaga(completedContext.sagaId(), aggregateResults(completedContext)));
+        new SagaAction.CompleteSaga(
+            completedContext.sagaId(), SagaPayloadBuilder.aggregateResults(completedContext)));
 
     return new SagaTransitionResult(completedContext, actions);
   }
@@ -399,7 +400,7 @@ public class SagaStateMachine {
             stepDef.adapter(),
             stepDef.compensationOperation(),
             stepDef.compensateTopic(),
-            buildCompensationPayload(currentContext, step)));
+            SagaPayloadBuilder.buildCompensationPayload(currentContext, step)));
 
     return new SagaTransitionResult(currentContext, actions);
   }
@@ -416,7 +417,7 @@ public class SagaStateMachine {
 
       var stale = new ArrayList<SagaAction.StaleResource>();
       var cleaned = new ArrayList<SagaAction.CleanedResource>();
-      collectCompensationResults(failedContext, stale, cleaned);
+      SagaPayloadBuilder.collectCompensationResults(failedContext, stale, cleaned);
 
       actions.add(
           new SagaAction.FailSaga(
@@ -447,107 +448,5 @@ public class SagaStateMachine {
             List.of()));
 
     return new SagaTransitionResult(compensatedContext, actions);
-  }
-
-  // ─── Payload Building ───────────────────────────────────────────────────────
-
-  /**
-   * Build the payload for a forward step command. The actual payload transformation is delegated to
-   * the DataMapper (Task #6) — for now returns the trigger payload augmented with previous step
-   * results.
-   */
-  private Map<String, Object> buildStepPayload(SagaContext context, SagaStepDefinition stepDef) {
-    var payload = new HashMap<>(context.triggerPayload());
-    // Add results from previous steps so downstream adapters can access them
-    for (SagaStep step : context.steps()) {
-      if (step.status() == SagaStepStatus.SUCCESS && step.result() != null) {
-        payload.putAll(step.result());
-      }
-    }
-    // Saga envelope fields needed by command handlers to correlate results
-    payload.put("sagaId", context.sagaId());
-    payload.put("datasetId", context.datasetId());
-    payload.put("_operation", stepDef.operation());
-    payload.put("_stepId", stepDef.stepId());
-    return Map.copyOf(payload);
-  }
-
-  /** Build the compensation payload from the step's stored compensation data. */
-  private Map<String, Object> buildCompensationPayload(SagaContext context, SagaStep step) {
-    var payload = new HashMap<String, Object>();
-    if (step.compensationData() != null) {
-      payload.putAll(step.compensationData());
-    }
-    if (step.result() != null) {
-      payload.putAll(step.result());
-    }
-    payload.put("sagaId", context.sagaId());
-    payload.put("datasetId", context.datasetId());
-    payload.put("_operation", step.operation());
-    payload.put("_stepId", step.stepId());
-    return Map.copyOf(payload);
-  }
-
-  // ─── Result Aggregation ─────────────────────────────────────────────────────
-
-  /** Aggregate results from all successful steps for the final CompleteSaga action. */
-  private Map<String, Object> aggregateResults(SagaContext context) {
-    var results = new HashMap<String, Object>();
-    results.put("sagaId", context.sagaId());
-    results.put("datasetId", context.datasetId());
-    for (SagaStep step : context.steps()) {
-      if (step.status() == SagaStepStatus.SUCCESS && step.result() != null) {
-        results.putAll(step.result());
-      }
-    }
-    return Map.copyOf(results);
-  }
-
-  /** Collect stale and cleaned resources from compensation results. */
-  private void collectCompensationResults(
-      SagaContext context,
-      List<SagaAction.StaleResource> stale,
-      List<SagaAction.CleanedResource> cleaned) {
-    for (SagaStep step : context.steps()) {
-      String resourceId = extractResourceId(step);
-      if (step.status() == SagaStepStatus.COMPENSATION_FAILED) {
-        stale.add(new SagaAction.StaleResource(step.adapter(), resourceId, step.error()));
-      } else if (step.status() == SagaStepStatus.COMPENSATED) {
-        cleaned.add(new SagaAction.CleanedResource(step.adapter(), resourceId));
-      }
-    }
-  }
-
-  /** Collect stale and deleted resources from delete execution results. */
-  private void collectDeleteResults(
-      SagaContext context,
-      List<SagaAction.StaleResource> stale,
-      List<SagaAction.CleanedResource> cleaned) {
-    for (SagaStep step : context.steps()) {
-      if (step.status() == SagaStepStatus.SKIPPED) {
-        continue;
-      }
-      String resourceId = extractResourceId(step);
-      if (step.status() == SagaStepStatus.FAILED) {
-        stale.add(new SagaAction.StaleResource(step.adapter(), resourceId, step.error()));
-      } else if (step.status() == SagaStepStatus.SUCCESS) {
-        cleaned.add(new SagaAction.CleanedResource(step.adapter(), resourceId));
-      }
-    }
-  }
-
-  /** Extract a representative resource ID from a step's result data. */
-  private String extractResourceId(SagaStep step) {
-    if (step.result() == null || step.result().isEmpty()) {
-      return step.stepId();
-    }
-    // Try common resource ID keys
-    for (String key : List.of("projectId", "routeId", "serviceId", "pipelineIds")) {
-      Object value = step.result().get(key);
-      if (value != null) {
-        return value.toString();
-      }
-    }
-    return step.stepId();
   }
 }
