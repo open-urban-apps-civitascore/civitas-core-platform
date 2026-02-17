@@ -23,13 +23,9 @@ export const BasicInfoTab = (props: BasicInfoTabProps) => {
 
   return (
     <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement />}>
-      <div className="max-w-300 flex flex-col gap-2 pt-2" data-testid="basicInfoTab">
-        <DetailsFieldContainer className="pt-0 border-b-0">
-          <SubHeader
-            title={t('edit.basicInfo.title')}
-            titleClassName="text-2xl leading-none font-bold"
-            subtitle={t('edit.basicInfo.subtitle')}
-          />
+      <div className="max-w-300 flex flex-col" data-testid="basicInfoTab">
+        <DetailsFieldContainer className="pt-0 pb-4 ">
+          <SubHeader title={t('edit.basicInfo.title')} subtitle={t('edit.basicInfo.subtitle')} />
         </DetailsFieldContainer>
 
         <DetailsFieldContainer className="max-w-300">
