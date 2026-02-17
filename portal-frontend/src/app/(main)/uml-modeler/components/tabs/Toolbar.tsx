@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { uploadModelToBackend } from '../../services/modelUploadService'
 import { downloadXmi } from '../../services/xmiExportService'
 import { importXmiFromFile } from '../../services/xmiImportService'
 
