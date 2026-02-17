@@ -141,7 +141,7 @@ chmod -R a+rX "${BUNDLE_DIR}"
 cat > "${BUNDLE_DIR}/.manifest" << EOF
 {
   "revision": "${REVISION}",
-  "roots": ["civitas", "backends"]
+  "roots": ["civitas", "backends", "system"]
 }
 EOF
 

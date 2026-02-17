@@ -1,4 +1,4 @@
 {
   "revision": "",
-  "roots": ["civitas", "backends"]
+  "roots": ["civitas", "backends", "system"]
 }

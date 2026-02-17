@@ -101,7 +101,7 @@ bundle-authz:
       cat > /tmp/bundle/.manifest << EOF
       {
         "revision": "${REVISION:-$CI_COMMIT_SHORT_SHA}",
-        "roots": ["civitas", "backends"]
+        "roots": ["civitas", "backends", "system"]
       }
       EOF
     # Build bundle
