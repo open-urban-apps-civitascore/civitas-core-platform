@@ -97,7 +97,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       DatastructureFormAvailableSchema.safeParse(formValues).success &&
       !!datastructure.versions.find(version => version.status === STATUS_TYPES.AVAILABLE)
     )
-  }, [formValues])
+  }, [formValues, datastructure.versions])
 
   const revalidateForm = () => {
     if (!isDraftMode) {
