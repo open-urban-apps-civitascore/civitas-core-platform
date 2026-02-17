@@ -149,12 +149,20 @@ class FrostSagaHandlerTest {
   class UpdateProject {
 
     @Test
-    @DisplayName("returns success with projectId and baseUrl")
+    @DisplayName("returns success with projectId, baseUrl and previous state in compensationData")
     void shouldUpdateProjectSuccessfully() {
       try (FrostSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(mockResponse);
+        // Mock GET for reading current state
+        Response getResponse = mock(Response.class);
+        when(getResponse.getStatus()).thenReturn(200);
+        when(getResponse.readEntity(Map.class))
+            .thenReturn(Map.of("name", "Old Name", "description", "Old Description"));
+        when(mockBuilder.get()).thenReturn(getResponse);
+
+        // Mock PATCH for the update
+        Response patchResponse = mock(Response.class);
+        when(patchResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(patchResponse);
 
         SagaCommandMessage command =
             createCommand(
@@ -168,6 +176,8 @@ class FrostSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("42", result.resultData().get("projectId"));
         assertEquals("42", result.compensationData().get("projectId"));
+        assertEquals("Old Name", result.compensationData().get("previousName"));
+        assertEquals("Old Description", result.compensationData().get("previousDescription"));
       }
     }
   }
@@ -222,6 +232,83 @@ class FrostSagaHandlerTest {
 
         SagaCommandMessage command =
             createCommand("COMPENSATE_STEP", "DELETE_PROJECT", Map.of("projectId", "999"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_FAILED", result.type());
+        assertNotNull(result.error());
+      }
+    }
+  }
+
+  @Nested
+  @DisplayName("RESTORE_PROJECT")
+  class RestoreProject {
+
+    @Test
+    @DisplayName("returns COMPENSATION_COMPLETED on successful restore")
+    void shouldRestoreProjectSuccessfully() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PROJECT",
+                Map.of(
+                    "projectId", "42",
+                    "previousName", "Old Name",
+                    "previousDescription", "Old Description"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        assertEquals("saga-001", result.sagaId());
+      }
+    }
+
+    @Test
+    @DisplayName("returns COMPENSATION_FAILED on HTTP error")
+    void shouldReturnCompensationFailureOnError() {
+      try (FrostSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(500);
+        when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
+        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PROJECT",
+                Map.of(
+                    "projectId", "42",
+                    "previousName", "Old Name",
+                    "previousDescription", "Old Description"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_FAILED", result.type());
+        assertNotNull(result.error());
+      }
+    }
+
+    @Test
+    @DisplayName("returns COMPENSATION_FAILED on network error")
+    void shouldReturnCompensationFailureOnNetworkError() {
+      try (FrostSagaHandler handler = createHandler()) {
+        when(mockBuilder.method(eq("PATCH"), any(Entity.class)))
+            .thenThrow(new ProcessingException("Connection refused"));
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PROJECT",
+                Map.of(
+                    "projectId", "42",
+                    "previousName", "Old Name",
+                    "previousDescription", "Old Description"));
 
         SagaCommandResult result = handler.handle(command);
 

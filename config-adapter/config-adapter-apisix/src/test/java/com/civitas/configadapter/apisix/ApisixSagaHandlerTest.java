@@ -153,12 +153,25 @@ class ApisixSagaHandlerTest {
   class UpdateRoute {
 
     @Test
-    @DisplayName("updates route and returns routeId and serviceId")
+    @DisplayName("updates route and returns routeId, serviceId and previous state")
     void shouldUpdateRouteSuccessfully() {
-      try (ApisixSagaHandler handler = createHandler()) {
-        Response mockResponse = mock(Response.class);
-        when(mockResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        // Mock GET for reading current route state (route has plugin_config_id → not open data)
+        Response getResponse = mock(Response.class);
+        when(getResponse.getStatus()).thenReturn(200);
+        when(getResponse.readEntity(Map.class))
+            .thenReturn(
+                Map.of(
+                    "value",
+                    Map.of(
+                        "uri", "/datasets/ds-001/*",
+                        "plugin_config_id", "auth-plugin-1")));
+        when(mockBuilder.get()).thenReturn(getResponse);
+
+        // Mock PUT for the update
+        Response putResponse = mock(Response.class);
+        when(putResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(putResponse);
 
         SagaCommandMessage command =
             createCommand(
@@ -171,6 +184,7 @@ class ApisixSagaHandlerTest {
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("ds-001", result.resultData().get("routeId"));
         assertEquals("ds-001", result.resultData().get("serviceId"));
+        assertEquals(false, result.compensationData().get("previousOpenDataAccess"));
       }
     }
   }
@@ -236,6 +250,83 @@ class ApisixSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("COMPENSATION_FAILED", result.type());
+      }
+    }
+  }
+
+  @Nested
+  @DisplayName("RESTORE_ROUTE")
+  class RestoreRoute {
+
+    @Test
+    @DisplayName("returns COMPENSATION_COMPLETED on successful restore")
+    void shouldRestoreRouteSuccessfully() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_ROUTE",
+                Map.of(
+                    "routeId", "ds-001",
+                    "serviceId", "ds-001",
+                    "previousOpenDataAccess", false));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+        assertEquals("saga-001", result.sagaId());
+      }
+    }
+
+    @Test
+    @DisplayName("returns COMPENSATION_FAILED on HTTP error")
+    void shouldReturnCompensationFailureOnError() {
+      try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(500);
+        when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
+        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_ROUTE",
+                Map.of(
+                    "routeId", "ds-001",
+                    "serviceId", "ds-001",
+                    "previousOpenDataAccess", true));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_FAILED", result.type());
+        assertNotNull(result.error());
+      }
+    }
+
+    @Test
+    @DisplayName("returns COMPENSATION_FAILED on network error")
+    void shouldReturnCompensationFailureOnNetworkError() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        when(mockBuilder.put(any(Entity.class)))
+            .thenThrow(new ProcessingException("Connection refused"));
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_ROUTE",
+                Map.of(
+                    "routeId", "ds-001",
+                    "serviceId", "ds-001",
+                    "previousOpenDataAccess", false));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("COMPENSATION_FAILED", result.type());
+        assertNotNull(result.error());
       }
     }
   }

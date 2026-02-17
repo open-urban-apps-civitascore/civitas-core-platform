@@ -34,9 +34,12 @@ import org.slf4j.LoggerFactory;
  *   <li>{@code CREATE_ROUTE} — creates upstream + route (uses datasetId as deterministic ID)
  *   <li>{@code UPDATE_ROUTE} — updates route configuration (plugin_config_id for auth)
  *   <li>{@code DELETE_ROUTE} — deletes route + upstream
+ *   <li>{@code RESTORE_ROUTE} — restores route to previous auth configuration (update compensation)
  * </ul>
  *
  * <p>Uses PUT with deterministic IDs (derived from datasetId) to ensure idempotent operations.
+ * Compensation: {@code DELETE_ROUTE} for create rollback, {@code RESTORE_ROUTE} for update
+ * rollback.
  */
 public class ApisixSagaHandler implements SagaCommandHandler {
 
@@ -98,6 +101,7 @@ public class ApisixSagaHandler implements SagaCommandHandler {
         case "CREATE_ROUTE" -> handleCreateRoute(command);
         case "UPDATE_ROUTE" -> handleUpdateRoute(command);
         case "DELETE_ROUTE" -> handleDeleteRoute(command);
+        case "RESTORE_ROUTE" -> handleRestoreRoute(command);
         default -> {
           String error = "Unknown APISIX operation: " + command.operation();
           LOG.warn(error);
@@ -161,11 +165,18 @@ public class ApisixSagaHandler implements SagaCommandHandler {
     String serviceId = (String) command.payload().get("serviceId");
     Object openDataAccess = command.payload().getOrDefault("openDataAccess", false);
 
+    // Read current route state before updating (needed for compensation)
+    boolean previousOpenDataAccess = readCurrentOpenDataAccess(routeId);
+
     Map<String, Object> routeBody = buildRouteBody(serviceId, openDataAccess);
     putResource(ROUTES_PATH + routeId, routeBody, "UPDATE route");
 
     Map<String, Object> resultData = Map.of("routeId", routeId, "serviceId", serviceId);
-    Map<String, Object> compensationData = Map.of("routeId", routeId, "serviceId", serviceId);
+    Map<String, Object> compensationData =
+        Map.of(
+            "routeId", routeId,
+            "serviceId", serviceId,
+            "previousOpenDataAccess", previousOpenDataAccess);
 
     LOG.info(
         "APISIX route updated: routeId={}, saga={}",
@@ -194,6 +205,48 @@ public class ApisixSagaHandler implements SagaCommandHandler {
     return "COMPENSATE_STEP".equals(command.type())
         ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
         : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
+  }
+
+  private SagaCommandResult handleRestoreRoute(SagaCommandMessage command) {
+    String routeId = (String) command.payload().get("routeId");
+    String serviceId = (String) command.payload().get("serviceId");
+    Object previousOpenDataAccess = command.payload().getOrDefault("previousOpenDataAccess", false);
+
+    Map<String, Object> routeBody = buildRouteBody(serviceId, previousOpenDataAccess);
+    putResource(ROUTES_PATH + routeId, routeBody, "RESTORE route");
+
+    LOG.info(
+        "APISIX route restored: routeId={}, saga={}",
+        Encode.forJava(routeId),
+        Encode.forJava(command.sagaId()));
+
+    return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
+  }
+
+  /**
+   * Reads the current route from APISIX and determines if it has open data access (no
+   * plugin_config_id means open data).
+   */
+  private boolean readCurrentOpenDataAccess(String routeId) {
+    try (Response response =
+        client
+            .target(adminApiUrl)
+            .path(ROUTES_PATH + routeId)
+            .request(MediaType.APPLICATION_JSON)
+            .header(X_API_KEY, adminApiKey)
+            .get()) {
+      checkResponse(response, "GET route for UPDATE_ROUTE");
+      @SuppressWarnings("unchecked")
+      Map<String, Object> responseBody = response.readEntity(Map.class);
+      // APISIX wraps the route in a "value" field
+      @SuppressWarnings("unchecked")
+      Map<String, Object> routeValue =
+          responseBody.containsKey("value")
+              ? (Map<String, Object>) responseBody.get("value")
+              : responseBody;
+      // No plugin_config_id means open data access
+      return !routeValue.containsKey("plugin_config_id");
+    }
   }
 
   // ─── HTTP helpers ────────────────────────────────────────────────────────────

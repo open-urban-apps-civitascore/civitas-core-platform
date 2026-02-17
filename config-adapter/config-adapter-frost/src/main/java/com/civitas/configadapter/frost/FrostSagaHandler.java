@@ -34,10 +34,12 @@ import org.slf4j.LoggerFactory;
  *   <li>{@code CREATE_PROJECT} — POST /Projects
  *   <li>{@code UPDATE_PROJECT} — PATCH /Projects({projectId})
  *   <li>{@code DELETE_PROJECT} — DELETE /Projects({projectId})
+ *   <li>{@code RESTORE_PROJECT} — PATCH /Projects({projectId}) with previous state (update
+ *       compensation)
  * </ul>
  *
- * <p>Compensation operations use the same handler with the inverse operation (e.g. {@code
- * DELETE_PROJECT} to compensate a {@code CREATE_PROJECT}).
+ * <p>Compensation operations: {@code DELETE_PROJECT} to compensate a {@code CREATE_PROJECT}, {@code
+ * RESTORE_PROJECT} to compensate an {@code UPDATE_PROJECT}.
  */
 public class FrostSagaHandler implements SagaCommandHandler {
 
@@ -97,6 +99,7 @@ public class FrostSagaHandler implements SagaCommandHandler {
         case "CREATE_PROJECT" -> handleCreateProject(command);
         case "UPDATE_PROJECT" -> handleUpdateProject(command);
         case "DELETE_PROJECT" -> handleDeleteProject(command);
+        case "RESTORE_PROJECT" -> handleRestoreProject(command);
         default -> {
           String error = "Unknown FROST operation: " + command.operation();
           LOG.warn(error);
@@ -167,6 +170,23 @@ public class FrostSagaHandler implements SagaCommandHandler {
     String datasetName = (String) command.payload().get("datasetName");
     String description = (String) command.payload().getOrDefault("description", "");
 
+    // Read current state before updating (needed for compensation)
+    String previousName;
+    String previousDescription;
+    try (Response getResponse =
+        client
+            .target(serverUrl)
+            .path("Projects(" + projectId + ")")
+            .request(MediaType.APPLICATION_JSON)
+            .header(apiKeyHeader, apiKey)
+            .get()) {
+      checkResponse(getResponse, "GET project for UPDATE_PROJECT");
+      @SuppressWarnings("unchecked")
+      Map<String, Object> currentProject = getResponse.readEntity(Map.class);
+      previousName = (String) currentProject.getOrDefault("name", "");
+      previousDescription = (String) currentProject.getOrDefault("description", "");
+    }
+
     Map<String, Object> body = new HashMap<>();
     body.put("name", datasetName);
     body.put("description", description);
@@ -183,7 +203,11 @@ public class FrostSagaHandler implements SagaCommandHandler {
 
       String baseUrl = serverUrl + "/Projects(" + projectId + ")";
       Map<String, Object> resultData = Map.of("projectId", projectId, "baseUrl", baseUrl);
-      Map<String, Object> compensationData = Map.of("projectId", projectId);
+      Map<String, Object> compensationData =
+          Map.of(
+              "projectId", projectId,
+              "previousName", previousName,
+              "previousDescription", previousDescription);
 
       LOG.info(
           "FROST project updated: projectId={}, saga={}",
@@ -216,6 +240,34 @@ public class FrostSagaHandler implements SagaCommandHandler {
       return "COMPENSATE_STEP".equals(command.type())
           ? SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId())
           : SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
+    }
+  }
+
+  private SagaCommandResult handleRestoreProject(SagaCommandMessage command) {
+    String projectId = (String) command.payload().get("projectId");
+    String previousName = (String) command.payload().get("previousName");
+    String previousDescription = (String) command.payload().getOrDefault("previousDescription", "");
+
+    Map<String, Object> body = new HashMap<>();
+    body.put("name", previousName);
+    body.put("description", previousDescription);
+
+    try (Response response =
+        client
+            .target(serverUrl)
+            .path("Projects(" + projectId + ")")
+            .request(MediaType.APPLICATION_JSON)
+            .header(apiKeyHeader, apiKey)
+            .method("PATCH", Entity.json(body))) {
+
+      checkResponse(response, "RESTORE_PROJECT");
+
+      LOG.info(
+          "FROST project restored: projectId={}, saga={}",
+          Encode.forJava(projectId),
+          Encode.forJava(command.sagaId()));
+
+      return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
     }
   }
 
