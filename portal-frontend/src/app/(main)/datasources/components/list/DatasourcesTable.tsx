@@ -7,8 +7,9 @@ import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { CONNECTOR_TYPE_KEYS, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPE_KEYS } from '@/const/connectors'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
+import { STATUS_TYPES } from '@/types/common'
 import { Datasource } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
@@ -99,7 +100,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
         const status = info.getValue()
         return (
           <div className="flex items-center gap-2">
-            {status === DATASOURCE_STATUS_TYPES.DRAFT ? (
+            {status === STATUS_TYPES.DRAFT ? (
               <CircleDashed className="text-muted-foreground" size={16} />
             ) : (
               <CircleCheckBig className="text-muted-foreground" size={16} />

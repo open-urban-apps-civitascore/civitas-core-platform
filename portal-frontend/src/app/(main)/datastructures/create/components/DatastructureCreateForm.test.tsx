@@ -83,9 +83,7 @@ describe('DatastructureCreateForm', () => {
         expect.objectContaining({
           name: 'Test Datastructure',
           description: '',
-          status: 'draft',
-          connector: null,
-          connection: 'inactive',
+          status: 'DRAFT',
         }),
         expect.any(Object),
       )

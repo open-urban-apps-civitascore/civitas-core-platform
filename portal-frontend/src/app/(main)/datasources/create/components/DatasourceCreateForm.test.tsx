@@ -83,7 +83,7 @@ describe('DatasourceCreateForm', () => {
         expect.objectContaining({
           name: 'Test Datasource',
           description: '',
-          status: 'draft',
+          status: 'DRAFT',
           connector: null,
           connection: 'inactive',
         }),

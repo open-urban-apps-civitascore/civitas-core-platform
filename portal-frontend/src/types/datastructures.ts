@@ -71,4 +71,4 @@ export type DatastructureCreateFormData = z.infer<typeof DatastructureCreateForm
 export type DatastructureCreateApiData = z.infer<typeof DatastructureCreateFormSchema>
 export type DatastructureCreateJsonServerData = Omit<Datastructure, 'id'>
 
-export type DatastructureUpdateData = Omit<DatastructureFormDraft, 'status'>
+export type DatastructureUpdateData = DatastructureFormDraft

@@ -143,10 +143,13 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       return
     }
 
-    // eslint-disable-next-line unused-imports/no-unused-vars
-    const { status, ...updateData } = parsed.data
-
-    updateDatastructure.mutate({ ...updateData, id: values.id }, { onSuccess: () => onSuccess?.() })
+    updateDatastructure.mutate(parsed.data, {
+      onSuccess: () => {
+        toast.success('Successfully updated datastructure.')
+        onSuccess?.()
+      },
+      onError: () => toast.error('An error occurred while updateing datastructure.'),
+    })
   }
 
   const handleSave = () => {

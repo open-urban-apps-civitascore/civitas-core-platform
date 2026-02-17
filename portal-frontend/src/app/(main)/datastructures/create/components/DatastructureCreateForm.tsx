@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
 
 import { useCreateDatastructure } from '@/app/services/api/datastructures/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
@@ -40,8 +41,10 @@ export const DatastructureCreateForm = () => {
     const datastructureCreateData = formData
     createDatastructure.mutate(mapdatastructureFormToApiData(datastructureCreateData), {
       onSuccess: ({ data }) => {
+        toast.success('Successfully created datastructure.')
         router.push(`/datastructures/${data.id}?mode=edit`)
       },
+      onError: () => toast.error('An error occurred while creating datastructure.'),
     })
   }
 
