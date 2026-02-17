@@ -9,7 +9,7 @@
  */
 import { useTranslations } from 'next-intl'
 
-import { DATASOURCE_STATUS_TYPES } from '@/types/datasources'
+import { DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 
 import { datasourceToSelectable, useDataSourceEntities } from '../../../_services/entityService'
 import type { DataSourceNodeData } from '../../../_types/nodes'
