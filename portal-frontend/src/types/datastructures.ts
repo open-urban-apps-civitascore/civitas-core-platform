@@ -41,6 +41,8 @@ export type DatastructureVersion = z.infer<typeof DatastructureVersionApiRespons
 export type DatastructureVersionSummary = z.infer<typeof DatastructureVersionSummaryApiResponseSchema>
 export type Datastructure = z.infer<typeof DatastructureApiResponseSchema>
 
+export type DatastructureVersionsListData = DatastructureVersionSummary
+
 export type DatastructuresListData = Omit<DatastructureVersionSummary, 'versionNumber' | 'source'> & {
   name: string
   versionNumber: string | null

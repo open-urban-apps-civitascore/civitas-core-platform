@@ -28,6 +28,7 @@ import {
 } from '@/types/datastructures'
 
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
+import { VersionsList } from './versions-tab/VersionsList'
 
 const tabs: Tab<DatastructureTab>[] = [
   {
@@ -44,7 +45,7 @@ const tabs: Tab<DatastructureTab>[] = [
   },
 ]
 
-const disabledTabs: DatastructureTab[] = ['versions', 'accessPermissions']
+const disabledTabs: DatastructureTab[] = ['accessPermissions']
 
 interface DatastructureOverviewProps {
   datastructure: Datastructure
@@ -175,15 +176,6 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     else handleExit()
   }
 
-  const renderTabContent = () => {
-    switch (selectedTab) {
-      case 'basicInfo':
-        return <BasicInfoTab form={form} isReadOnly={isReadOnly} />
-      default:
-        return null
-    }
-  }
-
   const isConfirmButtonDisabled = useMemo(
     () =>
       !form.formState.isDirty ||
@@ -215,6 +207,18 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       {tCommon('actions.edit')}
     </Button>
   )
+
+
+  const renderTabContent = () => {
+    switch (selectedTab) {
+      case 'basicInfo':
+        return <BasicInfoTab form={form} isReadOnly={isReadOnly} />
+      case 'versions':
+        return <VersionsList versions={datastructure.versions} rowCount={datastructure.versions.length}/>
+      default:
+        return null
+    }
+  }
 
   return (
     <PageContainer testId="datastructureOverviewPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
