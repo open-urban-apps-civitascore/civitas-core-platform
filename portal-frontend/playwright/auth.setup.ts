@@ -1,4 +1,5 @@
 import { test as setup } from '@playwright/test'
+
 import { TEST_PASSWORD, TEST_USERNAME } from '../playwright.config'
 
 const authFile = './playwright/.auth/user.json'

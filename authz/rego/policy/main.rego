@@ -23,8 +23,8 @@ package civitas.authz
 
 import rego.v1
 
-import data.civitas.authz.resource_mapping
 import data.civitas.authz.permission_eval
+import data.civitas.authz.resource_mapping
 import data.civitas.authz.user_context_fetcher
 
 # Default deny - fail secure
@@ -35,12 +35,12 @@ default decision := {"allow": false, "reason": "default_deny"}
 
 # Main decision rule
 decision := result if {
-    result := evaluate_request
+	result := evaluate_request
 }
 
 # Allow if user has required permission (includes null-permission endpoints)
 allow if {
-    permission_eval.has_permission
+	permission_eval.has_permission
 }
 
 # =============================================================================
@@ -69,61 +69,59 @@ allow if {
 # 1. Null-permission endpoints (auth required, no specific permission)
 # No scope header needed - these endpoints don't have permission-based filtering
 evaluate_request := {"allow": true, "reason": "authenticated_endpoint"} if {
-    permission_eval.is_null_permission_endpoint
-    permission_eval.is_authenticated
+	permission_eval.is_null_permission_endpoint
+	permission_eval.is_authenticated
 }
 
-# 2. Null-permission endpoint but not authenticated; 
+# 2. Null-permission endpoint but not authenticated;
 # Separate case for more specific error message
 evaluate_request := {"allow": false, "reason": "authentication_required"} if {
-    permission_eval.is_null_permission_endpoint
-    not permission_eval.is_authenticated
+	permission_eval.is_null_permission_endpoint
+	not permission_eval.is_authenticated
 }
 
 # 3. Missing user context (AuthZ Repository unavailable or fetch failed) - fail secure
 # Must be checked BEFORE permission evaluation to avoid conflicts
 evaluate_request := {"allow": false, "reason": "missing_user_context"} if {
-    resource_mapping.backend != "unknown"
-    permission_eval.is_known_endpoint
-    not permission_eval.is_null_permission_endpoint
-    not has_user_context
+	resource_mapping.backend != "unknown"
+	permission_eval.is_known_endpoint
+	not permission_eval.is_null_permission_endpoint
+	not has_user_context
 }
 
 # 4. Permission-based access (regular protected endpoints)
 # Include scope header for collection filtering (M5.5)
 evaluate_request := result if {
-    permission_eval.is_known_endpoint
-    not permission_eval.is_null_permission_endpoint
-    has_user_context
-    permission_eval.has_permission
-    result := {
-        "allow": true,
-        "reason": "permission_granted",
-        "permission": permission_eval.required_permission,
-        "headers": {
-            "X-Allowed-Scope-Ids": allowed_scope_ids_header
-        }
-    }
+	permission_eval.is_known_endpoint
+	not permission_eval.is_null_permission_endpoint
+	has_user_context
+	permission_eval.has_permission
+	result := {
+		"allow": true,
+		"reason": "permission_granted",
+		"permission": permission_eval.required_permission,
+		"headers": {"X-Allowed-Scope-Ids": allowed_scope_ids_header},
+	}
 }
 
 # 5. Permission denied (user lacks required permission)
 # Is a separate case for more specific error message
 evaluate_request := {"allow": false, "reason": "permission_denied", "required": permission_eval.required_permission} if {
-    permission_eval.is_known_endpoint
-    not permission_eval.is_null_permission_endpoint
-    has_user_context
-    not permission_eval.has_permission
+	permission_eval.is_known_endpoint
+	not permission_eval.is_null_permission_endpoint
+	has_user_context
+	not permission_eval.has_permission
 }
 
 # 6. Unknown backend (no APISIX service metadata or unknown service name)
 evaluate_request := {"allow": false, "reason": "unknown_backend"} if {
-    resource_mapping.backend == "unknown"
+	resource_mapping.backend == "unknown"
 }
 
 # 7. Unknown endpoint (path not in backend's mappings) - fail secure
 evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
-    resource_mapping.backend != "unknown"
-    not permission_eval.is_known_endpoint
+	resource_mapping.backend != "unknown"
+	not permission_eval.is_known_endpoint
 }
 
 # =============================================================================
@@ -143,24 +141,24 @@ evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
 # Check if user has TENANT scope for the required permission
 # TENANT scope acts as wildcard - user can see all resources
 has_tenant_scope if {
-    permission_eval.required_permission != ""
-    some group in user_context_fetcher.user_context.groups
-    some assignment in group.assignments
-    permission_eval.required_permission in assignment.permissions
-    assignment.scopeType == "TENANT"
+	permission_eval.required_permission != ""
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission_eval.required_permission in assignment.permissions
+	assignment.scopeType == "TENANT"
 }
 
 # Collect specific scope IDs where user has the required permission
 # Only includes scopes matching the expected scope type for the resource
 specific_scope_ids contains scope_id if {
-    permission_eval.required_permission != ""
-    resource_mapping.expected_scope_type != ""
-    some group in user_context_fetcher.user_context.groups
-    some assignment in group.assignments
-    permission_eval.required_permission in assignment.permissions
-    assignment.scopeType == resource_mapping.expected_scope_type
-    scope_id := assignment.scopeId
-    scope_id != null
+	permission_eval.required_permission != ""
+	resource_mapping.expected_scope_type != ""
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission_eval.required_permission in assignment.permissions
+	assignment.scopeType == resource_mapping.expected_scope_type
+	scope_id := assignment.scopeId
+	scope_id != null
 }
 
 # Generate the header value based on user's scopes
@@ -168,13 +166,13 @@ default allowed_scope_ids_header := ""
 
 # TENANT scope = wildcard (user can see everything)
 allowed_scope_ids_header := "*" if {
-    has_tenant_scope
+	has_tenant_scope
 }
 
 # Specific scopes = comma-separated sorted IDs
 allowed_scope_ids_header := concat(",", sort(specific_scope_ids)) if {
-    not has_tenant_scope
-    count(specific_scope_ids) > 0
+	not has_tenant_scope
+	count(specific_scope_ids) > 0
 }
 
 # =============================================================================
@@ -190,13 +188,13 @@ allowed_scope_ids_header := concat(",", sort(specific_scope_ids)) if {
 default has_user_context := false
 
 has_user_context if {
-    user_context_fetcher.user_context
-    user_context_fetcher.user_context.userId != null
+	user_context_fetcher.user_context
+	user_context_fetcher.user_context.userId != null
 }
 
 has_user_context if {
-    user_context_fetcher.user_context
-    user_context_fetcher.user_context.externalId != null
+	user_context_fetcher.user_context
+	user_context_fetcher.user_context.externalId != null
 }
 
 # =============================================================================
@@ -205,11 +203,11 @@ has_user_context if {
 
 # Expose computed values for debugging/logging
 request_info := {
-    "method": input.request.method,
-    "path": input.request.path,
-    "backend": resource_mapping.backend,
-    "path_pattern": resource_mapping.path_pattern,
-    "required_permission": permission_eval.required_permission,
-    "is_null_permission": permission_eval.is_null_permission_endpoint,
-    "user_context_source": user_context_fetcher.user_context_source,
+	"method": input.request.method,
+	"path": input.request.path,
+	"backend": resource_mapping.backend,
+	"path_pattern": resource_mapping.path_pattern,
+	"required_permission": permission_eval.required_permission,
+	"is_null_permission": permission_eval.is_null_permission_endpoint,
+	"user_context_source": user_context_fetcher.user_context_source,
 }

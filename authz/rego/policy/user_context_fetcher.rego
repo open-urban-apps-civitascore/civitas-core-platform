@@ -60,14 +60,14 @@ import rego.v1
 # For a working example, see: dev-environment/authz/docker-compose.yml
 # and dev-environment/authz/opa-config.json
 authz_repository_url := data.config.authz_repository_url if {
-    data.config.authz_repository_url
+	data.config.authz_repository_url
 }
 
 # Request timeout for http.send()
 default request_timeout := "5s"
 
 request_timeout := data.config.authz_request_timeout if {
-    data.config.authz_request_timeout
+	data.config.authz_request_timeout
 }
 
 # Cache duration for AuthZ Repository responses (seconds).
@@ -78,7 +78,7 @@ request_timeout := data.config.authz_request_timeout if {
 default cache_duration_seconds := 0
 
 cache_duration_seconds := data.config.authz_cache_duration_seconds if {
-    data.config.authz_cache_duration_seconds
+	data.config.authz_cache_duration_seconds
 }
 
 # =============================================================================
@@ -94,25 +94,25 @@ cache_duration_seconds := data.config.authz_cache_duration_seconds if {
 # NOTE: APISIX may send headers with mixed case (X-Userinfo) or lowercase
 # (x-userinfo) depending on version. We check both.
 raw_userinfo_header := input.request.headers["x-userinfo"] if {
-    input.request.headers["x-userinfo"]
+	input.request.headers["x-userinfo"]
 }
 
 # Handle mixed-case header from APISIX OPA plugin
 raw_userinfo_header := input.request.headers["X-Userinfo"] if {
-    not input.request.headers["x-userinfo"]
-    input.request.headers["X-Userinfo"]
+	not input.request.headers["x-userinfo"]
+	input.request.headers["X-Userinfo"]
 }
 
 # Decode the base64url-encoded userinfo to JSON
 # Returns the decoded claims object, or undefined if decoding fails
 decoded_userinfo := json.unmarshal(base64url.decode(raw_userinfo_header)) if {
-    raw_userinfo_header
+	raw_userinfo_header
 }
 
 # Extract the subject (externalId) from decoded JWT claims
 # The 'sub' claim is the Keycloak user ID (UUID)
 external_id := decoded_userinfo.sub if {
-    decoded_userinfo.sub
+	decoded_userinfo.sub
 }
 
 # =============================================================================
@@ -128,36 +128,32 @@ external_id := decoded_userinfo.sub if {
 
 # Uncached path (default): fresh fetch every evaluation
 fetched_user_context := response.body if {
-    cache_duration_seconds == 0
-    external_id
-    url := concat("", [authz_repository_url, "/", external_id])
-    response := http.send({
-        "method": "GET",
-        "url": url,
-        "timeout": request_timeout,
-        "headers": {
-            "Accept": "application/json"
-        }
-    })
-    response.status_code == 200
+	cache_duration_seconds == 0
+	external_id
+	url := concat("", [authz_repository_url, "/", external_id])
+	response := http.send({
+		"method": "GET",
+		"url": url,
+		"timeout": request_timeout,
+		"headers": {"Accept": "application/json"},
+	})
+	response.status_code == 200
 }
 
 # Cached path: reuse response across evaluations for cache_duration_seconds
 fetched_user_context := response.body if {
-    cache_duration_seconds > 0
-    external_id
-    url := concat("", [authz_repository_url, "/", external_id])
-    response := http.send({
-        "method": "GET",
-        "url": url,
-        "timeout": request_timeout,
-        "headers": {
-            "Accept": "application/json"
-        },
-        "force_cache": true,
-        "force_cache_duration_seconds": cache_duration_seconds
-    })
-    response.status_code == 200
+	cache_duration_seconds > 0
+	external_id
+	url := concat("", [authz_repository_url, "/", external_id])
+	response := http.send({
+		"method": "GET",
+		"url": url,
+		"timeout": request_timeout,
+		"headers": {"Accept": "application/json"},
+		"force_cache": true,
+		"force_cache_duration_seconds": cache_duration_seconds,
+	})
+	response.status_code == 200
 }
 
 # =============================================================================
@@ -171,14 +167,14 @@ fetched_user_context := response.body if {
 
 # Use fetched user_context when userId is non-null
 user_context := fetched_user_context if {
-    fetched_user_context.userId != null
+	fetched_user_context.userId != null
 }
 
 # Alternative: externalId is non-null (even if userId is null/missing)
 # Note: Both rules can fire if both IDs are non-null, but they produce the
 # same value (fetched_user_context) so Rego allows this.
 user_context := fetched_user_context if {
-    fetched_user_context.externalId != null
+	fetched_user_context.externalId != null
 }
 
 # =============================================================================
@@ -187,33 +183,36 @@ user_context := fetched_user_context if {
 
 # Helper to check if a value is defined (not undefined)
 default has_raw_userinfo_header := false
-has_raw_userinfo_header if { raw_userinfo_header }
+
+has_raw_userinfo_header if raw_userinfo_header
 
 default has_external_id := false
-has_external_id if { external_id }
+
+has_external_id if external_id
 
 # Expose intermediate values for debugging (visible in decision logs)
 # Uses helper rules to avoid evaluation failures when values are undefined
 debug_info := {
-    "has_userinfo_header": has_raw_userinfo_header,
-    "external_id": external_id_or_null,
-    "fetch_attempted": has_external_id,
-    "user_context_source": user_context_source,
+	"has_userinfo_header": has_raw_userinfo_header,
+	"external_id": external_id_or_null,
+	"fetch_attempted": has_external_id,
+	"user_context_source": user_context_source,
 }
 
 # Safe accessor for external_id that returns null if undefined
-external_id_or_null := external_id if { external_id }
+external_id_or_null := external_id if external_id
+
 default external_id_or_null := null
 
 # [R-020] Single source: All user_context comes from AuthZ Repository.
 # Tests mock http.send() to provide test data.
 # Determine source of user_context for debugging
 user_context_source := "fetched" if {
-    fetched_user_context.userId != null
+	fetched_user_context.userId != null
 }
 
 user_context_source := "fetched" if {
-    fetched_user_context.externalId != null
+	fetched_user_context.externalId != null
 }
 
 default user_context_source := "none"

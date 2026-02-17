@@ -44,28 +44,28 @@ import data.civitas.authz.user_context_fetcher
 
 # Get the endpoint config for the matched path pattern
 endpoint_config := resource_mapping.backend_endpoints[resource_mapping.path_pattern] if {
-    resource_mapping.path_pattern != ""
+	resource_mapping.path_pattern != ""
 }
 
 # Get permission for the specific HTTP method
 # Note: JSON null becomes rego null, missing key returns undefined
 method_permission := endpoint_config[resource_mapping.request_method] if {
-    endpoint_config
-    endpoint_config[resource_mapping.request_method] != null
+	endpoint_config
+	endpoint_config[resource_mapping.request_method] != null
 }
 
 # Check if this is a no-permission-required endpoint (null in mappings)
 is_null_permission if {
-    endpoint_config
-    resource_mapping.request_method in object.keys(endpoint_config)
-    endpoint_config[resource_mapping.request_method] == null
+	endpoint_config
+	resource_mapping.request_method in object.keys(endpoint_config)
+	endpoint_config[resource_mapping.request_method] == null
 }
 
 # Required permission: the permission string from mappings, or "" if not found
 default required_permission := ""
 
 required_permission := method_permission if {
-    method_permission
+	method_permission
 }
 
 # =============================================================================
@@ -75,20 +75,20 @@ required_permission := method_permission if {
 # Endpoint exists in backend mappings (fail-secure: unknown endpoints are denied)
 default is_known_endpoint := false
 
-is_known_endpoint := true if {
-    required_permission != ""
+is_known_endpoint if {
+	required_permission != ""
 }
 
-is_known_endpoint := true if {
-    is_null_permission
+is_known_endpoint if {
+	is_null_permission
 }
 
 # Endpoints that require authentication but no specific permission
 # (e.g., /users/me - any authenticated user can access their own data)
 default is_null_permission_endpoint := false
 
-is_null_permission_endpoint := true if {
-    is_null_permission
+is_null_permission_endpoint if {
+	is_null_permission
 }
 
 # =============================================================================
@@ -108,12 +108,12 @@ is_null_permission_endpoint := true if {
 # Uses user_context_fetcher to get user context (fetched or from input)
 default is_authenticated := false
 
-is_authenticated := true if {
-    user_context_fetcher.user_context.userId != null
+is_authenticated if {
+	user_context_fetcher.user_context.userId != null
 }
 
-is_authenticated := true if {
-    user_context_fetcher.user_context.externalId != null
+is_authenticated if {
+	user_context_fetcher.user_context.externalId != null
 }
 
 # =============================================================================
@@ -124,15 +124,15 @@ is_authenticated := true if {
 default has_permission := false
 
 # Null-permission endpoints: allowed for any authenticated user
-has_permission := true if {
-    is_null_permission_endpoint
-    is_authenticated
+has_permission if {
+	is_null_permission_endpoint
+	is_authenticated
 }
 
 # User has permission if it's in their assignments with matching scope (M5.1)
-has_permission := true if {
-    required_permission != ""
-    user_has_permission(required_permission)
+has_permission if {
+	required_permission != ""
+	user_has_permission(required_permission)
 }
 
 # =============================================================================
@@ -151,44 +151,44 @@ has_permission := true if {
 # For collection endpoints with TENANT scope: always allowed
 # (TENANT scope users can see all resources in list endpoints)
 user_has_permission(permission) if {
-    resource_mapping.is_collection_endpoint
-    some group in user_context_fetcher.user_context.groups
-    some assignment in group.assignments
-    permission in assignment.permissions
-    assignment.scopeType == "TENANT"
+	resource_mapping.is_collection_endpoint
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	assignment.scopeType == "TENANT"
 }
 
 # For collection endpoints with matching scope type: allowed
 # (User has permission via scope type matching the resource's expected scope type)
 user_has_permission(permission) if {
-    resource_mapping.is_collection_endpoint
-    some group in user_context_fetcher.user_context.groups
-    some assignment in group.assignments
-    permission in assignment.permissions
-    assignment.scopeType == resource_mapping.expected_scope_type
+	resource_mapping.is_collection_endpoint
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	assignment.scopeType == resource_mapping.expected_scope_type
 }
 
 # For resource endpoints with TENANT-scoped resources (users, groups, roles, etc.):
 # User must have permission with scopeType=TENANT
 user_has_permission(permission) if {
-    resource_mapping.is_resource_endpoint
-    resource_mapping.expected_scope_type == "TENANT"
-    some group in user_context_fetcher.user_context.groups
-    some assignment in group.assignments
-    permission in assignment.permissions
-    assignment.scopeType == "TENANT"
+	resource_mapping.is_resource_endpoint
+	resource_mapping.expected_scope_type == "TENANT"
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	assignment.scopeType == "TENANT"
 }
 
 # For resource endpoints with DATASPACE/DATASET resources:
 # User must have permission with matching scopeType AND scopeId
 user_has_permission(permission) if {
-    resource_mapping.is_resource_endpoint
-    resource_mapping.expected_scope_type != "TENANT"
-    some group in user_context_fetcher.user_context.groups
-    some assignment in group.assignments
-    permission in assignment.permissions
-    assignment.scopeType == resource_mapping.expected_scope_type
-    assignment.scopeId == resource_mapping.resource_id
+	resource_mapping.is_resource_endpoint
+	resource_mapping.expected_scope_type != "TENANT"
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	assignment.scopeType == resource_mapping.expected_scope_type
+	assignment.scopeId == resource_mapping.resource_id
 }
 
 # =============================================================================
@@ -199,7 +199,7 @@ user_has_permission(permission) if {
 # Used by tests; useful for troubleshooting permission issues
 # Uses user_context_fetcher to get user context (fetched or from input)
 all_user_permissions contains permission if {
-    some group in user_context_fetcher.user_context.groups
-    some assignment in group.assignments
-    some permission in assignment.permissions
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	some permission in assignment.permissions
 }
