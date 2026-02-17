@@ -16,7 +16,6 @@ export type Source = (typeof SOURCE)[keyof typeof SOURCE]
 
 export const DatastructureVersionApiResponseSchema = z.object({
   id: z.string(),
-  name: z.string(),
   versionNumber: z.string(),
   description: z.string(),
   source: SourceEnum,
@@ -34,6 +33,7 @@ export const DatastructureApiResponseSchema = DatastructureVersionApiResponseSch
   umlModelData: true,
   versionNumber: true,
 }).extend({
+  name: z.string(),
   versions: z.array(DatastructureVersionSummaryApiResponseSchema),
 })
 
@@ -42,6 +42,7 @@ export type DatastructureVersionSummary = z.infer<typeof DatastructureVersionSum
 export type Datastructure = z.infer<typeof DatastructureApiResponseSchema>
 
 export type DatastructuresListData = Omit<DatastructureVersionSummary, 'versionNumber' | 'source'> & {
+  name: string
   versionNumber: string | null
   source: Source | null
   versions: DatastructuresListData[]

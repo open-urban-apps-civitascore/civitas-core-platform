@@ -9,7 +9,6 @@ type Version = Datastructure['versions'][number]
 
 const createVersion = (versionNumber: string): Version => ({
   id: versionNumber,
-  name: `Test Datastructure ${versionNumber}`,
   description: `Test Description ${versionNumber}`,
   status: 'DRAFT',
   versionNumber,
@@ -38,6 +37,18 @@ describe('mapDatastructuresApiToListData', () => {
     expect(result[0]).toMatchObject({ ...expectedResult, versionNumber: '1.0' })
   })
 
+  it('maps versions correctly', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0'])
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result).toHaveLength(1)
+    // eslint-disable-next-line unused-imports/no-unused-vars
+    const { versions, inUse, ...expectedResult } = datastructure
+    const expectedVersions = [{ ...versions[0], name: `Version ${versions[0].versionNumber}` }]
+    expect(result[0]).toMatchObject({ ...expectedResult, versionNumber: '1.0', versions: expectedVersions })
+  })
+
   it('selects the highest numeric version', () => {
     const datastructure: Datastructure = createDatastructure(['1.0', '1.1', '2.0'])
 
@@ -46,7 +57,7 @@ describe('mapDatastructuresApiToListData', () => {
     expect(result[0].versionNumber).toBe('2.0')
   })
 
-  it('adds empty versions array to each version (subrows)', () => {
+  it('adds empty versions array to each version (subrows) when no versions in datastructure', () => {
     const datastructure: Datastructure = createDatastructure(['1.0'])
 
     const result = mapDatastructuresApiToListData([datastructure])
