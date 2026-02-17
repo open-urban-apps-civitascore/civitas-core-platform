@@ -65,7 +65,6 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   }
 
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   const [selectedTab, setSelectedTab] = useState<DatastructureTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -137,7 +136,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
 
-  const submitDatastructure = (onSuccess?: () => void) => {
+  const submitDatastructure = () => {
     const values = form.getValues()
     const parsed = isDraftMode
       ? DatastructureFormDraftSchema.safeParse(values)
@@ -151,34 +150,26 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     updateDatastructure.mutate(parsed.data, {
       onSuccess: () => {
         toast.success('Successfully updated datastructure.')
-        onSuccess?.()
+        setIsExitModalOpen(false)
+        router.refresh()
       },
       onError: () => toast.error('An error occurred while updateing datastructure.'),
     })
   }
 
   const handleSave = () => {
-    submitDatastructure(() => router.refresh())
+    submitDatastructure()
   }
 
   const handleExit = () => {
-    if (form.formState.isDirty) {
-      setIsExitModalOpen(true)
-    } else {
-      router.push(`/datastructures?${searchParams.toString()}`)
-    }
-  }
-
-  const handleDiscardAndExit = () => {
+    form.reset()
+    setIsReadOnly(true)
     setIsExitModalOpen(false)
-    router.push(`/datastructures?${searchParams.toString()}`)
   }
 
-  const handleSaveAndExit = () => {
-    submitDatastructure(() => {
-      setIsExitModalOpen(false)
-      router.push(`/datastructures?${searchParams.toString()}`)
-    })
+  const handleExitButtonClick = () => {
+    if (form.formState.isDirty) setIsExitModalOpen(true)
+    else handleExit()
   }
 
   const renderTabContent = () => {
@@ -205,7 +196,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       <StatusDropdown status={statusWatch} onStatusChange={handleStatusChange} canSetAvailable={canSetAvailable} />
       <ActionButtons
         confirmButtonType="button"
-        onCancelClick={handleExit}
+        onCancelClick={handleExitButtonClick}
         onConfirmClick={handleSave}
         isConfirmButtonDisabled={isConfirmButtonDisabled}
         isCancelButtonDisabled={isLoading}
@@ -251,8 +242,8 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       <ExitWarningModal
         isOpen={isExitModalOpen}
         onClose={() => setIsExitModalOpen(false)}
-        onDiscard={handleDiscardAndExit}
-        onSave={handleSaveAndExit}
+        onDiscard={handleExit}
+        onSave={handleSave}
         isLoading={isLoading}
       />
     </PageContainer>
