@@ -1,30 +1,26 @@
 'use client'
 
 import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
-import { PageBackground } from '@/components/page-background/PageBackground'
-import { PageContainer } from '@/components/page-container/PageContainer'
-import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { DatastructuresListData, DatastructureVersionsListData } from '@/types/datastructures'
+import { DatastructureVersionsListData } from '@/types/datastructures'
 
-import { DatastructuresTable } from './DatastructuresTable'
 import { VersionsTable } from './VersionsTable'
-import { ContentCard } from '@/components/content-card/ContentCard'
 
 interface VersionsTabProps {
   versions: DatastructureVersionsListData[]
+  isReadOnly: boolean
   rowCount: number
 }
 
 export const VersionsTab = (props: VersionsTabProps) => {
-  const { versions, rowCount } = props
+  const { versions, rowCount, isReadOnly } = props
   const t = useTranslations('datastructures')
   const router = useRouter()
   const {
@@ -42,7 +38,7 @@ export const VersionsTab = (props: VersionsTabProps) => {
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
   const CustomElement = (
-    <Button data-testid="addVersionButton" onClick={() => router.push('datastructures/versions/create')}>
+    <Button data-testid="addVersionButton" onClick={() => router.push('/datastructures/createVersion')}>
       <Plus />
       {t('newVersion')}
     </Button>
@@ -50,7 +46,11 @@ export const VersionsTab = (props: VersionsTabProps) => {
 
   return (
     <TableContainer>
-      <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />
+      <SearchHeader
+        customElement={!isReadOnly && CustomElement}
+        onChangeSearchString={setSearchParam}
+        searchString={search}
+      />
       <VersionsTable
         versions={versions}
         rowCount={rowCount}

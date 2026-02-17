@@ -208,13 +208,18 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     </Button>
   )
 
-
   const renderTabContent = () => {
     switch (selectedTab) {
       case 'basicInfo':
         return <BasicInfoTab form={form} isReadOnly={isReadOnly} />
       case 'versions':
-        return <VersionsTab versions={datastructure.versions} rowCount={datastructure.versions.length}/>
+        return (
+          <VersionsTab
+            versions={datastructure.versions}
+            rowCount={datastructure.versions.length}
+            isReadOnly={isReadOnly}
+          />
+        )
       default:
         return null
     }
