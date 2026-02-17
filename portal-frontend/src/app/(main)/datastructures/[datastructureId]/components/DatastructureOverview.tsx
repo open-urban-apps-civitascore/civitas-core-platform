@@ -27,7 +27,7 @@ import {
   DatastructureTab,
 } from '@/types/datastructures'
 
-import { BasicInfoTab } from './basic-info/BasicInfoTab'
+import { BasicInfoTab } from './basic-info-tab/BasicInfoTab'
 
 const tabs: Tab<DatastructureTab>[] = [
   {
