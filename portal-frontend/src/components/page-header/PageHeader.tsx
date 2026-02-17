@@ -12,23 +12,15 @@ import { TabSectionProps, TabsSection } from './components/TabsSections'
 export type PageHeaderProps<TabValue extends string> = Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & {
   title?: string
   subtitle?: string
-  segmentedControlBarSectionProps?: SegmentedControlBarProps<TabValue>
+  segmentedControlBarProps?: SegmentedControlBarProps<TabValue>
   badgeTitle?: string
   customElement?: JSX.Element
   tabsSectionProps?: TabSectionProps
 }
 
 export const PageHeader = <TabValue extends string>(props: PageHeaderProps<TabValue>) => {
-  const {
-    title,
-    subtitle,
-    className,
-    style,
-    tabsSectionProps,
-    segmentedControlBarSectionProps,
-    badgeTitle,
-    customElement,
-  } = props
+  const { title, subtitle, className, style, tabsSectionProps, segmentedControlBarProps, badgeTitle, customElement } =
+    props
   const isMobile = useIsMobile()
   return (
     <div
@@ -72,14 +64,14 @@ export const PageHeader = <TabValue extends string>(props: PageHeaderProps<TabVa
         </div>
         <div className="pr-[var(--layout-padding)]">{customElement}</div>
       </div>
-      {segmentedControlBarSectionProps && (
+      {segmentedControlBarProps && (
         <SegmentedControlBar
-          tabs={segmentedControlBarSectionProps.tabs}
-          selectedTab={segmentedControlBarSectionProps.selectedTab}
-          onTabChange={segmentedControlBarSectionProps.onTabChange}
-          completedTabs={segmentedControlBarSectionProps.completedTabs}
-          disabledTabs={segmentedControlBarSectionProps.disabledTabs}
-          hasCompletionStatus={segmentedControlBarSectionProps.hasCompletionStatus}
+          tabs={segmentedControlBarProps.tabs}
+          selectedTab={segmentedControlBarProps.selectedTab}
+          onTabChange={segmentedControlBarProps.onTabChange}
+          completedTabs={segmentedControlBarProps.completedTabs}
+          disabledTabs={segmentedControlBarProps.disabledTabs}
+          hasCompletionStatus={segmentedControlBarProps.hasCompletionStatus}
           className="mx-[var(--layout-padding)]"
         />
       )}

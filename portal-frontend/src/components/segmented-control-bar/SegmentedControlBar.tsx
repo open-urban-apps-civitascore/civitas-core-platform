@@ -15,6 +15,7 @@ export interface SegmentedControlBarProps<TabValue extends string> {
   disabledTabs?: TabValue[]
   hasCompletionStatus?: boolean
   className?: string
+  testId?: string
 }
 
 export const SegmentedControlBar = <TabValue extends string>(props: SegmentedControlBarProps<TabValue>) => {
@@ -26,6 +27,7 @@ export const SegmentedControlBar = <TabValue extends string>(props: SegmentedCon
     disabledTabs = [],
     hasCompletionStatus = false,
     className,
+    testId,
   } = props
   const t = useTranslations()
 
@@ -46,7 +48,8 @@ export const SegmentedControlBar = <TabValue extends string>(props: SegmentedCon
   return (
     <div
       className={cn('flex flex-wrap gap-1 p-1 bg-accent rounded-lg w-fit', className)}
-      data-testid="segmentedControlBar"
+      data-testid={testId || 'segmentedControlBar'}
+      role="tablist"
     >
       {tabs.map(tab => {
         const isSelected = selectedTab === tab.value
@@ -60,6 +63,7 @@ export const SegmentedControlBar = <TabValue extends string>(props: SegmentedCon
             type="button"
             onClick={() => !isDisabled && onTabChange(tab.value)}
             disabled={isDisabled}
+            role="tab"
             className={cn(
               'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors h-7.5',
               isSelected ? 'bg-background shadow-sm' : 'bg-transparent hover:bg-background/50',

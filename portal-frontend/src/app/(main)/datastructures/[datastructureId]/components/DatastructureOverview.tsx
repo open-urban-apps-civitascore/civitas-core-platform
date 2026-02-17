@@ -226,7 +226,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     <PageContainer testId="datastructureOverviewPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader
         title={datastructure.name}
-        segmentedControlBarSectionProps={{
+        segmentedControlBarProps={{
           tabs: tabs,
           selectedTab: selectedTab,
           onTabChange: setSelectedTab,

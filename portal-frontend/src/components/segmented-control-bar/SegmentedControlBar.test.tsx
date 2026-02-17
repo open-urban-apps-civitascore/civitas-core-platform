@@ -69,7 +69,7 @@ describe('SegmentedControlBar', () => {
   })
 
   test('completed tabs show check icon', () => {
-    setup({ completedTabs: ['tab3'] })
+    setup({ completedTabs: ['tab3'], hasCompletionStatus: true })
 
     const tab1 = screen.getByTestId('tab-tab1')
     const tab2 = screen.getByTestId('tab-tab2')

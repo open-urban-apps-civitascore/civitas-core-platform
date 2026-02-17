@@ -241,7 +241,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     <PageContainer testId="datasourceOverviewPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader
         title={datasource.name}
-        segmentedControlBarSectionProps={{
+        segmentedControlBarProps={{
           tabs: tabs,
           selectedTab: selectedTab,
           onTabChange: setSelectedTab,

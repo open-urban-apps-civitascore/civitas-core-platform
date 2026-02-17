@@ -81,7 +81,7 @@ export const GroupDetails = (props: GroupDetailsProps) => {
     <PageContainer headerType="withSubTabsOrSubtitle">
       <PageHeader
         title={title}
-        segmentedControlBarSectionProps={{
+        segmentedControlBarProps={{
           tabs: tabs,
           selectedTab: subTabValue,
           onTabChange: setSubTabValueParam,

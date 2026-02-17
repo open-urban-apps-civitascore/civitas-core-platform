@@ -162,7 +162,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       <PageHeader
         title={roleId ? initialRole?.name : tRoles('newRole')}
         badgeTitle={badgeTitle}
-        segmentedControlBarSectionProps={{
+        segmentedControlBarProps={{
           tabs: subTabs,
           selectedTab: subTabValue || defaultSubTab,
           onTabChange: newSubTab => setSubTabValueParam(newSubTab),

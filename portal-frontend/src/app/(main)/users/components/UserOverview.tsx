@@ -173,7 +173,7 @@ export const UserOverview = (props: UserOverviewProps) => {
     <PageContainer testId={testId} headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader
         title={title}
-        segmentedControlBarSectionProps={{
+        segmentedControlBarProps={{
           tabs: tabs,
           selectedTab: subTabValue || defaultTab,
           onTabChange: newTab => handleSelectTab(newTab),
