@@ -64,9 +64,9 @@ const PermissionsPage = () => {
     <PageContainer headerType="withPrimaryTabs">
       <PageHeader
         title={tabs.find(tab => tab.value === permissionType)?.label}
-        tabs={{
+        segmentedControlBarSectionProps={{
           tabs,
-          onClick: type => {
+          onTabChange: type => {
             setPermissionsType(type)
             setTabValueParam(type)
           },

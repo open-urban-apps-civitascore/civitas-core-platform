@@ -66,7 +66,7 @@ const RolesPage = () => {
     <PageContainer headerType="withPrimaryTabs">
       <PageHeader
         title={`${t('overView')} ${tabs.find(tab => tab.value === selectedRoleType)?.label}`}
-        tabs={{
+        tabsSectionProps={{
           tabs,
           onClick: type => {
             setSelectedRoleType(type)

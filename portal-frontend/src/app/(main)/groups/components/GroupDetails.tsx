@@ -7,16 +7,15 @@ import { useEffect, useMemo } from 'react'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
-import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
+import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Group } from '@/types/groups'
+import { Group, GroupTab } from '@/types/groups'
 
 import Icon from '../../../../../public/svg/info.svg'
 import { BaseInfoTab } from './BaseInfoTab'
 import { RolesTab } from './roles-tab/RolesTab'
 import { UsersTab } from './users-tab/UsersTab'
-
 interface GroupDetailsProps {
   title: string
   groupData: Group
@@ -27,28 +26,26 @@ export const GroupDetails = (props: GroupDetailsProps) => {
   const { subTabValue, setSubTabValueParam } = useQueryParams()
 
   const t = useTranslations('groups')
-  const tabValues: Record<'info' | 'roles' | 'users' | 'subgroups', Tab> = {
+  const tabValues: Record<GroupTab, Tab<GroupTab>> = {
     info: {
       value: 'info',
       label: t('detailsTabs.info'),
-      isActive: true,
     },
     roles: {
       value: 'roles',
       label: t('detailsTabs.roles'),
-      isActive: isEditMode,
     },
     users: {
       value: 'users',
       label: t('detailsTabs.users'),
-      isActive: isEditMode,
     },
     subgroups: {
       value: 'subgroups',
       label: t('detailsTabs.subgroups'),
-      isActive: isEditMode,
     },
   }
+
+  const disabledTabs = !isEditMode ? ['roles', 'users', 'subgroups'] : undefined
 
   const tabs = Object.values(tabValues)
 
@@ -82,10 +79,18 @@ export const GroupDetails = (props: GroupDetailsProps) => {
 
   return (
     <PageContainer headerType="withSubTabsOrSubtitle">
-      <PageHeader title={title} subTabs={{ tabs: tabs, selectedTab: subTabValue, onClick: setSubTabValueParam }} />
+      <PageHeader
+        title={title}
+        segmentedControlBarSectionProps={{
+          tabs: tabs,
+          selectedTab: subTabValue,
+          onTabChange: setSubTabValueParam,
+          disabledTabs,
+        }}
+      />
       <PageBackground className="flex flex-col">
         {!isEditMode && (
-          <ContentCard className="flex gap-2 p-4 mb-5 text-sm">
+          <ContentCard className="flex flex-row gap-2 p-4 mb-5 text-sm">
             <Image src={Icon} alt="Info icon" width={20} height={20} />
             {t('createHint')}
           </ContentCard>

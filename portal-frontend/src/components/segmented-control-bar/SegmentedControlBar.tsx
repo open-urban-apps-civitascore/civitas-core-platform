@@ -5,26 +5,49 @@ import { useTranslations } from 'next-intl'
 
 import { cn } from '@/lib/utils'
 
-export type Tab<TabValue> = { value: TabValue; label: string; isActive?: boolean }
+export type Tab<TabValue> = { value: TabValue; label: string }
 
-interface SegmentedControlBarProps<TabValue extends string> {
+export interface SegmentedControlBarProps<TabValue extends string> {
   tabs: Tab<TabValue>[]
   selectedTab: TabValue
   onTabChange: (tab: TabValue) => void
   completedTabs?: TabValue[]
   disabledTabs?: TabValue[]
+  hasCompletionStatus?: boolean
+  className?: string
 }
 
 export const SegmentedControlBar = <TabValue extends string>(props: SegmentedControlBarProps<TabValue>) => {
-  const { tabs, selectedTab, onTabChange, completedTabs = [], disabledTabs = [] } = props
+  const {
+    tabs,
+    selectedTab,
+    onTabChange,
+    completedTabs = [],
+    disabledTabs = [],
+    hasCompletionStatus = false,
+    className,
+  } = props
   const t = useTranslations()
 
   const getTabLabel = (tabLabel: string): string => {
     return t(tabLabel)
   }
 
+  const getCompletionStatusIcon = (isCompleted: boolean) => {
+    if (!hasCompletionStatus) return undefined
+
+    return isCompleted ? (
+      <CircleCheckBig className="w-4 h-4 text-green-600" />
+    ) : (
+      <CircleDashed className="w-4 h-4 text-muted-foreground" />
+    )
+  }
+
   return (
-    <div className="flex flex-wrap gap-1 p-1 bg-accent rounded-lg" data-testid="segmentedControlBar">
+    <div
+      className={cn('flex flex-wrap gap-1 p-1 bg-accent rounded-lg w-fit', className)}
+      data-testid="segmentedControlBar"
+    >
       {tabs.map(tab => {
         const isSelected = selectedTab === tab.value
         const isCompleted = completedTabs.includes(tab.value)
@@ -38,16 +61,12 @@ export const SegmentedControlBar = <TabValue extends string>(props: SegmentedCon
             onClick={() => !isDisabled && onTabChange(tab.value)}
             disabled={isDisabled}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
+              'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors h-7.5',
               isSelected ? 'bg-background shadow-sm' : 'bg-transparent hover:bg-background/50',
               isDisabled && 'opacity-50 cursor-not-allowed',
             )}
           >
-            {isCompleted ? (
-              <CircleCheckBig className="w-4 h-4 text-green-600" />
-            ) : (
-              <CircleDashed className="w-4 h-4 text-muted-foreground" />
-            )}
+            {getCompletionStatusIcon(isCompleted)}
             <span>{getTabLabel(tab.label)}</span>
           </button>
         )

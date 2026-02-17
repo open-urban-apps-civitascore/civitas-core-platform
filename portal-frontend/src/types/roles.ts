@@ -5,6 +5,8 @@ import { Group } from './groups'
 import { Permission } from './permissions'
 import { User } from './users'
 
+export type RoleTab = 'basicInformation' | 'permissions' | 'groupAssignment'
+
 export const ROLE_TYPES = {
   SYSTEM: 'system',
   DATA: 'data',

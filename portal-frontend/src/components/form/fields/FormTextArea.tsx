@@ -27,7 +27,7 @@ export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>)
     placeholder,
     label,
     required,
-    disabled,
+    disabled = false,
     formItemProps,
     hint,
     maxLength,
@@ -75,7 +75,7 @@ export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>)
             </FormControl>
             <div className="flex justify-between">
               {shouldShowErrors && <FormMessage />}
-              {hasCharacterCount && maxLength && (
+              {hasCharacterCount && maxLength && !disabled && (
                 <span className="text-sm text-muted-foreground ml-auto mt-1">
                   {characterCount}/{maxLength}
                 </span>

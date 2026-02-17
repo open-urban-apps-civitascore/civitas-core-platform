@@ -51,7 +51,7 @@ describe('TabsSection primary tabs', () => {
     )
   })
 
-  it('renders the tabs with primary tabs styles', () => {
+  it('renders the tabs with tabs styles', () => {
     expect(screen.getAllByRole('tab')[1]).toHaveClass('border-transparent')
     expect(screen.getAllByRole('tab')[1]).toHaveClass('border-b-2')
     expect(screen.getAllByRole('tab')[1]).toHaveClass('rounded-none')
@@ -64,29 +64,5 @@ describe('TabsSection primary tabs', () => {
     expect(screen.getAllByRole('tab')[0]).not.toHaveClass('text-slate-400')
     expect(screen.getAllByRole('tab')[1]).not.toHaveClass('border-primary')
     expect(screen.getAllByRole('tab')[1]).toHaveClass('text-slate-400')
-  })
-})
-
-describe('TabsSection subtabs', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <TabsSection tabs={tabsMock} onClick={onTabClickMock} selectedTab={tabsMock[0].value} isSubTabsSection />
-      </NextIntlClientProvider>,
-    )
-  })
-
-  it('renders the tabs with sub tabs styles', () => {
-    expect(screen.getAllByRole('tab')[1]).toHaveClass('rounded-sm')
-    expect(screen.getAllByRole('tab')[1]).toHaveClass('no-underline')
-    expect(screen.getAllByRole('tab')[1]).toHaveClass('hover:bg-white')
-  })
-
-  it('highlights the selected tab', () => {
-    expect(screen.getAllByRole('tab')[0]).toHaveClass('bg-white')
-    expect(screen.getAllByRole('tab')[0]).toHaveClass('shadow-sm')
-    expect(screen.getAllByRole('tab')[1]).not.toHaveClass('bg-white')
-    expect(screen.getAllByRole('tab')[1]).not.toHaveClass('shadow-sm')
   })
 })

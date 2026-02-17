@@ -8,11 +8,13 @@ import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useUpdateDatastructure } from '@/app/services/api/datastructures/clientRequests'
+import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
-import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
+import { PageHeader } from '@/components/page-header/PageHeader'
+import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
@@ -50,6 +52,8 @@ interface DatastructureOverviewProps {
 
 export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const { datastructure } = props
+  const params = useSearchParams()
+  const mode = params.get('mode')
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
 
@@ -65,6 +69,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
 
   const [selectedTab, setSelectedTab] = useState<DatastructureTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+  const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
 
   const updateDatastructure = useUpdateDatastructure()
   const isLoading = updateDatastructure.isPending
@@ -179,57 +184,58 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const renderTabContent = () => {
     switch (selectedTab) {
       case 'basicInfo':
-        return <BasicInfoTab form={form} />
+        return <BasicInfoTab form={form} isReadOnly={isReadOnly} />
       default:
         return null
     }
   }
 
+  const isConfirmButtonDisabled = useMemo(
+    () =>
+      !form.formState.isDirty ||
+      !!form.formState.errors.name ||
+      (statusWatch !== STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
+      isLoading,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isLoading, statusWatch, formValues],
+  )
+
+  const ActionButtonsAndStatusSwitch = (
+    <div className="flex gap-6">
+      <StatusDropdown status={statusWatch} onStatusChange={handleStatusChange} canSetAvailable={canSetAvailable} />
+      <ActionButtons
+        confirmButtonType="button"
+        onCancelClick={handleExit}
+        onConfirmClick={handleSave}
+        isConfirmButtonDisabled={isConfirmButtonDisabled}
+        isCancelButtonDisabled={isLoading}
+        cancelButtonTitle={tCommon('actions.exit')}
+        hasCard={false}
+        wrapperClassname="w-auto"
+      />
+    </div>
+  )
+
+  const EditButton = (
+    <Button data-testid="editButton" type="button" onClick={() => setIsReadOnly(false)}>
+      {tCommon('actions.edit')}
+    </Button>
+  )
+
   return (
     <PageContainer testId="datastructureOverviewPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
-      <div className="w-full flex flex-col h-[var(--title-height)] py-[var(--layout-padding)] border-b-1">
-        <div className="flex items-center justify-between px-[var(--layout-padding)]">
-          <h1 className="text-3xl font-bold truncate max-w-full min-w-0">{datastructure.name}</h1>
-          <div className="flex items-center gap-4">
-            <StatusDropdown
-              status={statusWatch}
-              onStatusChange={handleStatusChange}
-              canSetAvailable={canSetAvailable}
-            />
-            <Button
-              data-testid="exitButton"
-              type="button"
-              variant="secondary"
-              onClick={handleExit}
-              disabled={isLoading}
-            >
-              {tCommon('actions.exit')}
-            </Button>
-            <Button
-              data-testid="saveButton"
-              type="button"
-              onClick={handleSave}
-              disabled={
-                !form.formState.isDirty ||
-                !!form.formState.errors.name ||
-                (statusWatch !== STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
-                isLoading
-              }
-            >
-              {tCommon('actions.submit')}
-            </Button>
-          </div>
-        </div>
-        <div className="mt-4 px-[var(--layout-padding)]">
-          <SegmentedControlBar
-            tabs={tabs}
-            selectedTab={selectedTab}
-            onTabChange={setSelectedTab}
-            completedTabs={completedTabs}
-            disabledTabs={disabledTabs}
-          />
-        </div>
-      </div>
+      <PageHeader
+        title={datastructure.name}
+        segmentedControlBarSectionProps={{
+          tabs: tabs,
+          selectedTab: selectedTab,
+          onTabChange: setSelectedTab,
+          completedTabs,
+          disabledTabs,
+          hasCompletionStatus: true,
+        }}
+        customElement={isReadOnly ? EditButton : ActionButtonsAndStatusSwitch}
+      />
       <PageBackground className="overflow-y-auto">
         <Form {...form}>
           <form
