@@ -27,8 +27,8 @@ import {
   DatastructureTab,
 } from '@/types/datastructures'
 
-import { BasicInfoTab } from './basic-info/BasicInfoTab'
-import { VersionsList } from './versions-tab/VersionsList'
+import { BasicInfoTab } from './basic-info-tab/BasicInfoTab'
+import { VersionsTab } from './versions-tab/VersionsTab'
 
 const tabs: Tab<DatastructureTab>[] = [
   {
@@ -214,7 +214,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       case 'basicInfo':
         return <BasicInfoTab form={form} isReadOnly={isReadOnly} />
       case 'versions':
-        return <VersionsList versions={datastructure.versions} rowCount={datastructure.versions.length}/>
+        return <VersionsTab versions={datastructure.versions} rowCount={datastructure.versions.length}/>
       default:
         return null
     }

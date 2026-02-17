@@ -22,7 +22,7 @@ interface VersionsTabProps {
   rowCount: number
 }
 
-export const Versions = (props: VersionsTabProps) => {
+export const VersionsTab = (props: VersionsTabProps) => {
   const { versions, rowCount } = props
   const t = useTranslations('datastructures')
   const router = useRouter()
