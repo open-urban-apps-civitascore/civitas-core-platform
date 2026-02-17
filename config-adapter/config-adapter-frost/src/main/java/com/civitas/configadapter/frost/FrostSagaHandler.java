@@ -9,22 +9,17 @@
  */
 package com.civitas.configadapter.frost;
 
-import com.civitas.configadapter.adapter.SagaCommandHandler;
+import com.civitas.configadapter.adapter.AbstractSagaCommandHandler;
 import com.civitas.configadapter.adapter.SagaCommandMessage;
 import com.civitas.configadapter.adapter.SagaCommandResult;
 import com.civitas.configadapter.configuration.AdapterConfig;
-import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.owasp.encoder.Encode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Saga command handler for the FROST SensorThings API. Handles project-level operations dispatched
@@ -41,94 +36,46 @@ import org.slf4j.LoggerFactory;
  * <p>Compensation operations: {@code DELETE_PROJECT} to compensate a {@code CREATE_PROJECT}, {@code
  * RESTORE_PROJECT} to compensate an {@code UPDATE_PROJECT}.
  */
-public class FrostSagaHandler implements SagaCommandHandler {
-
-  private static final Logger LOG = LoggerFactory.getLogger(FrostSagaHandler.class);
+public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
 
-  private Client client;
   private String serverUrl;
   private String apiKey;
   private String apiKeyHeader;
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
-  public FrostSagaHandler() {}
-
-  @Override
-  public String adapter() {
-    return ADAPTER_NAME;
+  public FrostSagaHandler() {
+    super(ADAPTER_NAME);
   }
 
   @Override
-  public void initialize(AdapterConfig config) {
-    this.serverUrl =
-        config.getProperty(ADAPTER_NAME + ".url", DEFAULT_SERVER_URL).replaceAll("/$", "");
-    this.apiKey = config.getProperty(ADAPTER_NAME + ".api.key");
-    this.apiKeyHeader = config.getProperty(ADAPTER_NAME + ".api.key.header", "X-API-Key");
+  protected void doInitialize(AdapterConfig config) {
+    this.serverUrl = getProperty("url", DEFAULT_SERVER_URL).replaceAll("/$", "");
+    this.apiKey = getProperty("api.key");
+    this.apiKeyHeader = getProperty("api.key.header", "X-API-Key");
 
     if (apiKey == null || apiKey.isBlank()) {
       throw new IllegalArgumentException("The FROST API key cannot be null or blank.");
     }
 
-    if (this.client == null) {
-      this.client = createClient();
-    }
-
-    LOG.info("FrostSagaHandler initialized for: {}", Encode.forJava(serverUrl));
+    log.info("FrostSagaHandler initialized for: {}", Encode.forJava(serverUrl));
   }
 
-  protected Client createClient() {
-    return ClientBuilder.newBuilder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build();
-  }
-
-  void setClient(Client client) {
-    this.client = client;
+  void setTestClient(Client client) {
+    super.setClient(client);
   }
 
   @Override
-  public SagaCommandResult handle(SagaCommandMessage command) {
-    boolean isCompensation = "COMPENSATE_STEP".equals(command.type());
-
-    try {
-      return switch (command.operation()) {
-        case "CREATE_PROJECT" -> handleCreateProject(command);
-        case "UPDATE_PROJECT" -> handleUpdateProject(command);
-        case "DELETE_PROJECT" -> handleDeleteProject(command);
-        case "RESTORE_PROJECT" -> handleRestoreProject(command);
-        default -> {
-          String error = "Unknown FROST operation: " + command.operation();
-          LOG.warn(error);
-          yield isCompensation
-              ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)
-              : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
-        }
-      };
-    } catch (ProcessingException e) {
-      String error = "Network error: " + e.getMessage();
-      LOG.warn(
-          "FROST {} failed for saga {}: {}",
-          Encode.forJava(command.operation()),
-          Encode.forJava(command.sagaId()),
-          Encode.forJava(e.getMessage()));
-      return isCompensation
-          ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)
-          : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
-    } catch (Exception e) {
-      String error = command.operation() + " failed: " + e.getMessage();
-      LOG.error(
-          "FROST {} failed for saga {}",
-          Encode.forJava(command.operation()),
-          Encode.forJava(command.sagaId()),
-          e);
-      return isCompensation
-          ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)
-          : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
-    }
+  protected SagaCommandResult doHandle(SagaCommandMessage command) {
+    return switch (command.operation()) {
+      case "CREATE_PROJECT" -> handleCreateProject(command);
+      case "UPDATE_PROJECT" -> handleUpdateProject(command);
+      case "DELETE_PROJECT" -> handleDeleteProject(command);
+      case "RESTORE_PROJECT" -> handleRestoreProject(command);
+      default -> unknownOperation(command);
+    };
   }
 
   private SagaCommandResult handleCreateProject(SagaCommandMessage command) {
@@ -140,7 +87,7 @@ public class FrostSagaHandler implements SagaCommandHandler {
     body.put("description", description);
 
     try (Response response =
-        client
+        client()
             .target(serverUrl)
             .path("Projects")
             .request(MediaType.APPLICATION_JSON)
@@ -149,13 +96,13 @@ public class FrostSagaHandler implements SagaCommandHandler {
 
       checkResponse(response, "CREATE_PROJECT");
 
-      String projectId = extractIdFromLocation(response.getHeaderString("Location"));
+      String projectId = FrostUtils.extractIdFromLocation(response.getHeaderString("Location"));
       String baseUrl = serverUrl + "/Projects(" + projectId + ")";
 
       Map<String, Object> resultData = Map.of("projectId", projectId, "baseUrl", baseUrl);
       Map<String, Object> compensationData = Map.of("projectId", projectId);
 
-      LOG.info(
+      log.info(
           "FROST project created: projectId={}, saga={}",
           Encode.forJava(projectId),
           Encode.forJava(command.sagaId()));
@@ -174,7 +121,7 @@ public class FrostSagaHandler implements SagaCommandHandler {
     String previousName;
     String previousDescription;
     try (Response getResponse =
-        client
+        client()
             .target(serverUrl)
             .path("Projects(" + projectId + ")")
             .request(MediaType.APPLICATION_JSON)
@@ -192,7 +139,7 @@ public class FrostSagaHandler implements SagaCommandHandler {
     body.put("description", description);
 
     try (Response response =
-        client
+        client()
             .target(serverUrl)
             .path("Projects(" + projectId + ")")
             .request(MediaType.APPLICATION_JSON)
@@ -209,7 +156,7 @@ public class FrostSagaHandler implements SagaCommandHandler {
               "previousName", previousName,
               "previousDescription", previousDescription);
 
-      LOG.info(
+      log.info(
           "FROST project updated: projectId={}, saga={}",
           Encode.forJava(projectId),
           Encode.forJava(command.sagaId()));
@@ -223,7 +170,7 @@ public class FrostSagaHandler implements SagaCommandHandler {
     String projectId = (String) command.payload().get("projectId");
 
     try (Response response =
-        client
+        client()
             .target(serverUrl)
             .path("Projects(" + projectId + ")")
             .request(MediaType.APPLICATION_JSON)
@@ -232,7 +179,7 @@ public class FrostSagaHandler implements SagaCommandHandler {
 
       checkResponse(response, "DELETE_PROJECT");
 
-      LOG.info(
+      log.info(
           "FROST project deleted: projectId={}, saga={}",
           Encode.forJava(projectId),
           Encode.forJava(command.sagaId()));
@@ -253,7 +200,7 @@ public class FrostSagaHandler implements SagaCommandHandler {
     body.put("description", previousDescription);
 
     try (Response response =
-        client
+        client()
             .target(serverUrl)
             .path("Projects(" + projectId + ")")
             .request(MediaType.APPLICATION_JSON)
@@ -262,63 +209,12 @@ public class FrostSagaHandler implements SagaCommandHandler {
 
       checkResponse(response, "RESTORE_PROJECT");
 
-      LOG.info(
+      log.info(
           "FROST project restored: projectId={}, saga={}",
           Encode.forJava(projectId),
           Encode.forJava(command.sagaId()));
 
       return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
-    }
-  }
-
-  private void checkResponse(Response response, String operation) {
-    int status = response.getStatus();
-    if (status >= 200 && status < 300) {
-      return;
-    }
-
-    String body = response.readEntity(String.class);
-    throw new FrostApiException(
-        "FROST " + operation + " failed: HTTP " + status + " — " + body, status);
-  }
-
-  private String extractIdFromLocation(String locationHeader) {
-    if (locationHeader == null || locationHeader.isBlank()) {
-      return null;
-    }
-    int start = locationHeader.lastIndexOf('(');
-    int end = locationHeader.lastIndexOf(')');
-    if (start >= 0 && end > start) {
-      return locationHeader.substring(start + 1, end);
-    }
-    return null;
-  }
-
-  @Override
-  public void close() {
-    if (client != null) {
-      client.close();
-      LOG.info("FrostSagaHandler closed");
-    }
-  }
-
-  /**
-   * Internal exception for FROST API errors. Carries the HTTP status code to distinguish retryable
-   * (5xx) from fatal (4xx) errors.
-   */
-  static class FrostApiException extends RuntimeException {
-    /** serialVersionUID */
-    private static final long serialVersionUID = -6459111249541958343L;
-
-    private final int statusCode;
-
-    FrostApiException(String message, int statusCode) {
-      super(message);
-      this.statusCode = statusCode;
-    }
-
-    int statusCode() {
-      return statusCode;
     }
   }
 }

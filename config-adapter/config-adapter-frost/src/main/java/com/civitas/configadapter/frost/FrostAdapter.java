@@ -20,7 +20,6 @@ import com.civitas.configadapter.frost.StaResourcePathParser.ResourceInfo;
 import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.AdapterOperation;
 import com.civitas.configadapter.model.ConfigEvent;
-import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.ConfigValue;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.frost.FrostConfigValue;
@@ -53,8 +52,6 @@ import org.slf4j.LoggerFactory;
 public class FrostAdapter extends AbstractConfigAdapter {
 
   private static final Logger logger = LoggerFactory.getLogger(FrostAdapter.class);
-
-  private static final String FROST_SOURCE = "civitas.config-adapter.frost";
 
   public static final String ADAPTER_NAME = "frost";
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
@@ -274,7 +271,7 @@ public class FrostAdapter extends AbstractConfigAdapter {
 
       if (operation == AdapterOperation.FROST_ENTITY_CREATE) {
         String locationHeader = response.getHeaderString("Location");
-        resourceId = extractIdFromLocation(locationHeader);
+        resourceId = FrostUtils.extractIdFromLocation(locationHeader);
       }
 
       logger.info(Encode.forJava(successMessage));
@@ -310,43 +307,6 @@ public class FrostAdapter extends AbstractConfigAdapter {
       return frostValue.toApiMap();
     }
     return configValue;
-  }
-
-  private String extractIdFromLocation(String locationHeader) {
-    if (locationHeader == null || locationHeader.isBlank()) {
-      return null;
-    }
-    int start = locationHeader.lastIndexOf('(');
-    int end = locationHeader.lastIndexOf(')');
-    if (start >= 0 && end > start) {
-      return locationHeader.substring(start + 1, end);
-    }
-    return null;
-  }
-
-  // ============== RESULT PUBLISHING ==============
-
-  private void publishSuccessResult(ConfigEvent originalEvent, String message, String resourceId)
-      throws RetryableAdapterException, FatalAdapterException {
-    if (getEventPublisher() == null || originalEvent.metadata().resultTopic() == null) {
-      return;
-    }
-
-    ConfigResultEvent resultEvent =
-        ConfigResultEvent.success(
-            originalEvent.metadata().correlationId(),
-            originalEvent.metadata().messageId(),
-            message,
-            resourceId,
-            originalEvent.payload().operation(),
-            originalEvent.payload().targetResource(),
-            FROST_SOURCE,
-            FrostConfigValue.FROST_RESULT_TYPE);
-
-    getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
-    logger.debug(
-        "Published SUCCESS result to topic: {}",
-        Encode.forJava(originalEvent.metadata().resultTopic()));
   }
 
   @Override

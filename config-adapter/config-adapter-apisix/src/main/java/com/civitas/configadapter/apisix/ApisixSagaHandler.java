@@ -9,22 +9,17 @@
  */
 package com.civitas.configadapter.apisix;
 
-import com.civitas.configadapter.adapter.SagaCommandHandler;
+import com.civitas.configadapter.adapter.AbstractSagaCommandHandler;
 import com.civitas.configadapter.adapter.SagaCommandMessage;
 import com.civitas.configadapter.adapter.SagaCommandResult;
 import com.civitas.configadapter.configuration.AdapterConfig;
-import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.owasp.encoder.Encode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Saga command handler for the APISIX API Gateway. Handles route and upstream management for
@@ -41,9 +36,7 @@ import org.slf4j.LoggerFactory;
  * Compensation: {@code DELETE_ROUTE} for create rollback, {@code RESTORE_ROUTE} for update
  * rollback.
  */
-public class ApisixSagaHandler implements SagaCommandHandler {
-
-  private static final Logger LOG = LoggerFactory.getLogger(ApisixSagaHandler.class);
+public class ApisixSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "apisix";
   private static final String ADMIN_URL_DEFAULT = "http://localhost:9180";
@@ -51,86 +44,41 @@ public class ApisixSagaHandler implements SagaCommandHandler {
   private static final String UPSTREAMS_PATH = "/apisix/admin/upstreams/";
   private static final String X_API_KEY = "X-API-KEY";
 
-  private Client client;
   private String adminApiUrl;
   private String adminApiKey;
   private String pluginConfigId;
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
-  public ApisixSagaHandler() {}
-
-  @Override
-  public String adapter() {
-    return ADAPTER_NAME;
+  public ApisixSagaHandler() {
+    super(ADAPTER_NAME);
   }
 
   @Override
-  public void initialize(AdapterConfig config) {
-    this.adminApiUrl = config.getProperty(ADAPTER_NAME + ".admin.url", ADMIN_URL_DEFAULT);
-    this.adminApiKey = config.getProperty(ADAPTER_NAME + ".admin.key");
-    this.pluginConfigId = config.getProperty(ADAPTER_NAME + ".plugin.config.id");
+  protected void doInitialize(AdapterConfig config) {
+    this.adminApiUrl = getProperty("admin.url", ADMIN_URL_DEFAULT);
+    this.adminApiKey = getProperty("admin.key");
+    this.pluginConfigId = getProperty("plugin.config.id");
 
     if (adminApiKey == null || adminApiKey.isBlank()) {
       throw new IllegalArgumentException("The APISIX admin key cannot be null or blank.");
     }
 
-    if (this.client == null) {
-      this.client = createClient();
-    }
-
-    LOG.info("ApisixSagaHandler initialized for: {}", Encode.forJava(adminApiUrl));
+    log.info("ApisixSagaHandler initialized for: {}", Encode.forJava(adminApiUrl));
   }
 
-  protected Client createClient() {
-    return ClientBuilder.newBuilder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build();
-  }
-
-  void setClient(Client client) {
-    this.client = client;
+  void setTestClient(Client client) {
+    super.setClient(client);
   }
 
   @Override
-  public SagaCommandResult handle(SagaCommandMessage command) {
-    boolean isCompensation = "COMPENSATE_STEP".equals(command.type());
-
-    try {
-      return switch (command.operation()) {
-        case "CREATE_ROUTE" -> handleCreateRoute(command);
-        case "UPDATE_ROUTE" -> handleUpdateRoute(command);
-        case "DELETE_ROUTE" -> handleDeleteRoute(command);
-        case "RESTORE_ROUTE" -> handleRestoreRoute(command);
-        default -> {
-          String error = "Unknown APISIX operation: " + command.operation();
-          LOG.warn(error);
-          yield isCompensation
-              ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)
-              : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
-        }
-      };
-    } catch (ProcessingException e) {
-      String error = "Network error: " + e.getMessage();
-      LOG.warn(
-          "APISIX {} failed for saga {}: {}",
-          Encode.forJava(command.operation()),
-          Encode.forJava(command.sagaId()),
-          Encode.forJava(e.getMessage()));
-      return isCompensation
-          ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)
-          : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
-    } catch (Exception e) {
-      String error = command.operation() + " failed: " + e.getMessage();
-      LOG.error(
-          "APISIX {} failed for saga {}",
-          Encode.forJava(command.operation()),
-          Encode.forJava(command.sagaId()),
-          e);
-      return isCompensation
-          ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)
-          : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
-    }
+  protected SagaCommandResult doHandle(SagaCommandMessage command) {
+    return switch (command.operation()) {
+      case "CREATE_ROUTE" -> handleCreateRoute(command);
+      case "UPDATE_ROUTE" -> handleUpdateRoute(command);
+      case "DELETE_ROUTE" -> handleDeleteRoute(command);
+      case "RESTORE_ROUTE" -> handleRestoreRoute(command);
+      default -> unknownOperation(command);
+    };
   }
 
   private SagaCommandResult handleCreateRoute(SagaCommandMessage command) {
@@ -151,7 +99,7 @@ public class ApisixSagaHandler implements SagaCommandHandler {
         Map.of("routeId", datasetId, "serviceId", datasetId, "publicUrl", publicUrl);
     Map<String, Object> compensationData = Map.of("routeId", datasetId, "serviceId", datasetId);
 
-    LOG.info(
+    log.info(
         "APISIX route created: datasetId={}, saga={}",
         Encode.forJava(datasetId),
         Encode.forJava(command.sagaId()));
@@ -178,7 +126,7 @@ public class ApisixSagaHandler implements SagaCommandHandler {
             "serviceId", serviceId,
             "previousOpenDataAccess", previousOpenDataAccess);
 
-    LOG.info(
+    log.info(
         "APISIX route updated: routeId={}, saga={}",
         Encode.forJava(routeId),
         Encode.forJava(command.sagaId()));
@@ -197,7 +145,7 @@ public class ApisixSagaHandler implements SagaCommandHandler {
     // 2. Delete upstream
     deleteResource(UPSTREAMS_PATH + serviceId, "DELETE upstream");
 
-    LOG.info(
+    log.info(
         "APISIX route deleted: routeId={}, saga={}",
         Encode.forJava(routeId),
         Encode.forJava(command.sagaId()));
@@ -215,7 +163,7 @@ public class ApisixSagaHandler implements SagaCommandHandler {
     Map<String, Object> routeBody = buildRouteBody(serviceId, previousOpenDataAccess);
     putResource(ROUTES_PATH + routeId, routeBody, "RESTORE route");
 
-    LOG.info(
+    log.info(
         "APISIX route restored: routeId={}, saga={}",
         Encode.forJava(routeId),
         Encode.forJava(command.sagaId()));
@@ -229,7 +177,7 @@ public class ApisixSagaHandler implements SagaCommandHandler {
    */
   private boolean readCurrentOpenDataAccess(String routeId) {
     try (Response response =
-        client
+        client()
             .target(adminApiUrl)
             .path(ROUTES_PATH + routeId)
             .request(MediaType.APPLICATION_JSON)
@@ -253,7 +201,7 @@ public class ApisixSagaHandler implements SagaCommandHandler {
 
   private void putResource(String path, Map<String, Object> body, String operationDesc) {
     try (Response response =
-        client
+        client()
             .target(adminApiUrl)
             .path(path)
             .request(MediaType.APPLICATION_JSON)
@@ -265,7 +213,7 @@ public class ApisixSagaHandler implements SagaCommandHandler {
 
   private void deleteResource(String path, String operationDesc) {
     try (Response response =
-        client
+        client()
             .target(adminApiUrl)
             .path(path)
             .request(MediaType.APPLICATION_JSON)
@@ -273,16 +221,6 @@ public class ApisixSagaHandler implements SagaCommandHandler {
             .delete()) {
       checkResponse(response, operationDesc);
     }
-  }
-
-  private void checkResponse(Response response, String operationDesc) {
-    int status = response.getStatus();
-    if (status >= 200 && status < 300) {
-      return;
-    }
-    String body = response.readEntity(String.class);
-    throw new ApisixApiException(
-        "APISIX " + operationDesc + " failed: HTTP " + status + " — " + body, status);
   }
 
   // ─── Body builders ───────────────────────────────────────────────────────────
@@ -307,30 +245,5 @@ public class ApisixSagaHandler implements SagaCommandHandler {
     }
 
     return body;
-  }
-
-  @Override
-  public void close() {
-    if (client != null) {
-      client.close();
-      LOG.info("ApisixSagaHandler closed");
-    }
-  }
-
-  /** Internal exception for APISIX API errors with HTTP status code. */
-  static class ApisixApiException extends RuntimeException {
-    /** serialVersionUID */
-    private static final long serialVersionUID = 1202743508913948225L;
-
-    private final int statusCode;
-
-    ApisixApiException(String message, int statusCode) {
-      super(message);
-      this.statusCode = statusCode;
-    }
-
-    int statusCode() {
-      return statusCode;
-    }
   }
 }

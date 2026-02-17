@@ -156,7 +156,7 @@ class SagaContextHelperTest {
   }
 
   @Nested
-  @DisplayName("getCompletedStepsReversed / getStepsToCompensate")
+  @DisplayName("getCompletedStepsReversed")
   class CompensationOrder {
 
     @Test
@@ -176,24 +176,11 @@ class SagaContextHelperTest {
     }
 
     @Test
-    @DisplayName("getStepsToCompensate delegates to getCompletedStepsReversed")
-    void shouldMatchCompletedStepsReversed() {
-      SagaContext context =
-          saga(
-              step("create-project", "frost", SagaStepStatus.SUCCESS),
-              step("create-route", "apisix", SagaStepStatus.SUCCESS));
-
-      assertEquals(
-          SagaContextHelper.getCompletedStepsReversed(context),
-          SagaContextHelper.getStepsToCompensate(context));
-    }
-
-    @Test
     @DisplayName("returns empty list when no steps completed")
     void shouldReturnEmptyWhenNoneCompleted() {
       SagaContext context = saga(step("create-project", "frost", SagaStepStatus.FAILED));
 
-      assertTrue(SagaContextHelper.getStepsToCompensate(context).isEmpty());
+      assertTrue(SagaContextHelper.getCompletedStepsReversed(context).isEmpty());
     }
   }
 

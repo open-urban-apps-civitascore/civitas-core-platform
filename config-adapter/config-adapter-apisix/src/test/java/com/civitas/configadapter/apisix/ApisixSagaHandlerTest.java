@@ -383,7 +383,7 @@ class ApisixSagaHandlerTest {
     when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
     when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
 
-    handler.setClient(mockClient);
+    handler.setTestClient(mockClient);
     return handler;
   }
 

@@ -55,11 +55,6 @@ public final class SagaContextHelper {
     return completed.reversed();
   }
 
-  /** Returns all steps that need compensation (SUCCESS status, in reverse execution order). */
-  public static List<SagaStep> getStepsToCompensate(SagaContext saga) {
-    return getCompletedStepsReversed(saga);
-  }
-
   /**
    * Returns steps where compensation failed. These represent stale resources requiring manual
    * intervention.
