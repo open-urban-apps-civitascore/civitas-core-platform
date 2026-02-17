@@ -92,6 +92,7 @@ public final class RouteConfigValue extends AbstractApiModel implements ConfigVa
   @JsonProperty("service_id")
   private String serviceId;
 
+  // Object because APISIX accepts plugin_config_id as both String and Integer
   @JsonProperty("plugin_config_id")
   private Object pluginConfigId;
 

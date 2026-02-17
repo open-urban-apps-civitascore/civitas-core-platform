@@ -113,17 +113,19 @@ public class KafkaSagaCommandConsumer implements AutoCloseable {
       while (running.get()) {
         try {
           ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(500));
-          for (ConsumerRecord<String, byte[]> record : records) {
-            try {
+          if (records.isEmpty()) {
+            continue;
+          }
+          try {
+            for (ConsumerRecord<String, byte[]> record : records) {
               processRecord(record);
-              consumer.commitSync();
-            } catch (IOException e) {
-              LOG.error(
-                  "Failed to process saga command from topic {}: {}",
-                  Encode.forJava(record.topic()),
-                  Encode.forJava(String.valueOf(e.getMessage())),
-                  e);
             }
+            consumer.commitSync();
+          } catch (IOException e) {
+            LOG.error(
+                "Failed to process saga command, batch not committed: {}",
+                Encode.forJava(String.valueOf(e.getMessage())),
+                e);
           }
         } catch (WakeupException e) {
           if (running.get()) {
