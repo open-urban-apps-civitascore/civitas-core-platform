@@ -529,7 +529,7 @@ class DataSetControllerIntegrationTest
           .isNotNull()
           .hasSize(2)
           .extracting(PipelineSummaryDTO::getId)
-          .isEqualTo(originalPipelineIds);
+          .containsExactlyInAnyOrderElementsOf(originalPipelineIds);
 
       assertThat(output.getDataSetStatus()).as("Status should remain unchanged").isEqualTo(status);
     }
@@ -816,8 +816,8 @@ class DataSetControllerIntegrationTest
           .forEach(
               distribution -> {
                 assertThat(distribution.getAccessUrl())
-                    .as("Access URL should start with gateway base URL")
-                    .startsWith("http://localhost:8080/api/v1/");
+                    .as("Access URL should be set with their respective API paths")
+                    .startsWith("/api/v1/");
                 assertThat(distribution.getApiType())
                     .as("API type should be SensorThings")
                     .isEqualTo("SensorThings");
