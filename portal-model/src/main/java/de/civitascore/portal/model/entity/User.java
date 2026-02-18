@@ -40,13 +40,17 @@ public class User extends BaseEntity {
   @Column(name = "title", nullable = false)
   private UserTitleType title = UserTitleType.OTHER;
 
-  @NotBlank @Column(name = "first_name", nullable = false)
+  @NotBlank
+  @Column(name = "first_name", nullable = false)
   private String firstName;
 
-  @NotBlank @Column(name = "last_name", nullable = false)
+  @NotBlank
+  @Column(name = "last_name", nullable = false)
   private String lastName;
 
-  @Email @NotBlank @Column(nullable = false)
+  @Email
+  @NotBlank
+  @Column(nullable = false)
   private String email;
 
   @Column(name = "phone")
@@ -59,9 +63,60 @@ public class User extends BaseEntity {
   private Boolean active = true;
 
   @ManyToMany(fetch = FetchType.LAZY, mappedBy = "members")
+  @Setter(AccessLevel.NONE) // setGroups overwritten to handle the bidirectional relationship
   private Set<Group> groups = new HashSet<>();
 
   @Setter(AccessLevel.NONE)
   @Formula("first_name || ' ' || last_name")
   private String fullName;
+
+  /**
+   * Adds a group to the user's memberships. Since Group owns the ManyToMany relationship (via
+   * group_members join table), this method properly updates both sides of the bidirectional
+   * relationship.
+   *
+   * @param group the group to add
+   */
+  public void addGroup(Group group) {
+    if (group != null && !this.groups.contains(group)) {
+      group.getMembers().add(this);
+      this.groups.add(group);
+    }
+  }
+
+  /**
+   * Removes a group from the user's memberships. Since Group owns the ManyToMany relationship (via
+   * group_members join table), this method properly updates both sides of the bidirectional
+   * relationship.
+   *
+   * @param group the group to remove
+   */
+  public void removeGroup(Group group) {
+    if (group != null && this.groups.contains(group)) {
+      group.getMembers().remove(this);
+      this.groups.remove(group);
+    }
+  }
+
+  /**
+   * Replaces all of the user's group memberships with the provided set of groups. This method uses
+   * {@link #addGroup} and {@link #removeGroup} to properly handle the bidirectional relationship.
+   *
+   * @param newGroups the new set of groups the user should belong to
+   */
+  public void setGroups(Set<Group> newGroups) {
+    Set<Group> groupsToProcess = newGroups != null ? newGroups : new HashSet<>();
+
+    // Remove groups that are no longer needed
+    Set<Group> groupsToRemove = new HashSet<>(this.groups);
+    groupsToRemove.removeAll(groupsToProcess);
+    for (Group group : groupsToRemove) {
+      removeGroup(group);
+    }
+
+    // Add new groups
+    for (Group group : groupsToProcess) {
+      addGroup(group);
+    }
+  }
 }
