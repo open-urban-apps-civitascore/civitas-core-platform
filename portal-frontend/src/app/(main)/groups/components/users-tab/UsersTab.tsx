@@ -50,10 +50,13 @@ export const UsersTab = (props: UsersTabProps) => {
     return params
   }
 
+
   const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
+    queryKey: 'groupUsers',
     params: getUserRequestParams(),
-    isEnabled: originalUsers.length > 0,
+    isEnabled: originalUsers?.length > 0,
   })
+
 
   const isLoading = isFetchingUsers || updateGroup.isPending
   const rowCount = usersData?.totalElements || 0

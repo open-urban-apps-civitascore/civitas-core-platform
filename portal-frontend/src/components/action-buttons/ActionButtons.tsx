@@ -65,9 +65,9 @@ export const ActionButtons = (props: ActionButtonsProps) => {
   return (
     <div className={cn('flex w-full justify-end', wrapperClassname)}>
       {hasCard ? (
-        <ContentCard className={cn('flex gap-4 py-3', className)}>{Buttons}</ContentCard>
+        <ContentCard className={cn('flex flex-row gap-4 py-3', className)}>{Buttons}</ContentCard>
       ) : (
-        <div className={cn('flex gap-4 py-3', className)}>{Buttons}</div>
+        <div className={cn('flex flex-row gap-4 py-3', className)}>{Buttons}</div>
       )}
     </div>
   )
