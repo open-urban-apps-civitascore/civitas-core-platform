@@ -32,6 +32,8 @@ interface RouteContext {
  */
 
 const proxyRequest = async (request: NextRequest, context: RouteContext, method: string) => {
+  logger.debug({ url: request.url, method: request.method, headers: request.headers }, 'Incoming request')
+
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
   if (!token?.access_token) {
     logger.debug({ method }, 'Unauthorized request - no access token')
