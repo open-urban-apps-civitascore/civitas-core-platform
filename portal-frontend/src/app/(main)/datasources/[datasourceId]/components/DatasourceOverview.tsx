@@ -45,7 +45,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     id: datasource.id,
     name: datasource.name ?? '',
     description: datasource.description ?? '',
-    tags: datasource.tags ?? [],
     status: datasource.status ?? DATASOURCE_STATUS_TYPES.DRAFT,
     connector: ConnectorApiToFormSchema.safeParse(datasource.connector).data ?? null,
   }

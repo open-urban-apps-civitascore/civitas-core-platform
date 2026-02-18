@@ -24,6 +24,11 @@ import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.apisix.RouteConfigValue;
+import com.civitas.configadapter.model.apisix.plugins.ProxyRewritePlugin;
+import com.civitas.configadapter.model.apisix.plugins.ResponseRewritePlugin;
+import com.civitas.configadapter.model.apisix.plugins.RewriteHeaders;
+import com.civitas.configadapter.model.apisix.plugins.RoutePlugins;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.HashMap;
 import java.util.List;
@@ -37,11 +42,13 @@ class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
   void createRoute() throws Exception {
     String upstreamId = createDefaultUpstream("for-route");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/test/*");
-    routeConfig.put("methods", List.of("GET", "POST"));
-    routeConfig.put("upstream_id", upstreamId);
-    routeConfig.put("plugins", Map.of("prometheus", Map.of()));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/test/*");
+    routeConfig.setMethods(List.of("GET", "POST"));
+    routeConfig.setUpstreamId(upstreamId);
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.handleUnknownPlugin("prometheus", Map.of());
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -62,12 +69,16 @@ class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
     initialRouteConfig.put("upstream_id", upstreamId);
     createRouteDirectly(routeId, initialRouteConfig);
 
-    Map<String, Object> updatedRouteConfig = new HashMap<>();
-    updatedRouteConfig.put("uri", "/api/v1/updated/*");
-    updatedRouteConfig.put("methods", List.of("GET", "POST", "PUT", "DELETE"));
-    updatedRouteConfig.put("upstream_id", upstreamId);
-    updatedRouteConfig.put(
-        "plugins", Map.of("prometheus", Map.of(), "proxy-rewrite", Map.of("uri", "/updated")));
+    RouteConfigValue updatedRouteConfig = new RouteConfigValue();
+    updatedRouteConfig.setUri("/api/v1/updated/*");
+    updatedRouteConfig.setMethods(List.of("GET", "POST", "PUT", "DELETE"));
+    updatedRouteConfig.setUpstreamId(upstreamId);
+    RoutePlugins updatedPlugins = new RoutePlugins();
+    updatedPlugins.handleUnknownPlugin("prometheus", Map.of());
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setUri("/updated");
+    updatedPlugins.setProxyRewrite(proxyRewrite);
+    updatedRouteConfig.setPlugins(updatedPlugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds(
@@ -105,7 +116,8 @@ class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
     assertNotNull(route, "Route should exist before delete");
 
     ConfigEvent event =
-        ApisixTestFixtures.routeEventRandomIds("routes/" + routeId, Operation.DELETE, null);
+        ApisixTestFixtures.routeEventRandomIds(
+            "routes/" + routeId, Operation.DELETE, (RouteConfigValue) null);
 
     adapter.processConfigEvent(Topics.ROUTE_DELETED.toString(), event);
 
@@ -131,18 +143,22 @@ class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
   void createRouteWithAllPlugins() throws Exception {
     String upstreamId = createDefaultUpstream("for-full-route");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/full-plugins/*");
-    routeConfig.put("methods", List.of("GET", "POST", "PUT", "DELETE"));
-    routeConfig.put("upstream_id", upstreamId);
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/full-plugins/*");
+    routeConfig.setMethods(List.of("GET", "POST", "PUT", "DELETE"));
+    routeConfig.setUpstreamId(upstreamId);
 
-    Map<String, Object> plugins = new HashMap<>();
-    plugins.put("prometheus", Map.of());
-    plugins.put("proxy-rewrite", Map.of("uri", "/rewritten"));
-    plugins.put(
-        "response-rewrite",
-        Map.of("headers", Map.of("set", Map.of("X-Custom-Header", "custom-value"))));
-    routeConfig.put("plugins", plugins);
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.handleUnknownPlugin("prometheus", Map.of());
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setUri("/rewritten");
+    plugins.setProxyRewrite(proxyRewrite);
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Custom-Header", "custom-value"));
+    responseRewrite.setHeaders(headers);
+    plugins.setResponseRewrite(responseRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, routeConfig);
@@ -154,7 +170,8 @@ class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
 
   @Test
   void handleInvalidRouteConfiguration() {
-    Map<String, Object> invalidConfig = Map.of("methods", List.of("GET"));
+    RouteConfigValue invalidConfig = new RouteConfigValue();
+    invalidConfig.setMethods(List.of("GET"));
 
     ConfigEvent event =
         ApisixTestFixtures.routeEventRandomIds("routes", Operation.CREATE, invalidConfig);

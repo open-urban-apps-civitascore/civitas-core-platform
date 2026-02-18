@@ -25,8 +25,10 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
  * Base interface for typed configuration values. Each adapter domain (IDM, APISIX, etc.) provides
  * its own implementation with domain-specific data.
  *
- * <p>This interface enables type-safe configuration handling while maintaining flexibility for
- * different adapter types.
+ * <p>This interface serves as a Jackson polymorphism marker ({@code @JsonTypeInfo}) that enables
+ * type-safe deserialization of domain-specific configuration values. It intentionally declares no
+ * methods — domain-specific behaviour (e.g. {@code toApiMap()}) belongs in the respective base
+ * classes like {@link AbstractApiModel}.
  */
 @JsonTypeInfo(
     use = JsonTypeInfo.Id.NAME,

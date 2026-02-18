@@ -39,7 +39,6 @@ const datasetMock: DatasetFormData = {
   name: 'Dataset 1',
   description: 'Description',
   dataspace: '1',
-  tags: ['tag1'],
 }
 
 const emptyDatasetMock: DatasetFormData = {
@@ -47,7 +46,6 @@ const emptyDatasetMock: DatasetFormData = {
   name: '',
   description: '',
   dataspace: '',
-  tags: [],
 }
 
 const dataspaces = [
@@ -82,7 +80,6 @@ describe('BaseInfoForm', () => {
     expect(screen.getByTestId('dataspaceSelectTrigger')).toBeEnabled()
     expect(screen.getByTestId('nameTextField')).toBeEnabled()
     expect(screen.getByTestId('descriptionTextField')).toBeEnabled()
-    expect(screen.getByTestId('tagsInput')).toBeEnabled()
   })
 
   test('renders in read-only mode initially when editing', () => {
@@ -94,8 +91,6 @@ describe('BaseInfoForm', () => {
     expect(screen.getByTestId('dataspaceSelectTrigger')).toBeDisabled()
     expect(screen.getByTestId('nameTextField')).toBeDisabled()
     expect(screen.getByTestId('descriptionTextField')).toBeDisabled()
-    expect(screen.getByTestId('tagsField')).toBeInTheDocument()
-    expect(screen.queryByTestId('tagsInput')).not.toBeInTheDocument()
   })
 
   test('clicking edit button disables read-only', () => {
@@ -107,40 +102,6 @@ describe('BaseInfoForm', () => {
     expect(screen.getByTestId('dataspaceSelectTrigger')).toBeEnabled()
     expect(screen.getByTestId('nameTextField')).toBeEnabled()
     expect(screen.getByTestId('descriptionTextField')).toBeEnabled()
-    expect(screen.getByTestId('tagsInput')).toBeEnabled()
-  })
-
-  test('tags input adds a tag', async () => {
-    setup(false)
-
-    const input = screen.getByTestId('tagsInput')
-    fireEvent.change(screen.getByTestId('tagsInput'), { target: { value: 'newTag' } })
-    fireEvent.keyUp(input, { key: 'Enter' })
-    expect(screen.getByText('newTag')).toBeInTheDocument()
-  })
-
-  test('tags input does not add the same tag twice', () => {
-    setup()
-    fireEvent.click(screen.getByRole('button', { name: EDIT_BUTTON }))
-
-    expect(screen.queryByText('tag1')).toBeInTheDocument()
-
-    const input = screen.getByTestId('tagsInput')
-    fireEvent.change(screen.getByTestId('tagsInput'), { target: { value: 'tag1' } })
-    fireEvent.keyUp(input, { key: 'Enter' })
-
-    expect(screen.getAllByText('tag1')).toHaveLength(1)
-  })
-
-  test('tag gets removed when clicking X on a tag', () => {
-    setup()
-    fireEvent.click(screen.getByRole('button', { name: EDIT_BUTTON }))
-
-    expect(screen.getByText('tag1')).toBeInTheDocument()
-    const removeBtn = screen.getAllByRole('button').find(button => button.innerHTML.includes('x')) as HTMLElement
-
-    fireEvent.click(removeBtn)
-    expect(screen.queryByText('tag1')).not.toBeInTheDocument()
   })
 
   test('save button gets enabled after changing a form value', () => {

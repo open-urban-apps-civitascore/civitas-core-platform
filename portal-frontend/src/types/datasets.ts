@@ -39,7 +39,6 @@ export type Dataset = {
   access: boolean
   status: DatasetStatus
   dataspace: Item2 | null
-  tags: string[]
 }
 
 export type CreateDatasetData = Omit<Dataset, 'id'>
@@ -63,7 +62,6 @@ export const DatasetFormSchema = z.object({
     message: 'common.errors.atLeast2',
   }),
   description: z.string(),
-  tags: z.array(z.string()),
 })
 
 export type DatasetFormData = z.infer<typeof DatasetFormSchema>

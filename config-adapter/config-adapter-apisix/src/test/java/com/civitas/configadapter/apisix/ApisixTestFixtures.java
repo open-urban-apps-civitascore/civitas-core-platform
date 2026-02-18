@@ -18,6 +18,7 @@ import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
 import com.civitas.configadapter.model.apisix.ApisixConfigValue;
 import com.civitas.configadapter.model.apisix.RouteConfigValue;
+import com.civitas.configadapter.model.apisix.UpstreamNodes;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -27,9 +28,17 @@ final class ApisixTestFixtures {
 
   private ApisixTestFixtures() {}
 
-  /** Default upstream configuration used across many tests. */
+  /** Default upstream configuration map used for createUpstreamDirectly() in integration tests. */
   static Map<String, Object> defaultUpstreamConfig() {
     return Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1));
+  }
+
+  /** Default upstream ConfigValue for adapter tests. */
+  static ApisixConfigValue defaultUpstreamConfigValue() {
+    ApisixConfigValue value = new ApisixConfigValue();
+    value.setType("roundrobin");
+    value.setNodes(UpstreamNodes.ofMap(Map.of("backend1:8080", 1)));
+    return value;
   }
 
   // ---- Private helpers ----
@@ -61,16 +70,16 @@ final class ApisixTestFixtures {
    * Creates an upstream {@link ConfigEvent} with fixed metadata IDs ({@code "msg-123"} / {@code
    * "corr-123"}). Use in unit tests where deterministic IDs simplify assertion.
    */
-  static ConfigEvent upstreamEvent(Operation op, String target, Map<String, Object> val) {
-    return createEvent(fixedMetadata(), target, op, new ApisixConfigValue(val), null);
+  static ConfigEvent upstreamEvent(Operation op, String target, ApisixConfigValue val) {
+    return createEvent(fixedMetadata(), target, op, val, null);
   }
 
   /**
    * Creates a route {@link ConfigEvent} with fixed metadata IDs ({@code "msg-123"} / {@code
    * "corr-123"}). Use in unit tests where deterministic IDs simplify assertion.
    */
-  static ConfigEvent routeEvent(Operation op, String target, Map<String, Object> val) {
-    return createEvent(fixedMetadata(), target, op, new RouteConfigValue(val), null);
+  static ConfigEvent routeEvent(Operation op, String target, RouteConfigValue val) {
+    return createEvent(fixedMetadata(), target, op, val, null);
   }
 
   // ---- Random-ID factories (integration tests) ----
@@ -79,15 +88,15 @@ final class ApisixTestFixtures {
    * Creates an upstream {@link ConfigEvent} with random UUID metadata IDs. Use in integration tests
    * to avoid ID collisions between concurrent test runs.
    */
-  static ConfigEvent upstreamEventRandomIds(String target, Operation op, Map<String, Object> val) {
-    return createEvent(randomMetadata(), target, op, new ApisixConfigValue(val), target);
+  static ConfigEvent upstreamEventRandomIds(String target, Operation op, ApisixConfigValue val) {
+    return createEvent(randomMetadata(), target, op, val, target);
   }
 
   /**
    * Creates a route {@link ConfigEvent} with random UUID metadata IDs. Use in integration tests to
    * avoid ID collisions between concurrent test runs.
    */
-  static ConfigEvent routeEventRandomIds(String target, Operation op, Map<String, Object> val) {
-    return createEvent(randomMetadata(), target, op, new RouteConfigValue(val), target);
+  static ConfigEvent routeEventRandomIds(String target, Operation op, RouteConfigValue val) {
+    return createEvent(randomMetadata(), target, op, val, target);
   }
 }

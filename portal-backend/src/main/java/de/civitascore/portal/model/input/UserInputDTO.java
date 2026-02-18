@@ -4,6 +4,7 @@ import de.civitascore.portal.model.embedded.UserTitleType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
+import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -22,5 +23,5 @@ public class UserInputDTO extends BaseInputDTO {
   private String phone;
   private String externalId;
   private Boolean active;
-  private List<String> groupIds;
+  private List<UUID> groupIds;
 }

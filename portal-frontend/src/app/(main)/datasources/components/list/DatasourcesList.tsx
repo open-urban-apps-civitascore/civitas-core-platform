@@ -47,8 +47,8 @@ export const DatasourcesList = (props: DatasourcesListProps) => {
   )
 
   return (
-    <PageContainer headerType="onlyTitle" testId="datasourcesPage">
-      <PageHeader title={t('title')} />
+    <PageContainer headerType="withSubTabsOrSubtitle" testId="datasourcesPage">
+      <PageHeader title={t('title')} subtitle={t('subtitle')} />
       <PageBackground>
         <TableContainer>
           <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />

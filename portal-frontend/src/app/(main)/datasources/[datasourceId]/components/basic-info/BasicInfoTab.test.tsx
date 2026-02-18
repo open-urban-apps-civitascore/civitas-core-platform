@@ -16,30 +16,10 @@ vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => false,
 }))
 
-vi.mock('./TagsMultiSelect', () => ({
-  TagsMultiSelect: ({
-    selectedTags,
-    onTagsChange,
-    isDisabled,
-  }: {
-    selectedTags: string[]
-    onTagsChange: (tags: string[]) => void
-    isDisabled?: boolean
-  }) => (
-    <div data-testid="mockedTagsMultiSelect" data-disabled={isDisabled}>
-      <span data-testid="selectedTags">{selectedTags.join(',')}</span>
-      <button data-testid="addTagButton" onClick={() => onTagsChange([...selectedTags, 'New Tag'])}>
-        Add Tag
-      </button>
-    </div>
-  ),
-}))
-
 const defaultFormValues: DatasourceBaseFormData = {
-  id: 1,
+  id: '1',
   name: '',
   description: '',
-  tags: [],
   status: 'draft',
 }
 
@@ -93,12 +73,6 @@ describe('BasicInfoTab', () => {
       expect(screen.getByTestId('descriptionTextArea')).toBeInTheDocument()
     })
 
-    test('renders tags field container', () => {
-      setup()
-      expect(screen.getByTestId('tagsField')).toBeInTheDocument()
-      expect(screen.getByTestId('mockedTagsMultiSelect')).toBeInTheDocument()
-    })
-
     test('renders name label', () => {
       setup()
       expect(screen.getByText('form.name')).toBeInTheDocument()
@@ -107,12 +81,6 @@ describe('BasicInfoTab', () => {
     test('renders description label', () => {
       setup()
       expect(screen.getByText('form.description')).toBeInTheDocument()
-    })
-
-    test('renders tags label with optional text', () => {
-      setup()
-      expect(screen.getByText('form.tags')).toBeInTheDocument()
-      expect(screen.getByText('form.tagsOptional')).toBeInTheDocument()
     })
   })
 
@@ -147,12 +115,6 @@ describe('BasicInfoTab', () => {
       const textarea = screen.getByTestId('descriptionTextArea')
       expect(textarea).toBeDisabled()
     })
-
-    test('tags component receives isDisabled true', () => {
-      setup({ isReadOnly: true })
-      const tagsComponent = screen.getByTestId('mockedTagsMultiSelect')
-      expect(tagsComponent).toHaveAttribute('data-disabled', 'true')
-    })
   })
 
   describe('Editable Mode', () => {
@@ -166,12 +128,6 @@ describe('BasicInfoTab', () => {
       setup({ isReadOnly: false })
       const textarea = screen.getByTestId('descriptionTextArea')
       expect(textarea).not.toBeDisabled()
-    })
-
-    test('tags component receives isDisabled false', () => {
-      setup({ isReadOnly: false })
-      const tagsComponent = screen.getByTestId('mockedTagsMultiSelect')
-      expect(tagsComponent).toHaveAttribute('data-disabled', 'false')
     })
   })
 
@@ -208,14 +164,6 @@ describe('BasicInfoTab', () => {
       fireEvent.change(textarea, { target: { value: 'New description' } })
       expect(textarea).toHaveValue('New description')
     })
-
-    test('tags change updates selected tags', () => {
-      setup({ initialValues: { tags: ['Tag1'] } })
-      expect(screen.getByTestId('selectedTags')).toHaveTextContent('Tag1')
-
-      fireEvent.click(screen.getByTestId('addTagButton'))
-      expect(screen.getByTestId('selectedTags')).toHaveTextContent('Tag1,New Tag')
-    })
   })
 
   describe('Initial Values', () => {
@@ -229,11 +177,6 @@ describe('BasicInfoTab', () => {
       setup({ initialValues: { description: 'Existing description' } })
       const textarea = screen.getByTestId('descriptionTextArea')
       expect(textarea).toHaveValue('Existing description')
-    })
-
-    test('displays initial tags', () => {
-      setup({ initialValues: { tags: ['Tag1', 'Tag2'] } })
-      expect(screen.getByTestId('selectedTags')).toHaveTextContent('Tag1,Tag2')
     })
   })
 })

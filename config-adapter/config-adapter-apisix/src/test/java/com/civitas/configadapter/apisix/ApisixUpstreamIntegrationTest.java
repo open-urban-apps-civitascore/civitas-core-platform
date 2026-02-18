@@ -24,6 +24,8 @@ import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.apisix.ApisixConfigValue;
+import com.civitas.configadapter.model.apisix.UpstreamNodes;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -33,8 +35,9 @@ class ApisixUpstreamIntegrationTest extends AbstractApisixIntegrationTest {
 
   @Test
   void createUpstream() throws Exception {
-    Map<String, Object> upstreamConfig =
-        Map.of("type", "roundrobin", "nodes", Map.of("backend1:8080", 1, "backend2:8080", 1));
+    ApisixConfigValue upstreamConfig = new ApisixConfigValue();
+    upstreamConfig.setType("roundrobin");
+    upstreamConfig.setNodes(UpstreamNodes.ofMap(Map.of("backend1:8080", 1, "backend2:8080", 1)));
 
     ConfigEvent event =
         ApisixTestFixtures.upstreamEventRandomIds("upstreams", Operation.CREATE, upstreamConfig);
@@ -49,12 +52,10 @@ class ApisixUpstreamIntegrationTest extends AbstractApisixIntegrationTest {
     String upstreamId = "test-upstream-update";
     createUpstreamDirectly(upstreamId, ApisixTestFixtures.defaultUpstreamConfig());
 
-    Map<String, Object> updatedConfig =
-        Map.of(
-            "type",
-            "roundrobin",
-            "nodes",
-            Map.of("backend1:8080", 2, "backend2:8080", 1, "backend3:8080", 1));
+    ApisixConfigValue updatedConfig = new ApisixConfigValue();
+    updatedConfig.setType("roundrobin");
+    updatedConfig.setNodes(
+        UpstreamNodes.ofMap(Map.of("backend1:8080", 2, "backend2:8080", 1, "backend3:8080", 1)));
 
     ConfigEvent event =
         ApisixTestFixtures.upstreamEventRandomIds(
@@ -88,7 +89,7 @@ class ApisixUpstreamIntegrationTest extends AbstractApisixIntegrationTest {
 
     ConfigEvent event =
         ApisixTestFixtures.upstreamEventRandomIds(
-            "upstreams/" + upstreamId, Operation.DELETE, null);
+            "upstreams/" + upstreamId, Operation.DELETE, (ApisixConfigValue) null);
 
     adapter.processConfigEvent(Topics.BACKEND_DELETED.toString(), event);
 
@@ -112,7 +113,8 @@ class ApisixUpstreamIntegrationTest extends AbstractApisixIntegrationTest {
 
   @Test
   void handleInvalidUpstreamConfiguration() {
-    Map<String, Object> invalidConfig = Map.of("type", "invalid-type");
+    ApisixConfigValue invalidConfig = new ApisixConfigValue();
+    invalidConfig.setType("invalid-type");
 
     ConfigEvent event =
         ApisixTestFixtures.upstreamEventRandomIds("upstreams", Operation.CREATE, invalidConfig);

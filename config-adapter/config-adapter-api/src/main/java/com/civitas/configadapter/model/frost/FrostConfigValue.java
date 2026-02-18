@@ -10,11 +10,9 @@
  */
 package com.civitas.configadapter.model.frost;
 
+import com.civitas.configadapter.model.AbstractApiModel;
 import com.civitas.configadapter.model.ConfigValue;
-import com.fasterxml.jackson.annotation.JsonAnyGetter;
-import com.fasterxml.jackson.annotation.JsonAnySetter;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -65,125 +63,122 @@ import java.util.Objects;
  * }
  * }</pre>
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
-public final class FrostConfigValue implements ConfigValue {
+public final class FrostConfigValue extends AbstractApiModel implements ConfigValue {
 
   public static final String FROST_RESULT_TYPE = "de.civitascore.data.processing.result";
 
-  private final Map<String, Object> data;
-
-  @JsonCreator
-  public FrostConfigValue() {
-    this.data = new LinkedHashMap<>();
-  }
-
-  public FrostConfigValue(Map<String, Object> data) {
-    this.data = data != null ? new LinkedHashMap<>(data) : new LinkedHashMap<>();
-  }
-
-  @JsonAnyGetter
-  public Map<String, Object> data() {
-    return data;
-  }
-
-  @JsonAnySetter
-  public void setProperty(String key, Object value) {
-    data.put(key, value);
-  }
+  private String name;
+  private String description;
+  private Map<String, Object> properties;
+  private String encodingType;
+  private Map<String, Object> location;
+  private String definition;
+  private UnitOfMeasurement unitOfMeasurement;
+  private String observationType;
 
   /**
-   * Get a property value by key.
-   *
-   * @param key the property key
-   * @return the property value, or null if not present
+   * Arbitrary metadata; structure depends on the SensorThings entity type. Typically a {@link
+   * String} or a {@link java.util.Map Map&lt;String, Object&gt;} that Jackson can serialize to
+   * JSON. For Sensor entities this is often a document URL or description string.
    */
-  public Object get(String key) {
-    return data.get(key);
-  }
+  private Object metadata;
 
-  /**
-   * Check if a property exists.
-   *
-   * @param key the property key
-   * @return true if the property exists
-   */
-  public boolean has(String key) {
-    return data.containsKey(key);
-  }
+  public FrostConfigValue() {}
 
-  /**
-   * Get the entity name (common to all SensorThings entities).
-   *
-   * @return the entity name, or null if not specified
-   */
   public String getName() {
-    return (String) data.get("name");
+    return name;
   }
 
-  /**
-   * Get the entity description (common to all SensorThings entities).
-   *
-   * @return the entity description, or null if not specified
-   */
+  public void setName(String name) {
+    this.name = name;
+  }
+
   public String getDescription() {
-    return (String) data.get("description");
+    return description;
   }
 
-  /**
-   * Get the properties map (user-defined metadata).
-   *
-   * @return map of custom properties, or null if not specified
-   */
-  @SuppressWarnings("unchecked")
+  public void setDescription(String description) {
+    this.description = description;
+  }
+
   public Map<String, Object> getProperties() {
-    return (Map<String, Object>) data.get("properties");
+    return properties;
   }
 
-  /**
-   * Get the encoding type (for Location entities).
-   *
-   * @return the encoding type (e.g., "application/geo+json"), or null if not specified
-   */
+  public void setProperties(Map<String, Object> properties) {
+    this.properties = properties;
+  }
+
   public String getEncodingType() {
-    return (String) data.get("encodingType");
+    return encodingType;
   }
 
-  /**
-   * Get the location object (for Location entities).
-   *
-   * @return the GeoJSON location object, or null if not specified
-   */
-  @SuppressWarnings("unchecked")
+  public void setEncodingType(String encodingType) {
+    this.encodingType = encodingType;
+  }
+
   public Map<String, Object> getLocation() {
-    return (Map<String, Object>) data.get("location");
+    return location;
   }
 
-  /**
-   * Get the definition URI (for Sensor and ObservedProperty entities).
-   *
-   * @return the definition URI, or null if not specified
-   */
+  public void setLocation(Map<String, Object> location) {
+    this.location = location;
+  }
+
   public String getDefinition() {
-    return (String) data.get("definition");
+    return definition;
   }
 
-  /**
-   * Get the unit of measurement (for Datastream entities).
-   *
-   * @return the unit of measurement object, or null if not specified
-   */
-  @SuppressWarnings("unchecked")
-  public Map<String, Object> getUnitOfMeasurement() {
-    return (Map<String, Object>) data.get("unitOfMeasurement");
+  public void setDefinition(String definition) {
+    this.definition = definition;
   }
 
-  /**
-   * Get the observation type (for Datastream entities).
-   *
-   * @return the observation type URI, or null if not specified
-   */
+  public UnitOfMeasurement getUnitOfMeasurement() {
+    return unitOfMeasurement;
+  }
+
+  public void setUnitOfMeasurement(UnitOfMeasurement unitOfMeasurement) {
+    this.unitOfMeasurement = unitOfMeasurement;
+  }
+
   public String getObservationType() {
-    return (String) data.get("observationType");
+    return observationType;
+  }
+
+  public void setObservationType(String observationType) {
+    this.observationType = observationType;
+  }
+
+  public Object getMetadata() {
+    return metadata;
+  }
+
+  public void setMetadata(Object metadata) {
+    this.metadata = metadata;
+  }
+
+  /**
+   * Converts typed fields and additional properties to a plain map for the FROST-Server API.
+   *
+   * @return an unmodifiable map of configuration key-value pairs
+   */
+  @Override
+  public Map<String, Object> toApiMap() {
+    Map<String, Object> map = new LinkedHashMap<>();
+    if (name != null) map.put("name", name);
+    if (description != null) map.put("description", description);
+    if (properties != null) map.put("properties", properties);
+    if (encodingType != null) map.put("encodingType", encodingType);
+    if (location != null) map.put("location", location);
+    if (definition != null) map.put("definition", definition);
+    if (unitOfMeasurement != null) {
+      Map<String, Object> uom = unitOfMeasurement.toApiMap();
+      if (!uom.isEmpty()) map.put("unitOfMeasurement", uom);
+    }
+    if (observationType != null) map.put("observationType", observationType);
+    if (metadata != null) map.put("metadata", metadata);
+    additionalProperties().forEach(map::putIfAbsent);
+    return Collections.unmodifiableMap(map);
   }
 
   @Override
@@ -191,16 +186,56 @@ public final class FrostConfigValue implements ConfigValue {
     if (obj == this) return true;
     if (obj == null || obj.getClass() != this.getClass()) return false;
     var that = (FrostConfigValue) obj;
-    return Objects.equals(this.data, that.data);
+    return Objects.equals(this.name, that.name)
+        && Objects.equals(this.description, that.description)
+        && Objects.equals(this.properties, that.properties)
+        && Objects.equals(this.encodingType, that.encodingType)
+        && Objects.equals(this.location, that.location)
+        && Objects.equals(this.definition, that.definition)
+        && Objects.equals(this.unitOfMeasurement, that.unitOfMeasurement)
+        && Objects.equals(this.observationType, that.observationType)
+        && Objects.equals(this.metadata, that.metadata)
+        && Objects.equals(this.additionalProperties(), that.additionalProperties());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(data);
+    return Objects.hash(
+        name,
+        description,
+        properties,
+        encodingType,
+        location,
+        definition,
+        unitOfMeasurement,
+        observationType,
+        metadata,
+        additionalProperties());
   }
 
   @Override
   public String toString() {
-    return "FrostConfigValue[" + "data=" + data + ']';
+    return "FrostConfigValue["
+        + "name="
+        + name
+        + ", description="
+        + description
+        + ", properties="
+        + properties
+        + ", encodingType="
+        + encodingType
+        + ", location="
+        + location
+        + ", definition="
+        + definition
+        + ", unitOfMeasurement="
+        + unitOfMeasurement
+        + ", observationType="
+        + observationType
+        + ", metadata="
+        + metadata
+        + ", additionalProperties="
+        + additionalProperties().keySet()
+        + ']';
   }
 }

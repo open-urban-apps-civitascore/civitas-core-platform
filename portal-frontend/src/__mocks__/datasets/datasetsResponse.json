@@ -9,9 +9,8 @@
     "status": null,
     "distribution": null,
     "catalog": ["1"],
-    "dataspace": {"id": "1", "title": "Dataspace 1"},
-    "department": { "id": "1", "title": "Stadtentwicklung" },
-    "tags": []
+    "dataspace": { "id": "1", "title": "Dataspace 1" },
+    "department": { "id": "1", "title": "Stadtentwicklung" }
   },
   {
     "id": "2",
@@ -29,7 +28,6 @@
     },
     "catalog": ["1"],
     "dataspace": null,
-    "department": { "id": "2", "title": "Verkehrsplanung" },
-    "tags": []
+    "department": { "id": "2", "title": "Verkehrsplanung" }
   }
 ]

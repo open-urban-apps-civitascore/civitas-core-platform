@@ -22,6 +22,13 @@ import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.apisix.ApisixConfigValue;
+import com.civitas.configadapter.model.apisix.RouteConfigValue;
+import com.civitas.configadapter.model.apisix.plugins.ProxyRewritePlugin;
+import com.civitas.configadapter.model.apisix.plugins.ResponseRewritePlugin;
+import com.civitas.configadapter.model.apisix.plugins.RewriteHeaders;
+import com.civitas.configadapter.model.apisix.plugins.RoutePlugins;
+import com.civitas.configadapter.model.apisix.plugins.ServerlessFunctionPlugin;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Entity;
 import java.util.List;
@@ -35,16 +42,14 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
   void testRouteCreateSuccess() throws FatalAdapterException, RetryableAdapterException {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/users/*",
-            "methods",
-            List.of("GET", "POST"),
-            "upstream_id",
-            "backend-users",
-            "plugins",
-            Map.of("prometheus", Map.of(), "openid-connect", Map.of("client_id", "api-gateway")));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/users/*");
+    routeConfig.setMethods(List.of("GET", "POST"));
+    routeConfig.setUpstreamId("backend-users");
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.handleUnknownPlugin("prometheus", Map.of());
+    plugins.handleUnknownPlugin("openid-connect", Map.of("client_id", "api-gateway"));
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
@@ -59,7 +64,8 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
   void testRouteCreateFailure() {
     givenMockPostReturns(400, "{\"error\":\"Invalid route config\"}");
 
-    Map<String, Object> routeConfig = Map.of("uri", "/api/v1/invalid");
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/invalid");
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
     FatalAdapterException exception =
@@ -75,16 +81,16 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
   void testRouteUpdateSuccess() throws FatalAdapterException, RetryableAdapterException {
     givenMockPutReturns(200, "{\"key\":\"routes/test-route-id\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/users/*",
-            "methods",
-            List.of("GET", "POST", "PUT", "DELETE"),
-            "upstream_id",
-            "backend-users-updated",
-            "plugins",
-            Map.of("prometheus", Map.of(), "proxy-rewrite", Map.of("uri", "/users")));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/users/*");
+    routeConfig.setMethods(List.of("GET", "POST", "PUT", "DELETE"));
+    routeConfig.setUpstreamId("backend-users-updated");
+    RoutePlugins plugins = new RoutePlugins();
+    plugins.handleUnknownPlugin("prometheus", Map.of());
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setUri("/users");
+    plugins.setProxyRewrite(proxyRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEvent(Operation.UPDATE, "routes/test-route-id", routeConfig);
@@ -101,7 +107,8 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
   void testRouteUpdateFailure() {
     givenMockPutReturns(404, "{\"error\":\"Route not found\"}");
 
-    Map<String, Object> routeConfig = Map.of("uri", "/api/v1/users/*");
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/users/*");
     ConfigEvent event =
         ApisixTestFixtures.routeEvent(Operation.UPDATE, "routes/nonexistent-route", routeConfig);
 
@@ -119,7 +126,8 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
     givenMockDeleteReturns(200, "{\"deleted\":\"routes/test-route-id\"}");
 
     ConfigEvent event =
-        ApisixTestFixtures.routeEvent(Operation.DELETE, "routes/test-route-id", null);
+        ApisixTestFixtures.routeEvent(
+            Operation.DELETE, "routes/test-route-id", (RouteConfigValue) null);
 
     adapter.processConfigEvent("de.civitascore.api.route.deleted", event);
 
@@ -134,7 +142,8 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
     givenMockDeleteReturns(404, "{\"error\":\"Route not found\"}");
 
     ConfigEvent event =
-        ApisixTestFixtures.routeEvent(Operation.DELETE, "routes/nonexistent-route", null);
+        ApisixTestFixtures.routeEvent(
+            Operation.DELETE, "routes/nonexistent-route", (RouteConfigValue) null);
 
     FatalAdapterException exception =
         assertThrows(
@@ -151,33 +160,45 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
     // Create a route with all CIVITAS/CORE V1 plugins
-    Map<String, Object> routeConfig =
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/data/*");
+    routeConfig.setMethods(List.of("GET", "POST", "PUT", "DELETE"));
+    routeConfig.setUpstreamId("data-service");
+
+    RoutePlugins plugins = new RoutePlugins();
+
+    // Untyped plugins
+    plugins.handleUnknownPlugin(
+        "openid-connect",
         Map.of(
-            "uri",
-            "/api/v1/data/*",
-            "methods",
-            List.of("GET", "POST", "PUT", "DELETE"),
-            "upstream_id",
-            "data-service",
-            "plugins",
-            Map.of(
-                "openid-connect",
-                Map.of(
-                    "discovery", "https://keycloak.example.com/.well-known/openid-configuration",
-                    "client_id", "api-gateway",
-                    "client_secret", "secret"),
-                "serverless-pre-function",
-                Map.of("phase", "rewrite", "functions", List.of("return function() end")),
-                "serverless-post-function",
-                Map.of("phase", "log", "functions", List.of("return function() end")),
-                "response-rewrite",
-                Map.of("headers", Map.of("X-Custom-Header", "value")),
-                "proxy-rewrite",
-                Map.of("regex_uri", List.of("/api/v1/(.*)", "/$1")),
-                "prometheus",
-                Map.of(),
-                "loki",
-                Map.of("endpoint", "http://loki:3100")));
+            "discovery", "https://keycloak.example.com/.well-known/openid-configuration",
+            "client_id", "api-gateway",
+            "client_secret", "secret"));
+    plugins.handleUnknownPlugin("prometheus", Map.of());
+    plugins.handleUnknownPlugin("loki", Map.of("endpoint", "http://loki:3100"));
+
+    // Typed plugins
+    ServerlessFunctionPlugin preFunction = new ServerlessFunctionPlugin();
+    preFunction.setPhase("rewrite");
+    preFunction.setFunctions(List.of("return function() end"));
+    plugins.setServerlessPreFunction(preFunction);
+
+    ServerlessFunctionPlugin postFunction = new ServerlessFunctionPlugin();
+    postFunction.setPhase("log");
+    postFunction.setFunctions(List.of("return function() end"));
+    plugins.setServerlessPostFunction(postFunction);
+
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    RewriteHeaders responseHeaders = new RewriteHeaders();
+    responseHeaders.setSet(Map.of("X-Custom-Header", "value"));
+    responseRewrite.setHeaders(responseHeaders);
+    plugins.setResponseRewrite(responseRewrite);
+
+    ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
+    proxyRewrite.setRegexUri(List.of("/api/v1/(.*)", "/$1"));
+    plugins.setProxyRewrite(proxyRewrite);
+
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
@@ -192,7 +213,8 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
     when(mockBuilder.post(any(Entity.class)))
         .thenThrow(new ProcessingException("Connection refused"));
 
-    Map<String, Object> routeConfig = Map.of("uri", "/api/v1/test");
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/test");
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
     RetryableAdapterException exception =
@@ -209,8 +231,8 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
     // Test that routes also work with ApisixConfigValue (backward compatibility)
-    Map<String, Object> routeConfig =
-        Map.of("uri", "/api/v1/legacy/*", "upstream_id", "legacy-backend");
+    ApisixConfigValue routeConfig = new ApisixConfigValue();
+    routeConfig.setType("roundrobin");
 
     ConfigEvent event = ApisixTestFixtures.upstreamEvent(Operation.CREATE, "routes", routeConfig);
 

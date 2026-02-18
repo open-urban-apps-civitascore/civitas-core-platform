@@ -39,7 +39,6 @@ export const DatasourceApiResponseSchema = z.object({
   description: z.string().trim(),
   connection: ConnectionTypeSchema,
   lastActive: z.string(),
-  tags: z.array(z.string()).default([]),
   status: DatasourceStatusSchema,
   connector: ConnectorApiResponseSchema.nullable(),
 })
@@ -51,9 +50,8 @@ export const DatasourceBaseFormSchema = DatasourceApiResponseSchema.pick({
   id: true,
   name: true,
   description: true,
-  tags: true,
   status: true,
-}).required({ tags: true })
+})
 
 export type DatasourceBaseFormData = z.infer<typeof DatasourceBaseFormSchema>
 

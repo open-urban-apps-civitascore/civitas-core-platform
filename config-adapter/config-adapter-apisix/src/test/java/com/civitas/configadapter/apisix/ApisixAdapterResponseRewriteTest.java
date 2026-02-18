@@ -17,6 +17,11 @@ import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
 import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.apisix.RouteConfigValue;
+import com.civitas.configadapter.model.apisix.plugins.ResponseFilter;
+import com.civitas.configadapter.model.apisix.plugins.ResponseRewritePlugin;
+import com.civitas.configadapter.model.apisix.plugins.RewriteHeaders;
+import com.civitas.configadapter.model.apisix.plugins.RoutePlugins;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -29,21 +34,18 @@ class ApisixAdapterResponseRewriteTest extends AbstractApisixAdapterTest {
       throws FatalAdapterException, RetryableAdapterException {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/response-headers/*",
-            "upstream_id",
-            "backend-service",
-            "plugins",
-            Map.of(
-                "response-rewrite",
-                Map.of(
-                    "headers",
-                    Map.of(
-                        "set", Map.of("X-Server-Id", "server-1"),
-                        "add", Map.of("X-Custom", "value"),
-                        "remove", List.of("X-Internal")))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-headers/*");
+    routeConfig.setUpstreamId("backend-service");
+    RoutePlugins plugins = new RoutePlugins();
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Server-Id", "server-1"));
+    headers.setAdd(Map.of("X-Custom", "value"));
+    headers.setRemove(List.of("X-Internal"));
+    responseRewrite.setHeaders(headers);
+    plugins.setResponseRewrite(responseRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
@@ -59,14 +61,14 @@ class ApisixAdapterResponseRewriteTest extends AbstractApisixAdapterTest {
       throws FatalAdapterException, RetryableAdapterException {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/response-status/*",
-            "upstream_id",
-            "backend-service",
-            "plugins",
-            Map.of("response-rewrite", Map.of("status_code", 201)));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-status/*");
+    routeConfig.setUpstreamId("backend-service");
+    RoutePlugins plugins = new RoutePlugins();
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setStatusCode(201);
+    plugins.setResponseRewrite(responseRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
@@ -81,15 +83,15 @@ class ApisixAdapterResponseRewriteTest extends AbstractApisixAdapterTest {
       throws FatalAdapterException, RetryableAdapterException {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/response-body/*",
-            "upstream_id",
-            "backend-service",
-            "plugins",
-            Map.of(
-                "response-rewrite", Map.of("body", "{\"status\":\"ok\"}", "body_base64", false)));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-body/*");
+    routeConfig.setUpstreamId("backend-service");
+    RoutePlugins plugins = new RoutePlugins();
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setBody("{\"status\":\"ok\"}");
+    responseRewrite.setBodyBase64(false);
+    plugins.setResponseRewrite(responseRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
@@ -104,16 +106,17 @@ class ApisixAdapterResponseRewriteTest extends AbstractApisixAdapterTest {
       throws FatalAdapterException, RetryableAdapterException {
     givenMockPostReturns(201, "{\"key\":\"routes/1\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/response-filters/*",
-            "upstream_id",
-            "backend-service",
-            "plugins",
-            Map.of(
-                "response-rewrite",
-                Map.of("filters", List.of(Map.of("regex", "old_text", "replace", "new_text")))));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/response-filters/*");
+    routeConfig.setUpstreamId("backend-service");
+    RoutePlugins plugins = new RoutePlugins();
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    ResponseFilter filter = new ResponseFilter();
+    filter.setRegex("old_text");
+    filter.setReplace("new_text");
+    responseRewrite.setFilters(List.of(filter));
+    plugins.setResponseRewrite(responseRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event = ApisixTestFixtures.routeEvent(Operation.CREATE, "routes", routeConfig);
 
@@ -128,22 +131,18 @@ class ApisixAdapterResponseRewriteTest extends AbstractApisixAdapterTest {
       throws FatalAdapterException, RetryableAdapterException {
     givenMockPutReturns(200, "{\"key\":\"routes/test-route-id\"}");
 
-    Map<String, Object> routeConfig =
-        Map.of(
-            "uri",
-            "/api/v1/updated/*",
-            "upstream_id",
-            "backend-service",
-            "plugins",
-            Map.of(
-                "response-rewrite",
-                Map.of(
-                    "status_code",
-                    200,
-                    "headers",
-                    Map.of("set", Map.of("X-Updated", "true")),
-                    "body",
-                    "{\"updated\":true}")));
+    RouteConfigValue routeConfig = new RouteConfigValue();
+    routeConfig.setUri("/api/v1/updated/*");
+    routeConfig.setUpstreamId("backend-service");
+    RoutePlugins plugins = new RoutePlugins();
+    ResponseRewritePlugin responseRewrite = new ResponseRewritePlugin();
+    responseRewrite.setStatusCode(200);
+    RewriteHeaders headers = new RewriteHeaders();
+    headers.setSet(Map.of("X-Updated", "true"));
+    responseRewrite.setHeaders(headers);
+    responseRewrite.setBody("{\"updated\":true}");
+    plugins.setResponseRewrite(responseRewrite);
+    routeConfig.setPlugins(plugins);
 
     ConfigEvent event =
         ApisixTestFixtures.routeEvent(Operation.UPDATE, "routes/test-route-id", routeConfig);
