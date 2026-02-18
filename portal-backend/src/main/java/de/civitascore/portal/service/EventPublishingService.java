@@ -48,6 +48,9 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
     entity = preSave(entity);
 
     entity = getRepository().saveAndFlush(entity);
+
+    entity = prePublish(entity, preProcessedInput);
+
     ConfigResultEvent result = preValidateWithExternalSystem(entity, operation);
 
     if (result != null && !Strings.isBlank(result.resourceId())) {
@@ -128,6 +131,10 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
   protected abstract ConfigValue toConfigValue(T entity);
 
   protected abstract UUID getEntityId(T entity);
+
+  protected T prePublish(T entity, I input) {
+    return entity;
+  }
 
   protected void updateExternalId(T entity, String externalId) {}
 }

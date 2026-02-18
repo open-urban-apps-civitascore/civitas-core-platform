@@ -17,10 +17,4 @@ public class PermissionAssembler implements BaseAssembler<Permission, Permission
   public PermissionOutputDTO mapToBaseDto(Permission entity) {
     return permissionMapper.toOutput(entity);
   }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(Permission entity) {
-    return (I) permissionMapper.toInput(entity);
-  }
 }
