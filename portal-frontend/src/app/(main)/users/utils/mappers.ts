@@ -5,15 +5,14 @@ export const mapRolesData = (roles: BaseRole[], groupData: Group[]) => {
   const roleMap = new Map(roles.map(role => [role.id, role]))
 
   const allRoles = groupData.flatMap(group =>
-    group.roles.flatMap(groupRole => {
-      const currentRole = roleMap.get(groupRole)
+    group.roles?.flatMap(groupRole => {
+      const currentRole = roleMap.get(groupRole.id)
       if (!currentRole) return []
       return {
         id: `${group.id}-${currentRole.id}`,
         name: currentRole.name,
         inherited: false,
         group: group?.name || null,
-        dataspace: group?.dataspace || null,
         type: currentRole.type,
         roleId: currentRole.id,
       }

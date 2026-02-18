@@ -19,7 +19,6 @@ import { GroupAssignmentModal } from './GroupAssignmentModal'
 import GroupsTable from './GroupsTable'
 
 interface GroupsTabProps {
-  originalGroupIds: string[]
   formValues: UserFormData
   isReadOnly: boolean
   onAssignGroups: (groupSelection: RowSelectionState) => void
@@ -27,7 +26,7 @@ interface GroupsTabProps {
 }
 
 export const GroupsTab = (props: GroupsTabProps) => {
-  const { formValues, originalGroupIds, isReadOnly, onAssignGroups, onRemoveGroup } = props
+  const { formValues, isReadOnly, onAssignGroups, onRemoveGroup } = props
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
   const tGroups = useTranslations('groups')
@@ -41,7 +40,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
 
   const getGroupsRequestParams = () => {
     const params = new URLSearchParams()
-    originalGroupIds.forEach(group => {
+    formValues.groupIds.forEach(group => {
       params.append('id', group)
     })
     return params
@@ -119,6 +118,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
                 totalPages={totalPages}
                 isLoading={isLoading}
                 onRemoveGroupClick={handleRemoveGroupClick}
+                isReadOnly={isReadOnly}
               />
             </TableContainer>
           </>

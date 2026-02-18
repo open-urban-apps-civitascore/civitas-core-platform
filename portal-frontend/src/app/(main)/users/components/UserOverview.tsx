@@ -167,7 +167,6 @@ export const UserOverview = (props: UserOverviewProps) => {
         return (
           <GroupsTab
             formValues={watch}
-            originalGroupIds={originalGroupIds}
             isReadOnly={isReadOnly}
             onAssignGroups={handleAssignGroups}
             onRemoveGroup={handleRemoveGroup}

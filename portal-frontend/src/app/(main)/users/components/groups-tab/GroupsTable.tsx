@@ -7,10 +7,12 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { UserGroupsListData } from '@/types/groups'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 
 interface GroupsTableProps extends TableProps<UserGroupsListData> {
   groups: UserGroupsListData[]
   onRemoveGroupClick: (id: string) => void
+  isReadOnly: boolean
 }
 
 const GroupsTable = (props: GroupsTableProps) => {
@@ -27,6 +29,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     onSortingChange,
     onRemoveGroupClick,
     isLoading,
+    isReadOnly,
   } = props
   const t = useTranslations('users')
   const tCommon = useTranslations('common')
@@ -40,7 +43,7 @@ const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('groupsTab.name')} />,
-      cell: info => info.getValue(),
+      cell: ({ row }) => <LinkCell href={`/groups/${row.id}`}>{row.original.name}</LinkCell>,
       meta: {
         style: {
           width: '22.22%',
@@ -51,10 +54,22 @@ const GroupsTable = (props: GroupsTableProps) => {
     columnHelper.accessor('membersCount', {
       header: t('groupsTab.membersCount'),
       cell: info => info.getValue() || 0,
+      meta: {
+        style: {
+          width: '22.22%',
+          minWidth: '100px',
+        },
+      },
     }),
     columnHelper.accessor('contactUser', {
       header: t('groupsTab.contact'),
       cell: info => info.getValue()?.name || '-',
+      meta: {
+        style: {
+          width: '22.22%',
+          minWidth: '200px',
+        },
+      },
     }),
     columnHelper.accessor('description', {
       header: t('groupsTab.description'),
@@ -68,19 +83,28 @@ const GroupsTable = (props: GroupsTableProps) => {
         },
       },
     }),
-    {
-      id: 'actions',
-      cell: ({ row }: { row: Row<UserGroupsListData> }) => (
-        <TableDropdownMenu
-          menuItems={[
-            {
-              label: tCommon('actions.deleteItem', { item: tCommon('items.group') }),
-              onClick: () => onRemoveGroupClick(row.original.id),
+    ...(!isReadOnly
+      ? [
+          {
+            id: 'actions',
+            cell: ({ row }: { row: Row<UserGroupsListData> }) => (
+              <TableDropdownMenu
+                menuItems={[
+                  {
+                    label: tCommon('actions.deleteItem', { item: tCommon('items.group') }),
+                    onClick: () => onRemoveGroupClick(row.original.id),
+                  },
+                ]}
+              />
+            ),
+            meta: {
+              style: {
+                width: '50px',
+              },
             },
-          ]}
-        />
-      ),
-    },
+          },
+        ]
+      : []),
   ]
 
   const table = useReactTable({
