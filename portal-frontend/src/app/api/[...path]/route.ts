@@ -1,8 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
+import pino from 'pino'
+
+// Local logger for this route - controlled by LOG_LEVEL env var
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'debug',
+})
+
+// Log environment variables at module load (only in debug mode)
+logger.debug(
+  {
+    JSON_SERVER_HOST: process.env.JSON_SERVER_HOST ?? 'undefined',
+    JSON_SERVER_PORT: process.env.JSON_SERVER_PORT ?? 'undefined',
+    API_BASE_URL: process.env.API_BASE_URL ?? 'undefined',
+    API_PORT: process.env.API_PORT ?? 'undefined',
+  },
+  'Proxy route environment variables',
+)
 
 const JSON_SERVER_URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 const API_URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
+
+// Log constructed URLs at module load
+logger.debug({ JSON_SERVER_URL, API_URL }, 'Constructed base URLs')
 interface RouteContext {
   params: Promise<{ path: string[] }>
 }
@@ -14,10 +34,12 @@ interface RouteContext {
 const proxyRequest = async (request: NextRequest, context: RouteContext, method: string) => {
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
   if (!token?.access_token) {
+    logger.debug({ method }, 'Unauthorized request - no access token')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   if (token.error === 'RefreshTokenError') {
+    logger.debug({ method }, 'Session expired - refresh token error')
     return NextResponse.json({ error: 'Session expired' }, { status: 401 })
   }
 
@@ -31,7 +53,23 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     // Forward all original headers from the request
     const headers = new Headers(request.headers)
 
-    const url = `${headers.get('x-api-request') === 'true' ? API_URL : JSON_SERVER_URL}/${pathString}${searchParamsString}`
+    const isApiRequest = headers.get('x-api-request') === 'true'
+    const baseUrl = isApiRequest ? API_URL : JSON_SERVER_URL
+
+    logger.debug(
+      {
+        method,
+        pathString,
+        searchParams,
+        isApiRequest,
+        baseUrl,
+      },
+      'Processing proxy request',
+    )
+
+    const url = `${baseUrl}/${pathString}${searchParamsString}`
+
+    logger.debug({ url }, 'Constructed request URL')
 
     headers.set('Authorization', `Bearer ${token.access_token}`)
 
@@ -56,12 +94,18 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
 
     const response = await fetch(url, fetchOptions)
 
+    logger.debug(
+      { status: response.status, contentType: response.headers.get('Content-Type') },
+      'Received response from backend',
+    )
+
     // Forward response headers from backend
     const responseHeaders = new Headers(response.headers)
 
     // Non-JSON responses, stream the body directly
     const contentType = response.headers.get('Content-Type')
     if (!contentType || !contentType.includes('application/json')) {
+      logger.debug({ status: response.status }, 'Returning non-JSON response')
       return new NextResponse(response.body, {
         status: response.status,
         headers: responseHeaders,
@@ -75,12 +119,21 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
 
     // JSON responses
     const data = await response.json()
+    logger.debug({ status: response.status }, 'Returning JSON response')
     return NextResponse.json(data, {
       status: response.status,
       headers: responseHeaders,
     })
   } catch (error) {
-    console.error('Proxy error:', error)
+    logger.error(
+      {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        JSON_SERVER_URL,
+        API_URL,
+      },
+      'Proxy error occurred',
+    )
     return NextResponse.json({ error: 'Proxy error' }, { status: 500 })
   }
 }
