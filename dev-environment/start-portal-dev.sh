@@ -263,20 +263,21 @@ export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 export KAFKA_GROUP_ID=config-adapter-group
 export KAFKA_RETRY_MAX_ATTEMPTS=3
 export KAFKA_RETRY_INITIAL_BACKOFF_MS=1000
-export KAFKA_DLQ_TOPIC=core.civitas.idm.dlq
+export KAFKA_DLQ_TOPIC=de.civitascore.idm.dlq
 export KEYCLOAK_URL=http://localhost:8080
 export KEYCLOAK_REALM=master
 export KEYCLOAK_USERNAME=admin
 export KEYCLOAK_PASSWORD=admin
 export KEYCLOAK_CLIENT_ID=admin-cli
-export KEYCLOAK_TOPICS=core.civitas.idm.user.created,core.civitas.idm.user.updated,core.civitas.idm.user.deleted,core.civitas.idm.group.created,core.civitas.idm.group.updated,core.civitas.idm.group.deleted
+export KEYCLOAK_TOPICS=de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted,de.civitascore.idm.group.created,de.civitascore.idm.group.updated,de.civitascore.idm.group.deleted
 export APISIX_ADMIN_URL=http://localhost:9180
 export APISIX_ADMIN_KEY=edd1c9f034335f136f87ad84b625c8f1
-export APISIX_TOPICS=core.civitas.api.backend.created,core.civitas.api.backend.updated,core.civitas.api.backend.deleted
+export APISIX_TOPICS=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
 export FROST_URL=http://localhost:9080/FROST-Server/v1.1
 export FROST_API_KEY=dev-frost-api-key
 export FROST_API_KEY_HEADER=X-API-Key
-export FROST_TOPICS=core.civitas.data.thing.created,core.civitas.data.thing.updated,core.civitas.data.thing.deleted,core.civitas.data.location.created,core.civitas.data.location.updated,core.civitas.data.location.deleted,core.civitas.data.sensor.created,core.civitas.data.sensor.updated,core.civitas.data.sensor.deleted,core.civitas.data.observedproperty.created,core.civitas.data.observedproperty.updated,core.civitas.data.observedproperty.deleted,core.civitas.data.datastream.created,core.civitas.data.datastream.updated,core.civitas.data.datastream.deleted
+export FROST_TOPICS=de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
+
 
 java -jar "$1"
 exec bash
