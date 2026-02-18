@@ -1,12 +1,13 @@
 'use client'
 
 import { FileDown, FileUp, Loader2, Save } from 'lucide-react'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef } from 'react'
 
+import { useCreateModel } from '@/app/services/api/models/clientRequests'
 import { Button } from '@/components/ui/button'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
-import { uploadModelToBackend } from '../../services/modelUploadService'
+import { buildUMLModelPayload } from '../../services/modelUploadService'
 import { downloadXmi } from '../../services/xmiExportService'
 import { importXmiFromFile } from '../../services/xmiImportService'
 
@@ -14,32 +15,33 @@ interface ToolbarProps {
   onSave?: () => void
   hasUnsavedChanges?: boolean
   onExport?: () => void
+  sessionName?: string
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ onSave, hasUnsavedChanges = false }) => {
+export const Toolbar: React.FC<ToolbarProps> = ({ onSave, hasUnsavedChanges = false, sessionName }) => {
   const { diagram, dispatch } = useActiveDiagram()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [isSaving, setIsSaving] = useState(false)
+  const createModel = useCreateModel()
+  const isSaving = createModel.isPending
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(() => {
     if (isSaving) return
 
-    setIsSaving(true)
-    try {
-      const result = await uploadModelToBackend(diagram)
-      if (result.success) {
-        onSave?.()
-      } else {
-        console.error('Save failed:', result.message)
-        alert(`Failed to save model: ${result.message}`)
-      }
-    } catch (error) {
-      console.error('Save error:', error)
-      alert('An error occurred while saving the model')
-    } finally {
-      setIsSaving(false)
+    const payload = {
+      ...buildUMLModelPayload(diagram),
+      name: sessionName || diagram.name,
     }
-  }, [diagram, isSaving, onSave])
+
+    createModel.mutate(payload, {
+      onSuccess: () => {
+        onSave?.()
+        console.log('Model saved successfully')
+      },
+      onError: error => {
+        console.error('Failed to save model:', error)
+      },
+    })
+  }, [diagram, isSaving, onSave, createModel, sessionName])
 
   const handleExportXmi = useCallback(() => {
     downloadXmi(diagram)

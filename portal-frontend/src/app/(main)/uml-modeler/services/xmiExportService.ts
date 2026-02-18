@@ -78,22 +78,6 @@ const escapeXml = (text: string): string => {
 }
 
 /**
- * Generates eAnnotations for layout information (Eclipse EMF compatible)
- */
-const generateEAnnotation = (x: number, y: number, indent: string): string => {
-  const annotationId = generateId()
-  const xDetailsId = generateId()
-  const yDetailsId = generateId()
-
-  return [
-    `${indent}<eAnnotations xmi:id="${annotationId}" source="nodeLayout">`,
-    `${indent}  <details xmi:id="${xDetailsId}" key="x" value="${x}"/>`,
-    `${indent}  <details xmi:id="${yDetailsId}" key="y" value="${y}"/>`,
-    `${indent}</eAnnotations>`,
-  ].join('\n')
-}
-
-/**
  * Converts a UML type to XMI type reference
  */
 const typeToXmi = (type: UMLType, indent: string): string => {
@@ -236,9 +220,6 @@ const classToXmi = (element: UMLClass, node: UMLNode, indent: string): string =>
 
   lines.push(`${indent}<packagedElement ${classAttrs}>`)
 
-  // eAnnotations for layout (must be first child for Eclipse compatibility)
-  lines.push(generateEAnnotation(node.position.x, node.position.y, childIndent))
-
   // Documentation as comment
   if (element.documentation) {
     const commentId = `${element.id}_comment`
@@ -273,9 +254,6 @@ const interfaceToXmi = (element: UMLInterface, node: UMLNode, indent: string): s
     `${indent}<packagedElement xmi:type="uml:Interface" xmi:id="${element.id}" name="${escapeXml(element.name)}">`,
   )
 
-  // eAnnotations for layout (must be first child for Eclipse compatibility)
-  lines.push(generateEAnnotation(node.position.x, node.position.y, childIndent))
-
   // Documentation as comment
   if (element.documentation) {
     const commentId = `${element.id}_comment`
@@ -304,9 +282,6 @@ const abstractClassToXmi = (element: UMLAbstractClass, node: UMLNode, indent: st
   lines.push(
     `${indent}<packagedElement xmi:type="uml:Class" xmi:id="${element.id}" name="${escapeXml(element.name)}" isAbstract="true">`,
   )
-
-  // eAnnotations for layout (must be first child for Eclipse compatibility)
-  lines.push(generateEAnnotation(node.position.x, node.position.y, childIndent))
 
   // Documentation as comment
   if (element.documentation) {
@@ -341,9 +316,6 @@ const enumerationToXmi = (element: UMLEnumeration, node: UMLNode, indent: string
   lines.push(
     `${indent}<packagedElement xmi:type="uml:Enumeration" xmi:id="${element.id}" name="${escapeXml(element.name)}">`,
   )
-
-  // eAnnotations for layout (must be first child for Eclipse compatibility)
-  lines.push(generateEAnnotation(node.position.x, node.position.y, childIndent))
 
   // Documentation as comment
   if (element.documentation) {

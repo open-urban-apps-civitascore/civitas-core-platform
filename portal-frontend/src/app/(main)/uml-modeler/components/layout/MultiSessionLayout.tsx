@@ -90,7 +90,12 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = ({ classNam
           />
 
           {/* Toolbar */}
-          <Toolbar onSave={handleSave} onExport={handleExport} hasUnsavedChanges={activeSession?.isDirty || false} />
+          <Toolbar
+            onSave={handleSave}
+            onExport={handleExport}
+            hasUnsavedChanges={activeSession?.isDirty || false}
+            sessionName={activeSession?.name}
+          />
 
           {/* Tab Content Area */}
           <div className="flex-1 relative overflow-hidden">

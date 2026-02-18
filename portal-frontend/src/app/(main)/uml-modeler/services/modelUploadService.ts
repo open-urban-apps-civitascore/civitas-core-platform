@@ -1,50 +1,50 @@
 /**
  * Model Upload Service
  *
- * Client-side service for uploading UML model files to the backend Model Atlas Service.
+ * Builds the payload for saving UML models to the backend.
+ * Follows the same pattern as the pipeline editor's payloadBuilderService.
+ *
+ * Separates concerns:
+ * - styles: React Flow config (viewport + node positions) for frontend reload
+ * - model: Pure XMI without layout info
  */
 
-import { apiRequest } from '@/app/services/api/request/apiRequest'
-
 import type { UMLDiagram } from '../types/diagram'
-import { exportToXmi, sanitizeName } from './xmiExportService'
+import { exportToXmi } from './xmiExportService'
 
-export interface UploadResult {
-  success: boolean
-  message?: string
+export interface UMLModelStylesPayload {
+  viewport?: { x: number; y: number; zoom: number }
+  nodePositions: Record<string, { x: number; y: number }>
+}
+
+export interface UMLModelPayload {
+  name: string
+  description: string
+  styles: UMLModelStylesPayload
+  model: string
 }
 
 /**
- * Uploads a UML diagram to the backend Model Atlas Service
+ * Builds the complete UMLModelPayload for backend API submission.
+ *
+ * @param diagram - The UML diagram with nodes, edges, and viewport
+ * @returns The payload ready to be sent to `POST /models`
  */
-export const uploadModelToBackend = async (diagram: UMLDiagram): Promise<UploadResult> => {
-  try {
-    const xmiContent = exportToXmi(diagram)
-    const sanitizedName = sanitizeName(diagram.name)
-    const nsUri = `http://civitas.org/model/${sanitizedName}`
-    const filename = `${sanitizedName}.xmi`
+export const buildUMLModelPayload = (diagram: UMLDiagram): UMLModelPayload => {
+  // 1. Extract styles (viewport + node positions for reload)
+  const styles: UMLModelStylesPayload = {
+    viewport: diagram.viewport,
+    nodePositions: Object.fromEntries(diagram.nodes.map(node => [node.id, node.position])),
+  }
 
-    // Create a Blob from the XMI content
-    const blob = new Blob([xmiContent], { type: 'application/xml' })
+  // 2. Build XMI model (without layout info - styles are stored separately)
+  const model = exportToXmi(diagram)
 
-    // Create FormData for multipart upload
-    const formData = new FormData()
-    formData.append('modelFile', blob, filename)
-    formData.append('nsUri', nsUri)
-
-    await apiRequest({
-      endpoint: '/models/upload',
-      method: 'POST',
-      data: formData,
-      errorMessage: 'Failed to upload model to backend.',
-    })
-
-    return { success: true, message: 'Model uploaded successfully' }
-  } catch (error) {
-    console.error('Error uploading model:', error)
-    return {
-      success: false,
-      message: error instanceof Error ? error.message : 'An unknown error occurred',
-    }
+  // 3. Assemble payload
+  return {
+    name: diagram.name,
+    description: '-',
+    styles,
+    model,
   }
 }
