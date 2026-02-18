@@ -613,7 +613,10 @@ class DataSetControllerIntegrationTest
       updateInput.setPersistenceId(99999L); // Try to change persistence ID
       updateInput.setPipelineIds(
           Collections.singletonList(
-              dataSet.getPipelines().getFirst().getId())); // Omit the second pipeline
+              dataSet.getPipelines().stream()
+                  .findFirst()
+                  .map(Pipeline::getId)
+                  .orElseThrow())); // Omit the second pipeline
 
       ResponseEntity<DataSetOutputDTO> response = performUpdate(dataSetId, updateInput);
 

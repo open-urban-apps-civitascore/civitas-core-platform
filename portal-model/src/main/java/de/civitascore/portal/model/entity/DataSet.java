@@ -59,7 +59,7 @@ public class DataSet extends NamedEntity {
   private Long persistenceId;
 
   @OneToMany(mappedBy = "dataSet", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
-  private List<Pipeline> pipelines = new ArrayList<>();
+  private Set<Pipeline> pipelines = new HashSet<>();
 
   @Column(name = "identifier")
   private String identifier;
