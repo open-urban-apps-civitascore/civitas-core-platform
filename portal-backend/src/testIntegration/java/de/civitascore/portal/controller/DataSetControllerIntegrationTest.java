@@ -4,14 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,6 +43,8 @@ class DataSetControllerIntegrationTest
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DistributionRepository distributionRepository;
+  @Autowired private DataSpaceRepository dataSpaceRepository;
+  @Autowired private UserRepository userRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -70,6 +76,8 @@ class DataSetControllerIntegrationTest
     pipelineRepository.deleteAll();
     distributionRepository.deleteAll();
     dataSetRepository.deleteAll();
+    dataSpaceRepository.deleteAll();
+    userRepository.deleteAll();
   }
 
   @Override
@@ -108,6 +116,15 @@ class DataSetControllerIntegrationTest
    * @return UUID of the created DataSet
    */
   private DataSet createDataSetWithRelationships() {
+    // Create a User to be the owner of the dataset
+    User owner = new User();
+    owner.setFirstName("Test");
+    owner.setLastName("Owner");
+    owner.setEmail("test.owner." + System.currentTimeMillis() + "@example.com");
+    owner.setExternalId("ext-user-" + System.currentTimeMillis());
+    owner.setActive(true);
+    owner = userRepository.save(owner);
+
     DataSet dataSet = new DataSet();
     dataSet.setName("test_dataset_with_relationships_" + System.currentTimeMillis());
     dataSet.setDescription("Test dataset with pipelines and distributions");
@@ -118,6 +135,17 @@ class DataSetControllerIntegrationTest
     dataSet.setExternalId("ext-dataset-" + System.currentTimeMillis());
     dataSet.setFormat("JSON");
     dataSet.setOpenDataAccess(false);
+    dataSet.setOwner(owner);
+    dataSet = dataSetRepository.save(dataSet);
+
+    // Create a DataSpace for the dataset
+    DataSpace dataSpace = new DataSpace();
+    dataSpace.setName("test_dataspace_" + System.currentTimeMillis());
+    dataSpace.setDescription("Test data space for dataset");
+    dataSpace = dataSpaceRepository.save(dataSpace);
+
+    // Associate dataset with dataspace
+    dataSet.getDataSpaces().add(dataSpace);
     dataSet = dataSetRepository.save(dataSet);
 
     // Create pipelines for the dataset
@@ -296,7 +324,8 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should retrieve dataset by ID successfully")
     void shouldRetrieveDataSetById() {
-      UUID dataSetId = createTestEntity();
+      DataSet dataSet = createDataSetWithRelationships();
+      UUID dataSetId = dataSet.getId();
 
       ResponseEntity<DataSetOutputDTO> response = performGetById(dataSetId);
 
@@ -307,6 +336,40 @@ class DataSetControllerIntegrationTest
       DataSetOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(dataSetId);
       assertThat(output.getName()).as("Name should be present").isNotNull();
+
+      assertThat(output.getPipelines())
+          .as("Pipelines should be included in the response")
+          .isNotNull()
+          .hasSize(2)
+          .allMatch(pipeline -> pipeline.getId() != null)
+          .allMatch(pipeline -> pipeline.getName() != null);
+
+      assertThat(output.getDistributions())
+          .as("Distributions should be included in the response")
+          .isNotNull()
+          .hasSize(2)
+          .allMatch(distribution -> distribution.getId() != null)
+          .allMatch(distribution -> distribution.getAccessUrl() != null)
+          .extracting("accessUrl")
+          .containsExactlyInAnyOrder(
+              "http://localhost:8080/api/v1/traffic", "http://localhost:8080/api/v1/weather");
+
+      assertThat(output.getDataSpaces())
+          .as("DataSpaces should be included in the response")
+          .isNotNull()
+          .hasSize(1)
+          .allMatch(dataSpace -> dataSpace.getId() != null)
+          .allMatch(dataSpace -> dataSpace.getName() != null)
+          .allMatch(dataSpace -> dataSpace.getName().startsWith("test_dataspace_"));
+
+      assertThat(output.getOwner()).as("Owner should be included in the response").isNotNull();
+      assertThat(output.getOwner().getId()).as("Owner ID should be set").isNotNull();
+      assertThat(output.getOwner().getName()).as("Owner name should be set").isNotNull();
+
+      assertThat(output.getDataSetStatus())
+          .as("Status should be DRAFT")
+          .isEqualTo(DataSetStatus.DRAFT);
+      assertThat(output.getPersistenceId()).as("Persistence ID should be set").isEqualTo(12345L);
     }
 
     @Test
