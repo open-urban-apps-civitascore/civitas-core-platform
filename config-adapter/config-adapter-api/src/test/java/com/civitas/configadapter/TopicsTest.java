@@ -23,131 +23,135 @@ class TopicsTest {
 
   @Test
   void getValue_whenBackendTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.api.backend.created", Topics.BACKEND_CREATED.getValue());
-    assertEquals("core.civitas.api.backend.updated", Topics.BACKEND_UPDATED.getValue());
-    assertEquals("core.civitas.api.backend.deleted", Topics.BACKEND_DELETED.getValue());
+    assertEquals("de.civitascore.api.backend.created", Topics.BACKEND_CREATED.getValue());
+    assertEquals("de.civitascore.api.backend.updated", Topics.BACKEND_UPDATED.getValue());
+    assertEquals("de.civitascore.api.backend.deleted", Topics.BACKEND_DELETED.getValue());
   }
 
   @Test
   void toString_whenCalled_shouldReturnValue() {
-    assertEquals("core.civitas.api.backend.created", Topics.BACKEND_CREATED.toString());
-    assertEquals("core.civitas.api.route.created", Topics.ROUTE_CREATED.toString());
+    assertEquals("de.civitascore.api.backend.created", Topics.BACKEND_CREATED.toString());
+    assertEquals("de.civitascore.api.route.created", Topics.ROUTE_CREATED.toString());
   }
 
   @Test
   void getValue_whenRouteTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.api.route.created", Topics.ROUTE_CREATED.getValue());
-    assertEquals("core.civitas.api.route.updated", Topics.ROUTE_UPDATED.getValue());
-    assertEquals("core.civitas.api.route.deleted", Topics.ROUTE_DELETED.getValue());
+    assertEquals("de.civitascore.api.route.created", Topics.ROUTE_CREATED.getValue());
+    assertEquals("de.civitascore.api.route.updated", Topics.ROUTE_UPDATED.getValue());
+    assertEquals("de.civitascore.api.route.deleted", Topics.ROUTE_DELETED.getValue());
   }
 
   @Test
   void getValue_whenUserTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.idm.user.created", Topics.USER_CREATED.getValue());
-    assertEquals("core.civitas.idm.user.updated", Topics.USER_UPDATED.getValue());
-    assertEquals("core.civitas.idm.user.deleted", Topics.USER_DELETED.getValue());
-    assertEquals("core.civitas.idm.user.locked", Topics.USER_LOCKED.getValue());
-    assertEquals("core.civitas.idm.user.unlocked", Topics.USER_UNLOCKED.getValue());
-    assertEquals("core.civitas.idm.user.password.changed", Topics.USER_PASSWORD_CHANGED.getValue());
-    assertEquals("core.civitas.idm.user.password.reset", Topics.USER_PASSWORD_RESET.getValue());
+    assertEquals("de.civitascore.idm.user.created", Topics.USER_CREATED.getValue());
+    assertEquals("de.civitascore.idm.user.updated", Topics.USER_UPDATED.getValue());
+    assertEquals("de.civitascore.idm.user.deleted", Topics.USER_DELETED.getValue());
+    assertEquals("de.civitascore.idm.user.locked", Topics.USER_LOCKED.getValue());
+    assertEquals("de.civitascore.idm.user.unlocked", Topics.USER_UNLOCKED.getValue());
+    assertEquals(
+        "de.civitascore.idm.user.password.changed", Topics.USER_PASSWORD_CHANGED.getValue());
+    assertEquals("de.civitascore.idm.user.password.reset", Topics.USER_PASSWORD_RESET.getValue());
   }
 
   @Test
   void getValue_whenRealmTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.idm.realm.created", Topics.REALM_CREATED.getValue());
-    assertEquals("core.civitas.idm.realm.updated", Topics.REALM_UPDATED.getValue());
-    assertEquals("core.civitas.idm.realm.deleted", Topics.REALM_DELETED.getValue());
+    assertEquals("de.civitascore.idm.realm.created", Topics.REALM_CREATED.getValue());
+    assertEquals("de.civitascore.idm.realm.updated", Topics.REALM_UPDATED.getValue());
+    assertEquals("de.civitascore.idm.realm.deleted", Topics.REALM_DELETED.getValue());
   }
 
   @Test
   void getValue_whenClientTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.idm.client.created", Topics.CLIENT_CREATED.getValue());
-    assertEquals("core.civitas.idm.client.updated", Topics.CLIENT_UPDATED.getValue());
-    assertEquals("core.civitas.idm.client.deleted", Topics.CLIENT_DELETED.getValue());
+    assertEquals("de.civitascore.idm.client.created", Topics.CLIENT_CREATED.getValue());
+    assertEquals("de.civitascore.idm.client.updated", Topics.CLIENT_UPDATED.getValue());
+    assertEquals("de.civitascore.idm.client.deleted", Topics.CLIENT_DELETED.getValue());
   }
 
   @Test
   void getValue_whenGroupTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.idm.group.created", Topics.GROUP_CREATED.getValue());
-    assertEquals("core.civitas.idm.group.updated", Topics.GROUP_UPDATED.getValue());
-    assertEquals("core.civitas.idm.group.deleted", Topics.GROUP_DELETED.getValue());
+    assertEquals("de.civitascore.idm.group.created", Topics.GROUP_CREATED.getValue());
+    assertEquals("de.civitascore.idm.group.updated", Topics.GROUP_UPDATED.getValue());
+    assertEquals("de.civitascore.idm.group.deleted", Topics.GROUP_DELETED.getValue());
   }
 
   @Test
   void getValue_whenRoleTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.idm.role.created", Topics.ROLE_CREATED.getValue());
-    assertEquals("core.civitas.idm.role.updated", Topics.ROLE_UPDATED.getValue());
-    assertEquals("core.civitas.idm.role.deleted", Topics.ROLE_DELETED.getValue());
+    assertEquals("de.civitascore.idm.role.created", Topics.ROLE_CREATED.getValue());
+    assertEquals("de.civitascore.idm.role.updated", Topics.ROLE_UPDATED.getValue());
+    assertEquals("de.civitascore.idm.role.deleted", Topics.ROLE_DELETED.getValue());
   }
 
   @Test
   void getValue_whenThingTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.data.thing.created", Topics.THING_CREATED.getValue());
-    assertEquals("core.civitas.data.thing.updated", Topics.THING_UPDATED.getValue());
-    assertEquals("core.civitas.data.thing.deleted", Topics.THING_DELETED.getValue());
+    assertEquals("de.civitascore.data.thing.created", Topics.THING_CREATED.getValue());
+    assertEquals("de.civitascore.data.thing.updated", Topics.THING_UPDATED.getValue());
+    assertEquals("de.civitascore.data.thing.deleted", Topics.THING_DELETED.getValue());
   }
 
   @Test
   void getValue_whenLocationTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.data.location.created", Topics.LOCATION_CREATED.getValue());
-    assertEquals("core.civitas.data.location.updated", Topics.LOCATION_UPDATED.getValue());
-    assertEquals("core.civitas.data.location.deleted", Topics.LOCATION_DELETED.getValue());
+    assertEquals("de.civitascore.data.location.created", Topics.LOCATION_CREATED.getValue());
+    assertEquals("de.civitascore.data.location.updated", Topics.LOCATION_UPDATED.getValue());
+    assertEquals("de.civitascore.data.location.deleted", Topics.LOCATION_DELETED.getValue());
   }
 
   @Test
   void getValue_whenSensorTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.data.sensor.created", Topics.SENSOR_CREATED.getValue());
-    assertEquals("core.civitas.data.sensor.updated", Topics.SENSOR_UPDATED.getValue());
-    assertEquals("core.civitas.data.sensor.deleted", Topics.SENSOR_DELETED.getValue());
+    assertEquals("de.civitascore.data.sensor.created", Topics.SENSOR_CREATED.getValue());
+    assertEquals("de.civitascore.data.sensor.updated", Topics.SENSOR_UPDATED.getValue());
+    assertEquals("de.civitascore.data.sensor.deleted", Topics.SENSOR_DELETED.getValue());
   }
 
   @Test
   void getValue_whenObservedPropertyTopics_shouldReturnCorrectValues() {
     assertEquals(
-        "core.civitas.data.observedproperty.created", Topics.OBSERVED_PROPERTY_CREATED.getValue());
+        "de.civitascore.data.observedproperty.created",
+        Topics.OBSERVED_PROPERTY_CREATED.getValue());
     assertEquals(
-        "core.civitas.data.observedproperty.updated", Topics.OBSERVED_PROPERTY_UPDATED.getValue());
+        "de.civitascore.data.observedproperty.updated",
+        Topics.OBSERVED_PROPERTY_UPDATED.getValue());
     assertEquals(
-        "core.civitas.data.observedproperty.deleted", Topics.OBSERVED_PROPERTY_DELETED.getValue());
+        "de.civitascore.data.observedproperty.deleted",
+        Topics.OBSERVED_PROPERTY_DELETED.getValue());
   }
 
   @Test
   void getValue_whenDatastreamTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.data.datastream.created", Topics.DATASTREAM_CREATED.getValue());
-    assertEquals("core.civitas.data.datastream.updated", Topics.DATASTREAM_UPDATED.getValue());
-    assertEquals("core.civitas.data.datastream.deleted", Topics.DATASTREAM_DELETED.getValue());
+    assertEquals("de.civitascore.data.datastream.created", Topics.DATASTREAM_CREATED.getValue());
+    assertEquals("de.civitascore.data.datastream.updated", Topics.DATASTREAM_UPDATED.getValue());
+    assertEquals("de.civitascore.data.datastream.deleted", Topics.DATASTREAM_DELETED.getValue());
   }
 
   @Test
   void getValue_whenFrostProjectTopics_shouldReturnCorrectValues() {
-    assertEquals("core.civitas.data.project.created", Topics.FROST_PROJECT_CREATED.getValue());
-    assertEquals("core.civitas.data.project.updated", Topics.FROST_PROJECT_UPDATED.getValue());
-    assertEquals("core.civitas.data.project.deleted", Topics.FROST_PROJECT_DELETED.getValue());
+    assertEquals("de.civitascore.data.project.created", Topics.FROST_PROJECT_CREATED.getValue());
+    assertEquals("de.civitascore.data.project.updated", Topics.FROST_PROJECT_UPDATED.getValue());
+    assertEquals("de.civitascore.data.project.deleted", Topics.FROST_PROJECT_DELETED.getValue());
   }
 
   @Test
   void isValidTopic_whenValidTopic_shouldReturnTrue() {
-    assertTrue(Topics.isValidTopic("core.civitas.api.backend.created"));
-    assertTrue(Topics.isValidTopic("core.civitas.api.route.created"));
-    assertTrue(Topics.isValidTopic("core.civitas.idm.user.created"));
+    assertTrue(Topics.isValidTopic("de.civitascore.api.backend.created"));
+    assertTrue(Topics.isValidTopic("de.civitascore.api.route.created"));
+    assertTrue(Topics.isValidTopic("de.civitascore.idm.user.created"));
   }
 
   @Test
   void isValidTopic_whenUpperCase_shouldReturnTrue() {
-    assertTrue(Topics.isValidTopic("CORE.CIVITAS.API.BACKEND.CREATED"));
-    assertTrue(Topics.isValidTopic("Core.Civitas.Api.Route.Updated"));
+    assertTrue(Topics.isValidTopic("DE.CIVITASCORE.API.BACKEND.CREATED"));
+    assertTrue(Topics.isValidTopic("De.Civitascore.Api.Route.Updated"));
   }
 
   @Test
   void isValidTopic_whenWhitespace_shouldReturnTrue() {
-    assertTrue(Topics.isValidTopic("  core.civitas.api.backend.created  "));
-    assertTrue(Topics.isValidTopic("\tcore.civitas.api.route.deleted\n"));
+    assertTrue(Topics.isValidTopic("  de.civitascore.api.backend.created  "));
+    assertTrue(Topics.isValidTopic("\tde.civitascore.api.route.deleted\n"));
   }
 
   @Test
   void isValidTopic_whenInvalidTopic_shouldReturnFalse() {
     assertFalse(Topics.isValidTopic("invalid.topic"));
-    assertFalse(Topics.isValidTopic("core.civitas.api.unknown"));
+    assertFalse(Topics.isValidTopic("de.civitascore.api.unknown"));
     assertFalse(Topics.isValidTopic(""));
   }
 
@@ -158,21 +162,21 @@ class TopicsTest {
 
   @Test
   void fromString_whenValidTopic_shouldReturnTopic() {
-    Optional<Topics> topic = Topics.fromString("core.civitas.api.backend.created");
+    Optional<Topics> topic = Topics.fromString("de.civitascore.api.backend.created");
     assertTrue(topic.isPresent());
     assertEquals(Topics.BACKEND_CREATED, topic.get());
   }
 
   @Test
   void fromString_whenUpperCase_shouldReturnTopic() {
-    Optional<Topics> topic = Topics.fromString("CORE.CIVITAS.API.ROUTE.CREATED");
+    Optional<Topics> topic = Topics.fromString("DE.CIVITASCORE.API.ROUTE.CREATED");
     assertTrue(topic.isPresent());
     assertEquals(Topics.ROUTE_CREATED, topic.get());
   }
 
   @Test
   void fromString_whenWhitespace_shouldReturnTopic() {
-    Optional<Topics> topic = Topics.fromString("  core.civitas.api.backend.updated  ");
+    Optional<Topics> topic = Topics.fromString("  de.civitascore.api.backend.updated  ");
     assertTrue(topic.isPresent());
     assertEquals(Topics.BACKEND_UPDATED, topic.get());
   }
@@ -198,32 +202,32 @@ class TopicsTest {
 
   @Test
   void allTopics_whenAccessed_shouldContainBackendTopics() {
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.api.backend.created"));
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.api.backend.updated"));
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.api.backend.deleted"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.api.backend.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.api.backend.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.api.backend.deleted"));
   }
 
   @Test
   void allTopics_whenAccessed_shouldContainRouteTopics() {
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.api.route.created"));
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.api.route.updated"));
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.api.route.deleted"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.api.route.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.api.route.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.api.route.deleted"));
   }
 
   @Test
   void allTopics_whenAccessed_shouldContainFrostTopics() {
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.thing.created"));
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.location.updated"));
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.sensor.deleted"));
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.observedproperty.created"));
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.datastream.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.thing.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.location.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.sensor.deleted"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.observedproperty.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.datastream.updated"));
   }
 
   @Test
   void allTopics_whenAccessed_shouldContainFrostProjectTopics() {
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.project.created"));
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.project.updated"));
-    assertTrue(Topics.ALL_TOPICS.contains("core.civitas.data.project.deleted"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.project.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.project.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.project.deleted"));
   }
 
   @Test

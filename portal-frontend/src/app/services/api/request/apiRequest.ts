@@ -58,7 +58,7 @@ export const apiRequest = async <TResponse, TBody = unknown>({
       url: `/api${endpoint}?${params?.toString() || ''}`,
       headers: {
         ...requestHeaders,
-        // eslint-disable-next-line @typescript-eslint/naming-convention
+        /* eslint-disable @typescript-eslint/naming-convention */
         'Cache-Control': 'no-store',
       },
       method,

@@ -186,7 +186,7 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
 
   /**
    * Returns the CloudEvent result type for this adapter (e.g.,
-   * "core.civitas.idm.processing.result").
+   * "de.civitascore.idm.processing.result").
    *
    * @return the result type string
    */

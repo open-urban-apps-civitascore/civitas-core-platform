@@ -1,6 +1,6 @@
 {
   "specversion": "1.0",
-  "type": "core.civitas.api.route.created",
+  "type": "de.civitascore.api.route.created",
   "source": "civitas.api.provisioning",
   "id": "event-serverless-pre-001",
   "datacontenttype": "application/json",

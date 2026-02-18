@@ -264,6 +264,6 @@ class KafkaEventHandlerPublishTest {
         Operation.CREATE,
         "users/resource-123",
         "test.source",
-        "core.civitas.test.result");
+        "de.civitascore.test.result");
   }
 }

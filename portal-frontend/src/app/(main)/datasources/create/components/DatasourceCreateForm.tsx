@@ -41,7 +41,6 @@ export const DatasourceCreateForm = () => {
       {
         name: formData.name,
         description: '',
-        tags: [],
         status: DATASOURCE_STATUS_TYPES.DRAFT,
         connector: null,
         connection: CONNECTION_TYPES.INACTIVE,

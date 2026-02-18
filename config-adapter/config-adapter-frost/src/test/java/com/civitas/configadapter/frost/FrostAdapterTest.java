@@ -67,7 +67,7 @@ class FrostAdapterTest {
   @Test
   void initializationWithDefaultUrlUsesLocalhostServer() {
     when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
-    when(mockConfig.getProperty("frost.topics")).thenReturn("core.civitas.data.thing.created");
+    when(mockConfig.getProperty("frost.topics")).thenReturn("de.civitascore.data.thing.created");
     when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
         .thenReturn("http://localhost:8080/v1.1");
     when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
@@ -77,7 +77,7 @@ class FrostAdapterTest {
     List<String> subscribedTopics = adapter.getSubscribedTopics();
     assertNotNull(subscribedTopics);
     assertEquals(1, subscribedTopics.size());
-    assertTrue(subscribedTopics.contains("core.civitas.data.thing.created"));
+    assertTrue(subscribedTopics.contains("de.civitascore.data.thing.created"));
   }
 
   @Test
@@ -85,7 +85,7 @@ class FrostAdapterTest {
     when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
     when(mockConfig.getProperty("frost.topics"))
         .thenReturn(
-            "core.civitas.data.thing.created,core.civitas.data.thing.updated,core.civitas.data.location.created");
+            "de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.location.created");
     when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
         .thenReturn("http://localhost:8080/v1.1");
     when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
@@ -94,15 +94,15 @@ class FrostAdapterTest {
 
     List<String> subscribedTopics = adapter.getSubscribedTopics();
     assertEquals(3, subscribedTopics.size());
-    assertTrue(subscribedTopics.contains("core.civitas.data.thing.created"));
-    assertTrue(subscribedTopics.contains("core.civitas.data.thing.updated"));
-    assertTrue(subscribedTopics.contains("core.civitas.data.location.created"));
+    assertTrue(subscribedTopics.contains("de.civitascore.data.thing.created"));
+    assertTrue(subscribedTopics.contains("de.civitascore.data.thing.updated"));
+    assertTrue(subscribedTopics.contains("de.civitascore.data.location.created"));
   }
 
   @Test
   void initializationWithCustomUrlUsesProvidedUrl() {
     when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
-    when(mockConfig.getProperty("frost.topics")).thenReturn("core.civitas.data.thing.created");
+    when(mockConfig.getProperty("frost.topics")).thenReturn("de.civitascore.data.thing.created");
     when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
         .thenReturn("http://custom-server:8080/api/v1.1");
     when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
@@ -114,7 +114,7 @@ class FrostAdapterTest {
 
   @Test
   void initializationWithoutApiKeyThrowsException() {
-    when(mockConfig.getProperty("frost.topics")).thenReturn("core.civitas.data.thing.created");
+    when(mockConfig.getProperty("frost.topics")).thenReturn("de.civitascore.data.thing.created");
     when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
         .thenReturn("http://localhost:8080/v1.1");
     when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
@@ -128,7 +128,7 @@ class FrostAdapterTest {
   @Test
   void initializationWithBlankApiKeyThrowsException() {
     when(mockConfig.getProperty("frost.api.key")).thenReturn("   ");
-    when(mockConfig.getProperty("frost.topics")).thenReturn("core.civitas.data.thing.created");
+    when(mockConfig.getProperty("frost.topics")).thenReturn("de.civitascore.data.thing.created");
     when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
         .thenReturn("http://localhost:8080/v1.1");
     when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
@@ -142,7 +142,7 @@ class FrostAdapterTest {
   @Test
   void closeReleasesResources() {
     when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
-    when(mockConfig.getProperty("frost.topics")).thenReturn("core.civitas.data.thing.created");
+    when(mockConfig.getProperty("frost.topics")).thenReturn("de.civitascore.data.thing.created");
     when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
         .thenReturn("http://localhost:8080/v1.1");
     when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
@@ -162,7 +162,7 @@ class FrostAdapterTest {
     void setUpMocks() {
       when(mockConfig.getProperty("frost.topics"))
           .thenReturn(
-              "core.civitas.data.thing.created,core.civitas.data.location.created,core.civitas.data.sensor.created");
+              "de.civitascore.data.thing.created,de.civitascore.data.location.created,de.civitascore.data.sensor.created");
       when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
           .thenReturn("http://localhost:8080/v1.1");
       when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
@@ -205,7 +205,7 @@ class FrostAdapterTest {
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "Things", thingConfig);
 
-      adapter.processConfigEvent("core.civitas.data.thing.created", event);
+      adapter.processConfigEvent("de.civitascore.data.thing.created", event);
 
       ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
       verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
@@ -233,7 +233,7 @@ class FrostAdapterTest {
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "Locations", locationConfig);
 
-      adapter.processConfigEvent("core.civitas.data.location.created", event);
+      adapter.processConfigEvent("de.civitascore.data.location.created", event);
 
       ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
       verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
@@ -259,7 +259,7 @@ class FrostAdapterTest {
 
       ConfigEvent event = createConfigEvent(Operation.CREATE, "Sensors", sensorConfig);
 
-      adapter.processConfigEvent("core.civitas.data.sensor.created", event);
+      adapter.processConfigEvent("de.civitascore.data.sensor.created", event);
 
       ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
       verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
@@ -280,7 +280,7 @@ class FrostAdapterTest {
       FatalAdapterException exception =
           assertThrows(
               FatalAdapterException.class,
-              () -> adapter.processConfigEvent("core.civitas.data.thing.created", event));
+              () -> adapter.processConfigEvent("de.civitascore.data.thing.created", event));
 
       assertEquals(AdapterErrorCode.FROST_ENTITY_ERROR, exception.getErrorCode());
     }
@@ -296,7 +296,7 @@ class FrostAdapterTest {
       RetryableAdapterException exception =
           assertThrows(
               RetryableAdapterException.class,
-              () -> adapter.processConfigEvent("core.civitas.data.thing.created", event));
+              () -> adapter.processConfigEvent("de.civitascore.data.thing.created", event));
 
       assertEquals(AdapterErrorCode.SERVICE_UNAVAILABLE, exception.getErrorCode());
     }
@@ -312,7 +312,7 @@ class FrostAdapterTest {
       RetryableAdapterException exception =
           assertThrows(
               RetryableAdapterException.class,
-              () -> adapter.processConfigEvent("core.civitas.data.thing.created", event));
+              () -> adapter.processConfigEvent("de.civitascore.data.thing.created", event));
 
       assertEquals(AdapterErrorCode.NETWORK_ERROR, exception.getErrorCode());
     }
@@ -325,7 +325,7 @@ class FrostAdapterTest {
       FatalAdapterException exception =
           assertThrows(
               FatalAdapterException.class,
-              () -> adapter.processConfigEvent("core.civitas.data.thing.created", event));
+              () -> adapter.processConfigEvent("de.civitascore.data.thing.created", event));
 
       assertEquals(AdapterErrorCode.INVALID_RESOURCE_TYPE, exception.getErrorCode());
     }
@@ -344,7 +344,7 @@ class FrostAdapterTest {
     @BeforeEach
     void setUpMocks() {
       when(mockConfig.getProperty("frost.topics"))
-          .thenReturn("core.civitas.data.thing.updated,core.civitas.data.location.updated");
+          .thenReturn("de.civitascore.data.thing.updated,de.civitascore.data.location.updated");
       when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
           .thenReturn("http://localhost:8080/v1.1");
       when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
@@ -378,7 +378,7 @@ class FrostAdapterTest {
 
       ConfigEvent event = createConfigEvent(Operation.UPDATE, "Things/123", thingConfig);
 
-      adapter.processConfigEvent("core.civitas.data.thing.updated", event);
+      adapter.processConfigEvent("de.civitascore.data.thing.updated", event);
 
       ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
       verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
@@ -397,7 +397,7 @@ class FrostAdapterTest {
       FatalAdapterException exception =
           assertThrows(
               FatalAdapterException.class,
-              () -> adapter.processConfigEvent("core.civitas.data.thing.updated", event));
+              () -> adapter.processConfigEvent("de.civitascore.data.thing.updated", event));
 
       assertEquals(AdapterErrorCode.INVALID_PAYLOAD, exception.getErrorCode());
     }
@@ -413,7 +413,7 @@ class FrostAdapterTest {
       FatalAdapterException exception =
           assertThrows(
               FatalAdapterException.class,
-              () -> adapter.processConfigEvent("core.civitas.data.thing.updated", event));
+              () -> adapter.processConfigEvent("de.civitascore.data.thing.updated", event));
 
       assertEquals(AdapterErrorCode.FROST_ENTITY_ERROR, exception.getErrorCode());
     }
@@ -432,7 +432,7 @@ class FrostAdapterTest {
     @BeforeEach
     void setUpMocks() {
       when(mockConfig.getProperty("frost.topics"))
-          .thenReturn("core.civitas.data.thing.deleted,core.civitas.data.location.deleted");
+          .thenReturn("de.civitascore.data.thing.deleted,de.civitascore.data.location.deleted");
       when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
           .thenReturn("http://localhost:8080/v1.1");
       when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
@@ -463,7 +463,7 @@ class FrostAdapterTest {
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "Things/123", null);
 
-      adapter.processConfigEvent("core.civitas.data.thing.deleted", event);
+      adapter.processConfigEvent("de.civitascore.data.thing.deleted", event);
 
       ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
       verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
@@ -481,7 +481,7 @@ class FrostAdapterTest {
       FatalAdapterException exception =
           assertThrows(
               FatalAdapterException.class,
-              () -> adapter.processConfigEvent("core.civitas.data.thing.deleted", event));
+              () -> adapter.processConfigEvent("de.civitascore.data.thing.deleted", event));
 
       assertEquals(AdapterErrorCode.INVALID_PAYLOAD, exception.getErrorCode());
     }
@@ -497,7 +497,7 @@ class FrostAdapterTest {
       FatalAdapterException exception =
           assertThrows(
               FatalAdapterException.class,
-              () -> adapter.processConfigEvent("core.civitas.data.thing.deleted", event));
+              () -> adapter.processConfigEvent("de.civitascore.data.thing.deleted", event));
 
       assertEquals(AdapterErrorCode.FROST_ENTITY_ERROR, exception.getErrorCode());
     }
@@ -515,7 +515,7 @@ class FrostAdapterTest {
 
     @BeforeEach
     void setUpMocks() {
-      when(mockConfig.getProperty("frost.topics")).thenReturn("core.civitas.data.thing.created");
+      when(mockConfig.getProperty("frost.topics")).thenReturn("de.civitascore.data.thing.created");
       when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
           .thenReturn("http://localhost:8080/v1.1");
       when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
@@ -551,7 +551,7 @@ class FrostAdapterTest {
       ConfigEvent event =
           createConfigEvent(Operation.CREATE, "Things", Map.of("name", "Test Thing"));
 
-      adapter.processConfigEvent("core.civitas.data.thing.created", event);
+      adapter.processConfigEvent("de.civitascore.data.thing.created", event);
 
       verify(mockPublisher, never()).publish(any(), any());
     }
@@ -568,15 +568,12 @@ class FrostAdapterTest {
 
       Metadata metadata =
           new Metadata("msg-123", OffsetDateTime.now(), "test-source", "corr-123", "v1.0.0", null);
-      Payload payload =
-          new Payload(
-              "frost",
-              "Things",
-              Operation.CREATE,
-              new Config(null, new FrostConfigValue(Map.of("name", "Test"))));
+      FrostConfigValue fv = new FrostConfigValue();
+      fv.setName("Test");
+      Payload payload = new Payload("frost", "Things", Operation.CREATE, new Config(null, fv));
       ConfigEvent event = new ConfigEvent(metadata, payload);
 
-      adapter.processConfigEvent("core.civitas.data.thing.created", event);
+      adapter.processConfigEvent("de.civitascore.data.thing.created", event);
 
       verify(mockPublisher, never()).publish(any(String.class), any(ConfigResultEvent.class));
     }
@@ -596,8 +593,8 @@ class FrostAdapterTest {
     void setUpMocks() {
       when(mockConfig.getProperty("frost.topics"))
           .thenReturn(
-              "core.civitas.data.project.created,core.civitas.data.project.updated,"
-                  + "core.civitas.data.project.deleted,core.civitas.data.thing.created");
+              "de.civitascore.data.project.created,de.civitascore.data.project.updated,"
+                  + "de.civitascore.data.project.deleted,de.civitascore.data.thing.created");
       when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
           .thenReturn("http://localhost:8080/v1.1");
       when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
@@ -634,7 +631,7 @@ class FrostAdapterTest {
               "Projects",
               Map.of("name", "Smart City", "description", "A smart city project"));
 
-      adapter.processConfigEvent("core.civitas.data.project.created", event);
+      adapter.processConfigEvent("de.civitascore.data.project.created", event);
 
       ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
       verify(mockTarget).path(pathCaptor.capture());
@@ -664,7 +661,7 @@ class FrostAdapterTest {
               "Projects/42/Things",
               Map.of("name", "Scoped Sensor", "description", "A sensor within a project"));
 
-      adapter.processConfigEvent("core.civitas.data.thing.created", event);
+      adapter.processConfigEvent("de.civitascore.data.thing.created", event);
 
       ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
       verify(mockTarget).path(pathCaptor.capture());
@@ -689,7 +686,7 @@ class FrostAdapterTest {
           createConfigEvent(
               Operation.UPDATE, "Projects/42", Map.of("description", "Updated project"));
 
-      adapter.processConfigEvent("core.civitas.data.project.updated", event);
+      adapter.processConfigEvent("de.civitascore.data.project.updated", event);
 
       ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
       verify(mockTarget).path(pathCaptor.capture());
@@ -712,7 +709,7 @@ class FrostAdapterTest {
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "Projects/42", null);
 
-      adapter.processConfigEvent("core.civitas.data.project.deleted", event);
+      adapter.processConfigEvent("de.civitascore.data.project.deleted", event);
 
       ArgumentCaptor<String> pathCaptor = ArgumentCaptor.forClass(String.class);
       verify(mockTarget).path(pathCaptor.capture());
@@ -740,7 +737,7 @@ class FrostAdapterTest {
             "v1.0.0",
             "test-result-topic");
 
-    FrostConfigValue frostValue = new FrostConfigValue(configValue);
+    FrostConfigValue frostValue = FrostTestFixtures.buildFrostConfigValue(configValue);
 
     Payload payload = new Payload("frost", targetResource, operation, new Config(null, frostValue));
     return new ConfigEvent(metadata, payload);

@@ -11,9 +11,10 @@
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - portal-model/**/*
-        - portal-backend/**/* # Also run when backend changes, since it depends on portal-model
+        - portal-backend/**/* # Backend depends on portal-model, so run when backend changes too
         - .gitlab-ci.yml
         - .gitlab/ci/portal-model.yml
+        - .gitlab/ci/backend.yml # Also run when backend changes since it depends on portal-model
 
 lint-portal-model:
   extends: .only-portal-model-changes

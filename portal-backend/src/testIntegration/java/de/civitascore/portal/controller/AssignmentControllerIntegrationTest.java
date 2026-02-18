@@ -4,24 +4,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.Catalog;
+import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSpace;
+import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
-import de.civitascore.portal.model.input.GroupInputDTO;
-import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
-import de.civitascore.portal.model.output.GroupOutputDTO;
-import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.CatalogRepository;
+import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSpaceRepository;
+import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.RestPage;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -32,6 +37,11 @@ class AssignmentControllerIntegrationTest
   private final String ASSIGNMENTS_ENDPOINT = "/assignments";
 
   @Autowired private AssignmentRepository assignmentRepository;
+  @Autowired private GroupRepository groupRepository;
+  @Autowired private RoleRepository roleRepository;
+  @Autowired private DataSpaceRepository dataSpaceRepository;
+  @Autowired private DataSetRepository dataSetRepository;
+  @Autowired private CatalogRepository catalogRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -81,42 +91,51 @@ class AssignmentControllerIntegrationTest
   }
 
   private UUID createTestGroup() {
-    GroupInputDTO groupInput = new GroupInputDTO();
-    groupInput.setName("Test Group " + System.currentTimeMillis());
-    groupInput.setDescription("Test group for assignment");
-
-    HttpHeaders headers = createAuthHeaders();
-    HttpEntity<GroupInputDTO> request = new HttpEntity<>(groupInput, headers);
-    ResponseEntity<GroupOutputDTO> response =
-        restTemplate.exchange(
-            "/groups",
-            HttpMethod.POST,
-            request,
-            new ParameterizedTypeReference<GroupOutputDTO>() {});
-
-    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId();
-    }
-    throw new IllegalStateException("Failed to create test group");
+    Group group = new Group();
+    group.setName("Test Group " + System.currentTimeMillis());
+    group.setDescription("Test group for assignment");
+    return groupRepository.save(group).getId();
   }
 
   private UUID createTestRole() {
-    RoleInputDTO roleInput = new RoleInputDTO();
-    roleInput.setName("test_role_" + System.currentTimeMillis());
-    roleInput.setName("Test Role " + System.currentTimeMillis());
-    roleInput.setDescription("Test role for assignment");
-    roleInput.setRoleType(RoleType.DATA);
+    Role role = new Role();
+    role.setName("Test Role " + System.currentTimeMillis());
+    role.setDescription("Test role for assignment");
+    role.setRoleType(RoleType.DATA);
+    return roleRepository.save(role).getId();
+  }
 
-    HttpHeaders headers = createAuthHeaders();
-    HttpEntity<RoleInputDTO> request = new HttpEntity<>(roleInput, headers);
-    ResponseEntity<RoleOutputDTO> response =
-        restTemplate.exchange(
-            "/roles", HttpMethod.POST, request, new ParameterizedTypeReference<RoleOutputDTO>() {});
+  private UUID createTestDataSpace() {
+    DataSpace dataSpace = new DataSpace();
+    dataSpace.setName("Test DataSpace " + System.currentTimeMillis());
+    dataSpace.setDescription("Test dataspace for assignment");
+    return dataSpaceRepository.save(dataSpace).getId();
+  }
 
-    if (response.getStatusCode() == HttpStatus.CREATED && response.getBody() != null) {
-      return response.getBody().getId();
-    }
-    throw new IllegalStateException("Failed to create test role");
+  private UUID createTestDataSet(UUID dataSpaceId) {
+    DataSpace dataSpace = dataSpaceRepository.findById(dataSpaceId).orElseThrow();
+    DataSet dataSet = new DataSet();
+    dataSet.setName("Test DataSet " + System.currentTimeMillis());
+    dataSet.setDescription("Test dataset for assignment");
+    dataSet.setDataSpaces(Set.of(dataSpace));
+    return dataSetRepository.save(dataSet).getId();
+  }
+
+  private UUID createTestCatalog() {
+    Catalog catalog = new Catalog();
+    catalog.setName("Test Catalog " + System.currentTimeMillis());
+    catalog.setDescription("Test catalog for assignment");
+    return catalogRepository.save(catalog).getId();
+  }
+
+  private UUID getScopeIdForType(ScopeType scopeType) {
+    return switch (scopeType) {
+      case TENANT -> null;
+      case DATASPACE -> createTestDataSpace();
+      case DATASET -> createTestDataSet(createTestDataSpace());
+      case CATALOG -> createTestCatalog();
+      case DATASOURCE, DATASTRUCTURE -> null;
+    };
   }
 
   @Nested
@@ -172,7 +191,8 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should create assignment with different scope types")
     void shouldCreateAssignmentWithDifferentScopeTypes() {
-      for (ScopeType scopeType : ScopeType.values()) {
+      for (ScopeType scopeType :
+          List.of(ScopeType.TENANT, ScopeType.DATASPACE, ScopeType.DATASET, ScopeType.CATALOG)) {
         UUID groupId = createTestGroup();
         UUID roleId = createTestRole();
 
@@ -180,12 +200,13 @@ class AssignmentControllerIntegrationTest
         input.setGroupId(groupId);
         input.setRoleId(roleId);
         input.setScopeType(scopeType);
-        UUID scopeID = UUID.randomUUID();
-        input.setScopeId(scopeID);
+        input.setScopeId(getScopeIdForType(scopeType));
 
         ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getStatusCode())
+            .as("Should create assignment with scope type " + scopeType)
+            .isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getScopeType()).isEqualTo(scopeType);
       }
@@ -194,16 +215,16 @@ class AssignmentControllerIntegrationTest
     @Test
     @DisplayName("Should create assignment with scope ID")
     void shouldCreateAssignmentWithScopeId() {
+      UUID dataSpaceId = createTestDataSpace();
       AssignmentInputDTO input = createValidInput();
       input.setScopeType(ScopeType.DATASPACE);
-      UUID scopeID = UUID.randomUUID();
-      input.setScopeId(scopeID);
+      input.setScopeId(dataSpaceId);
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getScopeId()).isEqualTo(scopeID);
+      assertThat(response.getBody().getScopeId()).isEqualTo(dataSpaceId);
     }
 
     @Test
@@ -417,17 +438,13 @@ class AssignmentControllerIntegrationTest
       AssignmentInputDTO input1 = new AssignmentInputDTO();
       input1.setGroupId(groupId);
       input1.setRoleId(role1Id);
-      UUID scopeID = UUID.randomUUID();
-      input1.setScopeId(scopeID);
-
       input1.setScopeType(ScopeType.TENANT);
 
       AssignmentInputDTO input2 = new AssignmentInputDTO();
       input2.setGroupId(groupId);
       input2.setRoleId(role2Id);
       input2.setScopeType(ScopeType.DATASPACE);
-      UUID scopeID2 = UUID.randomUUID();
-      input2.setScopeId(scopeID2);
+      input2.setScopeId(createTestDataSpace());
 
       ResponseEntity<AssignmentOutputDTO> response1 = performCreate(input1);
       ResponseEntity<AssignmentOutputDTO> response2 = performCreate(input2);

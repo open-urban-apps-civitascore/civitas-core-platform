@@ -1,10 +1,13 @@
 name: frost_allinone
 services:
   web:
-    image: fraunhoferiosb/frost-server:latest
+    #    image: fraunhoferiosb/frost-server:latest
+    image: hylkevds/frost-http-projects:latest
+    container_name: civitas-frost
+    hostname: civitas-frost
     environment:
       # For all settings see: https://fraunhoferiosb.github.io/FROST-Server/settings/settings.html
-      - serviceRootUrl=http://localhost:8080/FROST-Server/
+      - serviceRootUrl=http://localhost:9080/FROST-Server/
       - plugins_modelLoader_enable=true
       - plugins_multiDatastream_enable=false
       - plugins_actuation_enable=false
@@ -15,15 +18,20 @@ services:
       - persistence_db_username=sensorthings
       - persistence_db_password=BUvAK25gYnde0GX1dyC3f78a
       - persistence_autoUpdateDatabase=true
+    expose:
+      - "8080"
     ports:
-      - 8180:8080
       - 1883:1883
     depends_on:
       database:
         condition: service_healthy
+    networks:
+      - frost-network
+      - civitas-network
 
   database:
     image: postgis/postgis:16-3.4-alpine
+    container_name: civitas-frost-db
     environment:
       - POSTGRES_DB=sensorthings
       - POSTGRES_USER=sensorthings
@@ -35,7 +43,15 @@ services:
       interval: 2s
       timeout: 2s
       retries: 10
+    networks:
+      - frost-network
 
 volumes:
     postgis_volume:
 
+networks:
+  frost-network:
+    driver: bridge
+  civitas-network:
+    name: civitas-network
+    external: true
