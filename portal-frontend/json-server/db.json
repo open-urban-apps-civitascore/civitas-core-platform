@@ -11,9 +11,11 @@
       },
       "issued": "2023-09-10T08:00:00Z",
       "lastUpdated": "2023-09-10T08:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -38,7 +40,9 @@
         "name": "Superset",
         "url": "https://superset.de"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -63,7 +67,9 @@
         "name": "Masterportal",
         "url": "https://masterportal.de"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -88,7 +94,9 @@
         "name": "shapefile",
         "url": "https://shapefile.de"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -106,9 +114,11 @@
       },
       "issued": "2023-04-12T08:00:00Z",
       "lastUpdated": "2023-04-12T08:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -133,7 +143,9 @@
         "name": "Open Data Portal Masterportal",
         "url": "https://opendata.de"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -151,9 +163,11 @@
       },
       "issued": "2023-06-20T08:00:00Z",
       "lastUpdated": "2023-06-20T08:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -178,7 +192,9 @@
         "name": "Superset",
         "url": "https://superset.de"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -198,7 +214,9 @@
       "lastUpdated": "2025-11-20T15:11:29.431Z",
       "status": "published",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -223,7 +241,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/10"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "4",
         "name": "Sicherheit"
@@ -243,7 +263,9 @@
       "lastUpdated": "2023-07-08T00:00:00Z",
       "status": "published",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -268,7 +290,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/12"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -293,7 +317,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/13"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -313,7 +339,9 @@
       "lastUpdated": "2023-03-11T00:00:00Z",
       "status": "published",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -338,7 +366,9 @@
         "name": "API",
         "url": "https://sensors.example/15"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -358,7 +388,9 @@
       "lastUpdated": "2023-05-10T00:00:00Z",
       "status": "published",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -383,7 +415,9 @@
         "name": "API",
         "url": "https://sensors.example/17"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -401,14 +435,16 @@
       },
       "issued": "2023-01-19T00:00:00Z",
       "lastUpdated": "2023-01-30T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "18",
         "format": "ZIP",
         "name": "Sensorservice",
         "url": "https://sensors.example/18"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -426,14 +462,16 @@
       },
       "issued": "2023-09-19T00:00:00Z",
       "lastUpdated": "2023-10-13T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "19",
         "format": "GeoJSON",
         "name": "Messdaten",
         "url": "https://sensors.example/19"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -458,7 +496,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/20"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -476,14 +516,16 @@
       },
       "issued": "2023-10-08T00:00:00Z",
       "lastUpdated": "2023-10-10T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "21",
         "format": "XML",
         "name": "Messdaten",
         "url": "https://sensors.example/21"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -508,7 +550,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/22"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -533,7 +577,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/23"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -558,7 +604,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/24"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -583,7 +631,9 @@
         "name": "API",
         "url": "https://sensors.example/25"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -601,14 +651,16 @@
       },
       "issued": "2023-07-23T00:00:00Z",
       "lastUpdated": "2023-08-16T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "26",
         "format": "CSV",
         "name": "Messdaten",
         "url": "https://sensors.example/26"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "4",
         "name": "Sicherheit"
@@ -633,7 +685,9 @@
         "name": "Monitoring Report",
         "url": "https://sensors.example/27"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -653,7 +707,9 @@
       "lastUpdated": "2023-05-30T00:00:00Z",
       "status": "ready",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -673,7 +729,9 @@
       "lastUpdated": "2023-08-18T00:00:00Z",
       "status": "published",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -698,7 +756,9 @@
         "name": "API",
         "url": "https://sensors.example/30"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -723,7 +783,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/31"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -748,7 +810,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/32"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -766,14 +830,16 @@
       },
       "issued": "2023-04-11T00:00:00Z",
       "lastUpdated": "2025-11-20T19:58:56.644Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "33",
         "format": "PDF",
         "name": "Monitoring Report",
         "url": "https://sensors.example/33"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -791,14 +857,16 @@
       },
       "issued": "2023-04-14T00:00:00Z",
       "lastUpdated": "2023-04-23T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "34",
         "format": "XML",
         "name": "Messdaten",
         "url": "https://sensors.example/34"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -816,14 +884,16 @@
       },
       "issued": "2023-06-14T00:00:00Z",
       "lastUpdated": "2023-07-10T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "35",
         "format": "PDF",
         "name": "Messdaten",
         "url": "https://sensors.example/35"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -841,14 +911,16 @@
       },
       "issued": "2023-01-15T00:00:00Z",
       "lastUpdated": "2023-02-13T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "36",
         "format": "PDF",
         "name": "Sensorservice",
         "url": "https://sensors.example/36"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -868,7 +940,9 @@
       "lastUpdated": "2025-11-20T15:46:49.282Z",
       "status": "published",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -893,7 +967,9 @@
         "name": "Monitoring Report",
         "url": "https://sensors.example/38"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -911,14 +987,16 @@
       },
       "issued": "2023-06-05T00:00:00Z",
       "lastUpdated": "2023-06-11T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "39",
         "format": "CSV",
         "name": "Messdaten",
         "url": "https://sensors.example/39"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -938,7 +1016,9 @@
       "lastUpdated": "2023-02-03T00:00:00Z",
       "status": "ready",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "4",
         "name": "Sicherheit"
@@ -956,14 +1036,16 @@
       },
       "issued": "2023-05-18T00:00:00Z",
       "lastUpdated": "2023-05-25T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "41",
         "format": "PDF",
         "name": "API",
         "url": "https://sensors.example/41"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -988,7 +1070,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/42"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1006,14 +1090,16 @@
       },
       "issued": "2023-09-01T00:00:00Z",
       "lastUpdated": "2023-09-12T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "43",
         "format": "XLSX",
         "name": "Monitoring Report",
         "url": "https://sensors.example/43"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -1031,14 +1117,16 @@
       },
       "issued": "2023-04-25T00:00:00Z",
       "lastUpdated": "2023-04-26T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "44",
         "format": "JSON",
         "name": "Sensorservice",
         "url": "https://sensors.example/44"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1056,9 +1144,11 @@
       },
       "issued": "2023-01-30T00:00:00Z",
       "lastUpdated": "2023-02-27T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -1083,7 +1173,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/46"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -1101,14 +1193,16 @@
       },
       "issued": "2023-09-14T00:00:00Z",
       "lastUpdated": "2023-10-11T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "47",
         "format": "XLSX",
         "name": "Sensorservice",
         "url": "https://sensors.example/47"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "4",
         "name": "Sicherheit"
@@ -1133,7 +1227,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/48"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1158,7 +1254,9 @@
         "name": "API",
         "url": "https://sensors.example/49"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1183,7 +1281,9 @@
         "name": "API",
         "url": "https://sensors.example/50"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -1201,14 +1301,16 @@
       },
       "issued": "2023-09-03T00:00:00Z",
       "lastUpdated": "2023-09-17T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "51",
         "format": "CSV",
         "name": "API",
         "url": "https://sensors.example/51"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -1233,7 +1335,9 @@
         "name": "API",
         "url": "https://sensors.example/52"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -1258,7 +1362,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/53"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1276,9 +1382,11 @@
       },
       "issued": "2023-10-21T00:00:00Z",
       "lastUpdated": "2023-11-11T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -1303,7 +1411,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/55"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -1321,14 +1431,16 @@
       },
       "issued": "2023-09-23T00:00:00Z",
       "lastUpdated": "2023-09-29T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "56",
         "format": "PDF",
         "name": "Sensorservice",
         "url": "https://sensors.example/56"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -1353,7 +1465,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/57"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "4",
         "name": "Sicherheit"
@@ -1373,7 +1487,9 @@
       "lastUpdated": "2023-07-15T00:00:00Z",
       "status": "ready",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -1391,9 +1507,11 @@
       },
       "issued": "2023-05-13T00:00:00Z",
       "lastUpdated": "2023-05-19T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -1411,14 +1529,16 @@
       },
       "issued": "2023-05-24T00:00:00Z",
       "lastUpdated": "2023-06-16T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "60",
         "format": "PDF",
         "name": "API",
         "url": "https://sensors.example/60"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1443,7 +1563,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/61"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1468,7 +1590,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/62"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1486,14 +1610,16 @@
       },
       "issued": "2023-06-08T00:00:00Z",
       "lastUpdated": "2023-06-14T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "63",
         "format": "GeoJSON",
         "name": "Sensorservice",
         "url": "https://sensors.example/63"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -1513,7 +1639,9 @@
       "lastUpdated": "2023-11-07T00:00:00Z",
       "status": "published",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1538,7 +1666,9 @@
         "name": "API",
         "url": "https://sensors.example/65"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1558,7 +1688,9 @@
       "lastUpdated": "2023-04-29T00:00:00Z",
       "status": "published",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1583,7 +1715,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/67"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -1601,9 +1735,11 @@
       },
       "issued": "2023-09-26T00:00:00Z",
       "lastUpdated": "2023-09-26T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -1621,14 +1757,16 @@
       },
       "issued": "2023-04-30T00:00:00Z",
       "lastUpdated": "2023-05-19T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "69",
         "format": "JSON",
         "name": "Messdaten",
         "url": "https://sensors.example/69"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "4",
         "name": "Sicherheit"
@@ -1648,7 +1786,9 @@
       "lastUpdated": "2023-08-09T00:00:00Z",
       "status": "ready",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1673,7 +1813,9 @@
         "name": "Monitoring Report",
         "url": "https://sensors.example/71"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1698,7 +1840,9 @@
         "name": "API",
         "url": "https://sensors.example/72"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1723,7 +1867,9 @@
         "name": "Monitoring Report",
         "url": "https://sensors.example/73"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -1748,7 +1894,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/74"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1766,14 +1914,16 @@
       },
       "issued": "2023-09-08T00:00:00Z",
       "lastUpdated": "2023-09-17T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "75",
         "format": "XLSX",
         "name": "API",
         "url": "https://sensors.example/75"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -1798,7 +1948,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/76"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1823,7 +1975,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/77"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1848,7 +2002,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/78"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1868,7 +2024,9 @@
       "lastUpdated": "2023-04-09T00:00:00Z",
       "status": "ready",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -1893,7 +2051,9 @@
         "name": "API",
         "url": "https://sensors.example/80"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1911,14 +2071,16 @@
       },
       "issued": "2023-08-04T00:00:00Z",
       "lastUpdated": "2023-08-18T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "81",
         "format": "PDF",
         "name": "Messdaten",
         "url": "https://sensors.example/81"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1936,14 +2098,16 @@
       },
       "issued": "2023-09-17T00:00:00Z",
       "lastUpdated": "2023-09-25T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "82",
         "format": "ZIP",
         "name": "API",
         "url": "https://sensors.example/82"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -1961,14 +2125,16 @@
       },
       "issued": "2023-08-15T00:00:00Z",
       "lastUpdated": "2023-08-24T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "83",
         "format": "CSV",
         "name": "API",
         "url": "https://sensors.example/83"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -1986,14 +2152,16 @@
       },
       "issued": "2023-08-09T00:00:00Z",
       "lastUpdated": "2023-08-31T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "84",
         "format": "XML",
         "name": "Sensorservice",
         "url": "https://sensors.example/84"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -2011,14 +2179,16 @@
       },
       "issued": "2023-02-21T00:00:00Z",
       "lastUpdated": "2023-03-19T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "85",
         "format": "ZIP",
         "name": "Monitoring Report",
         "url": "https://sensors.example/85"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -2038,7 +2208,9 @@
       "lastUpdated": "2023-02-24T00:00:00Z",
       "status": "published",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -2056,14 +2228,16 @@
       },
       "issued": "2023-06-29T00:00:00Z",
       "lastUpdated": "2023-07-20T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "87",
         "format": "XLSX",
         "name": "Messdaten",
         "url": "https://sensors.example/87"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -2088,7 +2262,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/88"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -2113,7 +2289,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/89"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -2131,9 +2309,11 @@
       },
       "issued": "2023-02-25T00:00:00Z",
       "lastUpdated": "2023-03-23T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -2158,7 +2338,9 @@
         "name": "API",
         "url": "https://sensors.example/91"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -2178,7 +2360,9 @@
       "lastUpdated": "2023-03-13T00:00:00Z",
       "status": "published",
       "distribution": null,
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -2196,14 +2380,16 @@
       },
       "issued": "2023-02-04T00:00:00Z",
       "lastUpdated": "2023-02-08T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "93",
         "format": "XLSX",
         "name": "Messdaten",
         "url": "https://sensors.example/93"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -2221,14 +2407,16 @@
       },
       "issued": "2023-06-15T00:00:00Z",
       "lastUpdated": "2023-06-19T00:00:00Z",
-      "status": "draft",
+      "status": "DRAFT",
       "distribution": {
         "id": "94",
         "format": "JSON",
         "name": "Sensorservice",
         "url": "https://sensors.example/94"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "5",
         "name": "Gesundheit"
@@ -2253,7 +2441,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/95"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -2278,7 +2468,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/96"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "1",
         "name": "Verkehr"
@@ -2306,7 +2498,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/97"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -2331,7 +2525,9 @@
         "name": "Sensorservice",
         "url": "https://sensors.example/98"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -2356,7 +2552,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/99"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "3",
         "name": "Stadtplanung"
@@ -2381,7 +2579,9 @@
         "name": "Messdaten",
         "url": "https://sensors.example/100"
       },
-      "catalog": ["1"],
+      "catalog": [
+        "1"
+      ],
       "dataspace": {
         "id": "2",
         "name": "Umwelt"
@@ -2407,7 +2607,11 @@
       "active": true,
       "positionDescription": "Bauingenieur für Kanalisationsbau ",
       "displayName": "Sophia Fischer",
-      "groups": ["1", "2", "zQe8zBc"]
+      "groups": [
+        "1",
+        "2",
+        "zQe8zBc"
+      ]
     },
     {
       "id": "2",
@@ -2426,7 +2630,10 @@
       "active": true,
       "positionDescription": "Biotopschutz-Spezialist",
       "displayName": "Markus Schmidt",
-      "groups": ["3", "zQe8zBc"]
+      "groups": [
+        "3",
+        "zQe8zBc"
+      ]
     },
     {
       "id": "3",
@@ -2445,7 +2652,9 @@
       "active": false,
       "positionDescription": null,
       "displayName": "Michael Wagner",
-      "groups": ["2"]
+      "groups": [
+        "2"
+      ]
     },
     {
       "id": "4",
@@ -2461,8 +2670,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Luftfahrtprüfer",
       "positionDescription": ""
@@ -2480,12 +2695,18 @@
         }
       },
       "department": "1",
-      "groups": ["1", "2", "3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
       "phone": "+49 158 3743727",
       "active": true,
       "position": "Flugsicherheitsbeauftragter",
       "positionDescription": null,
-      "roles": ["1"],
+      "roles": [
+        "1"
+      ],
       "displayName": "Clara Becker"
     },
     {
@@ -2502,8 +2723,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": false,
       "position": "Sachbearbeiter Fahrerlaubnisse",
       "positionDescription": ""
@@ -2522,8 +2749,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Schleusenwärter",
       "positionDescription": ""
@@ -2542,8 +2775,15 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3", "zQe8zBc"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3",
+        "zQe8zBc"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": true,
       "position": "Fahrzeugtechniker",
       "positionDescription": ""
@@ -2562,8 +2802,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": false,
       "position": "Bodenschutzexperte",
       "positionDescription": ""
@@ -2601,8 +2847,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Leiter Recyclinghof",
       "positionDescription": ""
@@ -2621,8 +2873,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Wasserqualitätsprüfer",
       "positionDescription": ""
@@ -2641,8 +2899,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": false,
       "position": "Ingenieur Leitungsbau",
       "positionDescription": ""
@@ -2661,8 +2925,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Ingenieur Leitungsbau",
       "positionDescription": ""
@@ -2681,8 +2951,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": false,
       "position": "Forstingenieur",
       "positionDescription": ""
@@ -2701,8 +2977,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": true,
       "position": "Denkmalschutzexperte",
       "positionDescription": ""
@@ -2721,8 +3003,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": true,
       "position": "Klimaschutzkoordinator",
       "positionDescription": ""
@@ -2741,8 +3029,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": false,
       "position": "Klimaschutzkoordinator",
       "positionDescription": ""
@@ -2761,8 +3055,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": true,
       "position": "Kfz-Zulassungsprüfer",
       "positionDescription": ""
@@ -2781,8 +3081,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Artenschutzbeauftragter",
       "positionDescription": ""
@@ -2801,8 +3107,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Techniker Straßenbeleuchtung",
       "positionDescription": ""
@@ -2821,8 +3133,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Mitarbeiter Grundwasserbau",
       "positionDescription": ""
@@ -2841,8 +3159,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Wasserqualitätsprüfer",
       "positionDescription": ""
@@ -2861,8 +3185,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": true,
       "position": "Friedhofsgärtner",
       "positionDescription": ""
@@ -2881,8 +3211,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Mitarbeiter Restmüllentsorgung",
       "positionDescription": ""
@@ -2901,8 +3237,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": true,
       "position": "Landschaftsgärtner",
       "positionDescription": ""
@@ -2921,8 +3263,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": true,
       "position": "Biotopschutz-Spezialist",
       "positionDescription": ""
@@ -2941,8 +3289,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Abfallberater",
       "positionDescription": ""
@@ -2961,8 +3315,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Techniker Straßenbeleuchtung",
       "positionDescription": ""
@@ -2981,8 +3341,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": false,
       "position": "Spielplatzwart",
       "positionDescription": ""
@@ -3001,8 +3367,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": true,
       "position": "Mitarbeiter Grundwasserbau",
       "positionDescription": ""
@@ -3021,8 +3393,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Baumpfleger",
       "positionDescription": ""
@@ -3041,8 +3419,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Straßenplaner",
       "positionDescription": ""
@@ -3061,8 +3445,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": true,
       "position": "Friedhofsgärtner",
       "positionDescription": ""
@@ -3081,8 +3471,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Landschaftsgärtner",
       "positionDescription": ""
@@ -3101,8 +3497,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": true,
       "position": "Landschaftsgärtner",
       "positionDescription": ""
@@ -3121,8 +3523,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": true,
       "position": "Friedhofsgärtner",
       "positionDescription": ""
@@ -3141,8 +3549,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": true,
       "position": "Hafeninspektor",
       "positionDescription": ""
@@ -3161,8 +3575,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": true,
       "position": "Biotopschutz-Spezialist",
       "positionDescription": ""
@@ -3181,8 +3601,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Friedhofsgärtner",
       "positionDescription": ""
@@ -3201,8 +3627,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": false,
       "position": "Luftreinhalteexperte",
       "positionDescription": ""
@@ -3221,8 +3653,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Flughafeninspektor",
       "positionDescription": ""
@@ -3241,8 +3679,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Sachbearbeiter Bußgelder",
       "positionDescription": ""
@@ -3261,8 +3705,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": false,
       "position": "Forstingenieur",
       "positionDescription": ""
@@ -3281,8 +3731,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Experte für Biomüll",
       "positionDescription": ""
@@ -3301,8 +3757,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": true,
       "position": "Ingenieur Leitungsbau",
       "positionDescription": ""
@@ -3321,8 +3783,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": false,
       "position": "Flughafeninspektor",
       "positionDescription": ""
@@ -3341,8 +3809,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Forstingenieur",
       "positionDescription": ""
@@ -3361,8 +3835,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": false,
       "position": "Techniker Straßenbeleuchtung",
       "positionDescription": ""
@@ -3381,8 +3861,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Lärmschutzbeauftragter",
       "positionDescription": ""
@@ -3401,8 +3887,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Brückenbauingenieur",
       "positionDescription": ""
@@ -3421,8 +3913,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": true,
       "position": "Ingenieur Leitungsbau",
       "positionDescription": ""
@@ -3441,8 +3939,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": false,
       "position": "Lärmschutzbeauftragter",
       "positionDescription": ""
@@ -3461,8 +3965,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Biotopschutz-Spezialist",
       "positionDescription": ""
@@ -3481,8 +3991,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": true,
       "position": "Wasserwirtschaftsingenieur",
       "positionDescription": ""
@@ -3501,8 +4017,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": false,
       "position": "Ingenieur Leitungsbau",
       "positionDescription": ""
@@ -3521,8 +4043,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Mitarbeiter Restmüllentsorgung",
       "positionDescription": ""
@@ -3541,8 +4069,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": true,
       "position": "Brückenbauingenieur",
       "positionDescription": ""
@@ -3561,8 +4095,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": false,
       "position": "Verkehrsüberwacher",
       "positionDescription": ""
@@ -3581,8 +4121,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Binnenschifffahrtsinspektor",
       "positionDescription": ""
@@ -3601,8 +4147,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Landschaftsgärtner",
       "positionDescription": ""
@@ -3621,8 +4173,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": true,
       "position": "Friedhofsgärtner",
       "positionDescription": ""
@@ -3641,8 +4199,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Küstenschutztechniker",
       "positionDescription": ""
@@ -3661,8 +4225,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Sachbearbeiter Bußgelder",
       "positionDescription": ""
@@ -3681,8 +4251,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": true,
       "position": "Klimaschutzkoordinator",
       "positionDescription": ""
@@ -3701,8 +4277,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": true,
       "position": "Luftreinhalteexperte",
       "positionDescription": ""
@@ -3721,8 +4303,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Bauprüfer",
       "positionDescription": ""
@@ -3741,8 +4329,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": true,
       "position": "Binnenschifffahrtsinspektor",
       "positionDescription": ""
@@ -3761,8 +4355,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": true,
       "position": "Kfz-Zulassungsprüfer",
       "positionDescription": ""
@@ -3781,8 +4381,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Luftfahrtprüfer",
       "positionDescription": ""
@@ -3801,8 +4407,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Wasserwirtschaftsingenieur",
       "positionDescription": ""
@@ -3821,8 +4433,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": true,
       "position": "Techniker Straßenbeleuchtung",
       "positionDescription": ""
@@ -3841,8 +4459,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": false,
       "position": "Bauprüfer",
       "positionDescription": ""
@@ -3861,8 +4485,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Kfz-Zulassungsprüfer",
       "positionDescription": ""
@@ -3881,8 +4511,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": true,
       "position": "Leiter Recyclinghof",
       "positionDescription": ""
@@ -3901,8 +4537,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": true,
       "position": "Fahrzeugtechniker",
       "positionDescription": ""
@@ -3921,8 +4563,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Straßenplaner",
       "positionDescription": ""
@@ -3941,8 +4589,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Ingenieur Tunnelbau",
       "positionDescription": ""
@@ -3961,8 +4615,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": true,
       "position": "Mitarbeiter Restmüllentsorgung",
       "positionDescription": ""
@@ -3981,8 +4641,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": false,
       "position": "Experte für Sondermüll",
       "positionDescription": ""
@@ -4001,8 +4667,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Brückenbauingenieur",
       "positionDescription": ""
@@ -4021,8 +4693,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": true,
       "position": "Kfz-Zulassungsprüfer",
       "positionDescription": ""
@@ -4041,8 +4719,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": true,
       "position": "Leiter Recyclinghof",
       "positionDescription": ""
@@ -4061,8 +4745,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "3"
+      ],
       "active": true,
       "position": "Straßenunterhaltungsarbeiter",
       "positionDescription": ""
@@ -4081,8 +4771,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": false,
       "position": "Luftreinhalteexperte",
       "positionDescription": ""
@@ -4101,8 +4797,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": false,
       "position": "Techniker Straßenbeleuchtung",
       "positionDescription": ""
@@ -4121,8 +4823,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Sachbearbeiter Bußgelder",
       "positionDescription": ""
@@ -4141,8 +4849,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": true,
       "position": "Ingenieur Tunnelbau",
       "positionDescription": ""
@@ -4161,8 +4875,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": true,
       "position": "Mitarbeiter Restmüllentsorgung",
       "positionDescription": ""
@@ -4181,8 +4901,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": false,
       "position": "Flugraumüberwacher",
       "positionDescription": ""
@@ -4201,8 +4927,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": false,
       "position": "Parkanlagenpfleger",
       "positionDescription": ""
@@ -4221,8 +4953,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Parkanlagenpfleger",
       "positionDescription": ""
@@ -4241,8 +4979,14 @@
           "id": "4"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": false,
       "position": "Umweltpädagoge",
       "positionDescription": ""
@@ -4261,8 +5005,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["4"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "4"
+      ],
       "active": true,
       "position": "Landschaftsgärtner",
       "positionDescription": ""
@@ -4281,8 +5031,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Parkanlagenpfleger",
       "positionDescription": ""
@@ -4301,8 +5057,14 @@
           "id": "3"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Luftfahrtprüfer",
       "positionDescription": ""
@@ -4321,8 +5083,14 @@
           "id": "2"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": false,
       "position": "Lärmschutzbeauftragter",
       "positionDescription": ""
@@ -4341,8 +5109,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["5"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "5"
+      ],
       "active": false,
       "position": "Luftreinhalteexperte",
       "positionDescription": ""
@@ -4361,8 +5135,14 @@
           "id": "5"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["2"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "2"
+      ],
       "active": true,
       "position": "Energieberater",
       "positionDescription": ""
@@ -4381,8 +5161,14 @@
           "id": "1"
         }
       },
-      "groups": ["1", "2", "3"],
-      "roles": ["1"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
+      "roles": [
+        "1"
+      ],
       "active": false,
       "position": "Parkanlagenpfleger",
       "positionDescription": ""
@@ -4400,12 +5186,18 @@
         }
       },
       "department": "3",
-      "groups": ["1", "2", "3"],
+      "groups": [
+        "1",
+        "2",
+        "3"
+      ],
       "phone": "+49 164 6822941",
       "active": false,
       "position": "",
       "positionDescription": "",
-      "roles": ["3"],
+      "roles": [
+        "3"
+      ],
       "displayName": "Test 1 User 5"
     },
     {
@@ -4454,7 +5246,15 @@
         "displayName": "Sophia Fischer"
       },
       "parent": null,
-      "roles": ["1", "2", "4", "6", "8", "9", "KERWOWP"],
+      "roles": [
+        "1",
+        "2",
+        "4",
+        "6",
+        "8",
+        "9",
+        "KERWOWP"
+      ],
       "dataspace": {
         "id": "1",
         "title": "Test Dataspace"
@@ -4464,7 +5264,10 @@
           "id": "7",
           "title": "Systemadministration",
           "description": "Verantwortlich für Server, Netzwerke und IT-Sicherheitsrichtlinien. Führt regelmäßige Wartungen und Backups durch.",
-          "roles": ["1", "4"],
+          "roles": [
+            "1",
+            "4"
+          ],
           "users": [
             {
               "id": "20",
@@ -4486,7 +5289,9 @@
           "id": "8",
           "title": "Benutzerverwaltung",
           "description": "Kümmert sich um die Verwaltung von Benutzerkonten, Zugriffsrechten und Gruppenmitgliedschaften.",
-          "roles": ["2"],
+          "roles": [
+            "2"
+          ],
           "users": [
             {
               "id": "67",
@@ -4504,7 +5309,10 @@
           "id": "9",
           "title": "Sicherheitsmanagement",
           "description": "Überwacht sicherheitsrelevante Ereignisse und setzt Richtlinien zum Datenschutz und zur Systemintegrität um.",
-          "roles": ["2", "6"],
+          "roles": [
+            "2",
+            "6"
+          ],
           "users": [
             {
               "id": "1",
@@ -4547,7 +5355,10 @@
         "displayName": "Michael Hoffmann"
       },
       "parent": null,
-      "roles": ["2", "4"],
+      "roles": [
+        "2",
+        "4"
+      ],
       "users": [
         {
           "id": "1",
@@ -4567,7 +5378,9 @@
           "id": "10",
           "title": "IT-Infrastruktur",
           "description": "Pflegt Hardware, Netzwerke und Cloud-Umgebungen. Zuständig für den stabilen Betrieb der technischen Systeme.",
-          "roles": ["2"],
+          "roles": [
+            "2"
+          ],
           "users": [
             {
               "id": "3",
@@ -4589,7 +5402,9 @@
           "id": "11",
           "title": "Softwareentwicklung",
           "description": "Entwickelt und wartet interne Tools und Anwendungen zur Prozessoptimierung.",
-          "roles": ["2"],
+          "roles": [
+            "2"
+          ],
           "users": [
             {
               "id": "5",
@@ -4610,7 +5425,9 @@
               "id": "16",
               "title": "Frontend-Entwicklung",
               "description": "Verantwortlich für die Gestaltung und Implementierung der Benutzeroberflächen interner Anwendungen. Fokus auf Usability, Performance und responsives Design.",
-              "roles": ["2"],
+              "roles": [
+                "2"
+              ],
               "users": [
                 {
                   "id": "34",
@@ -4628,7 +5445,9 @@
               "id": "17",
               "title": "Backend-Entwicklung",
               "description": "Entwickelt und wartet serverseitige Komponenten, APIs und Datenbankschnittstellen. Verantwortlich für Performance, Skalierbarkeit und Sicherheit der Anwendung.",
-              "roles": ["2"],
+              "roles": [
+                "2"
+              ],
               "users": [
                 {
                   "id": "5",
@@ -4651,7 +5470,10 @@
       "id": "3",
       "title": "Sachbearbeiter",
       "description": "Bearbeitet administrative Vorgänge, pflegt Kundendaten und unterstützt interne Prozesse im Tagesgeschäft.",
-      "roles": ["4", "6"],
+      "roles": [
+        "4",
+        "6"
+      ],
       "users": [
         {
           "id": "2",
@@ -4677,7 +5499,10 @@
       "id": "4",
       "title": "Leitung",
       "description": "Verantwortlich für die strategische und operative Führung der jeweiligen Abteilung. Trifft Entscheidungen, koordiniert Teams und überwacht Zielerreichung.",
-      "roles": ["1", "6"],
+      "roles": [
+        "1",
+        "6"
+      ],
       "users": [
         {
           "id": "4",
@@ -4702,7 +5527,9 @@
           "id": "12",
           "title": "Teamleitung Technik",
           "description": "Leitet die technischen Mitarbeiterteams, priorisiert Aufgaben und koordiniert Ressourcen.",
-          "roles": ["6"],
+          "roles": [
+            "6"
+          ],
           "users": [
             {
               "id": "4",
@@ -4724,7 +5551,9 @@
           "id": "13",
           "title": "Projektmanagement",
           "description": "Plant, überwacht und steuert interne Projekte. Verantwortlich für Zeit- und Budgetplanung.",
-          "roles": ["6"],
+          "roles": [
+            "6"
+          ],
           "users": [
             {
               "id": "8",
@@ -4744,7 +5573,9 @@
       "id": "5",
       "title": "Support",
       "description": "Unterstützt Benutzer bei technischen und fachlichen Fragen, bearbeitet Anfragen und sorgt für eine schnelle Problemlösung im täglichen Betrieb.",
-      "roles": ["4"],
+      "roles": [
+        "4"
+      ],
       "users": [
         {
           "id": "5",
@@ -4765,7 +5596,9 @@
           "id": "14",
           "title": "First-Level-Support",
           "description": "Bearbeitet eingehende Supportanfragen, erfasst Tickets und löst Standardprobleme im Erstkontakt.",
-          "roles": ["4"],
+          "roles": [
+            "4"
+          ],
           "users": [
             {
               "id": "14",
@@ -4782,7 +5615,9 @@
               "id": "15",
               "title": "Second-Level-Support",
               "description": "Bearbeitet komplexe technische Probleme, die vom First-Level weitergeleitet werden, und arbeitet eng mit der IT-Abteilung zusammen.",
-              "roles": ["4"],
+              "roles": [
+                "4"
+              ],
               "users": [
                 {
                   "id": "5",
@@ -4804,7 +5639,9 @@
       "id": "6",
       "title": "User",
       "description": "Reguläre Benutzer mit eingeschränkten Zugriffsrechten. Nutzen die bereitgestellten Systeme und Anwendungen zur täglichen Arbeit.",
-      "roles": ["5"],
+      "roles": [
+        "5"
+      ],
       "users": [
         {
           "id": "6",
@@ -4835,7 +5672,9 @@
       "description": "New Group description",
       "contact": null,
       "parent": null,
-      "roles": ["b81evni"],
+      "roles": [
+        "b81evni"
+      ],
       "subgroups": [],
       "users": [
         {
@@ -5547,9 +6386,29 @@
       "description": "Diese Rolle ist für etwas spezifisches da",
       "tenant": "ExampleCorp",
       "type": "system",
-      "permissions": ["3", "1", "16", "31", "2", "17", "32", "18", "33", "4", "19", "5", "20"],
-      "users": ["1", "2"],
-      "groups": ["1", "4"],
+      "permissions": [
+        "3",
+        "1",
+        "16",
+        "31",
+        "2",
+        "17",
+        "32",
+        "18",
+        "33",
+        "4",
+        "19",
+        "5",
+        "20"
+      ],
+      "users": [
+        "1",
+        "2"
+      ],
+      "groups": [
+        "1",
+        "4"
+      ],
       "createdAt": "2024-06-01T12:00:00Z",
       "lastUpdated": "2024-06-01T12:00:00Z",
       "updatedBy": null,
@@ -5561,10 +6420,26 @@
       "description": "Diese Rolle ist für etwas spezifisches da",
       "tenant": "ExampleCorp",
       "type": "system",
-      "permissions": ["1", "2", "3", "6", "8", "11", "13", "7", "12"],
-      "users": ["3", "4"],
+      "permissions": [
+        "1",
+        "2",
+        "3",
+        "6",
+        "8",
+        "11",
+        "13",
+        "7",
+        "12"
+      ],
+      "users": [
+        "3",
+        "4"
+      ],
       "createdAt": "2024-06-01T12:00:00Z",
-      "groups": ["1", "2"],
+      "groups": [
+        "1",
+        "2"
+      ],
       "lastUpdated": "2024-06-01T12:00:00Z",
       "updatedBy": null,
       "roleOrigin": "default"
@@ -5575,10 +6450,23 @@
       "description": "Diese Rolle ist für etwas spezifisches da",
       "tenant": "ExampleCorp",
       "type": "system",
-      "permissions": ["perm3"],
-      "users": ["5", "6", "7", "8", "9", "10", "11", "12"],
+      "permissions": [
+        "perm3"
+      ],
+      "users": [
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
       "createdAt": "2024-06-01T12:00:00Z",
-      "groups": ["3"],
+      "groups": [
+        "3"
+      ],
       "lastUpdated": "2024-06-01T12:00:00Z",
       "updatedBy": null,
       "roleOrigin": "default"
@@ -5590,9 +6478,14 @@
       "tenant": "ExampleCorp",
       "type": "data",
       "permissions": [],
-      "users": ["1", "2"],
+      "users": [
+        "1",
+        "2"
+      ],
       "createdAt": "2024-06-01T12:00:00Z",
-      "groups": ["1"],
+      "groups": [
+        "1"
+      ],
       "lastUpdated": "2024-06-01T12:00:00Z",
       "updatedBy": null,
       "roleOrigin": "default"
@@ -5604,9 +6497,23 @@
       "tenant": "ExampleCorp",
       "type": "data",
       "permissions": [],
-      "users": ["3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
+      "users": [
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
       "createdAt": "2024-06-01T12:00:00Z",
-      "groups": ["1", "4"],
+      "groups": [
+        "1",
+        "4"
+      ],
       "lastUpdated": "2024-06-01T12:00:00Z",
       "updatedBy": null,
       "roleOrigin": "default"
@@ -5618,9 +6525,17 @@
       "tenant": "ExampleCorp",
       "type": "governance",
       "permissions": [],
-      "users": ["1", "2"],
+      "users": [
+        "1",
+        "2"
+      ],
       "createdAt": "2024-06-01T12:00:00Z",
-      "groups": ["1", "2", "3", "4"],
+      "groups": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ],
       "lastUpdated": "2024-06-01T12:00:00Z",
       "updatedBy": null,
       "roleOrigin": "default"
@@ -5632,9 +6547,16 @@
       "type": "data",
       "tenant": "ExampleCorp",
       "permissions": [],
-      "users": ["1", "2"],
+      "users": [
+        "1",
+        "2"
+      ],
       "createdAt": "2024-06-01T12:00:00Z",
-      "groups": ["1", "2", "6"],
+      "groups": [
+        "1",
+        "2",
+        "6"
+      ],
       "lastUpdated": "2024-06-01T12:00:00Z",
       "updatedBy": null,
       "roleOrigin": "custom"
@@ -5646,9 +6568,16 @@
       "type": "data",
       "tenant": "ExampleCorp",
       "permissions": [],
-      "users": ["1", "2"],
+      "users": [
+        "1",
+        "2"
+      ],
       "createdAt": "2024-06-01T12:00:00Z",
-      "groups": ["1", "4", "3"],
+      "groups": [
+        "1",
+        "4",
+        "3"
+      ],
       "lastUpdated": "2024-06-01T12:00:00Z",
       "updatedBy": null,
       "roleOrigin": "custom"
@@ -5685,12 +6614,21 @@
       "type": "system",
       "tenant": "ExampleCorp",
       "users": [],
-      "permissions": ["1", "16", "31", "2", "17", "32"],
+      "permissions": [
+        "1",
+        "16",
+        "31",
+        "2",
+        "17",
+        "32"
+      ],
       "createdAt": "2025-10-02T14:18:37.769Z",
       "name": "Testrolle",
       "description": "Diese Rolle ist für etwas spezifisches da.",
       "id": "b81evni",
-      "groups": ["1"],
+      "groups": [
+        "1"
+      ],
       "lastUpdated": "2024-06-01T12:00:00Z",
       "updatedBy": null,
       "roleOrigin": "custom"
@@ -5699,7 +6637,11 @@
       "type": "system",
       "tenant": "ExampleCorp",
       "users": [],
-      "permissions": ["1", "16", "31"],
+      "permissions": [
+        "1",
+        "16",
+        "31"
+      ],
       "createdAt": "2025-11-21T13:52:15.279Z",
       "groups": [],
       "name": "Test1",
@@ -5727,7 +6669,7 @@
       "connector": null,
       "connection": "inactive",
       "lastActive": "2025-01-01T00:00:00",
-      "status": "draft",
+      "status": "DRAFT",
       "id": "1"
     },
     {
@@ -5736,7 +6678,7 @@
       "connector": null,
       "connection": "active",
       "lastActive": "2025-05-01T00:00:00",
-      "status": "draft",
+      "status": "DRAFT",
       "id": "2"
     },
     {
@@ -5745,7 +6687,7 @@
       "connector": null,
       "connection": "static",
       "lastActive": "2026-01-15T00:00:00",
-      "status": "available",
+      "status": "AVAILABLE",
       "id": "3"
     },
     {
@@ -5754,7 +6696,7 @@
       "connector": null,
       "connection": "active",
       "lastActive": "2025-12-14T00:00:00",
-      "status": "available",
+      "status": "AVAILABLE",
       "id": "4"
     },
     {
@@ -5763,7 +6705,7 @@
       "connector": null,
       "connection": "inactive",
       "lastActive": "2026-01-21T00:00:00",
-      "status": "draft",
+      "status": "DRAFT",
       "id": "5"
     },
     {
@@ -5772,20 +6714,22 @@
       "connector": null,
       "connection": "inactive",
       "lastActive": "2025-01-25T00:00:00",
-      "status": "available",
+      "status": "AVAILABLE",
       "id": "6"
     },
     {
       "name": "Test Datasource",
       "description": "sdasd",
-      "status": "draft",
+      "status": "DRAFT",
       "connector": {
         "type": "sql",
         "config": {
           "driver": "postgres",
           "dsn": "",
           "table": "sdasd",
-          "columns": ["*"],
+          "columns": [
+            "*"
+          ],
           "where": "",
           "args_mapping": "",
           "prefix": "",
@@ -5801,6 +6745,89 @@
       "connection": "inactive",
       "lastActive": "2026-02-04T12:11:34.305Z",
       "id": "8"
+    }
+  ],
+  "datastructures": [
+    {
+      "id": "ds1",
+      "name": "Test Datastructure 1",
+      "description": "Description 1",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": [
+        {
+          "id": "v1",
+          "description": "Version Description 1.0",
+          "versionNumber": "1.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        }
+      ]
+    },
+    {
+      "id": "ds2",
+      "name": "Test Datastructure 2",
+      "description": "Description 2",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": [
+        {
+          "id": "v2",
+          "description": "Version Description 1.0",
+          "versionNumber": "1.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        },
+        {
+          "id": "v3",
+          "description": "Version Description 1.1",
+          "versionNumber": "1.1",
+          "source": "OWN",
+          "status": "DRAFT"
+        }
+      ]
+    },
+    {
+      "id": "ds3",
+      "name": "Test Datastructure 3",
+      "description": "Description 3",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": [
+        {
+          "id": "v4",
+          "description": "Version Description 1.0",
+          "versionNumber": "1.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        },
+        {
+          "id": "v5",
+          "description": "Version Description 1.1",
+          "versionNumber": "1.1",
+          "source": "OWN",
+          "status": "DRAFT"
+        },
+        {
+          "id": "v6",
+          "description": "Version Description 2.0",
+          "versionNumber": "2.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        }
+      ]
+    },
+    {
+      "id": "ds4",
+      "name": "Test Datastructure 4",
+      "description": "Description 4",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": []
     }
   ]
 }

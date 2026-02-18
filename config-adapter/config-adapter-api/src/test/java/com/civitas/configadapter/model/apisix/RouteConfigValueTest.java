@@ -1,12 +1,11 @@
 /**
- * This work and the accompanying materials are made available under the terms of the European Union
- * Public License (EU-PL) 1.2 which is available at
- * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ * <p>This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
  *
- * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to
- * all the individual contributors: Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ *
  */
 package com.civitas.configadapter.model.apisix;
 
@@ -46,6 +45,7 @@ class RouteConfigValueTest {
     assertNull(value.getPlugins());
     assertNull(value.getPriority());
     assertNull(value.getStatus());
+    assertNull(value.getPluginConfigId());
     assertNotNull(value.getAdditionalProperties());
     assertTrue(value.getAdditionalProperties().isEmpty());
   }
@@ -346,5 +346,127 @@ class RouteConfigValueTest {
     Map<String, Object> openidConnect = value.getPlugins().getAdditionalPlugin("openid-connect");
     assertNotNull(openidConnect);
     assertEquals("api-gateway", openidConnect.get("client_id"));
+  }
+
+  // ─── plugin_config_id tests ──────────────────────────────────────────────────
+
+  @Test
+  void pluginConfigId_whenSetAsInteger_shouldReturnInteger() {
+    RouteConfigValue value = new RouteConfigValue();
+    value.setPluginConfigId(1);
+    assertEquals(1, value.getPluginConfigId());
+  }
+
+  @Test
+  void pluginConfigId_whenSetAsString_shouldReturnString() {
+    RouteConfigValue value = new RouteConfigValue();
+    value.setPluginConfigId("auth-plugins");
+    assertEquals("auth-plugins", value.getPluginConfigId());
+  }
+
+  @Test
+  void toApiMap_whenPluginConfigIdSet_shouldContainField() {
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUri("/api/dataspace/ds-001/*");
+    value.setServiceId("svc-frost-server");
+    value.setPluginConfigId(1);
+
+    Map<String, Object> map = value.toApiMap();
+    assertEquals(1, map.get("plugin_config_id"));
+    assertEquals("svc-frost-server", map.get("service_id"));
+  }
+
+  @Test
+  void toApiMap_whenPluginConfigIdNull_shouldNotContainField() {
+    RouteConfigValue value = new RouteConfigValue();
+    value.setUri("/api/dataspace/ds-001/*");
+    value.setServiceId("svc-frost-server");
+
+    Map<String, Object> map = value.toApiMap();
+    assertFalse(map.containsKey("plugin_config_id"));
+    assertEquals("svc-frost-server", map.get("service_id"));
+  }
+
+  @Test
+  void jsonDeserialization_protectedRoute_shouldParsePluginConfigId() throws Exception {
+    String json =
+        """
+                {
+                  "resourceType": "apisix-route",
+                  "uri": "/api/dataspace/ds-001/*",
+                  "service_id": "svc-frost-server",
+                  "plugin_config_id": 1
+                }
+                """;
+
+    RouteConfigValue value = objectMapper.readValue(json, RouteConfigValue.class);
+    assertEquals("/api/dataspace/ds-001/*", value.getUri());
+    assertEquals("svc-frost-server", value.getServiceId());
+    assertEquals(1, value.getPluginConfigId());
+    assertNull(value.getPlugins());
+    assertNull(value.getPriority());
+  }
+
+  @Test
+  void jsonDeserialization_publicRoute_shouldHaveNullPluginConfigId() throws Exception {
+    String json =
+        """
+                {
+                  "resourceType": "apisix-route",
+                  "uri": "/api/dataspace/ds-002/*",
+                  "service_id": "svc-frost-server",
+                  "priority": 1
+                }
+                """;
+
+    RouteConfigValue value = objectMapper.readValue(json, RouteConfigValue.class);
+    assertEquals("/api/dataspace/ds-002/*", value.getUri());
+    assertEquals("svc-frost-server", value.getServiceId());
+    assertNull(value.getPluginConfigId());
+    assertEquals(1, value.getPriority());
+  }
+
+  @Test
+  void toApiMap_protectedToPublicUpdate_shouldOmitPluginConfigId() {
+    // Simulate UPDATE_ROUTE: openDataAccess changed from false to true
+    // The route should lose plugin_config_id and gain priority
+    RouteConfigValue publicRoute = new RouteConfigValue();
+    publicRoute.setUri("/api/dataspace/ds-001/*");
+    publicRoute.setServiceId("svc-frost-server");
+    publicRoute.setPriority(1);
+    // pluginConfigId deliberately NOT set (null) -> public
+
+    Map<String, Object> map = publicRoute.toApiMap();
+    assertFalse(map.containsKey("plugin_config_id"));
+    assertEquals(1, map.get("priority"));
+    assertEquals("svc-frost-server", map.get("service_id"));
+  }
+
+  @Test
+  void toApiMap_publicToProtectedUpdate_shouldIncludePluginConfigId() {
+    // Simulate UPDATE_ROUTE: openDataAccess changed from true to false
+    // The route should gain plugin_config_id and lose priority
+    RouteConfigValue protectedRoute = new RouteConfigValue();
+    protectedRoute.setUri("/api/dataspace/ds-001/*");
+    protectedRoute.setServiceId("svc-frost-server");
+    protectedRoute.setPluginConfigId(1);
+    // priority deliberately NOT set (null) -> protected, default priority
+
+    Map<String, Object> map = protectedRoute.toApiMap();
+    assertEquals(1, map.get("plugin_config_id"));
+    assertFalse(map.containsKey("priority"));
+    assertEquals("svc-frost-server", map.get("service_id"));
+  }
+
+  @Test
+  void equals_whenDifferentPluginConfigId_shouldReturnFalse() {
+    RouteConfigValue protectedRoute = new RouteConfigValue();
+    protectedRoute.setUri("/test");
+    protectedRoute.setPluginConfigId(1);
+
+    RouteConfigValue publicRoute = new RouteConfigValue();
+    publicRoute.setUri("/test");
+
+    assertNotEquals(protectedRoute, publicRoute);
   }
 }

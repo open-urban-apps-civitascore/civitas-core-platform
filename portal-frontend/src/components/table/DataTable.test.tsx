@@ -61,7 +61,9 @@ const mockColumnsWithSubrows = [
   columnHelper.accessor('name', {
     header: 'name',
     cell: ({ row }: CellContext<Row, unknown>) => (
-      <ExpanderCell row={row} value={row.original.name} className="font-medium" />
+      <ExpanderCell row={row} className="font-medium">
+        {row.original.name}
+      </ExpanderCell>
     ),
   }),
   columnHelper.accessor('description', {

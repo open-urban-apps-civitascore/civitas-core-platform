@@ -1,6 +1,8 @@
 import { AxiosRequestConfig } from 'axios'
 import { InputHTMLAttributes } from 'react'
 
+import { enumFromConst } from '@/utils/common'
+
 export type Item = {
   id: string
   title: string
@@ -15,6 +17,15 @@ export type SelectOption = {
   value: string
   label: string
 }
+
+export const STATUS_TYPES = {
+  DRAFT: 'DRAFT',
+  AVAILABLE: 'AVAILABLE',
+} as const
+
+export const StatusEnum = enumFromConst(STATUS_TYPES)
+
+export type Status = (typeof STATUS_TYPES)[keyof typeof STATUS_TYPES]
 
 export type InputPropsWithoutForm = Omit<InputHTMLAttributes<HTMLInputElement>, 'form' | 'onChange'>
 

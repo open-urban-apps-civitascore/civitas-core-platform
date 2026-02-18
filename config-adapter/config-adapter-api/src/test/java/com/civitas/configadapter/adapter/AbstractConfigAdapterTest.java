@@ -1,12 +1,11 @@
 /**
- * This work and the accompanying materials are made available under the terms of the European Union
- * Public License (EU-PL) 1.2 which is available at
- * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ * <p>This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
  *
- * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to
- * all the individual contributors: Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ *
  */
 package com.civitas.configadapter.adapter;
 
@@ -139,10 +138,10 @@ class AbstractConfigAdapterTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-
-    assertNotNull(adapter);
-    assertTrue(adapter.getSubscribedTopics().isEmpty());
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      assertNotNull(adapter);
+      assertTrue(adapter.getSubscribedTopics().isEmpty());
+    }
   }
 
   @Test
@@ -150,10 +149,10 @@ class AbstractConfigAdapterTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn("   ");
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-
-    assertNotNull(adapter);
-    assertTrue(adapter.getSubscribedTopics().isEmpty());
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      assertNotNull(adapter);
+      assertTrue(adapter.getSubscribedTopics().isEmpty());
+    }
   }
 
   @Test
@@ -161,11 +160,11 @@ class AbstractConfigAdapterTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(Topics.USER_CREATED.toString());
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-
-    assertNotNull(adapter);
-    assertEquals(1, adapter.getSubscribedTopics().size());
-    assertEquals(Topics.USER_CREATED.toString(), adapter.getSubscribedTopics().getFirst());
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      assertNotNull(adapter);
+      assertEquals(1, adapter.getSubscribedTopics().size());
+      assertEquals(Topics.USER_CREATED.toString(), adapter.getSubscribedTopics().getFirst());
+    }
   }
 
   @Test
@@ -174,12 +173,12 @@ class AbstractConfigAdapterTest {
     when(mockConfig.getProperty("test-adapter.topics"))
         .thenReturn(Topics.USER_CREATED + "," + Topics.USER_UPDATED);
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-
-    assertNotNull(adapter);
-    assertEquals(2, adapter.getSubscribedTopics().size());
-    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_CREATED.toString()));
-    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_UPDATED.toString()));
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      assertNotNull(adapter);
+      assertEquals(2, adapter.getSubscribedTopics().size());
+      assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_CREATED.toString()));
+      assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_UPDATED.toString()));
+    }
   }
 
   @Test
@@ -188,12 +187,12 @@ class AbstractConfigAdapterTest {
     when(mockConfig.getProperty("test-adapter.topics"))
         .thenReturn("  " + Topics.USER_CREATED + " , " + Topics.USER_UPDATED + "  ");
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-
-    assertNotNull(adapter);
-    assertEquals(2, adapter.getSubscribedTopics().size());
-    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_CREATED.toString()));
-    assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_UPDATED.toString()));
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      assertNotNull(adapter);
+      assertEquals(2, adapter.getSubscribedTopics().size());
+      assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_CREATED.toString()));
+      assertTrue(adapter.getSubscribedTopics().contains(Topics.USER_UPDATED.toString()));
+    }
   }
 
   @Test
@@ -201,10 +200,9 @@ class AbstractConfigAdapterTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("my-adapter.topics")).thenReturn(null);
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "my-adapter");
-
-    assertEquals("my-adapter", adapter.getName());
-    adapter.close();
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "my-adapter")) {
+      assertEquals("my-adapter", adapter.getName());
+    }
   }
 
   @Test
@@ -213,10 +211,9 @@ class AbstractConfigAdapterTest {
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
     when(mockConfig.getProperty("test-adapter.url")).thenReturn("http://localhost:8080");
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-
-    assertEquals("http://localhost:8080", adapter.getAdapterProperty("url"));
-    adapter.close();
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      assertEquals("http://localhost:8080", adapter.getAdapterProperty("url"));
+    }
   }
 
   @Test
@@ -225,10 +222,9 @@ class AbstractConfigAdapterTest {
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
     when(mockConfig.getProperty("test-adapter.url", "default")).thenReturn("http://localhost:8080");
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-
-    assertEquals("http://localhost:8080", adapter.getAdapterProperty("url", "default"));
-    adapter.close();
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      assertEquals("http://localhost:8080", adapter.getAdapterProperty("url", "default"));
+    }
   }
 
   @Test
@@ -236,15 +232,15 @@ class AbstractConfigAdapterTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-    EventPublisher mockPublisher = mock(EventPublisher.class);
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      EventPublisher mockPublisher = mock(EventPublisher.class);
 
-    assertNull(adapter.getEventPublisher());
+      assertNull(adapter.getEventPublisher());
 
-    adapter.setEventPublisher(mockPublisher);
+      adapter.setEventPublisher(mockPublisher);
 
-    assertEquals(mockPublisher, adapter.getEventPublisher());
-    adapter.close();
+      assertEquals(mockPublisher, adapter.getEventPublisher());
+    }
   }
 
   @Test
@@ -252,10 +248,9 @@ class AbstractConfigAdapterTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-
-    assertEquals(mockConfig, adapter.getConfig());
-    adapter.close();
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      assertEquals(mockConfig, adapter.getConfig());
+    }
   }
 
   @Test
@@ -263,12 +258,12 @@ class AbstractConfigAdapterTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(Topics.USER_CREATED.toString());
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-    List<String> topics = adapter.getSubscribedTopics();
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      List<String> topics = adapter.getSubscribedTopics();
 
-    assertNotNull(topics);
-    assertThrows(UnsupportedOperationException.class, () -> topics.add("new-topic"));
-    adapter.close();
+      assertNotNull(topics);
+      assertThrows(UnsupportedOperationException.class, () -> topics.add("new-topic"));
+    }
   }
 
   @Test
@@ -278,26 +273,27 @@ class AbstractConfigAdapterTest {
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
     EventPublisher mockPublisher = mock(EventPublisher.class);
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-    adapter.setEventPublisher(mockPublisher);
-    adapter.fatalToThrow =
-        new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, "test error");
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      adapter.setEventPublisher(mockPublisher);
+      adapter.fatalToThrow =
+          new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, "test error");
 
-    ConfigEvent event = createTestConfigEvent();
+      ConfigEvent event = createTestConfigEvent();
 
-    FatalAdapterException thrown =
-        assertThrows(
-            FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
+      FatalAdapterException thrown =
+          assertThrows(
+              FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
 
-    assertEquals(AdapterErrorCode.INVALID_PAYLOAD, thrown.getErrorCode());
+      assertEquals(AdapterErrorCode.INVALID_PAYLOAD, thrown.getErrorCode());
 
-    ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
-    verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
 
-    ConfigResultEvent result = captor.getValue();
-    assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
-    assertEquals("civitas.config-adapter.test-adapter", result.source());
-    assertEquals(TEST_RESULT_TYPE, result.resultType());
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
+      assertEquals("civitas.config-adapter.test-adapter", result.source());
+      assertEquals(TEST_RESULT_TYPE, result.resultType());
+    }
   }
 
   @Test
@@ -306,19 +302,21 @@ class AbstractConfigAdapterTest {
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
     EventPublisher mockPublisher = mock(EventPublisher.class);
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-    adapter.setEventPublisher(mockPublisher);
-    adapter.retryableToThrow =
-        new RetryableAdapterException(AdapterErrorCode.CONNECTION_TIMEOUT, "test-service");
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      adapter.setEventPublisher(mockPublisher);
+      adapter.retryableToThrow =
+          new RetryableAdapterException(AdapterErrorCode.CONNECTION_TIMEOUT, "test-service");
 
-    ConfigEvent event = createTestConfigEvent();
+      ConfigEvent event = createTestConfigEvent();
 
-    RetryableAdapterException thrown =
-        assertThrows(
-            RetryableAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
+      RetryableAdapterException thrown =
+          assertThrows(
+              RetryableAdapterException.class,
+              () -> adapter.processConfigEvent("test-topic", event));
 
-    assertEquals(AdapterErrorCode.CONNECTION_TIMEOUT, thrown.getErrorCode());
-    assertTrue(thrown.isRetryable());
+      assertEquals(AdapterErrorCode.CONNECTION_TIMEOUT, thrown.getErrorCode());
+      assertTrue(thrown.isRetryable());
+    }
   }
 
   @Test
@@ -328,23 +326,24 @@ class AbstractConfigAdapterTest {
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
     EventPublisher mockPublisher = mock(EventPublisher.class);
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-    adapter.setEventPublisher(mockPublisher);
-    adapter.runtimeToThrow = new RuntimeException("unexpected error");
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      adapter.setEventPublisher(mockPublisher);
+      adapter.runtimeToThrow = new RuntimeException("unexpected error");
 
-    ConfigEvent event = createTestConfigEvent();
+      ConfigEvent event = createTestConfigEvent();
 
-    FatalAdapterException thrown =
-        assertThrows(
-            FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
+      FatalAdapterException thrown =
+          assertThrows(
+              FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
 
-    assertEquals(AdapterErrorCode.UNKNOWN_ERROR, thrown.getErrorCode());
+      assertEquals(AdapterErrorCode.UNKNOWN_ERROR, thrown.getErrorCode());
 
-    ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
-    verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
 
-    ConfigResultEvent result = captor.getValue();
-    assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
+      ConfigResultEvent result = captor.getValue();
+      assertEquals(ConfigResultEvent.Status.FAILURE, result.status());
+    }
   }
 
   @Test
@@ -352,15 +351,16 @@ class AbstractConfigAdapterTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-    adapter.fatalToThrow =
-        new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, "test error");
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      adapter.fatalToThrow =
+          new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, "test error");
 
-    ConfigEvent event = createTestConfigEvent();
+      ConfigEvent event = createTestConfigEvent();
 
-    assertThrows(
-        FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
-    // No NPE from publishFailureResult when publisher is null
+      assertThrows(
+          FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
+      // No NPE from publishFailureResult when publisher is null
+    }
   }
 
   @Test
@@ -369,12 +369,14 @@ class AbstractConfigAdapterTest {
     when(mockConfig.getProperty("test-adapter.topics")).thenReturn(null);
     EventPublisher mockPublisher = mock(EventPublisher.class);
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-    adapter.setEventPublisher(mockPublisher);
-    adapter.runtimeToThrow = new NullPointerException("null event");
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      adapter.setEventPublisher(mockPublisher);
+      adapter.runtimeToThrow = new NullPointerException("null event");
 
-    assertThrows(FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", null));
-    // publishFailureResult should handle null event gracefully
+      assertThrows(
+          FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", null));
+      // publishFailureResult should handle null event gracefully
+    }
   }
 
   @Test
@@ -382,10 +384,9 @@ class AbstractConfigAdapterTest {
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("my-adapter.topics")).thenReturn(null);
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "my-adapter");
-
-    assertEquals("civitas.config-adapter.my-adapter", adapter.getAdapterSource());
-    adapter.close();
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "my-adapter")) {
+      assertEquals("civitas.config-adapter.my-adapter", adapter.getAdapterSource());
+    }
   }
 
   @Test
@@ -398,19 +399,20 @@ class AbstractConfigAdapterTest {
         .when(mockPublisher)
         .publish(any(String.class), any(ConfigResultEvent.class));
 
-    TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter");
-    adapter.setEventPublisher(mockPublisher);
-    adapter.fatalToThrow =
-        new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, "test error");
+    try (TestAdapter adapter = new TestAdapter(mockConfig, "test-adapter")) {
+      adapter.setEventPublisher(mockPublisher);
+      adapter.fatalToThrow =
+          new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, "test error");
 
-    ConfigEvent event = createTestConfigEvent();
+      ConfigEvent event = createTestConfigEvent();
 
-    // Should still throw the original exception, not the publish exception
-    FatalAdapterException thrown =
-        assertThrows(
-            FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
+      // Should still throw the original exception, not the publish exception
+      FatalAdapterException thrown =
+          assertThrows(
+              FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
 
-    assertEquals(AdapterErrorCode.INVALID_PAYLOAD, thrown.getErrorCode());
+      assertEquals(AdapterErrorCode.INVALID_PAYLOAD, thrown.getErrorCode());
+    }
   }
 
   private ConfigEvent createTestConfigEvent() {

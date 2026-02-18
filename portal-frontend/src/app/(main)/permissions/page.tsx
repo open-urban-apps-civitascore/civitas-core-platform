@@ -16,18 +16,17 @@ import { ROLE_TYPES } from '@/types/roles'
 
 import { PermissionsTable } from './components/PermissionsTable'
 
+const tabsValues = {
+  systemPermissions: { value: ROLE_TYPES.SYSTEM, label: 'permissions.systemPermissions' },
+  dataPermissions: { value: ROLE_TYPES.DATA, label: 'permissions.dataPermissions' },
+  governancePermissions: { value: ROLE_TYPES.GOVERNANCE, label: 'permissions.governancePermissions' },
+}
+
 export const DEFAULT_TAB = ROLE_TYPES.SYSTEM
 
 const PermissionsPage = () => {
-  const t = useTranslations('permissions')
-
+  const t = useTranslations()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-
-  const tabsValues = {
-    systemPermissions: { value: ROLE_TYPES.SYSTEM, label: t('systemPermissions') },
-    dataPermissions: { value: ROLE_TYPES.DATA, label: t('dataPermissions') },
-    governancePermissions: { value: ROLE_TYPES.GOVERNANCE, label: t('governancePermissions') },
-  }
   const tabs = [tabsValues.systemPermissions, tabsValues.dataPermissions, tabsValues.governancePermissions]
 
   const {
@@ -60,13 +59,18 @@ const PermissionsPage = () => {
     console.log(`/permissions/${row.original.id}?_tab=${permissionType}`)
   }
 
+  const getTitle = () => {
+    const label = tabs.find(tab => tab.value === permissionType)?.label
+    return label ? t(label) : ''
+  }
+
   return (
     <PageContainer headerType="withPrimaryTabs">
       <PageHeader
-        title={tabs.find(tab => tab.value === permissionType)?.label}
-        tabs={{
+        title={getTitle()}
+        segmentedControlBarProps={{
           tabs,
-          onClick: type => {
+          onTabChange: type => {
             setPermissionsType(type)
             setTabValueParam(type)
           },

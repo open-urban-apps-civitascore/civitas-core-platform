@@ -19,7 +19,6 @@
 # - develop: snapshot version (e.g., 1.0.2-SNAPSHOT)
 # - MR: merge request version (e.g., 1.0.2-MR-123)
 setup-version-config-adapter:
-  extends: .only-config-adapter-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: .pre
   variables:

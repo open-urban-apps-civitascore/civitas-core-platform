@@ -1,12 +1,11 @@
 /**
- * This work and the accompanying materials are made available under the terms of the European Union
- * Public License (EU-PL) 1.2 which is available at
- * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ * <p>This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
  *
- * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to
- * all the individual contributors: Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ *
  */
 package com.civitas.configadapter.application;
 
@@ -17,6 +16,7 @@ import static java.util.Objects.requireNonNull;
 
 import com.civitas.configadapter.adapter.AbstractConfigAdapter;
 import com.civitas.configadapter.adapter.ConfigAdapter;
+import com.civitas.configadapter.adapter.SagaCommandHandler;
 import com.civitas.configadapter.configuration.AdapterConfig;
 import com.civitas.configadapter.configuration.AppConfig;
 import com.civitas.configadapter.configuration.ApplicationConfig;
@@ -24,10 +24,23 @@ import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.messaging.EventConsumer;
 import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.AdapterErrorCode;
+import com.civitas.event.handler.kafka.KafkaSagaCommandConsumer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
+import java.util.ServiceLoader;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +93,7 @@ public class Application {
 
   private final AppConfig appConfig;
   private final List<EventConsumer> consumers;
+  private KafkaSagaCommandConsumer sagaCommandConsumer;
 
   /**
    * Creates a new Application instance with the specified configuration file.
@@ -93,6 +107,7 @@ public class Application {
   public Application(String configFileName) throws FatalAdapterException {
     appConfig = new AppConfig(requireNonNull(configFileName));
     consumers = createConsumers(appConfig);
+    sagaCommandConsumer = createSagaCommandConsumer(appConfig);
   }
 
   /**
@@ -122,6 +137,10 @@ public class Application {
         consumer.start();
       }
 
+      if (sagaCommandConsumer != null) {
+        sagaCommandConsumer.start();
+      }
+
       healthCheckServer.markReady();
 
       logger.info(
@@ -138,6 +157,14 @@ public class Application {
       System.exit(1);
     } finally {
       logger.info("Shutting down {} consumer(s)", consumers.size());
+
+      if (sagaCommandConsumer != null) {
+        try {
+          sagaCommandConsumer.close();
+        } catch (Exception e) {
+          logger.error("Error closing saga command consumer", e);
+        }
+      }
 
       for (EventConsumer consumer : consumers) {
         try {
@@ -297,6 +324,74 @@ public class Application {
       return ep;
     }
     return null;
+  }
+
+  private KafkaSagaCommandConsumer createSagaCommandConsumer(AppConfig config) {
+    Map<String, SagaCommandHandler> handlers = discoverSagaHandlers(config);
+    if (handlers.isEmpty()) {
+      logger.info("No SagaCommandHandler implementations found, saga consumer disabled");
+      return null;
+    }
+
+    String bootstrapServers = config.getProperty("kafka.bootstrap.servers", "localhost:9092");
+    String groupId = config.getProperty("kafka.group.id", "config-adapter-group");
+
+    KafkaConsumer<String, byte[]> consumer =
+        new KafkaConsumer<>(createSagaConsumerProperties(bootstrapServers, groupId + "-saga"));
+    KafkaProducer<String, byte[]> producer =
+        new KafkaProducer<>(createSagaProducerProperties(bootstrapServers));
+
+    logger.info(
+        "SagaCommandConsumer created with {} handler(s): {}",
+        handlers.size(),
+        Encode.forJava(String.valueOf(handlers.keySet())));
+
+    return new KafkaSagaCommandConsumer(consumer, producer, handlers);
+  }
+
+  private Map<String, SagaCommandHandler> discoverSagaHandlers(AdapterConfig config) {
+    Map<String, SagaCommandHandler> handlers = new HashMap<>();
+    ServiceLoader<SagaCommandHandler> loader = ServiceLoader.load(SagaCommandHandler.class);
+
+    for (SagaCommandHandler handler : loader) {
+      try {
+        handler.initialize(config);
+        handlers.put(handler.adapter(), handler);
+        logger.info(
+            "Discovered SagaCommandHandler: {} ({})",
+            Encode.forJava(handler.adapter()),
+            handler.getClass().getSimpleName());
+      } catch (Exception e) {
+        logger.error(
+            "Failed to initialize SagaCommandHandler {}: {}",
+            handler.getClass().getSimpleName(),
+            Encode.forJava(e.getMessage()),
+            e);
+      }
+    }
+    return handlers;
+  }
+
+  private Properties createSagaConsumerProperties(String bootstrapServers, String groupId) {
+    Properties props = new Properties();
+    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    props.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+    props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+    props.put(
+        ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class.getName());
+    props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+    props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+    return props;
+  }
+
+  private Properties createSagaProducerProperties(String bootstrapServers) {
+    Properties props = new Properties();
+    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+    props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+    props.put(ProducerConfig.ACKS_CONFIG, "all");
+    props.put(ProducerConfig.RETRIES_CONFIG, 3);
+    return props;
   }
 
   private ConfigAdapter createAdapter(AdapterConfig config, String adapterName) {
