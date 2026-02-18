@@ -3,11 +3,11 @@ import { useTranslations } from 'next-intl'
 
 import { ActivityBadge } from '@/components/activity-badge/ActivityBadge'
 import { DataTable } from '@/components/table/DataTable'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { TableProps } from '@/types/table'
 import { ListUser } from '@/types/users'
 import { resolveUpdater } from '@/utils/table'
-import { LinkCell } from '@/components/table/link-cell/LinkCell'
 
 interface UsersTableProps extends TableProps<ListUser> {
   users: ListUser[]

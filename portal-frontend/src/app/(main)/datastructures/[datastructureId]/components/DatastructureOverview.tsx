@@ -9,8 +9,8 @@ import { toast } from 'sonner'
 
 import { useUpdateDatastructure } from '@/app/services/api/datastructures/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
-import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
+import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -243,10 +243,10 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       </PageBackground>
 
       <ExitWarningModal
-        isOpen={isExitModalOpen}
-        onClose={() => setIsExitModalOpen(false)}
+        open={isExitModalOpen}
+        onOpenChange={() => setIsExitModalOpen(false)}
         onDiscard={handleExit}
-        onSave={handleSave}
+        onConfirm={handleSave}
         isLoading={isLoading}
       />
     </PageContainer>

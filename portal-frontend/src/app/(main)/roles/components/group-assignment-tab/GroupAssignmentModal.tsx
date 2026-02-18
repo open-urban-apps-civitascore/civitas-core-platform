@@ -123,7 +123,7 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
       ),
       cell: ({ row }: CellContext<Group, unknown>) => (
         <ExpanderCell row={row} className="font-medium">
-          {row.original.title}
+          {row.original.name}
         </ExpanderCell>
       ),
       meta: {

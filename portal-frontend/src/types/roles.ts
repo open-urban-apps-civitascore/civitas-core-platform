@@ -1,6 +1,6 @@
 import z from 'zod'
 
-import { Item, WithId } from './common'
+import { WithId } from './common'
 import { Group } from './groups'
 import { Permission } from './permissions'
 import { User } from './users'
@@ -48,7 +48,6 @@ export type UserRolesTableData = {
   id: string
   name: string
   group: string | null
-  dataspace: Item | null
   inherited: boolean
   type: RoleType
   roleId: string
