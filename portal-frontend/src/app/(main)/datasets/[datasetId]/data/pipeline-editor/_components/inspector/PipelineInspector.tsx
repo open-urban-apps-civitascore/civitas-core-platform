@@ -45,7 +45,7 @@ interface PipelineInspectorProps {
 // ============================================================================
 
 export const PipelineInspector: React.FC<PipelineInspectorProps> = ({ className = '' }) => {
-  const t = useTranslations('pipelineEditor')
+  const t = useTranslations('datastructures.pipelineEditor')
   const { selectedNode, selectedEdge, updateNode, shouldShowValidationPanel, validationResult } = useActivePipeline()
 
   // Resizable width state

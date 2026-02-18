@@ -18,7 +18,7 @@ interface ApiPanelProps {
 }
 
 export const ApiPanel: React.FC<ApiPanelProps> = ({ data }) => {
-  const t = useTranslations('pipelineEditor')
+  const t = useTranslations('datastructures.pipelineEditor')
   const isRequest = data.nodeType === 'apiRequest'
 
   return (
