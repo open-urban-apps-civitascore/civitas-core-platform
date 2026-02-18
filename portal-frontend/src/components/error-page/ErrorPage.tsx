@@ -8,7 +8,7 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 
 interface ErrorPageProps {
-  title: string
+  title?: string
   errorText?: string
   testId?: string
 }
@@ -19,7 +19,7 @@ export const ErrorPage = (props: ErrorPageProps) => {
 
   return (
     <PageContainer headerType="onlyTitle" testId={testId}>
-      <PageHeader title={title || t('common.errors.loadingError', { item: t('users.user') })} />
+      <PageHeader title={title || t('common.errors.loadingError')} />
       <PageBackground>
         <ContentCard className="p-10">
           <p className="text-center">{errorText || t('common.errors.unexpectedError')}</p>

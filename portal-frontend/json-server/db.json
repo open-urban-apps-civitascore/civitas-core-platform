@@ -5802,5 +5802,88 @@
       "lastActive": "2026-02-04T12:11:34.305Z",
       "id": "8"
     }
+  ],
+  "datastructures": [
+    {
+      "id": "ds1",
+      "name": "Test Datastructure 1",
+      "description": "Description 1",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": [
+        {
+          "id": "v1",
+          "description": "Version Description 1.0",
+          "versionNumber": "1.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        }
+      ]
+    },
+    {
+      "id": "ds2",
+      "name": "Test Datastructure 2",
+      "description": "Description 2",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": [
+        {
+          "id": "v2",
+          "description": "Version Description 1.0",
+          "versionNumber": "1.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        },
+        {
+          "id": "v3",
+          "description": "Version Description 1.1",
+          "versionNumber": "1.1",
+          "source": "OWN",
+          "status": "DRAFT"
+        }
+      ]
+    },
+    {
+      "id": "ds3",
+      "name": "Test Datastructure 3",
+      "description": "Description 3",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": [
+        {
+          "id": "v4",
+          "description": "Version Description 1.0",
+          "versionNumber": "1.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        },
+        {
+          "id": "v5",
+          "description": "Version Description 1.1",
+          "versionNumber": "1.1",
+          "source": "OWN",
+          "status": "DRAFT"
+        },
+        {
+          "id": "v6",
+          "description": "Version Description 2.0",
+          "versionNumber": "2.0",
+          "source": "OWN",
+          "status": "DRAFT"
+        }
+      ]
+    },
+    {
+      "id": "ds4",
+      "name": "Test Datastructure 4",
+      "description": "Description 4",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": []
+    }
   ]
 }
