@@ -1,21 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Circle, CircleCheckBig, SquarePen, X } from 'lucide-react'
+import { Circle, CircleCheckBig, SquarePen } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { KeyboardEvent, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 
 import { useCreateDataset, usePatchDataset } from '@/app/services/api/datasets/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { Select } from '@/components/form/fields/Select'
+import { FormSelect } from '@/components/form/fields/FormSelect'
 import { TextField } from '@/components/form/fields/TextField'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Form, FormItem, FormLabel } from '@/components/ui/form'
-import { useIsMobile } from '@/hooks/use-mobile'
+import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { DatasetFormData, DatasetFormSchema } from '@/types/datasets'
@@ -32,7 +30,6 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
 
-  const isMobile = useIsMobile()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isReadOnly, setIsReadOnly] = useState(isEditMode)
@@ -46,30 +43,6 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
     resolver: zodResolver(DatasetFormSchema),
     defaultValues: dataset,
   })
-
-  const tagsWatch = form.watch('tags')
-
-  const haveTagsChanged = useMemo(
-    () =>
-      JSON.stringify([...tagsWatch].sort((a, b) => a.localeCompare(b))) !==
-      JSON.stringify([...dataset.tags].sort((a, b) => a.localeCompare(b))),
-    [tagsWatch, dataset.tags],
-  )
-
-  const handleAddTag = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (
-      event.key === 'Enter' &&
-      !form.getValues('tags').find(tag => tag.toLocaleLowerCase() === event.currentTarget.value.toLowerCase())
-    ) {
-      form.setValue('tags', [...new Set([...form.getValues('tags'), event.currentTarget.value])])
-      event.currentTarget.value = ''
-    }
-  }
-
-  const handleRemoveTag = (tag: string) => {
-    const filteredTags = tagsWatch.filter(formTag => formTag !== tag)
-    form.setValue('tags', filteredTags)
-  }
 
   const handleCreateDataset = async (formData: DatasetFormData) => {
     const selectedDataspace = dataspaces.find(dataspace => dataspace.value === formData.dataspace)
@@ -140,7 +113,7 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
           ) : (
             <>
               <DetailsFieldContainer className="max-w-300">
-                <Select
+                <FormSelect
                   id="dataspaceSelect"
                   form={form}
                   label={t('overview.info.dataspace')}
@@ -171,62 +144,12 @@ export const BaseInfoForm = (props: BaseInfoFormProps) => {
                   disabled={isReadOnly}
                 />
               </DetailsFieldContainer>
-              <DetailsFieldContainer className={cn('mb-6 max-w-300')}>
-                <FormItem className={cn(isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]')}>
-                  <FormLabel>{t('overview.info.tags')}</FormLabel>
-                  <div>
-                    <div
-                      data-testid="tagsField"
-                      className={cn(
-                        'flex flex-wrap min-h-9',
-                        'file:text-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex w-full min-w-0 rounded-md border bg-transparent px-0.5 py-0.5 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
-                        'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
-                        'aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
-                        isReadOnly && 'min-h-8 opacity-100 text-muted-foreground border-hidden shadow-none py-0 px-2',
-                      )}
-                    >
-                      {tagsWatch.map(tag => (
-                        <Badge key={tag} className="m-0.5">
-                          {tag}
-                          {!isReadOnly && (
-                            <Button
-                              className="h-auto"
-                              style={{ padding: 0 }}
-                              size="sm"
-                              type="button"
-                              onClick={() => handleRemoveTag(tag)}
-                            >
-                              <X />
-                            </Button>
-                          )}
-                        </Badge>
-                      ))}
-                      {(!isReadOnly || (isReadOnly && tagsWatch.length === 0)) && (
-                        <input
-                          id="datasetTags"
-                          data-testid="tagsInput"
-                          placeholder={t('overview.info.typeTag')}
-                          onKeyUp={handleAddTag}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') e.preventDefault()
-                          }}
-                          disabled={isReadOnly}
-                          className={cn(
-                            'flex-1 px-1 min-w-26 border-none outline-none shadow-none focus:outline-none focus:ring-0 placeholder:text-muted-foreground',
-                            !isReadOnly && 'px-2',
-                          )}
-                        />
-                      )}
-                    </div>
-                  </div>
-                </FormItem>
-              </DetailsFieldContainer>
             </>
           )}
           {!isReadOnly && (
             <ActionButtons
               confirmButtonType="submit"
-              isConfirmButtonDisabled={(!form.formState.isDirty && !haveTagsChanged) || isLoading}
+              isConfirmButtonDisabled={!form.formState.isDirty || isLoading}
               onCancelClick={() => router.push(`/datasets?${searchParams.toString()}`)}
               hasCard={false}
             />

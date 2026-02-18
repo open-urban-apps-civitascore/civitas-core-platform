@@ -28,7 +28,6 @@ test.describe('Create Dataset Flow', async () => {
       const field = fields.nth(i)
       await expect(field).toBeEnabled()
     }
-    await expect(page.getByTestId('tagsInput')).toBeVisible()
     await expect(page.locator('[data-testid^="completionStep-"]')).not.toBeVisible()
   })
 
@@ -54,13 +53,6 @@ test.describe('Create Dataset Flow', async () => {
 
     await page.getByTestId('nameTextField').fill(MOCK_DATASET_1.name)
     await page.getByTestId('descriptionTextField').fill(MOCK_DATASET_1.description)
-    await page.getByTestId('tagsInput').fill(MOCK_DATASET_1.tags[0])
-    await page.getByTestId('tagsInput').press('Enter')
-    await page.getByTestId('tagsInput').fill(MOCK_DATASET_1.tags[1])
-    await page.getByTestId('tagsInput').press('Enter')
-    const tags = page.getByTestId('tagsField').locator('span')
-
-    await expect(tags).toHaveCount(2)
 
     await page.getByTestId('confirmButton').click()
     await page.waitForLoadState('networkidle')
@@ -73,11 +65,10 @@ test.describe('Create Dataset Flow', async () => {
     for (const field of await fields.all()) {
       await expect(field).toBeDisabled()
     }
-    await expect(page.getByTestId('tagsInput')).not.toBeVisible()
+
     await expect(page.getByTestId('dataspaceSelectTrigger')).toHaveText(selectOptionText)
     await expect(page.getByTestId('nameTextField')).toHaveValue(MOCK_DATASET_1.name)
     await expect(page.getByTestId('descriptionTextField')).toHaveValue(MOCK_DATASET_1.description)
-    expect(await tags.allTextContents()).toEqual(MOCK_DATASET_1.tags)
   })
 
   test('new created dataset appears in datasets list', async ({ page }) => {
@@ -94,7 +85,7 @@ test.describe('Create Dataset Flow', async () => {
     await page.waitForLoadState('networkidle')
 
     // verify new created user appears in users list
-    await page.getByTestId('sidebarMenuItem-ourData').click()
+    await page.goto('/datasets')
     await page.waitForLoadState('networkidle')
     await page.getByTestId('searchArea').locator('input').fill(MOCK_DATASET_1.name)
 

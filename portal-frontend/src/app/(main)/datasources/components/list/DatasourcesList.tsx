@@ -47,8 +47,8 @@ export const DatasourcesList = (props: DatasourcesListProps) => {
   )
 
   return (
-    <PageContainer headerType="onlyTitle" testId="datasourcesPage">
-      <PageHeader title={t('title')} />
+    <PageContainer headerType="withSubTabsOrSubtitle" testId="datasourcesPage">
+      <PageHeader title={t('title')} subtitle={t('subtitle')} />
       <PageBackground>
         <TableContainer>
           <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />
@@ -61,7 +61,6 @@ export const DatasourcesList = (props: DatasourcesListProps) => {
             totalPages={totalPages}
             onPaginationChange={setPaginationParams}
             onSortingChange={setSortingParams}
-            onRowClick={datasource => router.push(`/datasources/${datasource.id}`)}
           />
         </TableContainer>
       </PageBackground>

@@ -25,10 +25,13 @@ import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.Config;
 import com.civitas.configadapter.model.ConfigEvent;
+import com.civitas.configadapter.model.ConfigValue;
 import com.civitas.configadapter.model.Metadata;
 import com.civitas.configadapter.model.Operation;
 import com.civitas.configadapter.model.Payload;
 import com.civitas.configadapter.model.apisix.ApisixConfigValue;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
@@ -62,7 +65,7 @@ class ApisixAdapterExceptionTest {
     adapter = new ApisixAdapter();
     mockConfig = mock(AdapterConfig.class);
 
-    when(mockConfig.getProperty("apisix.topics")).thenReturn("core.civitas.api.backend.created");
+    when(mockConfig.getProperty("apisix.topics")).thenReturn("de.civitascore.api.backend.created");
     when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
         .thenReturn("http://localhost:9180");
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("test-api-key");
@@ -350,13 +353,14 @@ class ApisixAdapterExceptionTest {
     }
   }
 
-  private ConfigEvent createConfigEvent(
-      Operation operation, String targetResource, Map<String, Object> configValue) {
-    return createConfigEventWithOperation(operation, targetResource, configValue);
-  }
+  @JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
+  private abstract static class NoTypeInfoMixin {}
 
-  private ConfigEvent createConfigEventWithOperation(
-      Operation operation, String targetResource, Map<String, Object> configValue) {
+  private static final ObjectMapper MAPPER =
+      new ObjectMapper().addMixIn(ConfigValue.class, NoTypeInfoMixin.class);
+
+  private ConfigEvent createConfigEvent(
+      Operation operation, String targetResource, Map<String, Object> configMap) {
     Metadata metadata =
         new Metadata(
             "msg-123",
@@ -366,7 +370,8 @@ class ApisixAdapterExceptionTest {
             "v1.0.0",
             "test-result-topic");
 
-    ApisixConfigValue apisixValue = new ApisixConfigValue(configValue);
+    ApisixConfigValue apisixValue =
+        configMap != null ? MAPPER.convertValue(configMap, ApisixConfigValue.class) : null;
     Payload payload =
         new Payload("apisix", targetResource, operation, new Config(null, apisixValue));
     return new ConfigEvent(metadata, payload);

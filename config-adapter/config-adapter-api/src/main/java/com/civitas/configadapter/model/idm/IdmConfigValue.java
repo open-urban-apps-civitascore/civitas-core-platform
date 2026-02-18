@@ -35,5 +35,5 @@ import com.civitas.configadapter.model.ConfigValue;
 public sealed interface IdmConfigValue extends ConfigValue
     permits ClientConfig, GroupConfig, RealmConfig, RoleConfig, UserConfig {
 
-  static final String IDM_RESULT_TYPE = "core.civitas.idm.processing.result";
+  static final String IDM_RESULT_TYPE = "de.civitascore.idm.processing.result";
 }

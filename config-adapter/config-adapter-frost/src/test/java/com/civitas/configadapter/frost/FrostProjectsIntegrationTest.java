@@ -75,7 +75,8 @@ class FrostProjectsIntegrationTest {
           .withNetworkAliases("database")
           .withEnv("POSTGRES_DB", "sensorthings")
           .withEnv("POSTGRES_USER", "sensorthings")
-          .withEnv("POSTGRES_PASSWORD", "ChangeMe");
+          .withEnv("POSTGRES_PASSWORD", "ChangeMe")
+          .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*", 2));
 
   @SuppressWarnings("resource")
   @Container
@@ -318,7 +319,7 @@ class FrostProjectsIntegrationTest {
             "1.0",
             "test-result-topic");
 
-    FrostConfigValue frostValue = new FrostConfigValue(configValue);
+    FrostConfigValue frostValue = FrostTestFixtures.buildFrostConfigValue(configValue);
     Payload payload = new Payload("frost", targetResource, operation, new Config(null, frostValue));
     return new ConfigEvent(metadata, payload);
   }

@@ -83,9 +83,8 @@ describe('DatasourceCreateForm', () => {
         expect.objectContaining({
           name: 'Test Datasource',
           description: '',
-          tags: [],
           status: 'draft',
-          connector: 'rest',
+          connector: null,
           connection: 'inactive',
         }),
         expect.any(Object),

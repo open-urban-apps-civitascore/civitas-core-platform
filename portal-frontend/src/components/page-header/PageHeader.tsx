@@ -1,6 +1,6 @@
 'use client'
 
-import { HTMLAttributes } from 'react'
+import { HTMLAttributes, JSX } from 'react'
 
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
@@ -14,10 +14,11 @@ export type PageHeaderProps = Pick<HTMLAttributes<HTMLDivElement>, 'className' |
   tabs?: TabSectionProps
   subTabs?: TabSectionProps
   badgeTitle?: string
+  customElement?: JSX.Element
 }
 
 export const PageHeader = (props: PageHeaderProps) => {
-  const { title, subtitle, className, style, tabs, subTabs, badgeTitle } = props
+  const { title, subtitle, className, style, tabs, subTabs, badgeTitle, customElement } = props
   const isMobile = useIsMobile()
   return (
     <div
@@ -32,26 +33,29 @@ export const PageHeader = (props: PageHeaderProps) => {
       {tabs && (
         <TabsSection testId="primaryTabs" tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} />
       )}
-      <div id="pageHeaderTitle" className="flex-1 w-full min-w-0 px-[var(--layout-padding)]">
-        {title && (
-          <div className="flex flex-row items-center gap-4">
-            <h1
-              id="page-heading"
-              className={cn(
-                'block bg-transparent text-3xl font-bold text-center m-0 truncate max-w-full min-w-0',
-                isMobile && 'text-2xl',
+      <div className={cn('flex')}>
+        <div id="pageHeaderTitle" className={cn('flex-1 w-full min-w-0 px-[var(--layout-padding)]')}>
+          {title && (
+            <div className="flex flex-row items-center gap-4">
+              <h1
+                id="page-heading"
+                className={cn(
+                  'block bg-transparent text-3xl font-bold text-center m-0 truncate max-w-full min-w-0',
+                  isMobile && 'text-2xl',
+                )}
+              >
+                {title}
+              </h1>
+              {badgeTitle && (
+                <Badge data-testid="pageHeaderBadge" variant="outline">
+                  {badgeTitle}
+                </Badge>
               )}
-            >
-              {title}
-            </h1>
-            {badgeTitle && (
-              <Badge data-testid="pageHeaderBadge" variant="outline">
-                {badgeTitle}
-              </Badge>
-            )}
-          </div>
-        )}
-        {subtitle && <p className="mt-6 text-muted-foreground">{subtitle}</p>}
+            </div>
+          )}
+          {subtitle && <p className="mt-6 text-muted-foreground">{subtitle}</p>}
+        </div>
+        {customElement}
       </div>
       {subTabs && (
         <TabsSection

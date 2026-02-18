@@ -31,10 +31,8 @@ public class AssignmentAssembler implements BaseAssembler<Assignment, Assignment
       output.setRole(roleMapper.toSummary(entity.getRole()));
     }
 
-    // Map parentAssignment (recursive)
-    if (entity.getParentAssignment() != null) {
-      output.setParentAssignment(mapToBaseDto(entity.getParentAssignment()));
-    }
+    // Map scopeId
+    output.setScopeId(entity.getScopeId());
 
     return output;
   }

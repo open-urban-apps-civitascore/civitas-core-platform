@@ -40,7 +40,7 @@ import org.mockito.ArgumentCaptor;
 
 class AbstractConfigAdapterTest {
 
-  private static final String TEST_RESULT_TYPE = "core.civitas.test.processing.result";
+  private static final String TEST_RESULT_TYPE = "de.civitascore.test.processing.result";
 
   private static class TestAdapter extends AbstractConfigAdapter {
     private String adapterName;

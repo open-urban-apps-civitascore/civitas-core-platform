@@ -29,7 +29,6 @@ describe('SegmentedControlBar', () => {
     expect(screen.getByTestId('tab-connector')).toBeInTheDocument()
     expect(screen.getByTestId('tab-dataStructure')).toBeInTheDocument()
     expect(screen.getByTestId('tab-accessPermissions')).toBeInTheDocument()
-    expect(screen.getByTestId('tab-dataspaces')).toBeInTheDocument()
   })
 
   test('clicking a tab calls onTabChange with correct tab value', () => {

@@ -7,6 +7,7 @@ gl-dependency-scanning.json
 **/.settings
 **/.project
 **/.classpath
+**/.flattened-pom.xml
 **/maven.graph.json
 
 /.idea/

@@ -7,8 +7,8 @@ import { UseFormReturn } from 'react-hook-form'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { Select } from '@/components/form/fields/Select'
-import { TextArea } from '@/components/form/fields/TextArea'
+import { FormSelect } from '@/components/form/fields/FormSelect'
+import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
@@ -76,7 +76,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           </DetailsFieldContainer>
 
           <DetailsFieldContainer>
-            <TextArea
+            <FormTextArea
               className="max-w-lg my-12"
               form={form}
               label={tRolesBaseInfo('form.inputs.description')}
@@ -90,7 +90,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           </DetailsFieldContainer>
 
           <DetailsFieldContainer className="border-0">
-            <Select
+            <FormSelect
               id="role-origin-select"
               form={form}
               options={[

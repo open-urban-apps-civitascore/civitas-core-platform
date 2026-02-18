@@ -7,7 +7,7 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { InputPropsWithoutForm } from '@/types/common'
 
-interface TextAreaProps<T extends FieldValues> extends InputPropsWithoutForm {
+interface FormTextAreaProps<T extends FieldValues> extends InputPropsWithoutForm {
   form: UseFormReturn<T>
   name: Path<T>
   placeholder: string
@@ -17,9 +17,10 @@ interface TextAreaProps<T extends FieldValues> extends InputPropsWithoutForm {
   maxLength?: number
   hasCharacterCount?: boolean
   className?: string
+  shouldShowErrors?: boolean
 }
 
-export const TextArea = <T extends FieldValues>(props: TextAreaProps<T>) => {
+export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>) => {
   const {
     form,
     name,
@@ -32,6 +33,7 @@ export const TextArea = <T extends FieldValues>(props: TextAreaProps<T>) => {
     maxLength,
     hasCharacterCount,
     className,
+    shouldShowErrors = true,
   } = props
   const isMobile = useIsMobile()
 
@@ -71,10 +73,10 @@ export const TextArea = <T extends FieldValues>(props: TextAreaProps<T>) => {
                 disabled={disabled}
               />
             </FormControl>
-            <div className="flex justify-between mt-1">
-              <FormMessage />
+            <div className="flex justify-between">
+              {shouldShowErrors && <FormMessage />}
               {hasCharacterCount && maxLength && (
-                <span className="text-sm text-muted-foreground ml-auto">
+                <span className="text-sm text-muted-foreground ml-auto mt-1">
                   {characterCount}/{maxLength}
                 </span>
               )}

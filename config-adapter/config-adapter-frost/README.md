@@ -65,34 +65,34 @@ The FROST adapter integrates with FROST-Server's OGC SensorThings API to manage 
 The adapter subscribes to all SensorThings entity lifecycle events:
 
 **Thing Events (3):**
-- `core.civitas.data.thing.created`
-- `core.civitas.data.thing.updated`
-- `core.civitas.data.thing.deleted`
+- `de.civitascore.data.thing.created`
+- `de.civitascore.data.thing.updated`
+- `de.civitascore.data.thing.deleted`
 
 **Location Events (3):**
-- `core.civitas.data.location.created`
-- `core.civitas.data.location.updated`
-- `core.civitas.data.location.deleted`
+- `de.civitascore.data.location.created`
+- `de.civitascore.data.location.updated`
+- `de.civitascore.data.location.deleted`
 
 **Sensor Events (3):**
-- `core.civitas.data.sensor.created`
-- `core.civitas.data.sensor.updated`
-- `core.civitas.data.sensor.deleted`
+- `de.civitascore.data.sensor.created`
+- `de.civitascore.data.sensor.updated`
+- `de.civitascore.data.sensor.deleted`
 
 **ObservedProperty Events (3):**
-- `core.civitas.data.observedproperty.created`
-- `core.civitas.data.observedproperty.updated`
-- `core.civitas.data.observedproperty.deleted`
+- `de.civitascore.data.observedproperty.created`
+- `de.civitascore.data.observedproperty.updated`
+- `de.civitascore.data.observedproperty.deleted`
 
 **Datastream Events (3):**
-- `core.civitas.data.datastream.created`
-- `core.civitas.data.datastream.updated`
-- `core.civitas.data.datastream.deleted`
+- `de.civitascore.data.datastream.created`
+- `de.civitascore.data.datastream.updated`
+- `de.civitascore.data.datastream.deleted`
 
 **Project Events (3):**
-- `core.civitas.data.project.created`
-- `core.civitas.data.project.updated`
-- `core.civitas.data.project.deleted`
+- `de.civitascore.data.project.created`
+- `de.civitascore.data.project.updated`
+- `de.civitascore.data.project.deleted`
 
 ## Configuration
 
@@ -109,7 +109,7 @@ frost.api.key=your-frost-api-key
 frost.api.key.header=X-API-Key
 
 # Topics to subscribe to (comma-separated)
-frost.topics=core.civitas.data.thing.created,core.civitas.data.thing.updated,core.civitas.data.thing.deleted,core.civitas.data.location.created,core.civitas.data.location.updated,core.civitas.data.location.deleted,core.civitas.data.sensor.created,core.civitas.data.sensor.updated,core.civitas.data.sensor.deleted,core.civitas.data.observedproperty.created,core.civitas.data.observedproperty.updated,core.civitas.data.observedproperty.deleted,core.civitas.data.datastream.created,core.civitas.data.datastream.updated,core.civitas.data.datastream.deleted
+frost.topics=de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
 ```
 
 ### Environment Variables
@@ -120,7 +120,7 @@ All properties can be overridden with environment variables:
 FROST_URL=http://frost-server:8080/FROST-Server/v1.1
 FROST_API_KEY=your-api-key
 FROST_API_KEY_HEADER=X-API-Key
-FROST_TOPICS=core.civitas.data.thing.created,core.civitas.data.thing.updated
+FROST_TOPICS=de.civitascore.data.thing.created,de.civitascore.data.thing.updated
 ```
 
 ### Docker Compose Example
@@ -136,7 +136,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       FROST_URL: http://frost-server:8080/FROST-Server/v1.1
       FROST_API_KEY: ${FROST_API_KEY}
-      FROST_TOPICS: core.civitas.data.thing.created,core.civitas.data.thing.updated,core.civitas.data.thing.deleted
+      FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted
     depends_on:
       - kafka
       - frost-server
@@ -151,7 +151,7 @@ services:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.data.thing.created",
+  "type": "de.civitascore.data.thing.created",
   "source": "civitas.iot.provisioning",
   "id": "event-123",
   "datacontenttype": "application/json",
@@ -162,7 +162,7 @@ services:
       "source": "iot.service",
       "correlationId": "corr-789",
       "configVersion": "1.0",
-      "resultTopic": "core.civitas.data.processing.result"
+      "resultTopic": "de.civitascore.data.processing.result"
     },
     "payload": {
       "targetComponent": "frost",
@@ -188,14 +188,14 @@ services:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.data.location.created",
+  "type": "de.civitascore.data.location.created",
   "source": "civitas.iot.provisioning",
   "id": "event-456",
   "data": {
     "metadata": {
       "messageId": "msg-789",
       "correlationId": "corr-012",
-      "resultTopic": "core.civitas.data.processing.result"
+      "resultTopic": "de.civitascore.data.processing.result"
     },
     "payload": {
       "targetComponent": "frost",
@@ -222,14 +222,14 @@ services:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.data.thing.created",
+  "type": "de.civitascore.data.thing.created",
   "source": "civitas.iot.provisioning",
   "id": "event-789",
   "data": {
     "metadata": {
       "messageId": "msg-012",
       "correlationId": "corr-345",
-      "resultTopic": "core.civitas.data.processing.result"
+      "resultTopic": "de.civitascore.data.processing.result"
     },
     "payload": {
       "targetComponent": "frost",
@@ -251,14 +251,14 @@ services:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.data.datastream.created",
+  "type": "de.civitascore.data.datastream.created",
   "source": "civitas.iot.provisioning",
   "id": "event-012",
   "data": {
     "metadata": {
       "messageId": "msg-345",
       "correlationId": "corr-678",
-      "resultTopic": "core.civitas.data.processing.result"
+      "resultTopic": "de.civitascore.data.processing.result"
     },
     "payload": {
       "targetComponent": "frost",
@@ -289,7 +289,7 @@ services:
 ```json
 {
   "specversion": "1.0",
-  "type": "core.civitas.data.processing.result",
+  "type": "de.civitascore.data.processing.result",
   "source": "civitas.config-adapter.frost",
   "id": "result-123",
   "datacontenttype": "application/json",

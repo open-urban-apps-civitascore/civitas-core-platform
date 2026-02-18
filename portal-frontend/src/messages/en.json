@@ -14,15 +14,21 @@
       "add": "Add",
       "edit": "Edit",
       "editBase": "Edit base",
-      "open": "open"
+      "open": "open",
+      "saveAndContinue": "Save and continue",
+      "exit": "Exit"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
       "invalidEmail": "Invalid E-mail address",
+      "invalidNumber": "Enter a valid number",
       "required": "This field is required",
       "atLeast2": "The input must be at least 2 characters.",
       "atLeast10": "The input must be at least 10 characters.",
+      "atLeast1Value": "At least 1 value is required.",
       "minChar": "The input has to be at least {amount} characters.",
+      "itemsNotFound": "No {items} found",
+      "itemNotFound": "{item} not found",
       "notFound": "No {items} found",
       "loadingError": "Error while loading data",
       "unexpectedError": "An unexpected error occurred. Please try again.",
@@ -37,7 +43,14 @@
       "roles": "Roles",
       "datasets": "Datasets",
       "dataspaces": "Dataspaces",
-      "permissions": "Permissions"
+      "permissions": "Permissions",
+      "datasources": "Datasources",
+      "datasource": "Datasource"
+    },
+    "info": {
+      "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
+      "commaSeparated": "comma-separated",
+      "requiredInAvailable": "This field is required in the available mode."
     }
   },
   "languages": {
@@ -98,9 +111,7 @@
         "dataspace": "Data Space",
         "selectDataspace": "Select Data Space...",
         "name": "Name of the Dataset",
-        "description": "Description",
-        "tags": "Tags",
-        "typeTag": "Type tag..."
+        "description": "Description"
       },
       "completion": {
         "title": "Creation Progress",
@@ -141,7 +152,6 @@
     "newUser": "Create User",
     "createUser": "Create User",
     "searchUsers": "Filter...",
-    "notFound": "User not found",
     "info": {
       "header": "User Information",
       "subheader": "Personal details and general information.",
@@ -154,26 +164,18 @@
       "phone": "Telephone Number",
       "email": "E-Mail",
       "group": "Group",
-      "position": "Position",
-      "description": "Activity Description",
       "status": {
         "title": "Status",
         "active": "Active",
         "inactive": "Inactive"
-      }
+      },
+      "selectTitle": "Select title..."
     },
     "detailsTabs": {
       "userData": "User Data",
       "roles": "Roles",
       "groups": "Groups",
-      "dataspaces": "Data Spaces and Datasets",
       "account": "Account"
-    },
-    "form": {
-      "selectTitle": "Select titel...",
-      "selectAuthority": "Select authority...",
-      "selectDepartment": "Select department...",
-      "selectGroup": "Select group..."
     },
     "roles": {
       "title": "Overview: Roles",
@@ -194,6 +196,10 @@
       "contact": "Contact",
       "description": "Description",
       "roles": "Roles"
+    },
+    "messages": {
+      "createSuccess": "User has been successfully created.",
+      "updateSuccess": "User has been successfully updated."
     }
   },
   "groups": {
@@ -372,7 +378,6 @@
       "connector": "Connector",
       "connection": "Connection",
       "lastActive": "Last active",
-      "tags": "Tags",
       "status": "Status",
       "action": "Action"
     },
@@ -410,21 +415,19 @@
       "name": "Name",
       "namePlaceholder": "Name of the data source",
       "description": "Description",
-      "descriptionHint": "max. 150 characters",
-      "tags": "Tags",
-      "tagsOptional": "(optional)",
-      "tagsPlaceholder": "Add tag...",
-      "tagsSearch": "Search tag...",
-      "noTagsFound": "No tags found"
-    },
-    "actions": {
-      "saveAndContinue": "Save and continue",
-      "exit": "Exit"
+      "descriptionHint": "max. 150 characters"
     },
     "exitModal": {
       "title": "Save before exiting?",
       "description": "There are unsaved changes. \"Discard\" cannot be undone.",
       "discard": "Discard"
+    },
+    "connectorTab": {
+      "title1": "Connector",
+      "title2": "Configuration",
+      "type": "Type",
+      "connection": "Connection",
+      "establishConnection": "Establish Connection"
     }
   },
   "pipelineEditor": {

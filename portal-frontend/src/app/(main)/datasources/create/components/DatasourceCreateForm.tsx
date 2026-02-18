@@ -15,8 +15,9 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { CONNECTION_TYPES, DATASOURCE_STATUS_TYPES } from '@/const/connectors'
 import { cn } from '@/lib/utils'
-import { DATASOURCE_STATUS_TYPES, DatasourceCreateFormData, DatasourceCreateFormSchema } from '@/types/datasources'
+import { DatasourceCreateFormData, DatasourceCreateFormSchema } from '@/types/datasources'
 
 export const DatasourceCreateForm = () => {
   const t = useTranslations('datasources')
@@ -40,10 +41,9 @@ export const DatasourceCreateForm = () => {
       {
         name: formData.name,
         description: '',
-        tags: [],
         status: DATASOURCE_STATUS_TYPES.DRAFT,
-        connector: 'rest',
-        connection: 'inactive',
+        connector: null,
+        connection: CONNECTION_TYPES.INACTIVE,
         lastActive: new Date().toISOString(),
       },
       {
@@ -82,7 +82,7 @@ export const DatasourceCreateForm = () => {
               onClick={form.handleSubmit(handleCreateDatasource)}
               disabled={!form.formState.isDirty || isLoading}
             >
-              {t('actions.saveAndContinue')}
+              {tCommon('actions.saveAndContinue')}
             </Button>
           </div>
         </div>

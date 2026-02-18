@@ -8,7 +8,6 @@ export const defaultDataset: DatasetFormData = {
   dataspace: '',
   name: '',
   description: '',
-  tags: [],
 }
 
 const CreateDatasetPage = async () => {

@@ -79,7 +79,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
   // Default values
   private static final int DEFAULT_MAX_RETRIES = 3;
   private static final long DEFAULT_INITIAL_BACKOFF_MS = 1000L;
-  private static final String DEFAULT_DLQ_TOPIC = "core.civitas.idm.dlq";
+  private static final String DEFAULT_DLQ_TOPIC = "de.civitascore.idm.dlq";
   private static final long DEFAULT_PUBLISH_TIMEOUT_MS = 5000L;
 
   // MDC keys

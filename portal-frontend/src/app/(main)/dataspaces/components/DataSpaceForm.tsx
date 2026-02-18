@@ -4,8 +4,8 @@ import { UseFormReturn } from 'react-hook-form'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
+import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { Switch as CommonSwitch } from '@/components/form/fields/Switch'
-import { TextArea } from '@/components/form/fields/TextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
@@ -40,7 +40,7 @@ export const DataSpaceForm = (props: DataSpaceFormProps) => {
                 formItemProps={{ className: 'mb-6' }}
               />
 
-              <TextArea
+              <FormTextArea
                 form={form}
                 name="description"
                 label={tDataSpaces('form.inputs.description')}

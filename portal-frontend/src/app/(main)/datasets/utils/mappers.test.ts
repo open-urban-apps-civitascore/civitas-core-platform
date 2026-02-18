@@ -15,7 +15,6 @@ const dataset: Dataset = {
   access: true,
   status: DATASET_STATUS.DRAFT,
   dataspace: { id: 'ds1', name: 'dataspace1' },
-  tags: ['tag1', 'tag2'],
 }
 
 describe('mapDatasetToFormData', () => {
@@ -27,7 +26,6 @@ describe('mapDatasetToFormData', () => {
       name: 'Dataset 1',
       dataspace: 'ds1',
       description: 'Test description',
-      tags: ['tag1', 'tag2'],
     })
   })
 
