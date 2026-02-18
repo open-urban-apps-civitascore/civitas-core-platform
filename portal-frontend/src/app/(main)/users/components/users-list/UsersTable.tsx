@@ -7,6 +7,7 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { TableProps } from '@/types/table'
 import { ListUser } from '@/types/users'
 import { resolveUpdater } from '@/utils/table'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 
 interface UsersTableProps extends TableProps<ListUser> {
   users: ListUser[]
@@ -21,12 +22,13 @@ const UsersTable = (props: UsersTableProps) => {
     pageSize,
     sorting,
     rowSelection,
-    onRowClick,
     onPaginationChange,
     onSortingChange,
   } = props
   const t = useTranslations('users')
   const columnHelper = createColumnHelper<ListUser>()
+
+  const params = new URLSearchParams(window.location.search)
 
   const columns = [
     columnHelper.accessor('id', {
@@ -36,7 +38,7 @@ const UsersTable = (props: UsersTableProps) => {
     }),
     columnHelper.accessor('fullName', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.displayName')} />,
-      cell: info => info.getValue(),
+      cell: ({ row }) => <LinkCell href={`/users/${row.id}?${params.toString()}`}>{row.original.fullName}</LinkCell>,
       meta: {
         style: {
           width: '27%',
@@ -83,14 +85,7 @@ const UsersTable = (props: UsersTableProps) => {
   })
 
   return (
-    <DataTable
-      testId="usersTable"
-      table={table}
-      pageIndex={pageIndex}
-      pageSize={pageSize}
-      totalPages={totalPages}
-      onRowClick={onRowClick}
-    />
+    <DataTable testId="usersTable" table={table} pageIndex={pageIndex} pageSize={pageSize} totalPages={totalPages} />
   )
 }
 
