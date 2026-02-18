@@ -13,6 +13,7 @@
       "delete": "Delete",
       "deleteItem": "Delete {item}",
       "remove": "Remove",
+      "removeItem": "Remove {item}",
       "add": "Add",
       "edit": "Edit",
       "editBase": "Edit base",

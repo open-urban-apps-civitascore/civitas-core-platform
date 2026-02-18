@@ -91,7 +91,7 @@ const GroupsTable = (props: GroupsTableProps) => {
               <TableDropdownMenu
                 menuItems={[
                   {
-                    label: tCommon('actions.deleteItem', { item: tCommon('items.group') }),
+                    label: tCommon('actions.removeItem', { item: tCommon('items.group') }),
                     onClick: () => onRemoveGroupClick(row.original.id),
                   },
                 ]}
