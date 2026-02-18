@@ -1,3 +1,26 @@
+import { getTranslations } from 'next-intl/server'
+
+import { PageContainer } from '@/components/page-container/PageContainer'
+import { PageHeader } from '@/components/page-header/PageHeader'
+
+import { PipelineEditorWrapper } from './pipeline-editor/_components/layout/PipelineEditorWrapper'
+
+const DataModePage = async () => {
+  const t = await getTranslations('datasets')
+
+  return (
+    <PageContainer headerType="onlyTitle">
+      <PageHeader title={t('dataMode.pipelineEditor')} />
+      <div className="h-[calc(100vh-12rem)] w-full overflow-hidden rounded-xl border bg-background">
+        <PipelineEditorWrapper />
+      </div>
+    </PageContainer>
+  )
+}
+
+export default DataModePage
+
+/* TODO DISABLED FEATURE -> TABLE EDITOR - Original DataModePage with mode selection
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 
@@ -65,3 +88,4 @@ const DataModePage = async ({ params, searchParams }: PageProps) => {
 }
 
 export default DataModePage
+*/
