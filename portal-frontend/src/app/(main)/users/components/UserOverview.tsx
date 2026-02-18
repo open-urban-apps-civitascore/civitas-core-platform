@@ -22,6 +22,21 @@ import { UserBasicInfoTab } from './basic-info-tab/UserBasicInfoTab'
 import { GroupsTab } from './groups-tab/GroupsTab'
 import { RolesTab } from './roles-tab/RolesTab'
 
+const tabValues: Record<UserTab, Tab<UserTab>> = {
+  userData: {
+    label: 'users.detailsTabs.userData',
+    value: 'userData',
+  },
+  groups: {
+    label: 'users.detailsTabs.groups',
+    value: 'groups',
+  },
+  roles: {
+    label: 'users.detailsTabs.roles',
+    value: 'roles',
+  },
+}
+
 interface UserOverviewProps {
   title: string
   userData: User
@@ -47,20 +62,6 @@ export const UserOverview = (props: UserOverviewProps) => {
     toast.error(tCommon('errors.unexpectedError'))
   }
 
-  const tabValues: Record<UserTab, Tab<UserTab>> = {
-    userData: {
-      label: t('detailsTabs.userData'),
-      value: 'userData',
-    },
-    groups: {
-      label: t('detailsTabs.groups'),
-      value: 'groups',
-    },
-    roles: {
-      label: t('detailsTabs.roles'),
-      value: 'roles',
-    },
-  }
   const tabs: Tab<UserTab>[] = [tabValues.userData, tabValues.groups, tabValues.roles]
 
   const defaultTab = tabValues.userData.value

@@ -19,6 +19,21 @@ import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
 import { PermissionsTab } from './permissions-tab/PermissionsTab'
 
+const subTabValues: Record<RoleTab, Tab<RoleTab>> = {
+  basicInformation: {
+    label: 'roles.tabLabels.basicInformation',
+    value: 'basicInformation',
+  },
+  permissions: {
+    label: 'roles.tabLabels.permissions',
+    value: 'permissions',
+  },
+  groupAssignment: {
+    label: 'roles.tabLabels.groupAssignment',
+    value: 'groupAssignment',
+  },
+}
+
 const defaultRole: Role = {
   id: '',
   name: '',
@@ -121,21 +136,6 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         },
       },
     )
-  }
-
-  const subTabValues: Record<RoleTab, Tab<RoleTab>> = {
-    basicInformation: {
-      label: tRoles('tabLabels.basicInformation'),
-      value: 'basicInformation',
-    },
-    permissions: {
-      label: tRoles('tabLabels.permissions'),
-      value: 'permissions',
-    },
-    groupAssignment: {
-      label: tRoles('tabLabels.groupAssignment'),
-      value: 'groupAssignment',
-    },
   }
 
   const disabledTabs = !isEditMode ? ['permissions', 'groupAssignment'] : undefined
