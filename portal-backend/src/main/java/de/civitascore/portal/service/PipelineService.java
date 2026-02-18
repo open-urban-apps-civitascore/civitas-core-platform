@@ -80,12 +80,16 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
 
   private void validateUniqueName(Pipeline entity) {
     pipelineRepository
-        .findByName(entity.getName())
+        .findByNameAndDataSetId(entity.getName(), entity.getDataSet().getId())
         .ifPresent(
             existing -> {
               if (!existing.getId().equals(entity.getId())) {
                 throw new UniqueConstraintViolationException(
-                    Pipeline.class.getSimpleName(), "name", entity.getName());
+                    Pipeline.class.getSimpleName(),
+                    "name",
+                    entity.getName(),
+                    "datasetId",
+                    entity.getDataSet().getId().toString());
               }
             });
   }

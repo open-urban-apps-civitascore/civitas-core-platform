@@ -14,4 +14,13 @@ public interface PipelineRepository extends NamedEntityRepository<Pipeline, UUID
   @EntityGraph(attributePaths = {"dataSet"})
   @Query("SELECT p FROM Pipeline p WHERE p.id = :id")
   Optional<Pipeline> findByIdWithDataSet(UUID id);
+
+  /**
+   * Find an entity by name and dataset ID.
+   *
+   * @param name the entity name
+   * @param datasetId the dataset ID
+   * @return the entity if found
+   */
+  Optional<Pipeline> findByNameAndDataSetId(String name, UUID datasetId);
 }
