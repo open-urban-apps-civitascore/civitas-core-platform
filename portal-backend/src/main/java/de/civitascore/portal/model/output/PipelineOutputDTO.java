@@ -12,7 +12,7 @@ public class PipelineOutputDTO extends BaseOutputDTO {
   private String name;
   private String description;
   private Map<String, Object> styles;
-  private Long[] dataSources;
+  // TODO: Add dataSourceIds or dataSources field once DataSource DTOs are implemented
   private String[] apis;
   private Long[] persistences;
   private Map<String, Object> model;

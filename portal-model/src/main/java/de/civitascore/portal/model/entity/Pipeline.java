@@ -6,15 +6,19 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.util.List;
-import java.util.Map;
 
 @Entity
 @Table(
@@ -38,10 +42,14 @@ public class Pipeline extends NamedEntity {
   private Map<String, Object> styles;
 
   /**
-   * Array of data source IDs from DataSource nodes.
+   * Data sources associated with this pipeline.
    */
-  @Column(name = "data_sources", columnDefinition = "bigint[]")
-  private List<Long> dataSources;
+  @ManyToMany(fetch = FetchType.LAZY)
+  @JoinTable(
+      name = "pipeline_data_sources",
+      joinColumns = @JoinColumn(name = "pipeline_id"),
+      inverseJoinColumns = @JoinColumn(name = "data_source_id"))
+  private Set<DataSource> dataSources = new HashSet<>();
 
   /**
    * Array of API paths (e.g., ["/api/v1/traffic"]).

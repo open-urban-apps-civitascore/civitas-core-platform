@@ -18,13 +18,16 @@ import org.mapstruct.ReportingPolicy;
 public interface PipelineMapper extends DtoMapper<PipelineInputDTO, PipelineOutputDTO, Pipeline> {
 
   @Mapping(target = "dataSet", ignore = true)
+  @Mapping(target = "dataSources", ignore = true)
   @Override
   Pipeline toEntity(PipelineInputDTO input);
 
+  // TODO: Add dataSourceIds mapping once DataSource DTOs are implemented
   @Override
   PipelineOutputDTO toOutput(Pipeline entity);
 
   @Mapping(target = "dataSetId", source = "dataSet.id")
+  // TODO: Add dataSourceIds mapping once DataSource DTOs are implemented
   @Override
   PipelineInputDTO toInput(Pipeline entity);
 
@@ -32,6 +35,7 @@ public interface PipelineMapper extends DtoMapper<PipelineInputDTO, PipelineOutp
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "dataSet", ignore = true)
+  @Mapping(target = "dataSources", ignore = true)
   @Override
   void updateEntity(@MappingTarget Pipeline entity, PipelineInputDTO input);
 }

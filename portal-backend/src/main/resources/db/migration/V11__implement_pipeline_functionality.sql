@@ -9,7 +9,6 @@ CREATE TABLE pipelines
     modified_by  UUID,
     dataset_id   UUID                        NOT NULL,
     styles       JSONB,
-    data_sources bigint[],
     apis         text[],
     persistences bigint[],
     model        JSONB,
@@ -20,6 +19,22 @@ ALTER TABLE pipelines
     ADD CONSTRAINT FK_PIPELINES_ON_DATASET FOREIGN KEY (dataset_id) REFERENCES datasets (id);
 
 CREATE INDEX idx_pipeline_dataset ON pipelines (dataset_id);
+
+CREATE TABLE pipeline_data_sources
+(
+    pipeline_id    UUID NOT NULL,
+    data_source_id UUID NOT NULL,
+    CONSTRAINT pk_pipeline_data_sources PRIMARY KEY (pipeline_id, data_source_id)
+);
+
+ALTER TABLE pipeline_data_sources
+    ADD CONSTRAINT FK_PIPELINE_DATA_SOURCES_ON_PIPELINE FOREIGN KEY (pipeline_id) REFERENCES pipelines (id);
+
+ALTER TABLE pipeline_data_sources
+    ADD CONSTRAINT FK_PIPELINE_DATA_SOURCES_ON_DATA_SOURCE FOREIGN KEY (data_source_id) REFERENCES data_sources (id);
+
+CREATE INDEX idx_pipeline_data_sources_pipeline ON pipeline_data_sources (pipeline_id);
+CREATE INDEX idx_pipeline_data_sources_data_source ON pipeline_data_sources (data_source_id);
 
 ALTER TABLE datasets
     ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'DRAFT';

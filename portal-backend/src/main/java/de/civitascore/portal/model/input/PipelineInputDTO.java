@@ -3,6 +3,7 @@ package de.civitascore.portal.model.input;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -19,7 +20,7 @@ public class PipelineInputDTO extends BaseInputDTO {
 
   private Map<String, Object> styles;
 
-  private Long[] dataSources;
+  private Set<UUID> dataSourceIds;
 
   private String[] apis;
 

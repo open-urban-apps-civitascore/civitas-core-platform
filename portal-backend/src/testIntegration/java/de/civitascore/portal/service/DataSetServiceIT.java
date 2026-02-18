@@ -9,6 +9,7 @@ import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -16,6 +17,7 @@ import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.PipelineRepository;
@@ -46,6 +48,7 @@ class DataSetServiceIT extends BaseKeycloakIntegrationTest {
   @Autowired private AssignmentRepository assignmentRepository;
   @Autowired private GroupRepository groupRepository;
   @Autowired private RoleRepository roleRepository;
+  @Autowired private DataSourceRepository dataSourceRepository;
 
   @AfterEach
   void cleanup() {
@@ -187,12 +190,27 @@ class DataSetServiceIT extends BaseKeycloakIntegrationTest {
   }
 
   private Pipeline createPipelineForDataSet(DataSet dataSet, String name) {
+    // Create data sources for the pipeline
+    DataSource dataSource1 = new DataSource();
+    dataSource1.setName("test_ds_1_" + System.currentTimeMillis());
+    dataSource1 = dataSourceRepository.save(dataSource1);
+
+    DataSource dataSource2 = new DataSource();
+    dataSource2.setName("test_ds_2_" + System.currentTimeMillis());
+    dataSource2 = dataSourceRepository.save(dataSource2);
+
+    DataSource dataSource3 = new DataSource();
+    dataSource3.setName("test_ds_3_" + System.currentTimeMillis());
+    dataSource3 = dataSourceRepository.save(dataSource3);
+
     Pipeline pipeline = new Pipeline();
     pipeline.setName(name + "_" + System.currentTimeMillis());
     pipeline.setDescription("Test pipeline for " + name);
     pipeline.setDataSet(dataSet);
     pipeline.setStyles(createSampleStyles());
-    pipeline.setDataSources(Arrays.asList(100L, 200L, 300L));
+    pipeline.getDataSources().add(dataSource1);
+    pipeline.getDataSources().add(dataSource2);
+    pipeline.getDataSources().add(dataSource3);
     pipeline.setApis(Arrays.asList("/api/v1/traffic", "/api/v1/weather"));
     pipeline.setPersistences(Collections.singletonList(12345L));
     pipeline.setModel(createSampleModel());

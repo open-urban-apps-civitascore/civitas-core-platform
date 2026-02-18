@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Pipeline;
@@ -12,6 +13,7 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
@@ -45,6 +47,7 @@ class DataSetControllerIntegrationTest
   @Autowired private DistributionRepository distributionRepository;
   @Autowired private DataSpaceRepository dataSpaceRepository;
   @Autowired private UserRepository userRepository;
+  @Autowired private DataSourceRepository dataSourceRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -148,13 +151,35 @@ class DataSetControllerIntegrationTest
     dataSet.getDataSpaces().add(dataSpace);
     dataSet = dataSetRepository.save(dataSet);
 
+    // Create data sources for the pipelines
+    DataSource dataSource1 = new DataSource();
+    dataSource1.setName("test_data_source_1_" + System.currentTimeMillis());
+    dataSource1.setDescription("Test data source 1");
+    dataSource1 = dataSourceRepository.save(dataSource1);
+
+    DataSource dataSource2 = new DataSource();
+    dataSource2.setName("test_data_source_2_" + System.currentTimeMillis());
+    dataSource2.setDescription("Test data source 2");
+    dataSource2 = dataSourceRepository.save(dataSource2);
+
+    DataSource dataSource3 = new DataSource();
+    dataSource3.setName("test_data_source_3_" + System.currentTimeMillis());
+    dataSource3.setDescription("Test data source 3");
+    dataSource3 = dataSourceRepository.save(dataSource3);
+
+    DataSource dataSource4 = new DataSource();
+    dataSource4.setName("test_data_source_4_" + System.currentTimeMillis());
+    dataSource4.setDescription("Test data source 4");
+    dataSource4 = dataSourceRepository.save(dataSource4);
+
     // Create pipelines for the dataset
     Pipeline pipeline1 = new Pipeline();
     pipeline1.setName("test_pipeline_1_" + System.currentTimeMillis());
     pipeline1.setDescription("Test pipeline 1");
     pipeline1.setDataSet(dataSet);
     pipeline1.setStyles(createSampleStyles());
-    pipeline1.setDataSources(Arrays.asList(100L, 200L));
+    pipeline1.getDataSources().add(dataSource1);
+    pipeline1.getDataSources().add(dataSource2);
     pipeline1.setApis(Collections.singletonList("/api/v1/traffic"));
     pipeline1.setPersistences(Collections.singletonList(12345L));
     pipeline1.setModel(createSampleModel());
@@ -165,7 +190,8 @@ class DataSetControllerIntegrationTest
     pipeline2.setDescription("Test pipeline 2");
     pipeline2.setDataSet(dataSet);
     pipeline2.setStyles(createSampleStyles());
-    pipeline2.setDataSources(Arrays.asList(300L, 400L));
+    pipeline2.getDataSources().add(dataSource3);
+    pipeline2.getDataSources().add(dataSource4);
     pipeline2.setApis(Collections.singletonList("/api/v1/weather"));
     pipeline2.setPersistences(Collections.singletonList(12345L));
     pipeline2.setModel(createSampleModel());
