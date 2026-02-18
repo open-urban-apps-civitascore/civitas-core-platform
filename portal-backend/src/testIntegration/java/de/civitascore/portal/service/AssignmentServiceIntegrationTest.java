@@ -13,6 +13,7 @@ import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
+import de.civitascore.portal.model.input.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.input.CatalogInputDTO;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
@@ -855,6 +856,270 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(result.getRole().getId()).isEqualTo(testDataRole.getId());
       assertThat(result.getDataset()).isNotNull();
       assertThat(result.getDataset().getId()).isEqualTo(testDataSet.getId());
+    }
+  }
+
+  @Nested
+  @DisplayName("replaceAllByScopeTypeAndScopeId Tests")
+  class ReplaceAllByScopeTypeAndScopeIdTests {
+
+    private AssignmentScopedInputDTO scopedInput(UUID groupId, UUID roleId) {
+      AssignmentScopedInputDTO input = new AssignmentScopedInputDTO();
+      input.setGroupId(groupId);
+      input.setRoleId(roleId);
+      return input;
+    }
+
+    @Test
+    @DisplayName("Should replace existing assignments with new ones")
+    void shouldReplaceExistingAssignmentsWithNewOnes() {
+      // Create an existing assignment for the dataset scope
+      AssignmentInputDTO existingInput = new AssignmentInputDTO();
+      existingInput.setGroupId(testGroup.getId());
+      existingInput.setRoleId(testDataRole.getId());
+      existingInput.setScopeType(ScopeType.DATASET);
+      existingInput.setScopeId(testDataSet.getId());
+      Assignment existing = assignmentService.create(existingInput);
+      UUID existingId = existing.getId();
+
+      // Create a second group for the replacement
+      GroupInputDTO groupInput = new GroupInputDTO();
+      groupInput.setName("Replacement Group " + System.currentTimeMillis());
+      groupInput.setDescription("Group for replacement");
+      Group replacementGroup = groupService.create(groupInput);
+
+      // Replace with a new assignment using the different group
+      List<Assignment> result =
+          assignmentService.replaceAllByScopeTypeAndScopeId(
+              List.of(scopedInput(replacementGroup.getId(), testDataRole.getId())),
+              ScopeType.DATASET,
+              testDataSet.getId());
+
+      assertThat(result).hasSize(1);
+      assertThat(result.get(0).getGroup().getId()).isEqualTo(replacementGroup.getId());
+      assertThat(result.get(0).getId()).isNotEqualTo(existingId);
+
+      // Verify old assignment is gone
+      assertThat(assignmentService.findById(existingId)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should create assignments when none exist for the scope")
+    void shouldCreateAssignmentsWhenNoneExist() {
+      List<Assignment> result =
+          assignmentService.replaceAllByScopeTypeAndScopeId(
+              List.of(scopedInput(testGroup.getId(), testDataRole.getId())),
+              ScopeType.DATASET,
+              testDataSet.getId());
+
+      assertThat(result).hasSize(1);
+      assertThat(result.get(0).getGroup().getId()).isEqualTo(testGroup.getId());
+      assertThat(result.get(0).getRole().getId()).isEqualTo(testDataRole.getId());
+      assertThat(result.get(0).getScopeType()).isEqualTo(ScopeType.DATASET);
+      assertThat(result.get(0).getDataset().getId()).isEqualTo(testDataSet.getId());
+    }
+
+    @Test
+    @DisplayName("Should delete all existing assignments when input list is empty")
+    void shouldDeleteAllWhenInputListIsEmpty() {
+      // Create an existing assignment
+      AssignmentInputDTO existingInput = new AssignmentInputDTO();
+      existingInput.setGroupId(testGroup.getId());
+      existingInput.setRoleId(testDataRole.getId());
+      existingInput.setScopeType(ScopeType.DATASET);
+      existingInput.setScopeId(testDataSet.getId());
+      assignmentService.create(existingInput);
+
+      List<Assignment> result =
+          assignmentService.replaceAllByScopeTypeAndScopeId(
+              List.of(), ScopeType.DATASET, testDataSet.getId());
+
+      assertThat(result).isEmpty();
+      assertThat(
+              assignmentService.findAllByScopeTypeAndScopeId(
+                  ScopeType.DATASET, testDataSet.getId()))
+          .isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should create multiple assignments for the same scope")
+    void shouldCreateMultipleAssignmentsForSameScope() {
+      // Create a second group
+      GroupInputDTO groupInput = new GroupInputDTO();
+      groupInput.setName("Second Group " + System.currentTimeMillis());
+      groupInput.setDescription("Second group");
+      Group secondGroup = groupService.create(groupInput);
+
+      List<Assignment> result =
+          assignmentService.replaceAllByScopeTypeAndScopeId(
+              List.of(
+                  scopedInput(testGroup.getId(), testDataRole.getId()),
+                  scopedInput(secondGroup.getId(), testDataRole.getId())),
+              ScopeType.DATASET,
+              testDataSet.getId());
+
+      assertThat(result).hasSize(2);
+      assertThat(result)
+          .allSatisfy(
+              a -> {
+                assertThat(a.getScopeType()).isEqualTo(ScopeType.DATASET);
+                assertThat(a.getDataset().getId()).isEqualTo(testDataSet.getId());
+              });
+      assertThat(result)
+          .extracting(a -> a.getGroup().getId())
+          .containsExactlyInAnyOrder(testGroup.getId(), secondGroup.getId());
+    }
+
+    @Test
+    @DisplayName("Should work with DATASPACE scope type")
+    void shouldWorkWithDataspaceScope() {
+      List<Assignment> result =
+          assignmentService.replaceAllByScopeTypeAndScopeId(
+              List.of(scopedInput(testGroup.getId(), testDataRole.getId())),
+              ScopeType.DATASPACE,
+              testDataSpace.getId());
+
+      assertThat(result).hasSize(1);
+      assertThat(result.get(0).getScopeType()).isEqualTo(ScopeType.DATASPACE);
+      assertThat(result.get(0).getDataSpace().getId()).isEqualTo(testDataSpace.getId());
+    }
+
+    @Test
+    @DisplayName("Should work with CATALOG scope type")
+    void shouldWorkWithCatalogScope() {
+      List<Assignment> result =
+          assignmentService.replaceAllByScopeTypeAndScopeId(
+              List.of(scopedInput(testGroup.getId(), testDataRole.getId())),
+              ScopeType.CATALOG,
+              testCatalog.getId());
+
+      assertThat(result).hasSize(1);
+      assertThat(result.get(0).getScopeType()).isEqualTo(ScopeType.CATALOG);
+      assertThat(result.get(0).getCatalog().getId()).isEqualTo(testCatalog.getId());
+    }
+
+    @Test
+    @DisplayName("Should not delete existing assignments when validation fails")
+    void shouldNotDeleteExistingWhenValidationFails() {
+      // Create a valid existing assignment
+      AssignmentInputDTO existingInput = new AssignmentInputDTO();
+      existingInput.setGroupId(testGroup.getId());
+      existingInput.setRoleId(testDataRole.getId());
+      existingInput.setScopeType(ScopeType.DATASET);
+      existingInput.setScopeId(testDataSet.getId());
+      assignmentService.create(existingInput);
+
+      // Try to replace with an invalid input (non-existent group)
+      assertThatThrownBy(
+              () ->
+                  assignmentService.replaceAllByScopeTypeAndScopeId(
+                      List.of(scopedInput(UUID.randomUUID(), testDataRole.getId())),
+                      ScopeType.DATASET,
+                      testDataSet.getId()))
+          .isInstanceOf(ResourceNotFoundException.class);
+
+      // Existing assignment should still be there
+      List<Assignment> remaining =
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, testDataSet.getId());
+      assertThat(remaining).hasSize(1);
+      assertThat(remaining.get(0).getGroup().getId()).isEqualTo(testGroup.getId());
+    }
+
+    @Test
+    @DisplayName("Should not delete existing assignments when role validation fails")
+    void shouldNotDeleteExistingWhenRoleValidationFails() {
+      // Create a valid existing assignment
+      AssignmentInputDTO existingInput = new AssignmentInputDTO();
+      existingInput.setGroupId(testGroup.getId());
+      existingInput.setRoleId(testDataRole.getId());
+      existingInput.setScopeType(ScopeType.DATASET);
+      existingInput.setScopeId(testDataSet.getId());
+      assignmentService.create(existingInput);
+
+      // Try to replace with SYSTEM role + scoped assignment (invalid combination)
+      assertThatThrownBy(
+              () ->
+                  assignmentService.replaceAllByScopeTypeAndScopeId(
+                      List.of(scopedInput(testGroup.getId(), testSystemRole.getId())),
+                      ScopeType.DATASET,
+                      testDataSet.getId()))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("SYSTEM roles cannot have scope");
+
+      // Existing assignment should still be there
+      List<Assignment> remaining =
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, testDataSet.getId());
+      assertThat(remaining).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Should not delete existing when second input in list fails validation")
+    void shouldNotDeleteExistingWhenSecondInputFailsValidation() {
+      // Create a valid existing assignment
+      AssignmentInputDTO existingInput = new AssignmentInputDTO();
+      existingInput.setGroupId(testGroup.getId());
+      existingInput.setRoleId(testDataRole.getId());
+      existingInput.setScopeType(ScopeType.DATASET);
+      existingInput.setScopeId(testDataSet.getId());
+      assignmentService.create(existingInput);
+
+      // First input is valid, second has non-existent group
+      GroupInputDTO groupInput = new GroupInputDTO();
+      groupInput.setName("Valid Group " + System.currentTimeMillis());
+      groupInput.setDescription("Valid group");
+      Group validGroup = groupService.create(groupInput);
+
+      assertThatThrownBy(
+              () ->
+                  assignmentService.replaceAllByScopeTypeAndScopeId(
+                      List.of(
+                          scopedInput(validGroup.getId(), testDataRole.getId()),
+                          scopedInput(UUID.randomUUID(), testDataRole.getId())),
+                      ScopeType.DATASET,
+                      testDataSet.getId()))
+          .isInstanceOf(ResourceNotFoundException.class);
+
+      // Existing assignment should still be there
+      List<Assignment> remaining =
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, testDataSet.getId());
+      assertThat(remaining).hasSize(1);
+      assertThat(remaining.get(0).getGroup().getId()).isEqualTo(testGroup.getId());
+    }
+
+    @Test
+    @DisplayName("Should not affect assignments with different scope")
+    void shouldNotAffectAssignmentsWithDifferentScope() {
+      // Create assignment on DATASET scope
+      AssignmentInputDTO datasetInput = new AssignmentInputDTO();
+      datasetInput.setGroupId(testGroup.getId());
+      datasetInput.setRoleId(testDataRole.getId());
+      datasetInput.setScopeType(ScopeType.DATASET);
+      datasetInput.setScopeId(testDataSet.getId());
+      assignmentService.create(datasetInput);
+
+      // Create assignment on DATASPACE scope
+      AssignmentInputDTO dataspaceInput = new AssignmentInputDTO();
+      dataspaceInput.setGroupId(testGroup.getId());
+      dataspaceInput.setRoleId(testDataRole.getId());
+      dataspaceInput.setScopeType(ScopeType.DATASPACE);
+      dataspaceInput.setScopeId(testDataSpace.getId());
+      assignmentService.create(dataspaceInput);
+
+      // Replace only the DATASET scope assignments with empty list
+      assignmentService.replaceAllByScopeTypeAndScopeId(
+          List.of(), ScopeType.DATASET, testDataSet.getId());
+
+      // DATASET scope should be empty
+      assertThat(
+              assignmentService.findAllByScopeTypeAndScopeId(
+                  ScopeType.DATASET, testDataSet.getId()))
+          .isEmpty();
+
+      // DATASPACE scope should be untouched
+      assertThat(
+              assignmentService.findAllByScopeTypeAndScopeId(
+                  ScopeType.DATASPACE, testDataSpace.getId()))
+          .hasSize(1);
     }
   }
 
