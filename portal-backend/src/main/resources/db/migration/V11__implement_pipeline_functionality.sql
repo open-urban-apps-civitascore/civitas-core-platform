@@ -8,11 +8,11 @@ CREATE TABLE pipelines
     created_by   UUID,
     modified_by  UUID,
     dataset_id   UUID                        NOT NULL,
-    styles       TEXT,
+    styles       JSONB,
     data_sources bigint[],
     apis         text[],
     persistences bigint[],
-    model        TEXT,
+    model        JSONB,
     CONSTRAINT pk_pipelines PRIMARY KEY (id)
 );
 

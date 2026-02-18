@@ -10,8 +10,11 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(
@@ -30,8 +33,9 @@ public class Pipeline extends NamedEntity {
   /**
    * React Flow visual layout stored as JSON (nodes/edges/viewport).
    */
-  @Column(name = "styles", columnDefinition = "TEXT")
-  private String styles;
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "styles", columnDefinition = "jsonb")
+  private Map<String, Object> styles;
 
   /**
    * Array of data source IDs from DataSource nodes.
@@ -55,7 +59,8 @@ public class Pipeline extends NamedEntity {
   /**
    * Executable RedpandaConnect configuration in JSON/YAML format.
    */
-  @Column(name = "model", columnDefinition = "TEXT")
-  private String model;
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "model", columnDefinition = "jsonb")
+  private Map<String, Object> model;
 }
 

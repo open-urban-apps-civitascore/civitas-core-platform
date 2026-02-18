@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.output;
 
+import java.util.Map;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -10,9 +11,9 @@ public class PipelineOutputDTO extends BaseOutputDTO {
 
   private String name;
   private String description;
-  private String styles;
+  private Map<String, Object> styles;
   private Long[] dataSources;
   private String[] apis;
   private Long[] persistences;
-  private String model;
+  private Map<String, Object> model;
 }

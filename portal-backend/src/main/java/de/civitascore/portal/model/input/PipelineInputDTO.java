@@ -2,6 +2,7 @@ package de.civitascore.portal.model.input;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -16,7 +17,7 @@ public class PipelineInputDTO extends BaseInputDTO {
 
   @NotNull(message = "DataSet ID is required") private UUID dataSetId;
 
-  private String styles;
+  private Map<String, Object> styles;
 
   private Long[] dataSources;
 
@@ -24,5 +25,5 @@ public class PipelineInputDTO extends BaseInputDTO {
 
   private Long[] persistences;
 
-  private String model;
+  private Map<String, Object> model;
 }

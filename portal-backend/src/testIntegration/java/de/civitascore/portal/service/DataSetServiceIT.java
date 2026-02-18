@@ -22,6 +22,9 @@ import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -53,6 +56,28 @@ class DataSetServiceIT extends BaseKeycloakIntegrationTest {
     dataSetRepository.deleteAll();
     roleRepository.deleteAll();
     groupRepository.deleteAll();
+  }
+
+  /** Helper method to create a sample styles map for Pipeline. */
+  private Map<String, Object> createSampleStyles() {
+    Map<String, Object> styles = new HashMap<>();
+    styles.put("nodes", List.of(Map.of("id", "1", "type", "input")));
+    styles.put("edges", List.of());
+    Map<String, Object> viewport = new HashMap<>();
+    viewport.put("x", 0);
+    viewport.put("y", 0);
+    viewport.put("zoom", 1);
+    styles.put("viewport", viewport);
+    return styles;
+  }
+
+  /** Helper method to create a sample model map for Pipeline. */
+  private Map<String, Object> createSampleModel() {
+    Map<String, Object> model = new HashMap<>();
+    model.put("input", Map.of("type", "kafka"));
+    model.put("pipeline", List.of(Map.of("processor", "transform")));
+    model.put("output", Map.of("type", "frost"));
+    return model;
   }
 
   @Test
@@ -166,13 +191,11 @@ class DataSetServiceIT extends BaseKeycloakIntegrationTest {
     pipeline.setName(name + "_" + System.currentTimeMillis());
     pipeline.setDescription("Test pipeline for " + name);
     pipeline.setDataSet(dataSet);
-    pipeline.setStyles(
-        "{\"nodes\":[{\"id\":\"1\",\"type\":\"input\"}],\"edges\":[],\"viewport\":{\"x\":0,\"y\":0,\"zoom\":1}}");
+    pipeline.setStyles(createSampleStyles());
     pipeline.setDataSources(Arrays.asList(100L, 200L, 300L));
     pipeline.setApis(Arrays.asList("/api/v1/traffic", "/api/v1/weather"));
     pipeline.setPersistences(Collections.singletonList(12345L));
-    pipeline.setModel(
-        "{\"input\":{\"type\":\"kafka\"},\"pipeline\":[{\"processor\":\"transform\"}],\"output\":{\"type\":\"frost\"}}");
+    pipeline.setModel(createSampleModel());
     return pipelineRepository.save(pipeline);
   }
 

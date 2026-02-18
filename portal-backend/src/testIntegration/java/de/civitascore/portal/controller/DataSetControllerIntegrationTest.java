@@ -45,6 +45,26 @@ class DataSetControllerIntegrationTest
     return DATASETS_ENDPOINT;
   }
 
+  /** Helper method to create a sample styles map for Pipeline. */
+  private Map<String, Object> createSampleStyles() {
+    Map<String, Object> styles = new HashMap<>();
+    styles.put("nodes", List.of());
+    styles.put("edges", List.of());
+    Map<String, Object> viewport = new HashMap<>();
+    viewport.put("x", 0);
+    viewport.put("y", 0);
+    viewport.put("zoom", 1);
+    styles.put("viewport", viewport);
+    return styles;
+  }
+
+  /** Helper method to create a sample model map for Pipeline. */
+  private Map<String, Object> createSampleModel() {
+    Map<String, Object> model = new HashMap<>();
+    model.put("input", Map.of("type", "kafka"));
+    return model;
+  }
+
   @Override
   protected void performAdditionalCleanup() {
     pipelineRepository.deleteAll();
@@ -105,22 +125,22 @@ class DataSetControllerIntegrationTest
     pipeline1.setName("test_pipeline_1_" + System.currentTimeMillis());
     pipeline1.setDescription("Test pipeline 1");
     pipeline1.setDataSet(dataSet);
-    pipeline1.setStyles("{\"nodes\":[],\"edges\":[],\"viewport\":{\"x\":0,\"y\":0,\"zoom\":1}}");
+    pipeline1.setStyles(createSampleStyles());
     pipeline1.setDataSources(Arrays.asList(100L, 200L));
     pipeline1.setApis(Collections.singletonList("/api/v1/traffic"));
     pipeline1.setPersistences(Collections.singletonList(12345L));
-    pipeline1.setModel("{\"input\":{\"type\":\"kafka\"}}");
+    pipeline1.setModel(createSampleModel());
     pipeline1 = pipelineRepository.save(pipeline1);
 
     Pipeline pipeline2 = new Pipeline();
     pipeline2.setName("test_pipeline_2_" + System.currentTimeMillis());
     pipeline2.setDescription("Test pipeline 2");
     pipeline2.setDataSet(dataSet);
-    pipeline2.setStyles("{\"nodes\":[],\"edges\":[],\"viewport\":{\"x\":0,\"y\":0,\"zoom\":1}}");
+    pipeline2.setStyles(createSampleStyles());
     pipeline2.setDataSources(Arrays.asList(300L, 400L));
     pipeline2.setApis(Collections.singletonList("/api/v1/weather"));
     pipeline2.setPersistences(Collections.singletonList(12345L));
-    pipeline2.setModel("{\"input\":{\"type\":\"kafka\"}}");
+    pipeline2.setModel(createSampleModel());
     pipeline2 = pipelineRepository.save(pipeline2);
 
     // Create distributions for the dataset
@@ -772,6 +792,8 @@ class DataSetControllerIntegrationTest
       pipeline1.setName("test_pipeline_api1_" + System.currentTimeMillis());
       pipeline1.setDescription("Pipeline with API 1");
       pipeline1.setDataSet(dataSet);
+      pipeline1.setStyles(createSampleStyles());
+      pipeline1.setModel(createSampleModel());
       pipeline1.setApis(Arrays.asList("/api/v1/traffic", "/api/v1/sensors"));
       pipeline1.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline1);
@@ -780,6 +802,8 @@ class DataSetControllerIntegrationTest
       pipeline2.setName("test_pipeline_api2_" + System.currentTimeMillis());
       pipeline2.setDescription("Pipeline with API 2");
       pipeline2.setDataSet(dataSet);
+      pipeline2.setStyles(createSampleStyles());
+      pipeline2.setModel(createSampleModel());
       pipeline2.setApis(Collections.singletonList("/api/v1/weather"));
       pipeline2.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline2);
@@ -894,6 +918,8 @@ class DataSetControllerIntegrationTest
       pipeline1.setName("test_pipeline_dup1_" + System.currentTimeMillis());
       pipeline1.setDescription("Pipeline 1 with duplicate API");
       pipeline1.setDataSet(dataSet);
+      pipeline1.setStyles(createSampleStyles());
+      pipeline1.setModel(createSampleModel());
       pipeline1.setApis(Arrays.asList("/api/v1/traffic", "/api/v1/weather"));
       pipeline1.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline1);
@@ -902,6 +928,8 @@ class DataSetControllerIntegrationTest
       pipeline2.setName("test_pipeline_dup2_" + System.currentTimeMillis());
       pipeline2.setDescription("Pipeline 2 with duplicate API");
       pipeline2.setDataSet(dataSet);
+      pipeline2.setStyles(createSampleStyles());
+      pipeline2.setModel(createSampleModel());
       pipeline2.setApis(Collections.singletonList("/api/v1/traffic")); // Same as in pipeline1
       pipeline2.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline2);
