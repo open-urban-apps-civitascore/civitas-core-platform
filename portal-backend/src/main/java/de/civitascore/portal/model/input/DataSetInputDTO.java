@@ -11,9 +11,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class DataSetInputDTO extends BaseInputDTO {
 
-  @NotBlank(message = "Name is required") private String name;
-
-  @Size(min = 3, max = 255, message = "Title must be between 3 and 255 characters") private String title;
+  @NotBlank(message = "Name is required") @Size(min = 3, max = 255, message = "Name must be between 3 and 255 characters") private String name;
 
   private String identifier;
   private String description;

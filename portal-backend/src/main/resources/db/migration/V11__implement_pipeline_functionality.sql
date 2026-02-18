@@ -22,9 +22,6 @@ ALTER TABLE pipelines
 CREATE INDEX idx_pipeline_dataset ON pipelines (dataset_id);
 
 ALTER TABLE datasets
-    ADD COLUMN title VARCHAR(255);
-
-ALTER TABLE datasets
     ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'DRAFT';
 
 ALTER TABLE datasets

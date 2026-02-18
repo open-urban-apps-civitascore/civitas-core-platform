@@ -91,7 +91,6 @@ class DataSetServiceIT extends BaseKeycloakIntegrationTest {
 
     assertThat(retrievedDataSet.getId()).isEqualTo(dataSet.getId());
     assertThat(retrievedDataSet.getName()).isEqualTo(dataSet.getName());
-    assertThat(retrievedDataSet.getTitle()).isEqualTo(dataSet.getTitle());
     assertThat(retrievedDataSet.getDescription()).isEqualTo(dataSet.getDescription());
     assertThat(retrievedDataSet.getDataSetStatus()).isEqualTo(DataSetStatus.DRAFT);
     assertThat(retrievedDataSet.getPersistenceId()).isEqualTo(12345L);
@@ -153,7 +152,6 @@ class DataSetServiceIT extends BaseKeycloakIntegrationTest {
   private DataSet createInitialDataSet() {
     DataSet dataSet = new DataSet();
     dataSet.setName("test_dataset_" + System.currentTimeMillis());
-    dataSet.setTitle("Test Dataset");
     dataSet.setDescription("Test dataset for relationship testing");
     dataSet.setPersistenceId(12345L);
     dataSet.setIdentifier("test-identifier-001");

@@ -19,7 +19,6 @@ public class DataSetOutputDTO extends BaseOutputDTO {
   private String identifier;
   private String name;
   private String description;
-  private String title;
 
   private DataSetStatus dataSetStatus;
   private String version;

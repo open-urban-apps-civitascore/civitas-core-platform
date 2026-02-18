@@ -16,7 +16,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import jakarta.validation.constraints.Size;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -43,10 +42,6 @@ import lombok.Setter;
 @Getter
 @Setter
 public class DataSet extends NamedEntity {
-
-  @Size(min = 3, max = 255)
-  @Column(name = "title")
-  private String title;
 
   /**
    * Status of the dataset in its lifecycle.

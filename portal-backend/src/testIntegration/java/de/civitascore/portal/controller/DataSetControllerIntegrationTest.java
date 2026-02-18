@@ -90,7 +90,6 @@ class DataSetControllerIntegrationTest
   private DataSet createDataSetWithRelationships() {
     DataSet dataSet = new DataSet();
     dataSet.setName("test_dataset_with_relationships_" + System.currentTimeMillis());
-    dataSet.setTitle("Test Dataset With Relationships");
     dataSet.setDescription("Test dataset with pipelines and distributions");
     dataSet.setDataSetStatus(DataSetStatus.DRAFT);
     dataSet.setPersistenceId(12345L);
@@ -759,7 +758,6 @@ class DataSetControllerIntegrationTest
     void shouldPublishDataSetWithPipelinesSuccessfully() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_publish_" + System.currentTimeMillis());
-      dataSet.setTitle("Test Dataset for Publishing");
       dataSet.setDescription("Test dataset with pipelines");
       dataSet.setDataSetStatus(DataSetStatus.DRAFT);
       dataSet.setPersistenceId(12345L);
@@ -835,7 +833,6 @@ class DataSetControllerIntegrationTest
     void shouldFailToPublishDataSetWithoutPipelines() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_no_pipelines_" + System.currentTimeMillis());
-      dataSet.setTitle("Test Dataset Without Pipelines");
       dataSet.setDescription("Test dataset without pipelines");
       dataSet.setDataSetStatus(DataSetStatus.DRAFT);
       dataSet.setFormat("JSON");
@@ -886,7 +883,6 @@ class DataSetControllerIntegrationTest
     void shouldAvoidDuplicateDistributions() {
       DataSet dataSet = new DataSet();
       dataSet.setName("test_dataset_duplicate_apis_" + System.currentTimeMillis());
-      dataSet.setTitle("Test Dataset with Duplicate APIs");
       dataSet.setDescription("Test dataset with duplicate API paths");
       dataSet.setDataSetStatus(DataSetStatus.DRAFT);
       dataSet.setPersistenceId(12345L);
