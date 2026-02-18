@@ -18,7 +18,7 @@ import type { MappingNodeData } from '../../../_types/nodes'
 
 // Loading fallback component for Monaco Editor
 const LoadingFallback = () => {
-  const t = useTranslations('pipelineEditor')
+  const t = useTranslations('datastructures.pipelineEditor')
   return (
     <div className="flex h-[200px] items-center justify-center bg-muted/30">
       <span className="text-sm text-muted-foreground">{t('mappingPanel.loadingEditor')}</span>
@@ -48,7 +48,7 @@ interface MappingPanelProps {
 }
 
 export const MappingPanel: React.FC<MappingPanelProps> = ({ data, onUpdate }) => {
-  const t = useTranslations('pipelineEditor')
+  const t = useTranslations('datastructures.pipelineEditor')
 
   const handleCodeChange = useCallback(
     (value: string | undefined) => {

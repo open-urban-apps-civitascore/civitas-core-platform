@@ -53,7 +53,7 @@ const NODE_TYPE_TO_TRANSLATION_KEY: Record<PipelineNodeType, string> = {
  *
  */
 export const PipelinePalette: React.FC<PipelinePaletteProps> = ({ className = '' }) => {
-  const t = useTranslations('pipelineEditor')
+  const t = useTranslations('datastructures.pipelineEditor')
 
   // Track expanded state for each category
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() => {

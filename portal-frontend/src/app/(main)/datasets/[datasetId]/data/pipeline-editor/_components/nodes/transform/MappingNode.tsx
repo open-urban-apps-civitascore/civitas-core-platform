@@ -27,7 +27,7 @@ import { BasePipelineNode } from '../base/BasePipelineNode'
  *
  */
 export const MappingNode: React.FC<NodeProps> = ({ data, selected: isSelected = false }) => {
-  const t = useTranslations('pipelineEditor')
+  const t = useTranslations('datastructures.pipelineEditor')
 
   // Type guard to ensure we have the correct data shape
   const nodeData = data as MappingNodeData

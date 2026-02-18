@@ -53,7 +53,7 @@ interface PipelineEditorLayoutInnerProps {
  * Does NOT call usePipelineSession() - receives it via props.
  */
 const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ className = '', sessionManager }) => {
-  const t = useTranslations('pipelineEditor')
+  const t = useTranslations('datastructures.pipelineEditor')
 
   // ===== Tab management handlers =====
   const handleCreateSession = useCallback(() => {
