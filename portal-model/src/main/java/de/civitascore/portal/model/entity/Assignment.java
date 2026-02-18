@@ -95,7 +95,7 @@ public class Assignment extends BaseEntity {
   }
 
   @PrePersist
-  protected void validateBeforePersist() {
+  public void validateBeforePersist() {
     validateScope();
     validateRoleType();
   }
