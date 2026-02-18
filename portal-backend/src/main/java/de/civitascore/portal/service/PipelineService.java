@@ -15,7 +15,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -91,8 +90,8 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
             });
   }
 
-  @Transactional
-  public void delete(UUID id) {
+  @Override
+  protected Pipeline preProcessDelete(UUID id) {
     Pipeline pipeline =
         pipelineRepository
             .findByIdWithDataSet(id)
@@ -104,7 +103,6 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
           "Cannot delete pipeline associated with a dataset that is not in DRAFT status.");
     }
 
-    pipelineRepository.delete(pipeline);
-    log.info("Deleted pipeline with id: {}", id);
+    return pipeline;
   }
 }
