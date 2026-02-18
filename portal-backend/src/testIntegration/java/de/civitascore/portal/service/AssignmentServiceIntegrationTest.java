@@ -711,6 +711,154 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   @Nested
+  @DisplayName("findAllByScopeTypeAndScopeId Tests")
+  class FindAllByScopeTypeAndScopeIdTests {
+
+    @Test
+    @DisplayName("Should return assignments matching DATASET scope type and scope ID")
+    void shouldReturnAssignmentsMatchingDatasetScope() {
+      AssignmentInputDTO input = new AssignmentInputDTO();
+      input.setGroupId(testGroup.getId());
+      input.setRoleId(testDataRole.getId());
+      input.setScopeType(ScopeType.DATASET);
+      input.setScopeId(testDataSet.getId());
+      assignmentService.create(input);
+
+      List<Assignment> results =
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, testDataSet.getId());
+
+      assertThat(results).hasSize(1);
+      assertThat(results.get(0).getScopeType()).isEqualTo(ScopeType.DATASET);
+      assertThat(results.get(0).getDataset().getId()).isEqualTo(testDataSet.getId());
+    }
+
+    @Test
+    @DisplayName("Should return assignments matching DATASPACE scope type and scope ID")
+    void shouldReturnAssignmentsMatchingDataspaceScope() {
+      AssignmentInputDTO input = new AssignmentInputDTO();
+      input.setGroupId(testGroup.getId());
+      input.setRoleId(testDataRole.getId());
+      input.setScopeType(ScopeType.DATASPACE);
+      input.setScopeId(testDataSpace.getId());
+      assignmentService.create(input);
+
+      List<Assignment> results =
+          assignmentService.findAllByScopeTypeAndScopeId(
+              ScopeType.DATASPACE, testDataSpace.getId());
+
+      assertThat(results).hasSize(1);
+      assertThat(results.get(0).getScopeType()).isEqualTo(ScopeType.DATASPACE);
+      assertThat(results.get(0).getDataSpace().getId()).isEqualTo(testDataSpace.getId());
+    }
+
+    @Test
+    @DisplayName("Should return assignments matching CATALOG scope type and scope ID")
+    void shouldReturnAssignmentsMatchingCatalogScope() {
+      AssignmentInputDTO input = new AssignmentInputDTO();
+      input.setGroupId(testGroup.getId());
+      input.setRoleId(testDataRole.getId());
+      input.setScopeType(ScopeType.CATALOG);
+      input.setScopeId(testCatalog.getId());
+      assignmentService.create(input);
+
+      List<Assignment> results =
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.CATALOG, testCatalog.getId());
+
+      assertThat(results).hasSize(1);
+      assertThat(results.get(0).getScopeType()).isEqualTo(ScopeType.CATALOG);
+      assertThat(results.get(0).getCatalog().getId()).isEqualTo(testCatalog.getId());
+    }
+
+    @Test
+    @DisplayName("Should return empty list when no assignments match the scope")
+    void shouldReturnEmptyListWhenNoAssignmentsMatch() {
+      List<Assignment> results =
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, UUID.randomUUID());
+
+      assertThat(results).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should return multiple assignments for the same scope")
+    void shouldReturnMultipleAssignmentsForSameScope() {
+      // Create second group
+      GroupInputDTO groupInput = new GroupInputDTO();
+      groupInput.setName("Second Group " + System.currentTimeMillis());
+      groupInput.setDescription("Second test group");
+      Group secondGroup = groupService.create(groupInput);
+
+      // Create first assignment
+      AssignmentInputDTO input1 = new AssignmentInputDTO();
+      input1.setGroupId(testGroup.getId());
+      input1.setRoleId(testDataRole.getId());
+      input1.setScopeType(ScopeType.DATASET);
+      input1.setScopeId(testDataSet.getId());
+      assignmentService.create(input1);
+
+      // Create second assignment with different group, same scope
+      AssignmentInputDTO input2 = new AssignmentInputDTO();
+      input2.setGroupId(secondGroup.getId());
+      input2.setRoleId(testDataRole.getId());
+      input2.setScopeType(ScopeType.DATASET);
+      input2.setScopeId(testDataSet.getId());
+      assignmentService.create(input2);
+
+      List<Assignment> results =
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, testDataSet.getId());
+
+      assertThat(results).hasSize(2);
+      assertThat(results)
+          .allSatisfy(
+              a -> {
+                assertThat(a.getScopeType()).isEqualTo(ScopeType.DATASET);
+                assertThat(a.getDataset().getId()).isEqualTo(testDataSet.getId());
+              });
+    }
+
+    @Test
+    @DisplayName("Should not return assignments with different scope type but same entity ID")
+    void shouldNotReturnAssignmentsWithDifferentScopeType() {
+      // Create a DATASET-scoped assignment
+      AssignmentInputDTO input = new AssignmentInputDTO();
+      input.setGroupId(testGroup.getId());
+      input.setRoleId(testDataRole.getId());
+      input.setScopeType(ScopeType.DATASET);
+      input.setScopeId(testDataSet.getId());
+      assignmentService.create(input);
+
+      // Query with DATASPACE scope type using the dataset's ID — should find nothing
+      List<Assignment> results =
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASPACE, testDataSet.getId());
+
+      assertThat(results).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should eagerly load group and role relationships")
+    void shouldEagerlyLoadRelationships() {
+      AssignmentInputDTO input = new AssignmentInputDTO();
+      input.setGroupId(testGroup.getId());
+      input.setRoleId(testDataRole.getId());
+      input.setScopeType(ScopeType.DATASET);
+      input.setScopeId(testDataSet.getId());
+      assignmentService.create(input);
+
+      List<Assignment> results =
+          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, testDataSet.getId());
+
+      assertThat(results).hasSize(1);
+      Assignment result = results.get(0);
+      // These should not throw LazyInitializationException
+      assertThat(result.getGroup()).isNotNull();
+      assertThat(result.getGroup().getId()).isEqualTo(testGroup.getId());
+      assertThat(result.getRole()).isNotNull();
+      assertThat(result.getRole().getId()).isEqualTo(testDataRole.getId());
+      assertThat(result.getDataset()).isNotNull();
+      assertThat(result.getDataset().getId()).isEqualTo(testDataSet.getId());
+    }
+  }
+
+  @Nested
   @DisplayName("Edge Cases and Error Handling")
   class EdgeCasesTests {
 
