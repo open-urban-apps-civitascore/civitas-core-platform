@@ -101,4 +101,8 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   public List<Assignment> findAllByRoleId(UUID roleId) {
     return getRepository().findAllByRoleId(roleId);
   }
+
+  public List<Assignment> findAllByScopeTypeAndScopeId(ScopeType scopeType, UUID scopeId) {
+    return getRepository().findAllByScopeTypeAndScopeId(scopeType, scopeId);
+  }
 }
