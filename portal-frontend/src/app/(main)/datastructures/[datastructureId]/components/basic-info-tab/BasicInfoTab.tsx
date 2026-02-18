@@ -10,31 +10,27 @@ import { TextField } from '@/components/form/fields/TextField'
 import { FooterElement } from '@/components/form/FooterElement'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { cn } from '@/lib/utils'
-import { DatasourceFormDraft } from '@/types/datasources'
+import { DatastructureFormDraft } from '@/types/datastructures'
 
 interface BasicInfoTabProps {
-  form: UseFormReturn<DatasourceFormDraft>
+  form: UseFormReturn<DatastructureFormDraft>
   isReadOnly?: boolean
 }
 
 export const BasicInfoTab = (props: BasicInfoTabProps) => {
   const { form, isReadOnly = false } = props
-  const t = useTranslations('datasources')
+  const t = useTranslations('datastructures')
 
   return (
     <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement />}>
-      <div className="max-w-300 flex flex-col gap-2 pt-2" data-testid="basicInfoTab">
-        <DetailsFieldContainer className="pt-0 border-b-0">
-          <SubHeader
-            title={t('edit.basicInfo.title')}
-            titleClassName="text-2xl leading-none font-bold"
-            subtitle={t('edit.basicInfo.subtitle')}
-          />
+      <div className="max-w-300 flex flex-col" data-testid="basicInfoTab">
+        <DetailsFieldContainer className="pt-0 pb-4 ">
+          <SubHeader title={t('edit.basicInfo.title')} subtitle={t('edit.basicInfo.subtitle')} />
         </DetailsFieldContainer>
 
         <DetailsFieldContainer className="max-w-300">
           <TextField
-            id="datasourceName"
+            id="datastructureName"
             form={form}
             label={t('form.name')}
             name="name"

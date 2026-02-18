@@ -11,6 +11,7 @@ import { useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { STATUS_TYPES } from '@/types/common'
 import { DatastructuresListData } from '@/types/datastructures'
@@ -48,7 +49,13 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
       // TODO: Implement cell click for navigation to datastructure
       cell: ({ row }: CellContext<DatastructuresListData, unknown>) => (
-        <ExpanderCell row={row} value={row.original.name} className="font-medium" />
+        <ExpanderCell row={row} className="font-medium">
+          {row.depth > 0 ? (
+            row.original.name
+          ) : (
+            <LinkCell href={`datastructures/${row.original.id}`}>{row.original.name}</LinkCell>
+          )}
+        </ExpanderCell>
       ),
       meta: {
         style: {

@@ -11,16 +11,31 @@ import { useCreateUser, useUpdateUser } from '@/app/services/api/users/clientReq
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
 import { PageContainer } from '@/components/page-container/PageContainer'
-import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
+import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { User, UserFormData, UserFormSchema } from '@/types/users'
+import { User, UserFormData, UserFormSchema, UserTab } from '@/types/users'
 import { mapUserToFormData } from '@/utils/users'
 
 import { UserBasicInfoTab } from './basic-info-tab/UserBasicInfoTab'
 import { GroupsTab } from './groups-tab/GroupsTab'
 import { RolesTab } from './roles-tab/RolesTab'
+
+const tabValues: Record<UserTab, Tab<UserTab>> = {
+  userData: {
+    label: 'users.detailsTabs.userData',
+    value: 'userData',
+  },
+  groups: {
+    label: 'users.detailsTabs.groups',
+    value: 'groups',
+  },
+  roles: {
+    label: 'users.detailsTabs.roles',
+    value: 'roles',
+  },
+}
 
 interface UserOverviewProps {
   title: string
@@ -47,24 +62,7 @@ export const UserOverview = (props: UserOverviewProps) => {
     toast.error(tCommon('errors.unexpectedError'))
   }
 
-  const tabValues: Record<'userData' | 'roles' | 'groups', Tab> = {
-    userData: {
-      label: t('detailsTabs.userData'),
-      value: 'userDetails',
-      isActive: true,
-    },
-    groups: {
-      label: t('detailsTabs.groups'),
-      value: 'userGroups',
-      isActive: true,
-    },
-    roles: {
-      label: t('detailsTabs.roles'),
-      value: 'roles',
-      isActive: true,
-    },
-  }
-  const tabs: Tab[] = [tabValues.userData, tabValues.groups, tabValues.roles]
+  const tabs: Tab<UserTab>[] = [tabValues.userData, tabValues.groups, tabValues.roles]
 
   const defaultTab = tabValues.userData.value
 
@@ -167,7 +165,7 @@ export const UserOverview = (props: UserOverviewProps) => {
   )
 
   const EditButton = (
-    <Button data-testid="editButton" type="button" onClick={() => setIsReadOnly(false)} className="mx-6">
+    <Button data-testid="editButton" type="button" onClick={() => setIsReadOnly(false)}>
       {tCommon('actions.edit')}
     </Button>
   )
@@ -176,7 +174,11 @@ export const UserOverview = (props: UserOverviewProps) => {
     <PageContainer testId={testId} headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader
         title={title}
-        subTabs={{ tabs: tabs, selectedTab: subTabValue || defaultTab, onClick: newTab => handleSelectTab(newTab) }}
+        segmentedControlBarProps={{
+          tabs: tabs,
+          selectedTab: subTabValue || defaultTab,
+          onTabChange: newTab => handleSelectTab(newTab),
+        }}
         customElement={isReadOnly ? EditButton : SaveAndExitButtons}
       />
       {renderTabContent()}

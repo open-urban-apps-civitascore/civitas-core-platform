@@ -5,20 +5,22 @@ import { HTMLAttributes, JSX } from 'react'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
+import { SegmentedControlBar, SegmentedControlBarProps } from '../segmented-control-bar/SegmentedControlBar'
 import { Badge } from '../ui/badge'
 import { TabSectionProps, TabsSection } from './components/TabsSections'
 
-export type PageHeaderProps = Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & {
+export type PageHeaderProps<TabValue extends string> = Pick<HTMLAttributes<HTMLDivElement>, 'className' | 'style'> & {
   title?: string
   subtitle?: string
-  tabs?: TabSectionProps
-  subTabs?: TabSectionProps
+  segmentedControlBarProps?: SegmentedControlBarProps<TabValue>
   badgeTitle?: string
   customElement?: JSX.Element
+  tabsSectionProps?: TabSectionProps
 }
 
-export const PageHeader = (props: PageHeaderProps) => {
-  const { title, subtitle, className, style, tabs, subTabs, badgeTitle, customElement } = props
+export const PageHeader = <TabValue extends string>(props: PageHeaderProps<TabValue>) => {
+  const { title, subtitle, className, style, tabsSectionProps, segmentedControlBarProps, badgeTitle, customElement } =
+    props
   const isMobile = useIsMobile()
   return (
     <div
@@ -30,8 +32,13 @@ export const PageHeader = (props: PageHeaderProps) => {
       )}
       style={style}
     >
-      {tabs && (
-        <TabsSection testId="primaryTabs" tabs={tabs.tabs} onClick={tabs.onClick} selectedTab={tabs.selectedTab} />
+      {tabsSectionProps && (
+        <TabsSection
+          testId="primaryTabs"
+          tabs={tabsSectionProps.tabs}
+          onClick={tabsSectionProps.onClick}
+          selectedTab={tabsSectionProps.selectedTab}
+        />
       )}
       <div className={cn('flex')}>
         <div id="pageHeaderTitle" className={cn('flex-1 w-full min-w-0 px-[var(--layout-padding)]')}>
@@ -55,16 +62,17 @@ export const PageHeader = (props: PageHeaderProps) => {
           )}
           {subtitle && <p className="mt-6 text-muted-foreground">{subtitle}</p>}
         </div>
-        {customElement}
+        <div className="pr-[var(--layout-padding)]">{customElement}</div>
       </div>
-      {subTabs && (
-        <TabsSection
-          testId="subTabs"
-          tabs={subTabs.tabs}
-          selectedTab={subTabs.selectedTab}
-          onClick={subTabs.onClick}
-          isSubTabsSection={!!subTabs}
-          className="bg-accent"
+      {segmentedControlBarProps && (
+        <SegmentedControlBar
+          tabs={segmentedControlBarProps.tabs}
+          selectedTab={segmentedControlBarProps.selectedTab}
+          onTabChange={segmentedControlBarProps.onTabChange}
+          completedTabs={segmentedControlBarProps.completedTabs}
+          disabledTabs={segmentedControlBarProps.disabledTabs}
+          hasCompletionStatus={segmentedControlBarProps.hasCompletionStatus}
+          className="mx-[var(--layout-padding)]"
         />
       )}
     </div>

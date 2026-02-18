@@ -1,6 +1,7 @@
 'use client'
 
 import { Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 
@@ -23,6 +24,7 @@ interface DatastructuresListProps {
 export const DatastructuresList = (props: DatastructuresListProps) => {
   const { datastructures, rowCount } = props
   const t = useTranslations('datastructures')
+  const router = useRouter()
   const {
     pageIndex,
     pageSize,
@@ -38,7 +40,7 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
   const CustomElement = (
-    <Button data-testid="addDatasourceButton" onClick={() => console.log('datastructures/create')}>
+    <Button data-testid="addDatasourceButton" onClick={() => router.push('datastructures/create')}>
       <Plus />
       {t('newDatasource')}
     </Button>

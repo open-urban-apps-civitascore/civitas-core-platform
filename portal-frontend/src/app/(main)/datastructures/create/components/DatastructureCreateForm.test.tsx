@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
-import { DatasourceCreateForm } from './DatasourceCreateForm'
+import { DatastructureCreateForm } from './DatastructureCreateForm'
 
 const mockPush = vi.fn()
 const mockMutate = vi.fn()
@@ -19,8 +19,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('page=1'),
 }))
 
-vi.mock('@/app/services/api/datasources/clientRequests', () => ({
-  useCreateDatasource: () => ({
+vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
+  useCreateDatastructure: () => ({
     mutate: mockMutate,
     isPending: false,
   }),
@@ -30,20 +30,20 @@ const setup = () => {
   const client = new QueryClient()
   return render(
     <QueryClientProvider client={client}>
-      <DatasourceCreateForm />
+      <DatastructureCreateForm />
     </QueryClientProvider>,
   )
 }
 
-describe('DatasourceCreateForm', () => {
+describe('DatastructureCreateForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   test('renders the form with correct elements', () => {
     setup()
-    expect(screen.getByTestId('createDatasourcePage')).toBeInTheDocument()
-    expect(screen.getByTestId('datasourceCreateForm')).toBeInTheDocument()
+    expect(screen.getByTestId('createDatastructurePage')).toBeInTheDocument()
+    expect(screen.getByTestId('datastructureCreateForm')).toBeInTheDocument()
     expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
     expect(screen.getByTestId('submitButton')).toBeInTheDocument()
   })
@@ -62,30 +62,28 @@ describe('DatasourceCreateForm', () => {
   test('submit button is enabled after changing form values', () => {
     setup()
     const nameInput = screen.getByRole('textbox')
-    fireEvent.change(nameInput, { target: { value: 'Test Datasource' } })
+    fireEvent.change(nameInput, { target: { value: 'Test Datastructure' } })
     expect(screen.getByTestId('submitButton')).toBeEnabled()
   })
 
-  test('cancel button navigates back to datasources list', () => {
+  test('cancel button navigates back to datastructures list', () => {
     setup()
     fireEvent.click(screen.getByTestId('cancelButton'))
-    expect(mockPush).toHaveBeenCalledWith('/datasources?page=1')
+    expect(mockPush).toHaveBeenCalledWith('/datastructures?page=1')
   })
 
-  test('calls createDatasource mutation on form submission', async () => {
+  test('calls createDatastructure mutation on form submission', async () => {
     setup()
     const nameInput = screen.getByRole('textbox')
-    fireEvent.change(nameInput, { target: { value: 'Test Datasource' } })
+    fireEvent.change(nameInput, { target: { value: 'Test Datastructure' } })
     fireEvent.click(screen.getByTestId('submitButton'))
 
     await waitFor(() => {
       expect(mockMutate).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: 'Test Datasource',
+          name: 'Test Datastructure',
           description: '',
           status: 'DRAFT',
-          connector: null,
-          connection: 'inactive',
         }),
         expect.any(Object),
       )
@@ -93,14 +91,14 @@ describe('DatasourceCreateForm', () => {
   })
 })
 
-describe('DatasourceCreateForm loading state', () => {
+describe('DatastructureCreateForm loading state', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   test('shows loading spinner when form is submitting', () => {
-    vi.doMock('@/app/services/api/datasources/clientRequests', () => ({
-      useCreateDatasource: () => ({
+    vi.doMock('@/app/services/api/datastructures/clientRequests', () => ({
+      useCreateDatastructure: () => ({
         mutate: mockMutate,
         isPending: true,
       }),

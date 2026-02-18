@@ -2,6 +2,8 @@ import { z } from 'zod'
 
 import { Item, WithId } from './common'
 
+export type GroupTab = 'info' | 'roles' | 'users' | 'subgroups'
+
 export type Group = {
   id: string
   title: string

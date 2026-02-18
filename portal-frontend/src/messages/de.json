@@ -33,7 +33,8 @@
       "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
       "nameRequired": "Name ist erforderlich",
       "descriptionRequired": "Beschreibung ist erforderlich",
-      "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein"
+      "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
+      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden"
     },
     "items": {
       "users": "Users",
@@ -391,8 +392,8 @@
       "action": "Aktion"
     },
     "status": {
-      "draft": "Entwurf",
-      "available": "Verfügbar"
+      "DRAFT": "Entwurf",
+      "AVAILABLE": "Verfügbar"
     },
     "connection": {
       "active": "aktiv",
@@ -452,6 +453,35 @@
     },
     "source": {
       "OWN": "Eigene"
+    },
+    "create": {
+      "title": "Neue Datenstruktur",
+      "subtitle": "Neue Datenstrukturen sind nur intern sichtbar.",
+      "basicInfo": {
+        "title": "Basisinformation",
+        "subtitle": "Der Name kann später angepasst werden."
+      }
+    },
+    "form": {
+      "name": "Name",
+      "namePlaceholder": "Name der Datenstruktur",
+      "description": "Beschreibung",
+      "descriptionHint": "max. 150 Zeichen"
+    },
+    "tabs": {
+      "basicInfo": "Basisinformationen",
+      "accessPermissions": "Zugriffsberechtigungen",
+      "versions": "Versionen"
+    },
+    "edit": {
+      "basicInfo": {
+        "title": "Basisinformationen",
+        "subtitle": "Basisinformationen können auch später noch mal angepasst werden."
+      }
+    },
+    "messages": {
+      "createSuccess": "Datenstruktur wurde erfolgreich angelegt.",
+      "updateSuccess": "Datenstruktur wurde erfolgreich aktualisiert."
     },
     "pipelineEditor": {
       "canvas": {

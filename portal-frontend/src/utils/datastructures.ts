@@ -1,4 +1,10 @@
-import { Datastructure, DatastructuresListData, DatastructureVersionSummary } from '@/types/datastructures'
+import {
+  Datastructure,
+  DatastructureCreateFormData,
+  DatastructureCreateJsonServerData,
+  DatastructuresListData,
+  DatastructureVersionSummary,
+} from '@/types/datastructures'
 
 export const mapDatastructuresApiToListData = (datastructures: Datastructure[]): DatastructuresListData[] => {
   return datastructures.map(datastructure => {
@@ -24,3 +30,15 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
     }
   })
 }
+
+// TODO: This mapper is needed for creating json-server data. remove it when API is implemented
+export const mapdatastructureFormToApiData = (
+  datastructure: DatastructureCreateFormData,
+): DatastructureCreateJsonServerData => ({
+  name: datastructure.name,
+  description: '',
+  source: 'OWN',
+  status: 'DRAFT',
+  inUse: false,
+  versions: [],
+})

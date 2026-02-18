@@ -51,7 +51,9 @@ export const GroupsTable = (props: GroupsTableProps) => {
     columnHelper.accessor('title', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('list.title')} />,
       cell: ({ row }: CellContext<Group, unknown>) => (
-        <ExpanderCell row={row} value={row.original.title} className="font-medium" />
+        <ExpanderCell row={row} className="font-medium">
+          {row.original.title}
+        </ExpanderCell>
       ),
       meta: {
         style: {
