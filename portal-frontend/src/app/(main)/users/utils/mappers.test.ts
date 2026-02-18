@@ -2,14 +2,20 @@
 import { describe, expect, it } from 'vitest'
 
 import type { Group } from '@/types/groups'
-import { type BaseRole, ROLE_TYPES } from '@/types/roles'
+import { ROLE_TYPES } from '@/types/roles'
 
 import { mapRolesData } from './mappers'
 
-const roles: BaseRole[] = [
+const roles = [
   { id: 'r1', name: 'Admin', type: ROLE_TYPES.SYSTEM },
   { id: 'r2', name: 'Editor', type: ROLE_TYPES.DATA },
   { id: 'r3', name: 'Support', type: ROLE_TYPES.GOVERNANCE },
+]
+
+const groupRoles = [
+  { id: 'r1', name: 'Admin', roleType: ROLE_TYPES.SYSTEM },
+  { id: 'r2', name: 'Editor', roleType: ROLE_TYPES.DATA },
+  { id: 'r3', name: 'Support', roleType: ROLE_TYPES.GOVERNANCE },
 ]
 
 const groups: Group[] = [
@@ -17,23 +23,21 @@ const groups: Group[] = [
     id: 'g1',
     name: 'Group 01',
     description: '',
-    roles: ['r1', 'r2'],
-    users: [],
+    roles: [groupRoles[0], groupRoles[1]],
+    members: null,
     contactUser: null,
-    parent: null,
-    subgroups: [],
-    dataspace: null,
+    createdAt: '',
+    modifiedAt: '',
   },
   {
     id: 'g2',
     name: 'Group 02',
     description: '',
-    roles: ['r1', 'r3'],
-    users: [],
+    roles: [groupRoles[0], groupRoles[2]],
+    members: [],
     contactUser: null,
-    parent: null,
-    subgroups: [],
-    dataspace: { id: 'ds1', title: 'Dataspace 01' },
+    createdAt: '',
+    modifiedAt: '',
   },
 ]
 
@@ -47,7 +51,6 @@ describe('mapRolesData', () => {
         name: 'Admin',
         inherited: false,
         group: 'Group 01',
-        dataspace: null,
         type: ROLE_TYPES.SYSTEM,
         roleId: 'r1',
       },
@@ -56,7 +59,6 @@ describe('mapRolesData', () => {
         name: 'Editor',
         inherited: false,
         group: 'Group 01',
-        dataspace: null,
         type: ROLE_TYPES.DATA,
         roleId: 'r2',
       },
@@ -65,7 +67,6 @@ describe('mapRolesData', () => {
         name: 'Admin',
         inherited: false,
         group: 'Group 02',
-        dataspace: { id: 'ds1', title: 'Dataspace 01' },
         type: ROLE_TYPES.SYSTEM,
         roleId: 'r1',
       },
@@ -74,30 +75,8 @@ describe('mapRolesData', () => {
         name: 'Support',
         inherited: false,
         group: 'Group 02',
-        dataspace: { id: 'ds1', title: 'Dataspace 01' },
         type: ROLE_TYPES.GOVERNANCE,
         roleId: 'r3',
-      },
-    ])
-  })
-
-  it('filters out roles not present in role map', () => {
-    const result = mapRolesData(roles, [
-      {
-        ...groups[0],
-        roles: ['r1', 'unknown'],
-      },
-    ])
-
-    expect(result).toEqual([
-      {
-        id: 'g1-r1',
-        name: 'Admin',
-        inherited: false,
-        group: 'Group 01',
-        dataspace: null,
-        type: ROLE_TYPES.SYSTEM,
-        roleId: 'r1',
       },
     ])
   })

@@ -18,7 +18,6 @@ const defaultProps = {
   totalPages: 1,
   rowSelection: {},
   rowCount: 2,
-  onRowClick: vi.fn(),
   onPaginationChange: vi.fn(),
   onSortingChange: vi.fn(),
 }
@@ -47,16 +46,6 @@ describe('GroupTable', () => {
     expect(screen.getByRole('cell', { name: '0' })).toBeInTheDocument() // User count for Group 2
     expect(screen.getByRole('cell', { name: 'Contact 2' })).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: 'description for Group 2' })).toBeInTheDocument()
-    renderedTable.unmount()
-  })
-
-  it('calls onRowClick when a row is clicked', () => {
-    const renderedTable = render(<GroupTable {...defaultProps} />)
-
-    const row = screen.getByText('Group 1').closest('tr') as HTMLElement
-    fireEvent.click(row)
-
-    expect(defaultProps.onRowClick).toHaveBeenCalled()
     renderedTable.unmount()
   })
 })
