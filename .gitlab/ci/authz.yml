@@ -107,6 +107,7 @@ bundle-authz:
       }
       EOF
     # Build bundle
+    - chmod -R 0755 /tmp/bundle
     - opa build -b /tmp/bundle -o bundle.tar.gz
     - echo "Bundle built successfully"
     - tar -tzf bundle.tar.gz | head -20
