@@ -54,6 +54,11 @@ public enum AdapterOperation {
   FROST_ENTITY_UPDATE("FROST entity update"),
   FROST_ENTITY_DELETE("FROST entity deletion"),
 
+  // RedPanda Connect operations
+  PIPELINE_CREATE("pipeline creation"),
+  PIPELINE_UPDATE("pipeline update"),
+  PIPELINE_DELETE("pipeline deletion"),
+
   // DummyLog operations
   EVENT_PROCESSING("event processing");
 
