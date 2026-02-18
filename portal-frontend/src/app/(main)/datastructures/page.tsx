@@ -8,7 +8,7 @@ type Props = {
   searchParams: Promise<JsonServerRequestParams>
 }
 
-const Datasources = async ({ searchParams }: Props) => {
+const Datastructures = async ({ searchParams }: Props) => {
   const params = await searchParams
   const { jsonServerParams } = getJsonServerRequestParams(params)
   const datastructuresResponse = await getDatastructures(jsonServerParams)
@@ -17,4 +17,4 @@ const Datasources = async ({ searchParams }: Props) => {
   return <DatastructuresList datastructures={datastructures} rowCount={datastructuresResponse.totalElements || 0} />
 }
 
-export default Datasources
+export default Datastructures

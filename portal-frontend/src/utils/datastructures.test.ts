@@ -1,4 +1,3 @@
-// mapDatastructuresApiToListData.test.ts
 import { describe, expect, it } from 'vitest'
 
 import type { Datastructure } from '@/types/datastructures'
@@ -57,7 +56,7 @@ describe('mapDatastructuresApiToListData', () => {
     expect(result[0].versionNumber).toBe('2.0')
   })
 
-  it('adds empty versions array to each version (subrows) when no versions in datastructure', () => {
+  it('adds empty versions array to each version', () => {
     const datastructure: Datastructure = createDatastructure(['1.0'])
 
     const result = mapDatastructuresApiToListData([datastructure])
@@ -81,5 +80,16 @@ describe('mapDatastructuresApiToListData', () => {
     expect(result[0].versionNumber).toBe('2.0')
     expect(result[1].id).toBe('ds2')
     expect(result[1].versionNumber).toBe('1.2')
+  })
+
+  it('returns null for versionNumber and source when versions array is empty', () => {
+    const datastructure: Datastructure = createDatastructure([])
+
+    const result = mapDatastructuresApiToListData([datastructure])
+
+    expect(result).toHaveLength(1)
+    expect(result[0].versionNumber).toBeNull()
+    expect(result[0].source).toBeNull()
+    expect(result[0].versions).toEqual([])
   })
 })

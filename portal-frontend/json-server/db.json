@@ -5875,6 +5875,15 @@
           "status": "DRAFT"
         }
       ]
+    },
+    {
+      "id": "ds4",
+      "name": "Test Datastructure 4",
+      "description": "Description 4",
+      "source": "OWN",
+      "inUse": false,
+      "status": "DRAFT",
+      "versions": []
     }
   ]
 }

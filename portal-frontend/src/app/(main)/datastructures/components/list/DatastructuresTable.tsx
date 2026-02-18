@@ -71,7 +71,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     columnHelper.accessor('source', {
       header: t('tableHeaders.source'),
-      cell: info => t(`source.${info.getValue()}`),
+      cell: info => (info.getValue() ? t(`source.${info.getValue()}`) : '-'),
       meta: {
         style: {
           width: '10%',
@@ -81,7 +81,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     columnHelper.accessor('versionNumber', {
       header: t('tableHeaders.versionNumber'),
-      cell: info => info.getValue(),
+      cell: info => info.getValue() || '-',
       meta: {
         style: {
           width: '10%',
