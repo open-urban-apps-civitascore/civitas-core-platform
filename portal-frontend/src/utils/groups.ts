@@ -13,7 +13,7 @@ export const mapGroupApiToFormData = (groupData: Group): GroupBaseFormData => ({
   id: groupData.id,
   name: groupData.name,
   description: groupData.description || '',
-  contactUser: groupData.contactUser?.id || '',
+  contactUserId: groupData.contactUser?.id || '',
 })
 
 export const mapGroupsApiToListData = (groups: Group[]): UserGroupsListData[] =>

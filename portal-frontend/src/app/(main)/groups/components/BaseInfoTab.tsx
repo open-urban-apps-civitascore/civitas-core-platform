@@ -22,8 +22,6 @@ import { Group, GroupBaseFormData, GroupBaseFormDataSchema } from '@/types/group
 import { Contact } from '@/types/users'
 import { mapGroupApiToFormData } from '@/utils/groups'
 
-import { mapFormGroupToApiData } from '../utils/mappers'
-
 const MIN_LENGTH = 2
 
 const getContactListItems = (contacts: Contact[]) =>
@@ -83,7 +81,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   useEffect(() => {
     console.log('form values', form.getValues())
-    form.setValue('contactUser', selectedContact?.id || '')
+    form.setValue('contactUserId', selectedContact?.id || '')
   }, [selectedContact, form])
 
   useEffect(() => {
@@ -92,7 +90,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   useEffect(() => {
     if (debouncedInput.trim().length < MIN_LENGTH) {
-      form.setValue('contactUser', '')
+      form.setValue('contactUserId', '')
       setSelectedContact(null)
       setContacts([])
       setContactListItems([])
@@ -101,13 +99,12 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   const handleCreateGroup = async (formData: GroupBaseFormData) => {
     // eslint-disable-next-line unused-imports/no-unused-vars
-    const { id, ...createGroupData } = mapFormGroupToApiData(formData, selectedContact)
+    const { id, ...createGroupData } = formData
     createGroup.mutate(createGroupData, { onSuccess: ({ data }) => router.push(`/groups/${data.id}`) })
   }
 
   const handleUpdateGroup = async (formData: GroupBaseFormData) => {
-    const updateGroupData = mapFormGroupToApiData(formData, selectedContact)
-    updateGroup.mutate(updateGroupData, { onSuccess: ({ data }) => setDefaultFormData(mapGroupApiToFormData(data)) })
+    updateGroup.mutate(formData, { onSuccess: ({ data }) => setDefaultFormData(mapGroupApiToFormData(data)) })
   }
 
   const handleContactInputChange = async (value: string) => {
@@ -116,7 +113,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   }
 
   const handleSelectContact = (newSelection: SelectItem) => {
-    form.setValue('contactUser', newSelection.value, { shouldDirty: true })
+    form.setValue('contactUserId', newSelection.value, { shouldDirty: true })
     const selectedContact = contacts.find(contact => contact.id === newSelection.value)
     if (selectedContact) {
       setSelectedContact(selectedContact)
@@ -167,7 +164,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               isOpen={isContactListOpen}
               listItems={contactListItems}
               form={form}
-              name="contactUser"
+              name="contactUserId"
               placeholder={t('details.contact.placeholder')}
               label={t('details.contact.label')}
               inputValue={contactInput}
@@ -184,7 +181,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           onCancelClick={() => router.push('/groups')}
           confirmButtonType="submit"
           isConfirmButtonDisabled={
-            !form.formState.isDirty && form.getValues().contactUser === defaultFormData.contactUser
+            !form.formState.isDirty && form.getValues().contactUserId === defaultFormData.contactUserId
           }
         />
       </form>

@@ -89,7 +89,7 @@ export const UserOverview = (props: UserOverviewProps) => {
       dirtyFields.phone && form.getValues('phone')?.replace(/\s+/g, '') !== defaultUserData?.phone?.replace(/\s+/g, '')
     const isNonPhoneFieldDirty = Object.keys(dirtyFields).find(field => field !== 'phone')
     return isNonPhoneFieldDirty || isPhoneFieldDirty
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watch, form, defaultUserData?.phone])
 
   useEffect(() => {

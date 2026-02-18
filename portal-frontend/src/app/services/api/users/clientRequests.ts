@@ -8,7 +8,6 @@ import { CreateUserData, UpdateUserData, User } from '@/types/users'
 const key = 'users'
 
 export const useGetUsers = ({ params, isEnabled, queryKey }: GetListInput = {}) => {
-
   return useDataQuery<User[]>({
     key,
     queryKey,
