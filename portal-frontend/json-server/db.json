@@ -6795,7 +6795,7 @@
       "description": "Description 3",
       "source": "OWN",
       "inUse": false,
-      "status": "AVAILABLE",
+      "status": "DRAFT",
       "versions": [
         {
           "id": "v4",
