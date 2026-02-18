@@ -10,10 +10,10 @@ const logger = pino({
 // Log environment variables at module load (only in debug mode)
 logger.debug(
   {
-    JSON_SERVER_HOST: process.env.JSON_SERVER_HOST ?? 'undefined',
-    JSON_SERVER_PORT: process.env.JSON_SERVER_PORT ?? 'undefined',
-    API_BASE_URL: process.env.API_BASE_URL ?? 'undefined',
-    API_PORT: process.env.API_PORT ?? 'undefined',
+    jsonServerHost: process.env.JSON_SERVER_HOST ?? 'undefined',
+    jsonServerPort: process.env.JSON_SERVER_PORT ?? 'undefined',
+    apiBaseUrl: process.env.API_BASE_URL ?? 'undefined',
+    apiPort: process.env.API_PORT ?? 'undefined',
   },
   'Proxy route environment variables',
 )
@@ -22,7 +22,7 @@ const JSON_SERVER_URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERV
 const API_URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
 
 // Log constructed URLs at module load
-logger.debug({ JSON_SERVER_URL, API_URL }, 'Constructed base URLs')
+logger.debug({ jsonServerUrl: JSON_SERVER_URL, apiUrl: API_URL }, 'Constructed base URLs')
 interface RouteContext {
   params: Promise<{ path: string[] }>
 }
@@ -129,8 +129,8 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
       {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        JSON_SERVER_URL,
-        API_URL,
+        jsonServerUrl: JSON_SERVER_URL,
+        apiUrl: API_URL,
       },
       'Proxy error occurred',
     )
