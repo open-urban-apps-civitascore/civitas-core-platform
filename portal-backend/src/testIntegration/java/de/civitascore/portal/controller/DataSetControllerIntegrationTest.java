@@ -105,7 +105,6 @@ class DataSetControllerIntegrationTest
   @Override
   protected DataSetInputDTO createUpdateInput() {
     DataSetInputDTO input = new DataSetInputDTO();
-    input.setName("updated_dataset");
     input.setName("Updated DataSet");
     input.setDescription("Updated description");
     input.setFormat("CSV");
