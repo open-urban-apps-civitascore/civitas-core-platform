@@ -45,8 +45,8 @@ export const DatastructuresList = (props: DatastructuresListProps) => {
   )
 
   return (
-    <PageContainer headerType="onlyTitle" testId="datastructuresPage">
-      <PageHeader title={t('title')} />
+    <PageContainer headerType="withSubTabsOrSubtitle" testId="datastructuresPage">
+      <PageHeader title={t('title')} subtitle={t('subtitle')} />
       <PageBackground>
         <TableContainer>
           <SearchHeader customElement={CustomElement} onChangeSearchString={setSearchParam} searchString={search} />
