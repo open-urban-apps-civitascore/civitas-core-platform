@@ -47,25 +47,18 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
   @Query("SELECT a FROM Assignment a WHERE a.group.id = :groupId")
   List<Assignment> findAllByGroupId(@Param("groupId") UUID groupId);
 
-  @EntityGraph(
-      attributePaths = {
-        "group",
-        "role",
-        "dataSource",
-        "dataset",
-        "dataSpace",
-        "catalog",
-        "dataStructure"
-      })
-  @Query(
-      "SELECT a FROM Assignment a WHERE a.scopeType = :scopeType "
-          + "AND CASE a.scopeType "
-          + "WHEN ScopeType.DATASOURCE THEN a.dataSource.id "
-          + "WHEN ScopeType.DATASET THEN a.dataset.id "
-          + "WHEN ScopeType.DATASPACE THEN a.dataSpace.id "
-          + "WHEN ScopeType.CATALOG THEN a.catalog.id "
-          + "WHEN ScopeType.DATASTRUCTURE THEN a.dataStructure.id "
-          + "END = :scopeId")
-  List<Assignment> findAllByScopeTypeAndScopeId(
-      @Param("scopeType") ScopeType scopeType, @Param("scopeId") UUID scopeId);
+  @EntityGraph(attributePaths = {"group", "role", "dataSource"})
+  List<Assignment> findAllByScopeTypeAndDataSourceId(ScopeType scopeType, UUID dataSourceId);
+
+  @EntityGraph(attributePaths = {"group", "role", "dataset"})
+  List<Assignment> findAllByScopeTypeAndDatasetId(ScopeType scopeType, UUID datasetId);
+
+  @EntityGraph(attributePaths = {"group", "role", "dataSpace"})
+  List<Assignment> findAllByScopeTypeAndDataSpaceId(ScopeType scopeType, UUID dataSpaceId);
+
+  @EntityGraph(attributePaths = {"group", "role", "catalog"})
+  List<Assignment> findAllByScopeTypeAndCatalogId(ScopeType scopeType, UUID catalogId);
+
+  @EntityGraph(attributePaths = {"group", "role", "dataStructure"})
+  List<Assignment> findAllByScopeTypeAndDataStructureId(ScopeType scopeType, UUID dataStructureId);
 }

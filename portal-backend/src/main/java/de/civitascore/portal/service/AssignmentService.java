@@ -9,6 +9,7 @@ import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
 import de.civitascore.portal.model.input.AssignmentScopedInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.List;
 import java.util.Optional;
@@ -106,7 +107,15 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   }
 
   public List<Assignment> findAllByScopeTypeAndScopeId(ScopeType scopeType, UUID scopeId) {
-    return getRepository().findAllByScopeTypeAndScopeId(scopeType, scopeId);
+    return switch (scopeType) {
+      case DATASOURCE -> getRepository().findAllByScopeTypeAndDataSourceId(scopeType, scopeId);
+      case DATASET -> getRepository().findAllByScopeTypeAndDatasetId(scopeType, scopeId);
+      case DATASPACE -> getRepository().findAllByScopeTypeAndDataSpaceId(scopeType, scopeId);
+      case CATALOG -> getRepository().findAllByScopeTypeAndCatalogId(scopeType, scopeId);
+      case DATASTRUCTURE ->
+          getRepository().findAllByScopeTypeAndDataStructureId(scopeType, scopeId);
+      default -> throw new InvalidInputException("Assignment", scopeType.name(), "Unsupported scope type");
+    };
   }
 
   /**
@@ -147,7 +156,7 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
             .toList();
 
     // Delete existing assignments only after all inputs are validated
-    List<Assignment> existing = getRepository().findAllByScopeTypeAndScopeId(scopeType, scopeId);
+    List<Assignment> existing = findAllByScopeTypeAndScopeId(scopeType, scopeId);
     if (existing != null && !existing.isEmpty()) {
       getRepository().deleteAll(existing);
       getRepository().flush();
