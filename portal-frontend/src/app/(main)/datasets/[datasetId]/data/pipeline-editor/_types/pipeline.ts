@@ -1,0 +1,153 @@
+import type { Edge, Node, Viewport } from '@xyflow/react'
+
+import type { PipelineNodeData } from './nodes'
+
+// ============================================================================
+// Pipeline Node Types
+// ============================================================================
+
+/**
+ * All available pipeline node types.
+ * Used to identify node categories and render appropriate components.
+ *
+ */
+export const PIPELINE_NODE_TYPES = {
+  // Control nodes
+  Start: 'start',
+  End: 'end',
+  // Trigger nodes
+  ApiRequest: 'apiRequest',
+  ApiResponse: 'apiResponse',
+  Cron: 'cron',
+  // Source nodes
+  DataSource: 'dataSource',
+  // Storage nodes
+  Frost: 'frost',
+  // Transform nodes
+  Mapping: 'mapping',
+} as const
+
+export type PipelineNodeType = (typeof PIPELINE_NODE_TYPES)[keyof typeof PIPELINE_NODE_TYPES]
+
+// ============================================================================
+// Pipeline Node (React Flow Extended)
+// ============================================================================
+
+/**
+ * Extended React Flow Node with pipeline-specific data.
+ * This is the primary node type used throughout the pipeline editor.
+ *
+ */
+export interface PipelineNode extends Node<PipelineNodeData, PipelineNodeType> {
+  type: PipelineNodeType
+  data: PipelineNodeData
+}
+
+// ============================================================================
+// Pipeline Edge
+// ============================================================================
+
+/**
+ * Pipeline edge data structure.
+ * Defines the data attached to each edge/connection.
+ */
+export interface PipelineEdgeData extends Record<string, unknown> {
+  label?: string
+  guard?: string // Optional guard expression for conditional transitions
+  isSelected?: boolean
+}
+
+/**
+ * Extended React Flow Edge for pipeline connections.
+ *
+ */
+export interface PipelineEdge extends Edge<PipelineEdgeData> {
+  data?: PipelineEdgeData
+}
+
+// ============================================================================
+// Pipeline Model
+// ============================================================================
+
+/**
+ * Complete pipeline model representing a single pipeline diagram.
+ * Contains all nodes, edges, and metadata.
+ *
+ */
+export interface Pipeline {
+  id: string
+  name: string
+  description: string
+  nodes: PipelineNode[]
+  edges: PipelineEdge[]
+  viewport?: Viewport
+  createdAt: Date
+  updatedAt: Date
+  isDirty: boolean
+}
+
+// ============================================================================
+// Pipeline Backend Payload
+// ============================================================================
+
+/**
+ * Styles object for backend payload.
+ * Stores React Flow visual configuration.
+ */
+export interface PipelineStylesPayload {
+  viewport?: Viewport
+  nodePositions: Record<string, { x: number; y: number }>
+}
+
+/**
+ * Backend API payload structure for saving pipelines.
+ * This is the format expected by `POST /backend/pipeline`.
+ *
+ */
+export interface PipelinePayload {
+  name: string
+  description: string
+  styles: PipelineStylesPayload
+  dataSources: number[] // IDs extracted from DataSource nodes (real API)
+  apis: string[] // IDs extracted from ApiRequest/ApiResponse nodes (mock)
+  persistences: string[] // IDs extracted from Frost nodes (mock)
+  model: string // Pipeline graph serialized in RedPandaConnect syntax
+}
+
+// ============================================================================
+// Pipeline Actions (Redux-style)
+// ============================================================================
+
+/**
+ * Pipeline diagram actions for state management.
+ *
+ */
+export type PipelineAction =
+  | { type: 'SET_NODES'; payload: PipelineNode[] }
+  | { type: 'SET_EDGES'; payload: PipelineEdge[] }
+  | { type: 'ADD_NODE'; payload: PipelineNode }
+  | { type: 'ADD_EDGE'; payload: PipelineEdge }
+  | { type: 'UPDATE_NODE'; payload: { id: string; updates: Partial<PipelineNodeData> } }
+  | { type: 'UPDATE_EDGE'; payload: { id: string; updates: Partial<PipelineEdgeData> } }
+  | { type: 'DELETE_NODES'; payload: string[] }
+  | { type: 'DELETE_EDGES'; payload: string[] }
+  | { type: 'SET_VIEWPORT'; payload: Viewport }
+  | { type: 'MARK_CLEAN' }
+  | { type: 'MARK_DIRTY' }
+  | { type: 'LOAD_PIPELINE'; payload: Pipeline }
+  | { type: 'RESET_PIPELINE' }
+
+// ============================================================================
+// Node Creation Context
+// ============================================================================
+
+/**
+ * Context for creating new pipeline nodes.
+ * Used when dragging from palette to canvas.
+ *
+ */
+export interface NodeCreationContext {
+  nodeType: PipelineNodeType
+  position: { x: number; y: number }
+  name?: string
+}

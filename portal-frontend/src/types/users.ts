@@ -3,6 +3,8 @@ import { z } from 'zod'
 
 import { Item, ItemScheme, WithId } from './common'
 
+export type UserTab = 'userData' | 'roles' | 'groups'
+
 export type Contact = {
   id: string
   displayName: string

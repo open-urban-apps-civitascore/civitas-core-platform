@@ -122,7 +122,9 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
         <SortableTableHeader column={column} title={tRoles('groupAssignmentTab.modal.tableHeaders.name')} />
       ),
       cell: ({ row }: CellContext<Group, unknown>) => (
-        <ExpanderCell row={row} value={row.original.name} className="font-medium" />
+        <ExpanderCell row={row} className="font-medium">
+          {row.original.title}
+        </ExpanderCell>
       ),
       meta: {
         style: {

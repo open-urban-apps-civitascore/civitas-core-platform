@@ -27,7 +27,7 @@ export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>)
     placeholder,
     label,
     required,
-    disabled,
+    disabled = false,
     formItemProps,
     hint,
     maxLength,
@@ -64,7 +64,7 @@ export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>)
                 data-testid={`${name}TextArea`}
                 data-test-element="formField"
                 className={cn(
-                  'disabled:opacity-100 disabled:border-hidden disabled:shadow-none disabled:min-h-4 disabled:py-0 disabled:resize-none disabled:pointer-events-none',
+                  'disabled:opacity-100 disabled:border-transparent disabled:text-muted-foreground disabled:shadow-none disabled:min-h-9 disabled:py-2 disabled:resize-none disabled:pointer-events-none',
                   className,
                 )}
                 placeholder={placeholder}
@@ -75,7 +75,7 @@ export const FormTextArea = <T extends FieldValues>(props: FormTextAreaProps<T>)
             </FormControl>
             <div className="flex justify-between">
               {shouldShowErrors && <FormMessage />}
-              {hasCharacterCount && maxLength && (
+              {hasCharacterCount && maxLength && !disabled && (
                 <span className="text-sm text-muted-foreground ml-auto mt-1">
                   {characterCount}/{maxLength}
                 </span>

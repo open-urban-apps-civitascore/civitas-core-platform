@@ -1,12 +1,11 @@
 /**
- * This work and the accompanying materials are made available under the terms of the European Union
- * Public License (EU-PL) 1.2 which is available at
- * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ * <p>This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
  *
- * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to
- * all the individual contributors: Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ *
  */
 package com.civitas.configadapter.keycloak;
 
@@ -24,6 +23,7 @@ import com.civitas.configadapter.model.idm.IdmConfigValue;
 import com.civitas.configadapter.model.idm.RealmConfig;
 import com.civitas.configadapter.model.idm.RoleConfig;
 import com.civitas.configadapter.model.idm.UserConfig;
+import com.civitas.configadapter.util.PiiMaskingUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.ProcessingException;
@@ -908,58 +908,18 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
 
   // ============== PII MASKING ==============
 
-  /**
-   * Masks email addresses in log messages.
-   *
-   * @param email the email to mask
-   * @return masked email (e.g., "use***@***.***")
-   */
-  @SuppressWarnings("unused")
-  private String maskEmail(String email) {
-    if (email == null || !email.contains("@")) {
-      return "***";
-    }
-    int at = email.indexOf('@');
-    return email.substring(0, Math.min(3, at)) + "***@***.***";
-  }
-
-  /**
-   * Masks UUIDs/IDs in log messages.
-   *
-   * @param id the ID to mask
-   * @return masked ID showing only first 8 characters
-   */
   private String maskId(String id) {
-    if (id == null || id.length() <= 8) {
-      return "***";
-    }
-    return id.substring(0, 8) + "***";
+    return PiiMaskingUtil.maskId(id);
   }
 
-  /**
-   * Masks potential PII in error messages.
-   *
-   * @param message the message to mask
-   * @return masked message
-   */
   private String maskPII(String message) {
-    if (message == null) {
-      return "Unknown error";
-    }
-    // Mask email patterns
-    String masked =
-        message.replaceAll("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "***@***.***");
-    // Mask UUIDs
-    masked =
-        masked.replaceAll(
-            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
-            "***-***-***");
-    // Mask potential file paths
-    masked = masked.replaceAll("/[a-zA-Z0-9/_.-]+", "/***");
-    return masked;
+    return PiiMaskingUtil.maskPII(message);
   }
 
   public static class KeycloakOperationException extends Exception {
+    /** serialVersionUID */
+    private static final long serialVersionUID = -8977227116700940716L;
+
     public KeycloakOperationException(String message) {
       super(message);
     }
