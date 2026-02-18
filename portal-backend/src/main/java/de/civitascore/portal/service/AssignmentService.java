@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -114,14 +113,14 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
       case CATALOG -> getRepository().findAllByScopeTypeAndCatalogId(scopeType, scopeId);
       case DATASTRUCTURE ->
           getRepository().findAllByScopeTypeAndDataStructureId(scopeType, scopeId);
-      default -> throw new InvalidInputException("Assignment", scopeType.name(), "Unsupported scope type");
+      default ->
+          throw new InvalidInputException("Assignment", scopeType.name(), "Unsupported scope type");
     };
   }
 
   /**
    * Replace all assignments for the given scope with new assignments. Deletes all existing
-   * assignments matching the scopeType and scopeId, then creates new ones from the input list. Each
-   * new assignment goes through the full create lifecycle (postConvertToEntity, entity validation).
+   * assignments matching the scopeType and scopeId, then creates new ones from the input list.
    *
    * @param inputs the new assignments to create
    * @param scopeType the scope type to replace assignments for
@@ -132,38 +131,21 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   public List<Assignment> replaceAllByScopeTypeAndScopeId(
       List<AssignmentScopedInputDTO> inputs, ScopeType scopeType, UUID scopeId) {
 
-    // Build and validate all entities before modifying anything, keeping the preprocessed input
-    record ValidatedAssignment(@NonNull Assignment entity, AssignmentInputDTO input) {}
-
-    List<ValidatedAssignment> validated =
-        inputs.stream()
-            .map(
-                scopedInput -> {
-                  AssignmentInputDTO input = new AssignmentInputDTO();
-                  input.setGroupId(scopedInput.getGroupId());
-                  input.setRoleId(scopedInput.getRoleId());
-                  input.setScopeType(scopeType);
-                  input.setScopeId(scopeId);
-
-                  AssignmentInputDTO preProcessedInput = preProcessCreateInput(input);
-                  Assignment entity = getMapper().toEntity(preProcessedInput);
-
-                  entity = postConvertToEntity(entity, preProcessedInput);
-                  entity.validateBeforePersist();
-
-                  return new ValidatedAssignment(entity, preProcessedInput);
-                })
-            .toList();
-
-    // Delete existing assignments only after all inputs are validated
+    // Delete existing assignments
     List<Assignment> existing = findAllByScopeTypeAndScopeId(scopeType, scopeId);
-    if (existing != null && !existing.isEmpty()) {
-      getRepository().deleteAll(existing);
-      getRepository().flush();
-    }
+    existing.forEach(entity -> deleteById(entity.getId()));
 
-    return validated.stream()
-        .map(v -> postSave(getRepository().save(v.entity()), v.input()))
+    return inputs.stream()
+        .map(
+            scopedInput -> {
+              AssignmentInputDTO input = new AssignmentInputDTO();
+              input.setGroupId(scopedInput.getGroupId());
+              input.setRoleId(scopedInput.getRoleId());
+              input.setScopeType(scopeType);
+              input.setScopeId(scopeId);
+
+              return create(input);
+            })
         .toList();
   }
 }

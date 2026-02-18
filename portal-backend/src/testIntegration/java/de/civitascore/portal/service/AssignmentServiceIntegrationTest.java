@@ -1037,13 +1037,14 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assignmentService.create(existingInput);
 
       // Try to replace with SYSTEM role + scoped assignment (invalid combination)
+      // @PrePersist validation wraps IllegalStateException in InvalidDataAccessApiUsageException
       assertThatThrownBy(
               () ->
                   assignmentService.replaceAllByScopeTypeAndScopeId(
                       List.of(scopedInput(testGroup.getId(), testSystemRole.getId())),
                       ScopeType.DATASET,
                       testDataSet.getId()))
-          .isInstanceOf(IllegalStateException.class)
+          .isInstanceOf(InvalidDataAccessApiUsageException.class)
           .hasMessageContaining("SYSTEM roles cannot have scope");
 
       // Existing assignment should still be there
