@@ -1,5 +1,6 @@
 package de.civitascore.portal.repository;
 
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import java.util.List;
 import java.util.Optional;
@@ -54,4 +55,19 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
   @EntityGraph(attributePaths = {"role"})
   @Query("SELECT a FROM Assignment a WHERE a.group.id = :groupId")
   List<Assignment> findAllByGroupId(@Param("groupId") UUID groupId);
+
+  @EntityGraph(attributePaths = {"group", "role", "dataSource"})
+  List<Assignment> findAllByScopeTypeAndDataSourceId(ScopeType scopeType, UUID dataSourceId);
+
+  @EntityGraph(attributePaths = {"group", "role", "dataset"})
+  List<Assignment> findAllByScopeTypeAndDatasetId(ScopeType scopeType, UUID datasetId);
+
+  @EntityGraph(attributePaths = {"group", "role", "dataSpace"})
+  List<Assignment> findAllByScopeTypeAndDataSpaceId(ScopeType scopeType, UUID dataSpaceId);
+
+  @EntityGraph(attributePaths = {"group", "role", "catalog"})
+  List<Assignment> findAllByScopeTypeAndCatalogId(ScopeType scopeType, UUID catalogId);
+
+  @EntityGraph(attributePaths = {"group", "role", "dataStructure"})
+  List<Assignment> findAllByScopeTypeAndDataStructureId(ScopeType scopeType, UUID dataStructureId);
 }
