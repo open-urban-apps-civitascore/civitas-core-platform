@@ -93,7 +93,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSetInputDTO dataSetInput = new DataSetInputDTO();
     dataSetInput.setName("Test DataSet " + System.currentTimeMillis());
     dataSetInput.setDescription("Test dataset for assignment testing");
-    dataSetInput.setDataSpaceIds(List.of(testDataSpace.getId()));
     dataSetInput.setOpenDataAccess(false);
     testDataSet = dataSetService.create(dataSetInput);
 

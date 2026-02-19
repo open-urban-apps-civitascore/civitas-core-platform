@@ -88,9 +88,7 @@ class DataSetControllerIntegrationTest
     DataSetInputDTO input = new DataSetInputDTO();
     input.setName("test_dataset_" + System.currentTimeMillis());
     input.setDescription("A test dataset for integration testing");
-    input.setFormat("JSON");
     input.setOpenDataAccess(false);
-    input.setExternalId("ext-" + System.currentTimeMillis());
     return input;
   }
 
@@ -107,7 +105,6 @@ class DataSetControllerIntegrationTest
     DataSetInputDTO input = new DataSetInputDTO();
     input.setName("Updated DataSet");
     input.setDescription("Updated description");
-    input.setFormat("CSV");
     input.setOpenDataAccess(false);
     return input;
   }
@@ -260,7 +257,6 @@ class DataSetControllerIntegrationTest
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo(input.getDescription());
-      assertThat(output.getFormat()).as("Format should match input").isEqualTo(input.getFormat());
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -288,31 +284,6 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should create dataset with dataspaces")
-    void shouldCreateDataSetWithDataSpaces() {
-      DataSetInputDTO input = createValidInput();
-      input.setDataSpaceIds(Collections.emptyList());
-
-      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("Should create dataset with external ID")
-    void shouldCreateDataSetWithExternalId() {
-      DataSetInputDTO input = createValidInput();
-      input.setExternalId("external-dataset-123");
-
-      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getExternalId()).isEqualTo("external-dataset-123");
-    }
-
-    @Test
     @DisplayName("Should create dataset with metadata")
     void shouldCreateDataSetWithMetadata() {
       DataSetInputDTO input = createValidInput();
@@ -321,24 +292,6 @@ class DataSetControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("Should create dataset with different formats")
-    void shouldCreateDataSetWithDifferentFormats() {
-      String[] formats = {"JSON", "CSV", "XML", "PARQUET", "AVRO"};
-
-      for (String format : formats) {
-        DataSetInputDTO input = createValidInput();
-        input.setName("dataset_" + format.toLowerCase() + "_" + System.currentTimeMillis());
-        input.setFormat(format);
-
-        ResponseEntity<DataSetOutputDTO> response = performCreate(input);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getFormat()).isEqualTo(format);
-      }
     }
   }
 
@@ -475,9 +428,6 @@ class DataSetControllerIntegrationTest
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
-      assertThat(output.getFormat())
-          .as("Format should be updated")
-          .isEqualTo(updateInput.getFormat());
       assertThat(output.getModifiedAt()).isNotNull();
     }
 
@@ -793,23 +743,6 @@ class DataSetControllerIntegrationTest
   }
 
   @Nested
-  @DisplayName("Business Logic Tests")
-  class BusinessLogicTests {
-
-    @Test
-    @DisplayName("Should handle dataset with multiple dataspaces")
-    void shouldHandleDataSetWithMultipleDataSpaces() {
-      DataSetInputDTO input = createValidInput();
-      input.setDataSpaceIds(Collections.emptyList());
-
-      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-    }
-  }
-
-  @Nested
   @DisplayName("Edge Cases and Error Handling")
   class EdgeCasesTests {
 
@@ -846,17 +779,6 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    @Test
-    @DisplayName("Should handle null format")
-    void shouldHandleNullFormat() {
-      DataSetInputDTO input = createValidInput();
-      input.setFormat(null);
-
-      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
   }
 

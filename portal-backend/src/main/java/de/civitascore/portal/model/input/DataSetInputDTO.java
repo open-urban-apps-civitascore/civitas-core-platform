@@ -13,21 +13,10 @@ public class DataSetInputDTO extends BaseInputDTO {
 
   @NotBlank(message = "Name is required") @Size(min = 3, max = 255, message = "Name must be between 3 and 255 characters") private String name;
 
-  private String identifier;
   private String description;
 
-  private String version;
-
-  private UUID ownerUserId;
-  private UUID dataSetSeriesId;
-  private List<UUID> dataSpaceIds;
-  private List<UUID> agentIds;
-  private List<UUID> distributionIds;
-  private List<UUID> catalogIds;
   private List<UUID> pipelineIds;
 
   private Long persistenceId;
-  private String externalId;
-  private String format;
   private Boolean openDataAccess;
 }

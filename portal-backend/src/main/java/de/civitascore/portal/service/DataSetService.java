@@ -17,8 +17,6 @@ import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
@@ -90,45 +88,6 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
 
   @Override
   protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
-    Optional.ofNullable(input.getOwnerUserId())
-        .map(userService::findByIdOrThrow)
-        .ifPresentOrElse(entity::setOwner, () -> entity.setOwner(null));
-
-    // Set dataSetSeries
-    Optional.ofNullable(input.getDataSetSeriesId())
-        .flatMap(dataSetSeriesRepository::findById)
-        .ifPresentOrElse(entity::setDataSetSeries, () -> entity.setDataSetSeries(null));
-
-    // Set dataSpaces
-    Optional.ofNullable(input.getDataSpaceIds())
-        .map(dataSpaceRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setDataSpaces);
-
-    // Set agents
-    Optional.ofNullable(input.getAgentIds())
-        .map(agentRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setAgents);
-
-    // Set distributions
-    Optional.ofNullable(input.getDistributionIds())
-        .map(distributionRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setDistributions);
-
-    // Set catalogs
-    Optional.ofNullable(input.getCatalogIds())
-        .map(catalogRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setCatalogs);
-
-    // Set pipelines
-    Optional.ofNullable(input.getPipelineIds())
-        .map(pipelineRepository::findAllById)
-        .map(ArrayList::new)
-        .ifPresent(entity::setPipelines);
-
     return super.postConvertToEntity(entity, input);
   }
 
