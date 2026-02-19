@@ -11,6 +11,8 @@ import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
@@ -22,7 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/pipelines")
+@RequestMapping("/datasets/{dataSetId}/pipelines")
 @RequiredArgsConstructor
 @Tag(name = "Pipelines", description = "Pipeline management endpoints")
 public class PipelineController
@@ -65,5 +67,13 @@ public class PipelineController
   @Override
   protected PipelineAssembler getAssembler() {
     return pipelineAssembler;
+  }
+
+  @Override
+  protected PipelineInputDTO preProcessInput(PipelineInputDTO input) {
+    Optional.of(extractPathVariables().get("dataSetId"))
+        .map(UUID::fromString)
+        .ifPresent(input::setDataSetId);
+    return super.preProcessInput(input);
   }
 }
