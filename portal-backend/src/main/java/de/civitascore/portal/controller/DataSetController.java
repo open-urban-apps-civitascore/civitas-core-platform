@@ -75,7 +75,7 @@ public class DataSetController
   @Operation(
       summary = "Publish a dataset",
       description =
-          "Publishes a dataset by generating distributions from pipeline APIs and setting status to FINISHED. Requires at least one pipeline to be present in the dataset.")
+          "Publishes a dataset by generating distributions from pipeline APIs and setting status to READY. Requires at least one pipeline to be present in the dataset.")
   public ResponseEntity<DataSetOutputDTO> publishDataSet(@PathVariable UUID id) {
     DataSet published = dataSetService.publish(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(published);

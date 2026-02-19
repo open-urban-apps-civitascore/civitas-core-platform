@@ -5,12 +5,12 @@ package de.civitascore.portal.model.embedded;
  *
  * <ul>
  *   <li>DRAFT: Dataset is being created/edited
- *   <li>FINISHED: Dataset has been published and validated
+ *   <li>READY: Dataset has been published and validated
  *   <li>AVAILABLE: Dataset is available for consumption
  * </ul>
  */
 public enum DataSetStatus {
   DRAFT,
-  FINISHED,
+  READY,
   AVAILABLE
 }

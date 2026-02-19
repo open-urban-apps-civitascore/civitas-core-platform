@@ -912,8 +912,8 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getDataSetStatus())
-          .as("DataSet status should be FINISHED after publishing")
-          .isEqualTo(DataSetStatus.FINISHED);
+          .as("DataSet status should be READY after publishing")
+          .isEqualTo(DataSetStatus.READY);
 
       long distributionCount =
           distributionRepository.findAll().stream()

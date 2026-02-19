@@ -177,7 +177,7 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
 
   /**
    * Publishes a dataset by validating it has at least one pipeline, generating distributions from
-   * pipeline APIs, and setting status to FINISHED.
+   * pipeline APIs, and setting status to READY.
    *
    * @param id the dataset ID
    * @return the published dataset
@@ -209,9 +209,7 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
               dataSet.getDistributions().add(distribution);
             });
 
-    // Update status to FINISHED
-    dataSet.setDataSetStatus(DataSetStatus.FINISHED);
-
+    dataSet.setDataSetStatus(DataSetStatus.READY);
     return dataSetRepository.save(dataSet);
   }
 
