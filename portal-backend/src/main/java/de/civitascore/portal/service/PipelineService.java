@@ -52,6 +52,12 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
   }
 
   @Override
+  public Optional<Pipeline> findById(UUID id) {
+    Optional<Pipeline> entity = pipelineRepository.findByIdWithRelations(id);
+    return postLoad(entity);
+  }
+
+  @Override
   protected Pipeline postConvertToEntity(Pipeline entity, PipelineInputDTO input) {
     // Set the DataSet relationship
     Optional.ofNullable(input.getDataSetId())
@@ -80,26 +86,25 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
 
   private void validateUniqueName(Pipeline entity) {
     pipelineRepository
-        .findByNameAndDataSetId(entity.getName(), entity.getDataSet().getId())
+        .findAllByNameAndDataSetId(entity.getName(), entity.getDataSet().getId())
+        .stream()
+        .filter(result -> !result.getId().equals(entity.getId()))
+        .findFirst()
         .ifPresent(
             existing -> {
-              if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException(
-                    Pipeline.class.getSimpleName(),
-                    "name",
-                    entity.getName(),
-                    "datasetId",
-                    entity.getDataSet().getId().toString());
-              }
+              throw new UniqueConstraintViolationException(
+                  Pipeline.class.getSimpleName(),
+                  "name",
+                  entity.getName(),
+                  "datasetId",
+                  entity.getDataSet().getId().toString());
             });
   }
 
   @Override
   protected Pipeline preProcessDelete(UUID id) {
     Pipeline pipeline =
-        pipelineRepository
-            .findByIdWithDataSet(id)
-            .orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
+        findById(id).orElseThrow(() -> new ResourceNotFoundException(getEntityName(), id));
 
     if (pipeline.getDataSet() != null
         && pipeline.getDataSet().getDataSetStatus() != DataSetStatus.DRAFT) {
