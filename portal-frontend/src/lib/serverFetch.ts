@@ -16,7 +16,7 @@ interface ServerFetchConfig {
    * If true, request goes to the real API backend
    * If false/undefined, uses JSON Server (for development/testing)
    */
-  useApiBackend?: boolean
+  isApiBackend?: boolean
 }
 
 interface ApiResponse<T> {
@@ -43,14 +43,14 @@ export interface ServerFetchResponse<T> {
  * @returns Response data with metadata
  * @throws Error if not authenticated or fetch fails
  */
-export async function serverFetch<TResponse>({
+export const serverFetch = async <TResponse>({
   endpoint,
   method = 'GET',
   params,
   body,
   headers = {},
-  useApiBackend = false,
-}: ServerFetchConfig): Promise<ServerFetchResponse<TResponse>> {
+  isApiBackend = false,
+}: ServerFetchConfig): Promise<ServerFetchResponse<TResponse>> => {
   // Get the session server-side
   const session = await auth()
 
@@ -60,7 +60,8 @@ export async function serverFetch<TResponse>({
 
   // Access the access_token from the session
   // Note: This requires the token to be exposed in the session callback
-  const accessToken = (session as any).access_token
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const accessToken = (session as any).access_token as string | undefined
 
   if (!accessToken) {
     throw new Error('No access token available')
@@ -75,8 +76,8 @@ export async function serverFetch<TResponse>({
   const JSON_SERVER_URL = `${JSON_SERVER_HOST}:${JSON_SERVER_PORT}`
   const API_URL = API_BASE_URL && API_PORT ? `${API_BASE_URL}:${API_PORT}/v2` : undefined
 
-  // Choose base URL based on useApiBackend flag
-  const baseUrl = useApiBackend ? API_URL : JSON_SERVER_URL
+  // Choose base URL based on isApiBackend flag
+  const baseUrl = isApiBackend ? API_URL : JSON_SERVER_URL
 
   if (!baseUrl) {
     throw new Error('Backend URL not configured')
@@ -89,8 +90,10 @@ export async function serverFetch<TResponse>({
   const fetchOptions: RequestInit = {
     method,
     headers: {
+      /* eslint-disable @typescript-eslint/naming-convention */
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
+      /* eslint-enable @typescript-eslint/naming-convention */
       ...headers,
     },
     cache: 'no-store', // Equivalent to Cache-Control: no-store
@@ -112,17 +115,16 @@ export async function serverFetch<TResponse>({
 
     // Handle different response formats
     // JSON Server returns data directly, API backend wraps in { content: ... }
-    if (useApiBackend) {
+    if (isApiBackend) {
       return {
         data: data.content,
         totalElements: data.totalElements,
         totalPages: data.totalPages,
       }
-    } else {
-      // JSON Server response doesn't have .content wrapper
-      return {
-        data: data as any as TResponse,
-      }
+    }
+    // JSON Server response doesn't have .content wrapper
+    return {
+      data: data as unknown as TResponse,
     }
   } catch (error) {
     console.error(`Server fetch failed for ${endpoint}:`, error)

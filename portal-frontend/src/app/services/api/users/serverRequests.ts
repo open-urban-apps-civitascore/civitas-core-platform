@@ -13,7 +13,7 @@ export const getUsers = async (params: URLSearchParams) => {
       endpoint: '/users',
       method: 'GET',
       params,
-      useApiBackend: true, // Users endpoint uses real API backend
+      isApiBackend: true, // Users endpoint uses real API backend
     })
   } catch (error) {
     console.error('An error occurred while fetching users.', error)
@@ -26,7 +26,7 @@ export const getUser = async (id: string) => {
     return await serverFetch<User>({
       endpoint: `/users/${id}`,
       method: 'GET',
-      useApiBackend: true, // Users endpoint uses real API backend
+      isApiBackend: true, // Users endpoint uses real API backend
     })
   } catch (error) {
     console.error(`An error occurred while fetching user data for ${id}.`, error)
