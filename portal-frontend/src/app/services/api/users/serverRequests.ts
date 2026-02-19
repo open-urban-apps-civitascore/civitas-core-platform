@@ -1,22 +1,35 @@
-/* eslint-disable @typescript-eslint/naming-convention */
+import { serverFetch } from '@/lib/serverFetch'
 import { User } from '@/types/users'
 
-import { apiRequest } from '../request/apiRequest'
-import { getServerRequestHeaders } from '../request/getServerRequestHeaders'
+/**
+ * Server-side data fetching for users
+ * Uses serverFetch for direct backend communication with NextAuth's auth()
+ * IMPORTANT: Only use in Server Components and Server Actions
+ */
 
-export const getUsers = async (params: URLSearchParams) =>
-  apiRequest<User[]>({
-    endpoint: '/users',
-    method: 'GET',
-    params: params,
-    headers: { ...(await getServerRequestHeaders()), 'x-api-request': 'true' },
-    errorMessage: 'An error occurred while fetching users.',
-  })
+export const getUsers = async (params: URLSearchParams) => {
+  try {
+    return await serverFetch<User[]>({
+      endpoint: '/users',
+      method: 'GET',
+      params,
+      useApiBackend: true, // Users endpoint uses real API backend
+    })
+  } catch (error) {
+    console.error('An error occurred while fetching users.', error)
+    throw new Error('An error occurred while fetching users.')
+  }
+}
 
-export const getUser = async (id: string) =>
-  apiRequest<User>({
-    method: 'GET',
-    endpoint: `/users/${id}`,
-    headers: { ...(await getServerRequestHeaders()), 'x-api-request': 'true' },
-    errorMessage: 'An error occurred while fetching user data.',
-  })
+export const getUser = async (id: string) => {
+  try {
+    return await serverFetch<User>({
+      endpoint: `/users/${id}`,
+      method: 'GET',
+      useApiBackend: true, // Users endpoint uses real API backend
+    })
+  } catch (error) {
+    console.error(`An error occurred while fetching user data for ${id}.`, error)
+    throw new Error('An error occurred while fetching user data.')
+  }
+}
