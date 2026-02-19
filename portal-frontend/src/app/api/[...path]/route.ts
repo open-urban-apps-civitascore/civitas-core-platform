@@ -32,16 +32,60 @@ interface RouteContext {
  */
 
 const proxyRequest = async (request: NextRequest, context: RouteContext, method: string) => {
-  logger.debug({ url: request.url, method: request.method, headers: request.headers }, 'Incoming request')
+  // Convert Headers to plain object for better logging
+  const incomingHeaders: Record<string, string> = {}
+  request.headers.forEach((value, key) => {
+    incomingHeaders[key] = value
+  })
+
+  logger.info(
+    {
+      url: request.url,
+      method: request.method,
+      headers: incomingHeaders,
+    },
+    'Incoming request with all headers',
+  )
 
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+
+  // Log detailed token information
+  logger.info(
+    {
+      hasToken: !!token,
+      hasAccessToken: !!token?.access_token,
+      tokenError: token?.error,
+      tokenKeys: token ? Object.keys(token) : [],
+      accessToken: token?.access_token,
+      tokenExp: token?.exp,
+      tokenIat: token?.iat,
+    },
+    'Retrieved token from request',
+  )
+
   if (!token?.access_token) {
-    logger.debug({ method }, 'Unauthorized request - no access token')
+    logger.warn(
+      {
+        method,
+        url: request.url,
+        headers: incomingHeaders,
+        hasToken: !!token,
+        tokenData: token,
+      },
+      'Unauthorized request - no access token found',
+    )
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   if (token.error === 'RefreshTokenError') {
-    logger.debug({ method }, 'Session expired - refresh token error')
+    logger.warn(
+      {
+        method,
+        url: request.url,
+        tokenError: token.error,
+      },
+      'Session expired - refresh token error',
+    )
     return NextResponse.json({ error: 'Session expired' }, { status: 401 })
   }
 
