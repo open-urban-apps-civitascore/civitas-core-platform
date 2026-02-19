@@ -1,28 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
-import pino from 'pino'
 
-// Local logger for this route - controlled by LOG_LEVEL env var
-const logger = pino({
-  level: process.env.LOG_LEVEL || 'debug',
-})
-
-// Log environment variables at module load (only in debug mode)
-logger.debug(
-  {
-    jsonServerHost: process.env.JSON_SERVER_HOST ?? 'undefined',
-    jsonServerPort: process.env.JSON_SERVER_PORT ?? 'undefined',
-    apiBaseUrl: process.env.API_BASE_URL ?? 'undefined',
-    apiPort: process.env.API_PORT ?? 'undefined',
-  },
-  'Proxy route environment variables',
-)
+import { logger, getRequestLogContext } from '@/lib/logger'
 
 const JSON_SERVER_URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 const API_URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
 
-// Log constructed URLs at module load
-logger.debug({ jsonServerUrl: JSON_SERVER_URL, apiUrl: API_URL }, 'Constructed base URLs')
+// Log configured endpoints on module initialization
+logger.debug({ jsonServerUrl: JSON_SERVER_URL, apiUrl: API_URL }, 'Proxy endpoints configured')
 interface RouteContext {
   params: Promise<{ path: string[] }>
 }
@@ -32,25 +17,14 @@ interface RouteContext {
  */
 
 const proxyRequest = async (request: NextRequest, context: RouteContext, method: string) => {
-  // Convert Headers to plain object for better logging
-  const incomingHeaders: Record<string, string> = {}
-  request.headers.forEach((value, key) => {
-    incomingHeaders[key] = value
-  })
+  // Get safe request context for logging (no sensitive data)
+  const requestContext = getRequestLogContext(request)
 
-  logger.info(
-    {
-      url: request.url,
-      method: request.method,
-      headers: incomingHeaders,
-      forwardedProto: incomingHeaders['x-forwarded-proto'],
-      forwardedHost: incomingHeaders['x-forwarded-host'],
-    },
-    'Incoming request with all headers',
-  )
+  logger.debug(requestContext, 'Proxy request received')
 
   // Determine if we should use secure cookies based on the forwarded protocol
-  const isSecure = incomingHeaders['x-forwarded-proto'] === 'https'
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const isSecure = forwardedProto === 'https'
 
   const token = await getToken({
     req: request,
@@ -58,43 +32,14 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     secureCookie: isSecure,
   })
 
-  // Log detailed token information
-  logger.info(
-    {
-      hasToken: !!token,
-      hasAccessToken: !!token?.access_token,
-      tokenError: token?.error,
-      tokenKeys: token ? Object.keys(token) : [],
-      accessToken: token?.access_token,
-      tokenExp: token?.exp,
-      tokenIat: token?.iat,
-    },
-    'Retrieved token from request',
-  )
-
+  // Check authentication status (no sensitive token data logged)
   if (!token?.access_token) {
-    logger.warn(
-      {
-        method,
-        url: request.url,
-        headers: incomingHeaders,
-        hasToken: !!token,
-        tokenData: token,
-      },
-      'Unauthorized request - no access token found',
-    )
+    logger.debug({ method, url: request.url }, 'Unauthorized: No access token')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   if (token.error === 'RefreshTokenError') {
-    logger.warn(
-      {
-        method,
-        url: request.url,
-        tokenError: token.error,
-      },
-      'Session expired - refresh token error',
-    )
+    logger.debug({ method, url: request.url }, 'Unauthorized: Session expired')
     return NextResponse.json({ error: 'Session expired' }, { status: 401 })
   }
 
@@ -102,7 +47,6 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     const { path } = await context.params
     const pathString = path.join('/')
     const searchParams = request.nextUrl.searchParams.toString()
-
     const searchParamsString = searchParams ? `?${searchParams}` : ''
 
     // Forward all original headers from the request
@@ -110,22 +54,11 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
 
     const isApiRequest = headers.get('x-api-request') === 'true'
     const baseUrl = isApiRequest ? API_URL : JSON_SERVER_URL
-
-    logger.debug(
-      {
-        method,
-        pathString,
-        searchParams,
-        isApiRequest,
-        baseUrl,
-      },
-      'Processing proxy request',
-    )
-
     const url = `${baseUrl}/${pathString}${searchParamsString}`
 
-    logger.debug({ url }, 'Constructed request URL')
+    logger.debug({ method, path: pathString, isApiRequest }, 'Routing request')
 
+    // Attach authorization token
     headers.set('Authorization', `Bearer ${token.access_token}`)
 
     // Remove host header to avoid conflicts with backend
@@ -149,10 +82,7 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
 
     const response = await fetch(url, fetchOptions)
 
-    logger.debug(
-      { status: response.status, contentType: response.headers.get('Content-Type') },
-      'Received response from backend',
-    )
+    logger.debug({ method, path: pathString, status: response.status }, 'Proxy request completed')
 
     // Forward response headers from backend
     const responseHeaders = new Headers(response.headers)
@@ -160,7 +90,6 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     // Non-JSON responses, stream the body directly
     const contentType = response.headers.get('Content-Type')
     if (!contentType || !contentType.includes('application/json')) {
-      logger.debug({ status: response.status }, 'Returning non-JSON response')
       return new NextResponse(response.body, {
         status: response.status,
         headers: responseHeaders,
@@ -174,7 +103,6 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
 
     // JSON responses
     const data = await response.json()
-    logger.debug({ status: response.status }, 'Returning JSON response')
     return NextResponse.json(data, {
       status: response.status,
       headers: responseHeaders,
@@ -182,12 +110,12 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
   } catch (error) {
     logger.error(
       {
+        method,
+        url: request.url,
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
-        jsonServerUrl: JSON_SERVER_URL,
-        apiUrl: API_URL,
       },
-      'Proxy error occurred',
+      'Proxy request failed',
     )
     return NextResponse.json({ error: 'Proxy error' }, { status: 500 })
   }
