@@ -32,7 +32,7 @@ export const logger = pino({
  * Extracts safe logging context from request
  * Excludes sensitive information like tokens and full headers
  */
-export const getRequestLogContext = (request: { url: string; method: string; headers: Headers }) => {
+export const GetRequestLogContext = (request: { url: string; method: string; headers: Headers }) => {
   const headersObj: Record<string, string> = {}
   request.headers.forEach((value, key) => {
     headersObj[key] = value

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
-import { logger, getRequestLogContext } from '@/lib/logger'
+import { GetRequestLogContext, logger } from '@/lib/logger'
 
 const JSON_SERVER_URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
 const API_URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
@@ -18,9 +18,9 @@ interface RouteContext {
 
 const proxyRequest = async (request: NextRequest, context: RouteContext, method: string) => {
   // Get safe request context for logging (no sensitive data)
-  const requestContext = getRequestLogContext(request)
+  const RequestContext = GetRequestLogContext(request)
 
-  logger.debug(requestContext, 'Proxy request received')
+  logger.debug(RequestContext, 'Proxy request received')
 
   // Determine if we should use secure cookies based on the forwarded protocol
   const forwardedProto = request.headers.get('x-forwarded-proto')
