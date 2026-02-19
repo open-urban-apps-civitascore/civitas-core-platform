@@ -43,11 +43,20 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
       url: request.url,
       method: request.method,
       headers: incomingHeaders,
+      forwardedProto: incomingHeaders['x-forwarded-proto'],
+      forwardedHost: incomingHeaders['x-forwarded-host'],
     },
     'Incoming request with all headers',
   )
 
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+  // Determine if we should use secure cookies based on the forwarded protocol
+  const isSecure = incomingHeaders['x-forwarded-proto'] === 'https'
+
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+    secureCookie: isSecure,
+  })
 
   // Log detailed token information
   logger.info(
