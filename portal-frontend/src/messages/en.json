@@ -263,6 +263,10 @@
         "title": "Remove User from Group?",
         "description": "This action removes the association between the user, the group, and their role assignment."
       }
+    },
+    "messages": {
+      "createSuccess": "Group has been successfully created.",
+      "updateSuccess": "Group has been successfully updated."
     }
   },
   "pagination": {

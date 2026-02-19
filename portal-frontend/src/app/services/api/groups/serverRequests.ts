@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { Group } from '@/types/groups'
 
 import { apiRequest } from '../request/apiRequest'
@@ -8,7 +9,14 @@ export const getGroups = async (params?: URLSearchParams) =>
     method: 'GET',
     endpoint: `/groups`,
     params,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     headers: { ...(await getServerRequestHeaders()), 'x-api-request': 'true' },
     errorMessage: 'An error occurred while fetching groups data.',
+  })
+
+export const getGroup = async (id: string) =>
+  apiRequest<Group>({
+    method: 'GET',
+    endpoint: `/groups/${id}`,
+    headers: { ...(await getServerRequestHeaders()), 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while fetching user data.',
   })

@@ -265,6 +265,10 @@
         "title": "User aus Gruppe entfernen?",
         "description": "Diese Aktion löst die Zuordnung zwischen dem User, der Gruppe und ihre Rollen-Zuordnung auf."
       }
+    },
+    "messages": {
+      "createSuccess": "Gruppe wurde erfolgreich angelegt.",
+      "updateSuccess": "Gruppe wurde erfolgreich aktualisiert."
     }
   },
   "pagination": {

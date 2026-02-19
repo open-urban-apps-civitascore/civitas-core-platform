@@ -15,6 +15,8 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
 import { mapGroupListUsers } from '@/utils/users'
 
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { AssignUsersModal } from './AssignUsersModal'
 import { UsersTable } from './UsersTable'
 
@@ -23,12 +25,11 @@ interface UsersTabProps {
 }
 export const UsersTab = (props: UsersTabProps) => {
   const { groupData } = props
-  const originalUsers = groupData.members || []
   const t = useTranslations('groups')
-  const updateGroup = usePatchGroup()
-
+  const tCommon = useTranslations('common')
+  const router = useRouter()
   const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false)
-
+  
   const {
     setSortingParams,
     setPaginationParams,
@@ -41,20 +42,21 @@ export const UsersTab = (props: UsersTabProps) => {
     search,
     totalPages,
   } = useQueryParams()
-
-  const getUserRequestParams = () => {
+  
+  const originalUsers = useMemo(() => groupData.members || [], [groupData])
+  const userRequestParams = useMemo(() => {
     const params = new URLSearchParams(getApiRequestParamsByUrl())
     originalUsers?.forEach(user => {
       params.append('id', user.id)
     })
     return params
-  }
+  }, [getApiRequestParamsByUrl, originalUsers])
 
   const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
-    queryKey: 'groupUsers',
-    params: getUserRequestParams(),
+    params: userRequestParams,
     isEnabled: originalUsers?.length > 0,
   })
+  const updateGroup = usePatchGroup()
 
   const isLoading = isFetchingUsers || updateGroup.isPending
   const rowCount = usersData?.totalElements || 0
@@ -75,7 +77,16 @@ export const UsersTab = (props: UsersTabProps) => {
   const handleUpdateGroupUsers = async (userSelection: RowSelectionState) => {
     const selectedUserIds = Object.keys(userSelection).filter(key => userSelection[key])
     const updateUserData = selectedUserIds.concat(originalUsers.map(user => user.id))
-    updateGroup.mutate({ id: groupData.id, memberIds: updateUserData })
+    updateGroup.mutate(
+      { id: groupData.id, memberIds: updateUserData },
+      {
+        onSuccess: () => {
+          toast.success(t('messages.updateSuccess'))
+          router.refresh()
+        },
+        onError: () => toast.error(tCommon('errors.unexpectedError')),
+      },
+    )
   }
 
   const CustomElement = (

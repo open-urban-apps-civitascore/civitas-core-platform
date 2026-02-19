@@ -23,6 +23,7 @@ import { mapUserToFormData } from '@/utils/users'
 import { UserBasicInfoTab } from './basic-info-tab/UserBasicInfoTab'
 import { GroupsTab } from './groups-tab/GroupsTab'
 import { RolesTab } from './roles-tab/RolesTab'
+import { useQueryClient } from '@tanstack/react-query'
 
 const tabValues: Record<UserTab, Tab<UserTab>> = {
   userData: {
@@ -56,6 +57,7 @@ export const UserOverview = (props: UserOverviewProps) => {
   const [defaultUserData, setDefaultUserData] = useState(userData)
   const [isReadOnly, setIsReadOnly] = useState(isCreateMode ? false : mode !== 'edit')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+  const queryClient = useQueryClient()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const isLoading = createUser.isPending || updateUser.isPending
@@ -146,6 +148,7 @@ export const UserOverview = (props: UserOverviewProps) => {
       { ...updateData, id: parsed.id },
       {
         onSuccess: ({ data }) => {
+          ;[['groups']].forEach(queryKey => queryClient.invalidateQueries({ queryKey }))
           setDefaultUserData(data)
           if (isExitModalOpen) setIsExitModalOpen(false)
           router.refresh()
