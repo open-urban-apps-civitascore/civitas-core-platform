@@ -35,7 +35,6 @@ class DataSpaceControllerIntegrationTest
   @Override
   protected void performAdditionalCleanup() {
     dataSetRepository.deleteAll();
-    ;
     dataSpaceRepository.deleteAll();
   }
 
