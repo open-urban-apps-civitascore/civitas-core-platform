@@ -24,12 +24,15 @@ import static org.mockito.Mockito.when;
 import com.civitas.configadapter.adapter.SagaCommandHandler;
 import com.civitas.configadapter.adapter.SagaCommandMessage;
 import com.civitas.configadapter.adapter.SagaCommandResult;
+import com.civitas.configadapter.util.BackoffCalculator;
 import com.civitas.configadapter.util.PayloadConverter;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Future;
+import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -70,7 +73,7 @@ class KafkaSagaCommandConsumerTest {
 
     @SuppressWarnings("unchecked")
     ArgumentCaptor<List<String>> topicCaptor = ArgumentCaptor.forClass(List.class);
-    verify(mockConsumer).subscribe(topicCaptor.capture());
+    verify(mockConsumer).subscribe(topicCaptor.capture(), any(ConsumerRebalanceListener.class));
 
     List<String> topics = topicCaptor.getValue();
     assertEquals(4, topics.size());
@@ -93,7 +96,7 @@ class KafkaSagaCommandConsumerTest {
       consumer.stop();
     }
 
-    verify(mockConsumer, times(1)).subscribe(any(List.class));
+    verify(mockConsumer, times(2)).subscribe(any(List.class), any(ConsumerRebalanceListener.class));
   }
 
   @Test
@@ -283,7 +286,7 @@ class KafkaSagaCommandConsumerTest {
     }
 
     @Test
-    @DisplayName("continues processing after deserialization error")
+    @DisplayName("continues processing after deserialization error and commits offset")
     void shouldContinueAfterDeserializationError() throws Exception {
       // Invalid JSON
       byte[] invalidJson = "not-valid-json".getBytes();
@@ -301,15 +304,108 @@ class KafkaSagaCommandConsumerTest {
       try (KafkaSagaCommandConsumer consumer =
           new KafkaSagaCommandConsumer(mockConsumer, mockProducer, Map.of("frost", frostHandler))) {
         consumer.start();
-        await()
-            .atMost(2, SECONDS)
-            .untilAsserted(() -> verify(mockConsumer, atLeast(2)).poll(any(Duration.class)));
+        await().atMost(2, SECONDS).untilAsserted(() -> verify(mockConsumer).commitSync());
         consumer.stop();
       }
 
       // Should not crash — handler never called, producer never called
       verify(frostHandler, never()).handle(any());
       verify(mockProducer, never()).send(any());
+    }
+
+    @Test
+    @DisplayName("retries when publishResult fails then commits")
+    @SuppressWarnings("unchecked")
+    void consumeLoop_publishResultFails_retriesThenCommits() throws Exception {
+      SagaCommandResult result =
+          SagaCommandResult.success("saga-001", "step-1", Map.of(), Map.of());
+      when(frostHandler.handle(any(SagaCommandMessage.class))).thenReturn(result);
+
+      Future<Object> mockFuture = mock(Future.class);
+      when(mockFuture.get(any(Long.class), any(java.util.concurrent.TimeUnit.class)))
+          .thenThrow(
+              new java.util.concurrent.ExecutionException(new RuntimeException("broker down")));
+      when(mockProducer.send(any(ProducerRecord.class))).thenReturn(mockFuture);
+
+      Map<String, Object> commandMap = new HashMap<>();
+      commandMap.put("type", "EXECUTE_STEP");
+      commandMap.put("messageId", "msg-001");
+      commandMap.put("sagaId", "saga-001");
+      commandMap.put("stepId", "step-1");
+      commandMap.put("adapter", "frost");
+      commandMap.put("operation", "CREATE_PROJECT");
+      byte[] commandJson = PayloadConverter.writeValueAsBytes(commandMap);
+
+      ConsumerRecord<String, byte[]> record =
+          new ConsumerRecord<>(
+              "core.civitas.dataset.frost.execute", 0, 0L, "saga-001", commandJson);
+      TopicPartition tp = new TopicPartition("core.civitas.dataset.frost.execute", 0);
+      ConsumerRecords<String, byte[]> records = consumerRecords(tp, record);
+
+      when(mockConsumer.poll(any(Duration.class)))
+          .thenReturn(records)
+          .thenReturn(ConsumerRecords.empty());
+      when(mockConsumer.assignment()).thenReturn(Set.of(tp));
+
+      BackoffCalculator fastBackoff = new BackoffCalculator(1L, 10L);
+      try (KafkaSagaCommandConsumer consumer =
+          new KafkaSagaCommandConsumer(
+              mockConsumer, mockProducer, Map.of("frost", frostHandler), fastBackoff)) {
+        consumer.start();
+        await().atMost(2, SECONDS).untilAsserted(() -> verify(mockConsumer).commitSync());
+        consumer.stop();
+      }
+
+      // Handler called multiple times due to retries (publish failure = RuntimeException =
+      // transient)
+      verify(frostHandler, atLeast(2)).handle(any());
+    }
+
+    @Test
+    @DisplayName("poison pill then valid record — processes second record and commits twice")
+    @SuppressWarnings("unchecked")
+    void consumeLoop_poisonPillThenValid_processesSecondAndCommitsTwice() throws Exception {
+      SagaCommandResult result =
+          SagaCommandResult.success("saga-001", "step-1", Map.of(), Map.of());
+      when(frostHandler.handle(any(SagaCommandMessage.class))).thenReturn(result);
+
+      Future<Object> mockFuture = mock(Future.class);
+      when(mockProducer.send(any(ProducerRecord.class))).thenReturn(mockFuture);
+
+      byte[] invalidJson = "not-valid-json".getBytes();
+      ConsumerRecord<String, byte[]> badRecord =
+          new ConsumerRecord<>(
+              "core.civitas.dataset.frost.execute", 0, 0L, "saga-001", invalidJson);
+
+      Map<String, Object> commandMap = new HashMap<>();
+      commandMap.put("type", "EXECUTE_STEP");
+      commandMap.put("messageId", "msg-002");
+      commandMap.put("sagaId", "saga-001");
+      commandMap.put("stepId", "step-1");
+      commandMap.put("adapter", "frost");
+      commandMap.put("operation", "CREATE_PROJECT");
+      byte[] validJson = PayloadConverter.writeValueAsBytes(commandMap);
+      ConsumerRecord<String, byte[]> goodRecord =
+          new ConsumerRecord<>("core.civitas.dataset.frost.execute", 0, 1L, "saga-001", validJson);
+
+      TopicPartition tp = new TopicPartition("core.civitas.dataset.frost.execute", 0);
+      ConsumerRecords<String, byte[]> records =
+          new ConsumerRecords<>(Map.of(tp, List.of(badRecord, goodRecord)));
+
+      when(mockConsumer.poll(any(Duration.class)))
+          .thenReturn(records)
+          .thenReturn(ConsumerRecords.empty());
+
+      BackoffCalculator fastBackoff = new BackoffCalculator(1L, 10L);
+      try (KafkaSagaCommandConsumer consumer =
+          new KafkaSagaCommandConsumer(
+              mockConsumer, mockProducer, Map.of("frost", frostHandler), fastBackoff)) {
+        consumer.start();
+        await().atMost(2, SECONDS).untilAsserted(() -> verify(mockConsumer, times(2)).commitSync());
+        consumer.stop();
+      }
+
+      verify(frostHandler, times(1)).handle(any());
     }
   }
 

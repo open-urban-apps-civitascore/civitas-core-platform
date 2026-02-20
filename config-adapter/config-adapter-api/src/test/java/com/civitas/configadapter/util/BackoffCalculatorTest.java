@@ -7,9 +7,10 @@
  * Copyright (c) 2026 Civitas Connect e. V. and others.
  *
  */
-package com.civitas.event.handler.kafka;
+package com.civitas.configadapter.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,5 +53,43 @@ class BackoffCalculatorTest {
 
     // Then
     assertEquals(5000L, result);
+  }
+
+  @Test
+  @DisplayName("Constructor rejects zero initialBackoffMs")
+  void constructor_zeroInitialBackoff_throwsIllegalArgument() {
+    assertThrows(IllegalArgumentException.class, () -> new BackoffCalculator(0, 1000L));
+  }
+
+  @Test
+  @DisplayName("Constructor rejects negative initialBackoffMs")
+  void constructor_negativeInitialBackoff_throwsIllegalArgument() {
+    assertThrows(IllegalArgumentException.class, () -> new BackoffCalculator(-1, 1000L));
+  }
+
+  @Test
+  @DisplayName("Constructor rejects zero maxBackoffMs")
+  void constructor_zeroMaxBackoff_throwsIllegalArgument() {
+    assertThrows(IllegalArgumentException.class, () -> new BackoffCalculator(1000L, 0));
+  }
+
+  @Test
+  @DisplayName("Constructor rejects negative maxBackoffMs")
+  void constructor_negativeMaxBackoff_throwsIllegalArgument() {
+    assertThrows(IllegalArgumentException.class, () -> new BackoffCalculator(1000L, -1));
+  }
+
+  @Test
+  @DisplayName("calculate rejects zero attempt")
+  void calculate_zeroAttempt_throwsIllegalArgument() {
+    BackoffCalculator calculator = new BackoffCalculator(1000L, 60000L);
+    assertThrows(IllegalArgumentException.class, () -> calculator.calculate(0));
+  }
+
+  @Test
+  @DisplayName("calculate rejects negative attempt")
+  void calculate_negativeAttempt_throwsIllegalArgument() {
+    BackoffCalculator calculator = new BackoffCalculator(1000L, 60000L);
+    assertThrows(IllegalArgumentException.class, () -> calculator.calculate(-1));
   }
 }
