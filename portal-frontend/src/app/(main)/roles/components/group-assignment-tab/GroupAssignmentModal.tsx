@@ -135,7 +135,7 @@ export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
     }),
     columnHelper.accessor('members', {
       header: tRoles('groupAssignmentTab.modal.tableHeaders.usersCount'),
-      cell: info => info.getValue()?.length,
+      cell: info => info.getValue()?.length || 0,
       meta: {
         style: { width: '10%' },
       },

@@ -1,6 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueryClient } from '@tanstack/react-query'
 import { RowSelectionState } from '@tanstack/react-table'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -23,7 +24,6 @@ import { mapUserToFormData } from '@/utils/users'
 import { UserBasicInfoTab } from './basic-info-tab/UserBasicInfoTab'
 import { GroupsTab } from './groups-tab/GroupsTab'
 import { RolesTab } from './roles-tab/RolesTab'
-import { useQueryClient } from '@tanstack/react-query'
 
 const tabValues: Record<UserTab, Tab<UserTab>> = {
   userData: {

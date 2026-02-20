@@ -1,6 +1,5 @@
-
-
 import { getGroup } from '@/app/services/api/groups/serverRequests'
+
 import { GroupDetails } from '../components/GroupDetails'
 
 interface PageProps {

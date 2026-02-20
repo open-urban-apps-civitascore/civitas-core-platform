@@ -2,8 +2,10 @@
 
 import { RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 
 import { usePatchGroup } from '@/app/services/api/groups/clientRequests'
 import { useGetUsers } from '@/app/services/api/users/clientRequests'
@@ -15,8 +17,6 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
 import { mapGroupListUsers } from '@/utils/users'
 
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import { AssignUsersModal } from './AssignUsersModal'
 import { UsersTable } from './UsersTable'
 
@@ -29,7 +29,7 @@ export const UsersTab = (props: UsersTabProps) => {
   const tCommon = useTranslations('common')
   const router = useRouter()
   const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false)
-  
+
   const {
     setSortingParams,
     setPaginationParams,
@@ -42,8 +42,9 @@ export const UsersTab = (props: UsersTabProps) => {
     search,
     totalPages,
   } = useQueryParams()
-  
+
   const originalUsers = useMemo(() => groupData.members || [], [groupData])
+  const shouldLoadUsers = originalUsers?.length > 0
   const userRequestParams = useMemo(() => {
     const params = new URLSearchParams(getApiRequestParamsByUrl())
     originalUsers?.forEach(user => {
@@ -54,8 +55,9 @@ export const UsersTab = (props: UsersTabProps) => {
 
   const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
     params: userRequestParams,
-    isEnabled: originalUsers?.length > 0,
+    isEnabled: shouldLoadUsers,
   })
+
   const updateGroup = usePatchGroup()
 
   const isLoading = isFetchingUsers || updateGroup.isPending
@@ -65,7 +67,10 @@ export const UsersTab = (props: UsersTabProps) => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, setTotalPages, pageSize])
 
-  const users = useMemo(() => (isLoading ? [] : mapGroupListUsers(usersData?.data || [])), [usersData?.data, isLoading])
+  const users = useMemo(
+    () => (isLoading ? [] : mapGroupListUsers(shouldLoadUsers && usersData?.data ? usersData?.data : [])),
+    [usersData?.data, isLoading, shouldLoadUsers],
+  )
 
   // closes the user assignment modal after update
   useEffect(() => {

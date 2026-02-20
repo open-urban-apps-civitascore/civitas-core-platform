@@ -25,7 +25,7 @@ export const mapGroupsApiToListData = (groups: Group[]): UserGroupsListData[] =>
     contactUser: group.contactUser,
   }))
 
-// TODO: subgroups have been excluded from v::2, so the implementation of subgroups has been commented out
+// TODO: subgroups have been excluded from v2, so the implementation of subgroups has been commented out
 // export const flattenGroups = (groups: Group[]): Group[] => {
 //   const result: Group[] = []
 
