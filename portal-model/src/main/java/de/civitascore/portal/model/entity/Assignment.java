@@ -14,8 +14,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import de.civitascore.portal.model.entity.base.NamedEntity;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.Setter;
@@ -86,16 +86,15 @@ public class Assignment extends BaseEntity {
   @JoinColumn(name = "catalog_id")
   private Catalog catalog;
 
-  public UUID getScopeId() {
+  public NamedEntity getScope() {
     return Stream.of(dataStructure, dataSource, dataset, dataSpace, catalog)
         .filter(Objects::nonNull)
-        .map(e -> e.getId())
         .findFirst()
         .orElse(null);
   }
 
   @PrePersist
-  protected void validateBeforePersist() {
+  private void validateBeforePersist() {
     validateScope();
     validateRoleType();
   }

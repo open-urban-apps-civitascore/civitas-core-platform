@@ -1,12 +1,11 @@
 /**
- * This work and the accompanying materials are made available under the terms of the European Union
- * Public License (EU-PL) 1.2 which is available at
- * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ * <p>This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
  *
- * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to
- * all the individual contributors: Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ *
  */
 package com.civitas.configadapter.adapter;
 
@@ -200,6 +199,37 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
    */
   protected String getAdapterSource() {
     return "civitas.config-adapter." + getName();
+  }
+
+  /**
+   * Publishes a success result event to the result topic. Uses {@link #getAdapterSource()} and
+   * {@link #getResultType()} for the source and type fields.
+   *
+   * @param originalEvent the original config event
+   * @param message the success message
+   * @param resourceId the created/updated resource ID (may be null)
+   */
+  protected void publishSuccessResult(ConfigEvent originalEvent, String message, String resourceId)
+      throws FatalAdapterException, RetryableAdapterException {
+    if (getEventPublisher() == null || originalEvent.metadata().resultTopic() == null) {
+      return;
+    }
+
+    ConfigResultEvent resultEvent =
+        ConfigResultEvent.success(
+            originalEvent.metadata().correlationId(),
+            originalEvent.metadata().messageId(),
+            message,
+            resourceId,
+            originalEvent.payload().operation(),
+            originalEvent.payload().targetResource(),
+            getAdapterSource(),
+            getResultType());
+
+    getEventPublisher().publish(originalEvent.metadata().resultTopic(), resultEvent);
+    logger.debug(
+        "Published SUCCESS result to topic: {}",
+        Encode.forJava(originalEvent.metadata().resultTopic()));
   }
 
   @Override

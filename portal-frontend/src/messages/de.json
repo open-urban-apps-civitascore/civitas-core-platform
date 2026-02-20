@@ -392,8 +392,8 @@
       "action": "Aktion"
     },
     "status": {
-      "draft": "Entwurf",
-      "available": "Verfügbar"
+      "DRAFT": "Entwurf",
+      "AVAILABLE": "Verfügbar"
     },
     "connection": {
       "active": "aktiv",
@@ -483,6 +483,144 @@
     "messages": {
       "createSuccess": "Datenstruktur wurde erfolgreich angelegt.",
       "updateSuccess": "Datenstruktur wurde erfolgreich aktualisiert."
+    },
+    "pipelineEditor": {
+      "canvas": {
+        "noPipeline": "Keine Pipeline verfügbar"
+      },
+      "inspector": {
+        "edgeProperties": "Kantenattribute",
+        "source": "Quelle",
+        "target": "Ziel",
+        "properties": "Eigenschaften",
+        "noNodeSelected": "Kein Knoten ausgewählt",
+        "noNodeSelectedHint": "Wähle einen Knoten auf der Arbeitsfläche aus, um seine Eigenschaften anzuzeigen und zu bearbeiten",
+        "configured": "Konfiguriert",
+        "notConfigured": "Nicht konfiguriert"
+      },
+      "nodeTypes": {
+        "start": "Start",
+        "end": "Ende",
+        "dataSource": "Datenquelle",
+        "apiRequest": "API-Request",
+        "apiResponse": "API-Response",
+        "cronTrigger": "CRON-Trigger",
+        "frostStorage": "FROST-Server",
+        "mapping": "Mapping"
+      },
+      "palette": {
+        "title": "Knoten"
+      },
+      "categories": {
+        "general": "Allgemein",
+        "sources": "Quellen",
+        "trigger": "Trigger",
+        "storage": "Speicher",
+        "transformation": "Transformation"
+      },
+      "paletteItems": {
+        "flowStart": "Flow Start",
+        "flowStartDesc": "Pipeline-Einstiegspunkt. Ausführung beginnt hier.",
+        "flowEnd": "Flow Ende",
+        "flowEndDesc": "Pipeline-Endpunkt. Ausführung endet hier.",
+        "dataSource": "Datenquelle",
+        "dataSourceDesc": "Datenquelle. Wähle eine konfigurierte Datenquelle aus.",
+        "apiRequest": "API-Request",
+        "apiRequestDesc": "REST-API Request. Erstellt Endpunkt, der Daten bereitstellt.",
+        "apiResponse": "API-Response",
+        "apiResponseDesc": "REST-API Response.",
+        "cron": "CRON",
+        "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
+        "frostServer": "FROST Server",
+        "frostServerDesc": "SensorThings API Persistenz. Daten speichern oder abrufen.",
+        "mapping": "Mapping",
+        "mappingDesc": "Bloblang-Datentransformation. Daten zuordnen und transformieren."
+      },
+      "controlPanel": {
+        "entryPoint": "Pipeline-Einstiegspunkt",
+        "entryPointDesc": "Der Start-Knoten markiert, wo die Pipeline-Ausführung beginnt. Verbinde ihn mit einem Trigger- oder Datenquellen-Knoten, um festzulegen, wie die Pipeline aktiviert wird.",
+        "exitPoint": "Pipeline-Endpunkt",
+        "exitPointDesc": "Der End-Knoten markiert, wo die Pipeline-Ausführung endet. Alle Datenfluss-Pfade sollten schließlich zu diesem Knoten führen.",
+        "nodeInformation": "Knoteninformation",
+        "type": "Typ",
+        "configurable": "Konfigurierbar",
+        "no": "Nein"
+      },
+      "cronPanel": {
+        "cronExpression": "CRON-Ausdruck",
+        "invalidCron": "Ungültiger CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein (Sekunden Minuten Stunden Tag-des-Monats Monat Wochentag).",
+        "cronHint": "Ein CRON-Ausdruck legt fest, wann die Pipeline automatisch ausgeführt werden soll.",
+        "learnCron": "Über CRON-Ausdrücke erfahren",
+        "currentExpression": "Aktueller Ausdruck"
+      },
+      "dataSourcePanel": {
+        "label": "Datenquelle",
+        "placeholder": "Datenquelle auswählen...",
+        "details": "Datenquellen-Details",
+        "connector": "Konnektor",
+        "connection": "Verbindung",
+        "status": "Status",
+        "description": "Beschreibung",
+        "tags": "Tags",
+        "showDataStructure": "Datenstruktur anzeigen"
+      },
+      "apiPanel": {
+        "requestDetails": "API-Request-Details",
+        "responseDetails": "API-Response-Details",
+        "apiPath": "API-Pfad"
+      },
+      "frostPanel": {
+        "details": "FROST Server Details",
+        "serverName": "Servername",
+        "serverUrl": "Server-URL",
+        "version": "Version"
+      },
+      "mappingPanel": {
+        "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
+        "mappingCode": "Mapping-Code",
+        "loadingEditor": "Editor wird geladen...",
+        "status": "Status",
+        "mappingConfigured": "Mapping konfiguriert",
+        "noMappingDefined": "Kein Mapping definiert"
+      },
+      "entitySelector": {
+        "selectEntity": "Entität auswählen...",
+        "errorLoading": "Fehler beim Laden der Entitäten",
+        "clearSelection": "Auswahl aufheben"
+      },
+      "validation": {
+        "results": "Validierungsergebnisse",
+        "pipelineValid": "Pipeline ist gültig",
+        "allChecksPassed": "Alle Validierungsprüfungen bestanden. Die Pipeline kann gespeichert werden.",
+        "errors": "Fehler ({count})",
+        "warnings": "Warnungen ({count})",
+        "fixErrors": "Behebe die obigen Fehler, bevor du die Pipeline speicherst.",
+        "hasWarnings": "Pipeline hat Warnungen, kann aber gespeichert werden.",
+        "messages": {
+          "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
+          "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",
+          "apiPairing": "API-Request-Knoten benötigt einen API-Response-Knoten in der Pipeline",
+          "nodeNotConfigured": "{label} ist nicht konfiguriert",
+          "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
+          "orphanNode": "{label} ist mit keinem anderen Knoten verbunden"
+        }
+      },
+      "toolbar": {
+        "unsavedChanges": "(ungespeicherte Änderungen)",
+        "validateBeforeSave": "Klicke auf Validieren vor dem Speichern",
+        "validate": "Validieren",
+        "save": "Speichern",
+        "saving": "Speichert..."
+      },
+      "tabs": {
+        "closeTab": "Tab schließen",
+        "newPipeline": "Neue Pipeline",
+        "untitledPipeline": "Unbenannte Pipeline"
+      },
+      "nodeLabels": {
+        "notConfigured": "Nicht konfiguriert"
+      },
+      "lines": "{count, plural, one {# Zeile} other {# Zeilen}}"
     }
   }
 }

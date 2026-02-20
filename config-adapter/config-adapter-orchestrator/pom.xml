@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>com.civitas</groupId>
+		<artifactId>config-adapter-parent</artifactId>
+		<version>${revision}</version>
+	</parent>
+
+	<artifactId>config-adapter-orchestrator</artifactId>
+	<packaging>jar</packaging>
+
+	<name>Config Adapter Saga Orchestrator</name>
+	<description>Saga orchestrator for multi-adapter provisioning workflows (Dataset lifecycle: FROST, APISIX, Redpanda)</description>
+
+	<dependencies>
+		<!-- Internal -->
+		<dependency>
+			<groupId>com.civitas</groupId>
+			<artifactId>config-adapter-api</artifactId>
+			<version>${revision}</version>
+		</dependency>
+
+		<!-- Kafka -->
+		<dependency>
+			<groupId>org.apache.kafka</groupId>
+			<artifactId>kafka-clients</artifactId>
+		</dependency>
+
+		<!-- Jackson (for saga state serialization) -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
+		</dependency>
+
+		<!-- Logging -->
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+		</dependency>
+
+		<!-- OWASP Encoder -->
+		<dependency>
+			<groupId>org.owasp.encoder</groupId>
+			<artifactId>encoder</artifactId>
+		</dependency>
+
+		<!-- Testing -->
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-core</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.mockito</groupId>
+			<artifactId>mockito-junit-jupiter</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-kafka</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.awaitility</groupId>
+			<artifactId>awaitility</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- E2E integration test: adapter modules for real handler execution -->
+		<dependency>
+			<groupId>com.civitas</groupId>
+			<artifactId>config-adapter-frost</artifactId>
+			<version>${revision}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.civitas</groupId>
+			<artifactId>config-adapter-apisix</artifactId>
+			<version>${revision}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.civitas</groupId>
+			<artifactId>event-handler-kafka</artifactId>
+			<version>${revision}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Testcontainers generic (for PostGIS + FROST containers) -->
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<configuration>
+					<!-- JDK 21+ requires add-opens for Jersey PATCH method support via reflection -->
+					<argLine>@{argLine} --add-opens java.base/java.net=ALL-UNNAMED</argLine>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>integration-test</goal>
+							<goal>verify</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+</project>

@@ -106,10 +106,14 @@ class AssignmentControllerIntegrationTest
   }
 
   private UUID createTestDataSpace() {
+    return createTestDataSpaceEntity().getId();
+  }
+
+  private DataSpace createTestDataSpaceEntity() {
     DataSpace dataSpace = new DataSpace();
     dataSpace.setName("Test DataSpace " + System.currentTimeMillis());
     dataSpace.setDescription("Test dataspace for assignment");
-    return dataSpaceRepository.save(dataSpace).getId();
+    return dataSpaceRepository.save(dataSpace);
   }
 
   private UUID createTestDataSet(UUID dataSpaceId) {
@@ -162,6 +166,7 @@ class AssignmentControllerIntegrationTest
       assertThat(output.getScopeType())
           .as("Scope type should match input")
           .isEqualTo(input.getScopeType());
+      assertThat(output.getScope()).as("Scope should be null for TENANT assignments").isNull();
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -213,18 +218,25 @@ class AssignmentControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should create assignment with scope ID")
-    void shouldCreateAssignmentWithScopeId() {
-      UUID dataSpaceId = createTestDataSpace();
+    @DisplayName("Should create assignment with dataspace scope and return scope summary")
+    void shouldCreateAssignmentWithDataspaceScope() {
+      DataSpace dataSpace = createTestDataSpaceEntity();
+
       AssignmentInputDTO input = createValidInput();
       input.setScopeType(ScopeType.DATASPACE);
-      input.setScopeId(dataSpaceId);
+      input.setScopeId(dataSpace.getId());
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getScopeId()).isEqualTo(dataSpaceId);
+      assertThat(response.getBody().getScope()).as("Scope summary should be set").isNotNull();
+      assertThat(response.getBody().getScope().getId())
+          .as("Scope ID should match dataspace ID")
+          .isEqualTo(dataSpace.getId());
+      assertThat(response.getBody().getScope().getName())
+          .as("Scope name should match dataspace name")
+          .isEqualTo(dataSpace.getName());
     }
 
     @Test
@@ -408,6 +420,9 @@ class AssignmentControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getScopeType()).isEqualTo(ScopeType.TENANT);
+      assertThat(response.getBody().getScope())
+          .as("Scope should be null for TENANT assignments")
+          .isNull();
     }
 
     @Test

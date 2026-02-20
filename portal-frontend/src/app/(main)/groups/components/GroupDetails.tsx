@@ -16,6 +16,26 @@ import Icon from '../../../../../public/svg/info.svg'
 import { BaseInfoTab } from './BaseInfoTab'
 import { RolesTab } from './roles-tab/RolesTab'
 import { UsersTab } from './users-tab/UsersTab'
+
+const tabValues: Record<GroupTab, Tab<GroupTab>> = {
+  info: {
+    value: 'info',
+    label: 'groups.detailsTabs.info',
+  },
+  roles: {
+    value: 'roles',
+    label: 'groups.detailsTabs.roles',
+  },
+  users: {
+    value: 'users',
+    label: 'groups.detailsTabs.users',
+  },
+  subgroups: {
+    value: 'subgroups',
+    label: 'groups.detailsTabs.subgroups',
+  },
+}
+
 interface GroupDetailsProps {
   title: string
   groupData: Group
@@ -26,24 +46,6 @@ export const GroupDetails = (props: GroupDetailsProps) => {
   const { subTabValue, setSubTabValueParam } = useQueryParams()
 
   const t = useTranslations('groups')
-  const tabValues: Record<GroupTab, Tab<GroupTab>> = {
-    info: {
-      value: 'info',
-      label: t('detailsTabs.info'),
-    },
-    roles: {
-      value: 'roles',
-      label: t('detailsTabs.roles'),
-    },
-    users: {
-      value: 'users',
-      label: t('detailsTabs.users'),
-    },
-    subgroups: {
-      value: 'subgroups',
-      label: t('detailsTabs.subgroups'),
-    },
-  }
 
   const disabledTabs = !isEditMode ? ['roles', 'users', 'subgroups'] : undefined
 

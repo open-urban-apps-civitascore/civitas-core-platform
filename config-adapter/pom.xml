@@ -29,6 +29,7 @@
 		<module>config-adapter-apisix</module>
 		<module>config-adapter-examples</module>
 		<module>config-adapter-frost</module>
+		<module>config-adapter-orchestrator</module>
 	</modules>
 
 	<properties>
@@ -45,11 +46,11 @@
 		<jakarta.ws.rs.version>3.1.0</jakarta.ws.rs.version>
 		<jersey.version>3.1.5</jersey.version>
 		<commons.configuration2.version>2.11.0</commons.configuration2.version>
-		<junit.version>5.10.1</junit.version>
-		<mockito.version>5.8.0</mockito.version>
+		<junit.version>5.14.2</junit.version>
+		<mockito.version>5.21.0</mockito.version>
 		<testcontainers.version>2.0.2</testcontainers.version>
 		<awaitility.version>4.2.2</awaitility.version>
-		<jacoco.version>0.8.11</jacoco.version>
+		<jacoco.version>0.8.14</jacoco.version>
 		<spotless.version>2.46.1</spotless.version>
 		<commons.beanutils.version>1.11.0</commons.beanutils.version>
 		<commons.io.version>2.21.0</commons.io.version>
@@ -291,6 +292,9 @@
 							<include>src/main/java/**/*.java</include>
 							<include>src/test/java/**/*.java</include>
 						</includes>
+                        <googleJavaFormat>
+                            <version>1.28.0</version>
+                        </googleJavaFormat>
 						<licenseHeader>
 							<content>/**
  * &lt;p&gt;This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
@@ -302,7 +306,6 @@
  *
  */</content>
 						</licenseHeader>
-						<googleJavaFormat />
 						<removeUnusedImports />
 						<importOrder />
 						<formatAnnotations />
@@ -333,6 +336,61 @@
 							<goal>report</goal>
 						</goals>
 						<configuration>
+							<formats>
+								<format>XML</format>
+								<format>CSV</format>
+								<format>HTML</format>
+							</formats>
+						</configuration>
+					</execution>
+					<execution>
+						<id>prepare-agent-integration</id>
+						<goals>
+							<goal>prepare-agent-integration</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report-integration</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report-integration</goal>
+						</goals>
+						<configuration>
+							<formats>
+								<format>XML</format>
+								<format>CSV</format>
+								<format>HTML</format>
+							</formats>
+						</configuration>
+					</execution>
+					<execution>
+						<id>merge-results</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>merge</goal>
+						</goals>
+						<configuration>
+							<fileSets>
+								<fileSet>
+									<directory>${project.build.directory}</directory>
+									<includes>
+										<include>jacoco.exec</include>
+										<include>jacoco-it.exec</include>
+									</includes>
+								</fileSet>
+							</fileSets>
+							<destFile>${project.build.directory}/jacoco-merged.exec</destFile>
+						</configuration>
+					</execution>
+					<execution>
+						<id>report-merged</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+						<configuration>
+							<dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+							<outputDirectory>${project.reporting.outputDirectory}/jacoco-merged</outputDirectory>
 							<formats>
 								<format>XML</format>
 								<format>CSV</format>

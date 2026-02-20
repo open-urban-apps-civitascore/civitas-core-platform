@@ -9,10 +9,13 @@ import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.UserInputDTO;
+import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -25,6 +28,7 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
 
   private final UserRepository userRepository;
   private final UserMapper userMapper;
+  private final GroupRepository groupRepository;
   private final ObjectMapper objectMapper;
   private final String targetRealm;
 
@@ -32,11 +36,13 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
       ConfigEventPublisherService configEventPublisher,
       UserRepository userRepository,
       UserMapper userMapper,
+      GroupRepository groupRepository,
       ObjectMapper objectMapper,
       @Value("${keycloak.target-realm}") String targetRealm) {
     super(configEventPublisher);
     this.userRepository = userRepository;
     this.userMapper = userMapper;
+    this.groupRepository = groupRepository;
     this.objectMapper = objectMapper;
     this.targetRealm = targetRealm;
   }
@@ -57,9 +63,30 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   }
 
   @Override
+  protected UserInputDTO preProcessCreateInput(UserInputDTO input) {
+    validateGroupIdsExist(input.getGroupIds());
+    return super.preProcessCreateInput(input);
+  }
+
+  @Override
   protected User preSave(User entity) {
     validateUniqueEmail(entity);
     return super.preSave(entity);
+  }
+
+  @Override
+  protected User prePublish(User entity, UserInputDTO input) {
+    List<UUID> groupUUIDs = input.getGroupIds();
+    // Handle group membership updates after the user has been saved
+    if (groupUUIDs != null) {
+      // Fetch the new groups from the input (with members eagerly loaded)
+      Set<Group> newGroups = new HashSet<>(groupRepository.findAllByIdWithMembers(groupUUIDs));
+
+      // Use the entity's setGroups helper to handle the bidirectional relationship
+      entity.setGroups(newGroups);
+    }
+
+    return super.prePublish(entity, input);
   }
 
   private UserConfig buildUserConfig(User entity) {
@@ -99,6 +126,8 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
 
   @Override
   protected UserInputDTO preProcessUpdateInput(UserInputDTO input, User existingEntity) {
+    validateGroupIdsExist(input.getGroupIds());
+
     try {
       String inputJson = objectMapper.writeValueAsString(input);
       JsonNode jsonNode = objectMapper.readTree(inputJson);
@@ -125,6 +154,20 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
       throw new RuntimeException("Failed to process update input", e);
     }
     return input;
+  }
+
+  private void validateGroupIdsExist(List<UUID> groupIds) {
+    if (groupIds == null || groupIds.isEmpty()) {
+      return;
+    }
+
+    long foundCount = groupRepository.countByIdIn(groupIds);
+    long missingCount = groupIds.size() - foundCount;
+
+    if (missingCount > 0) {
+      throw new InvalidInputException(
+          "groups", missingCount + " groups not found", "One or more groups do not exist.");
+    }
   }
 
   @Override
