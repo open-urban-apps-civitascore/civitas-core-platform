@@ -5,6 +5,10 @@
 # Local testing:
 # gitlab-ci-local <jobName>
 
+# Use private runner (hosted by Frachtwerk @tobias.dillig@frachtwerk.de)
+default:
+  tags: ['external']
+
 # Change to retrigger all pipeline for a new commit
 
 include:
