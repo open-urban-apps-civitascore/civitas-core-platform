@@ -342,7 +342,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
           return;
         }
 
-        long backoff = backoffCalculator.calculate(attempt);
+        long backoff = backoffCalculator.calculate(attempts);
         logger.warn(
             "Retryable error processing event {} (attempt {}/{}). Retrying in {}ms. Error: {}",
             Encode.forJava(record.value().getId()),
