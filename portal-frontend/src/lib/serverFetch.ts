@@ -1,9 +1,9 @@
-import { auth } from '@/auth'
+import { headers as nextHeaders } from 'next/headers'
+import { getToken } from 'next-auth/jwt'
 
 /**
  * Server-side fetch utility for direct backend communication
- * Uses NextAuth's auth() to get the session and access token
- * This should ONLY be used in Server Components and Server Actions
+ * Reads the access token directly from the encrypted JWT cookie via getToken().
  */
 
 interface ServerFetchConfig {
@@ -51,17 +51,22 @@ export const serverFetch = async <TResponse>({
   headers = {},
   isApiBackend = false,
 }: ServerFetchConfig): Promise<ServerFetchResponse<TResponse>> => {
-  // Get the session server-side
-  const session = await auth()
+  // Read the JWT token directly from the encrypted cookie
+  const requestHeaders = await nextHeaders()
+  const forwardedProto = requestHeaders.get('x-forwarded-proto')
+  const isSecure = forwardedProto === 'https'
 
-  if (!session?.user) {
+  const token = await getToken({
+    req: { headers: requestHeaders },
+    secret: process.env.NEXTAUTH_SECRET,
+    secureCookie: isSecure,
+  })
+
+  if (!token) {
     throw new Error('Not authenticated')
   }
 
-  // Access the access_token from the session
-  // Note: This requires the token to be exposed in the session callback
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const accessToken = (session as any).access_token as string | undefined
+  const accessToken = token.access_token as string | undefined
 
   if (!accessToken) {
     throw new Error('No access token available')
