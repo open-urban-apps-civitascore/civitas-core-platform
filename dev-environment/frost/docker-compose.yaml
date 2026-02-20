@@ -3,6 +3,7 @@ services:
   web:
     #    image: fraunhoferiosb/frost-server:latest
     image: hylkevds/frost-http-projects:latest
+    platform: linux/amd64
     container_name: civitas-frost
     hostname: civitas-frost
     environment:
