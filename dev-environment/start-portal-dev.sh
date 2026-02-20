@@ -541,6 +541,26 @@ fi
 echo
 
 # ---- Phase 4: Application Build & Start -----------------------------
+# ---- Terminal Helper -----------------------------------------------
+
+start_in_new_terminal() {
+    local title="$1"
+    local script="$2"
+    if [ "$OS_TYPE" = "Darwin" ]; then
+        osascript -e "tell application \"Terminal\" to do script \"bash '$script'\"" 2>/dev/null && return 0
+        echo "Could not open Terminal.app. Starting '$title' in background..."
+        bash "$script" &
+    else
+        gnome-terminal --title="$title" -- bash "$script" 2>/dev/null || \
+        xterm -T "$title" -e "bash '$script'" 2>/dev/null || \
+        {
+            echo "Could not open new terminal. Starting '$title' in background..."
+            bash "$script" &
+        }
+    fi
+}
+
+# ---- Backend Services Selection -----------------------------------
 
 # Kill any leftover processes from a previous run to avoid port conflicts.
 # Without this, the health check may hit an old backend and falsely report success.
@@ -731,6 +751,25 @@ if [ "$authz_option" = "1" ]; then
         echo "  Dev admin seeding complete"
     else
         echo "  WARNING: seed-dev-admin.sql not found"
+    fi
+    echo
+fi
+# Check if Keycloak client secret needs to be configured
+if [ -f "$FRONTEND_DIR/.env.local" ]; then
+    CURRENT_SECRET=$(grep '^KEYCLOAK_CLIENT_SECRET=' "$FRONTEND_DIR/.env.local" | cut -d'=' -f2)
+    if [ "$CURRENT_SECRET" = "XXXXXXXXXXXXXXXXXXX" ] || [ -z "$CURRENT_SECRET" ]; then
+        echo
+        echo "The Keycloak client secret is not configured in .env.local."
+        echo "You can find it in Keycloak Admin (http://localhost:8080):"
+        echo "  Realm: civitas-core > Clients > portal-frontend > Credentials"
+        echo
+        read -p "Enter Keycloak client secret (or press Enter to skip): " keycloak_secret
+        if [ -n "$keycloak_secret" ]; then
+            perl -i -pe "s|^KEYCLOAK_CLIENT_SECRET=.*|KEYCLOAK_CLIENT_SECRET=$keycloak_secret|" "$FRONTEND_DIR/.env.local"
+            echo "  Keycloak client secret updated in .env.local"
+        else
+            echo "  Skipped. Update KEYCLOAK_CLIENT_SECRET in portal-frontend/.env.local before using the frontend."
+        fi
     fi
     echo
 fi
