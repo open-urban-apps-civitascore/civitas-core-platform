@@ -12,19 +12,17 @@ package com.civitas.configadapter.orchestrator.kafka;
 import com.civitas.configadapter.model.saga.SagaContext;
 import com.civitas.configadapter.model.saga.SagaType;
 import com.civitas.configadapter.orchestrator.DatasetSagaOrchestrator;
+import com.civitas.configadapter.util.BackoffCalculator;
+import com.civitas.configadapter.util.ConsumerRecordRetry;
+import com.civitas.configadapter.util.RetryConsumerLoop;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.errors.WakeupException;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,73 +48,50 @@ public class SagaTriggerConsumer {
 
   static final String TRIGGER_TOPIC = "core.civitas.dataset.saga.trigger";
 
-  private final KafkaConsumer<String, byte[]> consumer;
+  private final KafkaPollingConsumer pollingConsumer;
+  private final RetryConsumerLoop<String, byte[]> loop;
   private final DatasetSagaOrchestrator orchestrator;
   private final ObjectMapper objectMapper;
-  private static final long STOP_TIMEOUT_MS = 5000L;
-
-  private final AtomicBoolean running = new AtomicBoolean(false);
-  private Thread consumerThread;
 
   public SagaTriggerConsumer(
       KafkaConsumer<String, byte[]> consumer, DatasetSagaOrchestrator orchestrator) {
-    this.consumer = consumer;
+    this(
+        consumer,
+        orchestrator,
+        new BackoffCalculator(
+            ConsumerRecordRetry.DEFAULT_INITIAL_BACKOFF_MS,
+            ConsumerRecordRetry.DEFAULT_MAX_BACKOFF_MS));
+  }
+
+  SagaTriggerConsumer(
+      KafkaConsumer<String, byte[]> consumer,
+      DatasetSagaOrchestrator orchestrator,
+      BackoffCalculator backoffCalculator) {
     this.orchestrator = orchestrator;
     this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    this.pollingConsumer = new KafkaPollingConsumer(consumer);
+    this.loop =
+        new RetryConsumerLoop<>(
+            pollingConsumer,
+            rec -> () -> processTrigger(rec.value()),
+            backoffCalculator,
+            LOG,
+            "saga-trigger-consumer");
+    pollingConsumer.setRevocationCallback(loop::resetState);
   }
 
   /** Start consuming trigger events in a virtual thread. */
   public void start() {
-    if (running.compareAndSet(false, true)) {
-      consumer.subscribe(List.of(TRIGGER_TOPIC));
-      consumerThread = Thread.ofVirtual().name("saga-trigger-consumer").start(this::consumeLoop);
+    pollingConsumer.subscribe(List.of(TRIGGER_TOPIC));
+    if (loop.start()) {
       LOG.info("SagaTriggerConsumer started, subscribed to {}", TRIGGER_TOPIC);
     }
   }
 
   /** Stop consuming. */
   public void stop() {
-    LOG.info("Stopping SagaTriggerConsumer");
-    running.set(false);
-    if (consumerThread != null) {
-      try {
-        consumerThread.join(STOP_TIMEOUT_MS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-    consumer.close();
-  }
-
-  private void consumeLoop() {
-    try {
-      while (running.get()) {
-        try {
-          ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(500));
-          for (ConsumerRecord<String, byte[]> record : records) {
-            try {
-              processTrigger(record.value());
-              consumer.commitSync();
-            } catch (IOException e) {
-              LOG.error(
-                  "Failed to process trigger event: {}",
-                  Encode.forJava(String.valueOf(e.getMessage())),
-                  e);
-            }
-          }
-        } catch (WakeupException e) {
-          if (running.get()) {
-            LOG.warn("Unexpected WakeupException in SagaTriggerConsumer loop", e);
-          }
-        } catch (RuntimeException e) {
-          if (running.get()) {
-            LOG.error("Error in SagaTriggerConsumer loop", e);
-          }
-        }
-      }
-    } finally {
-      LOG.info("SagaTriggerConsumer loop ended");
-    }
+    loop.stop();
+    pollingConsumer.delegate().close();
   }
 
   private void processTrigger(byte[] value) throws IOException {

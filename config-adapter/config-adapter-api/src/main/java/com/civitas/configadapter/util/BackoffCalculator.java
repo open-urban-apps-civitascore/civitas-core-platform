@@ -7,13 +7,21 @@
  * Copyright (c) 2026 Civitas Connect e. V. and others.
  *
  */
-package com.civitas.event.handler.kafka;
+package com.civitas.configadapter.util;
 
-class BackoffCalculator {
+/** Calculates exponential backoff delays capped at a configurable maximum. */
+public class BackoffCalculator {
   private final long initialBackoffMs;
   private final long maxBackoffMs;
 
   public BackoffCalculator(long initialBackoffMs, long maxBackoffMs) {
+    if (initialBackoffMs <= 0) {
+      throw new IllegalArgumentException(
+          "initialBackoffMs must be positive, got: " + initialBackoffMs);
+    }
+    if (maxBackoffMs <= 0) {
+      throw new IllegalArgumentException("maxBackoffMs must be positive, got: " + maxBackoffMs);
+    }
     this.initialBackoffMs = initialBackoffMs;
     this.maxBackoffMs = maxBackoffMs;
   }
@@ -25,6 +33,9 @@ class BackoffCalculator {
    * @return the backoff delay in milliseconds
    */
   public long calculate(int attempt) {
+    if (attempt <= 0) {
+      throw new IllegalArgumentException("attempt must be positive, got: " + attempt);
+    }
     long backoff = initialBackoffMs * (long) Math.pow(2, attempt - 1);
     return Math.min(backoff, maxBackoffMs);
   }

@@ -10,18 +10,16 @@
 package com.civitas.configadapter.orchestrator.kafka;
 
 import com.civitas.configadapter.orchestrator.engine.SagaEngine;
+import com.civitas.configadapter.util.BackoffCalculator;
+import com.civitas.configadapter.util.ConsumerRecordRetry;
+import com.civitas.configadapter.util.RetryConsumerLoop;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.errors.WakeupException;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,73 +50,49 @@ public class SagaResultConsumer {
           "core.civitas.dataset.apisix.result",
           "core.civitas.dataset.redpanda.result");
 
-  private final KafkaConsumer<String, byte[]> consumer;
+  private final KafkaPollingConsumer pollingConsumer;
+  private final RetryConsumerLoop<String, byte[]> loop;
   private final SagaEngine engine;
   private final ObjectMapper objectMapper;
-  private static final long STOP_TIMEOUT_MS = 5000L;
-
-  private final AtomicBoolean running = new AtomicBoolean(false);
-  private Thread consumerThread;
 
   public SagaResultConsumer(KafkaConsumer<String, byte[]> consumer, SagaEngine engine) {
-    this.consumer = consumer;
+    this(
+        consumer,
+        engine,
+        new BackoffCalculator(
+            ConsumerRecordRetry.DEFAULT_INITIAL_BACKOFF_MS,
+            ConsumerRecordRetry.DEFAULT_MAX_BACKOFF_MS));
+  }
+
+  SagaResultConsumer(
+      KafkaConsumer<String, byte[]> consumer,
+      SagaEngine engine,
+      BackoffCalculator backoffCalculator) {
     this.engine = engine;
     this.objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    this.pollingConsumer = new KafkaPollingConsumer(consumer);
+    this.loop =
+        new RetryConsumerLoop<>(
+            pollingConsumer,
+            rec -> () -> processRecord(rec.value()),
+            backoffCalculator,
+            LOG,
+            "saga-result-consumer");
+    pollingConsumer.setRevocationCallback(loop::resetState);
   }
 
   /** Start consuming adapter results in a virtual thread. */
   public void start() {
-    if (running.compareAndSet(false, true)) {
-      consumer.subscribe(RESULT_TOPICS);
-      consumerThread = Thread.ofVirtual().name("saga-result-consumer").start(this::consumeLoop);
+    pollingConsumer.subscribe(RESULT_TOPICS);
+    if (loop.start()) {
       LOG.info("SagaResultConsumer started, subscribed to {}", RESULT_TOPICS);
     }
   }
 
   /** Stop consuming. */
   public void stop() {
-    LOG.info("Stopping SagaResultConsumer");
-    running.set(false);
-    if (consumerThread != null) {
-      try {
-        consumerThread.join(STOP_TIMEOUT_MS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
-    consumer.close();
-  }
-
-  private void consumeLoop() {
-    try {
-      while (running.get()) {
-        try {
-          ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(500));
-          for (ConsumerRecord<String, byte[]> record : records) {
-            try {
-              processRecord(record.value());
-              consumer.commitSync();
-            } catch (IOException e) {
-              LOG.error(
-                  "Failed to process adapter result from topic {}: {}",
-                  Encode.forJava(record.topic()),
-                  Encode.forJava(String.valueOf(e.getMessage())),
-                  e);
-            }
-          }
-        } catch (WakeupException e) {
-          if (running.get()) {
-            LOG.warn("Unexpected WakeupException in SagaResultConsumer loop", e);
-          }
-        } catch (RuntimeException e) {
-          if (running.get()) {
-            LOG.error("Error in SagaResultConsumer loop", e);
-          }
-        }
-      }
-    } finally {
-      LOG.info("SagaResultConsumer loop ended");
-    }
+    loop.stop();
+    pollingConsumer.delegate().close();
   }
 
   @SuppressWarnings("unchecked")
