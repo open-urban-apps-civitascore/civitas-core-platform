@@ -2,9 +2,10 @@ import z from 'zod'
 
 import { enumFromConst } from '@/utils/common'
 
-import { StatusEnum } from './common'
+import { StatusEnum, WithId } from './common'
 
 export type DatastructureTab = 'basicInfo' | 'versions' | 'accessPermissions'
+export type DatastructureVersionTab = 'structure' | 'versionInfo'
 
 export const SOURCE = {
   OWN: 'OWN',
@@ -77,3 +78,20 @@ export type DatastructureCreateApiData = z.infer<typeof DatastructureCreateFormS
 export type DatastructureCreateJsonServerData = Omit<Datastructure, 'id'>
 
 export type DatastructureUpdateData = DatastructureFormDraft
+
+export const DatastructureVersionFormDraftSchema = z.object({
+  id: z.string(),
+  versionNumber: z.string().trim().min(1, 'common.errors.required'),
+  description: z.string(),
+  source: SourceEnum,
+  status: StatusEnum,
+})
+
+export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormDraftSchema.extend({
+  description: z.string().trim().min(1, 'common.errors.required'),
+})
+
+export type DatastructureVersionFormData = z.infer<typeof DatastructureVersionFormDraftSchema>
+export type DatastructureVersionCreateData = Omit<DatastructureVersionFormData, 'id'>
+export type DatastructureVersionPutData = DatastructureVersionFormData
+export type DatastructureVersionPatchData = Partial<DatastructureVersionCreateData> & WithId

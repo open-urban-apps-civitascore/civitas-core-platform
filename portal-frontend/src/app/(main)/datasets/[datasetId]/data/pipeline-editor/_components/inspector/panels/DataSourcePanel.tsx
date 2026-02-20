@@ -30,7 +30,7 @@ interface DataSourcePanelProps {
 // ============================================================================
 
 export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate }) => {
-  const t = useTranslations('datastructures.pipelineEditor')
+  const t = useTranslations('pipelineEditor')
   const { entities, isLoading, isError, getEntityById } = useDataSourceEntities()
 
   const selectedEntity = data.entityId !== undefined ? getEntityById(data.entityId) : undefined

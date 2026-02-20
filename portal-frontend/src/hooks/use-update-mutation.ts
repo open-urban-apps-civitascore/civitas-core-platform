@@ -8,7 +8,7 @@ export const useUpdateMutation = <TResponse, TData extends WithId<string | numbe
   key: mutationKey,
   errorMessage,
   headers,
-}: UpdateMutationInput) => {
+}: UpdateMutationInput<TData>) => {
   const queryClient = useQueryClient()
 
   return useMutation<ApiServiceResponse<TResponse>, unknown, MutationData<TData>>({

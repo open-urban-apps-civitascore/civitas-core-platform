@@ -36,7 +36,7 @@ interface PipelineToolbarProps {
  *
  */
 export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = '' }) => {
-  const t = useTranslations('datastructures.pipelineEditor')
+  const t = useTranslations('pipelineEditor')
   const { pipeline, runValidation, savePipeline, isDirty, canSave, isValidationRequired, isSaving } =
     useActivePipeline()
 

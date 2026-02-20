@@ -42,6 +42,7 @@ export type GetItemInput = {
 export type DataQueryInput = {
   key: string
   errorMessage: string
+  endpoint?: string
   id?: string
   params?: URLSearchParams
   isEnabled?: boolean
@@ -61,14 +62,16 @@ export type UpdateInput = {
 
 export type BaseMutationInput = {
   key: string
+  endpoint?: string
   errorMessage: string
   headers?: AxiosRequestConfig['headers']
 }
 
 export type CreateMutationInput = BaseMutationInput
 
-export type UpdateMutationInput = BaseMutationInput & {
+export type UpdateMutationInput<TData> = Omit<BaseMutationInput, 'endpoint'> & {
   method: UpdateMutationMethod
+  endpoint?: (data: TData) => string
 }
 
 export type DeleteMutationInput = BaseMutationInput & {
