@@ -10,7 +10,7 @@ import { TextField } from '@/components/form/fields/TextField'
 import { FooterElement } from '@/components/form/FooterElement'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { cn } from '@/lib/utils'
-import { DatastructureFormDraft, DatastructureVersionFormData } from '@/types/datastructures'
+import { DatastructureVersionFormData } from '@/types/datastructures'
 
 interface VersionInfoTabProps {
   form: UseFormReturn<DatastructureVersionFormData>
@@ -20,6 +20,7 @@ interface VersionInfoTabProps {
 export const VersionInfoTab = (props: VersionInfoTabProps) => {
   const { form, isReadOnly = false } = props
   const t = useTranslations('datastructureVersion')
+  const tCommon = useTranslations('common')
 
   return (
     <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement />}>
@@ -30,11 +31,11 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
 
         <DetailsFieldContainer className="max-w-300">
           <TextField
-            id="datastructureName"
+            id="versionNumber"
             form={form}
-            label={t('form.name')}
+            label={t('versionInfo.versionNumber')}
             name="versionNumber"
-            placeholder={t('form.versionNumberPlaceholder')}
+            placeholder={t('versionInfo.versionNumberPlaceholder')}
             disabled={isReadOnly}
             required
           />
@@ -44,14 +45,26 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
           <FormTextArea
             form={form}
             name="description"
-            label={t('form.description')}
-            placeholder={t('form.description')}
-            hint={t('form.descriptionHint')}
+            label={t('versionInfo.description')}
+            placeholder={t('versionInfo.description')}
+            hint={tCommon('info.descriptionHint')}
             maxLength={150}
             hasCharacterCount
             disabled={isReadOnly}
             required
             className="min-h-[100px] resize-none"
+          />
+        </DetailsFieldContainer>
+
+        <DetailsFieldContainer className="max-w-300">
+          <TextField
+            id="source"
+            form={form}
+            label={t('versionInfo.source')}
+            name="versionNumber"
+            placeholder={t('source.OWN')}
+            disabled={true}
+            required
           />
         </DetailsFieldContainer>
       </div>

@@ -1,8 +1,8 @@
 'use client'
 
 import { Plus } from 'lucide-react'
-import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 
 import { SearchHeader } from '@/components/search-area/SearchArea'
@@ -14,13 +14,14 @@ import { DatastructureVersionsListData } from '@/types/datastructures'
 import { VersionsTable } from './VersionsTable'
 
 interface VersionsTabProps {
+  datastructureId: string
   versions: DatastructureVersionsListData[]
   isReadOnly: boolean
   rowCount: number
 }
 
 export const VersionsTab = (props: VersionsTabProps) => {
-  const { versions, rowCount, isReadOnly } = props
+  const { datastructureId, versions, rowCount, isReadOnly } = props
   const t = useTranslations('datastructures')
   const router = useRouter()
   const {
@@ -38,7 +39,10 @@ export const VersionsTab = (props: VersionsTabProps) => {
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
   const CustomElement = (
-    <Button data-testid="addVersionButton" onClick={() => router.push('/datastructures/createVersion')}>
+    <Button
+      data-testid="addVersionButton"
+      onClick={() => router.push(`/datastructures/${datastructureId}/createVersion`)}
+    >
       <Plus />
       {t('newVersion')}
     </Button>
@@ -52,6 +56,7 @@ export const VersionsTab = (props: VersionsTabProps) => {
         searchString={search}
       />
       <VersionsTable
+        datastructureId={datastructureId}
         versions={versions}
         rowCount={rowCount}
         pageIndex={pageIndex}

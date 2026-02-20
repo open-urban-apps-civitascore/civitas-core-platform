@@ -51,7 +51,8 @@
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
-      "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus."
+      "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
+      "descriptionHint": "max. 150 Zeichen"
     },
     "status": {
       "DRAFT": "Entwurf",
@@ -76,6 +77,7 @@
     "permissions": "Berechtigungen",
     "roles": "Rollen",
     "create": "erstellen",
+    "createVersion": "Neue Version",
     "edit": "bearbeiten",
     "users": "User Management",
     "groups": "Gruppen",
@@ -417,8 +419,7 @@
     "form": {
       "name": "Name",
       "namePlaceholder": "Name der Datenquelle",
-      "description": "Beschreibung",
-      "descriptionHint": "max. 150 Zeichen"
+      "description": "Beschreibung"
     },
     "tabs": {
       "basicInfo": "Basisinformationen",
@@ -452,9 +453,6 @@
       "versionNumber": "Version",
       "status": "Status"
     },
-    "source": {
-      "OWN": "Eigene"
-    },
     "create": {
       "title": "Neue Datenstruktur",
       "subtitle": "Neue Datenstrukturen sind nur intern sichtbar.",
@@ -466,8 +464,7 @@
     "form": {
       "name": "Name",
       "namePlaceholder": "Name der Datenstruktur",
-      "description": "Beschreibung",
-      "descriptionHint": "max. 150 Zeichen"
+      "description": "Beschreibung"
     },
     "tabs": {
       "basicInfo": "Basisinformationen",
@@ -485,8 +482,8 @@
       "updateSuccess": "Datenstruktur wurde erfolgreich aktualisiert."
     }
   },
-  "datastructureVersions": {
-    "title": "Neue Version",
+  "datastructureVersion": {
+    "newVersion": "Neue Version",
     "tabs": {
       "structure": "Strukturdefinition",
       "versionInfo": "Versionsinformationen"
@@ -497,6 +494,9 @@
       "versionNumberPlaceholder": "z. B. 1.0",
       "description": "Versionsbeschreibung",
       "source": "Quelle"
+    },
+    "source": {
+      "OWN": "Eigene"
     }
   },
   "pipelineEditor": {

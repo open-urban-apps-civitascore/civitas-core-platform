@@ -1,12 +1,16 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useTranslations } from 'next-intl'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
+import {
+  useCreateDatastructureVersion,
+  useUpdateDatastructureVersion,
+} from '@/app/services/api/datastructures/versions/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
@@ -17,45 +21,34 @@ import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { useQueryParams } from '@/hooks/use-query-params'
 import { Status, STATUS_TYPES } from '@/types/common'
 import {
-  Datastructure,
   DatastructureFormAvailableSchema,
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionFormData,
   DatastructureVersionFormDraftSchema,
   DatastructureVersionSummary,
   DatastructureVersionTab,
-  SOURCE,
 } from '@/types/datastructures'
-import {
-  useCreateDatastructureVersion,
-  useUpdateDatastructureVersion,
-} from '@/app/services/api/datastructures/versions/clientRequests'
 
-export const defaultVersion: DatastructureVersionSummary = {
-  id: '',
-  versionNumber: '',
-  description: '',
-  source: SOURCE.OWN,
-  status: STATUS_TYPES.DRAFT,
-}
+import { StructureTab } from './components/structure-tab/StructureTab'
+import { VersionInfoTab } from './components/version-info-tab/VersionInfoTab'
 
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
     value: 'structure',
-    label: 'datastructureVersions.tabs.basicInfo',
+    label: 'datastructureVersion.tabs.structure',
   },
   {
     value: 'versionInfo',
-    label: 'datastructureVersionss.tabs.versions',
+    label: 'datastructureVersion.tabs.versionInfo',
   },
 ]
 
 interface VersionOverviewProps {
   title: string
   datastructureId: string
-  versionId: string
   version: DatastructureVersionSummary
   isCreateMode: boolean
   testId: string
@@ -65,8 +58,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const { title, datastructureId, version, isCreateMode, testId } = props
   const params = useSearchParams()
   const mode = params.get('mode')
-  const t = useTranslations('datastructureVersions')
+  const t = useTranslations('datastructureVersion')
   const tCommon = useTranslations('common')
+  const { setSubTabValueParam, subTabValue } = useQueryParams()
 
   const router = useRouter()
 
@@ -230,19 +224,18 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   )
 
   const renderTabContent = () => {
-    switch (selectedTab) {
+    switch (subTabValue) {
       case 'versionInfo':
         return <VersionInfoTab form={form} isReadOnly={isReadOnly} />
       case 'structure':
+      default:
         return (
-          <StructureDefinitionTab
-            versions={datastructure.versions}
-            rowCount={datastructure.versions.length}
-            isReadOnly={isReadOnly}
+          <StructureTab
+          // versions={datastructure.versions}
+          // rowCount={datastructure.versions.length}
+          // isReadOnly={isReadOnly}
           />
         )
-      default:
-        return null
     }
   }
 
@@ -252,8 +245,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         title={title}
         segmentedControlBarProps={{
           tabs: tabs,
-          selectedTab: selectedTab,
-          onTabChange: setSelectedTab,
+          selectedTab: subTabValue,
+          onTabChange: selectedTab => setSubTabValueParam(selectedTab),
           completedTabs,
           hasCompletionStatus: true,
         }}
@@ -263,7 +256,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         <Form {...form}>
           <form
             data-testid="datastructureEditForm"
-            aria-label={`${tCommon('form')} ${t('edit.basicInfo.title')}`}
+            aria-label={`${tCommon('form')} ${t('versionInfo.title')}`}
             onSubmit={e => e.preventDefault()}
           >
             {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}

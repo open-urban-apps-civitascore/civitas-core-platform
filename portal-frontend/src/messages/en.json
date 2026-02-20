@@ -52,7 +52,8 @@
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "commaSeparated": "comma-separated",
-      "requiredInAvailable": "This field is required in the available mode."
+      "requiredInAvailable": "This field is required in the available mode.",
+      "descriptionHint": "max. 150 characters"
     },
     "status": {
       "DRAFT": "Draft",
@@ -77,6 +78,7 @@
     "permissions": "Permissions",
     "roles": "Role Management",
     "create": "create",
+    "createVersion": "New Version",
     "edit": "edit",
     "users": "User Management",
     "groups": "Groups",
@@ -421,8 +423,7 @@
     "form": {
       "name": "Name",
       "namePlaceholder": "Name of the data source",
-      "description": "Description",
-      "descriptionHint": "max. 150 characters"
+      "description": "Description"
     },
     "exitModal": {
       "title": "Save before exiting?",
@@ -450,9 +451,6 @@
       "versionNumber": "Version",
       "status": "Status"
     },
-    "source": {
-      "OWN": "Own"
-    },
     "create": {
       "title": "New Data Structure",
       "subtitle": "New data structures are only visible internally.",
@@ -464,8 +462,7 @@
     "form": {
       "name": "Name",
       "namePlaceholder": "Name of the data structure",
-      "description": "Description",
-      "descriptionHint": "max. 150 characters"
+      "description": "Description"
     },
     "tabs": {
       "basicInfo": "Base Information",
@@ -483,7 +480,7 @@
       "updateSuccess": "Data structure  has been successfully updated."
     }
   },
-  "datastructureVersions": {
+  "datastructureVersion": {
     "title": "New Version",
     "tabs": {
       "structure": "Strukturdefinition",
@@ -495,6 +492,9 @@
       "versionNumberPlaceholder": "e. g. 1.0",
       "description": "Version Description",
       "source": "Source"
+    },
+    "source": {
+      "OWN": "Own"
     }
   },
   "pipelineEditor": {

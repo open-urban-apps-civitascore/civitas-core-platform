@@ -215,6 +215,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       case 'versions':
         return (
           <VersionsTab
+            datastructureId={datastructure.id}
             versions={datastructure.versions}
             rowCount={datastructure.versions.length}
             isReadOnly={isReadOnly}

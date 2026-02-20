@@ -36,6 +36,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     onSortingChange,
   } = props
   const t = useTranslations('datastructures')
+  const tVersion = useTranslations('datastructureVersion')
   const tCommon = useTranslations('common')
   const columnHelper = createColumnHelper<DatastructuresListData>()
 
@@ -78,7 +79,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     columnHelper.accessor('source', {
       header: t('tableHeaders.source'),
-      cell: info => (info.getValue() ? t(`source.${info.getValue()}`) : '-'),
+      cell: info => (info.getValue() ? tVersion(`source.${info.getValue()}`) : '-'),
       meta: {
         style: {
           width: '10%',

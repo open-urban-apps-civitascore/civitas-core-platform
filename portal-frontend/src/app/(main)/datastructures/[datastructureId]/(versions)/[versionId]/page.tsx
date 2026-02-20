@@ -1,19 +1,20 @@
 import { getTranslations } from 'next-intl/server'
 
-import { getDatastructure } from '@/app/services/api/datastructures/serverRequests'
+import { getDatastructureVersion } from '@/app/services/api/datastructures/versions/serverRequests'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { DatastructureApiResponseSchema } from '@/types/datastructures'
 
+import { defaultVersion } from '../createVersion/page'
 import { VersionOverview } from '../VersionOverview'
 
-interface PageProps {
+interface EditDatastructureVersionPage {
   params: Promise<{ versionId: string; datastructureId: string }>
 }
 
-const DatasourceDetailsPage = async ({ params }: PageProps) => {
+const EditDatastructureVersionPage = async ({ params }: EditDatastructureVersionPage) => {
   const { versionId, datastructureId } = await params
   const t = await getTranslations('common')
-  const datastructureResponse = await getDatastructure(datastructureId)
+  const datastructureResponse = await getDatastructureVersion(datastructureId, versionId)
   const parsedDatastructure = DatastructureApiResponseSchema.safeParse(datastructureResponse.data)
   if (!parsedDatastructure.success) {
     console.error(t('errors.loadingError'), parsedDatastructure)
@@ -23,12 +24,12 @@ const DatasourceDetailsPage = async ({ params }: PageProps) => {
   return (
     <VersionOverview
       title=""
-      datastructure={parsedDatastructure.data}
-      versionId={versionId}
+      datastructureId={datastructureId}
+      version={parsedDatastructure.data.versions.find(version => version.id === versionId) || defaultVersion}
       isCreateMode={false}
       testId="editDatastructureVersionOverview"
     />
   )
 }
 
-export default DatasourceDetailsPage
+export default EditDatastructureVersionPage
