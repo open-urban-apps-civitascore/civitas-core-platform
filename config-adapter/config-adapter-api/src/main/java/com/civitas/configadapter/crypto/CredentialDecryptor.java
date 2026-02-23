@@ -44,6 +44,7 @@ public final class CredentialDecryptor {
   // TODO: NIST SP 800-132 recommends >= 16 bytes for PBKDF2 salt.
   //       Current deployment uses 8-byte salt via CIVITAS_MASTER_SALT.
   //       Consider migrating to 16+ bytes with a versioned key derivation scheme.
+  //       Issue: #1003
   private static final int PBKDF2_ITERATIONS = 310_000;
   private static final int KEY_LENGTH_BITS = 256;
   private static final String ENC_PREFIX = "ENC(";
