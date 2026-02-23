@@ -1,6 +1,4 @@
-# Overrides application-local-init.yaml for integration tests.
-# Loaded via spring.config.import in application-local.yaml — the test classpath takes priority,
-# so this file is used instead of the main one when tests activate the "local" profile.
+# Test seed data for the local-init profile — overrides the main application-local-init.yaml.
 local:
   init:
     groups:
