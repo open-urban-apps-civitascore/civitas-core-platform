@@ -1,21 +1,20 @@
-import { createContext, Dispatch, ReactNode, SetStateAction, useContext, useState } from 'react'
+import { createContext, ReactNode, useContext } from 'react'
 
 interface ReadOnlyContextType {
   isReadOnly: boolean
-  setIsReadOnly: Dispatch<SetStateAction<boolean>>
 }
 
 const ReadOnlyContext = createContext<ReadOnlyContextType | null>(null)
 
 interface ReadOnlyProviderProps {
   children: ReactNode
+  isReadOnly: boolean
 }
 
 export const ReadOnlyProvider = (props: ReadOnlyProviderProps) => {
-  const { children } = props
-  const [isReadOnly, setIsReadOnly] = useState(false)
+  const { children, isReadOnly } = props
 
-  return <ReadOnlyContext.Provider value={{ isReadOnly, setIsReadOnly }}>{children}</ReadOnlyContext.Provider>
+  return <ReadOnlyContext.Provider value={{ isReadOnly }}>{children}</ReadOnlyContext.Provider>
 }
 
 export const useReadOnly = () => {

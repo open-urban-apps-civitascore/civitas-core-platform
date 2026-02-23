@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
+import { useCallback } from 'react'
 
 import { useMultiSessionManager } from '../../hooks/use-multi-session-manager'
 import { useReadOnly } from '../../hooks/use-read-only'
@@ -13,17 +13,12 @@ import { Toolbar } from '../tabs/Toolbar'
 
 interface MultiSessionLayoutProps {
   className?: string
-  isUmlModelerReadOnly: boolean
 }
 
 export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
-  const { isUmlModelerReadOnly, className } = props
-  const { setIsReadOnly, isReadOnly } = useReadOnly()
+  const { className } = props
+  const { isReadOnly } = useReadOnly()
   const sessionManager = useMultiSessionManager()
-
-  useEffect(() => {
-    setIsReadOnly(isUmlModelerReadOnly)
-  }, [isUmlModelerReadOnly, setIsReadOnly])
 
   // Tab management handlers
   const handleCreateSession = useCallback(() => {

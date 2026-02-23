@@ -8,16 +8,16 @@ import { ReadOnlyProvider } from './hooks/use-read-only'
 
 interface UmlModelerProps {
   className?: string
-  isUmlModelerReadOnly?: boolean
+  isReadOnly?: boolean
 }
 
 export const UmlModeler = (props: UmlModelerProps) => {
-  const { className, isUmlModelerReadOnly = false } = props
+  const { className, isReadOnly = false } = props
   return (
     <div className={cn('flex h-full w-full flex-1 flex-col gap-4 p-4', className)}>
       <div className="h-full w-full rounded-xl border bg-background overflow-hidden">
-        <ReadOnlyProvider>
-          <MultiSessionLayout className="rounded-xl" isUmlModelerReadOnly={isUmlModelerReadOnly} />
+        <ReadOnlyProvider isReadOnly={isReadOnly}>
+          <MultiSessionLayout className="rounded-xl" />
         </ReadOnlyProvider>
       </div>
     </div>
