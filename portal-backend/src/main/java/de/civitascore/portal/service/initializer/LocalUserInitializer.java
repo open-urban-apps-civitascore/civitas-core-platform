@@ -63,7 +63,7 @@ public class LocalUserInitializer {
   }
 
   private Map<String, Group> initializeGroups() {
-    Map<String, Group> result = new HashMap<>();
+    Map<String, Group> groupsByName = new HashMap<>();
 
     for (LocalInitProperties.GroupEntry entry : properties.getGroups()) {
       groupRepository
@@ -71,7 +71,7 @@ public class LocalUserInitializer {
           .ifPresentOrElse(
               existing -> {
                 log.debug("Local group '{}' already exists — skipping", entry.getName());
-                result.put(entry.getName(), existing);
+                groupsByName.put(entry.getName(), existing);
               },
               () -> {
                 Group group = new Group();
@@ -92,13 +92,13 @@ public class LocalUserInitializer {
                                   entry.getName()));
                 }
 
-                Group saved = groupRepository.save(group);
-                result.put(entry.getName(), saved);
+                Group createdGroup = groupRepository.save(group);
+                groupsByName.put(entry.getName(), createdGroup);
                 log.info("Created local group '{}'", entry.getName());
               });
     }
 
-    return result;
+    return groupsByName;
   }
 
   private void initializeUsers(Map<String, Group> groupsByName) {
@@ -119,7 +119,7 @@ public class LocalUserInitializer {
         user.setExternalId(entry.getExternalId());
       }
 
-      User saved = userRepository.save(user);
+      User createdUser = userRepository.save(user);
 
       entry
           .getGroups()
@@ -127,7 +127,7 @@ public class LocalUserInitializer {
               groupName -> {
                 Group group = groupsByName.get(groupName);
                 if (group != null) {
-                  saved.addGroup(group);
+                  createdUser.addGroup(group);
                 } else {
                   log.warn(
                       "Group '{}' not found for local user '{}' — skipping group assignment",
@@ -139,7 +139,7 @@ public class LocalUserInitializer {
       log.info("Created local user '{}'", entry.getEmail());
 
       if (entry.getExternalId() == null) {
-        publishUserCreated(saved);
+        publishUserCreated(createdUser);
       }
     }
   }
@@ -156,7 +156,7 @@ public class LocalUserInitializer {
     configEventPublisher
         .publishUserCreated(targetRealm, userConfig)
         .whenComplete(
-            (result, ex) -> {
+            (ignored, ex) -> {
               if (ex != null) {
                 log.error("Failed to sync local user '{}' to Keycloak", user.getEmail(), ex);
               } else {
