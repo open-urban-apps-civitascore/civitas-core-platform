@@ -1,15 +1,15 @@
 package de.civitascore.portal.service;
 
+import com.civitas.configadapter.Topics;
+import com.civitas.configadapter.model.Config;
+import com.civitas.configadapter.model.ConfigEvent;
+import com.civitas.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.ConfigValue;
+import com.civitas.configadapter.model.Metadata;
+import com.civitas.configadapter.model.Operation;
+import com.civitas.configadapter.model.Payload;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.civitascore.configadapter.Topics;
-import de.civitascore.configadapter.model.Config;
-import de.civitascore.configadapter.model.ConfigEvent;
-import de.civitascore.configadapter.model.ConfigResultEvent;
-import de.civitascore.configadapter.model.ConfigValue;
-import de.civitascore.configadapter.model.Metadata;
-import de.civitascore.configadapter.model.Operation;
-import de.civitascore.configadapter.model.Payload;
 import de.civitascore.portal.messaging.CloudEventPublisher;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;

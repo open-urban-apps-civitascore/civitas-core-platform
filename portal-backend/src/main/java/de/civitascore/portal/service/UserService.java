@@ -1,10 +1,10 @@
 package de.civitascore.portal.service;
 
+import com.civitas.configadapter.Topics;
+import com.civitas.configadapter.model.ConfigValue;
+import com.civitas.configadapter.model.idm.UserConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import de.civitascore.configadapter.Topics;
-import de.civitascore.configadapter.model.ConfigValue;
-import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;

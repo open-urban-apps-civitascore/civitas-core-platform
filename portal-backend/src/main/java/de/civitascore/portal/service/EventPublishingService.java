@@ -1,9 +1,9 @@
 package de.civitascore.portal.service;
 
-import de.civitascore.configadapter.Topics;
-import de.civitascore.configadapter.model.ConfigResultEvent;
-import de.civitascore.configadapter.model.ConfigValue;
-import de.civitascore.configadapter.model.Operation;
+import com.civitas.configadapter.Topics;
+import com.civitas.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.ConfigValue;
+import com.civitas.configadapter.model.Operation;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;

@@ -1,6 +1,6 @@
 package de.civitascore.portal.messaging.kafka;
 
-import de.civitascore.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.ConfigResultEvent;
 import de.civitascore.portal.messaging.CloudEventPublisher;
 import io.cloudevents.CloudEvent;
 import java.util.Map;

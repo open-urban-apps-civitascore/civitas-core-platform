@@ -1,6 +1,6 @@
 package de.civitascore.portal.messaging;
 
-import de.civitascore.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.model.ConfigResultEvent;
 import io.cloudevents.CloudEvent;
 import java.util.concurrent.CompletableFuture;
 
