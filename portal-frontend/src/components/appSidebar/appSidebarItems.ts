@@ -1,4 +1,4 @@
-import { BookOpen, Building2, GitPullRequestArrow, LucideProps, SquareMenu, SquareTerminal, User } from 'lucide-react'
+import { BookOpen, Building2, GitPullRequestArrow, LucideProps, SquareMenu, User } from 'lucide-react'
 import { ForwardRefExoticComponent, ReactNode, RefAttributes } from 'react'
 
 export interface NavItem {
@@ -63,11 +63,6 @@ export const appSidebarNavItems = [
     title: 'documentation',
     url: '#',
     icon: BookOpen,
-  },
-  {
-    title: 'uml-modeler',
-    url: '/uml-modeler',
-    icon: SquareTerminal,
   },
 ]
 

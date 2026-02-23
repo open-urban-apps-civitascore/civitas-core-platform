@@ -12,9 +12,11 @@ import { Toolbar } from '../tabs/Toolbar'
 
 interface MultiSessionLayoutProps {
   className?: string
+  isReadOnly: boolean
 }
 
-export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = ({ className = '' }) => {
+export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
+  const { isReadOnly, className } = props
   const sessionManager = useMultiSessionManager()
 
   // Tab management handlers
@@ -95,7 +97,12 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = ({ classNam
           {/* Tab Content Area */}
           <div className="flex-1 relative overflow-hidden">
             {sessionManager.sessions.map(session => (
-              <TabContent key={session.id} session={session} isActive={session.id === sessionManager.activeSessionId} />
+              <TabContent
+                key={session.id}
+                session={session}
+                isActive={session.id === sessionManager.activeSessionId}
+                isReadonly={isReadOnly}
+              />
             ))}
           </div>
         </div>

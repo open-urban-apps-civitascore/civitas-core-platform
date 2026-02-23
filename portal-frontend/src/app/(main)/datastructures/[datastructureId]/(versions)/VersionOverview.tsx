@@ -14,13 +14,11 @@ import {
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
-import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
-import { Form } from '@/components/ui/form'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Status, STATUS_TYPES } from '@/types/common'
 import {
@@ -32,8 +30,8 @@ import {
   DatastructureVersionTab,
 } from '@/types/datastructures'
 
-import { StructureTab } from './components/structure-tab/StructureTab'
 import { VersionInfoTab } from './components/version-info-tab/VersionInfoTab'
+import { StructureDefinitionTab } from './components/structure-definition-tab/StructureDefinitionTab'
 
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
@@ -45,6 +43,8 @@ const tabs: Tab<DatastructureVersionTab>[] = [
     label: 'datastructureVersion.tabs.versionInfo',
   },
 ]
+
+const DEFAULT_TAB = tabs[0]
 
 interface VersionOverviewProps {
   title: string
@@ -64,7 +64,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const router = useRouter()
 
-  const [selectedTab, setSelectedTab] = useState<DatastructureVersionTab>('structure')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
 
@@ -229,13 +228,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         return <VersionInfoTab form={form} isReadOnly={isReadOnly} />
       case 'structure':
       default:
-        return (
-          <StructureTab
-          // versions={datastructure.versions}
-          // rowCount={datastructure.versions.length}
-          // isReadOnly={isReadOnly}
-          />
-        )
+        return <StructureDefinitionTab isReadOnly={isReadOnly} />
     }
   }
 
@@ -245,24 +238,14 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         title={title}
         segmentedControlBarProps={{
           tabs: tabs,
-          selectedTab: subTabValue,
+          selectedTab: subTabValue || DEFAULT_TAB.value,
           onTabChange: selectedTab => setSubTabValueParam(selectedTab),
           completedTabs,
           hasCompletionStatus: true,
         }}
         customElement={isReadOnly ? EditButton : ActionButtonsAndStatusSwitch}
       />
-      <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
-        <Form {...form}>
-          <form
-            data-testid="datastructureEditForm"
-            aria-label={`${tCommon('form')} ${t('versionInfo.title')}`}
-            onSubmit={e => e.preventDefault()}
-          >
-            {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
-          </form>
-        </Form>
-      </PageBackground>
+      {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
 
       <ExitWarningModal
         isOpen={isExitModalOpen}

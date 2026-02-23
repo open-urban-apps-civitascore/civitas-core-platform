@@ -21,9 +21,11 @@ import { nodeTypes as umlNodeTypes } from '../nodes/nodeTypes'
 
 interface UMLCanvasProps {
   className?: string
+  isReadOnly: boolean
 }
 
-export const UMLCanvas: React.FC<UMLCanvasProps> = ({ className = '' }) => {
+export const UMLCanvas: React.FC<UMLCanvasProps> = props => {
+  const { className, isReadOnly } = props
   const { diagram, dispatch, addEdge, validateConnection, addNode } = useActiveDiagram()
   const { screenToFlowPosition } = useReactFlow()
 
@@ -102,11 +104,11 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({ className = '' }) => {
         edges={diagram.edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
+        onNodesChange={isReadOnly ? undefined : onNodesChange}
+        onEdgesChange={isReadOnly ? undefined : onEdgesChange}
+        onConnect={isReadOnly ? undefined : onConnect}
+        onDrop={isReadOnly ? undefined : onDrop}
+        onDragOver={isReadOnly ? undefined : onDragOver}
         connectionMode={ConnectionMode.Loose}
         fitView
         fitViewOptions={{ padding: 0.1 }}
@@ -115,7 +117,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({ className = '' }) => {
         multiSelectionKeyCode={['Meta', 'Ctrl']}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#464646" />
-        <Controls position="bottom-left" showZoom showFitView showInteractive />
+        <Controls position="bottom-left" showZoom showFitView />
       </ReactFlow>
     </div>
   )
