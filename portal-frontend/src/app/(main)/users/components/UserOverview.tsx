@@ -97,7 +97,6 @@ export const UserOverview = (props: UserOverviewProps) => {
   }, [defaultUserData])
 
   const handleAssignGroups = (groupSelection: RowSelectionState) => {
-    console.log('handleAssignGroups')
     const selectedgroupIds = Object.keys(groupSelection).filter(key => groupSelection[key])
     const updateGroupData = selectedgroupIds.concat(groupWatch || [])
     form.setValue('groupIds', updateGroupData, { shouldDirty: true })
