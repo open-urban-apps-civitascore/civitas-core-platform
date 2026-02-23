@@ -1,0 +1,16 @@
+# Overrides application-local-init.yaml for integration tests.
+# Loaded via spring.config.import in application-local.yaml — the test classpath takes priority,
+# so this file is used instead of the main one when tests activate the "local" profile.
+local:
+  init:
+    groups:
+      - name: "Init Test Admins"
+        roleName: "Tenant Admin"
+        description: "Init test admin group"
+    users:
+      - firstName: Init
+        lastName: TestUser
+        email: init-test@example.com
+        title: OTHER
+        groups:
+          - "Init Test Admins"

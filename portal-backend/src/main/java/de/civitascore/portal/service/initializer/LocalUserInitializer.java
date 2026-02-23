@@ -1,10 +1,8 @@
 package de.civitascore.portal.service.initializer;
 
-import com.civitas.configadapter.model.idm.GroupConfig;
 import com.civitas.configadapter.model.idm.UserConfig;
 import de.civitascore.portal.configuration.LocalInitProperties;
 import de.civitascore.portal.model.entity.Group;
-import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.RoleRepository;
@@ -22,9 +20,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
-@Profile("local")
+@Profile("local-init")
 @Slf4j
-public class LocalUserGroupInitializer {
+public class LocalUserInitializer {
 
   private final LocalInitProperties properties;
   private final UserRepository userRepository;
@@ -33,7 +31,7 @@ public class LocalUserGroupInitializer {
   private final ConfigEventPublisherService configEventPublisher;
   private final String targetRealm;
 
-  public LocalUserGroupInitializer(
+  public LocalUserInitializer(
       LocalInitProperties properties,
       UserRepository userRepository,
       GroupRepository groupRepository,
@@ -97,8 +95,6 @@ public class LocalUserGroupInitializer {
                 Group saved = groupRepository.save(group);
                 result.put(entry.getName(), saved);
                 log.info("Created local group '{}'", entry.getName());
-
-                publishGroupCreated(saved, entry);
               });
     }
 
@@ -142,28 +138,6 @@ public class LocalUserGroupInitializer {
     }
   }
 
-  private void publishGroupCreated(Group group, LocalInitProperties.GroupEntry entry) {
-    GroupConfig groupConfig = new GroupConfig();
-    groupConfig.setName(group.getName());
-    if (entry.getRoleName() != null) {
-      groupConfig.setRealmRoles(Set.of(entry.getRoleName()));
-    }
-
-    configEventPublisher
-        .publishGroupCreated(targetRealm, groupConfig)
-        .whenComplete(
-            (result, ex) -> {
-              if (ex != null) {
-                log.warn(
-                    "Failed to sync local group '{}' to config adapter: {}",
-                    group.getName(),
-                    ex.getMessage());
-              } else {
-                log.info("Synced local group '{}' to config adapter", group.getName());
-              }
-            });
-  }
-
   private void publishUserCreated(User user) {
     UserConfig userConfig = new UserConfig();
     userConfig.setUsername(user.getEmail());
@@ -178,28 +152,11 @@ public class LocalUserGroupInitializer {
         .whenComplete(
             (result, ex) -> {
               if (ex != null) {
-                log.warn(
-                    "USER_CREATED failed for local user '{}' (user may already exist in Keycloak"
-                        + " from a previous run — falling back to USER_UPDATED): {}",
-                    user.getEmail(),
-                    ex.getMessage());
-                configEventPublisher
-                    .publishUserUpdated(targetRealm, userConfig)
-                    .whenComplete(
-                        (updateResult, updateEx) -> {
-                          if (updateEx != null) {
-                            log.error(
-                                "USER_UPDATED fallback also failed for local user '{}': {}",
-                                user.getEmail(),
-                                updateEx.getMessage());
-                          } else {
-                            log.info(
-                                "Synced local user '{}' to config adapter via UPDATE fallback",
-                                user.getEmail());
-                          }
-                        });
+                log.info(
+                    "Local user '{}' already exists in Keycloak — skipping Keycloak sync",
+                    user.getEmail());
               } else {
-                log.info("Synced local user '{}' to config adapter", user.getEmail());
+                log.info("Synced local user '{}' to Keycloak via config adapter", user.getEmail());
               }
             });
   }

@@ -13,7 +13,7 @@ import org.springframework.validation.annotation.Validated;
 
 @Configuration
 @ConfigurationProperties(prefix = "local.init")
-@Profile("local")
+@Profile("local-init")
 @Validated
 @Getter
 @Setter

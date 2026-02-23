@@ -3,6 +3,7 @@ package de.civitascore.portal.service.event;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.ConfigAdapterTestHelper;
 import de.civitascore.portal.model.input.UserInputDTO;
+import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.UserService;
 import java.util.List;
@@ -38,10 +39,12 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
   private String embeddedKafkaBrokers;
 
   private ConfigAdapterTestHelper configAdapterHelper;
+  @Autowired private GroupRepository groupRepository;
 
   @BeforeEach
   void setUp() {
     log.debug("=== Test Setup Starting ===");
+    groupRepository.deleteAll();
     userRepository.deleteAll();
 
     ensureCivitasCoreRealmExists();
