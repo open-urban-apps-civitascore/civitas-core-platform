@@ -1,7 +1,7 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js'
 import { z } from 'zod'
 
-import { Item, WithId } from './common'
+import { Item, ItemScheme, WithId } from './common'
 
 export type UserTab = 'userData' | 'roles' | 'groups'
 
@@ -33,7 +33,7 @@ export const PhoneSchema = z
     }
   })
 
-export const UserSchema = z.object({
+export const UserApiSchema = z.object({
   id: z.string(),
   title: TitleSchema,
   firstName: z.string().min(2, {
@@ -47,10 +47,10 @@ export const UserSchema = z.object({
   }),
   phone: PhoneSchema.nullable(),
   active: z.boolean(),
-  groups: z.array(z.string()),
+  groups: z.array(ItemScheme).nullable(),
 })
 
-export type User = z.infer<typeof UserSchema>
+export type User = z.infer<typeof UserApiSchema>
 
 export type ListUser = {
   id: string
@@ -59,17 +59,14 @@ export type ListUser = {
   active: boolean
 }
 
-export type GroupListUser = ListUser & {
-  assignedAt: string
-}
-
-export const UserFormSchema = UserSchema.omit({
+export const UserFormSchema = UserApiSchema.omit({
   groups: true,
 }).extend({
   phone: PhoneSchema.optional(),
+  groupIds: z.array(z.string()),
 })
 
 export type UserFormData = z.infer<typeof UserFormSchema>
 
-export type CreateUserData = Omit<User, 'id'>
+export type CreateUserData = Omit<User, 'id' | 'groups'>
 export type UpdateUserData = Partial<CreateUserData> & WithId

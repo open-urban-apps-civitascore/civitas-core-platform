@@ -1,6 +1,8 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQueryClient } from '@tanstack/react-query'
+import { RowSelectionState } from '@tanstack/react-table'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -9,13 +11,14 @@ import { toast } from 'sonner'
 
 import { useCreateUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
-import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
+import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { User, UserFormData, UserFormSchema, UserTab } from '@/types/users'
+import { pickDirtyValues } from '@/utils/form'
 import { mapUserToFormData } from '@/utils/users'
 
 import { UserBasicInfoTab } from './basic-info-tab/UserBasicInfoTab'
@@ -38,8 +41,8 @@ const tabValues: Record<UserTab, Tab<UserTab>> = {
 }
 
 interface UserOverviewProps {
-  title: string
   userData: User
+  title: string
   isCreateMode?: boolean
   testId?: string
 }
@@ -54,6 +57,7 @@ export const UserOverview = (props: UserOverviewProps) => {
   const [defaultUserData, setDefaultUserData] = useState(userData)
   const [isReadOnly, setIsReadOnly] = useState(isCreateMode ? false : mode !== 'edit')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+  const queryClient = useQueryClient()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const isLoading = createUser.isPending || updateUser.isPending
@@ -76,6 +80,7 @@ export const UserOverview = (props: UserOverviewProps) => {
   })
 
   const watch = form.watch()
+  const groupWatch = form.watch('groupIds')
 
   const isFormDirty = useMemo(() => {
     const dirtyFields = form.formState.dirtyFields
@@ -90,6 +95,17 @@ export const UserOverview = (props: UserOverviewProps) => {
     form.reset(mapUserToFormData(defaultUserData))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultUserData])
+
+  const handleAssignGroups = (groupSelection: RowSelectionState) => {
+    const selectedgroupIds = Object.keys(groupSelection).filter(key => groupSelection[key])
+    const updateGroupData = selectedgroupIds.concat(groupWatch || [])
+    form.setValue('groupIds', updateGroupData, { shouldDirty: true })
+  }
+
+  const handleRemoveGroup = (id: string) => {
+    const currentGroups = groupWatch.filter(group => group !== id)
+    form.setValue('groupIds', currentGroups, { shouldDirty: true })
+  }
 
   const handleExit = () => {
     form.reset()
@@ -121,16 +137,25 @@ export const UserOverview = (props: UserOverviewProps) => {
 
   const handleUpdateUser = async (formData: UserFormData) => {
     const parsed = UserFormSchema.parse(formData)
-    const updateData = { ...parsed, phone: !parsed.phone && defaultUserData.phone ? null : parsed.phone }
-    updateUser.mutate(updateData, {
-      onSuccess: ({ data }) => {
-        setDefaultUserData(data)
-        if (isExitModalOpen) setIsExitModalOpen(false)
-        router.refresh()
-        toast.success(t('messages.updateSuccess'))
+    const dirtyFields = form.formState.dirtyFields
+    const fieldsToUpdate = pickDirtyValues(parsed, dirtyFields)
+    const updateData = {
+      ...fieldsToUpdate,
+      phone: !parsed.phone && dirtyFields.phone ? null : fieldsToUpdate.phone,
+    }
+    updateUser.mutate(
+      { ...updateData, id: parsed.id },
+      {
+        onSuccess: ({ data }) => {
+          ;[['groups']].forEach(queryKey => queryClient.invalidateQueries({ queryKey }))
+          setDefaultUserData(data)
+          if (isExitModalOpen) setIsExitModalOpen(false)
+          router.refresh()
+          toast.success(t('messages.updateSuccess'))
+        },
+        onError,
       },
-      onError,
-    })
+    )
   }
 
   const handleSave = isCreateMode ? form.handleSubmit(handleCreateUser) : form.handleSubmit(handleUpdateUser)
@@ -138,9 +163,16 @@ export const UserOverview = (props: UserOverviewProps) => {
   const renderTabContent = () => {
     switch (subTabValue) {
       case tabValues.groups.value:
-        return <GroupsTab userId={userData.id} />
+        return (
+          <GroupsTab
+            formValues={watch}
+            isReadOnly={isReadOnly}
+            onAssignGroups={handleAssignGroups}
+            onRemoveGroup={handleRemoveGroup}
+          />
+        )
       case tabValues.roles.value:
-        return <RolesTab groupIds={userData.groups} />
+        return <RolesTab groupIds={groupWatch} />
       case tabValues.userData.value:
       default:
         return <UserBasicInfoTab userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />
@@ -183,10 +215,10 @@ export const UserOverview = (props: UserOverviewProps) => {
       />
       {renderTabContent()}
       <ExitWarningModal
-        isOpen={isExitModalOpen}
-        onClose={() => setIsExitModalOpen(false)}
+        open={isExitModalOpen}
+        onOpenChange={setIsExitModalOpen}
         onDiscard={handleExit}
-        onSave={handleSave}
+        onConfirm={handleSave}
         isLoading={isLoading}
       />
     </PageContainer>

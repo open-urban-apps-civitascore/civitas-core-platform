@@ -1,5 +1,6 @@
 'use client'
 
+import { DialogProps } from '@radix-ui/react-dialog'
 import { Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
@@ -13,21 +14,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-interface ExitWarningModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onDiscard: () => void
-  onSave: () => void
+interface ExitWarningModalProps extends DialogProps {
   isLoading?: boolean
+  onDiscard: () => void
+  onConfirm: () => void
 }
 
 export const ExitWarningModal = (props: ExitWarningModalProps) => {
-  const { isOpen, onClose, onDiscard, onSave, isLoading = false } = props
-  const t = useTranslations('datasources.exitModal')
+  const { open, onOpenChange, onDiscard, onConfirm, isLoading = false } = props
+  const t = useTranslations('common.exitModal')
   const tCommon = useTranslations('common')
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="exitWarningModal" className="sm:max-w-md" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{t('title')}</DialogTitle>
@@ -45,7 +44,7 @@ export const ExitWarningModal = (props: ExitWarningModalProps) => {
             <Trash2 className="w-4 h-4 mr-1" />
             {t('discard')}
           </Button>
-          <Button data-testid="saveButton" type="button" onClick={onSave} disabled={isLoading}>
+          <Button data-testid="saveButton" type="button" onClick={onConfirm} disabled={isLoading}>
             {tCommon('actions.submit')}
           </Button>
         </DialogFooter>

@@ -13,7 +13,6 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { Button } from '@/components/ui/button'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
-import { flattenGroups } from '@/utils/groups'
 
 import { GroupAssignmentModal } from './GroupAssignmentModal'
 import { GroupTable } from './GroupTable'
@@ -49,8 +48,8 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     }
     // currently there is no API endpoint to get groups and subgroups by Ids, so we need to filter and flatten them on the client side
     // that's why pagination is not working correctly when there are subgroups assigned to the role
-    const flattenedGroups = flattenGroups(groupsData?.data)
-    const filteredGroups = flattenedGroups.filter(group => assignedGroupIds.includes(group.id))
+    // const flattenedGroups = flattenGroups(groupsData?.data)
+    const filteredGroups = groupsData.data.filter(group => assignedGroupIds.includes(group.id))
     return filteredGroups
   }, [groupsData?.data, assignedGroupIds])
 
@@ -60,8 +59,8 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     }
     return groups.filter(
       group =>
-        group.title.toLowerCase().includes(searchInput.toLowerCase()) ||
-        group.contact?.displayName.toLowerCase().includes(searchInput.toLowerCase()) ||
+        group.name.toLowerCase().includes(searchInput.toLowerCase()) ||
+        group.contactUser?.name.toLowerCase().includes(searchInput.toLowerCase()) ||
         group.description.toLowerCase().includes(searchInput.toLowerCase()),
     )
   }, [searchInput, groups])

@@ -19,3 +19,15 @@ export const getGroups = async (params?: URLSearchParams) => {
     throw new Error('An error occurred while fetching groups data.')
   }
 }
+
+export const getGroup = async (id: string) => {
+  try {
+    return await serverFetch<Group>({
+      endpoint: `/groups/${id}`,
+      method: 'GET',
+    })
+  } catch (error) {
+    console.error('An error occurred while fetching group data.', error)
+    throw new Error('An error occurred while fetching group data.')
+  }
+}

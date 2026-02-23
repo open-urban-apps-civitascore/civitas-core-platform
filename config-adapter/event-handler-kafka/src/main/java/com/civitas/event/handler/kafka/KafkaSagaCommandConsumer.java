@@ -12,22 +12,21 @@ package com.civitas.event.handler.kafka;
 import com.civitas.configadapter.adapter.SagaCommandHandler;
 import com.civitas.configadapter.adapter.SagaCommandMessage;
 import com.civitas.configadapter.adapter.SagaCommandResult;
+import com.civitas.configadapter.util.BackoffCalculator;
+import com.civitas.configadapter.util.ConsumerRecordRetry;
 import com.civitas.configadapter.util.PayloadConverter;
+import com.civitas.configadapter.util.PollingConsumer;
+import com.civitas.configadapter.util.RetryConsumerLoop;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.errors.WakeupException;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,13 +49,11 @@ public class KafkaSagaCommandConsumer implements AutoCloseable {
 
   private static final String TOPIC_PREFIX = "core.civitas.dataset.";
   private static final long PUBLISH_TIMEOUT_MS = 5000L;
-  private static final long STOP_TIMEOUT_MS = 5000L;
 
-  private final KafkaConsumer<String, byte[]> consumer;
+  private final KafkaPollingConsumer pollingConsumer;
+  private final RetryConsumerLoop<String, byte[]> loop;
   private final KafkaProducer<String, byte[]> producer;
   private final Map<String, SagaCommandHandler> handlers;
-  private final AtomicBoolean running = new AtomicBoolean(false);
-  private Thread consumerThread;
 
   /**
    * Creates a new saga command consumer.
@@ -69,17 +66,38 @@ public class KafkaSagaCommandConsumer implements AutoCloseable {
       KafkaConsumer<String, byte[]> consumer,
       KafkaProducer<String, byte[]> producer,
       Map<String, SagaCommandHandler> handlers) {
-    this.consumer = consumer;
+    this(
+        consumer,
+        producer,
+        handlers,
+        new BackoffCalculator(
+            ConsumerRecordRetry.DEFAULT_INITIAL_BACKOFF_MS,
+            ConsumerRecordRetry.DEFAULT_MAX_BACKOFF_MS));
+  }
+
+  KafkaSagaCommandConsumer(
+      KafkaConsumer<String, byte[]> consumer,
+      KafkaProducer<String, byte[]> producer,
+      Map<String, SagaCommandHandler> handlers,
+      BackoffCalculator backoffCalculator) {
     this.producer = producer;
     this.handlers = handlers;
+    this.pollingConsumer = new KafkaPollingConsumer(consumer);
+    this.loop =
+        new RetryConsumerLoop<>(
+            pollingConsumer,
+            rec -> () -> processRecord(rec),
+            backoffCalculator,
+            LOG,
+            "saga-command-consumer");
+    pollingConsumer.setRevocationCallback(loop::resetState);
   }
 
   /** Start consuming saga commands in a virtual thread. */
   public void start() {
-    if (running.compareAndSet(false, true)) {
-      List<String> topics = buildTopicList();
-      consumer.subscribe(topics);
-      consumerThread = Thread.ofVirtual().name("saga-command-consumer").start(this::consumeLoop);
+    List<String> topics = buildTopicList();
+    pollingConsumer.subscribe(topics);
+    if (loop.start()) {
       LOG.info(
           "KafkaSagaCommandConsumer started, subscribed to {} topics for adapters: {}",
           topics.size(),
@@ -89,60 +107,18 @@ public class KafkaSagaCommandConsumer implements AutoCloseable {
 
   /** Stop consuming and release resources. */
   public void stop() {
-    LOG.info("Stopping KafkaSagaCommandConsumer");
-    running.set(false);
-    if (consumerThread != null) {
-      try {
-        consumerThread.join(STOP_TIMEOUT_MS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    }
+    loop.stop();
   }
 
   @Override
   public void close() {
     stop();
-    consumer.close();
+    pollingConsumer.delegate().close();
     producer.close();
     LOG.info("KafkaSagaCommandConsumer closed");
   }
 
-  private void consumeLoop() {
-    try {
-      while (running.get()) {
-        try {
-          ConsumerRecords<String, byte[]> records = consumer.poll(Duration.ofMillis(500));
-          if (records.isEmpty()) {
-            continue;
-          }
-          try {
-            for (ConsumerRecord<String, byte[]> record : records) {
-              processRecord(record);
-            }
-            consumer.commitSync();
-          } catch (IOException e) {
-            LOG.error(
-                "Failed to process saga command, batch not committed: {}",
-                Encode.forJava(String.valueOf(e.getMessage())),
-                e);
-          }
-        } catch (WakeupException e) {
-          if (running.get()) {
-            LOG.warn("Unexpected WakeupException in saga command consumer", e);
-          }
-        } catch (RuntimeException e) {
-          if (running.get()) {
-            LOG.error("Error in saga command consumer loop", e);
-          }
-        }
-      }
-    } finally {
-      LOG.info("KafkaSagaCommandConsumer loop ended");
-    }
-  }
-
-  private void processRecord(ConsumerRecord<String, byte[]> record) throws IOException {
+  private void processRecord(PollingConsumer.Record<String, byte[]> record) throws IOException {
     Map<String, Object> map = PayloadConverter.readMap(record.value());
     SagaCommandMessage command = SagaCommandMessage.fromMap(map);
 
@@ -173,13 +149,15 @@ public class KafkaSagaCommandConsumer implements AutoCloseable {
   }
 
   /**
-   * Publishes the saga command result to the adapter's result topic. Throws on failure so that the
-   * calling record is NOT committed — it will be redelivered on the next poll.
+   * Publishes the saga command result to the adapter's result topic. Serialization {@link
+   * IOException} propagates as-is (permanent failure — no retry). Kafka send errors are wrapped as
+   * {@link RuntimeException} (transient failure — retried).
    */
   private void publishResult(String adapter, SagaCommandResult result) throws IOException {
     String resultTopic = TOPIC_PREFIX + adapter + ".result";
+    // Serialization IOException propagates → processOnce classifies as PERMANENT_FAILURE
+    byte[] json = PayloadConverter.writeValueAsBytes(result);
     try {
-      byte[] json = PayloadConverter.writeValueAsBytes(result);
       ProducerRecord<String, byte[]> record =
           new ProducerRecord<>(resultTopic, result.sagaId(), json);
       producer.send(record).get(PUBLISH_TIMEOUT_MS, TimeUnit.MILLISECONDS);
@@ -192,9 +170,9 @@ public class KafkaSagaCommandConsumer implements AutoCloseable {
           Encode.forJava(result.stepId()));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      throw new IOException("Interrupted while publishing result to " + resultTopic, e);
+      throw new RuntimeException("Interrupted publishing to " + resultTopic, e);
     } catch (ExecutionException | TimeoutException e) {
-      throw new IOException("Failed to publish result to " + resultTopic, e);
+      throw new RuntimeException("Failed to publish to " + resultTopic, e);
     }
   }
 

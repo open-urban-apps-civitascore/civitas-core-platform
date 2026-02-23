@@ -17,7 +17,7 @@ interface ConfirmButtons extends HTMLAttributes<HTMLDivElement> {
   confirmButtonType: 'button'
 }
 
-type ActionButtonsProps = (FormButtonProps | ConfirmButtons) & {
+export type ActionButtonsProps = (FormButtonProps | ConfirmButtons) & {
   onCancelClick: () => void
   isCancelButtonDisabled?: boolean
   isConfirmButtonDisabled?: boolean

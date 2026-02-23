@@ -9,21 +9,33 @@
  */
 package com.civitas.configadapter.orchestrator.kafka;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.civitas.configadapter.model.saga.SagaContext;
 import com.civitas.configadapter.model.saga.SagaType;
 import com.civitas.configadapter.orchestrator.DatasetSagaOrchestrator;
+import com.civitas.configadapter.util.BackoffCalculator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.lang.reflect.Method;
+import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -36,9 +48,10 @@ class SagaTriggerConsumerTest {
   private ObjectMapper objectMapper;
 
   @SuppressWarnings("unchecked")
+  private final KafkaConsumer<String, byte[]> kafkaConsumer = mock(KafkaConsumer.class);
+
   @BeforeEach
   void setUp() {
-    var kafkaConsumer = mock(org.apache.kafka.clients.consumer.KafkaConsumer.class);
     orchestrator = mock(DatasetSagaOrchestrator.class);
     consumer = new SagaTriggerConsumer(kafkaConsumer, orchestrator);
     objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
@@ -114,6 +127,106 @@ class SagaTriggerConsumerTest {
       invokeTrigger(Map.of("sagaType", "DATASET_DELETE", "datasetId", "ds-1"));
 
       verify(orchestrator).startSaga(eq(SagaType.DATASET_DELETE), eq("ds-1"), any());
+    }
+  }
+
+  @Nested
+  @DisplayName("consumeLoop error handling")
+  class ConsumeLoopErrorHandling {
+
+    private static final BackoffCalculator FAST_BACKOFF = new BackoffCalculator(1L, 10L);
+
+    @SuppressWarnings("unchecked")
+    private final KafkaConsumer<String, byte[]> loopConsumer = mock(KafkaConsumer.class);
+
+    private DatasetSagaOrchestrator loopOrchestrator;
+    private SagaTriggerConsumer loopSut;
+
+    @BeforeEach
+    void setUpLoop() {
+      loopOrchestrator = mock(DatasetSagaOrchestrator.class);
+      TopicPartition tp = new TopicPartition(SagaTriggerConsumer.TRIGGER_TOPIC, 0);
+      when(loopConsumer.assignment()).thenReturn(Set.of(tp));
+      loopSut = new SagaTriggerConsumer(loopConsumer, loopOrchestrator, FAST_BACKOFF);
+    }
+
+    @Test
+    @DisplayName("consumeLoop_malformedJson_commitsOffsetAndContinues")
+    void consumeLoop_malformedJson_commitsOffsetAndContinues() {
+      byte[] invalidJson = "not-valid-json".getBytes();
+      ConsumerRecord<String, byte[]> badRecord =
+          new ConsumerRecord<>(SagaTriggerConsumer.TRIGGER_TOPIC, 0, 0L, "key", invalidJson);
+      TopicPartition tp = new TopicPartition(SagaTriggerConsumer.TRIGGER_TOPIC, 0);
+      ConsumerRecords<String, byte[]> records =
+          new ConsumerRecords<>(Map.of(tp, List.of(badRecord)));
+
+      when(loopConsumer.poll(any(Duration.class)))
+          .thenReturn(records)
+          .thenReturn(ConsumerRecords.empty());
+
+      loopSut.start();
+      await().atMost(2, SECONDS).untilAsserted(() -> verify(loopConsumer).commitSync());
+      loopSut.stop();
+
+      verify(loopOrchestrator, never()).startSaga(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("consumeLoop_orchestratorThrowsRuntimeException_retriesThenCommits")
+    void consumeLoop_orchestratorThrowsRuntimeException_retriesThenCommits() throws Exception {
+      Map<String, Object> trigger =
+          Map.of("sagaType", "DATASET_CREATE", "datasetId", "ds-1", "name", "Test");
+      byte[] validJson = objectMapper.writeValueAsBytes(trigger);
+
+      ConsumerRecord<String, byte[]> record =
+          new ConsumerRecord<>(SagaTriggerConsumer.TRIGGER_TOPIC, 0, 0L, "key", validJson);
+      TopicPartition tp = new TopicPartition(SagaTriggerConsumer.TRIGGER_TOPIC, 0);
+      ConsumerRecords<String, byte[]> records = new ConsumerRecords<>(Map.of(tp, List.of(record)));
+
+      when(loopOrchestrator.startSaga(any(), any(), any()))
+          .thenThrow(new RuntimeException("orchestrator error"));
+
+      when(loopConsumer.poll(any(Duration.class)))
+          .thenReturn(records)
+          .thenReturn(ConsumerRecords.empty());
+
+      loopSut.start();
+      await().atMost(2, SECONDS).untilAsserted(() -> verify(loopConsumer).commitSync());
+      loopSut.stop();
+
+      // Orchestrator called multiple times due to retries
+      verify(loopOrchestrator, atLeast(2)).startSaga(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("consumeLoop_poisonPillThenValid_processesSecondRecordAndCommitsTwice")
+    void consumeLoop_poisonPillThenValid_processesSecondRecordAndCommitsTwice() throws Exception {
+      byte[] invalidJson = "not-valid-json".getBytes();
+      ConsumerRecord<String, byte[]> badRecord =
+          new ConsumerRecord<>(SagaTriggerConsumer.TRIGGER_TOPIC, 0, 0L, "key1", invalidJson);
+
+      Map<String, Object> trigger =
+          Map.of("sagaType", "DATASET_CREATE", "datasetId", "ds-1", "name", "Test");
+      byte[] validJson = objectMapper.writeValueAsBytes(trigger);
+      ConsumerRecord<String, byte[]> goodRecord =
+          new ConsumerRecord<>(SagaTriggerConsumer.TRIGGER_TOPIC, 0, 1L, "key2", validJson);
+
+      TopicPartition tp = new TopicPartition(SagaTriggerConsumer.TRIGGER_TOPIC, 0);
+      ConsumerRecords<String, byte[]> records =
+          new ConsumerRecords<>(Map.of(tp, List.of(badRecord, goodRecord)));
+
+      when(loopOrchestrator.startSaga(any(), any(), any()))
+          .thenReturn(Optional.of(mock(SagaContext.class)));
+
+      when(loopConsumer.poll(any(Duration.class)))
+          .thenReturn(records)
+          .thenReturn(ConsumerRecords.empty());
+
+      loopSut.start();
+      await().atMost(2, SECONDS).untilAsserted(() -> verify(loopConsumer, times(2)).commitSync());
+      loopSut.stop();
+
+      verify(loopOrchestrator).startSaga(eq(SagaType.DATASET_CREATE), eq("ds-1"), any());
     }
   }
 }
