@@ -8,13 +8,16 @@ import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
-import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
+import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
+import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
-import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/page-header/PageHeader'
+import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
+import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Form } from '@/components/ui/form'
-import { DATASOURCE_STATUS_TYPES } from '@/const/connectors'
+import { Status, STATUS_TYPES } from '@/types/common'
 import { ConnectorApiToFormSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
   Datasource,
@@ -22,19 +25,36 @@ import {
   DatasourceFormDraft,
   DatasourceFormDraftSchema,
   DatasourceFormToApiSchema,
-  DatasourceStatusType,
+  DatasourceTab,
 } from '@/types/datasources'
 import { getConnectorFormData } from '@/utils/connectors'
 import { pickDirtyValues } from '@/utils/form'
 
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
-import { DatasourceTab, SegmentedControlBar } from './SegmentedControlBar'
-import { StatusDropdown } from './StatusDropdown'
 
 interface DatasourceOverviewProps {
   datasource: Datasource
 }
+
+const tabs: Tab<DatasourceTab>[] = [
+  {
+    value: 'basicInfo',
+    label: 'datasources.tabs.basicInfo',
+  },
+  {
+    value: 'connector',
+    label: 'datasources.tabs.connector',
+  },
+  {
+    value: 'dataStructure',
+    label: 'datasources.tabs.dataStructure',
+  },
+  {
+    value: 'accessPermissions',
+    label: 'datasources.tabs.accessPermissions',
+  },
+]
 
 export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const { datasource } = props
@@ -45,7 +65,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     id: datasource.id,
     name: datasource.name ?? '',
     description: datasource.description ?? '',
-    status: datasource.status ?? DATASOURCE_STATUS_TYPES.DRAFT,
+    status: datasource.status ?? STATUS_TYPES.DRAFT,
     connector: ConnectorApiToFormSchema.safeParse(datasource.connector).data ?? null,
   }
 
@@ -75,7 +95,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const descriptionWatch = form.watch('description')
   const connectorTypeWatch = form.watch('connector.type')
 
-  const isDraftMode = statusWatch === DATASOURCE_STATUS_TYPES.DRAFT
+  const isDraftMode = statusWatch === STATUS_TYPES.DRAFT
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
@@ -92,8 +112,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
   // Auto-revert status to draft when required fields become empty
   const revalidateDraftMode = () => {
-    if (statusWatch === DATASOURCE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
-      form.setValue('status', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
+    if (statusWatch === STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+      form.setValue('status', STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
   }
@@ -131,7 +151,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   // Tabs that are disabled (for future implementation)
   const disabledTabs: DatasourceTab[] = ['dataStructure', 'accessPermissions']
 
-  const handleStatusChange = (newStatus: DatasourceStatusType) => {
+  const handleStatusChange = (newStatus: Status) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
 
@@ -196,50 +216,41 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     }
   }
 
+  const ActionButtonsAndStatusSwitch = (
+    <div className="flex gap-6">
+      <StatusDropdown status={statusWatch} onStatusChange={handleStatusChange} canSetAvailable={canSetAvailable} />
+      <ActionButtons
+        confirmButtonType="button"
+        onCancelClick={handleExit}
+        onConfirmClick={handleSave}
+        isConfirmButtonDisabled={
+          !form.formState.isDirty ||
+          !!form.formState.errors.name ||
+          (statusWatch !== STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
+          isLoading
+        }
+        isCancelButtonDisabled={isLoading}
+        cancelButtonTitle={tCommon('actions.exit')}
+        hasCard={false}
+        wrapperClassname="w-auto"
+      />
+    </div>
+  )
+
   return (
     <PageContainer testId="datasourceOverviewPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
-      <div className="w-full flex flex-col h-[var(--title-height)] py-[var(--layout-padding)] border-b-1">
-        <div className="flex items-center justify-between px-[var(--layout-padding)]">
-          <h1 className="text-3xl font-bold truncate max-w-full min-w-0">{datasource.name}</h1>
-          <div className="flex items-center gap-4">
-            <StatusDropdown
-              status={statusWatch}
-              onStatusChange={handleStatusChange}
-              canSetAvailable={canSetAvailable}
-            />
-            <Button
-              data-testid="exitButton"
-              type="button"
-              variant="secondary"
-              onClick={handleExit}
-              disabled={isLoading}
-            >
-              {tCommon('actions.exit')}
-            </Button>
-            <Button
-              data-testid="saveButton"
-              type="button"
-              onClick={handleSave}
-              disabled={
-                !form.formState.isDirty ||
-                !!form.formState.errors.name ||
-                (statusWatch !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
-                isLoading
-              }
-            >
-              {tCommon('actions.submit')}
-            </Button>
-          </div>
-        </div>
-        <div className="mt-4 px-[var(--layout-padding)]">
-          <SegmentedControlBar
-            selectedTab={selectedTab}
-            onTabChange={setSelectedTab}
-            completedTabs={completedTabs}
-            disabledTabs={disabledTabs}
-          />
-        </div>
-      </div>
+      <PageHeader
+        title={datasource.name}
+        segmentedControlBarProps={{
+          tabs: tabs,
+          selectedTab: selectedTab,
+          onTabChange: setSelectedTab,
+          completedTabs,
+          disabledTabs,
+          hasCompletionStatus: true,
+        }}
+        customElement={ActionButtonsAndStatusSwitch}
+      />
       <PageBackground className="overflow-y-auto">
         <Form {...form}>
           <form
@@ -253,11 +264,11 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       </PageBackground>
 
       <ExitWarningModal
-        isOpen={isExitModalOpen}
-        onClose={() => setIsExitModalOpen(false)}
-        onDiscard={handleDiscardAndExit}
-        onSave={handleSaveAndExit}
+        open={isExitModalOpen}
         isLoading={isLoading}
+        onOpenChange={setIsExitModalOpen}
+        onDiscard={handleDiscardAndExit}
+        onConfirm={handleSaveAndExit}
       />
     </PageContainer>
   )

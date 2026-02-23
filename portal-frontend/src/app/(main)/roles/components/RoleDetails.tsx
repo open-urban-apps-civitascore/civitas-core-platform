@@ -9,15 +9,30 @@ import { useForm } from 'react-hook-form'
 import { useCreateRole, useDeleteRole, useGetRole, useUpdateRole } from '@/app/services/api/roles/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
-import { Tab } from '@/components/page-header/components/TabsSections'
 import { PageHeader } from '@/components/page-header/PageHeader'
+import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { FormRole, Role, ROLE_ORIGINS, roleSchema } from '@/types/roles'
+import { FormRole, Role, ROLE_ORIGINS, roleSchema, RoleTab } from '@/types/roles'
 
 import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
 import { PermissionsTab } from './permissions-tab/PermissionsTab'
+
+const subTabValues: Record<RoleTab, Tab<RoleTab>> = {
+  basicInformation: {
+    label: 'roles.tabLabels.basicInformation',
+    value: 'basicInformation',
+  },
+  permissions: {
+    label: 'roles.tabLabels.permissions',
+    value: 'permissions',
+  },
+  groupAssignment: {
+    label: 'roles.tabLabels.groupAssignment',
+    value: 'groupAssignment',
+  },
+}
 
 const defaultRole: Role = {
   id: '',
@@ -123,25 +138,13 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     )
   }
 
-  const subTabValues: Record<'basicInformation' | 'permissions' | 'groupAssignment', Tab> = {
-    basicInformation: {
-      label: tRoles('tabLabels.basicInformation'),
-      value: 'basicInformation',
-      isActive: true,
-    },
-    permissions: {
-      label: tRoles('tabLabels.permissions'),
-      value: 'permissions',
-      isActive: isEditMode,
-    },
-    groupAssignment: {
-      label: tRoles('tabLabels.groupAssignment'),
-      value: 'groupAssignment',
-      isActive: isEditMode,
-    },
-  }
+  const disabledTabs = !isEditMode ? ['permissions', 'groupAssignment'] : undefined
 
-  const subTabs: Tab[] = [subTabValues.basicInformation, subTabValues.permissions, subTabValues.groupAssignment]
+  const subTabs: Tab<RoleTab>[] = [
+    subTabValues.basicInformation,
+    subTabValues.permissions,
+    subTabValues.groupAssignment,
+  ]
   const defaultSubTab = subTabValues.basicInformation.value
   const isDefaultRole = initialRole?.roleOrigin === ROLE_ORIGINS.DEFAULT
 
@@ -159,10 +162,11 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       <PageHeader
         title={roleId ? initialRole?.name : tRoles('newRole')}
         badgeTitle={badgeTitle}
-        subTabs={{
+        segmentedControlBarProps={{
           tabs: subTabs,
           selectedTab: subTabValue || defaultSubTab,
-          onClick: newSubTab => setSubTabValueParam(newSubTab),
+          onTabChange: newSubTab => setSubTabValueParam(newSubTab),
+          disabledTabs,
         }}
       />
 

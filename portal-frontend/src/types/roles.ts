@@ -1,9 +1,11 @@
 import z from 'zod'
 
-import { Item, WithId } from './common'
+import { WithId } from './common'
 import { Group } from './groups'
 import { Permission } from './permissions'
 import { User } from './users'
+
+export type RoleTab = 'basicInformation' | 'permissions' | 'groupAssignment'
 
 export const ROLE_TYPES = {
   SYSTEM: 'system',
@@ -46,7 +48,6 @@ export type UserRolesTableData = {
   id: string
   name: string
   group: string | null
-  dataspace: Item | null
   inherited: boolean
   type: RoleType
   roleId: string

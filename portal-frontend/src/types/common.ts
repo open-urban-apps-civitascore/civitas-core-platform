@@ -1,26 +1,41 @@
 import { AxiosRequestConfig } from 'axios'
 import { InputHTMLAttributes } from 'react'
+import z from 'zod'
+
+import { enumFromConst } from '@/utils/common'
 
 export type Item = {
   id: string
   title: string
 }
 
-export type Item2 = {
-  id: string
-  name: string
-}
+export const ItemScheme = z.object({
+  id: z.string(),
+  name: z.string(),
+})
+
+export type Item2 = z.infer<typeof ItemScheme>
 
 export type SelectOption = {
   value: string
   label: string
 }
 
+export const STATUS_TYPES = {
+  DRAFT: 'DRAFT',
+  AVAILABLE: 'AVAILABLE',
+} as const
+
+export const StatusEnum = enumFromConst(STATUS_TYPES)
+
+export type Status = (typeof STATUS_TYPES)[keyof typeof STATUS_TYPES]
+
 export type InputPropsWithoutForm = Omit<InputHTMLAttributes<HTMLInputElement>, 'form' | 'onChange'>
 
 export type GetListInput = {
   params?: URLSearchParams
   isEnabled?: boolean
+  queryKey?: string
 }
 
 export type GetItemInput = {
@@ -30,11 +45,12 @@ export type GetItemInput = {
 
 export type DataQueryInput = {
   key: string
+  queryKey?: string
   errorMessage: string
+  headers?: AxiosRequestConfig['headers']
   id?: string
   params?: URLSearchParams
   isEnabled?: boolean
-  headers?: AxiosRequestConfig['headers']
 }
 
 export type WithId<T = string> = { id: T }

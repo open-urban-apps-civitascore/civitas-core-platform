@@ -50,7 +50,7 @@ interface PipelineCanvasProps {
  *
  */
 export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }) => {
-  const t = useTranslations('pipelineEditor')
+  const t = useTranslations('datastructures.pipelineEditor')
   const { pipeline, dispatch, addNode, addEdge, validateConnection, hideValidationPanel } = useActivePipeline()
   const { screenToFlowPosition } = useReactFlow()
 

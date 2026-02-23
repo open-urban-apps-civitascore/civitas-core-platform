@@ -3,12 +3,15 @@ package de.civitascore.portal.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.embedded.UserTitleType;
+import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.input.UserInputDTO;
 import de.civitascore.portal.model.output.UserOutputDTO;
+import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +29,7 @@ class UserControllerIntegrationTest
   private final String USERS_ENDPOINT = "/users";
 
   @Autowired private UserRepository userRepository;
+  @Autowired private GroupRepository groupRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -34,6 +38,7 @@ class UserControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
+    groupRepository.deleteAll();
     userRepository.deleteAll();
   }
 
@@ -606,6 +611,229 @@ class UserControllerIntegrationTest
       ResponseEntity<UserOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("Group Membership Tests")
+  class GroupMembershipTests {
+
+    private Group createTestGroup(String name) {
+      Group group = new Group();
+      group.setName(name);
+      return groupRepository.save(group);
+    }
+
+    @Test
+    @DisplayName("Should create user with group memberships")
+    void shouldCreateUserWithGroups() {
+      Group group1 = createTestGroup("Test Group 1 " + System.currentTimeMillis());
+      Group group2 = createTestGroup("Test Group 2 " + System.currentTimeMillis());
+
+      UserInputDTO input = createValidInput();
+      input.setGroupIds(List.of(group1.getId(), group2.getId()));
+
+      ResponseEntity<UserOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CREATED status")
+          .isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getGroups()).as("User should have 2 groups").hasSize(2);
+      assertThat(response.getBody().getGroups())
+          .extracting("id")
+          .containsExactlyInAnyOrder(group1.getId(), group2.getId());
+    }
+
+    @Test
+    @DisplayName("Should update user groups with PUT")
+    void shouldUpdateUserGroupsWithPut() {
+      // Create initial groups
+      Group group1 = createTestGroup("Initial Group " + System.currentTimeMillis());
+
+      // Create user with initial group
+      UserInputDTO createInput = createValidInput();
+      createInput.setGroupIds(List.of(group1.getId()));
+      ResponseEntity<UserOutputDTO> createResponse = performCreate(createInput);
+      UUID userId = createResponse.getBody().getId();
+
+      // Create new groups for update
+      Group group2 = createTestGroup("Updated Group 1 " + System.currentTimeMillis());
+      Group group3 = createTestGroup("Updated Group 2 " + System.currentTimeMillis());
+
+      // Update user with new groups
+      UserInputDTO updateInput = createUpdateInput();
+      updateInput.setGroupIds(List.of(group2.getId(), group3.getId()));
+      ResponseEntity<UserOutputDTO> updateResponse = performUpdate(userId, updateInput);
+
+      assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(updateResponse.getBody()).isNotNull();
+      assertThat(updateResponse.getBody().getGroups())
+          .as("User should have 2 new groups")
+          .hasSize(2);
+      assertThat(updateResponse.getBody().getGroups())
+          .extracting("id")
+          .containsExactlyInAnyOrder(group2.getId(), group3.getId());
+      assertThat(updateResponse.getBody().getGroups())
+          .extracting("id")
+          .doesNotContain(group1.getId());
+    }
+
+    @Test
+    @DisplayName("Should update user groups with PATCH")
+    void shouldUpdateUserGroupsWithPatch() {
+      // Create initial group
+      Group group1 = createTestGroup("Initial Group " + System.currentTimeMillis());
+
+      // Create user with initial group
+      UserInputDTO createInput = createValidInput();
+      createInput.setGroupIds(List.of(group1.getId()));
+      ResponseEntity<UserOutputDTO> createResponse = performCreate(createInput);
+      UUID userId = createResponse.getBody().getId();
+
+      // Create new group for update
+      Group group2 = createTestGroup("New Group " + System.currentTimeMillis());
+
+      // PATCH user with new group
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("groupIds", List.of(group2.getId()));
+      ResponseEntity<UserOutputDTO> patchResponse = performPatch(userId, patchMap);
+
+      assertThat(patchResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patchResponse.getBody()).isNotNull();
+      assertThat(patchResponse.getBody().getGroups()).as("User should have 1 new group").hasSize(1);
+      assertThat(patchResponse.getBody().getGroups())
+          .extracting("id")
+          .containsExactly(group2.getId());
+    }
+
+    @Test
+    @DisplayName("Should remove all groups from user with empty list")
+    void shouldRemoveAllGroupsFromUser() {
+      // Create groups
+      Group group1 = createTestGroup("Group to Remove " + System.currentTimeMillis());
+
+      // Create user with group
+      UserInputDTO createInput = createValidInput();
+      createInput.setGroupIds(List.of(group1.getId()));
+      ResponseEntity<UserOutputDTO> createResponse = performCreate(createInput);
+      UUID userId = createResponse.getBody().getId();
+
+      assertThat(createResponse.getBody().getGroups()).hasSize(1);
+
+      // Update user with empty groups
+      UserInputDTO updateInput = createUpdateInput();
+      updateInput.setGroupIds(Collections.emptyList());
+      ResponseEntity<UserOutputDTO> updateResponse = performUpdate(userId, updateInput);
+
+      assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(updateResponse.getBody()).isNotNull();
+      assertThat(updateResponse.getBody().getGroups())
+          .as("User should have no groups")
+          .isNullOrEmpty();
+    }
+
+    @Test
+    @DisplayName("Should add groups to user who had none")
+    void shouldAddGroupsToUserWithNone() {
+      // Create user without groups
+      UserInputDTO createInput = createValidInput();
+      ResponseEntity<UserOutputDTO> createResponse = performCreate(createInput);
+      UUID userId = createResponse.getBody().getId();
+
+      assertThat(createResponse.getBody().getGroups()).isNullOrEmpty();
+
+      // Create group and add to user
+      Group group1 = createTestGroup("New Group " + System.currentTimeMillis());
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("groupIds", List.of(group1.getId()));
+      ResponseEntity<UserOutputDTO> patchResponse = performPatch(userId, patchMap);
+
+      assertThat(patchResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patchResponse.getBody()).isNotNull();
+      assertThat(patchResponse.getBody().getGroups()).as("User should have 1 group").hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Should not modify groups when groupIds field is not provided in PATCH")
+    void shouldNotModifyGroupsWhenNotProvided() {
+      // Create group and user with that group
+      Group group1 = createTestGroup("Existing Group " + System.currentTimeMillis());
+
+      UserInputDTO createInput = createValidInput();
+      createInput.setGroupIds(List.of(group1.getId()));
+      ResponseEntity<UserOutputDTO> createResponse = performCreate(createInput);
+      UUID userId = createResponse.getBody().getId();
+
+      assertThat(createResponse.getBody().getGroups()).hasSize(1);
+
+      // PATCH user with firstName only (no groupIds)
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("firstName", "UpdatedFirstName");
+      ResponseEntity<UserOutputDTO> patchResponse = performPatch(userId, patchMap);
+
+      assertThat(patchResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(patchResponse.getBody()).isNotNull();
+      assertThat(patchResponse.getBody().getFirstName()).isEqualTo("UpdatedFirstName");
+      assertThat(patchResponse.getBody().getGroups())
+          .as("User should still have the original group")
+          .hasSize(1);
+      assertThat(patchResponse.getBody().getGroups())
+          .extracting("id")
+          .containsExactly(group1.getId());
+    }
+
+    @Test
+    @DisplayName("Should fail to create user with non-existent group ID")
+    void shouldFailToCreateUserWithNonExistentGroupId() {
+      UUID nonExistentGroupId = UUID.randomUUID();
+
+      UserInputDTO input = createValidInput();
+      input.setGroupIds(List.of(nonExistentGroupId));
+
+      ResponseEntity<UserOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST for non-existent group")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should fail to update user with non-existent group ID")
+    void shouldFailToUpdateUserWithNonExistentGroupId() {
+      // Create a user first
+      UserInputDTO createInput = createValidInput();
+      ResponseEntity<UserOutputDTO> createResponse = performCreate(createInput);
+      UUID userId = createResponse.getBody().getId();
+
+      // Try to update with non-existent group
+      UUID nonExistentGroupId = UUID.randomUUID();
+      UserInputDTO updateInput = createUpdateInput();
+      updateInput.setGroupIds(List.of(nonExistentGroupId));
+
+      ResponseEntity<UserOutputDTO> updateResponse = performUpdate(userId, updateInput);
+
+      assertThat(updateResponse.getStatusCode())
+          .as("Should return BAD_REQUEST for non-existent group")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should fail when one of multiple group IDs does not exist")
+    void shouldFailWhenOneGroupIdDoesNotExist() {
+      // Create one valid group
+      Group validGroup = createTestGroup("Valid Group " + System.currentTimeMillis());
+      UUID nonExistentGroupId = UUID.randomUUID();
+
+      UserInputDTO input = createValidInput();
+      input.setGroupIds(List.of(validGroup.getId(), nonExistentGroupId));
+
+      ResponseEntity<UserOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST when any group ID is invalid")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
     }
   }
 }

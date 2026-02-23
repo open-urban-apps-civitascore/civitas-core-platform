@@ -1,30 +1,18 @@
-'use client'
-
-import { useParams } from 'next/navigation'
-import { useTranslations } from 'next-intl'
-
-import { useGetGroup } from '@/app/services/api/groups/clientRequests'
-import { ErrorPage } from '@/components/error-page/ErrorPage'
-import LoadingPage from '@/components/loading-page/LoadingPage'
+import { getGroup } from '@/app/services/api/groups/serverRequests'
 
 import { GroupDetails } from '../components/GroupDetails'
 
-const EditGroupPage = () => {
-  const params = useParams<{ groupId: string }>()
-  const { groupId } = params
-  const t = useTranslations('common')
+interface PageProps {
+  params: Promise<{ groupId: string }>
+}
 
-  const { data: groupData, isLoading, error } = useGetGroup({ id: groupId })
+const EditGroupPage = async (props: PageProps) => {
+  const { params } = props
+  const { groupId } = await params
 
-  if (isLoading) {
-    return <LoadingPage testId="editGroupLoadingPage" title={t('loadingItems', { item: t('items.groups') })} />
-  }
+  const groupData = await getGroup(groupId)
 
-  if (error || !groupData?.data) {
-    return <ErrorPage testId="editGroupErrorPage" title={t('errors.loadingError', { item: t('items.groups') })} />
-  }
-
-  return <GroupDetails title={groupData?.data.title || ''} groupData={groupData?.data} isEditMode />
+  return <GroupDetails title={groupData?.data.name || ''} groupData={groupData?.data} isEditMode />
 }
 
 export default EditGroupPage

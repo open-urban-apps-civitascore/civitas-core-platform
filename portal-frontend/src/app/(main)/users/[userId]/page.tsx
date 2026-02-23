@@ -1,6 +1,3 @@
-import { getTranslations } from 'next-intl/server'
-
-import { getGroups } from '@/app/services/api/groups/serverRequests'
 import { getUser } from '@/app/services/api/users/serverRequests'
 
 import { UserOverview } from '../components/UserOverview'
@@ -12,27 +9,11 @@ interface PageProps {
 const EditUserPage = async (props: PageProps) => {
   const { params } = props
   const { userId } = await params
-  const t = await getTranslations('common')
 
-  const getUserData = async (userId: string) => {
-    const userRequest = getUser(userId)
-    const groupsRequest = getGroups()
-    const [userResponse, groupsResponse] = await Promise.all([userRequest, groupsRequest])
-    const userData = userResponse.data
-    const groupsData = groupsResponse.data
-    const groupsContainingUser = groupsData.filter(group => group.users.find(user => user.id === userData.id))
-    const user = { ...userData, groups: groupsContainingUser.map(group => group.id) }
-    return user
-  }
-
-  const userData = await getUserData(userId)
+  const userData = (await getUser(userId)).data
 
   return (
-    <UserOverview
-      testId="userDetailsPage"
-      userData={userData}
-      title={userData ? `${userData.firstName} ${userData.lastName}` : t('itemNotFound', { item: t('items.user') })}
-    />
+    <UserOverview testId="userDetailsPage" userData={userData} title={`${userData.firstName} ${userData.lastName}`} />
   )
 }
 

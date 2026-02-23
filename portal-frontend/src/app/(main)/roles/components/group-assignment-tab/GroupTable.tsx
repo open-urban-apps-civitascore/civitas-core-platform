@@ -35,7 +35,7 @@ export const GroupTable = (props: GroupTableProps) => {
       cell: info => info.getValue(),
       enableHiding: true,
     }),
-    columnHelper.accessor('title', {
+    columnHelper.accessor('name', {
       header: ({ column }) => {
         return <SortableTableHeader column={column} title={t('tableHeaders.name')} />
       },
@@ -46,18 +46,18 @@ export const GroupTable = (props: GroupTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('users', {
+    columnHelper.accessor('members', {
       header: () => t('tableHeaders.usersCount'),
-      cell: info => info.getValue().length,
+      cell: info => info.getValue()?.length || 0,
       meta: {
         style: {
           width: '15%',
         },
       },
     }),
-    columnHelper.accessor('contact', {
+    columnHelper.accessor('contactUser', {
       header: () => t('tableHeaders.contact'),
-      cell: info => info.getValue()?.displayName ?? '',
+      cell: info => info.getValue()?.name ?? '',
       meta: {
         style: {
           width: '20%',
@@ -103,7 +103,7 @@ export const GroupTable = (props: GroupTableProps) => {
       totalPages={totalPages}
       isLoading={isLoading}
       onRowClick={onRowClick}
-      isRowClickable={row => !row.original.parent}
+      // isRowClickable={row => !row.original.parent}
     />
   )
 }

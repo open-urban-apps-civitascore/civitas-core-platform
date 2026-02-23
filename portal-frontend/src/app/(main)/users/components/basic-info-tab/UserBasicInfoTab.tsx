@@ -46,7 +46,7 @@ export const UserBasicInfoTab = (props: UserBasicInfoTabProps) => {
       <Form {...form}>
         <form onSubmit={e => e.preventDefault()} data-testid="userDetailsForm">
           <ContentCard>
-            <DetailsFieldContainer className="pt-0 pb-4 text-xl">
+            <DetailsFieldContainer className="pt-0 pb-4 ">
               <SubHeader title={t('info.header')} subtitle={t('info.subheader')} />
             </DetailsFieldContainer>
             {isLoading ? (

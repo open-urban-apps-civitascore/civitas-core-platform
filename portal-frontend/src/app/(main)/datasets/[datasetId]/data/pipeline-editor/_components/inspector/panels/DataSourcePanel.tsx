@@ -9,7 +9,7 @@
  */
 import { useTranslations } from 'next-intl'
 
-import { DATASOURCE_STATUS_TYPES } from '@/const/connectors'
+import { STATUS_TYPES } from '@/types/common'
 
 import { datasourceToSelectable, useDataSourceEntities } from '../../../_services/entityService'
 import type { DataSourceNodeData } from '../../../_types/nodes'
@@ -30,7 +30,7 @@ interface DataSourcePanelProps {
 // ============================================================================
 
 export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate }) => {
-  const t = useTranslations('pipelineEditor')
+  const t = useTranslations('datastructures.pipelineEditor')
   const { entities, isLoading, isError, getEntityById } = useDataSourceEntities()
 
   const selectedEntity = data.entityId !== undefined ? getEntityById(data.entityId) : undefined
@@ -52,7 +52,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
   }
 
   const selectableEntities = entities
-    .filter(entity => entity.status === DATASOURCE_STATUS_TYPES.AVAILABLE)
+    .filter(entity => entity.status === STATUS_TYPES.AVAILABLE)
     .map(datasourceToSelectable)
 
   return (
@@ -72,11 +72,10 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
           <EntityMetadata
             title={t('dataSourcePanel.details')}
             items={[
-              { label: t('dataSourcePanel.connector'), value: selectedEntity.connector },
+              { label: t('dataSourcePanel.connector'), value: selectedEntity.connector?.type },
               { label: t('dataSourcePanel.connection'), value: selectedEntity.connection },
               { label: t('dataSourcePanel.status'), value: selectedEntity.status },
               { label: t('dataSourcePanel.description'), value: selectedEntity.description },
-              { label: t('dataSourcePanel.tags'), value: selectedEntity.tags },
             ]}
           />
           <button

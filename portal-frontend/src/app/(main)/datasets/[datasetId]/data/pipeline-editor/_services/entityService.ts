@@ -54,8 +54,8 @@ export const useDataSourceEntities = (): UseEntityResult<Datasource> => {
 
   const getEntityById = useCallback(
     (id: string | number): Datasource | undefined => {
-      const numericId = typeof id === 'string' ? parseInt(id, 10) : id
-      return entities.find((e: Datasource) => e.id === numericId)
+      // TODO to string will be not need in future when all ids are consistent uuid
+      return entities.find((e: Datasource) => e.id === id.toString())
     },
     [entities],
   )
@@ -84,7 +84,6 @@ export const datasourceToSelectable = (ds: Datasource): SelectableEntity => ({
     connector: ds.connector,
     connection: ds.connection,
     status: ds.status,
-    tags: ds.tags,
     description: ds.description,
   },
 })

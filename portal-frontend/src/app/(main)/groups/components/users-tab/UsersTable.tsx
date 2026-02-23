@@ -1,16 +1,15 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 
 import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { TableProps } from '@/types/table'
-import { GroupListUser } from '@/types/users'
-import { formatDate } from '@/utils/formatDate'
+import { ListUser } from '@/types/users'
 import { resolveUpdater } from '@/utils/table'
 
-interface UsersTableProps extends TableProps<GroupListUser> {
-  users: GroupListUser[]
+interface UsersTableProps extends TableProps<ListUser> {
+  users: ListUser[]
 }
 
 export const UsersTable = (props: UsersTableProps) => {
@@ -27,10 +26,8 @@ export const UsersTable = (props: UsersTableProps) => {
     onSortingChange,
     isLoading,
   } = props
-  const locale = useLocale()
-  const t = useTranslations('groups')
   const tUsers = useTranslations('users')
-  const columnHelper = createColumnHelper<GroupListUser>()
+  const columnHelper = createColumnHelper<ListUser>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -51,10 +48,6 @@ export const UsersTable = (props: UsersTableProps) => {
     columnHelper.accessor('email', {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.email')} />,
       cell: info => info.getValue(),
-    }),
-    columnHelper.accessor('assignedAt', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('users.assignedAt')} />,
-      cell: info => formatDate(info.getValue(), locale),
     }),
     columnHelper.accessor('active', {
       header: tUsers('info.status.active'),

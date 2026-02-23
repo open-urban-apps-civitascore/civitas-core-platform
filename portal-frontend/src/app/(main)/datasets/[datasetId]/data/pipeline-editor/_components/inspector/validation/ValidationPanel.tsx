@@ -33,7 +33,7 @@ interface ValidationPanelProps {
  *
  */
 export const ValidationPanel: React.FC<ValidationPanelProps> = ({ validationResult }) => {
-  const t = useTranslations('pipelineEditor')
+  const t = useTranslations('datastructures.pipelineEditor')
   const { isValid, errors, warnings } = validationResult
   const errorCount = errors.length
   const warningCount = warnings.length

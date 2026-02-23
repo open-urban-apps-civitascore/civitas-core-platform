@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/naming-convention */
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
 import { GetItemInput, GetListInput } from '@/types/common'
-import { CreateGroupData, Group, PatchGroupData, UpdateGroupData } from '@/types/groups'
+import { CreateGroupData, Group, UpdateGroupData } from '@/types/groups'
 
 const key = 'groups'
 
@@ -11,6 +12,7 @@ export const useGetGroups = ({ params, isEnabled }: GetListInput = {}) =>
     key,
     params,
     isEnabled,
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while fetching groups.',
   })
 
@@ -19,26 +21,30 @@ export const useGetGroup = ({ id, isEnabled }: GetItemInput) =>
     id,
     key,
     isEnabled,
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while fetching groups.',
   })
 
 export const useCreateGroup = () => {
   return useCreateMutation<Group, CreateGroupData>({
     key,
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while creating the group.',
   })
 }
 
 export const useUpdateGroup = () =>
   useUpdateMutation<Group, UpdateGroupData>({
-    method: 'PUT',
     key,
+    method: 'PUT',
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating the group.',
   })
 
 export const usePatchGroup = () =>
-  useUpdateMutation<Group, PatchGroupData>({
-    method: 'PATCH',
+  useUpdateMutation<Group, UpdateGroupData>({
     key,
+    method: 'PATCH',
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating the group.',
   })

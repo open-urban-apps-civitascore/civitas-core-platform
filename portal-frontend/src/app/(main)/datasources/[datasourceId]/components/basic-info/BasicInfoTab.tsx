@@ -7,11 +7,10 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
+import { FooterElement } from '@/components/form/FooterElement'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { cn } from '@/lib/utils'
 import { DatasourceFormDraft } from '@/types/datasources'
-
-import { FooterElement } from '../FooterElement'
 
 interface BasicInfoTabProps {
   form: UseFormReturn<DatasourceFormDraft>

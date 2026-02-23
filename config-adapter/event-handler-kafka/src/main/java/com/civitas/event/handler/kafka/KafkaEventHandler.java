@@ -1,12 +1,11 @@
 /**
- * This work and the accompanying materials are made available under the terms of the European Union
- * Public License (EU-PL) 1.2 which is available at
- * https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
+ * <p>This work and the accompanying materials are made available under the terms of the European Union Public License (EU-PL) 1.2 which is available at https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
  *
  * <p>SPDX-License-Identifier: EUPL-1.2
  *
- * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to
- * all the individual contributors: Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ * <p>This project doesn't require a CLA (Contributor License Agreement). The copyright belongs to all the individual contributors:
+ * Copyright (c) 2012-2025 Civitas Connect e. V. and others.
+ *
  */
 package com.civitas.event.handler.kafka;
 
@@ -21,6 +20,7 @@ import com.civitas.configadapter.messaging.EventPublisher;
 import com.civitas.configadapter.model.AdapterErrorCode;
 import com.civitas.configadapter.model.ConfigEvent;
 import com.civitas.configadapter.model.ConfigResultEvent;
+import com.civitas.configadapter.util.BackoffCalculator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
@@ -342,7 +342,7 @@ public class KafkaEventHandler implements EventConsumer, EventPublisher {
           return;
         }
 
-        long backoff = backoffCalculator.calculate(attempt);
+        long backoff = backoffCalculator.calculate(attempts);
         logger.warn(
             "Retryable error processing event {} (attempt {}/{}). Retrying in {}ms. Error: {}",
             Encode.forJava(record.value().getId()),

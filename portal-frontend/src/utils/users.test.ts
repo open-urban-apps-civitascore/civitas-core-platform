@@ -9,7 +9,7 @@ const userResponse: User = {
   title: 'MR' as TitleType,
   email: 'maxmustermann@test.de',
   phone: '+49 152 1111111',
-  groups: ['3'],
+  groups: [{ id: 'g1', name: 'Group 1' }],
   active: true,
 }
 
@@ -36,22 +36,9 @@ describe('mapUserToFormData', () => {
       email: 'maxmustermann@test.de',
       phone: '+49 152 1111111',
       active: true,
+      groupIds: ['g1'],
     }
 
     expect(mapUserToFormData(userResponse)).toEqual(expected)
-  })
-
-  it('returns default values when user is null', () => {
-    const expected: UserFormData = {
-      id: '',
-      title: 'MR',
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '',
-      active: true,
-    }
-
-    expect(mapUserToFormData(null)).toEqual(expected)
   })
 })

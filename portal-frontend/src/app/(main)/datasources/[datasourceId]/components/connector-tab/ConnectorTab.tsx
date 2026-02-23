@@ -4,13 +4,13 @@ import { Path, UseFormReturn } from 'react-hook-form'
 
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FormSelect } from '@/components/form/fields/FormSelect'
+import { FooterElement } from '@/components/form/FooterElement'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { ConnectorType } from '@/types/connectors'
 import { ConnectorField, DatasourceFormDraft } from '@/types/datasources'
 
-import { FooterElement } from '../FooterElement'
 import { CONNECTORS } from './connectorSources'
 import { DynamicFormField } from './DynamicFormField'
 

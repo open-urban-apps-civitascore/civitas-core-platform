@@ -924,6 +924,10 @@ When an event fails all retry attempts or encounters a fatal error, it is sent t
 
 **Important:** DLQ publishing is synchronous to ensure no message loss. If DLQ send fails, the original event will be reprocessed on the next poll.
 
+#### Saga Consumer Retry Behavior
+
+The saga consumers (`SagaResultConsumer`, `SagaTriggerConsumer`, `KafkaSagaCommandConsumer`) use the same retry algorithm via `ConsumerRecordRetry`. Permanent errors (e.g., malformed JSON → `IOException`) are skipped immediately. Transient errors (e.g., engine/publish failures → `RuntimeException`) are retried with exponential backoff up to 3 attempts. After max retries, the record is skipped and committed. All saga consumers use **per-record commits** (not batch commits) to ensure a single poison-pill record cannot block the consumer. The saga timeout mechanism handles recovery by triggering compensation. No DLQ is used for saga consumers.
+
 #### Failure Result Event
 
 In addition to DLQ, a failure result event is published to the `resultTopic` (if specified in the original event metadata):

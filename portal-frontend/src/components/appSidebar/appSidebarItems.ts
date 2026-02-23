@@ -53,6 +53,10 @@ export const appSidebarNavItems = [
         title: 'datasources',
         url: '/datasources',
       },
+      {
+        title: 'datastructures',
+        url: '/datastructures',
+      },
     ],
   },
   {

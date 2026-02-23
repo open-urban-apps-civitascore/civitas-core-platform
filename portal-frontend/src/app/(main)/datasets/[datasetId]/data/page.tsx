@@ -20,7 +20,7 @@ const DataModePage = async () => {
 
 export default DataModePage
 
-/* DISABLED FEATURE -> TABLE EDITOR - Original DataModePage with mode selection
+/* TODO DISABLED FEATURE -> TABLE EDITOR - Original DataModePage with mode selection
 import Link from 'next/link'
 import { getTranslations } from 'next-intl/server'
 

@@ -6,14 +6,13 @@ import { GroupDetails } from '../components/GroupDetails'
 
 const defaultGroup: Group = {
   id: '',
-  title: '',
+  name: '',
   description: '',
-  roles: [],
-  users: [],
-  contact: null,
-  parent: null,
-  dataspace: null,
-  subgroups: [],
+  roles: null,
+  members: null,
+  contactUser: null,
+  createdAt: '',
+  modifiedAt: '',
 }
 
 const CreateGroupPage = async () => {
