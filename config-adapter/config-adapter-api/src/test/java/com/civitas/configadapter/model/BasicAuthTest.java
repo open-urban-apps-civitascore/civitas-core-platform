@@ -7,7 +7,7 @@
  * Copyright (c) 2026 Civitas Connect e. V. and others.
  *
  */
-package com.civitas.configadapter.model.redpanda;
+package com.civitas.configadapter.model;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;

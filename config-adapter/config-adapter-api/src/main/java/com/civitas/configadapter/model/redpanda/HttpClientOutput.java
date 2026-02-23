@@ -10,6 +10,7 @@
 package com.civitas.configadapter.model.redpanda;
 
 import com.civitas.configadapter.model.AbstractApiModel;
+import com.civitas.configadapter.model.BasicAuth;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Collections;
 import java.util.LinkedHashMap;

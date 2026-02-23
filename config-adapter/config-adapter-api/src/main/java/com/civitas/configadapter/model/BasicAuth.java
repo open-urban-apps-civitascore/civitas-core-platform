@@ -7,9 +7,8 @@
  * Copyright (c) 2026 Civitas Connect e. V. and others.
  *
  */
-package com.civitas.configadapter.model.redpanda;
+package com.civitas.configadapter.model;
 
-import com.civitas.configadapter.model.AbstractApiModel;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;

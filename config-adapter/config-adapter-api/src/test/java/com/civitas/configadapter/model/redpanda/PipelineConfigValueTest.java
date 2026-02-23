@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.civitas.configadapter.model.BasicAuth;
 import com.civitas.configadapter.model.ConfigValue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
