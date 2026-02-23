@@ -100,6 +100,7 @@ spring:
 ### Spring Profiles
 
 * **local** – local development
+* **local-init** – seed initial groups and users on startup (requires `local`)
 * **postgres** – PostgreSQL datasource
 * **debug** – extended logging
 

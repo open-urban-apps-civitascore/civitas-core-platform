@@ -1,6 +1,8 @@
 package de.civitascore.portal.configuration;
 
 import de.civitascore.portal.model.embedded.UserTitleType;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.Getter;
@@ -26,7 +28,7 @@ public class LocalInitProperties {
   @Getter
   @Setter
   public static class GroupEntry {
-    private String name;
+    @NotBlank private String name;
     private String roleName;
     private String description;
   }
@@ -34,9 +36,9 @@ public class LocalInitProperties {
   @Getter
   @Setter
   public static class UserEntry {
-    private String firstName;
-    private String lastName;
-    private String email;
+    @NotBlank private String firstName;
+    @NotBlank private String lastName;
+    @NotBlank @Email private String email;
     private UserTitleType title = UserTitleType.OTHER;
     private List<String> groups = new ArrayList<>();
   }

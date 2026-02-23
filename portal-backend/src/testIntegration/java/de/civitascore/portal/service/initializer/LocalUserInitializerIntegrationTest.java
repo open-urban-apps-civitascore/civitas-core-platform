@@ -10,7 +10,6 @@ import de.civitascore.portal.service.event.BaseEventPublishingIntegrationTest;
 import java.time.Duration;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -28,11 +27,6 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
 
   @Autowired private LocalUserInitializer localUserInitializer;
   @Autowired private GroupRepository groupRepository;
-
-  @BeforeEach
-  void setUpInitTest() {
-    groupRepository.deleteAll();
-  }
 
   @AfterEach
   void tearDownInitTest() {
@@ -92,13 +86,8 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   }
 
   @Test
-  @DisplayName("Should skip initialization when no groups or users are configured")
-  void shouldSkipWhenNothingConfigured() {
-    // Verify clean state — nothing was created yet
-    assertThat(groupRepository.count()).isZero();
-    assertThat(userRepository.count()).isZero();
-
-    // When configured (from application-local.yml), initialize creates exactly one group and user
+  @DisplayName("Should create configured group and user")
+  void shouldCreateConfiguredGroupAndUser() {
     localUserInitializer.initialize();
 
     assertThat(groupRepository.count()).isEqualTo(1);
