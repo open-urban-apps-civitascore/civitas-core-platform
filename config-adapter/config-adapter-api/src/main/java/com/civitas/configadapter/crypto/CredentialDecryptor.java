@@ -11,6 +11,7 @@ package com.civitas.configadapter.crypto;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -70,7 +71,7 @@ public final class CredentialDecryptor {
       if (spec != null) {
         spec.clearPassword();
       }
-      java.util.Arrays.fill(keyChars, '\0');
+      Arrays.fill(keyChars, '\0');
     }
   }
 

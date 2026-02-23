@@ -107,14 +107,13 @@ class RedpandaSagaHandlerTest {
     }
 
     @Test
-    @DisplayName("rolls back on failure and returns STEP_FAILED")
-    void handle_secondPipelineFails_rollsBackAndReturnsStepFailed() throws Exception {
+    @DisplayName("returns STEP_FAILED without inline rollback — orchestrator owns compensation")
+    void handle_secondPipelineFails_returnsStepFailed() throws Exception {
       RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
       doNothing().when(mockClient).createPipeline(eq("pipeline-1"), anyMap());
       doThrow(new FatalAdapterException(AdapterErrorCode.REDPANDA_PIPELINE_ERROR, "test"))
           .when(mockClient)
           .createPipeline(eq("pipeline-2"), anyMap());
-      doNothing().when(mockClient).deletePipeline("pipeline-1");
 
       try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
         SagaCommandMessage command =
@@ -132,7 +131,7 @@ class RedpandaSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_FAILED", result.type());
-        verify(mockClient).deletePipeline("pipeline-1");
+        verify(mockClient, never()).deletePipeline(any());
       }
     }
   }
@@ -525,46 +524,6 @@ class RedpandaSagaHandlerTest {
 
         assertEquals("STEP_FAILED", result.type());
         assertNotNull(result.error());
-      }
-    }
-
-    @Test
-    @DisplayName("partial deploy failure with rollback failure still returns STEP_FAILED")
-    void deployPipelines_partialRollbackFailure_shouldReturnStepFailed() throws Exception {
-      RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
-
-      // pipeline-1 deploys successfully
-      doNothing().when(mockClient).createPipeline(eq("pipeline-1"), anyMap());
-      // pipeline-2 fails
-      doThrow(new FatalAdapterException(AdapterErrorCode.REDPANDA_PIPELINE_ERROR, "deploy failed"))
-          .when(mockClient)
-          .createPipeline(eq("pipeline-2"), anyMap());
-      // rollback of pipeline-1 also fails
-      doThrow(
-              new FatalAdapterException(
-                  AdapterErrorCode.REDPANDA_PIPELINE_ERROR, "rollback failed"))
-          .when(mockClient)
-          .deletePipeline("pipeline-1");
-
-      try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
-        SagaCommandMessage command =
-            createCommand(
-                "EXECUTE_STEP",
-                "DEPLOY_PIPELINES",
-                Map.of(
-                    "datasetId",
-                    "ds-1",
-                    "dataPipelines",
-                    List.of(
-                        Map.of("id", "pipeline-1", "data", Map.of()),
-                        Map.of("id", "pipeline-2", "data", Map.of()))));
-
-        SagaCommandResult result = handler.handle(command);
-
-        assertEquals("STEP_FAILED", result.type());
-        assertNotNull(result.error());
-        // Rollback was attempted even though it failed
-        verify(mockClient).deletePipeline("pipeline-1");
       }
     }
   }

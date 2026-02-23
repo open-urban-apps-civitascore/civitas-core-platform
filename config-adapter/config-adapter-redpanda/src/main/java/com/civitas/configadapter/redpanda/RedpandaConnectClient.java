@@ -12,6 +12,7 @@ package com.civitas.configadapter.redpanda;
 import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.exception.RetryableAdapterException;
 import com.civitas.configadapter.model.AdapterErrorCode;
+import com.civitas.configadapter.model.AdapterOperation;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
@@ -54,7 +55,8 @@ class RedpandaConnectClient implements AutoCloseable {
    * Allowed characters for pipeline IDs: alphanumeric start, then alphanumeric, dots, dashes,
    * underscores.
    */
-  private static final Pattern VALID_PIPELINE_ID = Pattern.compile("[a-zA-Z0-9][a-zA-Z0-9_.-]*");
+  private static final Pattern VALID_PIPELINE_ID =
+      Pattern.compile("[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}");
 
   private final String baseUrl;
   private final PipelineSerializer serializer;
@@ -95,7 +97,7 @@ class RedpandaConnectClient implements AutoCloseable {
             .path(pipelineId)
             .request(MediaType.APPLICATION_JSON)
             .post(Entity.entity(yaml, "application/x-yaml"))) {
-      handleResponse(response, "create", pipelineId);
+      handleResponse(response, AdapterOperation.PIPELINE_CREATE, pipelineId);
     } catch (FatalAdapterException | RetryableAdapterException e) {
       throw e;
     } catch (ProcessingException e) {
@@ -124,7 +126,7 @@ class RedpandaConnectClient implements AutoCloseable {
             .path(pipelineId)
             .request(MediaType.APPLICATION_JSON)
             .put(Entity.entity(yaml, "application/x-yaml"))) {
-      handleResponse(response, "update", pipelineId);
+      handleResponse(response, AdapterOperation.PIPELINE_UPDATE, pipelineId);
     } catch (FatalAdapterException | RetryableAdapterException e) {
       throw e;
     } catch (ProcessingException e) {
@@ -150,7 +152,7 @@ class RedpandaConnectClient implements AutoCloseable {
             .path(pipelineId)
             .request(MediaType.APPLICATION_JSON)
             .delete()) {
-      handleResponse(response, "delete", pipelineId);
+      handleResponse(response, AdapterOperation.PIPELINE_DELETE, pipelineId);
     } catch (FatalAdapterException | RetryableAdapterException e) {
       throw e;
     } catch (ProcessingException e) {
@@ -172,13 +174,13 @@ class RedpandaConnectClient implements AutoCloseable {
     }
   }
 
-  private void handleResponse(Response response, String operation, String pipelineId)
+  private void handleResponse(Response response, AdapterOperation operation, String pipelineId)
       throws FatalAdapterException, RetryableAdapterException {
     int status = response.getStatus();
 
     if (status >= 200 && status < 300) {
       logger.info(
-          "Pipeline {} succeeded for: {}", Encode.forJava(operation), Encode.forJava(pipelineId));
+          "Pipeline {} succeeded for: {}", operation.getDescription(), Encode.forJava(pipelineId));
       return;
     }
 
@@ -187,7 +189,7 @@ class RedpandaConnectClient implements AutoCloseable {
     if (status >= HTTP_SERVER_ERROR_MIN) {
       logger.warn(
           "RedPanda server error during {} for pipeline {}: {} {}",
-          Encode.forJava(operation),
+          operation.getDescription(),
           Encode.forJava(pipelineId),
           status,
           Encode.forJava(body));
@@ -198,7 +200,7 @@ class RedpandaConnectClient implements AutoCloseable {
     if (status >= HTTP_CLIENT_ERROR_MIN) {
       logger.error(
           "RedPanda client error during {} for pipeline {}: {} {}",
-          Encode.forJava(operation),
+          operation.getDescription(),
           Encode.forJava(pipelineId),
           status,
           Encode.forJava(body));

@@ -157,6 +157,12 @@ public final class MqttInput extends AbstractApiModel {
         + clientId
         + ", qos="
         + qos
+        + ", connectTimeout="
+        + connectTimeout
+        + ", keepalive="
+        + keepalive
+        + ", username="
+        + username
         + ", password="
         + (password != null ? "[PRESENT]" : "null")
         + ", additionalProperties="

@@ -10,7 +10,9 @@
 package com.civitas.configadapter.redpanda;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -19,6 +21,7 @@ import static org.mockito.Mockito.when;
 
 import com.civitas.configadapter.exception.FatalAdapterException;
 import com.civitas.configadapter.exception.RetryableAdapterException;
+import com.civitas.configadapter.model.AdapterErrorCode;
 import jakarta.ws.rs.ProcessingException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
@@ -87,16 +90,20 @@ class RedpandaConnectClientTest {
     }
 
     @Test
-    @DisplayName("throws RetryableAdapterException on HTTP 500")
-    void createPipeline_http500_throwsRetryableAdapterException() {
+    @DisplayName("throws RetryableAdapterException with REDPANDA_ERROR on HTTP 500")
+    void createPipeline_http500_throwsRetryableWithCorrectErrorCode() {
       Response mockResponse = mock(Response.class);
       when(mockResponse.getStatus()).thenReturn(500);
       when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
       when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
 
-      assertThrows(
-          RetryableAdapterException.class,
-          () -> redpandaClient.createPipeline("test-pipeline", Map.of()));
+      RetryableAdapterException exception =
+          assertThrows(
+              RetryableAdapterException.class,
+              () -> redpandaClient.createPipeline("test-pipeline", Map.of()));
+
+      assertEquals(AdapterErrorCode.REDPANDA_ERROR, exception.getErrorCode());
+      assertTrue(exception.isRetryable());
     }
 
     @Test
@@ -253,6 +260,25 @@ class RedpandaConnectClientTest {
     @DisplayName("deletePipeline with invalid ID throws FatalAdapterException")
     void deletePipeline_invalidId_throwsFatalAdapterException() {
       assertThrows(FatalAdapterException.class, () -> redpandaClient.deletePipeline("../../admin"));
+    }
+
+    @Test
+    @DisplayName("ID exceeding 128 characters throws FatalAdapterException")
+    void createPipeline_idExceeding128Chars_throwsFatalAdapterException() {
+      String longId = "a" + "b".repeat(128); // 129 chars total
+      assertThrows(
+          FatalAdapterException.class, () -> redpandaClient.createPipeline(longId, Map.of()));
+    }
+
+    @Test
+    @DisplayName("ID exactly 128 characters succeeds")
+    void createPipeline_idExactly128Chars_succeeds() {
+      Response mockResponse = mock(Response.class);
+      when(mockResponse.getStatus()).thenReturn(200);
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      String exactId = "a" + "b".repeat(127); // 128 chars total
+      assertDoesNotThrow(() -> redpandaClient.createPipeline(exactId, Map.of("input", Map.of())));
     }
   }
 

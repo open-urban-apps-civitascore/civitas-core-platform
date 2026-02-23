@@ -118,7 +118,6 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
           command.sagaId(), command.stepId(), resultData, compensationData);
 
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      rollbackPipelines(deployedIds);
       log.error(
           "DEPLOY_PIPELINES failed for saga {}: {}",
           Encode.forJava(command.sagaId()),
@@ -292,19 +291,5 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
           "Pipeline field '" + field + "' is not a Map: " + value.getClass());
     }
     return (Map<String, Object>) value;
-  }
-
-  private void rollbackPipelines(List<String> pipelineIds) {
-    for (String id : pipelineIds) {
-      try {
-        redpandaClient.deletePipeline(id);
-        log.info("Rolled back pipeline: {}", Encode.forJava(id));
-      } catch (Exception e) {
-        log.warn(
-            "Failed to rollback pipeline {}: {}",
-            Encode.forJava(id),
-            Encode.forJava(e.getMessage()));
-      }
-    }
   }
 }
