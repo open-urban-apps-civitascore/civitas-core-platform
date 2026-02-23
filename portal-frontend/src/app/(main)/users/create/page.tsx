@@ -10,9 +10,9 @@ export const defaultFormUser: User = {
   lastName: '',
   title: 'MR',
   email: '',
-  active: false,
+  active: true,
   groups: [],
-  phone: '',
+  phone: null,
 }
 
 const CreateUserPage = async () => {

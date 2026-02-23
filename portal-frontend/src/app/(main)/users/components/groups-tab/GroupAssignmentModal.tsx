@@ -11,35 +11,33 @@ import {
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { useGetUsers } from '@/app/services/api/users/clientRequests'
+import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-area/SearchArea'
-import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Item2 } from '@/types/common'
-import { ListUser } from '@/types/users'
+import { UserGroupsListData } from '@/types/groups'
+import { setFocus } from '@/utils/common'
+import { mapGroupsApiToListData } from '@/utils/groups'
 import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
-import { mapListUsers } from '@/utils/users'
 
 export type UserSelection = { selectAll: boolean; selectedIds: string[]; excludedIds: string[] }
 
-interface AssignUsersModalProps extends DialogProps {
-  originalUsers: Item2[]
-  groupTitle: string
-  onUpdateUsers: (userSelection: RowSelectionState) => void
+interface GroupAssignmentModalProps extends DialogProps {
+  assignedGroups: string[]
+  userName: string
+  onAssignGroups: (groupSelection: RowSelectionState) => void
   isUpdating?: boolean
 }
 
-export const AssignUsersModal = (props: AssignUsersModalProps) => {
-  const { originalUsers, groupTitle, open, onOpenChange = () => {}, onUpdateUsers, isUpdating = false } = props
-  const t = useTranslations('groups')
+export const GroupAssignmentModal = (props: GroupAssignmentModalProps) => {
+  const { assignedGroups, userName, open, onOpenChange = () => {}, onAssignGroups, isUpdating = false } = props
   const tCommon = useTranslations('common')
-  const tUsers = useTranslations('users')
+  const t = useTranslations('users')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
   const [sorting, setSorting] = useState<SortingState>([])
@@ -48,21 +46,19 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
   const selectAllCheckbox = useRef<HTMLButtonElement>(null)
   const { getApiRequestParams } = useQueryParams()
 
-  // this implementation has to be adjusted when the backend is implemented
-  // only unassigned users have to be returned from the backend directly
-  const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
+  const { data: groupsData, isFetching: isFetchingGroups } = useGetGroups({
     params: getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString }),
   })
 
-  const users = useMemo(() => {
-    if (usersData?.data && usersData?.data.length > 0) {
-      const allUsers = mapListUsers(usersData?.data)
-      const unassignedUsers = allUsers.filter(user => !originalUsers.find(original => original.id === user.id))
-      return unassignedUsers
+  const groups = useMemo(() => {
+    if (groupsData?.data && groupsData?.data.length > 0) {
+      const allUsers = mapGroupsApiToListData(groupsData?.data)
+      const unassignedGroups = allUsers.filter(group => !assignedGroups.find(original => original === group.id))
+      return unassignedGroups
     } else return []
-  }, [usersData?.data, originalUsers])
+  }, [groupsData?.data, assignedGroups])
 
-  const rowCount = usersData?.totalElements || 0
+  const rowCount = groupsData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)
 
   useEffect(() => {
@@ -82,15 +78,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     setPageSize(newPagination.pageSize)
   }
 
-  // for accessibility: avoid losing focus after toggeling checkboxes via keyboard
-  const setFocus = (elementId: string) => {
-    requestAnimationFrame(() => {
-      const element = document.getElementById(elementId)
-      element?.focus()
-    })
-  }
-
-  const columnHelper = createColumnHelper<ListUser>()
+  const columnHelper = createColumnHelper<UserGroupsListData>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -111,15 +99,15 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
             row.toggleSelected(!!value)
             setFocus(row.id)
           }}
-          aria-label={`Select user ${row.original.fullName}`}
+          aria-label={`Select user ${row.original.name}`}
           id={row.id}
         />
       ),
       enableSorting: false,
       enableHiding: false,
     }),
-    columnHelper.accessor('fullName', {
-      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.displayName')} />,
+    columnHelper.accessor('name', {
+      header: ({ column }) => <SortableTableHeader column={column} title={t('groupsTab.name')} />,
       cell: info => info.getValue(),
       meta: {
         style: {
@@ -128,20 +116,32 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
         },
       },
     }),
-    columnHelper.accessor('email', {
-      header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.email')} />,
-      cell: info => info.getValue(),
+    columnHelper.accessor('membersCount', {
+      header: t('groupsTab.membersCount'),
+      cell: info => info.getValue() || 0,
     }),
-    columnHelper.accessor('active', {
-      header: tUsers('info.status.active'),
-      cell: info => <StatusLabel isChecked={info.getValue()} />,
+    columnHelper.accessor('contactUser', {
+      header: t('groupsTab.contact'),
+      cell: info => info.getValue()?.name || '-',
+    }),
+    columnHelper.accessor('description', {
+      header: t('groupsTab.description'),
+      cell: info => info.getValue() || '-',
+      meta: {
+        style: {
+          whiteSpace: 'nowrap',
+          maxWidth: '300px',
+          textOverflow: 'ellipsis',
+          overflow: 'hidden',
+        },
+      },
     }),
   ]
 
   const table = useReactTable({
     getRowId: row => row.id,
     columns: columns,
-    data: users,
+    data: groups,
     rowCount,
     state: {
       pagination: { pageIndex, pageSize },
@@ -163,10 +163,8 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="block sm:max-w-[95%] sm:w-[95%] md:max-w-[1061px] h-[80%] max-h-[743px]  [--title-height:64px] [--button-height:60px]">
         <DialogHeader>
-          <DialogTitle>{t('users.assign')}</DialogTitle>
-          <DialogDescription>
-            {t('users.toGroup')} {groupTitle}
-          </DialogDescription>
+          <DialogTitle>{tCommon('actions.assignItem', { item: tCommon('items.group') })}</DialogTitle>
+          <DialogDescription>{tCommon('actions.assignTo', { item: userName })}</DialogDescription>
         </DialogHeader>
         <SearchHeader
           searchString={searchString}
@@ -182,15 +180,18 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
               pageIndex={pageIndex}
               pageSize={pageSize}
               totalPages={totalPages}
-              isLoading={isFetchingUsers}
+              isLoading={isFetchingGroups}
             />
           )}
         </div>
         <ActionButtons
           confirmButtonType="button"
-          onConfirmClick={() => onUpdateUsers(selection)}
+          onConfirmClick={() => {
+            onAssignGroups(selection)
+            onOpenChange(false)
+          }}
           onCancelClick={() => onOpenChange(false)}
-          isConfirmButtonDisabled={isUpdating || isFetchingUsers}
+          isConfirmButtonDisabled={isUpdating || isFetchingGroups}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.add')}
         />

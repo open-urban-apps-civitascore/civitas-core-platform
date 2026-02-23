@@ -1,13 +1,8 @@
-import { DatasourceFormToApiData } from '@/types/datasources'
-
-export const pickDirtyValues = <T extends DatasourceFormToApiData>(
-  values: T,
-  dirty: Record<string, unknown>,
-): Partial<DatasourceFormToApiData> => {
+export const pickDirtyValues = <T>(values: T, dirtyFields: Record<string, unknown>): Partial<T> => {
   const result: Partial<T> = {}
 
-  for (const key in dirty) {
-    const dirtyValue = dirty[key]
+  for (const key in dirtyFields) {
+    const dirtyValue = dirtyFields[key]
     const value = values[key as keyof T]
 
     if (dirtyValue === true) {

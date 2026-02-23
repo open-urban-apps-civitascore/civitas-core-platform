@@ -5,17 +5,18 @@ import { DataQueryInput as DataQueryInput } from '@/types/common'
 
 export const useDataQuery = <TResponse>({
   id,
-  key: queryKey,
+  key,
+  queryKey,
   params,
   headers,
   isEnabled,
   errorMessage,
 }: DataQueryInput): UseQueryResult<ApiServiceResponse<TResponse>> => {
   return useQuery({
-    queryKey: [queryKey, id || params?.toString()],
+    queryKey: [queryKey || key, id || params?.toString()],
     queryFn: () =>
       apiRequest<TResponse>({
-        endpoint: id ? `/${queryKey}/${id}` : `/${queryKey}`,
+        endpoint: id ? `/${key}/${id}` : `/${key}`,
         method: 'GET',
         headers,
         params: params,

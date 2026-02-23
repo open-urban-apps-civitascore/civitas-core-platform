@@ -1,6 +1,6 @@
 'use client'
 
-import { PaginationState, Row, RowSelectionState, SortingState, Updater } from '@tanstack/react-table'
+import { PaginationState, RowSelectionState, SortingState, Updater } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -34,13 +34,6 @@ export const UsersListContent = ({
 }: UsersListContentProps) => {
   const router = useRouter()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-
-  const handleRowClick = (row: Row<ListUser>) => {
-    if (row.id) {
-      const params = new URLSearchParams(window.location.search)
-      router.push(`users/${row.id}?${params.toString()}`)
-    }
-  }
 
   const handleSortingChange = (updater: Updater<SortingState>) => {
     const newSorting = typeof updater === 'function' ? updater(initialSorting) : updater
@@ -108,7 +101,6 @@ export const UsersListContent = ({
         totalPages={totalPages}
         rowSelection={rowSelection}
         setRowSelection={setRowSelection}
-        onRowClick={handleRowClick}
         onSortingChange={handleSortingChange}
         onPaginationChange={handlePaginationChange}
       />

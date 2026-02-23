@@ -81,27 +81,6 @@ export const RoleCategory = (props: RolesCategoryProps) => {
         },
       },
     }),
-    columnHelper.accessor('dataspace', {
-      header: t('roles.rolesTables.assignment'),
-      cell: info =>
-        info.getValue() ? (
-          <div className="flex justify-between items-center">
-            {info.getValue()?.title}
-            <Button className="hidden group-hover:block group/button" variant="outline">
-              <ChevronRight className="group-hover/button:stroke-[3]" />
-            </Button>
-          </div>
-        ) : (
-          '-'
-        ),
-      meta: {
-        style: {
-          width: '44%',
-          minWidth: '200px',
-          fontWeight: '500',
-        },
-      },
-    }),
     columnHelper.accessor('group', {
       header: t('roles.rolesTables.group'),
       cell: info => info.getValue() || '-',

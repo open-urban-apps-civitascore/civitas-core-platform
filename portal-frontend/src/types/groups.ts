@@ -1,46 +1,57 @@
 import { z } from 'zod'
 
-import { Item, WithId } from './common'
+import { ItemScheme, WithId } from './common'
 
 export type GroupTab = 'info' | 'roles' | 'users' | 'subgroups'
 
-export type Group = {
-  id: string
-  title: string
-  description: string
-  roles: string[]
-  users: { id: string; assignedAt: string }[]
-  contact: { id: string; displayName: string } | null
-  parent: string | null
-  subgroups: Group[]
-  dataspace: Item | null
-}
+export const GroupRoleTypes = z.enum(['system', 'data', 'governance'])
 
-export type UserGroupsListData = {
-  id: string
-  title: string
-  description: string
-  roles: string[]
-  memberSince: string
-  contact: { id: string; displayName: string } | null
-}
+export const GroupRoleScheme = ItemScheme.extend({
+  roleType: GroupRoleTypes,
+})
 
-export type CreateGroupData = Omit<Group, 'id'>
-export type UpdateGroupData = Group
-export type PatchGroupData = Partial<CreateGroupData> & WithId
-
-export interface GroupTabProps {
-  groupData: Group
-  onCancel?: () => void
-}
-
-export const GroupBaseFormDataSchema = z.object({
+export const GroupApiResponseSchema = z.object({
   id: z.string(),
-  title: z.string().min(2, {
+  name: z.string().min(2, {
     message: 'common.errors.atLeast2',
   }),
   description: z.string(),
-  contact: z.string(),
+  roles: z.array(GroupRoleScheme).nullable(),
+  members: z.array(ItemScheme).nullable(),
+  contactUser: ItemScheme.nullable(),
+  createdAt: z.string(),
+  modifiedAt: z.string(),
+})
+
+export type Group = z.infer<typeof GroupApiResponseSchema>
+
+export type UserGroupsListData = Pick<Group, 'id' | 'name' | 'description' | 'contactUser'> & {
+  membersCount: number
+}
+
+export const GroupApiDataSchema = z.object({
+  id: z.string(),
+  name: z.string().min(2, {
+    message: 'common.errors.atLeast2',
+  }),
+  description: z.string().optional(),
+  contactUserId: z.string().optional(),
+  roleIds: z.array(z.string()).optional(),
+  memberIds: z.array(z.string()).optional(),
+})
+
+export type GroupApiData = z.infer<typeof GroupApiDataSchema>
+
+export const GroupBaseFormDataSchema = z.object({
+  id: z.string(),
+  name: z.string().min(2, {
+    message: 'common.errors.atLeast2',
+  }),
+  description: z.string(),
+  contactUserId: z.string(),
 })
 
 export type GroupBaseFormData = z.infer<typeof GroupBaseFormDataSchema>
+
+export type CreateGroupData = Omit<GroupApiData, 'id'> & { name: string }
+export type UpdateGroupData = Partial<CreateGroupData> & WithId

@@ -1,5 +1,6 @@
 import { AxiosRequestConfig } from 'axios'
 import { InputHTMLAttributes } from 'react'
+import z from 'zod'
 
 import { enumFromConst } from '@/utils/common'
 
@@ -8,10 +9,12 @@ export type Item = {
   title: string
 }
 
-export type Item2 = {
-  id: string
-  name: string
-}
+export const ItemScheme = z.object({
+  id: z.string(),
+  name: z.string(),
+})
+
+export type Item2 = z.infer<typeof ItemScheme>
 
 export type SelectOption = {
   value: string
@@ -32,6 +35,7 @@ export type InputPropsWithoutForm = Omit<InputHTMLAttributes<HTMLInputElement>, 
 export type GetListInput = {
   params?: URLSearchParams
   isEnabled?: boolean
+  queryKey?: string
 }
 
 export type GetItemInput = {
@@ -41,11 +45,12 @@ export type GetItemInput = {
 
 export type DataQueryInput = {
   key: string
+  queryKey?: string
   errorMessage: string
+  headers?: AxiosRequestConfig['headers']
   id?: string
   params?: URLSearchParams
   isEnabled?: boolean
-  headers?: AxiosRequestConfig['headers']
 }
 
 export type WithId<T = string> = { id: T }
