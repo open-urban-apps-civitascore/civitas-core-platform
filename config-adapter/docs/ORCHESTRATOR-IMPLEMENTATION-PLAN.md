@@ -76,7 +76,7 @@ Typisierte POJOs für die Dataset-CloudEvent-Payload:
 | `Datasource` | Klasse | Gemeinsame Felder (id, type, name, host, port) + `@JsonAnySetter`/`@JsonAnyGetter` für type-spezifische Properties (ssl_mode, pool, topics, tls, etc.) |
 | `DataPipeline` | Record | id, version, action, data (`Map<String, Object>`) |
 
-**Package**: `com.civitas.configadapter.model.dataset`
+**Package**: `de.civitascore.configadapter.model.dataset`
 
 **Tests**: `DatasetSerializationTest` (8 Tests) — Deserialisierung aus `dataset-event.json`, Round-Trip, alle Datasource-Typen (PostgreSQL, MQTT), beide Pipeline-Aktionen (ADD, DELETE).
 

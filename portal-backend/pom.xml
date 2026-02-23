@@ -237,27 +237,27 @@
 
         <!-- Config adapter -->
         <dependency>
-            <groupId>com.civitas</groupId>
+            <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-api</artifactId>
             <version>${config-adapter.version}</version>
         </dependency>
 
         <!-- Config adapter - Kafka event handler -->
         <dependency>
-            <groupId>com.civitas</groupId>
+            <groupId>de.civitas-core</groupId>
             <artifactId>event-handler-kafka</artifactId>
             <version>${config-adapter.version}</version>
         </dependency>
 
         <!-- Config adapter - Keycloak adapter for integration tests -->
         <dependency>
-            <groupId>com.civitas</groupId>
+            <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-keycloak</artifactId>
             <version>${config-adapter.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.civitas</groupId>
+            <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-configuration</artifactId>
             <version>${config-adapter.version}</version>
             <scope>test</scope>
@@ -281,7 +281,7 @@
                         <ignoredUnusedDeclaredDependency>commons-io:commons-io</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>io.rest-assured:rest-assured</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.hibernate.orm:hibernate-processor</ignoredUnusedDeclaredDependency>
-                        <ignoredUnusedDeclaredDependency>com.civitas:event-handler-kafka</ignoredUnusedDeclaredDependency>
+                        <ignoredUnusedDeclaredDependency>de.civitas-core:event-handler-kafka</ignoredUnusedDeclaredDependency>
                         <ignoredUnusedDeclaredDependency>org.postgresql:postgresql</ignoredUnusedDeclaredDependency>
                     </ignoredUnusedDeclaredDependencies>
                     <ignoredNonTestScopedDependencies>

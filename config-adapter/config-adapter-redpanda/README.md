@@ -86,8 +86,8 @@ All saga steps are **conditional** — they are skipped if the dataset has no da
 - `de.civitascore.data.pipeline.deleted`
 
 **Saga Topics:**
-- `core.civitas.dataset.redpanda.execute` — Forward execution commands
-- `core.civitas.dataset.redpanda.compensate` — Compensation commands
+- `de.civitascore.dataset.redpanda.execute` — Forward execution commands
+- `de.civitascore.dataset.redpanda.compensate` — Compensation commands
 
 ## Configuration
 

@@ -1272,7 +1272,7 @@ The adapter is thread-safe and can process multiple events concurrently. Each ev
 
 ```properties
 # application.properties
-logging.level.com.civitas.configadapter.apisix=DEBUG
+logging.level.de.civitascore.configadapter.apisix=DEBUG
 ```
 
 Or via environment:

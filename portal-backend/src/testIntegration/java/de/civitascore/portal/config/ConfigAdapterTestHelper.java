@@ -1,11 +1,11 @@
 package de.civitascore.portal.config;
 
-import com.civitas.configadapter.Topics;
-import com.civitas.configadapter.configuration.AppConfig;
-import com.civitas.configadapter.keycloak.KeycloakAdapter;
-import com.civitas.configadapter.messaging.EventPublisher;
-import com.civitas.configadapter.model.ConfigEvent;
-import com.civitas.configadapter.model.ConfigResultEvent;
+import de.civitascore.configadapter.Topics;
+import de.civitascore.configadapter.configuration.AppConfig;
+import de.civitascore.configadapter.keycloak.KeycloakAdapter;
+import de.civitascore.configadapter.messaging.EventPublisher;
+import de.civitascore.configadapter.model.ConfigEvent;
+import de.civitascore.configadapter.model.ConfigResultEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
@@ -182,8 +182,8 @@ public class ConfigAdapterTestHelper implements AutoCloseable {
 
     @Override
     public void initialize(
-        com.civitas.configadapter.configuration.ApplicationConfig config,
-        com.civitas.configadapter.adapter.ConfigAdapter adapter) {
+        de.civitascore.configadapter.configuration.ApplicationConfig config,
+        de.civitascore.configadapter.adapter.ConfigAdapter adapter) {
       // No initialization needed for test
     }
 

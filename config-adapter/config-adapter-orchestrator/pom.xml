@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>com.civitas</groupId>
+		<groupId>de.civitas-core</groupId>
 		<artifactId>config-adapter-parent</artifactId>
 		<version>${revision}</version>
 	</parent>
@@ -18,7 +18,7 @@
 	<dependencies>
 		<!-- Internal -->
 		<dependency>
-			<groupId>com.civitas</groupId>
+			<groupId>de.civitas-core</groupId>
 			<artifactId>config-adapter-api</artifactId>
 			<version>${revision}</version>
 		</dependency>
@@ -87,19 +87,19 @@
 
 		<!-- E2E integration test: adapter modules for real handler execution -->
 		<dependency>
-			<groupId>com.civitas</groupId>
+			<groupId>de.civitas-core</groupId>
 			<artifactId>config-adapter-frost</artifactId>
 			<version>${revision}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>com.civitas</groupId>
+			<groupId>de.civitas-core</groupId>
 			<artifactId>config-adapter-apisix</artifactId>
 			<version>${revision}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>com.civitas</groupId>
+			<groupId>de.civitas-core</groupId>
 			<artifactId>event-handler-kafka</artifactId>
 			<version>${revision}</version>
 			<scope>test</scope>

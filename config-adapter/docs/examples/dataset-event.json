@@ -1,6 +1,6 @@
 {
   "specversion": "1.0",
-  "type": "core.civitas.datamanagement.dataset.created",
+  "type": "de.civitascore.datamanagement.dataset.created",
   "source": "https://portal.civitas.local",
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "time": "2026-01-27T10:30:00Z",

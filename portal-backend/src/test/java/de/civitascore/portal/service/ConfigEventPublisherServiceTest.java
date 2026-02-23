@@ -2,9 +2,9 @@ package de.civitascore.portal.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
-import com.civitas.configadapter.Topics;
-import com.civitas.configadapter.model.Operation;
-import com.civitas.configadapter.model.idm.UserConfig;
+import de.civitascore.configadapter.Topics;
+import de.civitascore.configadapter.model.Operation;
+import de.civitascore.configadapter.model.idm.UserConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;

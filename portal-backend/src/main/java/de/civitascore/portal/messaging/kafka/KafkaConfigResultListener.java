@@ -1,6 +1,6 @@
 package de.civitascore.portal.messaging.kafka;
 
-import com.civitas.configadapter.model.ConfigResultEvent;
+import de.civitascore.configadapter.model.ConfigResultEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.messaging.CloudEventPublisher;
 import lombok.extern.slf4j.Slf4j;
