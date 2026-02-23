@@ -11,6 +11,7 @@ local:
       - firstName: Init
         lastName: TestUser
         email: init-test@example.com
+        externalId: "00000000-0000-0000-0000-000000000002"
         title: OTHER
         groups:
           - "Init Test Admins"

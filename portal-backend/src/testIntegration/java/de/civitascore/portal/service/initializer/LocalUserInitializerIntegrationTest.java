@@ -1,18 +1,15 @@
 package de.civitascore.portal.service.initializer;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.service.event.BaseEventPublishingIntegrationTest;
-import java.time.Duration;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ActiveProfiles;
@@ -24,6 +21,7 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
 
   private static final String TEST_EMAIL = "init-test@example.com";
   private static final String TEST_GROUP_NAME = "Init Test Admins";
+  private static final String TEST_EXTERNAL_ID = "00000000-0000-0000-0000-000000000002";
 
   @Autowired private LocalUserInitializer localUserInitializer;
   @Autowired private GroupRepository groupRepository;
@@ -58,6 +56,7 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
     assertThat(user.get().getFirstName()).isEqualTo("Init");
     assertThat(user.get().getLastName()).isEqualTo("TestUser");
     assertThat(user.get().getActive()).isTrue();
+    assertThat(user.get().getExternalId()).isEqualTo(TEST_EXTERNAL_ID);
     assertThat(user.get().getGroups()).extracting("name").containsExactly(TEST_GROUP_NAME);
   }
 
@@ -69,20 +68,6 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
 
     assertThat(groupRepository.count()).isEqualTo(1);
     assertThat(userRepository.count()).isEqualTo(1);
-  }
-
-  @Test
-  @DisplayName("Should sync user to Keycloak after initialization")
-  void shouldSyncUserToKeycloak() {
-    localUserInitializer.initialize();
-
-    await()
-        .atMost(Duration.ofSeconds(30))
-        .untilAsserted(
-            () -> {
-              UserRepresentation keycloakUser = findKeycloakUserByEmail(TEST_EMAIL);
-              assertThat(keycloakUser).as("User should be synced to Keycloak").isNotNull();
-            });
   }
 
   @Test

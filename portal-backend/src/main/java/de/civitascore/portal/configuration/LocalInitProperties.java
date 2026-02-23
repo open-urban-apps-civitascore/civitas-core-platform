@@ -39,6 +39,7 @@ public class LocalInitProperties {
     @NotBlank private String firstName;
     @NotBlank private String lastName;
     @NotBlank @Email private String email;
+    private String externalId;
     private UserTitleType title = UserTitleType.OTHER;
     private List<String> groups = new ArrayList<>();
   }

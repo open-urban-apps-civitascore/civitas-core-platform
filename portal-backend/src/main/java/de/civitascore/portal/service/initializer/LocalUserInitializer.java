@@ -115,6 +115,10 @@ public class LocalUserInitializer {
       user.setTitle(entry.getTitle());
       user.setActive(true);
 
+      if (entry.getExternalId() != null) {
+        user.setExternalId(entry.getExternalId());
+      }
+
       User saved = userRepository.save(user);
 
       entry
@@ -134,7 +138,9 @@ public class LocalUserInitializer {
 
       log.info("Created local user '{}'", entry.getEmail());
 
-      publishUserCreated(saved);
+      if (entry.getExternalId() == null) {
+        publishUserCreated(saved);
+      }
     }
   }
 
@@ -152,9 +158,7 @@ public class LocalUserInitializer {
         .whenComplete(
             (result, ex) -> {
               if (ex != null) {
-                log.info(
-                    "Local user '{}' already exists in Keycloak — skipping Keycloak sync",
-                    user.getEmail());
+                log.error("Failed to sync local user '{}' to Keycloak", user.getEmail(), ex);
               } else {
                 log.info("Synced local user '{}' to Keycloak via config adapter", user.getEmail());
               }
