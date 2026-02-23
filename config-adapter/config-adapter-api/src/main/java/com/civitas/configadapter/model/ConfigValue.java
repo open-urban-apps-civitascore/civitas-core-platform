@@ -17,6 +17,7 @@ import com.civitas.configadapter.model.idm.GroupConfig;
 import com.civitas.configadapter.model.idm.RealmConfig;
 import com.civitas.configadapter.model.idm.RoleConfig;
 import com.civitas.configadapter.model.idm.UserConfig;
+import com.civitas.configadapter.model.redpanda.PipelineConfigValue;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
@@ -47,5 +48,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
   @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-observedproperty"),
   @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-datastream"),
   @JsonSubTypes.Type(value = FrostConfigValue.class, name = "frost-project"),
+  @JsonSubTypes.Type(value = PipelineConfigValue.class, name = "redpanda-pipeline"),
 })
 public interface ConfigValue {}

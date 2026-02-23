@@ -61,6 +61,11 @@ public enum AdapterErrorCode {
 
   FROST_ENTITY_ERROR(3201, false, "FROST entity error: %s", "Entity operation failed"),
 
+  REDPANDA_ERROR(3301, true, "RedPanda Connect error: %s", "Pipeline service error"),
+  REDPANDA_PIPELINE_ERROR(3302, false, "RedPanda pipeline error: %s", "Pipeline operation failed"),
+  REDPANDA_DECRYPTION_ERROR(
+      3303, false, "Credential decryption error: %s", "Credential processing failed"),
+
   // 9xxx: Unknown/unexpected errors
   UNKNOWN_ERROR(9001, false, "Unexpected error: %s", "Internal error"),
   SERIALIZATION_ERROR(9002, false, "Serialization error: %s", "Data processing error"),

@@ -72,7 +72,12 @@ public enum Topics {
   // --- FROST Projects Events ---
   FROST_PROJECT_CREATED("de.civitascore.data.project.created"),
   FROST_PROJECT_UPDATED("de.civitascore.data.project.updated"),
-  FROST_PROJECT_DELETED("de.civitascore.data.project.deleted");
+  FROST_PROJECT_DELETED("de.civitascore.data.project.deleted"),
+
+  // --- Pipeline Events ---
+  PIPELINE_CREATED("de.civitascore.data.pipeline.created"),
+  PIPELINE_UPDATED("de.civitascore.data.pipeline.updated"),
+  PIPELINE_DELETED("de.civitascore.data.pipeline.deleted");
 
   private final String value;
 

@@ -54,6 +54,12 @@
 
         <dependency>
             <groupId>com.civitas</groupId>
+            <artifactId>config-adapter-redpanda</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.civitas</groupId>
             <artifactId>config-adapter-configuration</artifactId>
             <version>${project.version}</version>
         </dependency>
