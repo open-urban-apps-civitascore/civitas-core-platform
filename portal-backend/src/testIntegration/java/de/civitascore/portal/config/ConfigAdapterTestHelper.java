@@ -1,14 +1,14 @@
 package de.civitascore.portal.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import dasniko.testcontainers.keycloak.KeycloakContainer;
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.keycloak.KeycloakAdapter;
 import de.civitascore.configadapter.messaging.EventPublisher;
 import de.civitascore.configadapter.model.ConfigEvent;
 import de.civitascore.configadapter.model.ConfigResultEvent;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import dasniko.testcontainers.keycloak.KeycloakContainer;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.kafka.CloudEventDeserializer;
 import java.util.HashMap;
