@@ -104,6 +104,45 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
   }
 
   /**
+   * Override update to ensure it can only be called for DRAFT datasets. For published datasets, use
+   * updatePublishedMeta instead.
+   *
+   * @param id the dataset ID
+   * @param input the update input
+   * @return the updated dataset
+   * @throws UniqueConstraintViolationException if trying to update a non-DRAFT dataset
+   */
+  @Override
+  public DataSet update(UUID id, DataSetInputDTO input) {
+    DataSet existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataSetStatus() != DataSetStatus.DRAFT) {
+      throw new UniqueConstraintViolationException(
+          "DataSet", "id", id.toString(), "status", existingEntity.getDataSetStatus().toString());
+    }
+    return super.update(id, input);
+  }
+
+  /**
+   * Updates only the metadata (name, description) of a published dataset. Cannot modify
+   * persistenceId or pipelines.
+   *
+   * @param id the dataset ID
+   * @param input the update input
+   * @return the updated dataset
+   * @throws UniqueConstraintViolationException if trying to update a DRAFT dataset
+   */
+  @Transactional
+  public DataSet updatePublishedMeta(UUID id, DataSetInputDTO input) {
+    DataSet existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataSetStatus() == DataSetStatus.DRAFT) {
+      throw new UniqueConstraintViolationException(
+          "DataSet", "id", id.toString(), "status", existingEntity.getDataSetStatus().toString());
+    }
+
+    return super.update(id, input);
+  }
+
+  /**
    * Publishes a dataset by validating it has at least one pipeline, generating distributions from
    * pipeline APIs, and setting status to READY.
    *

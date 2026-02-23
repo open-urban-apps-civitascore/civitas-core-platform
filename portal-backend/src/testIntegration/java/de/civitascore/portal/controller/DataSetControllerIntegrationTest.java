@@ -411,8 +411,8 @@ class DataSetControllerIntegrationTest
   class UpdateDataSetTests {
 
     @Test
-    @DisplayName("Should update dataset successfully with PUT")
-    void shouldUpdateDataSetWithPut() {
+    @DisplayName("Should update DRAFT dataset successfully with PUT")
+    void shouldUpdateDraftDataSetWithPut() {
       UUID dataSetId = createTestEntity();
 
       DataSetInputDTO updateInput = createUpdateInput();
@@ -429,6 +429,133 @@ class DataSetControllerIntegrationTest
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
       assertThat(output.getModifiedAt()).isNotNull();
+      assertThat(output.getDataSetStatus())
+          .as("Status should remain DRAFT")
+          .isEqualTo(DataSetStatus.DRAFT);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+        value = DataSetStatus.class,
+        mode = EnumSource.Mode.EXCLUDE,
+        names = {"DRAFT"})
+    @DisplayName("Should fail to update published dataset via regular PUT endpoint")
+    void shouldFailToUpdatePublishedDataSetViaRegularEndpoint(DataSetStatus status) {
+      DataSet dataSet = createDataSetWithRelationships();
+      dataSet.setDataSetStatus(status);
+      dataSet = dataSetRepository.save(dataSet);
+
+      UUID dataSetId = dataSet.getId();
+
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Updated Name");
+      updateInput.setDescription("Updated description");
+      updateInput.setOpenDataAccess(false);
+
+      ResponseEntity<DataSetOutputDTO> response = performUpdate(dataSetId, updateInput);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status for %s dataset", status)
+          .isEqualTo(HttpStatus.CONFLICT);
+
+      // Verify dataset was not modified
+      DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElse(null);
+      assertThat(unchangedDataSet).isNotNull();
+      assertThat(unchangedDataSet.getName())
+          .as("Name should remain unchanged")
+          .isEqualTo(dataSet.getName());
+      assertThat(unchangedDataSet.getDataSetStatus())
+          .as("Status should remain unchanged")
+          .isEqualTo(status);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+        value = DataSetStatus.class,
+        mode = EnumSource.Mode.EXCLUDE,
+        names = {"DRAFT"})
+    @DisplayName("Should update published dataset metadata via /published/meta endpoint")
+    void shouldUpdatePublishedDataSetMetaViaPublishedEndpoint(DataSetStatus status) {
+      DataSet dataSet = createDataSetWithRelationships();
+      dataSet.setDataSetStatus(status);
+      dataSet = dataSetRepository.save(dataSet);
+
+      UUID dataSetId = dataSet.getId();
+      Long originalPersistenceId = dataSet.getPersistenceId();
+      List<UUID> originalPipelineIds =
+          dataSet.getPipelines().stream().map(Pipeline::getId).toList();
+
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Updated Published Dataset");
+      updateInput.setDescription("Updated description for published dataset");
+      updateInput.setOpenDataAccess(false);
+      updateInput.setPersistenceId(99999L); // Try to change (should be ignored)
+      updateInput.setPipelineIds(Collections.emptyList()); // Try to change (should be ignored)
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSetId + "/published/meta",
+              org.springframework.http.HttpMethod.PUT,
+              createAuthHeaders(),
+              updateInput,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("Should return OK status for %s dataset", status)
+          .isEqualTo(HttpStatus.OK);
+
+      assertThat(response.getBody()).isNotNull();
+
+      DataSetOutputDTO output = response.getBody();
+      assertThat(output.getId()).isEqualTo(dataSetId);
+      assertThat(output.getName())
+          .as("Name should be updated")
+          .isEqualTo("Updated Published Dataset");
+      assertThat(output.getDescription())
+          .as("Description should be updated")
+          .isEqualTo("Updated description for published dataset");
+      assertThat(output.getPersistenceId())
+          .as("PersistenceId should remain unchanged")
+          .isEqualTo(originalPersistenceId);
+      assertThat(output.getPipelines())
+          .as("Pipelines should remain unchanged")
+          .hasSize(2)
+          .extracting(PipelineSummaryDTO::getId)
+          .containsExactlyInAnyOrderElementsOf(originalPipelineIds);
+      assertThat(output.getDataSetStatus()).as("Status should remain unchanged").isEqualTo(status);
+    }
+
+    @Test
+    @DisplayName("Should fail to update DRAFT dataset via /published/meta endpoint")
+    void shouldFailToUpdateDraftDataSetViaPublishedEndpoint() {
+      UUID dataSetId = createTestEntity();
+
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Updated Name");
+      updateInput.setDescription("Updated description");
+      updateInput.setOpenDataAccess(false);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSetId + "/published/meta",
+              org.springframework.http.HttpMethod.PUT,
+              createAuthHeaders(),
+              updateInput,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status for DRAFT dataset")
+          .isEqualTo(HttpStatus.CONFLICT);
+
+      // Verify dataset was not modified
+      DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElse(null);
+      assertThat(unchangedDataSet).isNotNull();
+      assertThat(unchangedDataSet.getName())
+          .as("Name should remain unchanged")
+          .doesNotContain("Updated");
+      assertThat(unchangedDataSet.getDataSetStatus())
+          .as("Status should remain DRAFT")
+          .isEqualTo(DataSetStatus.DRAFT);
     }
 
     @Test
@@ -535,64 +662,9 @@ class DataSetControllerIntegrationTest
           .isEqualTo(secondResponse.getBody().getDescription());
     }
 
-    @ParameterizedTest
-    @EnumSource(
-        value = DataSetStatus.class,
-        mode = EnumSource.Mode.EXCLUDE,
-        names = {"DRAFT"})
-    @DisplayName("Should prevent updating persistenceId and pipelines after publishing")
-    void shouldPreventUpdatingLockedFieldsAfterPublishing(DataSetStatus status) {
-      // Create dataset with pipelines and distributions in DRAFT status
-      DataSet dataSet = createDataSetWithRelationships();
-      dataSet.setDataSetStatus(status);
-      dataSet = dataSetRepository.save(dataSet);
-
-      UUID dataSetId = dataSet.getId();
-      Long originalPersistenceId = dataSet.getPersistenceId();
-
-      // Get the original pipeline IDs
-      List<UUID> originalPipelineIds =
-          dataSet.getPipelines().stream().map(Pipeline::getId).toList();
-
-      // Attempt to update persistenceId and pipelines
-      DataSetInputDTO updateInput = new DataSetInputDTO();
-      updateInput.setName(dataSet.getName());
-      updateInput.setDescription("Updated description");
-      updateInput.setOpenDataAccess(false);
-      updateInput.setPersistenceId(99999L); // Try to change persistence ID
-      updateInput.setPipelineIds(
-          Collections.singletonList(
-              dataSet.getPipelines().stream()
-                  .findFirst()
-                  .map(Pipeline::getId)
-                  .orElseThrow())); // Omit the second pipeline
-
-      ResponseEntity<DataSetOutputDTO> response = performUpdate(dataSetId, updateInput);
-
-      assertThat(response.getStatusCode())
-          .as("Update should succeed (only description changes)")
-          .isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-
-      DataSetOutputDTO output = response.getBody();
-
-      assertThat(output.getDescription())
-          .as("Description should be updated")
-          .isEqualTo("Updated description");
-
-      assertThat(output.getPersistenceId())
-          .as("PersistenceId should remain unchanged after publishing")
-          .isEqualTo(originalPersistenceId);
-
-      assertThat(output.getPipelines())
-          .as("Pipelines should remain unchanged after publishing")
-          .isNotNull()
-          .hasSize(2)
-          .extracting(PipelineSummaryDTO::getId)
-          .containsExactlyInAnyOrderElementsOf(originalPipelineIds);
-
-      assertThat(output.getDataSetStatus()).as("Status should remain unchanged").isEqualTo(status);
-    }
+    // Tests for preventing updates of published datasets via regular endpoint
+    // are in shouldFailToUpdatePublishedDataSetViaRegularEndpoint and
+    // shouldUpdatePublishedDataSetMetaViaPublishedEndpoint above
 
     @Test
     @DisplayName("Should fail to update non-existent dataset")
