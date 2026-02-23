@@ -42,63 +42,61 @@ encode_userinfo_full(claims) := base64url.encode_no_pad(json.marshal(claims))
 
 # User with specific permissions at TENANT scope (for tenant-level resources)
 user_with_permissions(perms) := {
-    "userId": "test-user-123",
-    "externalId": "test-user-123",
-    "groups": [{
-        "id": "group-1",
-        "name": "Test Group",
-        "assignments": [{
-            "roleId": "role-1",
-            "roleName": "TestRole",
-            "roleType": "DATA",
-            "scopeType": "TENANT",
-            "scopeId": "tenant-1",
-            "permissions": perms
-        }]
-    }]
+	"userId": "test-user-123",
+	"externalId": "test-user-123",
+	"groups": [{
+		"id": "group-1",
+		"name": "Test Group",
+		"assignments": [{
+			"roleId": "role-1",
+			"roleName": "TestRole",
+			"roleType": "DATA",
+			"scopeType": "TENANT",
+			"scopeId": "tenant-1",
+			"permissions": perms,
+		}],
+	}],
 }
 
 # User with specific permissions at a specific scope (M5.1 scope enforcement)
 user_with_scoped_permissions(perms, scope_type, scope_id) := {
-    "userId": "test-user-123",
-    "externalId": "test-user-123",
-    "groups": [{
-        "id": "group-1",
-        "name": "Test Group",
-        "assignments": [{
-            "roleId": "role-1",
-            "roleName": "TestRole",
-            "roleType": "DATA",
-            "scopeType": scope_type,
-            "scopeId": scope_id,
-            "permissions": perms
-        }]
-    }]
+	"userId": "test-user-123",
+	"externalId": "test-user-123",
+	"groups": [{
+		"id": "group-1",
+		"name": "Test Group",
+		"assignments": [{
+			"roleId": "role-1",
+			"roleName": "TestRole",
+			"roleType": "DATA",
+			"scopeType": scope_type,
+			"scopeId": scope_id,
+			"permissions": perms,
+		}],
+	}],
 }
 
 # User with no permissions (empty groups)
 user_no_permissions := {
-    "userId": "test-user-no-perms",
-    "externalId": "test-user-no-perms",
-    "groups": []
+	"userId": "test-user-no-perms",
+	"externalId": "test-user-no-perms",
+	"groups": [],
 }
 
 # Minimal user context (only externalId, no userId)
 user_minimal := {
-    "externalId": "test-user-minimal",
-    "groups": []
+	"externalId": "test-user-minimal",
+	"groups": [],
 }
 
 # Admin user with TENANT-scoped permissions (for tenant-level resources like users)
 user_admin := user_with_permissions([
-    "READ_USER", "CREATE_USER", "UPDATE_USER", "DELETE_USER",
-    "READ_GROUP", "CREATE_GROUP", "UPDATE_GROUP", "DELETE_GROUP",
-    "READ_ROLE", "CREATE_ROLE", "UPDATE_ROLE", "DELETE_ROLE",
-    "READ_PERMISSION", "CREATE_PERMISSION", "UPDATE_PERMISSION", "DELETE_PERMISSION",
-    "READ_ASSIGNMENT", "CREATE_ASSIGNMENT", "UPDATE_ASSIGNMENT", "DELETE_ASSIGNMENT"
+	"USER_READ", "USER_CREATE", "USER_UPDATE", "USER_DELETE",
+	"GROUP_READ", "GROUP_CREATE", "GROUP_UPDATE", "GROUP_DELETE",
+	"ROLE_READ", "ROLE_CREATE", "ROLE_UPDATE", "ROLE_DELETE",
+	"PERMISSION_READ", "PERMISSION_CREATE", "PERMISSION_UPDATE", "PERMISSION_DELETE",
+	"ASSIGNMENT_READ", "ASSIGNMENT_CREATE", "ASSIGNMENT_UPDATE", "ASSIGNMENT_DELETE",
 ])
 
 # Reader user with TENANT-scoped read permissions
-user_reader := user_with_permissions([
-    "READ_USER", "READ_GROUP", "READ_ROLE", "READ_PERMISSION", "READ_ASSIGNMENT"
-])
+user_reader := user_with_permissions(["USER_READ", "GROUP_READ", "ROLE_READ", "PERMISSION_READ", "ASSIGNMENT_READ"])

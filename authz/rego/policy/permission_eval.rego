@@ -6,6 +6,7 @@
 #   - Null-permission endpoints (auth required, no specific permission needed)
 #   - Authentication checks (user context has identity)
 #   - Permission evaluation (user has required permission in assignments)
+#   - AND-permission support (endpoints requiring multiple permissions)
 #
 # User context is obtained via user_context_fetcher, which handles:
 #   - Decoding X-Userinfo header from APISIX
@@ -35,8 +36,10 @@ import data.civitas.authz.user_context_fetcher
 # PERMISSION LOOKUP FROM BACKEND MAPPINGS
 # =============================================================================
 
-# Look up required permission from backend's endpoint mappings.
-# Returns the permission string, null (no permission needed), or "" (not found).
+# Look up required permissions from backend's endpoint mappings.
+# Returns a set of permission strings. For single permissions (string in data.json),
+# the set has one element. For AND-permissions (array in data.json), the set has
+# multiple elements — ALL must be satisfied.
 #
 # Fail-secure design: if endpoint_config is undefined (no match), dependent rules
 # don't fire → is_known_endpoint=false → main.rego denies with "unknown_endpoint".
@@ -47,13 +50,6 @@ endpoint_config := resource_mapping.backend_endpoints[resource_mapping.path_patt
 	resource_mapping.path_pattern != ""
 }
 
-# Get permission for the specific HTTP method
-# Note: JSON null becomes rego null, missing key returns undefined
-method_permission := endpoint_config[resource_mapping.request_method] if {
-	endpoint_config
-	endpoint_config[resource_mapping.request_method] != null
-}
-
 # Check if this is a no-permission-required endpoint (null in mappings)
 is_null_permission if {
 	endpoint_config
@@ -61,11 +57,22 @@ is_null_permission if {
 	endpoint_config[resource_mapping.request_method] == null
 }
 
-# Required permission: the permission string from mappings, or "" if not found
-default required_permission := ""
+# Required permissions as a set.
+# String permission → 1-element set. Array permission → multi-element set (AND).
+required_permissions contains perm if {
+	endpoint_config
+	val := endpoint_config[resource_mapping.request_method]
+	val != null
+	is_string(val)
+	perm := val
+}
 
-required_permission := method_permission if {
-	method_permission
+required_permissions contains perm if {
+	endpoint_config
+	val := endpoint_config[resource_mapping.request_method]
+	val != null
+	is_array(val)
+	some perm in val
 }
 
 # =============================================================================
@@ -76,7 +83,7 @@ required_permission := method_permission if {
 default is_known_endpoint := false
 
 is_known_endpoint if {
-	required_permission != ""
+	count(required_permissions) > 0
 }
 
 is_known_endpoint if {
@@ -120,7 +127,8 @@ is_authenticated if {
 # PERMISSION EVALUATION
 # =============================================================================
 
-# Check if user has the required permission
+# Check if user has the required permission(s)
+# For AND-permissions (arrays in data.json), ALL permissions must be present.
 default has_permission := false
 
 # Null-permission endpoints: allowed for any authenticated user
@@ -129,10 +137,12 @@ has_permission if {
 	is_authenticated
 }
 
-# User has permission if it's in their assignments with matching scope (M5.1)
+# User has permission if EVERY required permission is satisfied (AND semantics)
 has_permission if {
-	required_permission != ""
-	user_has_permission(required_permission)
+	count(required_permissions) > 0
+	every perm in required_permissions {
+		user_has_permission(perm)
+	}
 }
 
 # =============================================================================

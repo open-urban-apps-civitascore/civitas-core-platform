@@ -2,11 +2,11 @@
 # Maps HTTP requests for the FROST Server (OGC SensorThings API proxy).
 #
 # FROST Server is accessed via a dataset-scoped proxy path:
-#   /api/v1/{dataset_id}/sta  →  READ_DATASET
+#   /api/v1/{dataset_id}/sta  →  DATASET_READ
 #
 # The {dataset_id} is the same dataset ID from portal_backend's PostgreSQL.
 # APISIX routes to the correct FROST instance based on the dataset ID;
-# OPA only checks that the user has READ_DATASET for that specific dataset.
+# OPA only checks that the user has DATASET_READ for that specific dataset.
 #
 # Note: Native OData endpoints (/v1.1/Things etc.) are NOT exposed through
 # APISIX. All FROST access goes through the /api/v1/{id}/sta proxy path.

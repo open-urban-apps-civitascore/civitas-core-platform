@@ -172,11 +172,15 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision \
      "_version": "1.0.0",
      "_backend_id": "my-backend",
      "endpoints": {
-       "/v1/things": {"GET": "READ_THING", "POST": "CREATE_THING"},
-       "/v1/things/{id}": {"GET": "READ_THING", "DELETE": "DELETE_THING"}
+       "/v1/things": {"GET": "THING_READ", "POST": "THING_CREATE"},
+       "/v1/things/{id}": {"GET": "THING_READ", "DELETE": "THING_DELETE"},
+       "/v1/things/{id}/publish": {"POST": ["THING_UPDATE", "THING_PUBLISH"]}
      }
    }
    ```
+
+   **Naming convention**: `ENTITY_ACTION` (e.g., `THING_READ`, not `READ_THING`).
+   **AND-permissions**: Use JSON arrays for endpoints requiring multiple permissions simultaneously (e.g., `["THING_UPDATE", "THING_PUBLISH"]`). The user must hold **all** listed permissions.
 
 3. **Register in dispatcher** (`policy/resource_mapping.rego`):
    ```rego
@@ -207,7 +211,7 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision \
 | File | Purpose |
 |------|---------|
 | `policy/main.rego` | Entry point, produces `{allowed: bool, reason: string}` |
-| `policy/permission_eval.rego` | Checks if user has required permission |
+| `policy/permission_eval.rego` | Checks if user has required permission(s) — supports AND-permission sets |
 | `policy/resource_mapping.rego` | Identifies backend, dispatches to provider |
 | `lib/genericrestmapper.rego` | Path validation, `/version/resource/{id}` matching |
 | `data/backends/*/data.json` | Endpoint → permission mappings per backend |

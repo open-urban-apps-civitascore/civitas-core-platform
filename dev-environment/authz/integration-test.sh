@@ -4,12 +4,13 @@
 # Tests the full authorization chain: APISIX -> OPA -> AuthZ Repository
 #
 # Test Scenarios:
-#   1. Admin reads users -> 200 (has READ_USER)
-#   2. Reader reads datasets -> 200 (has READ_DATASET)
-#   3. Reader creates dataset -> 403 (lacks CREATE_DATASET)
+#   1. Admin reads users -> 200 (has USER_READ)
+#   2. Reader reads datasets -> 200 (has DATASET_READ)
+#   3. Reader creates dataset -> 403 (lacks DATASET_CREATE)
 #   4. NoPerms user reads datasets -> 403 (no permissions)
 #   5. No token -> 401 (unauthenticated)
 #   6. /users/me (null-permission) -> 200 for any authenticated user
+#   7. Dataspaces/catalogs (null-permission) -> 200 for any authenticated user
 #
 # Prerequisites:
 #   - Full authz stack running: docker compose up -d
@@ -160,22 +161,22 @@ echo ""
 # =============================================================================
 
 echo "=== Test 1: Admin User (Full Permissions) ==="
-test_endpoint "GET /v2/users (READ_USER)" "GET" "/v2/users" "$ADMIN_TOKEN" "200"
-test_endpoint "GET /v2/datasets (READ_DATASET)" "GET" "/v2/datasets" "$ADMIN_TOKEN" "200"
+test_endpoint "GET /v2/users (USER_READ)" "GET" "/v2/users" "$ADMIN_TOKEN" "200"
+test_endpoint "GET /v2/datasets (DATASET_READ)" "GET" "/v2/datasets" "$ADMIN_TOKEN" "200"
 test_endpoint "GET /v2/users/me (null-permission)" "GET" "/v2/users/me" "$ADMIN_TOKEN" "200"
 echo ""
 
 echo "=== Test 2: Reader User (Read-Only Permissions) ==="
-test_endpoint "GET /v2/users (READ_USER)" "GET" "/v2/users" "$READER_TOKEN" "200"
-test_endpoint "GET /v2/datasets (READ_DATASET)" "GET" "/v2/datasets" "$READER_TOKEN" "200"
+test_endpoint "GET /v2/users (USER_READ)" "GET" "/v2/users" "$READER_TOKEN" "200"
+test_endpoint "GET /v2/datasets (DATASET_READ)" "GET" "/v2/datasets" "$READER_TOKEN" "200"
 test_endpoint "GET /v2/users/me (null-permission)" "GET" "/v2/users/me" "$READER_TOKEN" "200"
 echo ""
 
 echo "=== Test 3: Reader User Denied Write Operations ==="
-# POST to create should be denied (lacks CREATE_DATASET)
-test_endpoint "POST /v2/datasets (CREATE_DATASET - denied)" "POST" "/v2/datasets" "$READER_TOKEN" "403"
-# DELETE should be denied (lacks DELETE_USER)
-test_endpoint "DELETE /v2/users/fake-id (DELETE_USER - denied)" "DELETE" "/v2/users/fake-id" "$READER_TOKEN" "403"
+# POST to create should be denied (lacks DATASET_CREATE)
+test_endpoint "POST /v2/datasets (DATASET_CREATE - denied)" "POST" "/v2/datasets" "$READER_TOKEN" "403"
+# DELETE should be denied (lacks USER_DELETE)
+test_endpoint "DELETE /v2/users/fake-id (USER_DELETE - denied)" "DELETE" "/v2/users/fake-id" "$READER_TOKEN" "403"
 echo ""
 
 echo "=== Test 4: No-Perms User (No Permissions) ==="
@@ -194,15 +195,17 @@ echo ""
 echo "=== Test 6: New Resource Endpoints (Datasources/Datastructures) ==="
 # Backend may not have these controllers yet (404), but OPA should NOT block (403).
 # Tests verify authorization passes — backend 404 is expected until controllers are implemented.
-test_endpoint "GET /v2/datasources (authz allows - backend 404)" "GET" "/v2/datasources" "$ADMIN_TOKEN" "404"
-test_endpoint "GET /v2/datastructures (authz allows - backend 404)" "GET" "/v2/datastructures" "$ADMIN_TOKEN" "404"
-test_endpoint "GET /v2/datasources (reader authz allows - backend 404)" "GET" "/v2/datasources" "$READER_TOKEN" "404"
-test_endpoint "POST /v2/datasources (reader - denied by OPA)" "POST" "/v2/datasources" "$READER_TOKEN" "403"
+test_endpoint "GET /v2/datasources (DATASOURCE_READ - backend 404)" "GET" "/v2/datasources" "$ADMIN_TOKEN" "404"
+test_endpoint "GET /v2/datastructures (DATASTRUCTURE_READ - backend 404)" "GET" "/v2/datastructures" "$ADMIN_TOKEN" "404"
+test_endpoint "GET /v2/datasources (DATASOURCE_READ reader - backend 404)" "GET" "/v2/datasources" "$READER_TOKEN" "404"
+test_endpoint "POST /v2/datasources (DATASOURCE_CREATE - reader denied)" "POST" "/v2/datasources" "$READER_TOKEN" "403"
 echo ""
 
-echo "=== Test 7: Removed Endpoints (Dataspaces/Catalogs) ==="
-test_endpoint "GET /v2/dataspaces (removed - unknown_endpoint)" "GET" "/v2/dataspaces" "$ADMIN_TOKEN" "403"
-test_endpoint "GET /v2/catalogs (removed - unknown_endpoint)" "GET" "/v2/catalogs" "$ADMIN_TOKEN" "403"
+echo "=== Test 7: Null-Permission Endpoints (Dataspaces/Catalogs) ==="
+# Dataspaces and catalogs are null-permission endpoints (GET only, any authenticated user).
+# Backend may not have controllers yet (404), but OPA should allow (not 403).
+test_endpoint "GET /v2/dataspaces (null-permission - backend 404)" "GET" "/v2/dataspaces" "$ADMIN_TOKEN" "404"
+test_endpoint "GET /v2/catalogs (null-permission - backend 404)" "GET" "/v2/catalogs" "$ADMIN_TOKEN" "404"
 echo ""
 
 # =============================================================================

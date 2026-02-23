@@ -15,102 +15,82 @@
 -- =============================================================================
 -- PERMISSIONS
 -- =============================================================================
--- All permissions from portal_backend/data.json
+-- All permissions use ENTITY_ACTION naming convention (e.g., USER_READ, DATASET_CREATE).
+-- Must match permission strings in authz/rego/data/backends/portal_backend/data.json.
 
 -- User permissions
 INSERT INTO permissions (id, name, description, permission_type, category, created_at)
 VALUES
-    ('10000000-0000-0000-0000-000000000001', 'READ_USER', 'View users', 'DATA', 'USER', NOW()),
-    ('10000000-0000-0000-0000-000000000002', 'CREATE_USER', 'Create users', 'DATA', 'USER', NOW()),
-    ('10000000-0000-0000-0000-000000000003', 'UPDATE_USER', 'Update users', 'DATA', 'USER', NOW()),
-    ('10000000-0000-0000-0000-000000000004', 'DELETE_USER', 'Delete users', 'DATA', 'USER', NOW())
-ON CONFLICT (name) DO NOTHING;
-
--- Dataspace permissions
-INSERT INTO permissions (id, name, description, permission_type, category, created_at)
-VALUES
-    ('10000000-0000-0000-0000-000000000011', 'READ_DATASPACE', 'View dataspaces', 'DATA', 'DATASPACE', NOW()),
-    ('10000000-0000-0000-0000-000000000012', 'CREATE_DATASPACE', 'Create dataspaces', 'DATA', 'DATASPACE', NOW()),
-    ('10000000-0000-0000-0000-000000000013', 'UPDATE_DATASPACE', 'Update dataspaces', 'DATA', 'DATASPACE', NOW()),
-    ('10000000-0000-0000-0000-000000000014', 'DELETE_DATASPACE', 'Delete dataspaces', 'DATA', 'DATASPACE', NOW())
+    ('10000000-0000-0000-0000-000000000001', 'USER_READ', 'View users', 'DATA', 'USER', NOW()),
+    ('10000000-0000-0000-0000-000000000002', 'USER_CREATE', 'Create users', 'DATA', 'USER', NOW()),
+    ('10000000-0000-0000-0000-000000000003', 'USER_UPDATE', 'Update users', 'DATA', 'USER', NOW()),
+    ('10000000-0000-0000-0000-000000000004', 'USER_DELETE', 'Delete users', 'DATA', 'USER', NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Dataset permissions
 INSERT INTO permissions (id, name, description, permission_type, category, created_at)
 VALUES
-    ('10000000-0000-0000-0000-000000000021', 'READ_DATASET', 'View datasets', 'DATA', 'DATASET', NOW()),
-    ('10000000-0000-0000-0000-000000000022', 'CREATE_DATASET', 'Create datasets', 'DATA', 'DATASET', NOW()),
-    ('10000000-0000-0000-0000-000000000023', 'UPDATE_DATASET', 'Update datasets', 'DATA', 'DATASET', NOW()),
-    ('10000000-0000-0000-0000-000000000024', 'DELETE_DATASET', 'Delete datasets', 'DATA', 'DATASET', NOW())
+    ('10000000-0000-0000-0000-000000000021', 'DATASET_READ', 'View datasets', 'DATA', 'DATASET', NOW()),
+    ('10000000-0000-0000-0000-000000000022', 'DATASET_CREATE', 'Create datasets', 'DATA', 'DATASET', NOW()),
+    ('10000000-0000-0000-0000-000000000023', 'DATASET_UPDATE', 'Update datasets', 'DATA', 'DATASET', NOW()),
+    ('10000000-0000-0000-0000-000000000024', 'DATASET_DELETE', 'Delete datasets', 'DATA', 'DATASET', NOW()),
+    ('10000000-0000-0000-0000-000000000025', 'DATASET_PUBLISH', 'Publish/unpublish datasets', 'DATA', 'DATASET', NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Assignment permissions
 INSERT INTO permissions (id, name, description, permission_type, category, created_at)
 VALUES
-    ('10000000-0000-0000-0000-000000000031', 'READ_ASSIGNMENT', 'View assignments', 'DATA', 'ASSIGNMENT', NOW()),
-    ('10000000-0000-0000-0000-000000000032', 'CREATE_ASSIGNMENT', 'Create assignments', 'DATA', 'ASSIGNMENT', NOW()),
-    ('10000000-0000-0000-0000-000000000033', 'UPDATE_ASSIGNMENT', 'Update assignments', 'DATA', 'ASSIGNMENT', NOW()),
-    ('10000000-0000-0000-0000-000000000034', 'DELETE_ASSIGNMENT', 'Delete assignments', 'DATA', 'ASSIGNMENT', NOW())
+    ('10000000-0000-0000-0000-000000000031', 'ASSIGNMENT_READ', 'View assignments', 'DATA', 'ASSIGNMENT', NOW()),
+    ('10000000-0000-0000-0000-000000000032', 'ASSIGNMENT_CREATE', 'Create assignments', 'DATA', 'ASSIGNMENT', NOW()),
+    ('10000000-0000-0000-0000-000000000034', 'ASSIGNMENT_DELETE', 'Delete assignments', 'DATA', 'ASSIGNMENT', NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Group permissions
 INSERT INTO permissions (id, name, description, permission_type, category, created_at)
 VALUES
-    ('10000000-0000-0000-0000-000000000041', 'READ_GROUP', 'View groups', 'DATA', 'GROUP', NOW()),
-    ('10000000-0000-0000-0000-000000000042', 'CREATE_GROUP', 'Create groups', 'DATA', 'GROUP', NOW()),
-    ('10000000-0000-0000-0000-000000000043', 'UPDATE_GROUP', 'Update groups', 'DATA', 'GROUP', NOW()),
-    ('10000000-0000-0000-0000-000000000044', 'DELETE_GROUP', 'Delete groups', 'DATA', 'GROUP', NOW())
+    ('10000000-0000-0000-0000-000000000041', 'GROUP_READ', 'View groups', 'DATA', 'GROUP', NOW()),
+    ('10000000-0000-0000-0000-000000000042', 'GROUP_CREATE', 'Create groups', 'DATA', 'GROUP', NOW()),
+    ('10000000-0000-0000-0000-000000000043', 'GROUP_UPDATE', 'Update groups', 'DATA', 'GROUP', NOW()),
+    ('10000000-0000-0000-0000-000000000044', 'GROUP_DELETE', 'Delete groups', 'DATA', 'GROUP', NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Role permissions
 INSERT INTO permissions (id, name, description, permission_type, category, created_at)
 VALUES
-    ('10000000-0000-0000-0000-000000000051', 'READ_ROLE', 'View roles', 'DATA', 'ROLE', NOW()),
-    ('10000000-0000-0000-0000-000000000052', 'CREATE_ROLE', 'Create roles', 'DATA', 'ROLE', NOW()),
-    ('10000000-0000-0000-0000-000000000053', 'UPDATE_ROLE', 'Update roles', 'DATA', 'ROLE', NOW()),
-    ('10000000-0000-0000-0000-000000000054', 'DELETE_ROLE', 'Delete roles', 'DATA', 'ROLE', NOW())
+    ('10000000-0000-0000-0000-000000000051', 'ROLE_READ', 'View roles', 'DATA', 'ROLE', NOW()),
+    ('10000000-0000-0000-0000-000000000052', 'ROLE_CREATE', 'Create roles', 'DATA', 'ROLE', NOW()),
+    ('10000000-0000-0000-0000-000000000053', 'ROLE_UPDATE', 'Update roles', 'DATA', 'ROLE', NOW()),
+    ('10000000-0000-0000-0000-000000000054', 'ROLE_DELETE', 'Delete roles', 'DATA', 'ROLE', NOW())
 ON CONFLICT (name) DO NOTHING;
 
--- Permission permissions
+-- Permission permissions (read-only in Rego — only GET mapped)
 INSERT INTO permissions (id, name, description, permission_type, category, created_at)
 VALUES
-    ('10000000-0000-0000-0000-000000000061', 'READ_PERMISSION', 'View permissions', 'DATA', 'PERMISSION', NOW()),
-    ('10000000-0000-0000-0000-000000000062', 'CREATE_PERMISSION', 'Create permissions', 'DATA', 'PERMISSION', NOW()),
-    ('10000000-0000-0000-0000-000000000063', 'UPDATE_PERMISSION', 'Update permissions', 'DATA', 'PERMISSION', NOW()),
-    ('10000000-0000-0000-0000-000000000064', 'DELETE_PERMISSION', 'Delete permissions', 'DATA', 'PERMISSION', NOW())
-ON CONFLICT (name) DO NOTHING;
-
--- Catalog permissions
-INSERT INTO permissions (id, name, description, permission_type, category, created_at)
-VALUES
-    ('10000000-0000-0000-0000-000000000071', 'READ_CATALOG', 'View catalogs', 'DATA', 'CATALOG', NOW())
+    ('10000000-0000-0000-0000-000000000061', 'PERMISSION_READ', 'View permissions', 'DATA', 'PERMISSION', NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Datasource permissions
 INSERT INTO permissions (id, name, description, permission_type, category, created_at)
 VALUES
-    ('10000000-0000-0000-0000-000000000081', 'READ_DATASOURCE', 'View datasources', 'DATA', 'DATASOURCE', NOW()),
-    ('10000000-0000-0000-0000-000000000082', 'CREATE_DATASOURCE', 'Create datasources', 'DATA', 'DATASOURCE', NOW()),
-    ('10000000-0000-0000-0000-000000000083', 'UPDATE_DATASOURCE', 'Update datasources', 'DATA', 'DATASOURCE', NOW()),
-    ('10000000-0000-0000-0000-000000000084', 'DELETE_DATASOURCE', 'Delete datasources', 'DATA', 'DATASOURCE', NOW())
+    ('10000000-0000-0000-0000-000000000081', 'DATASOURCE_READ', 'View datasources', 'DATA', 'DATASOURCE', NOW()),
+    ('10000000-0000-0000-0000-000000000082', 'DATASOURCE_CREATE', 'Create datasources', 'DATA', 'DATASOURCE', NOW()),
+    ('10000000-0000-0000-0000-000000000083', 'DATASOURCE_UPDATE', 'Update datasources', 'DATA', 'DATASOURCE', NOW()),
+    ('10000000-0000-0000-0000-000000000084', 'DATASOURCE_DELETE', 'Delete datasources', 'DATA', 'DATASOURCE', NOW()),
+    ('10000000-0000-0000-0000-000000000085', 'DATASOURCE_PUBLISH', 'Publish datasources', 'DATA', 'DATASOURCE', NOW())
 ON CONFLICT (name) DO NOTHING;
 
 -- Datastructure permissions
 INSERT INTO permissions (id, name, description, permission_type, category, created_at)
 VALUES
-    ('10000000-0000-0000-0000-000000000091', 'READ_DATASTRUCTURE', 'View datastructures', 'DATA', 'DATASTRUCTURE', NOW()),
-    ('10000000-0000-0000-0000-000000000092', 'CREATE_DATASTRUCTURE', 'Create datastructures', 'DATA', 'DATASTRUCTURE', NOW()),
-    ('10000000-0000-0000-0000-000000000093', 'UPDATE_DATASTRUCTURE', 'Update datastructures', 'DATA', 'DATASTRUCTURE', NOW()),
-    ('10000000-0000-0000-0000-000000000094', 'DELETE_DATASTRUCTURE', 'Delete datastructures', 'DATA', 'DATASTRUCTURE', NOW())
+    ('10000000-0000-0000-0000-000000000091', 'DATASTRUCTURE_READ', 'View datastructures', 'DATA', 'DATASTRUCTURE', NOW()),
+    ('10000000-0000-0000-0000-000000000092', 'DATASTRUCTURE_CREATE', 'Create datastructures', 'DATA', 'DATASTRUCTURE', NOW()),
+    ('10000000-0000-0000-0000-000000000093', 'DATASTRUCTURE_UPDATE', 'Update datastructures', 'DATA', 'DATASTRUCTURE', NOW()),
+    ('10000000-0000-0000-0000-000000000094', 'DATASTRUCTURE_DELETE', 'Delete datastructures', 'DATA', 'DATASTRUCTURE', NOW()),
+    ('10000000-0000-0000-0000-000000000095', 'DATASTRUCTURE_PUBLISH', 'Publish datastructures', 'DATA', 'DATASTRUCTURE', NOW())
 ON CONFLICT (name) DO NOTHING;
 
--- Release permissions
-INSERT INTO permissions (id, name, description, permission_type, category, created_at)
-VALUES
-    ('10000000-0000-0000-0000-000000000101', 'RELEASE_DATASET', 'Release datasets', 'DATA', 'DATASET', NOW()),
-    ('10000000-0000-0000-0000-000000000102', 'RELEASE_DATASOURCE', 'Release datasources', 'DATA', 'DATASOURCE', NOW()),
-    ('10000000-0000-0000-0000-000000000103', 'RELEASE_DATASTRUCTURE', 'Release datastructures', 'DATA', 'DATASTRUCTURE', NOW())
-ON CONFLICT (name) DO NOTHING;
+-- NOTE: Dataspace and catalog endpoints are null-permission (GET only, any authenticated user).
+-- No database permissions needed for these — OPA allows them without checking permissions.
 
 -- =============================================================================
 -- ROLES
@@ -139,17 +119,14 @@ ON CONFLICT (name) DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT '20000000-0000-0000-0000-000000000001', id FROM permissions
 WHERE name IN (
-    'READ_USER', 'CREATE_USER', 'UPDATE_USER', 'DELETE_USER',
-    'READ_DATASPACE', 'CREATE_DATASPACE', 'UPDATE_DATASPACE', 'DELETE_DATASPACE',
-    'READ_DATASET', 'CREATE_DATASET', 'UPDATE_DATASET', 'DELETE_DATASET',
-    'READ_ASSIGNMENT', 'CREATE_ASSIGNMENT', 'UPDATE_ASSIGNMENT', 'DELETE_ASSIGNMENT',
-    'READ_GROUP', 'CREATE_GROUP', 'UPDATE_GROUP', 'DELETE_GROUP',
-    'READ_ROLE', 'CREATE_ROLE', 'UPDATE_ROLE', 'DELETE_ROLE',
-    'READ_PERMISSION', 'CREATE_PERMISSION', 'UPDATE_PERMISSION', 'DELETE_PERMISSION',
-    'READ_CATALOG',
-    'READ_DATASOURCE', 'CREATE_DATASOURCE', 'UPDATE_DATASOURCE', 'DELETE_DATASOURCE',
-    'READ_DATASTRUCTURE', 'CREATE_DATASTRUCTURE', 'UPDATE_DATASTRUCTURE', 'DELETE_DATASTRUCTURE',
-    'RELEASE_DATASET', 'RELEASE_DATASOURCE', 'RELEASE_DATASTRUCTURE'
+    'USER_READ', 'USER_CREATE', 'USER_UPDATE', 'USER_DELETE',
+    'DATASET_READ', 'DATASET_CREATE', 'DATASET_UPDATE', 'DATASET_DELETE', 'DATASET_PUBLISH',
+    'ASSIGNMENT_READ', 'ASSIGNMENT_CREATE', 'ASSIGNMENT_DELETE',
+    'GROUP_READ', 'GROUP_CREATE', 'GROUP_UPDATE', 'GROUP_DELETE',
+    'ROLE_READ', 'ROLE_CREATE', 'ROLE_UPDATE', 'ROLE_DELETE',
+    'PERMISSION_READ',
+    'DATASOURCE_READ', 'DATASOURCE_CREATE', 'DATASOURCE_UPDATE', 'DATASOURCE_DELETE', 'DATASOURCE_PUBLISH',
+    'DATASTRUCTURE_READ', 'DATASTRUCTURE_CREATE', 'DATASTRUCTURE_UPDATE', 'DATASTRUCTURE_DELETE', 'DATASTRUCTURE_PUBLISH'
 )
 ON CONFLICT DO NOTHING;
 
@@ -157,16 +134,14 @@ ON CONFLICT DO NOTHING;
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT '20000000-0000-0000-0000-000000000002', id FROM permissions
 WHERE name IN (
-    'READ_USER',
-    'READ_DATASPACE',
-    'READ_DATASET',
-    'READ_ASSIGNMENT',
-    'READ_GROUP',
-    'READ_ROLE',
-    'READ_PERMISSION',
-    'READ_CATALOG',
-    'READ_DATASOURCE',
-    'READ_DATASTRUCTURE'
+    'USER_READ',
+    'DATASET_READ',
+    'ASSIGNMENT_READ',
+    'GROUP_READ',
+    'ROLE_READ',
+    'PERMISSION_READ',
+    'DATASOURCE_READ',
+    'DATASTRUCTURE_READ'
 )
 ON CONFLICT DO NOTHING;
 
@@ -227,7 +202,7 @@ ON CONFLICT ON CONSTRAINT uk_assignment_group_role_scope DO NOTHING;
 -- =============================================================================
 
 -- Verify data was inserted correctly
-SELECT 'Permissions count:' AS info, COUNT(*) AS count FROM permissions WHERE name LIKE '%_USER' OR name LIKE '%_DATASET' OR name LIKE '%_DATASPACE';
+SELECT 'Permissions count:' AS info, COUNT(*) AS count FROM permissions WHERE name LIKE '%_USER' OR name LIKE 'DATASET_%' OR name LIKE 'DATASOURCE_%';
 SELECT 'Roles count:' AS info, COUNT(*) AS count FROM roles WHERE name LIKE 'Authz%';
 SELECT 'Users count:' AS info, COUNT(*) AS count FROM users WHERE email LIKE 'authz.%';
 SELECT 'Groups count:' AS info, COUNT(*) AS count FROM groups WHERE name LIKE 'Authz%';

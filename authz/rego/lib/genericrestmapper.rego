@@ -115,7 +115,7 @@ match_pattern(path, endpoints) := pattern if {
 	endpoints[pattern]
 }
 
-# 4. Pattern match - 5-segment sub-resource: /version/resource/id/sub/id
+# 4. Pattern match - 5-segment sub-resource with two IDs: /version/resource/id/sub/id
 match_pattern(path, endpoints) := pattern if {
 	is_valid_path(path)
 	not endpoints[path]
@@ -131,5 +131,43 @@ match_pattern(path, endpoints) := pattern if {
 	endpoints[pattern]
 }
 
-# 5. No match - return empty string
+# 5. Pattern match - 5-segment with literal tail: /version/resource/id/literal/literal
+# e.g., /v2/datasets/{id}/published/meta (only parts[2] is {id})
+# Guard: only fires if the both-{id} variant does NOT exist in endpoints,
+# preventing conflict with rule 4.
+match_pattern(path, endpoints) := pattern if {
+	is_valid_path(path)
+	not endpoints[path]
+
+	parts := parse_path(path)
+	count(parts) == 5
+	parts[2] != ""
+	not is_reserved_segment(parts[2])
+
+	# Guard: the both-{id} variant must NOT exist (prevents conflict with rule 4)
+	both_id_pattern := concat("/", ["", parts[0], parts[1], "{id}", parts[3], "{id}"])
+	not endpoints[both_id_pattern]
+
+	pattern := concat("/", ["", parts[0], parts[1], "{id}", parts[3], parts[4]])
+	endpoints[pattern]
+}
+
+# 6. Pattern match - 6-segment sub-resource: /version/resource/id/sub/id/action
+# e.g., /v2/datastructures/{id}/versions/{id}/publish
+match_pattern(path, endpoints) := pattern if {
+	is_valid_path(path)
+	not endpoints[path]
+
+	parts := parse_path(path)
+	count(parts) == 6
+	parts[2] != ""
+	not is_reserved_segment(parts[2])
+	parts[4] != ""
+	not is_reserved_segment(parts[4])
+
+	pattern := concat("/", ["", parts[0], parts[1], "{id}", parts[3], "{id}", parts[5]])
+	endpoints[pattern]
+}
+
+# 7. No match - return empty string
 default match_pattern(_, _) := ""

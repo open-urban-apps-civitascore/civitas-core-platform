@@ -4,7 +4,7 @@
   "_backend_id": "frost-server",
   "endpoints": {
     "/api/v1/{id}/sta": {
-      "GET": "READ_DATASET"
+      "GET": "DATASET_READ"
     }
   }
 }

@@ -40,8 +40,8 @@ async function authenticateAs(page: Page, email: string, password: string) {
 }
 
 test.describe('AuthZ Integration - Happy Path', () => {
-  test('user with READ_DATASET permission can view datasets page', async ({ page }) => {
-    // Login as reader (has READ_DATASET permission)
+  test('user with DATASET_READ permission can view datasets page', async ({ page }) => {
+    // Login as reader (has DATASET_READ permission)
     await authenticateAs(page, AUTHZ_READER_EMAIL, AUTHZ_READER_PASSWORD)
 
     // Navigate to datasets page
@@ -55,8 +55,8 @@ test.describe('AuthZ Integration - Happy Path', () => {
     await expect(datasetsTable).toBeVisible()
   })
 
-  test('user with READ_USER permission can view users page', async ({ page }) => {
-    // Login as reader (has READ_USER permission)
+  test('user with USER_READ permission can view users page', async ({ page }) => {
+    // Login as reader (has USER_READ permission)
     await authenticateAs(page, AUTHZ_READER_EMAIL, AUTHZ_READER_PASSWORD)
 
     // Navigate to users page

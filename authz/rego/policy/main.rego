@@ -99,14 +99,14 @@ evaluate_request := result if {
 	result := {
 		"allow": true,
 		"reason": "permission_granted",
-		"permission": permission_eval.required_permission,
+		"required_permissions": permission_eval.required_permissions,
 		"headers": {"X-Allowed-Scope-Ids": allowed_scope_ids_header},
 	}
 }
 
 # 5. Permission denied (user lacks required permission)
 # Is a separate case for more specific error message
-evaluate_request := {"allow": false, "reason": "permission_denied", "required": permission_eval.required_permission} if {
+evaluate_request := {"allow": false, "reason": "permission_denied", "required_permissions": permission_eval.required_permissions} if {
 	permission_eval.is_known_endpoint
 	not permission_eval.is_null_permission_endpoint
 	has_user_context
@@ -137,28 +137,53 @@ evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
 #
 # Note: For resource endpoints, backend uses existing scope enforcement (M5.1).
 # This header enables efficient filtering for collection queries.
+#
+# AND-permission support: For endpoints requiring multiple permissions,
+# TENANT scope is granted only if ALL required permissions have TENANT scope.
+# Specific scope IDs are included only if ALL required permissions are available
+# for that specific scope ID.
 
-# Check if user has TENANT scope for the required permission
+# Check if user has TENANT scope for ALL required permissions (AND semantics)
 # TENANT scope acts as wildcard - user can see all resources
 has_tenant_scope if {
-	permission_eval.required_permission != ""
+	count(permission_eval.required_permissions) > 0
+	every perm in permission_eval.required_permissions {
+		tenant_has_permission(perm)
+	}
+}
+
+# Helper: check if a single permission exists with TENANT scope
+tenant_has_permission(perm) if {
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
-	permission_eval.required_permission in assignment.permissions
+	perm in assignment.permissions
 	assignment.scopeType == "TENANT"
 }
 
-# Collect specific scope IDs where user has the required permission
+# Collect specific scope IDs where user has ALL required permissions (AND semantics)
 # Only includes scopes matching the expected scope type for the resource
 specific_scope_ids contains scope_id if {
-	permission_eval.required_permission != ""
+	count(permission_eval.required_permissions) > 0
 	resource_mapping.expected_scope_type != ""
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
-	permission_eval.required_permission in assignment.permissions
 	assignment.scopeType == resource_mapping.expected_scope_type
 	scope_id := assignment.scopeId
 	scope_id != null
+
+	# Only include this scope_id if ALL required permissions are available for it
+	every perm in permission_eval.required_permissions {
+		scope_has_permission(perm, scope_id)
+	}
+}
+
+# Helper: check if a single permission exists for a specific scope ID
+scope_has_permission(perm, target_scope_id) if {
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	perm in assignment.permissions
+	assignment.scopeType == resource_mapping.expected_scope_type
+	assignment.scopeId == target_scope_id
 }
 
 # Generate the header value based on user's scopes
@@ -207,7 +232,7 @@ request_info := {
 	"path": input.request.path,
 	"backend": resource_mapping.backend,
 	"path_pattern": resource_mapping.path_pattern,
-	"required_permission": permission_eval.required_permission,
+	"required_permissions": permission_eval.required_permissions,
 	"is_null_permission": permission_eval.is_null_permission_endpoint,
 	"user_context_source": user_context_fetcher.user_context_source,
 }

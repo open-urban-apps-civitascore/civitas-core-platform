@@ -78,6 +78,8 @@ resource_scope_type := {
 	"datasets": "DATASET",
 	"datasources": "DATASOURCE",
 	"datastructures": "DATASTRUCTURE",
+	"dataspaces": "DATASPACE",
+	"catalogs": "CATALOG",
 }
 
 # Extract resource name from path (second segment: /v2/{resource}/...)
