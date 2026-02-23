@@ -3,7 +3,10 @@
 import { Box, BoxSelect, List, PuzzleIcon } from 'lucide-react'
 import { useCallback } from 'react'
 
+import { cn } from '@/lib/utils'
+
 import { UML_COLORS } from '../../constants/umlTypes'
+import { useReadOnly } from '../../hooks/use-read-only'
 import type { UMLElementType } from '../../types/uml'
 
 interface PaletteItemProps {
@@ -21,7 +24,9 @@ const ICON_MAP = {
   list: List,
 } as const
 
-export const PaletteItem: React.FC<PaletteItemProps> = ({ elementType, label, description, icon }) => {
+export const PaletteItem: React.FC<PaletteItemProps> = props => {
+  const { elementType, label, description, icon } = props
+  const { isReadOnly } = useReadOnly()
   const onDragStart = useCallback((event: React.DragEvent, nodeType: UMLElementType) => {
     event.dataTransfer.setData('application/reactflow', nodeType)
     event.dataTransfer.effectAllowed = 'move'
@@ -31,9 +36,12 @@ export const PaletteItem: React.FC<PaletteItemProps> = ({ elementType, label, de
 
   return (
     <div
-      draggable
+      draggable={!isReadOnly}
       onDragStart={event => onDragStart(event, elementType)}
-      className="flex items-center gap-3 p-2 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 cursor-move transition-colors group"
+      className={cn(
+        'flex items-center gap-3 p-2 rounded-lg border border-gray-200  transition-colors group',
+        !isReadOnly && 'hover:border-gray-300 hover:bg-gray-50 cursor-move',
+      )}
       title={description}
     >
       {/* Icon Preview */}
@@ -58,14 +66,16 @@ export const PaletteItem: React.FC<PaletteItemProps> = ({ elementType, label, de
       </div>
 
       {/* Drag Hint */}
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-        <svg width="12" height="12" viewBox="0 0 12 12" className="text-gray-400">
-          <path
-            d="M2 2h2v2H2V2zm4 0h2v2H6V2zm4 0h2v2h-2V2zM2 6h2v2H2V6zm4 0h2v2H6V6zm4 0h2v2h-2V6zM2 10h2v2H2v-2zm4 0h2v2H6v-2zm4 0h2v2h-2v-2z"
-            fill="currentColor"
-          />
-        </svg>
-      </div>
+      {!isReadOnly && (
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+          <svg width="12" height="12" viewBox="0 0 12 12" className="text-gray-400">
+            <path
+              d="M2 2h2v2H2V2zm4 0h2v2H6V2zm4 0h2v2h-2V2zM2 6h2v2H2V6zm4 0h2v2H6V6zm4 0h2v2h-2V6zM2 10h2v2H2v-2zm4 0h2v2H6v-2zm4 0h2v2h-2v-2z"
+              fill="currentColor"
+            />
+          </svg>
+        </div>
+      )}
     </div>
   )
 }

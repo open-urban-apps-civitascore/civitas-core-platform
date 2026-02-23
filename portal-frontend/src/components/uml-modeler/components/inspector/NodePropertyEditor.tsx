@@ -5,6 +5,7 @@ import { ChangeEvent, useCallback, useState } from 'react'
 
 import { UML_STEREOTYPES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { useReadOnly } from '../../hooks/use-read-only'
 import type { UMLNode } from '../../types/diagram'
 import { hasAttributes, hasOperations } from '../../types/uml'
 import { AttributeManager } from './AttributeManager'
@@ -16,6 +17,7 @@ interface NodePropertyEditorProps {
 
 export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) => {
   const { updateNode } = useActiveDiagram()
+  const { isReadOnly } = useReadOnly()
   const [activeSection, setActiveSection] = useState<'basic' | 'attributes' | 'operations' | 'literals'>('basic')
 
   const element = node.data.element
@@ -137,6 +139,7 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) 
                 onChange={handleNameChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Element name"
+                disabled={isReadOnly}
               />
             </div>
 
@@ -148,6 +151,7 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) 
                   value={element.stereotype || ''}
                   onChange={handleStereotypeChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={isReadOnly}
                 >
                   <option value="">None</option>
                   {availableStereotypes.map(stereotype => (
@@ -173,13 +177,15 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h5 className="text-sm font-medium text-gray-700">Enumeration Values</h5>
-              <button
-                onClick={addEnumLiteral}
-                className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                <Plus size={12} />
-                Add Value
-              </button>
+              {!isReadOnly && (
+                <button
+                  onClick={addEnumLiteral}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  <Plus size={12} />
+                  Add Value
+                </button>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -192,14 +198,17 @@ export const NodePropertyEditor: React.FC<NodePropertyEditorProps> = ({ node }) 
                     onChange={e => updateEnumLiteral(literal.id, e.target.value)}
                     className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                     placeholder="VALUE_NAME"
+                    disabled={isReadOnly}
                   />
-                  <button
-                    onClick={() => removeEnumLiteral(literal.id)}
-                    className="p-1 text-red-500 hover:text-red-700"
-                    title="Remove value"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  {!isReadOnly && (
+                    <button
+                      onClick={() => removeEnumLiteral(literal.id)}
+                      className="p-1 text-red-500 hover:text-red-700"
+                      title="Remove value"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
                 </div>
               ))}
 

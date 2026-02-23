@@ -3,6 +3,7 @@
 import { Plus, X } from 'lucide-react'
 import { useCallback, useState } from 'react'
 
+import { useReadOnly } from '../../hooks/use-read-only'
 import type { DiagramSession } from '../../types/session'
 
 interface TabProps {
@@ -11,9 +12,11 @@ interface TabProps {
   onSelect: (sessionId: string) => void
   onClose: (sessionId: string) => void
   onRename: (sessionId: string, newName: string) => void
+  isModelerReadOnly: boolean
 }
 
-const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onClose, onRename }) => {
+const Tab: React.FC<TabProps> = props => {
+  const { session, isActive, onSelect, onClose, onRename, isModelerReadOnly } = props
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(session.name)
 
@@ -60,7 +63,7 @@ const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onClose, onRenam
         }
       `}
       onClick={() => onSelect(session.id)}
-      onDoubleClick={handleDoubleClick}
+      onDoubleClick={isModelerReadOnly ? undefined : handleDoubleClick}
     >
       {/* Tab Content */}
       <div className="flex-1 min-w-0 mr-2">
@@ -68,9 +71,9 @@ const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onClose, onRenam
           <input
             type="text"
             value={editName}
-            onChange={e => setEditName(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onBlur={handleBlur}
+            onChange={isModelerReadOnly ? undefined : e => setEditName(e.target.value)}
+            onKeyDown={isModelerReadOnly ? undefined : handleKeyDown}
+            onBlur={isModelerReadOnly ? undefined : handleBlur}
             className="w-full bg-transparent border-none outline-none text-sm"
             autoFocus
           />
@@ -83,13 +86,15 @@ const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onClose, onRenam
       </div>
 
       {/* Close Button */}
-      <button
-        onClick={handleClose}
-        className="flex-shrink-0 p-1 rounded hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
-        title="Close tab"
-      >
-        <X className="h-3 w-3" />
-      </button>
+      {!isModelerReadOnly && (
+        <button
+          onClick={handleClose}
+          className="flex-shrink-0 p-1 rounded hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Close tab"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
     </div>
   )
 }
@@ -103,14 +108,9 @@ interface TabBarProps {
   onCreateSession: () => void
 }
 
-export const TabBar: React.FC<TabBarProps> = ({
-  sessions,
-  activeSessionId,
-  onSelectSession,
-  onCloseSession,
-  onRenameSession,
-  onCreateSession,
-}) => {
+export const TabBar: React.FC<TabBarProps> = props => {
+  const { sessions, activeSessionId, onSelectSession, onCloseSession, onRenameSession, onCreateSession } = props
+  const { isReadOnly: isModelerReadOnly } = useReadOnly()
   return (
     <div className="flex items-center bg-gray-50 border-b border-gray-200 overflow-hidden">
       {/* Scrollable Tabs Container */}
@@ -123,18 +123,21 @@ export const TabBar: React.FC<TabBarProps> = ({
             onSelect={onSelectSession}
             onClose={onCloseSession}
             onRename={onRenameSession}
+            isModelerReadOnly={isModelerReadOnly}
           />
         ))}
       </div>
 
       {/* New Tab Button */}
-      <button
-        onClick={onCreateSession}
-        className="flex-shrink-0 p-2 hover:bg-gray-100 border-r border-gray-200 transition-colors"
-        title="New diagram"
-      >
-        <Plus className="h-4 w-4 text-gray-600" />
-      </button>
+      {!isModelerReadOnly && (
+        <button
+          onClick={onCreateSession}
+          className="flex-shrink-0 p-2 hover:bg-gray-100 border-r border-gray-200 transition-colors"
+          title="New diagram"
+        >
+          <Plus className="h-4 w-4 text-gray-600" />
+        </button>
+      )}
 
       {/* Fill remaining space */}
       <div className="flex-1 bg-gray-50" />

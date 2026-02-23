@@ -5,6 +5,7 @@ import { useCallback } from 'react'
 
 import { UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { useReadOnly } from '../../hooks/use-read-only'
 import type { UMLAttribute, UMLElement, UMLPrimitiveType, Visibility } from '../../types/uml'
 
 interface AttributeManagerProps {
@@ -12,7 +13,10 @@ interface AttributeManagerProps {
   element: UMLElement
 }
 
-export const AttributeManager: React.FC<AttributeManagerProps> = ({ nodeId, element }) => {
+export const AttributeManager: React.FC<AttributeManagerProps> = props => {
+  const { nodeId, element } = props
+  const { isReadOnly } = useReadOnly()
+
   const { updateNode } = useActiveDiagram()
 
   const addAttribute = useCallback(() => {
@@ -62,28 +66,32 @@ export const AttributeManager: React.FC<AttributeManagerProps> = ({ nodeId, elem
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h5 className="text-sm font-medium text-gray-700">Attributes</h5>
-        <button
-          onClick={addAttribute}
-          className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          <Plus size={12} />
-          Add Attribute
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={addAttribute}
+            className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            <Plus size={12} />
+            Add Attribute
+          </button>
+        )}
       </div>
 
       <div className="space-y-3">
         {element.attributes.map((attribute, index) => (
           <div key={attribute.id} className="p-3 border border-gray-200 rounded-lg space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-500">Attribute {index + 1}</span>
-              <button
-                onClick={() => removeAttribute(attribute.id)}
-                className="text-red-500 hover:text-red-700"
-                title="Remove attribute"
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
+            {!isReadOnly && (
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">Attribute {index + 1}</span>
+                <button
+                  onClick={() => removeAttribute(attribute.id)}
+                  className="text-red-500 hover:text-red-700"
+                  title="Remove attribute"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            )}
 
             {/* Name */}
             <div>
@@ -94,6 +102,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = ({ nodeId, elem
                 onChange={e => updateAttribute(attribute.id, { name: e.target.value })}
                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder="attributeName"
+                disabled={isReadOnly}
               />
             </div>
 
@@ -104,6 +113,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = ({ nodeId, elem
                 value={typeof attribute.type === 'string' ? attribute.type : attribute.type.name}
                 onChange={e => updateAttribute(attribute.id, { type: e.target.value as UMLPrimitiveType })}
                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                disabled={isReadOnly}
               >
                 {typeOptions.map(type => (
                   <option key={type} value={type}>
@@ -120,6 +130,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = ({ nodeId, elem
                 value={attribute.visibility}
                 onChange={e => updateAttribute(attribute.id, { visibility: e.target.value as Visibility })}
                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                disabled={isReadOnly}
               >
                 {visibilityOptions.map(visibility => (
                   <option key={visibility} value={visibility}>
@@ -146,6 +157,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = ({ nodeId, elem
                 onChange={e => updateAttribute(attribute.id, { defaultValue: e.target.value || undefined })}
                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 placeholder="Optional default value"
+                disabled={isReadOnly}
               />
             </div>
 
@@ -157,6 +169,7 @@ export const AttributeManager: React.FC<AttributeManagerProps> = ({ nodeId, elem
                 checked={attribute.isStatic || false}
                 onChange={e => updateAttribute(attribute.id, { isStatic: e.target.checked })}
                 className="mr-2"
+                disabled={isReadOnly}
               />
               <label htmlFor={`static-${attribute.id}`} className="text-xs text-gray-600">
                 Static (underlined)

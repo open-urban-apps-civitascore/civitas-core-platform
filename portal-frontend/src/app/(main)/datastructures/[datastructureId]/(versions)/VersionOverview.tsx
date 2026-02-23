@@ -30,8 +30,8 @@ import {
   DatastructureVersionTab,
 } from '@/types/datastructures'
 
-import { VersionInfoTab } from './components/version-info-tab/VersionInfoTab'
 import { StructureDefinitionTab } from './components/structure-definition-tab/StructureDefinitionTab'
+import { VersionInfoTab } from './components/version-info-tab/VersionInfoTab'
 
 const tabs: Tab<DatastructureVersionTab>[] = [
   {

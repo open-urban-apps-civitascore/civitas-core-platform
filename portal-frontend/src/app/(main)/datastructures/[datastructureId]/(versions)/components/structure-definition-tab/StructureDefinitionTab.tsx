@@ -5,5 +5,5 @@ interface StructureDefinitionTabProps {
 }
 export const StructureDefinitionTab = (props: StructureDefinitionTabProps) => {
   const { isReadOnly } = props
-  return <UmlModeler isReadOnly={isReadOnly} />
+  return <UmlModeler isUmlModelerReadOnly={isReadOnly} />
 }

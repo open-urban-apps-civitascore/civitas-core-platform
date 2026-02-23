@@ -8,11 +8,10 @@ import { UMLCanvas } from '../canvas/UMLCanvas'
 interface TabContentProps {
   session: DiagramSession
   isActive: boolean
-  isReadonly: boolean
 }
 
 export const TabContent: React.FC<TabContentProps> = props => {
-  const { isActive, isReadonly } = props
+  const { isActive } = props
   if (!isActive) {
     return null // Don't render inactive tabs to improve performance
   }
@@ -20,7 +19,7 @@ export const TabContent: React.FC<TabContentProps> = props => {
   return (
     <div className="flex-1 h-full">
       <ReactFlowProvider>
-        <UMLCanvas className="flex-1" isReadOnly={isReadonly} />
+        <UMLCanvas className="flex-1" />
       </ReactFlowProvider>
     </div>
   )

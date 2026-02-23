@@ -3,7 +3,10 @@
 import { ArrowRight, ArrowUpRight, Diamond, Gem, MoveRight, MoveUpRight } from 'lucide-react'
 import { useCallback } from 'react'
 
+import { cn } from '@/lib/utils'
+
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { useReadOnly } from '../../hooks/use-read-only'
 import type { UMLRelationshipType } from '../../types/uml'
 
 interface RelationshipToolProps {
@@ -23,8 +26,10 @@ const ICON_MAP = {
   moveRight: MoveRight,
 } as const
 
-export const RelationshipTool: React.FC<RelationshipToolProps> = ({ relationshipType, label, description, icon }) => {
+export const RelationshipTool: React.FC<RelationshipToolProps> = props => {
+  const { relationshipType, label, description, icon } = props
   const { activeRelationshipType, setActiveRelationshipType } = useActiveDiagram()
+  const { isReadOnly } = useReadOnly()
 
   const isActive = activeRelationshipType === relationshipType
 
@@ -38,10 +43,11 @@ export const RelationshipTool: React.FC<RelationshipToolProps> = ({ relationship
 
   return (
     <button
-      onClick={handleClick}
-      className={`w-full flex items-center gap-3 p-2 rounded-lg border transition-colors text-left ${
-        isActive ? 'border-blue-500 bg-blue-50 text-blue-900' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-      }`}
+      onClick={isReadOnly ? undefined : handleClick}
+      className={cn(
+        'w-full flex items-center gap-3 p-2 rounded-lg border transition-colors text-left',
+        isActive && !isReadOnly && 'border-blue-500 bg-blue-50 text-blue-900',
+      )}
       title={description}
     >
       {/* Icon */}
@@ -59,7 +65,7 @@ export const RelationshipTool: React.FC<RelationshipToolProps> = ({ relationship
       </div>
 
       {/* Active Indicator */}
-      {isActive && (
+      {isActive && !isReadOnly && (
         <div className="flex-shrink-0">
           <div className="w-2 h-2 rounded-full bg-blue-500"></div>
         </div>

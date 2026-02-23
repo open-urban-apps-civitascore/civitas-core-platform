@@ -12,7 +12,8 @@ interface ElementPaletteProps {
   className?: string
 }
 
-export const ElementPalette: React.FC<ElementPaletteProps> = ({ className = '' }) => {
+export const ElementPalette: React.FC<ElementPaletteProps> = props => {
+  const { className = '' } = props
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [areClassesExpanded, setAreClassesExpanded] = useState(true)
   const [areRelationshipsExpanded, setAreRelationshipsExpanded] = useState(true)

@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 
 import { useMultiSessionManager } from '../../hooks/use-multi-session-manager'
+import { useReadOnly } from '../../hooks/use-read-only'
 import { PropertyInspector } from '../inspector/PropertyInspector'
 import { ElementPalette } from '../palette/ElementPalette'
 import { ActiveDiagramProviderComponent } from '../providers/ActiveDiagramProvider'
@@ -12,12 +13,17 @@ import { Toolbar } from '../tabs/Toolbar'
 
 interface MultiSessionLayoutProps {
   className?: string
-  isReadOnly: boolean
+  isUmlModelerReadOnly: boolean
 }
 
 export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
-  const { isReadOnly, className } = props
+  const { isUmlModelerReadOnly, className } = props
+  const { setIsReadOnly, isReadOnly } = useReadOnly()
   const sessionManager = useMultiSessionManager()
+
+  useEffect(() => {
+    setIsReadOnly(isUmlModelerReadOnly)
+  }, [isUmlModelerReadOnly, setIsReadOnly])
 
   // Tab management handlers
   const handleCreateSession = useCallback(() => {
@@ -92,17 +98,14 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
           />
 
           {/* Toolbar */}
-          <Toolbar onSave={handleSave} onExport={handleExport} hasUnsavedChanges={activeSession?.isDirty || false} />
+          {!isReadOnly && (
+            <Toolbar onSave={handleSave} onExport={handleExport} hasUnsavedChanges={activeSession?.isDirty || false} />
+          )}
 
           {/* Tab Content Area */}
           <div className="flex-1 relative overflow-hidden">
             {sessionManager.sessions.map(session => (
-              <TabContent
-                key={session.id}
-                session={session}
-                isActive={session.id === sessionManager.activeSessionId}
-                isReadonly={isReadOnly}
-              />
+              <TabContent key={session.id} session={session} isActive={session.id === sessionManager.activeSessionId} />
             ))}
           </div>
         </div>

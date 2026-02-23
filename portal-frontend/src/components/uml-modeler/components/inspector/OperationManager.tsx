@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react'
 
 import { UML_PRIMITIVE_TYPES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { useReadOnly } from '../../hooks/use-read-only'
 import type { UMLElement, UMLOperation, UMLParameter, UMLPrimitiveType, Visibility } from '../../types/uml'
 
 interface OperationManagerProps {
@@ -14,6 +15,7 @@ interface OperationManagerProps {
 
 export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, element }) => {
   const { updateNode } = useActiveDiagram()
+  const { isReadOnly } = useReadOnly()
   const [expandedOperations, setExpandedOperations] = useState<Set<string>>(new Set())
 
   const addOperation = useCallback(() => {
@@ -123,13 +125,15 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h5 className="text-sm font-medium text-gray-700">Operations</h5>
-        <button
-          onClick={addOperation}
-          className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-        >
-          <Plus size={12} />
-          Add Operation
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={addOperation}
+            className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            <Plus size={12} />
+            Add Operation
+          </button>
+        )}
       </div>
 
       <div className="space-y-3">
@@ -150,13 +154,15 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
                     </button>
                     <span className="text-xs font-medium text-gray-500">Operation {index + 1}</span>
                   </div>
-                  <button
-                    onClick={() => removeOperation(operation.id)}
-                    className="text-red-500 hover:text-red-700"
-                    title="Remove operation"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  {!isReadOnly && (
+                    <button
+                      onClick={() => removeOperation(operation.id)}
+                      className="text-red-500 hover:text-red-700"
+                      title="Remove operation"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
                 </div>
 
                 {/* Basic Operation Info */}
@@ -170,6 +176,7 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
                         onChange={e => updateOperation(operation.id, { name: e.target.value })}
                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                         placeholder="operationName"
+                        disabled={isReadOnly}
                       />
                     </div>
                     <div>
@@ -184,6 +191,7 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
                           updateOperation(operation.id, { returnType: e.target.value as UMLPrimitiveType | 'void' })
                         }
                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        disabled={isReadOnly}
                       >
                         {returnTypeOptions.map(type => (
                           <option key={type} value={type}>
@@ -206,6 +214,7 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
                         value={operation.visibility}
                         onChange={e => updateOperation(operation.id, { visibility: e.target.value as Visibility })}
                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        disabled={isReadOnly}
                       >
                         {visibilityOptions.map(visibility => (
                           <option key={visibility} value={visibility}>
@@ -230,6 +239,7 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
                           checked={operation.isStatic || false}
                           onChange={e => updateOperation(operation.id, { isStatic: e.target.checked })}
                           className="mr-2"
+                          disabled={isReadOnly}
                         />
                         <label htmlFor={`static-${operation.id}`} className="text-xs text-gray-600">
                           Static
@@ -243,6 +253,7 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
                             checked={operation.isAbstract || false}
                             onChange={e => updateOperation(operation.id, { isAbstract: e.target.checked })}
                             className="mr-2"
+                            disabled={isReadOnly}
                           />
                           <label htmlFor={`abstract-${operation.id}`} className="text-xs text-gray-600">
                             Abstract
@@ -256,13 +267,15 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <h6 className="text-xs font-medium text-gray-600">Parameters</h6>
-                      <button
-                        onClick={() => addParameter(operation.id)}
-                        className="inline-flex items-center gap-1 px-1 py-0.5 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
-                      >
-                        <Plus size={10} />
-                        Add
-                      </button>
+                      {!isReadOnly && (
+                        <button
+                          onClick={() => addParameter(operation.id)}
+                          className="inline-flex items-center gap-1 px-1 py-0.5 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+                        >
+                          <Plus size={10} />
+                          Add
+                        </button>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -270,13 +283,15 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
                         <div key={parameter.id} className="p-2 bg-gray-50 rounded border">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-xs text-gray-500">Param {paramIndex + 1}</span>
-                            <button
-                              onClick={() => removeParameter(operation.id, parameter.id)}
-                              className="text-red-500 hover:text-red-700"
-                              title="Remove parameter"
-                            >
-                              <Trash2 size={10} />
-                            </button>
+                            {!isReadOnly && (
+                              <button
+                                onClick={() => removeParameter(operation.id, parameter.id)}
+                                className="text-red-500 hover:text-red-700"
+                                title="Remove parameter"
+                              >
+                                <Trash2 size={10} />
+                              </button>
+                            )}
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <input
@@ -285,6 +300,7 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
                               onChange={e => updateParameter(operation.id, parameter.id, { name: e.target.value })}
                               className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                               placeholder="parameter name"
+                              disabled={isReadOnly}
                             />
                             <select
                               value={typeof parameter.type === 'string' ? parameter.type : parameter.type.name}
@@ -294,6 +310,7 @@ export const OperationManager: React.FC<OperationManagerProps> = ({ nodeId, elem
                                 })
                               }
                               className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              disabled={isReadOnly}
                             >
                               {typeOptions.map(type => (
                                 <option key={type} value={type}>

@@ -14,6 +14,7 @@ import {
 import { useCallback, useMemo } from 'react'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { useReadOnly } from '../../hooks/use-read-only'
 import type { UMLElementType } from '../../types/uml'
 import { edgeTypes as umlEdgeTypes } from '../edges/edgeTypes'
 import { UMLMarkers } from '../edges/UMLMarkers'
@@ -21,11 +22,11 @@ import { nodeTypes as umlNodeTypes } from '../nodes/nodeTypes'
 
 interface UMLCanvasProps {
   className?: string
-  isReadOnly: boolean
 }
 
 export const UMLCanvas: React.FC<UMLCanvasProps> = props => {
-  const { className, isReadOnly } = props
+  const { className } = props
+  const { isReadOnly } = useReadOnly()
   const { diagram, dispatch, addEdge, validateConnection, addNode } = useActiveDiagram()
   const { screenToFlowPosition } = useReactFlow()
 
@@ -42,11 +43,29 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = props => {
     [dispatch],
   )
 
+  const onNodeSelect = useCallback(
+    (changes: NodeChange[]) => {
+      const filtered = isReadOnly ? changes.filter(c => c.type === 'select') : changes
+
+      dispatch({ type: 'NODE_CHANGES', payload: filtered })
+    },
+    [dispatch, isReadOnly],
+  )
+
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
       dispatch({ type: 'EDGE_CHANGES', payload: changes })
     },
     [dispatch],
+  )
+
+  const onEdgeSelect = useCallback(
+    (changes: EdgeChange[]) => {
+      const filtered = isReadOnly ? changes.filter(c => c.type === 'select') : changes
+
+      dispatch({ type: 'EDGE_CHANGES', payload: filtered })
+    },
+    [dispatch, isReadOnly],
   )
 
   const onConnect = useCallback(
@@ -100,15 +119,17 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = props => {
     <div className={`h-full w-full ${className}`}>
       <UMLMarkers />
       <ReactFlow
+        nodesDraggable={!isReadOnly}
+        nodesConnectable={!isReadOnly}
         nodes={diagram.nodes}
         edges={diagram.edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        onNodesChange={isReadOnly ? undefined : onNodesChange}
-        onEdgesChange={isReadOnly ? undefined : onEdgesChange}
-        onConnect={isReadOnly ? undefined : onConnect}
-        onDrop={isReadOnly ? undefined : onDrop}
-        onDragOver={isReadOnly ? undefined : onDragOver}
+        onNodesChange={isReadOnly ? onNodeSelect : onNodesChange}
+        onEdgesChange={isReadOnly ? onEdgeSelect : onEdgesChange}
+        onConnect={isReadOnly ? () => {} : onConnect}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
         connectionMode={ConnectionMode.Loose}
         fitView
         fitViewOptions={{ padding: 0.1 }}
@@ -117,7 +138,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = props => {
         multiSelectionKeyCode={['Meta', 'Ctrl']}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#464646" />
-        <Controls position="bottom-left" showZoom showFitView />
+        <Controls position="bottom-left" showZoom showFitView showInteractive={!isReadOnly} />
       </ReactFlow>
     </div>
   )

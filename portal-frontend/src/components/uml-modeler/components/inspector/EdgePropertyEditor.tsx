@@ -4,6 +4,7 @@ import { ChangeEvent, useCallback } from 'react'
 
 import { MULTIPLICITY_VALUES } from '../../constants/umlTypes'
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { useReadOnly } from '../../hooks/use-read-only'
 import type { UMLEdge } from '../../types/diagram'
 import type { UMLRelationshipType } from '../../types/uml'
 
@@ -13,6 +14,7 @@ interface EdgePropertyEditorProps {
 
 export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) => {
   const { updateEdge } = useActiveDiagram()
+  const { isReadOnly } = useReadOnly()
 
   const relationship = edge.data.relationship
 
@@ -96,6 +98,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
           value={relationship.type}
           onChange={handleTypeChange}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          disabled={isReadOnly}
         >
           {relationshipTypes.map(type => (
             <option key={type.value} value={type.value}>
@@ -114,6 +117,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
           onChange={handleNameChange}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="Optional relationship name"
+          disabled={isReadOnly}
         />
       </div>
 
@@ -125,6 +129,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
             value={relationship.sourceMultiplicity || ''}
             onChange={handleSourceMultiplicityChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={isReadOnly}
           >
             <option value="">None</option>
             {MULTIPLICITY_VALUES.filter(v => v !== '').map(value => (
@@ -140,6 +145,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
             value={relationship.targetMultiplicity || ''}
             onChange={handleTargetMultiplicityChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            disabled={isReadOnly}
           >
             <option value="">None</option>
             {MULTIPLICITY_VALUES.filter(v => v !== '').map(value => (
@@ -161,6 +167,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
             onChange={handleSourceRoleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Optional source role"
+            disabled={isReadOnly}
           />
         </div>
         <div>
@@ -171,6 +178,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
             onChange={handleTargetRoleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Optional target role"
+            disabled={isReadOnly}
           />
         </div>
       </div>
@@ -187,6 +195,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
               checked={relationship.isNavigable || false}
               onChange={handleNavigableChange}
               className="mr-2"
+              disabled={isReadOnly}
             />
             <label htmlFor={`navigable-${edge.id}`} className="text-sm text-gray-600">
               Navigable relationship
@@ -200,6 +209,7 @@ export const EdgePropertyEditor: React.FC<EdgePropertyEditorProps> = ({ edge }) 
               checked={relationship.isBidirectional || false}
               onChange={handleBidirectionalChange}
               className="mr-2"
+              disabled={isReadOnly}
             />
             <label htmlFor={`bidirectional-${edge.id}`} className="text-sm text-gray-600">
               Bidirectional navigation
