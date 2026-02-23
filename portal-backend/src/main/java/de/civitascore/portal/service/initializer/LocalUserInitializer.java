@@ -145,7 +145,7 @@ public class LocalUserInitializer {
     userConfig.setFirstName(user.getFirstName());
     userConfig.setLastName(user.getLastName());
     userConfig.setEnabled(true);
-    userConfig.setEmailVerified(false);
+    userConfig.setEmailVerified(true);
 
     configEventPublisher
         .publishUserCreated(targetRealm, userConfig)

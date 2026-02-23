@@ -100,7 +100,7 @@ spring:
 ### Spring Profiles
 
 * **local** – local development
-* **local-init** – seed initial groups and users on startup (requires `local`)
+* **local-init** – on startup, creates the groups and users defined in `application-local-init.yaml` and syncs them to Keycloak (requires `local`).
 * **postgres** – PostgreSQL datasource
 * **debug** – extended logging
 
