@@ -46,7 +46,6 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const router = useRouter()
   const createGroup = useCreateGroup()
   const updateGroup = useUpdateGroup()
-  console.log('group data', groupData)
 
   const [defaultFormData, setDefaultFormData] = useState(mapGroupApiToFormData(groupData))
   const [isContactListOpen, setIsContactListOpen] = useState(false)
@@ -80,7 +79,6 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   })
 
   useEffect(() => {
-    console.log('form values', form.getValues())
     form.setValue('contactUserId', selectedContact?.id || '')
   }, [selectedContact, form])
 

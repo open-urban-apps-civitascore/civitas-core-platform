@@ -14,13 +14,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-interface ExotWarningModalProps extends DialogProps {
+interface ExitWarningModalProps extends DialogProps {
   isLoading?: boolean
   onDiscard: () => void
   onConfirm: () => void
 }
 
-export const ExitWarningModal = (props: ExotWarningModalProps) => {
+export const ExitWarningModal = (props: ExitWarningModalProps) => {
   const { open, onOpenChange, onDiscard, onConfirm, isLoading = false } = props
   const t = useTranslations('common.exitModal')
   const tCommon = useTranslations('common')
