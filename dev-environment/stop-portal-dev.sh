@@ -63,28 +63,7 @@ if [[ "$prune_images" =~ ^[Yy]$ ]]; then
         echo "  Could not prune images"
 fi
 
-# Kill locally running development services
-echo "Stopping locally running services..."
-
-# Kills all processes listening on a given port (including child processes)
-stop_service_on_port() {
-    local name=$1
-    local port=$2
-    local pids
-    pids=$(lsof -ti :"$port" 2>/dev/null)
-    if [ -z "$pids" ]; then
-        # Fallback: extract PIDs from ss (works when lsof can't see the process)
-        pids=$(ss -tlnp "sport = :$port" 2>/dev/null | grep -oP 'pid=\K[0-9]+' | sort -u)
-    fi
-    if [ -n "$pids" ]; then
-        echo "$pids" | xargs kill 2>/dev/null && echo "  $name stopped" || true
-    else
-        echo "  $name not running"
-    fi
-}
-
-stop_service_on_port "Portal Backend" 8089
-stop_service_on_port "Config Adapter" 8088
-stop_service_on_port "Portal Frontend" 3000
-
+echo
+echo "Note: If you started backend services via command line,"
+echo "      please stop them manually (Ctrl+C in their terminals)."
 echo
