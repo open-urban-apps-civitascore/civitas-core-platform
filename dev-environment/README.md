@@ -9,7 +9,7 @@ Docker Compose setup for running the **CIVITAS CORE Platform** locally.
 ```
 dev-environment/
 ├── backend/    # Full backend stack — all services in Docker
-├── authz/      # Dev-mode startup — backend runs locally with hot-reload
+├── authz/      # AuthZ test data and integration tests
 ├── kafka/      # Kafka only
 ├── postgres/   # PostgreSQL only
 ├── keycloak/   # Keycloak only
@@ -44,21 +44,27 @@ cd backend
 Starts: Kafka, PostgreSQL, Keycloak, APISIX, OPA, AuthZ Repository,
 Portal Backend, and Config Adapter.
 
-### Option B: Dev Mode (recommended for development)
+### Option B: Portal Dev Mode (recommended for development)
 
-Backend runs locally with Spring Boot devtools hot-reload.
-Infrastructure and authorization services run in Docker.
+Starts all infrastructure in Docker, prompts for backend/frontend startup
+and authorization mode.
 
 ```bash
-cd authz
-./start-dev.sh              # Full stack from scratch
-./start-dev.sh --skip-build # Skip Maven builds (use existing JARs)
+./start-portal-dev.sh                # Interactive prompts
+./start-portal-dev.sh --authz=full   # Full AuthZ (enforce permissions)
+./start-portal-dev.sh --authz=allowall  # Allow-all (any logged-in user can do anything)
 ```
 
-Features: idempotent (safe to re-run), health-checked startup with timeouts,
-`--skip-build` flag, automatic test user and data seeding.
+### Authorization Modes
 
-See [authz/README.md](authz/README.md) for details.
+| Mode | Flag | Behavior |
+|------|------|----------|
+| **Full** | `--authz=full` | OPA enforces per-endpoint permissions. Users need role assignments. |
+| **Allow-all** | `--authz=allowall` | Any logged-in user can access all endpoints. OPA still runs (logs decisions) but uses null-permission data. APISIX injects wildcard scope header. |
+
+Both modes require a valid JWT (Keycloak login). Allow-all is useful when
+working on features unrelated to authorization. Integration tests
+(`authz/integration-test.sh`) require full mode.
 
 ---
 
@@ -86,6 +92,22 @@ cd apisix    && docker compose up -d
 | Kafka UI | http://localhost:8090 | |
 
 ---
+
+## Stopping
+
+```bash
+./stop-portal-dev.sh            # Stop all services (prompts to remove volumes)
+```
+
+Or manually per service:
+
+```bash
+cd apisix    && docker compose down && docker compose -f docker-compose.authz.yml down
+cd kafka     && docker compose down
+cd keycloak  && docker compose down
+cd postgres  && docker compose down
+cd frost     && docker compose down
+```
 
 ## Common Commands
 

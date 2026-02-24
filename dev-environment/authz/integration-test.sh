@@ -13,14 +13,16 @@
 #   7. Dataspaces/catalogs (null-permission) -> 200 for any authenticated user
 #
 # Prerequisites:
-#   - Full authz stack running: docker compose up -d
+#   - Full authz stack running (start-portal-dev.sh --authz=full)
 #   - Portal Backend running on port 8089
-#   - Test users created in Keycloak and database seeded
+#   - Keycloak test users exist (pre-provisioned in realm-export.json)
 #
 # Usage:
 #   ./integration-test.sh
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Configuration
 APISIX_URL="${APISIX_URL:-http://localhost:9080}"
@@ -114,6 +116,18 @@ check_health() {
         return 1
     fi
 }
+
+# =============================================================================
+# SEED TEST DATA (idempotent — ON CONFLICT DO NOTHING)
+# =============================================================================
+echo "=== Seeding Test Data ==="
+if docker exec -i civitas-postgres-portal psql -U admin -d portal_backend < "$SCRIPT_DIR/seed-authz-data.sql" > /dev/null 2>&1; then
+    echo -e "  ${GREEN}OK${NC}"
+else
+    echo -e "  ${RED}FAILED${NC} (is PostgreSQL running?)"
+    exit 1
+fi
+echo ""
 
 # =============================================================================
 # HEALTH CHECKS

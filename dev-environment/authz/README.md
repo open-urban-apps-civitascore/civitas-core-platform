@@ -1,56 +1,44 @@
-# AuthZ Development Environment
+# AuthZ — Test Data & Integration Tests
 
-This directory contains the authorization stack for local development and testing,
-plus dev-mode startup scripts that run the **full platform with authorization**.
+This directory contains authorization test data and integration tests for the
+APISIX → OPA → AuthZ Repository chain. The actual services live in
+`dev-environment/apisix/` (shared dev-env).
 
-## Two Ways to Start
-
-There are two startup scripts in the `dev-environment/` directory. Both include the
-full AuthZ stack (OPA, AuthZ Repository, APISIX with authorization). Choose based on
-your workflow:
-
-| | `backend/start.sh` | `authz/start-dev.sh` |
-|---|---|---|
-| **Mode** | Full Docker — all services containerized | Dev mode — backend runs locally with hot-reload |
-| **Use when** | CI, demos, or you just need the stack running | Active backend development |
-| **Hot-reload** | No (rebuild container on changes) | Yes (Spring Boot devtools) |
-| **Idempotent** | No (tears down and rebuilds each run) | Yes (safe to re-run on running stack) |
-| **Health checks** | Docker healthchecks only | Waits for each service with timeouts |
-| **Skip builds** | No | `--skip-build` flag available |
-
-## Quick Start (Dev Mode)
+## Quick Start
 
 ```bash
-cd dev-environment/authz
-./start-dev.sh              # Everything from scratch
-./start-dev.sh --skip-build # Same, but skip Maven builds
+# 1. Start the dev environment with full authz
+cd dev-environment
+./start-portal-dev.sh --authz=full
+
+# 2. Run integration tests (seeds test data automatically)
+cd authz
+./integration-test.sh
 ```
 
-Or run the pieces independently:
+## What's Here
 
-```bash
-./start-infra.sh             # Infrastructure only (PostgreSQL, Keycloak)
-./start-authz.sh             # AuthZ stack only (assumes infra is up)
-./start-authz.sh --skip-build
-```
+| File | Purpose |
+|------|---------|
+| `integration-test.sh` | 20-scenario integration test suite (seeds data, then tests) |
+| `seed-authz-data.sql` | Test data: 3 users with different permission levels |
+| `README.md` | This file |
 
-All scripts are idempotent — safe to re-run on an already-running stack.
+## Test Users
 
-### What each script does
+Pre-provisioned in `../keycloak/realm-export.json` with pinned UUIDs
+(`e2e00000-...-{1,2,3}`). Imported automatically when Keycloak starts.
 
-**`start-infra.sh`** — Infrastructure services:
-1. PostgreSQL (Docker, creates civitas-network automatically)
-2. Keycloak (Docker, waits for realm endpoint)
+| User | Email | Permissions |
+|------|-------|-------------|
+| Admin | `authz.admin@e2e.civitas.dev` | All (DataArchitect role) |
+| Reader | `authz.reader@e2e.civitas.dev` | Read-only (DataConsumer role) |
+| NoPerms | `authz.none@e2e.civitas.dev` | None |
 
-**`start-authz.sh`** — Application stack (requires infra):
-1. Verifies PostgreSQL and Keycloak are up
-2. Creates test users in Keycloak (idempotent)
-3. Seeds authorization data in database (ON CONFLICT)
-4. Maven builds (portal-model, portal-backend, authz-repository)
-5. Starts Portal Backend on host (with Spring Boot devtools)
-6. Starts AuthZ Docker stack (AuthZ Repository + OPA + APISIX)
+Password: `test123`
 
-**`start-dev.sh`** — Wrapper: checks prerequisites, then runs `start-infra.sh` + `start-authz.sh`
+The `seed-authz-data.sql` creates the matching database records (users, roles,
+permissions, assignments) using the same pinned UUIDs as `external_id`.
 
 ## Architecture
 
@@ -83,83 +71,21 @@ Request with JWT
  Portal Backend (port 8089)
 ```
 
-## Prerequisites
-
-- Docker and Docker Compose
-- Java 21 and Maven 3.9+
-- jq (for JSON parsing)
-- `/etc/hosts` must contain: `127.0.0.1 civitas-keycloak` (JWT issuer alignment)
-
-## Manual Setup (if not using start-dev.sh)
-
-### 1. Infrastructure
-
-```bash
-cd dev-environment/postgres && docker compose up -d   # creates civitas-network automatically
-cd dev-environment/keycloak && docker compose up -d
-```
-
-### 2. Create Keycloak Test Users
-
-```bash
-./seed-keycloak-users.sh
-```
-
-Creates three test users (password: `test123`):
-- `authz.admin@e2e.civitas.dev` — Full permissions (DataArchitect)
-- `authz.reader@e2e.civitas.dev` — Read-only permissions (DataConsumer)
-- `authz.none@e2e.civitas.dev` — No permissions
-
-### 3. Seed Database
-
-The `external_id` values in `seed-authz-data.sql` must match Keycloak user IDs. If the IDs match (they will on a fresh Keycloak install), run directly:
-
-```bash
-docker exec -i civitas-postgres-portal psql -U admin -d portal_backend < seed-authz-data.sql
-```
-
-### 4. Build AuthZ Repository
-
-The AuthZ Repository depends on `portal-model:1.0.0-SNAPSHOT` (local dependency). Build on host first:
-
-```bash
-mvn -f portal-model/pom.xml install -DskipTests
-mvn -f authz/repository/pom.xml package -DskipTests
-```
-
-### 5. Start Portal Backend
-
-```bash
-cd portal-backend && mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
-```
-
-### 6. Start the AuthZ Stack
-
-```bash
-docker compose up -d
-```
-
-This starts AuthZ Repository (8091), OPA (8181), and APISIX (9080/9443).
-
-## Testing
-
-### Integration Tests
+## Integration Tests
 
 ```bash
 ./integration-test.sh
 ```
 
-Tests 20 scenarios across 7 groups: admin full access, reader read-only, reader write-denied, no-perms denied, unauthenticated, new resource endpoints (datasources/datastructures), and removed endpoints (dataspaces/catalogs).
+Tests 20 scenarios across 7 groups: admin full access, reader read-only,
+reader write-denied, no-perms denied, unauthenticated, new resource endpoints
+(datasources/datastructures), and null-permission endpoints (dataspaces/catalogs).
 
-### Health Checks
+Requires:
+- `start-portal-dev.sh --authz=full` (full authz mode)
+- Portal Backend running on port 8089
 
-```bash
-curl http://localhost:8091/actuator/health   # AuthZ Repository
-curl http://localhost:8181/health             # OPA
-curl http://localhost:8089/v2/actuator/health # Backend (direct, not through APISIX)
-```
-
-### Manual Testing
+## Manual Testing
 
 ```bash
 # Get JWT for admin user
@@ -223,22 +149,6 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision -d '{
 # Get user context directly from AuthZ Repository
 curl http://localhost:8091/api/v1/user-context/{keycloak-user-id}
 ```
-
-## Files
-
-| File | Purpose |
-|------|---------|
-| `start-dev.sh` | Wrapper: prerequisite checks, then full stack from scratch |
-| `start-infra.sh` | Infrastructure: PostgreSQL, Keycloak |
-| `start-authz.sh` | Application: users, seed, builds, backend, authz stack |
-| `_common.sh` | Shared functions, configuration, and prerequisite checks |
-| `docker-compose.yml` | AuthZ Repository + OPA + APISIX |
-| `apisix-config.yaml` | APISIX config with OPA plugin enabled |
-| `apisix-routes.yaml` | Routes with openid-connect + opa plugins |
-| `../apisix/opa-config/data.json` | OPA data config (AuthZ Repository URL) — mounted as directory so OPA loads it at `data.config` |
-| `seed-authz-data.sql` | Test data for database |
-| `seed-keycloak-users.sh` | Creates test users in Keycloak |
-| `integration-test.sh` | 20-scenario integration test suite |
 
 ## Notes
 
