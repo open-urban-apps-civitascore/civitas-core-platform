@@ -170,7 +170,7 @@ public class ConfigAdapterTestHelper implements AutoCloseable {
     public void publish(String topic, ConfigResultEvent result) {
       try {
         String resultJson = objectMapper.writeValueAsString(result);
-        kafkaTemplate.send("core.civitas.config.results", result.originalMessageId(), resultJson);
+        kafkaTemplate.send("de.civitascore.config.results", result.originalMessageId(), resultJson);
         log.debug(
             "Published result for messageId: {}, status: {}",
             result.originalMessageId(),

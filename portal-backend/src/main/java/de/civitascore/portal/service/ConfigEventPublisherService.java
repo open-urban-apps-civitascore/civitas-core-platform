@@ -28,7 +28,7 @@ public class ConfigEventPublisherService {
 
   private static final String SOURCE = "portal-backend";
   private static final String CONFIG_VERSION = "1.0";
-  private static final String CLOUD_EVENT_TYPE = "core.civitas.config.event";
+  private static final String CLOUD_EVENT_TYPE = "de.civitascore.config.event";
 
   private final Optional<CloudEventPublisher> cloudEventPublisher;
   private final ObjectMapper objectMapper;

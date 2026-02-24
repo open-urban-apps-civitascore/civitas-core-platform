@@ -43,7 +43,7 @@ public class KafkaConfigResultListener {
   }
 
   @KafkaListener(
-      topics = "${kafka.result-topic:core.civitas.config.results}",
+      topics = "${kafka.result-topic:de.civitascore.config.results}",
       groupId = "${spring.kafka.consumer.group-id:portal-backend-group}")
   public void handleConfigResult(@Payload String payload) {
     if (kafkaPublisher == null) {

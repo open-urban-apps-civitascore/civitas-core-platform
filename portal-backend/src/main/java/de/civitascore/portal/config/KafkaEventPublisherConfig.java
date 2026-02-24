@@ -52,7 +52,7 @@ public class KafkaEventPublisherConfig {
     private String bootstrapServers = "localhost:9092";
     private String acks = "all";
     private int retries = 3;
-    private String resultTopic = "core.civitas.config.results";
+    private String resultTopic = "de.civitascore.config.results";
     private long resultTimeoutMs = 30000;
 
     public boolean isEnabled() {
