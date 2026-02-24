@@ -88,7 +88,6 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
             "name", existingEntity.getId(), "Name cannot be null or blank");
       }
 
-
     } catch (InvalidInputException e) {
       throw e;
     } catch (Exception e) {
