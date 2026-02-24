@@ -1,8 +1,8 @@
 /**
  * XMI Import Service
  *
- * Parses XMI 2.5.1 files and converts them to UMLDiagram format.
- * Designed to import files exported by the civitas-uml-modeler.
+ * Parses XMI files and converts them to UMLDiagram format.
+ * Supports Eclipse UML2 5.0.0 format with eAnnotations for layout.
  */
 
 import type { UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
@@ -23,24 +23,13 @@ import type {
   Visibility,
 } from '../types/uml'
 
-// Layout information from XMI Extension
+// Layout information from eAnnotations
 interface NodeLayout {
   elementId: string
   x: number
   y: number
   width?: number
   height?: number
-}
-
-interface DiagramLayout {
-  id: string
-  name: string
-  nodes: NodeLayout[]
-  viewport?: {
-    x: number
-    y: number
-    zoom: number
-  }
 }
 
 // Import result type
@@ -239,6 +228,38 @@ const parseOperation = (element: Element): UMLOperation => {
 }
 
 /**
+ * Parses eAnnotations for layout information (Eclipse EMF format)
+ */
+const parseEAnnotations = (element: Element): NodeLayout | null => {
+  const eAnnotations = element.querySelector(':scope > eAnnotations[source="nodeLayout"]')
+  if (!eAnnotations) {
+    return null
+  }
+
+  const elementId = getId(element)
+  let x: number | null = null
+  let y: number | null = null
+
+  // Parse details key-value pairs
+  const details = eAnnotations.querySelectorAll(':scope > details')
+  details.forEach(detail => {
+    const key = detail.getAttribute('key')
+    const value = detail.getAttribute('value')
+    if (key === 'x' && value) {
+      x = parseFloat(value)
+    } else if (key === 'y' && value) {
+      y = parseFloat(value)
+    }
+  })
+
+  if (x !== null && y !== null) {
+    return { elementId, x, y }
+  }
+
+  return null
+}
+
+/**
  * Parses a UML class from XMI
  */
 const parseClass = (element: Element): UMLClass | UMLAbstractClass => {
@@ -376,31 +397,76 @@ const parseAssociation = (element: Element): UMLRelationship | null => {
 }
 
 /**
- * Parses all UML elements and relationships from XMI
+ * Recursively collects all packagedElements from a container, including nested Packages
  */
-const parseModelElements = (modelElement: Element): { elements: UMLElement[]; relationships: UMLRelationship[] } => {
+const collectAllPackagedElements = (container: Element): Element[] => {
+  const allElements: Element[] = []
+  const directChildren = container.querySelectorAll(':scope > packagedElement')
+
+  directChildren.forEach(el => {
+    const xmiType = getType(el)
+
+    // If it's a Package, recursively collect its children
+    if (xmiType === 'uml:Package') {
+      allElements.push(...collectAllPackagedElements(el))
+    } else {
+      // Not a package, add the element itself
+      allElements.push(el)
+    }
+  })
+
+  return allElements
+}
+
+/**
+ * Parses all UML elements and relationships from XMI
+ * Now recursively handles nested Packages
+ */
+const parseModelElements = (
+  modelElement: Element,
+): { elements: UMLElement[]; relationships: UMLRelationship[]; layouts: Map<string, NodeLayout> } => {
   const elements: UMLElement[] = []
   const relationships: UMLRelationship[] = []
+  const layouts = new Map<string, NodeLayout>()
 
-  const packagedElements = modelElement.querySelectorAll(':scope > packagedElement')
+  // Collect all elements recursively (handles nested Packages)
+  const allPackagedElements = collectAllPackagedElements(modelElement)
 
-  packagedElements.forEach(el => {
+  allPackagedElements.forEach(el => {
     const xmiType = getType(el)
+
+    // Try to extract layout from eAnnotations
+    const layout = parseEAnnotations(el)
+    if (layout) {
+      layouts.set(layout.elementId, layout)
+    }
 
     switch (xmiType) {
       case 'uml:Class': {
         const classElement = parseClass(el)
         elements.push(classElement)
+        // Update layout map with correct ID
+        if (layout) {
+          layouts.set(classElement.id, { ...layout, elementId: classElement.id })
+        }
         break
       }
 
       case 'uml:Interface': {
-        elements.push(parseInterface(el))
+        const interfaceElement = parseInterface(el)
+        elements.push(interfaceElement)
+        if (layout) {
+          layouts.set(interfaceElement.id, { ...layout, elementId: interfaceElement.id })
+        }
         break
       }
 
       case 'uml:Enumeration': {
-        elements.push(parseEnumeration(el))
+        const enumElement = parseEnumeration(el)
+        elements.push(enumElement)
+        if (layout) {
+          layouts.set(enumElement.id, { ...layout, elementId: enumElement.id })
+        }
         break
       }
 
@@ -458,66 +524,7 @@ const parseModelElements = (modelElement: Element): { elements: UMLElement[]; re
     }
   })
 
-  return { elements, relationships }
-}
-
-/**
- * Parses the diagram extension for layout information
- */
-const parseDiagramExtension = (doc: Document): DiagramLayout | null => {
-  const extension = doc.querySelector('xmi\\:Extension, Extension')
-  if (!extension) {
-    return null
-  }
-
-  const extender = extension.getAttribute('extender')
-  if (extender !== 'civitas-uml-modeler') {
-    return null
-  }
-
-  const diagramEl = extension.querySelector('diagram')
-  if (!diagramEl) {
-    return null
-  }
-
-  const nodes: NodeLayout[] = []
-  diagramEl.querySelectorAll('nodeLayout').forEach(nodeEl => {
-    const elementId = nodeEl.getAttribute('elementId')
-    const x = nodeEl.getAttribute('x')
-    const y = nodeEl.getAttribute('y')
-
-    if (elementId && x && y) {
-      nodes.push({
-        elementId,
-        x: parseFloat(x),
-        y: parseFloat(y),
-        width: nodeEl.getAttribute('width') ? parseFloat(nodeEl.getAttribute('width')!) : undefined,
-        height: nodeEl.getAttribute('height') ? parseFloat(nodeEl.getAttribute('height')!) : undefined,
-      })
-    }
-  })
-
-  const viewportEl = diagramEl.querySelector('viewport')
-  let viewport: DiagramLayout['viewport'] | undefined
-  if (viewportEl) {
-    const vx = viewportEl.getAttribute('x')
-    const vy = viewportEl.getAttribute('y')
-    const zoom = viewportEl.getAttribute('zoom')
-    if (vx && vy && zoom) {
-      viewport = {
-        x: parseFloat(vx),
-        y: parseFloat(vy),
-        zoom: parseFloat(zoom),
-      }
-    }
-  }
-
-  return {
-    id: diagramEl.getAttribute('id') || crypto.randomUUID(),
-    name: diagramEl.getAttribute('name') || 'Imported Diagram',
-    nodes,
-    viewport,
-  }
+  return { elements, relationships, layouts }
 }
 
 /**
@@ -563,6 +570,7 @@ const createEdge = (relationship: UMLRelationship): UMLEdge => {
 
 /**
  * Main import function - parses XMI content and returns a UMLDiagram
+ * Supports Eclipse UML2 5.0.0 format with eAnnotations for layout
  */
 export const importFromXmi = (xmiContent: string): XmiImportResult => {
   const warnings: string[] = []
@@ -595,30 +603,21 @@ export const importFromXmi = (xmiContent: string): XmiImportResult => {
     const modelName = getAttr(modelElement, 'name') || 'Imported Diagram'
     const modelId = getId(modelElement).replace('_model', '')
 
-    // Parse elements and relationships
-    const { elements, relationships } = parseModelElements(modelElement)
+    // Parse elements, relationships, and eAnnotations layouts
+    const { elements, relationships, layouts } = parseModelElements(modelElement)
 
     if (elements.length === 0) {
       warnings.push('No UML elements found in the model')
     }
 
-    // Parse layout information
-    const layout = parseDiagramExtension(doc)
-    if (!layout) {
+    // Check if we have any layout info
+    if (layouts.size === 0) {
       warnings.push('No layout information found, using auto-layout')
-    }
-
-    // Create layout map for quick lookup
-    const layoutMap = new Map<string, NodeLayout>()
-    if (layout) {
-      layout.nodes.forEach(nodeLayout => {
-        layoutMap.set(nodeLayout.elementId, nodeLayout)
-      })
     }
 
     // Create nodes
     const nodes: UMLNode[] = elements.map((element, index) => {
-      return createNode(element, layoutMap.get(element.id), index)
+      return createNode(element, layouts.get(element.id), index)
     })
 
     // Create edges (filter out relationships with missing source/target)
@@ -638,11 +637,10 @@ export const importFromXmi = (xmiContent: string): XmiImportResult => {
 
     // Create the diagram
     const diagram: UMLDiagram = {
-      id: layout?.id || modelId,
-      name: layout?.name || modelName,
+      id: modelId,
+      name: modelName,
       nodes,
       edges,
-      viewport: layout?.viewport,
       lastModified: new Date(),
       isDirty: false,
     }
