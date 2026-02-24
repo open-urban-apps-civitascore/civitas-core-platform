@@ -225,7 +225,7 @@ build-backend:
 
 build-backend-image:
   extends: .only-backend-changes
-  image: docker:27-dind
+  image: docker:27
   stage: build
   needs:
     - job: setup-version
@@ -286,7 +286,7 @@ container-scan-backend:
 
 deploy-backend:
   extends: .only-backend-changes
-  image: docker:27-dind
+  image: docker:27
   stage: deploy
   needs:
     - job: setup-version
@@ -311,7 +311,7 @@ deploy-backend:
 
 sbom-backend-image:
   extends: .only-backend-changes
-  image: docker:27-dind
+  image: docker:27
   stage: report
   needs:
     - job: setup-version
