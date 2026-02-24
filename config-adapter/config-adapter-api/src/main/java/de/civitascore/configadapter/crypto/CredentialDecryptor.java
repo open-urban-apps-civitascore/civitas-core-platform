@@ -17,10 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Decrypts credentials encrypted with AES-256-GCM using PBKDF2 key derivation. Compliant with BSI
@@ -33,48 +30,12 @@ import javax.crypto.spec.SecretKeySpec;
  *
  * <ul>
  *   <li>{@code CIVITAS_MASTER_KEY} — 256-bit master key (hex-encoded)
- *   <li>{@code CIVITAS_MASTER_SALT} — 8-byte salt (hex-encoded)
+ *   <li>{@code CIVITAS_MASTER_SALT} — 16+ byte salt, hex-encoded (NIST SP 800-132)
  * </ul>
  */
 public final class CredentialDecryptor {
 
-  private static final String ALGORITHM = "AES/GCM/NoPadding";
-  private static final int GCM_TAG_LENGTH_BITS = 128;
-  private static final int GCM_IV_LENGTH_BYTES = 12;
-  // TODO: NIST SP 800-132 recommends >= 16 bytes for PBKDF2 salt.
-  //       Current deployment uses 8-byte salt via CIVITAS_MASTER_SALT.
-  //       Consider migrating to 16+ bytes with a versioned key derivation scheme.
-  //       Issue: #1003
-  private static final int PBKDF2_ITERATIONS = 310_000;
-  private static final int KEY_LENGTH_BITS = 256;
-  private static final String ENC_PREFIX = "ENC(";
-  private static final String ENC_SUFFIX = ")";
-
   private CredentialDecryptor() {}
-
-  /**
-   * Derives an AES-256 key from the master key and salt using PBKDF2WithHmacSHA256.
-   *
-   * @param masterKey the master key bytes
-   * @param salt the salt bytes
-   * @return the derived SecretKey
-   * @throws GeneralSecurityException if key derivation fails
-   */
-  static SecretKey deriveKey(byte[] masterKey, byte[] salt) throws GeneralSecurityException {
-    char[] keyChars = bytesToHexChars(masterKey);
-    PBEKeySpec spec = null;
-    try {
-      SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-      spec = new PBEKeySpec(keyChars, salt, PBKDF2_ITERATIONS, KEY_LENGTH_BITS);
-      byte[] derivedKey = factory.generateSecret(spec).getEncoded();
-      return new SecretKeySpec(derivedKey, "AES");
-    } finally {
-      if (spec != null) {
-        spec.clearPassword();
-      }
-      Arrays.fill(keyChars, '\0');
-    }
-  }
 
   /**
    * Decrypts a Base64-encoded encrypted value. The encoded payload contains the 12-byte IV
@@ -84,6 +45,8 @@ public final class CredentialDecryptor {
    * @param masterKey the master key bytes
    * @param salt the salt bytes
    * @return the decrypted plaintext string
+   * @throws IllegalArgumentException if {@code encryptedBase64} is {@code null} or empty, or if
+   *     {@code masterKey} or {@code salt} is {@code null} or empty
    * @throws GeneralSecurityException if decryption fails
    */
   public static String decrypt(String encryptedBase64, byte[] masterKey, byte[] salt)
@@ -93,22 +56,35 @@ public final class CredentialDecryptor {
     }
 
     byte[] decoded = Base64.getDecoder().decode(encryptedBase64);
-    if (decoded.length < GCM_IV_LENGTH_BYTES + 1) {
-      throw new GeneralSecurityException("Encrypted data too short");
+    byte[] ciphertext = null;
+    byte[] plaintext = null;
+    try {
+      if (decoded.length < CryptoUtils.GCM_IV_LENGTH_BYTES + 1) {
+        throw new GeneralSecurityException("Encrypted data too short");
+      }
+
+      byte[] iv = new byte[CryptoUtils.GCM_IV_LENGTH_BYTES];
+      System.arraycopy(decoded, 0, iv, 0, CryptoUtils.GCM_IV_LENGTH_BYTES);
+
+      ciphertext = new byte[decoded.length - CryptoUtils.GCM_IV_LENGTH_BYTES];
+      System.arraycopy(decoded, CryptoUtils.GCM_IV_LENGTH_BYTES, ciphertext, 0, ciphertext.length);
+
+      SecretKey key = CryptoUtils.deriveKey(masterKey, salt);
+      Cipher cipher = Cipher.getInstance(CryptoUtils.ALGORITHM);
+      cipher.init(
+          Cipher.DECRYPT_MODE, key, new GCMParameterSpec(CryptoUtils.GCM_TAG_LENGTH_BITS, iv));
+      plaintext = cipher.doFinal(ciphertext);
+
+      return new String(plaintext, StandardCharsets.UTF_8);
+    } finally {
+      Arrays.fill(decoded, (byte) 0);
+      if (ciphertext != null) {
+        Arrays.fill(ciphertext, (byte) 0);
+      }
+      if (plaintext != null) {
+        Arrays.fill(plaintext, (byte) 0);
+      }
     }
-
-    byte[] iv = new byte[GCM_IV_LENGTH_BYTES];
-    System.arraycopy(decoded, 0, iv, 0, GCM_IV_LENGTH_BYTES);
-
-    byte[] ciphertext = new byte[decoded.length - GCM_IV_LENGTH_BYTES];
-    System.arraycopy(decoded, GCM_IV_LENGTH_BYTES, ciphertext, 0, ciphertext.length);
-
-    SecretKey key = deriveKey(masterKey, salt);
-    Cipher cipher = Cipher.getInstance(ALGORITHM);
-    cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv));
-    byte[] plaintext = cipher.doFinal(ciphertext);
-
-    return new String(plaintext, StandardCharsets.UTF_8);
   }
 
   /**
@@ -132,8 +108,10 @@ public final class CredentialDecryptor {
     Map<String, Object> result = new LinkedHashMap<>();
     for (Map.Entry<String, Object> entry : map.entrySet()) {
       Object value = entry.getValue();
-      if (value instanceof String s && isEncrypted(s)) {
-        String encPayload = s.substring(ENC_PREFIX.length(), s.length() - ENC_SUFFIX.length());
+      if (value instanceof String s && CryptoUtils.isEncrypted(s)) {
+        String encPayload =
+            s.substring(
+                CryptoUtils.ENC_PREFIX.length(), s.length() - CryptoUtils.ENC_SUFFIX.length());
         result.put(entry.getKey(), decrypt(encPayload, masterKey, salt));
       } else if (value instanceof Map<?, ?> nested) {
         result.put(entry.getKey(), decryptMapValues((Map<String, Object>) nested, masterKey, salt));
@@ -157,7 +135,7 @@ public final class CredentialDecryptor {
       return false;
     }
     for (Object value : map.values()) {
-      if (value instanceof String s && isEncrypted(s)) {
+      if (value instanceof String s && CryptoUtils.isEncrypted(s)) {
         return true;
       }
       if (value instanceof Map<?, ?> nested
@@ -166,10 +144,6 @@ public final class CredentialDecryptor {
       }
     }
     return false;
-  }
-
-  private static boolean isEncrypted(String value) {
-    return value.startsWith(ENC_PREFIX) && value.endsWith(ENC_SUFFIX) && value.length() > 5;
   }
 
   /**
@@ -210,15 +184,5 @@ public final class CredentialDecryptor {
       return new byte[0];
     }
     return hexStringToBytes(hexValue);
-  }
-
-  private static char[] bytesToHexChars(byte[] bytes) {
-    char[] hexChars = new char[bytes.length * 2];
-    for (int i = 0; i < bytes.length; i++) {
-      int v = bytes[i] & 0xFF;
-      hexChars[i * 2] = Character.forDigit(v >>> 4, 16);
-      hexChars[i * 2 + 1] = Character.forDigit(v & 0x0F, 16);
-    }
-    return hexChars;
   }
 }

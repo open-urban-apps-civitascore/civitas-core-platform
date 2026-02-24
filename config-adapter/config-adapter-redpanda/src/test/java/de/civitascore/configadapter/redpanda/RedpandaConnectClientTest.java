@@ -38,7 +38,7 @@ import org.junit.jupiter.api.Test;
 class RedpandaConnectClientTest {
 
   private static final byte[] MASTER_KEY = new byte[32];
-  private static final byte[] SALT = new byte[8];
+  private static final byte[] SALT = new byte[16];
 
   private Client mockClient;
   private Invocation.Builder mockBuilder;
