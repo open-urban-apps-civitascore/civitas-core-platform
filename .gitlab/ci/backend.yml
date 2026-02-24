@@ -135,11 +135,13 @@ integration-test-backend:
       optional: true
     - job: publish-portal-model
   services:
-    - docker:27-dind
+    - name: docker:27-dind
+      command: ["--registry-mirror", "https://docker-mirror01.extern.frachtwerk.de"]
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_DRIVER: overlay2
     DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
   cache:
     key:
       prefix: backend-maven
