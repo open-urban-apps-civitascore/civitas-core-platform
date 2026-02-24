@@ -2,15 +2,16 @@ package de.civitascore.portal.service.initializer;
 
 import com.civitas.configadapter.model.idm.UserConfig;
 import de.civitascore.portal.configuration.LocalInitProperties;
+import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
+import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.ConfigEventPublisherService;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -28,6 +29,7 @@ public class LocalUserInitializer {
   private final UserRepository userRepository;
   private final GroupRepository groupRepository;
   private final RoleRepository roleRepository;
+  private final AssignmentRepository assignmentRepository;
   private final ConfigEventPublisherService configEventPublisher;
   private final String targetRealm;
 
@@ -36,12 +38,14 @@ public class LocalUserInitializer {
       UserRepository userRepository,
       GroupRepository groupRepository,
       RoleRepository roleRepository,
+      AssignmentRepository assignmentRepository,
       ConfigEventPublisherService configEventPublisher,
       @Value("${keycloak.target-realm}") String targetRealm) {
     this.properties = properties;
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.roleRepository = roleRepository;
+    this.assignmentRepository = assignmentRepository;
     this.configEventPublisher = configEventPublisher;
     this.targetRealm = targetRealm;
   }
@@ -66,39 +70,55 @@ public class LocalUserInitializer {
     Map<String, Group> groupsByName = new HashMap<>();
 
     for (LocalInitProperties.GroupEntry entry : properties.getGroups()) {
-      groupRepository
-          .findByName(entry.getName())
-          .ifPresentOrElse(
-              existing -> {
-                log.debug("Local group '{}' already exists — skipping", entry.getName());
-                groupsByName.put(entry.getName(), existing);
-              },
-              () -> {
-                Group group = new Group();
-                group.setName(entry.getName());
-                group.setDescription(entry.getDescription());
+      Group group =
+          groupRepository
+              .findByName(entry.getName())
+              .orElseGet(
+                  () -> {
+                    Group newGroup = new Group();
+                    newGroup.setName(entry.getName());
+                    newGroup.setDescription(entry.getDescription());
+                    Group saved = groupRepository.save(newGroup);
+                    log.info("Created local group '{}'", entry.getName());
+                    return saved;
+                  });
 
-                if (entry.getRoleName() != null) {
-                  roleRepository
-                      .findByName(entry.getRoleName())
-                      .map(Set::of)
-                      .ifPresentOrElse(
-                          group::setRoles,
-                          () ->
-                              log.warn(
-                                  "Role '{}' not found for local group '{}' — group will have no"
-                                      + " roles",
-                                  entry.getRoleName(),
-                                  entry.getName()));
-                }
+      groupsByName.put(entry.getName(), group);
 
-                Group createdGroup = groupRepository.save(group);
-                groupsByName.put(entry.getName(), createdGroup);
-                log.info("Created local group '{}'", entry.getName());
-              });
+      if (entry.getRoleName() != null) {
+        createAssignmentIfAbsent(group, entry.getRoleName());
+      }
     }
 
     return groupsByName;
+  }
+
+  private void createAssignmentIfAbsent(Group group, String roleName) {
+    roleRepository
+        .findByName(roleName)
+        .ifPresentOrElse(
+            role -> {
+              if (assignmentRepository.existsByGroupAndRoleAndScopeTypeIsNull(group, role)) {
+                log.debug(
+                    "Assignment for group '{}' and role '{}' already exists — skipping",
+                    group.getName(),
+                    role.getName());
+                return;
+              }
+              Assignment assignment = new Assignment();
+              assignment.setGroup(group);
+              assignment.setRole(role);
+              assignmentRepository.save(assignment);
+              log.info(
+                  "Created assignment for group '{}' with role '{}'",
+                  group.getName(),
+                  role.getName());
+            },
+            () ->
+                log.warn(
+                    "Role '{}' not found for local group '{}' — skipping assignment",
+                    roleName,
+                    group.getName()));
   }
 
   private void initializeUsers(Map<String, Group> groupsByName) {

@@ -1,6 +1,7 @@
 package de.civitascore.portal.configuration;
 
 import de.civitascore.portal.model.embedded.UserTitleType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import java.util.ArrayList;
@@ -22,8 +23,8 @@ import org.springframework.validation.annotation.Validated;
 @NoArgsConstructor
 public class LocalInitProperties {
 
-  private List<GroupEntry> groups = new ArrayList<>();
-  private List<UserEntry> users = new ArrayList<>();
+  private @Valid List<GroupEntry> groups = new ArrayList<>();
+  private @Valid List<UserEntry> users = new ArrayList<>();
 
   @Getter
   @Setter

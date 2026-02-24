@@ -2,10 +2,13 @@ package de.civitascore.portal.service.initializer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
+import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.service.event.BaseEventPublishingIntegrationTest;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,23 +28,29 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
 
   @Autowired private LocalUserInitializer localUserInitializer;
   @Autowired private GroupRepository groupRepository;
+  @Autowired private AssignmentRepository assignmentRepository;
 
   @AfterEach
   void tearDownInitTest() {
+    assignmentRepository.deleteAll();
     groupRepository.deleteAll();
   }
 
   @Test
   @Transactional
   @Rollback
-  @DisplayName("Should create group with assigned role in database")
-  void shouldCreateGroupWithRole() {
+  @DisplayName("Should create group with Tenant Admin assignment")
+  void shouldCreateGroupWithRoleAssignment() {
     localUserInitializer.initialize();
 
     Group group = groupRepository.findByName(TEST_GROUP_NAME).orElseThrow();
     assertThat(group.getName()).isEqualTo(TEST_GROUP_NAME);
     assertThat(group.getDescription()).isEqualTo("Init test admin group");
-    assertThat(group.getRoles()).extracting("name").containsExactly("Tenant Admin");
+
+    List<Assignment> assignments = assignmentRepository.findAllByGroupId(group.getId());
+    assertThat(assignments).hasSize(1);
+    assertThat(assignments.get(0).getRole().getName()).isEqualTo("Tenant Admin");
+    assertThat(assignments.get(0).getScopeType()).isNull();
   }
 
   @Test
@@ -61,21 +70,23 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   }
 
   @Test
-  @DisplayName("Should not duplicate group or user when called twice")
+  @DisplayName("Should not duplicate group, user or assignment when called twice")
   void shouldBeIdempotent() {
     localUserInitializer.initialize();
     localUserInitializer.initialize();
 
     assertThat(groupRepository.count()).isEqualTo(1);
     assertThat(userRepository.count()).isEqualTo(1);
+    assertThat(assignmentRepository.count()).isEqualTo(1);
   }
 
   @Test
-  @DisplayName("Should create configured group and user")
+  @DisplayName("Should create configured group, user and assignment")
   void shouldCreateConfiguredGroupAndUser() {
     localUserInitializer.initialize();
 
     assertThat(groupRepository.count()).isEqualTo(1);
     assertThat(userRepository.count()).isEqualTo(1);
+    assertThat(assignmentRepository.count()).isEqualTo(1);
   }
 }
