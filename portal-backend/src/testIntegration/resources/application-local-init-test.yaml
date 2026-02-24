@@ -1,4 +1,5 @@
-# Test seed data for the local-init profile — overrides the main application-local-init.yaml.
+# Test seed data — loaded when the "local-init-test" profile is active.
+# Overrides application-local-init.yaml to provide isolated test data.
 local:
   init:
     groups:
