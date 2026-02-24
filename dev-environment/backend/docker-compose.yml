@@ -40,7 +40,7 @@ services:
       KEYCLOAK_TARGET_REALM: civitas-core
       APP_URL: http://localhost:8089
       SERVER_PORT: 8089
-      SPRING_PROFILES_ACTIVE: local,postgres
+      SPRING_PROFILES_ACTIVE: local,postgres,local-init
     depends_on:
       postgres-portal:
         condition: service_healthy
