@@ -53,9 +53,9 @@ The saga orchestrator manages the dataset lifecycle across three adapters:
 
 | Topic | Purpose |
 |-------|---------|
-| `core.civitas.dataset.create.requested` | Start dataset create saga |
-| `core.civitas.dataset.update.requested` | Start dataset update saga |
-| `core.civitas.dataset.delete.requested` | Start dataset delete saga |
+| `de.civitascore.dataset.create.requested` | Start dataset create saga |
+| `de.civitascore.dataset.update.requested` | Start dataset update saga |
+| `de.civitascore.dataset.delete.requested` | Start dataset delete saga |
 
 ### Adapter Topics (Orchestrator ↔ Adapters)
 
@@ -63,36 +63,36 @@ Shared across all saga types. The operation (CREATE, UPDATE, DELETE) is conveyed
 
 | Topic | Direction | Purpose |
 |-------|-----------|---------|
-| `core.civitas.dataset.frost.execute` | Orchestrator → FROST | Send command to FROST |
-| `core.civitas.dataset.frost.completed` | FROST → Orchestrator | FROST step succeeded |
-| `core.civitas.dataset.frost.failed` | FROST → Orchestrator | FROST step failed |
-| `core.civitas.dataset.frost.compensate` | Orchestrator → FROST | Compensate FROST step |
-| `core.civitas.dataset.apisix.execute` | Orchestrator → APISIX | Send command to APISIX |
-| `core.civitas.dataset.apisix.completed` | APISIX → Orchestrator | APISIX step succeeded |
-| `core.civitas.dataset.apisix.failed` | APISIX → Orchestrator | APISIX step failed |
-| `core.civitas.dataset.apisix.compensate` | Orchestrator → APISIX | Compensate APISIX step |
-| `core.civitas.dataset.redpanda.execute` | Orchestrator → Redpanda | Send command to Redpanda |
-| `core.civitas.dataset.redpanda.completed` | Redpanda → Orchestrator | Redpanda step succeeded |
-| `core.civitas.dataset.redpanda.failed` | Redpanda → Orchestrator | Redpanda step failed |
-| `core.civitas.dataset.redpanda.compensate` | Orchestrator → Redpanda | Compensate Redpanda step |
+| `de.civitascore.dataset.frost.execute` | Orchestrator → FROST | Send command to FROST |
+| `de.civitascore.dataset.frost.completed` | FROST → Orchestrator | FROST step succeeded |
+| `de.civitascore.dataset.frost.failed` | FROST → Orchestrator | FROST step failed |
+| `de.civitascore.dataset.frost.compensate` | Orchestrator → FROST | Compensate FROST step |
+| `de.civitascore.dataset.apisix.execute` | Orchestrator → APISIX | Send command to APISIX |
+| `de.civitascore.dataset.apisix.completed` | APISIX → Orchestrator | APISIX step succeeded |
+| `de.civitascore.dataset.apisix.failed` | APISIX → Orchestrator | APISIX step failed |
+| `de.civitascore.dataset.apisix.compensate` | Orchestrator → APISIX | Compensate APISIX step |
+| `de.civitascore.dataset.redpanda.execute` | Orchestrator → Redpanda | Send command to Redpanda |
+| `de.civitascore.dataset.redpanda.completed` | Redpanda → Orchestrator | Redpanda step succeeded |
+| `de.civitascore.dataset.redpanda.failed` | Redpanda → Orchestrator | Redpanda step failed |
+| `de.civitascore.dataset.redpanda.compensate` | Orchestrator → Redpanda | Compensate Redpanda step |
 
 ### Result Topics (Orchestrator → Portal Backend)
 
 | Topic | Purpose |
 |-------|---------|
-| `core.civitas.dataset.create.completed` | Create saga succeeded |
-| `core.civitas.dataset.create.failed` | Create saga failed (with compensation status) |
-| `core.civitas.dataset.update.completed` | Update saga succeeded |
-| `core.civitas.dataset.update.failed` | Update saga failed (with compensation status) |
-| `core.civitas.dataset.delete.completed` | Delete saga succeeded |
-| `core.civitas.dataset.delete.failed` | Delete saga failed (no compensation) |
+| `de.civitascore.dataset.create.completed` | Create saga succeeded |
+| `de.civitascore.dataset.create.failed` | Create saga failed (with compensation status) |
+| `de.civitascore.dataset.update.completed` | Update saga succeeded |
+| `de.civitascore.dataset.update.failed` | Update saga failed (with compensation status) |
+| `de.civitascore.dataset.delete.completed` | Delete saga succeeded |
+| `de.civitascore.dataset.delete.failed` | Delete saga failed (no compensation) |
 
 ### Internal Topics
 
 | Topic | Purpose |
 |-------|---------|
-| `core.civitas.saga.state` | Compacted topic for saga state persistence and crash recovery |
-| `core.civitas.saga.manual-intervention` | Alerts for `COMPENSATION_FAILED` sagas |
+| `de.civitascore.saga.state` | Compacted topic for saga state persistence and crash recovery |
+| `de.civitascore.saga.manual-intervention` | Alerts for `COMPENSATION_FAILED` sagas |
 
 ### Subscription Overview
 
@@ -1210,7 +1210,7 @@ SUCCESS → COMPENSATING → COMPENSATED
 
 ## 10. Saga State Persistence (Kafka)
 
-The orchestrator persists saga state to a **Kafka compacted topic** (`core.civitas.saga.state`). This avoids an external database dependency — the same Kafka cluster used for messaging doubles as the state store.
+The orchestrator persists saga state to a **Kafka compacted topic** (`de.civitascore.saga.state`). This avoids an external database dependency — the same Kafka cluster used for messaging doubles as the state store.
 
 ### Why Kafka Compacted Topic?
 
@@ -1230,7 +1230,7 @@ Kafka compacted topics retain only the **latest record per key**. Older state tr
 ### Topic Configuration
 
 ```properties
-# Topic: core.civitas.saga.state
+# Topic: de.civitascore.saga.state
 cleanup.policy    = compact
 min.cleanable.dirty.ratio = 0.5
 delete.retention.ms       = 86400000   # 24h tombstone retention
@@ -1260,7 +1260,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 public class SagaStateStore {
 
-    private static final String STATE_TOPIC = "core.civitas.saga.state";
+    private static final String STATE_TOPIC = "de.civitascore.saga.state";
 
     private final KafkaProducer<String, String> producer;
     private final ObjectMapper objectMapper;
@@ -1420,7 +1420,7 @@ The state topic is an **internal orchestrator topic** — no other component rea
 
 | Topic | Publisher | Subscriber | Purpose |
 |-------|-----------|------------|---------|
-| `core.civitas.saga.state` | Orchestrator | Orchestrator (on startup) | Compacted topic for saga state persistence and crash recovery |
+| `de.civitascore.saga.state` | Orchestrator | Orchestrator (on startup) | Compacted topic for saga state persistence and crash recovery |
 
 ---
 

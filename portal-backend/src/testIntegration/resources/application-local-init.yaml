@@ -1,0 +1,15 @@
+# Test seed data for the local-init profile — overrides the main application-local-init.yaml.
+local:
+  init:
+    groups:
+      - name: "Init Test Admins"
+        roleName: "Tenant Admin"
+        description: "Init test admin group"
+    users:
+      - firstName: Init
+        lastName: TestUser
+        email: init-test@example.com
+        externalId: "00000000-0000-0000-0000-000000000002"
+        title: OTHER
+        groups:
+          - "Init Test Admins"

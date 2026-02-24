@@ -275,7 +275,7 @@ public class MyAdapter extends AbstractConfigAdapter {
 
 ```xml
 <dependency>
-    <groupId>com.civitas</groupId>
+    <groupId>de.civitascore</groupId>
     <artifactId>config-adapter-api</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
@@ -284,9 +284,9 @@ public class MyAdapter extends AbstractConfigAdapter {
 ### 2. Implement ConfigAdapter
 
 ```java
-import com.civitas.configadapter.adapter.AbstractConfigAdapter;
-import com.civitas.configadapter.model.ConfigEvent;
-import com.civitas.configadapter.messaging.EventPublisher;
+import de.civitascore.configadapter.adapter.AbstractConfigAdapter;
+import de.civitascore.configadapter.model.ConfigEvent;
+import de.civitascore.configadapter.messaging.EventPublisher;
 
 import java.util.List;
 
@@ -356,7 +356,7 @@ public class MyServiceAdapter extends AbstractConfigAdapter {
 
 ### 3. Register via ServiceLoader
 
-Create file `src/main/resources/META-INF/services/com.civitas.configadapter.adapter.ConfigAdapter`:
+Create file `src/main/resources/META-INF/services/de.civitascore.configadapter.adapter.ConfigAdapter`:
 ```
 com.mycompany.MyServiceAdapter
 ```
@@ -390,10 +390,10 @@ The `Application` class from `config-adapter-application` will automatically:
 ### 1. Implement EventConsumer
 
 ```java
-import com.civitas.configadapter.adapter.ConfigAdapter;
-import com.civitas.configadapter.configuration.ApplicationConfig;
-import com.civitas.configadapter.messaging.EventConsumer;
-import com.civitas.event.handler.kafka.CloudEventProcessor;
+import de.civitascore.configadapter.adapter.ConfigAdapter;
+import de.civitascore.configadapter.configuration.ApplicationConfig;
+import de.civitascore.configadapter.messaging.EventConsumer;
+import de.civitascore.event.handler.kafka.CloudEventProcessor;
 
 public class RabbitMQEventConsumer implements EventConsumer {
 
@@ -437,7 +437,7 @@ public class RabbitMQEventConsumer implements EventConsumer {
 
 ### 2. Register via ServiceLoader
 
-Create file `src/main/resources/META-INF/services/com.civitas.configadapter.messaging.EventConsumer`:
+Create file `src/main/resources/META-INF/services/de.civitascore.configadapter.messaging.EventConsumer`:
 ```
 com.mycompany.RabbitMQEventConsumer
 ```
@@ -470,7 +470,7 @@ Examples (from `Topics` constants):
 - `de.civitascore.idm.realm.created`
 - `de.civitascore.idm.client.updated`
 
-All available topic constants are defined in `com.civitas.configadapter.Topics`.
+All available topic constants are defined in `de.civitascore.configadapter.Topics`.
 
 ### Configuration Split Pattern
 
@@ -1003,7 +1003,7 @@ Error codes are categorized by type and severity:
 
 ### Valid Kafka Topics
 
-All topics are defined in `com.civitas.configadapter.Topics` and validated at startup.
+All topics are defined in `de.civitascore.configadapter.Topics` and validated at startup.
 
 #### User Events
 

@@ -15,6 +15,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.experimental.FieldDefaults;
 import org.springdoc.core.annotations.ParameterObject;
@@ -35,6 +37,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @Validated
@@ -98,7 +103,8 @@ public abstract class BaseController<
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public ResponseEntity<O> create(@Valid @RequestBody I input) {
-    E created = getService().create(input);
+    I preProcessedInput = preProcessInput(input);
+    E created = getService().create(preProcessedInput);
     O output = getAssembler().toOutput(created);
     UUID createdId = getAssembler().getIdFromOutput(output);
     URI location =
@@ -111,7 +117,8 @@ public abstract class BaseController<
 
   @PutMapping("/{id}")
   public ResponseEntity<O> update(@PathVariable UUID id, @Valid @RequestBody I input) {
-    E updated = getService().update(id, input);
+    I preProcessedInput = preProcessInput(input);
+    E updated = getService().update(id, preProcessedInput);
     O output = getAssembler().toOutput(updated);
     return ResponseEntity.ok(output);
   }
@@ -122,6 +129,7 @@ public abstract class BaseController<
     E current = getService().findByIdOrThrow(id);
     I currentDto = getAssembler().toInput(current);
     I patchedDto = objectMapper.readerForUpdating(currentDto).readValue(updates);
+    patchedDto = preProcessInput(patchedDto);
     E updated = getService().update(id, patchedDto);
     O output = getAssembler().toOutput(updated);
     return ResponseEntity.ok(output);
@@ -131,5 +139,32 @@ public abstract class BaseController<
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable UUID id) {
     getService().deleteById(id);
+  }
+
+  protected Map<String, String> extractPathVariables() {
+    ServletRequestAttributes attributes =
+        (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+
+    if (Objects.isNull(attributes)) {
+      return Map.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    Map<String, String> pathVariables =
+        (Map<String, String>)
+            attributes.getRequest().getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
+    return Objects.nonNull(pathVariables) ? pathVariables : Map.of();
+  }
+
+  /**
+   * Pre-process the input DTO before creating/updating an entity. This method can be overridden by
+   * subclasses to implement custom logic, e.g. when URL parameters need to be set on the input DTO
+   * before conversion to entity.
+   *
+   * @param input the original input DTO
+   * @return the processed input DTO to be used for entity creation/updating
+   */
+  protected I preProcessInput(I input) {
+    return input;
   }
 }

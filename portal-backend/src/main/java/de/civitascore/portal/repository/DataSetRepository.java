@@ -18,7 +18,7 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
    * @param id the dataset ID
    * @return the dataset with eagerly fetched owner
    */
-  @EntityGraph(attributePaths = {"owner"})
+  @EntityGraph(attributePaths = {"owner", "pipelines", "distributions"})
   @Query("SELECT d FROM DataSet d WHERE d.id = :id")
   Optional<DataSet> findByIdWithRelations(@Param("id") UUID id);
 }

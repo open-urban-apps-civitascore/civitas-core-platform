@@ -17,8 +17,8 @@ echo "Starting the Keycloak Config Adapter..."
 # export HEALTHCHECK_PORT=8080
 
 # Adapter Configuration
-# export ADAPTERS=com.civitas.configadapter.keycloak.KeycloakAdapter,com.civitas.configadapter.examples.DummyLogAdapter
-# export EVENTHANDLER_CLASS=com.civitas.event.handler.kafka.KafkaEventHandler
+# export ADAPTERS=de.civitascore.configadapter.keycloak.KeycloakAdapter,de.civitascore.configadapter.examples.DummyLogAdapter
+# export EVENTHANDLER_CLASS=de.civitascore.event.handler.kafka.KafkaEventHandler
 
 # Kafka Configuration
 # export KAFKA_BOOTSTRAP_SERVERS=localhost:9092

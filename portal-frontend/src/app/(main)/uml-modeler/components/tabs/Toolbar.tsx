@@ -1,11 +1,13 @@
 'use client'
 
-import { FileDown, FileUp, Save } from 'lucide-react'
+import { FileDown, FileUp, Loader2, Save } from 'lucide-react'
 import { useCallback, useRef } from 'react'
 
+import { useCreateModel } from '@/app/services/api/models/clientRequests'
 import { Button } from '@/components/ui/button'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { buildUMLModelPayload } from '../../services/modelUploadService'
 import { downloadXmi } from '../../services/xmiExportService'
 import { importXmiFromFile } from '../../services/xmiImportService'
 
@@ -13,15 +15,33 @@ interface ToolbarProps {
   onSave?: () => void
   hasUnsavedChanges?: boolean
   onExport?: () => void
+  sessionName?: string
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ onSave, hasUnsavedChanges = false }) => {
+export const Toolbar: React.FC<ToolbarProps> = ({ onSave, hasUnsavedChanges = false, sessionName }) => {
   const { diagram, dispatch } = useActiveDiagram()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const createModel = useCreateModel()
+  const isSaving = createModel.isPending
 
   const handleSave = useCallback(() => {
-    onSave?.()
-  }, [onSave])
+    if (isSaving) return
+
+    const payload = {
+      ...buildUMLModelPayload(diagram),
+      name: sessionName || diagram.name,
+    }
+
+    createModel.mutate(payload, {
+      onSuccess: () => {
+        onSave?.()
+        console.log('Model saved successfully')
+      },
+      onError: error => {
+        console.error('Failed to save model:', error)
+      },
+    })
+  }, [diagram, isSaving, onSave, createModel, sessionName])
 
   const handleExportXmi = useCallback(() => {
     downloadXmi(diagram)
@@ -75,11 +95,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onSave, hasUnsavedChanges = fa
           variant="ghost"
           size="sm"
           onClick={handleSave}
+          disabled={isSaving}
           className={`h-8 px-2 ${hasUnsavedChanges ? 'text-blue-600' : ''}`}
-          title={hasUnsavedChanges ? 'Save changes' : 'Save'}
+          title={isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save changes' : 'Save'}
         >
-          <Save className="h-4 w-4" />
-          <span className="ml-1 text-xs">Save</span>
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          <span className="ml-1 text-xs">{isSaving ? 'Saving...' : 'Save'}</span>
         </Button>
 
         <Button variant="ghost" size="sm" onClick={handleImportClick} className="h-8 px-2" title="Import XMI file">

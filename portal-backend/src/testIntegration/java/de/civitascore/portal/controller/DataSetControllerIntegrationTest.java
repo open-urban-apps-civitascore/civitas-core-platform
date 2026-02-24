@@ -2,17 +2,35 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.DataSpace;
+import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
+import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.repository.DataSourceRepository;
+import de.civitascore.portal.repository.DataSpaceRepository;
+import de.civitascore.portal.repository.DistributionRepository;
+import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
@@ -25,15 +43,44 @@ class DataSetControllerIntegrationTest
   private final String DATASETS_ENDPOINT = "/datasets";
 
   @Autowired private DataSetRepository dataSetRepository;
+  @Autowired private PipelineRepository pipelineRepository;
+  @Autowired private DistributionRepository distributionRepository;
+  @Autowired private DataSpaceRepository dataSpaceRepository;
+  @Autowired private UserRepository userRepository;
+  @Autowired private DataSourceRepository dataSourceRepository;
 
   @Override
   protected String getEndpointPath() {
     return DATASETS_ENDPOINT;
   }
 
+  /** Helper method to create a sample styles map for Pipeline. */
+  private Map<String, Object> createSampleStyles() {
+    Map<String, Object> styles = new HashMap<>();
+    styles.put("nodes", List.of());
+    styles.put("edges", List.of());
+    Map<String, Object> viewport = new HashMap<>();
+    viewport.put("x", 0);
+    viewport.put("y", 0);
+    viewport.put("zoom", 1);
+    styles.put("viewport", viewport);
+    return styles;
+  }
+
+  /** Helper method to create a sample model map for Pipeline. */
+  private Map<String, Object> createSampleModel() {
+    Map<String, Object> model = new HashMap<>();
+    model.put("input", Map.of("type", "kafka"));
+    return model;
+  }
+
   @Override
   protected void performAdditionalCleanup() {
+    pipelineRepository.deleteAll();
+    distributionRepository.deleteAll();
     dataSetRepository.deleteAll();
+    dataSpaceRepository.deleteAll();
+    userRepository.deleteAll();
   }
 
   @Override
@@ -41,8 +88,7 @@ class DataSetControllerIntegrationTest
     DataSetInputDTO input = new DataSetInputDTO();
     input.setName("test_dataset_" + System.currentTimeMillis());
     input.setDescription("A test dataset for integration testing");
-    input.setFormat("JSON");
-    input.setExternalId("ext-" + System.currentTimeMillis());
+    input.setOpenDataAccess(false);
     return input;
   }
 
@@ -50,17 +96,124 @@ class DataSetControllerIntegrationTest
   protected DataSetInputDTO createInvalidInput() {
     DataSetInputDTO input = new DataSetInputDTO();
     input.setDescription("Invalid dataset without required fields");
+    input.setOpenDataAccess(false);
     return input;
   }
 
   @Override
   protected DataSetInputDTO createUpdateInput() {
     DataSetInputDTO input = new DataSetInputDTO();
-    input.setName("updated_dataset");
     input.setName("Updated DataSet");
     input.setDescription("Updated description");
-    input.setFormat("CSV");
+    input.setOpenDataAccess(false);
     return input;
+  }
+
+  /**
+   * Creates a DataSet in DRAFT status with pre-existing relationships.
+   *
+   * @return UUID of the created DataSet
+   */
+  private DataSet createDataSetWithRelationships() {
+    // Create a User to be the owner of the dataset
+    User owner = new User();
+    owner.setFirstName("Test");
+    owner.setLastName("Owner");
+    owner.setEmail("test.owner." + System.currentTimeMillis() + "@example.com");
+    owner.setExternalId("ext-user-" + System.currentTimeMillis());
+    owner.setActive(true);
+    owner = userRepository.save(owner);
+
+    DataSet dataSet = new DataSet();
+    dataSet.setName("test_dataset_with_relationships_" + System.currentTimeMillis());
+    dataSet.setDescription("Test dataset with pipelines and distributions");
+    dataSet.setDataSetStatus(DataSetStatus.DRAFT);
+    dataSet.setPersistenceId(12345L);
+    dataSet.setIdentifier("test-identifier-001");
+    dataSet.setVersion("1.0.0");
+    dataSet.setExternalId("ext-dataset-" + System.currentTimeMillis());
+    dataSet.setFormat("JSON");
+    dataSet.setOpenDataAccess(false);
+    dataSet.setOwner(owner);
+    dataSet = dataSetRepository.save(dataSet);
+
+    // Create a DataSpace for the dataset
+    DataSpace dataSpace = new DataSpace();
+    dataSpace.setName("test_dataspace_" + System.currentTimeMillis());
+    dataSpace.setDescription("Test data space for dataset");
+    dataSpace = dataSpaceRepository.save(dataSpace);
+
+    // Associate dataset with dataspace
+    dataSet.getDataSpaces().add(dataSpace);
+    dataSet = dataSetRepository.save(dataSet);
+
+    // Create data sources for the pipelines
+    DataSource dataSource1 = new DataSource();
+    dataSource1.setName("test_data_source_1_" + System.currentTimeMillis());
+    dataSource1.setDescription("Test data source 1");
+    dataSource1 = dataSourceRepository.save(dataSource1);
+
+    DataSource dataSource2 = new DataSource();
+    dataSource2.setName("test_data_source_2_" + System.currentTimeMillis());
+    dataSource2.setDescription("Test data source 2");
+    dataSource2 = dataSourceRepository.save(dataSource2);
+
+    DataSource dataSource3 = new DataSource();
+    dataSource3.setName("test_data_source_3_" + System.currentTimeMillis());
+    dataSource3.setDescription("Test data source 3");
+    dataSource3 = dataSourceRepository.save(dataSource3);
+
+    DataSource dataSource4 = new DataSource();
+    dataSource4.setName("test_data_source_4_" + System.currentTimeMillis());
+    dataSource4.setDescription("Test data source 4");
+    dataSource4 = dataSourceRepository.save(dataSource4);
+
+    // Create pipelines for the dataset
+    Pipeline pipeline1 = new Pipeline();
+    pipeline1.setName("test_pipeline_1_" + System.currentTimeMillis());
+    pipeline1.setDescription("Test pipeline 1");
+    pipeline1.setDataSet(dataSet);
+    pipeline1.setStyles(createSampleStyles());
+    pipeline1.getDataSources().add(dataSource1);
+    pipeline1.getDataSources().add(dataSource2);
+    pipeline1.setApis(Collections.singletonList("/api/v1/traffic"));
+    pipeline1.setPersistences(Collections.singletonList(12345L));
+    pipeline1.setModel(createSampleModel());
+    pipeline1 = pipelineRepository.save(pipeline1);
+
+    Pipeline pipeline2 = new Pipeline();
+    pipeline2.setName("test_pipeline_2_" + System.currentTimeMillis());
+    pipeline2.setDescription("Test pipeline 2");
+    pipeline2.setDataSet(dataSet);
+    pipeline2.setStyles(createSampleStyles());
+    pipeline2.getDataSources().add(dataSource3);
+    pipeline2.getDataSources().add(dataSource4);
+    pipeline2.setApis(Collections.singletonList("/api/v1/weather"));
+    pipeline2.setPersistences(Collections.singletonList(12345L));
+    pipeline2.setModel(createSampleModel());
+    pipeline2 = pipelineRepository.save(pipeline2);
+
+    // Create distributions for the dataset
+    Distribution distribution1 = new Distribution();
+    distribution1.setAccessUrl("http://localhost:8080/api/v1/traffic");
+    distribution1.setApiType("SensorThings");
+    distribution1.setFormat("application/json");
+    distribution1.setAutoGenerated(true);
+    distribution1.setDataSet(dataSet);
+    distribution1 = distributionRepository.save(distribution1);
+
+    Distribution distribution2 = new Distribution();
+    distribution2.setAccessUrl("http://localhost:8080/api/v1/weather");
+    distribution2.setApiType("SensorThings");
+    distribution2.setFormat("application/json");
+    distribution2.setAutoGenerated(true);
+    distribution2.setDataSet(dataSet);
+    distribution2 = distributionRepository.save(distribution2);
+
+    dataSet.setPipelines(List.of(pipeline1, pipeline2));
+    dataSet.setDistributions(Set.of(distribution1, distribution2));
+
+    return dataSetRepository.save(dataSet);
   }
 
   @Override
@@ -98,10 +251,12 @@ class DataSetControllerIntegrationTest
       DataSetOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should be generated").isNotNull();
       assertThat(output.getName()).as("Name should match input").isEqualTo(input.getName());
+      assertThat(output.getDataSetStatus())
+          .as("Status should match input")
+          .isEqualTo(DataSetStatus.DRAFT);
       assertThat(output.getDescription())
           .as("Description should match input")
           .isEqualTo(input.getDescription());
-      assertThat(output.getFormat()).as("Format should match input").isEqualTo(input.getFormat());
       assertThat(output.getCreatedAt()).as("Created timestamp should be set").isNotNull();
     }
 
@@ -129,31 +284,6 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should create dataset with dataspaces")
-    void shouldCreateDataSetWithDataSpaces() {
-      DataSetInputDTO input = createValidInput();
-      input.setDataSpaceIds(Collections.emptyList());
-
-      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("Should create dataset with external ID")
-    void shouldCreateDataSetWithExternalId() {
-      DataSetInputDTO input = createValidInput();
-      input.setExternalId("external-dataset-123");
-
-      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getExternalId()).isEqualTo("external-dataset-123");
-    }
-
-    @Test
     @DisplayName("Should create dataset with metadata")
     void shouldCreateDataSetWithMetadata() {
       DataSetInputDTO input = createValidInput();
@@ -162,24 +292,6 @@ class DataSetControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
-    }
-
-    @Test
-    @DisplayName("Should create dataset with different formats")
-    void shouldCreateDataSetWithDifferentFormats() {
-      String[] formats = {"JSON", "CSV", "XML", "PARQUET", "AVRO"};
-
-      for (String format : formats) {
-        DataSetInputDTO input = createValidInput();
-        input.setName("dataset_" + format.toLowerCase() + "_" + System.currentTimeMillis());
-        input.setFormat(format);
-
-        ResponseEntity<DataSetOutputDTO> response = performCreate(input);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().getFormat()).isEqualTo(format);
-      }
     }
   }
 
@@ -190,7 +302,8 @@ class DataSetControllerIntegrationTest
     @Test
     @DisplayName("Should retrieve dataset by ID successfully")
     void shouldRetrieveDataSetById() {
-      UUID dataSetId = createTestEntity();
+      DataSet dataSet = createDataSetWithRelationships();
+      UUID dataSetId = dataSet.getId();
 
       ResponseEntity<DataSetOutputDTO> response = performGetById(dataSetId);
 
@@ -201,6 +314,27 @@ class DataSetControllerIntegrationTest
       DataSetOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(dataSetId);
       assertThat(output.getName()).as("Name should be present").isNotNull();
+
+      assertThat(output.getPipelines())
+          .as("Pipelines should be included in the response")
+          .isNotNull()
+          .hasSize(2)
+          .allMatch(pipeline -> pipeline.getId() != null)
+          .allMatch(pipeline -> pipeline.getName() != null);
+
+      assertThat(output.getDistributions())
+          .as("Distributions should be included in the response")
+          .isNotNull()
+          .hasSize(2)
+          .allMatch(distribution -> distribution.getId() != null)
+          .allMatch(distribution -> distribution.getAccessUrl() != null)
+          .extracting("accessUrl")
+          .containsExactlyInAnyOrder(
+              "http://localhost:8080/api/v1/traffic", "http://localhost:8080/api/v1/weather");
+
+      assertThat(output.getDataSetStatus())
+          .as("Status should be DRAFT")
+          .isEqualTo(DataSetStatus.DRAFT);
     }
 
     @Test
@@ -264,8 +398,8 @@ class DataSetControllerIntegrationTest
   class UpdateDataSetTests {
 
     @Test
-    @DisplayName("Should update dataset successfully with PUT")
-    void shouldUpdateDataSetWithPut() {
+    @DisplayName("Should update DRAFT dataset successfully with PUT")
+    void shouldUpdateDraftDataSetWithPut() {
       UUID dataSetId = createTestEntity();
 
       DataSetInputDTO updateInput = createUpdateInput();
@@ -281,10 +415,128 @@ class DataSetControllerIntegrationTest
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo(updateInput.getDescription());
-      assertThat(output.getFormat())
-          .as("Format should be updated")
-          .isEqualTo(updateInput.getFormat());
       assertThat(output.getModifiedAt()).isNotNull();
+      assertThat(output.getDataSetStatus())
+          .as("Status should remain DRAFT")
+          .isEqualTo(DataSetStatus.DRAFT);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+        value = DataSetStatus.class,
+        mode = EnumSource.Mode.EXCLUDE,
+        names = {"DRAFT"})
+    @DisplayName("Should fail to update published dataset via regular PUT endpoint")
+    void shouldFailToUpdatePublishedDataSetViaRegularEndpoint(DataSetStatus status) {
+      DataSet dataSet = createDataSetWithRelationships();
+      dataSet.setDataSetStatus(status);
+      dataSet = dataSetRepository.save(dataSet);
+
+      UUID dataSetId = dataSet.getId();
+
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Updated Name");
+      updateInput.setDescription("Updated description");
+      updateInput.setOpenDataAccess(false);
+
+      ResponseEntity<DataSetOutputDTO> response = performUpdate(dataSetId, updateInput);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status for %s dataset", status)
+          .isEqualTo(HttpStatus.CONFLICT);
+
+      // Verify dataset was not modified
+      DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElse(null);
+      assertThat(unchangedDataSet).isNotNull();
+      assertThat(unchangedDataSet.getName())
+          .as("Name should remain unchanged")
+          .isEqualTo(dataSet.getName());
+      assertThat(unchangedDataSet.getDataSetStatus())
+          .as("Status should remain unchanged")
+          .isEqualTo(status);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+        value = DataSetStatus.class,
+        mode = EnumSource.Mode.EXCLUDE,
+        names = {"DRAFT"})
+    @DisplayName("Should update published dataset metadata via /published/meta endpoint")
+    void shouldUpdatePublishedDataSetMetaViaPublishedEndpoint(DataSetStatus status) {
+      DataSet dataSet = createDataSetWithRelationships();
+      dataSet.setDataSetStatus(status);
+      dataSet = dataSetRepository.save(dataSet);
+
+      UUID dataSetId = dataSet.getId();
+      List<UUID> originalPipelineIds =
+          dataSet.getPipelines().stream().map(Pipeline::getId).toList();
+
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Updated Published Dataset");
+      updateInput.setDescription("Updated description for published dataset");
+      updateInput.setOpenDataAccess(false);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSetId + "/published/meta",
+              org.springframework.http.HttpMethod.PUT,
+              createAuthHeaders(),
+              updateInput,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("Should return OK status for %s dataset", status)
+          .isEqualTo(HttpStatus.OK);
+
+      assertThat(response.getBody()).isNotNull();
+
+      DataSetOutputDTO output = response.getBody();
+      assertThat(output.getId()).isEqualTo(dataSetId);
+      assertThat(output.getName())
+          .as("Name should be updated")
+          .isEqualTo("Updated Published Dataset");
+      assertThat(output.getDescription())
+          .as("Description should be updated")
+          .isEqualTo("Updated description for published dataset");
+      assertThat(output.getPipelines())
+          .as("Pipelines should remain unchanged")
+          .hasSize(2)
+          .extracting(PipelineSummaryDTO::getId)
+          .containsExactlyInAnyOrderElementsOf(originalPipelineIds);
+      assertThat(output.getDataSetStatus()).as("Status should remain unchanged").isEqualTo(status);
+    }
+
+    @Test
+    @DisplayName("Should fail to update DRAFT dataset via /published/meta endpoint")
+    void shouldFailToUpdateDraftDataSetViaPublishedEndpoint() {
+      UUID dataSetId = createTestEntity();
+
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Updated Name");
+      updateInput.setDescription("Updated description");
+      updateInput.setOpenDataAccess(false);
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSetId + "/published/meta",
+              org.springframework.http.HttpMethod.PUT,
+              createAuthHeaders(),
+              updateInput,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status for DRAFT dataset")
+          .isEqualTo(HttpStatus.CONFLICT);
+
+      // Verify dataset was not modified
+      DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElse(null);
+      assertThat(unchangedDataSet).isNotNull();
+      assertThat(unchangedDataSet.getName())
+          .as("Name should remain unchanged")
+          .doesNotContain("Updated");
+      assertThat(unchangedDataSet.getDataSetStatus())
+          .as("Status should remain DRAFT")
+          .isEqualTo(DataSetStatus.DRAFT);
     }
 
     @Test
@@ -391,6 +643,10 @@ class DataSetControllerIntegrationTest
           .isEqualTo(secondResponse.getBody().getDescription());
     }
 
+    // Tests for preventing updates of published datasets via regular endpoint
+    // are in shouldFailToUpdatePublishedDataSetViaRegularEndpoint and
+    // shouldUpdatePublishedDataSetMetaViaPublishedEndpoint above
+
     @Test
     @DisplayName("Should fail to update non-existent dataset")
     void shouldFailToUpdateNonExistentDataSet() {
@@ -435,9 +691,17 @@ class DataSetControllerIntegrationTest
   class DeleteDataSetTests {
 
     @Test
-    @DisplayName("Should delete dataset successfully")
+    @DisplayName("Should delete DRAFT dataset successfully and cascade to relationships")
     void shouldDeleteDataSetSuccessfully() {
-      UUID dataSetId = createTestEntity();
+      DataSet dataSet = createDataSetWithRelationships();
+      UUID dataSetId = dataSet.getId();
+
+      assertThat(pipelineRepository.findAll())
+          .as("Pipelines should exist before deletion")
+          .hasSize(2);
+      assertThat(distributionRepository.findAll())
+          .as("Distributions should exist before deletion")
+          .hasSize(2);
 
       ResponseEntity<Void> response = performDelete(dataSetId);
 
@@ -449,6 +713,62 @@ class DataSetControllerIntegrationTest
       assertThat(getResponse.getStatusCode())
           .as("Deleted dataset should not be found")
           .isEqualTo(HttpStatus.NOT_FOUND);
+
+      long pipelineCount =
+          pipelineRepository.findAll().stream()
+              .filter(p -> p.getDataSet() != null && p.getDataSet().getId().equals(dataSetId))
+              .count();
+      assertThat(pipelineCount)
+          .as("All pipelines associated with the dataset should be deleted")
+          .isEqualTo(0);
+
+      long distributionCount =
+          distributionRepository.findAll().stream()
+              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
+              .count();
+      assertThat(distributionCount)
+          .as("All distributions associated with the dataset should be deleted")
+          .isEqualTo(0);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+        value = DataSetStatus.class,
+        mode = EnumSource.Mode.EXCLUDE,
+        names = {"DRAFT"})
+    @DisplayName("Should fail to delete dataset when not in DRAFT status")
+    void shouldFailToDeleteNonDraftDataSet(DataSetStatus status) {
+      DataSet dataSet = createDataSetWithRelationships();
+      dataSet.setDataSetStatus(status);
+      dataSet = dataSetRepository.save(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      ResponseEntity<Void> response = performDelete(dataSetId);
+
+      assertThat(response.getStatusCode())
+          .as("Should not allow deletion of %s dataset", status)
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+
+      ResponseEntity<DataSetOutputDTO> getResponse = performGetById(dataSetId);
+      assertThat(getResponse.getStatusCode())
+          .as("Dataset should still exist after failed deletion attempt")
+          .isEqualTo(HttpStatus.OK);
+
+      long pipelineCount =
+          pipelineRepository.findAll().stream()
+              .filter(p -> p.getDataSet() != null && p.getDataSet().getId().equals(dataSetId))
+              .count();
+      assertThat(pipelineCount)
+          .as("Pipelines should still exist after failed deletion attempt")
+          .isEqualTo(2);
+
+      long distributionCount =
+          distributionRepository.findAll().stream()
+              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
+              .count();
+      assertThat(distributionCount)
+          .as("Distributions should still exist after failed deletion attempt")
+          .isEqualTo(2);
     }
 
     @Test
@@ -472,23 +792,6 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode())
           .as("Should return UNAUTHORIZED status")
           .isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-  }
-
-  @Nested
-  @DisplayName("Business Logic Tests")
-  class BusinessLogicTests {
-
-    @Test
-    @DisplayName("Should handle dataset with multiple dataspaces")
-    void shouldHandleDataSetWithMultipleDataSpaces() {
-      DataSetInputDTO input = createValidInput();
-      input.setDataSpaceIds(Collections.emptyList());
-
-      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
     }
   }
 
@@ -530,16 +833,193 @@ class DataSetControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
+  }
+
+  @Nested
+  @DisplayName("Publish DataSet Tests")
+  class PublishDataSetTests {
 
     @Test
-    @DisplayName("Should handle null format")
-    void shouldHandleNullFormat() {
-      DataSetInputDTO input = createValidInput();
-      input.setFormat(null);
+    @DisplayName("Should publish dataset with pipelines successfully")
+    void shouldPublishDataSetWithPipelinesSuccessfully() {
+      DataSet dataSet = new DataSet();
+      dataSet.setName("test_dataset_publish_" + System.currentTimeMillis());
+      dataSet.setDescription("Test dataset with pipelines");
+      dataSet.setDataSetStatus(DataSetStatus.DRAFT);
+      dataSet.setPersistenceId(12345L);
+      dataSet.setIdentifier("test-identifier-publish");
+      dataSet.setVersion("1.0.0");
+      dataSet.setExternalId("ext-dataset-publish-" + System.currentTimeMillis());
+      dataSet.setFormat("JSON");
+      dataSet.setOpenDataAccess(false);
+      dataSet = dataSetRepository.save(dataSet);
 
-      ResponseEntity<DataSetOutputDTO> response = performCreate(input);
+      Pipeline pipeline1 = new Pipeline();
+      pipeline1.setName("test_pipeline_api1_" + System.currentTimeMillis());
+      pipeline1.setDescription("Pipeline with API 1");
+      pipeline1.setDataSet(dataSet);
+      pipeline1.setStyles(createSampleStyles());
+      pipeline1.setModel(createSampleModel());
+      pipeline1.setApis(Arrays.asList("/api/v1/traffic", "/api/v1/sensors"));
+      pipeline1.setPersistences(Collections.singletonList(12345L));
+      pipelineRepository.save(pipeline1);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      Pipeline pipeline2 = new Pipeline();
+      pipeline2.setName("test_pipeline_api2_" + System.currentTimeMillis());
+      pipeline2.setDescription("Pipeline with API 2");
+      pipeline2.setDataSet(dataSet);
+      pipeline2.setStyles(createSampleStyles());
+      pipeline2.setModel(createSampleModel());
+      pipeline2.setApis(Collections.singletonList("/api/v1/weather"));
+      pipeline2.setPersistences(Collections.singletonList(12345L));
+      pipelineRepository.save(pipeline2);
+
+      UUID dataSetId = dataSet.getId();
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSetId + "/publish",
+              org.springframework.http.HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSetStatus())
+          .as("DataSet status should be READY after publishing")
+          .isEqualTo(DataSetStatus.READY);
+
+      long distributionCount =
+          distributionRepository.findAll().stream()
+              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
+              .count();
+
+      assertThat(distributionCount)
+          .as("Should create 3 distributions for 3 unique API paths")
+          .isEqualTo(3);
+
+      distributionRepository.findAll().stream()
+          .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
+          .forEach(
+              distribution -> {
+                assertThat(distribution.getAccessUrl())
+                    .as("Access URL should be set with their respective API paths")
+                    .startsWith("/api/v1/");
+                assertThat(distribution.getApiType())
+                    .as("API type should be SensorThings")
+                    .isEqualTo("SensorThings");
+                assertThat(distribution.getFormat())
+                    .as("Format should be application/json")
+                    .isEqualTo("application/json");
+                assertThat(distribution.getAutoGenerated())
+                    .as("Distribution should be marked as auto-generated")
+                    .isTrue();
+              });
+    }
+
+    @Test
+    @DisplayName("Should fail to publish dataset without pipelines")
+    void shouldFailToPublishDataSetWithoutPipelines() {
+      DataSet dataSet = new DataSet();
+      dataSet.setName("test_dataset_no_pipelines_" + System.currentTimeMillis());
+      dataSet.setDescription("Test dataset without pipelines");
+      dataSet.setDataSetStatus(DataSetStatus.DRAFT);
+      dataSet.setFormat("JSON");
+      dataSet.setOpenDataAccess(false);
+      dataSet = dataSetRepository.save(dataSet);
+
+      UUID dataSetId = dataSet.getId();
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSetId + "/publish",
+              org.springframework.http.HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status for dataset without pipelines")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+
+      DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElse(null);
+      assertThat(unchangedDataSet).isNotNull();
+      assertThat(unchangedDataSet.getDataSetStatus())
+          .as("DataSet status should remain DRAFT after failed publish")
+          .isEqualTo(DataSetStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Should fail to publish non-existent dataset")
+    void shouldFailToPublishNonExistentDataSet() {
+      UUID nonExistentId = UUID.randomUUID();
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + nonExistentId + "/publish",
+              org.springframework.http.HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("Should return NOT_FOUND status")
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should avoid duplicate distributions for same API path")
+    void shouldAvoidDuplicateDistributions() {
+      DataSet dataSet = new DataSet();
+      dataSet.setName("test_dataset_duplicate_apis_" + System.currentTimeMillis());
+      dataSet.setDescription("Test dataset with duplicate API paths");
+      dataSet.setDataSetStatus(DataSetStatus.DRAFT);
+      dataSet.setPersistenceId(12345L);
+      dataSet.setFormat("JSON");
+      dataSet.setOpenDataAccess(false);
+      dataSet = dataSetRepository.save(dataSet);
+
+      Pipeline pipeline1 = new Pipeline();
+      pipeline1.setName("test_pipeline_dup1_" + System.currentTimeMillis());
+      pipeline1.setDescription("Pipeline 1 with duplicate API");
+      pipeline1.setDataSet(dataSet);
+      pipeline1.setStyles(createSampleStyles());
+      pipeline1.setModel(createSampleModel());
+      pipeline1.setApis(Arrays.asList("/api/v1/traffic", "/api/v1/weather"));
+      pipeline1.setPersistences(Collections.singletonList(12345L));
+      pipelineRepository.save(pipeline1);
+
+      Pipeline pipeline2 = new Pipeline();
+      pipeline2.setName("test_pipeline_dup2_" + System.currentTimeMillis());
+      pipeline2.setDescription("Pipeline 2 with duplicate API");
+      pipeline2.setDataSet(dataSet);
+      pipeline2.setStyles(createSampleStyles());
+      pipeline2.setModel(createSampleModel());
+      pipeline2.setApis(Collections.singletonList("/api/v1/traffic")); // Same as in pipeline1
+      pipeline2.setPersistences(Collections.singletonList(12345L));
+      pipelineRepository.save(pipeline2);
+
+      UUID dataSetId = dataSet.getId();
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSetId + "/publish",
+              org.springframework.http.HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+      long distributionCount =
+          distributionRepository.findAll().stream()
+              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
+              .count();
+
+      assertThat(distributionCount)
+          .as("Should create only 2 distributions for 2 unique API paths (not 3)")
+          .isEqualTo(2);
     }
   }
 }

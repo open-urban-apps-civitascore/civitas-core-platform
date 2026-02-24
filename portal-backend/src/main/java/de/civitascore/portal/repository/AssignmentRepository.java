@@ -2,6 +2,8 @@ package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.entity.Role;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,4 +72,6 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
 
   @EntityGraph(attributePaths = {"group", "role", "dataStructure"})
   List<Assignment> findAllByScopeTypeAndDataStructureId(ScopeType scopeType, UUID dataStructureId);
+
+  boolean existsByGroupAndRoleAndScopeTypeIsNull(Group group, Role role);
 }

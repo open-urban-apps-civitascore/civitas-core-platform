@@ -10,8 +10,6 @@ server:
     context-path: /v2
 
 spring:
-  profiles:
-    active: local, postgres
   application:
     name: "CIVITAS/CORE Data Management API"
   security:

@@ -272,7 +272,7 @@ The `KafkaSagaStateStore` uses a **dual-write** architecture:
                     └──────────────┘
 ```
 
-**Write path** (`save`): The saga context is serialized to JSON and written to the Kafka compacted topic `core.civitas.saga.state` with `sagaId` as the message key. The write is **synchronous** (`producer.send().get(timeout)`) — the method blocks until Kafka acknowledges. Only after the Kafka write succeeds is the in-memory map updated. If the Kafka write fails, an `IllegalStateException` is thrown, preventing the engine from dispatching further actions on inconsistent state.
+**Write path** (`save`): The saga context is serialized to JSON and written to the Kafka compacted topic `de.civitascore.saga.state` with `sagaId` as the message key. The write is **synchronous** (`producer.send().get(timeout)`) — the method blocks until Kafka acknowledges. Only after the Kafka write succeeds is the in-memory map updated. If the Kafka write fails, an `IllegalStateException` is thrown, preventing the engine from dispatching further actions on inconsistent state.
 
 **Read path** (`findById`, `existsForDataset`, `findActiveSagas`): All reads go against the in-memory `ConcurrentHashMap`. No Kafka consumer is involved at read time. This makes reads O(1) and lock-free.
 
@@ -325,13 +325,13 @@ SagaStateStore stateStore = new KafkaSagaStateStore(producer, timeout, recovered
 
 | Topic | Type | Key | Value | Purpose |
 |-------|------|-----|-------|---------|
-| `core.civitas.saga.state` | Compacted | sagaId | SagaContext JSON / null (tombstone) | Saga state persistence |
-| `core.civitas.saga.result` | Standard | sagaId | CompleteSaga / FailSaga JSON | Final saga result for portal-backend |
-| `core.civitas.saga.manual-intervention` | Standard | sagaId | SagaContext JSON | Operator alert for compensation failures |
-| `core.civitas.dataset.saga.trigger` | Standard | datasetId | Trigger payload JSON | Portal-backend → Orchestrator |
-| `core.civitas.dataset.{adapter}.execute` | Standard | sagaId | Step command JSON | Orchestrator → Adapter |
-| `core.civitas.dataset.{adapter}.compensate` | Standard | sagaId | Compensation command JSON | Orchestrator → Adapter |
-| `core.civitas.dataset.{adapter}.result` | Standard | sagaId | Step result JSON | Adapter → Orchestrator |
+| `de.civitascore.saga.state` | Compacted | sagaId | SagaContext JSON / null (tombstone) | Saga state persistence |
+| `de.civitascore.saga.result` | Standard | sagaId | CompleteSaga / FailSaga JSON | Final saga result for portal-backend |
+| `de.civitascore.saga.manual-intervention` | Standard | sagaId | SagaContext JSON | Operator alert for compensation failures |
+| `de.civitascore.dataset.saga.trigger` | Standard | datasetId | Trigger payload JSON | Portal-backend → Orchestrator |
+| `de.civitascore.dataset.{adapter}.execute` | Standard | sagaId | Step command JSON | Orchestrator → Adapter |
+| `de.civitascore.dataset.{adapter}.compensate` | Standard | sagaId | Compensation command JSON | Orchestrator → Adapter |
+| `de.civitascore.dataset.{adapter}.result` | Standard | sagaId | Step result JSON | Adapter → Orchestrator |
 
 Where `{adapter}` is one of: `frost`, `apisix`, `redpanda`.
 
@@ -358,8 +358,8 @@ record SagaStepDefinition(
     String adapter,         // "frost"
     String operation,       // "CREATE_PROJECT"
     String compensationOp,  // "DELETE_PROJECT" (null for delete sagas)
-    String executeTopic,    // "core.civitas.dataset.frost.execute"
-    String compensateTopic, // "core.civitas.dataset.frost.compensate"
+    String executeTopic,    // "de.civitascore.dataset.frost.execute"
+    String compensateTopic, // "de.civitascore.dataset.frost.compensate"
     boolean conditional     // false for mandatory, true for pipelines
 )
 ```
@@ -508,7 +508,7 @@ public interface SagaCommandHandler extends AutoCloseable {
 }
 ```
 
-Discovered via `ServiceLoader<SagaCommandHandler>` in `Application.java`. Registrierung in `META-INF/services/com.civitas.configadapter.adapter.SagaCommandHandler`.
+Discovered via `ServiceLoader<SagaCommandHandler>` in `Application.java`. Registrierung in `META-INF/services/de.civitascore.configadapter.adapter.SagaCommandHandler`.
 
 ### 8.3 Message Format
 
@@ -545,7 +545,7 @@ APISIX verwendet **deterministische IDs** (= `datasetId`) für idempotente PUT-O
 
 ## 9. Model Classes (config-adapter-api)
 
-All saga model classes live in `com.civitas.configadapter.model.saga` in the `config-adapter-api` module. The adapter interfaces (`SagaCommandHandler`, `SagaCommandMessage`, `SagaCommandResult`) live in `com.civitas.configadapter.adapter`, so they are available to both the orchestrator and the adapters.
+All saga model classes live in `de.civitascore.configadapter.model.saga` in the `config-adapter-api` module. The adapter interfaces (`SagaCommandHandler`, `SagaCommandMessage`, `SagaCommandResult`) live in `de.civitascore.configadapter.adapter`, so they are available to both the orchestrator and the adapters.
 
 | Class | Type | Purpose |
 |-------|------|---------|

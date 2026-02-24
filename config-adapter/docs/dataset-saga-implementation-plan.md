@@ -186,11 +186,11 @@ These decisions were made during the team review of the initial proposal:
 Defined in `config-adapter-api`:
 
 ```java
-package com.civitas.configadapter.orchestrator;
+package de.civitascore.configadapter.orchestrator;
 
-import com.civitas.configadapter.configuration.AdapterConfig;
-import com.civitas.configadapter.messaging.EventPublisher;
-import com.civitas.configadapter.model.ConfigEvent;
+import de.civitascore.configadapter.configuration.AdapterConfig;
+import de.civitascore.configadapter.messaging.EventPublisher;
+import de.civitascore.configadapter.model.ConfigEvent;
 import java.util.List;
 
 /**
@@ -221,7 +221,7 @@ public interface SagaOrchestrator {
 
 ### Saga Model Classes
 
-New package `com.civitas.configadapter.model.saga` in `config-adapter-api`:
+New package `de.civitascore.configadapter.model.saga` in `config-adapter-api`:
 
 ```java
 // Saga workflow types
@@ -370,7 +370,7 @@ config-adapter/
       SagaStepDefinition.java
     src/main/resources/
       META-INF/services/
-        com.civitas.configadapter.orchestrator.SagaOrchestrator
+        de.civitascore.configadapter.orchestrator.SagaOrchestrator
     pom.xml                          # depends on config-adapter-api
   config-adapter-application/   # wires everything together (existing)
 ```
@@ -399,7 +399,7 @@ The orchestrator is the **single source of truth** for saga state. It maintains:
 
 1. **Step definitions**: an ordered list of adapter steps per saga type
 2. **Active saga state**: in-memory map of `sagaId -> SagaContext` for running sagas
-3. **Persistent state**: every state transition is written to a Kafka compacted topic (`core.civitas.saga.state`), keyed by `sagaId`
+3. **Persistent state**: every state transition is written to a Kafka compacted topic (`de.civitascore.saga.state`), keyed by `sagaId`
 
 On startup, the orchestrator replays the state topic to rebuild all in-flight sagas. Combined with per-step timeouts, this means sagas that were in-flight during a crash are automatically recovered and either resumed or timed out.
 
@@ -616,27 +616,27 @@ Separate topics per adapter are used (rather than central `saga.commands` / `sag
 | Topic | Direction | Purpose |
 |-------|-----------|---------|
 | **Saga triggers** | | |
-| `core.civitas.dataset.create.requested` | Backend -> Orchestrator | Start dataset create saga |
+| `de.civitascore.dataset.create.requested` | Backend -> Orchestrator | Start dataset create saga |
 | **FROST adapter** | | |
-| `core.civitas.dataset.frost.execute` | Orchestrator -> FROST | Execute FROST step |
-| `core.civitas.dataset.frost.completed` | FROST -> Orchestrator | FROST success reply |
-| `core.civitas.dataset.frost.failed` | FROST -> Orchestrator | FROST failure reply |
-| `core.civitas.dataset.frost.compensate` | Orchestrator -> FROST | Compensate FROST |
+| `de.civitascore.dataset.frost.execute` | Orchestrator -> FROST | Execute FROST step |
+| `de.civitascore.dataset.frost.completed` | FROST -> Orchestrator | FROST success reply |
+| `de.civitascore.dataset.frost.failed` | FROST -> Orchestrator | FROST failure reply |
+| `de.civitascore.dataset.frost.compensate` | Orchestrator -> FROST | Compensate FROST |
 | **APISIX adapter** | | |
-| `core.civitas.dataset.apisix.execute` | Orchestrator -> APISIX | Execute APISIX step |
-| `core.civitas.dataset.apisix.completed` | APISIX -> Orchestrator | APISIX success reply |
-| `core.civitas.dataset.apisix.failed` | APISIX -> Orchestrator | APISIX failure reply |
-| `core.civitas.dataset.apisix.compensate` | Orchestrator -> APISIX | Compensate APISIX |
+| `de.civitascore.dataset.apisix.execute` | Orchestrator -> APISIX | Execute APISIX step |
+| `de.civitascore.dataset.apisix.completed` | APISIX -> Orchestrator | APISIX success reply |
+| `de.civitascore.dataset.apisix.failed` | APISIX -> Orchestrator | APISIX failure reply |
+| `de.civitascore.dataset.apisix.compensate` | Orchestrator -> APISIX | Compensate APISIX |
 | **RedPanda Connect adapter** | | |
-| `core.civitas.dataset.redpanda.execute` | Orchestrator -> RedPanda | Execute RedPanda step |
-| `core.civitas.dataset.redpanda.completed` | RedPanda -> Orchestrator | RedPanda success reply |
-| `core.civitas.dataset.redpanda.failed` | RedPanda -> Orchestrator | RedPanda failure reply |
-| `core.civitas.dataset.redpanda.compensate` | Orchestrator -> RedPanda | Compensate RedPanda |
+| `de.civitascore.dataset.redpanda.execute` | Orchestrator -> RedPanda | Execute RedPanda step |
+| `de.civitascore.dataset.redpanda.completed` | RedPanda -> Orchestrator | RedPanda success reply |
+| `de.civitascore.dataset.redpanda.failed` | RedPanda -> Orchestrator | RedPanda failure reply |
+| `de.civitascore.dataset.redpanda.compensate` | Orchestrator -> RedPanda | Compensate RedPanda |
 | **Dataset saga results** | | |
-| `core.civitas.dataset.completed` | Orchestrator -> Backend | Dataset saga succeeded |
-| `core.civitas.dataset.failed` | Orchestrator -> Backend | Dataset saga failed (compensated) |
+| `de.civitascore.dataset.completed` | Orchestrator -> Backend | Dataset saga succeeded |
+| `de.civitascore.dataset.failed` | Orchestrator -> Backend | Dataset saga failed (compensated) |
 | **Orchestrator state** | | |
-| `core.civitas.saga.state` | Orchestrator (internal) | Compacted topic for saga state persistence and crash recovery |
+| `de.civitascore.saga.state` | Orchestrator (internal) | Compacted topic for saga state persistence and crash recovery |
 
 ### User Pipeline Topics
 
@@ -644,10 +644,10 @@ The user pipeline is **not routed through the orchestrator** in the initial impl
 
 | Topic | Direction | Purpose |
 |-------|-----------|---------|
-| `core.civitas.user.keycloak.execute` | Orchestrator -> Keycloak | Execute Keycloak step |
-| `core.civitas.user.keycloak.completed` | Keycloak -> Orchestrator | Keycloak success reply |
-| `core.civitas.user.keycloak.failed` | Keycloak -> Orchestrator | Keycloak failure reply |
-| `core.civitas.user.keycloak.compensate` | Orchestrator -> Keycloak | Compensate Keycloak |
+| `de.civitascore.user.keycloak.execute` | Orchestrator -> Keycloak | Execute Keycloak step |
+| `de.civitascore.user.keycloak.completed` | Keycloak -> Orchestrator | Keycloak success reply |
+| `de.civitascore.user.keycloak.failed` | Keycloak -> Orchestrator | Keycloak failure reply |
+| `de.civitascore.user.keycloak.compensate` | Orchestrator -> Keycloak | Compensate Keycloak |
 
 These topics will be activated when a second adapter is added to the user pipeline.
 
@@ -656,32 +656,32 @@ These topics will be activated when a second adapter is added to the user pipeli
 **Orchestrator** subscribes to:
 ```
 # Dataset pipeline
-core.civitas.dataset.create.requested    (trigger)
-core.civitas.dataset.frost.completed     (reply)
-core.civitas.dataset.frost.failed        (reply)
-core.civitas.dataset.apisix.completed    (reply)
-core.civitas.dataset.apisix.failed       (reply)
-core.civitas.dataset.redpanda.completed  (reply)
-core.civitas.dataset.redpanda.failed     (reply)
-core.civitas.saga.state                  (internal: state recovery on startup)
+de.civitascore.dataset.create.requested    (trigger)
+de.civitascore.dataset.frost.completed     (reply)
+de.civitascore.dataset.frost.failed        (reply)
+de.civitascore.dataset.apisix.completed    (reply)
+de.civitascore.dataset.apisix.failed       (reply)
+de.civitascore.dataset.redpanda.completed  (reply)
+de.civitascore.dataset.redpanda.failed     (reply)
+de.civitascore.saga.state                  (internal: state recovery on startup)
 ```
 
 **FROST adapter** subscribes to (saga topics added to existing FROST topics):
 ```
-core.civitas.dataset.frost.execute       (command)
-core.civitas.dataset.frost.compensate    (command)
+de.civitascore.dataset.frost.execute       (command)
+de.civitascore.dataset.frost.compensate    (command)
 ```
 
 **APISIX adapter** subscribes to (saga topics added to existing APISIX topics):
 ```
-core.civitas.dataset.apisix.execute      (command)
-core.civitas.dataset.apisix.compensate   (command)
+de.civitascore.dataset.apisix.execute      (command)
+de.civitascore.dataset.apisix.compensate   (command)
 ```
 
 **RedPanda Connect adapter** subscribes to:
 ```
-core.civitas.dataset.redpanda.execute    (command)
-core.civitas.dataset.redpanda.compensate (command)
+de.civitascore.dataset.redpanda.execute    (command)
+de.civitascore.dataset.redpanda.compensate (command)
 ```
 
 **Keycloak adapter** subscribes to existing IDM topics only (saga topics prepared but not active).
@@ -863,7 +863,7 @@ This section defines what the RedPanda Connect adapter (or any future adapter) m
 
 1. **Subscribe to your execute and compensate topics**:
    ```properties
-   redpanda.topics=core.civitas.dataset.redpanda.execute,core.civitas.dataset.redpanda.compensate
+   redpanda.topics=de.civitascore.dataset.redpanda.execute,de.civitascore.dataset.redpanda.compensate
    ```
 
 2. **Handle the execute command**: When receiving a `ConfigEvent` on `dataset.redpanda.execute`:
@@ -923,7 +923,7 @@ class RedPandaSagaHandler {
                                                     "connectorId", connectorId);
         SagaContext updated = SagaContextHelper.markStepSuccess(
             event.saga(), "create-connector", result, compensation, SagaStatus.IN_PROGRESS);
-        Metadata metadata = SagaContextHelper.createSagaMetadata("civitas.config-adapter.redpanda", event);
+        Metadata metadata = SagaContextHelper.createSagaMetadata("de.civitascore.config-adapter.redpanda", event);
         ConfigEvent reply = new ConfigEvent(metadata, event.payload(), updated);
         // Publish reply to dataset.redpanda.completed
 
@@ -940,7 +940,7 @@ class RedPandaSagaHandler {
         // 2. Delete the connector (idempotent: handle "not found" as success)
         // 3. Mark compensated
         SagaContext compensated = SagaContextHelper.markStepCompensated(event.saga(), "create-connector");
-        Metadata metadata = SagaContextHelper.createSagaMetadata("civitas.config-adapter.redpanda", event);
+        Metadata metadata = SagaContextHelper.createSagaMetadata("de.civitascore.config-adapter.redpanda", event);
         ConfigEvent reply = new ConfigEvent(metadata, event.payload(), compensated);
         // Publish reply to dataset.redpanda.completed with COMPENSATED status
     }
@@ -976,7 +976,7 @@ If compensation itself fails, the orchestrator handles it as follows:
 
 1. **Kafka-level retry**: The Kafka consumer's built-in retry and DLQ mechanism handles transient failures (network issues, temporary unavailability). If the compensation message fails processing, Kafka retries it automatically.
 2. **Persistent failure**: If compensation still fails after Kafka DLQ retries, the orchestrator marks the saga as `COMPENSATION_FAILED`. The saga state (persisted in the Kafka state topic) tracks exactly which steps are `COMPENSATED`, which are `COMPENSATION_FAILED`, and which are still `SUCCESS` (not yet compensated).
-3. **Alerting**: The orchestrator publishes a detailed event to `core.civitas.saga.manual-intervention` containing the full saga context -- saga ID, affected steps, resource IDs, and error details.
+3. **Alerting**: The orchestrator publishes a detailed event to `de.civitascore.saga.manual-intervention` containing the full saga context -- saga ID, affected steps, resource IDs, and error details.
 4. **Manual resolution** (via the future orchestrator API):
    - **Retry compensation**: Operator triggers a retry for the specific failed compensation step
    - **Skip and acknowledge**: Operator manually cleans up the resource and marks the step as compensated
@@ -995,7 +995,7 @@ Compensating a delete operation (recreating a deleted resource) is **not support
 
 ### Crash Recovery
 
-The orchestrator persists every state transition to the Kafka compacted topic `core.civitas.saga.state`, keyed by `sagaId`. On startup:
+The orchestrator persists every state transition to the Kafka compacted topic `de.civitascore.saga.state`, keyed by `sagaId`. On startup:
 
 1. The orchestrator replays the state topic to rebuild all in-flight sagas
 2. For each recovered saga, it checks the timestamp against the configured step timeout
@@ -1022,7 +1022,7 @@ Each adapter is responsible for:
 
 ### Saga State Topic as Audit Log
 
-The Kafka compacted topic `core.civitas.saga.state` serves dual purposes: crash recovery and audit trail. Tooling can consume this topic to visualize saga progress, build dashboards, and investigate failures.
+The Kafka compacted topic `de.civitascore.saga.state` serves dual purposes: crash recovery and audit trail. Tooling can consume this topic to visualize saga progress, build dashboards, and investigate failures.
 
 ### Structured Logging
 
@@ -1039,7 +1039,7 @@ Key metrics to expose (implementation depends on deployment environment):
 
 ### Alerting
 
-- `COMPENSATION_FAILED` events trigger alerts via the `core.civitas.saga.manual-intervention` topic
+- `COMPENSATION_FAILED` events trigger alerts via the `de.civitascore.saga.manual-intervention` topic
 - Timeout events are logged at WARN level
 - High compensation rates indicate systemic adapter issues
 
