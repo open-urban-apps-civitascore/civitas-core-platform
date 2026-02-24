@@ -1,10 +1,10 @@
--- Dev Admin Seed Data for Team 2's Backend Dev Environment
--- Creates a dev admin user with ALL permissions so team 2 gets
--- authorization "for free" when starting their dev environment.
+-- Dev Admin Seed Data for Backend Dev Environment
+-- Creates a dev admin user with ALL permissions so developers get
+-- authorization "for free" when starting the dev environment.
 --
 -- Dev Admin User:
---   - Email: dev.admin@civitas.dev
---   - Password: admin (set in Keycloak realm-export.json)
+--   - Email: dev@civitas.local
+--   - Password: dev123 (set in Keycloak realm-export.json)
 --   - Has ALL permissions via DevAdmin role
 --
 -- ID prefix A0000000-... to avoid conflicts with authz test seed (10000000-...)
@@ -120,12 +120,12 @@ WHERE name IN (
 ON CONFLICT DO NOTHING;
 
 -- =============================================================================
--- USER (dev.admin@civitas.dev)
+-- USER (dev@civitas.local)
 -- =============================================================================
--- external_id matches the fixed UUID in Keycloak realm-export.json
+-- external_id matches the pinned UUID in Keycloak realm-export.json
 
 INSERT INTO users (id, external_id, first_name, last_name, email, active, created_at)
-VALUES ('A0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Dev', 'Admin', 'dev.admin@civitas.dev', true, NOW())
+VALUES ('A0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Developer', 'User', 'dev@civitas.local', true, NOW())
 ON CONFLICT (email) DO UPDATE SET
     external_id = EXCLUDED.external_id,
     first_name = EXCLUDED.first_name,

@@ -11,6 +11,7 @@ include:
   - path: ../postgres/docker-compose.yml
   - path: ../keycloak/docker-compose.yml
   - path: ../modelatlas/docker-compose.yml
+  - path: ../apisix/docker-compose.authz.yml
   - path: ../apisix/docker-compose.yml
 
 services:

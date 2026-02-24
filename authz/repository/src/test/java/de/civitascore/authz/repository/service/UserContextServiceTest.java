@@ -15,6 +15,7 @@ import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.entity.User;
+import de.civitascore.portal.model.entity.base.NamedEntity;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -280,7 +281,12 @@ class UserContextServiceTest {
     // Only stub methods actually used by UserContextService
     when(assignment.getRole()).thenReturn(role);
     when(assignment.getScopeType()).thenReturn(scopeType);
-    when(assignment.getScopeId()).thenReturn(scopeId);
+    // Assignment no longer has getScopeId(); scope is resolved via getScope().getId()
+    NamedEntity scopeEntity = scopeId != null ? mock(NamedEntity.class) : null;
+    if (scopeEntity != null) {
+      when(scopeEntity.getId()).thenReturn(scopeId);
+    }
+    when(assignment.getScope()).thenReturn(scopeEntity);
     return assignment;
   }
 }

@@ -1,29 +1,16 @@
-# M5: Full AuthZ Integration Stack (standalone development)
+# AuthZ Services — OPA + AuthZ Repository + Seed
 #
-# Complete authorization chain: APISIX -> OPA -> AuthZ Repository
+# Split from docker-compose.yml so that the APISIX gateway can run
+# independently. Included by backend/docker-compose.yml for full-Docker
+# mode and started by start-portal-dev.sh for dev mode.
 #
-# This compose file brings up all components needed for end-to-end authorization:
-#   - AuthZ Repository: Serves user context (permissions, roles, groups)
-#   - OPA: Policy decision point, fetches context from AuthZ Repository
-#   - APISIX: API gateway, validates JWT and calls OPA for authorization
-#
-# Prerequisites:
-#   - PostgreSQL (civitas-postgres-portal) must be running with portal_backend DB
-#   - Keycloak (civitas-keycloak) must be running
-#   - Portal Backend (port 8089) should be running for actual API requests
-#
-# NOTE: This stack and dev-environment/apisix/docker-compose.yml define the same
-# OPA and AuthZ Repository services (same container names and ports). They are
-# mutually exclusive — do not run both simultaneously.
-#
-# Usage:
-#   docker compose up -d
-#
-# Test:
-#   ./integration-test.sh
+# Environment variables (set by start script):
+#   OPA_DATA_DIR  — path to backends data (default: real permissions)
+#                   Set to backends-allowall for allow-all mode.
 
 services:
   # AuthZ Repository - serves user context to OPA
+  # Requires PostgreSQL (postgres-portal) to be running — started by infra compose.
   authz-repository:
     build:
       context: ../../authz/repository
@@ -31,7 +18,7 @@ services:
     container_name: civitas-authz-repository
     restart: always
     environment:
-      DATABASE_URL: jdbc:postgresql://civitas-postgres-portal:5432/portal_backend
+      DATABASE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
       DATABASE_USERNAME: ${POSTGRES_USER:-admin}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       SERVER_PORT: 8091
@@ -66,7 +53,7 @@ services:
       - ../../authz/rego/policy:/policies:ro
       - ../../authz/rego/lib:/lib:ro
       - ../../authz/rego/providers:/providers:ro
-      - ../../authz/rego/data/backends:/data/backends:ro
+      - ${OPA_DATA_DIR:-../../authz/rego/data/backends}:/data/backends:ro
       - ./opa-config.json:/data/config.json:ro
     ports:
       - "8181:8181"
@@ -82,23 +69,24 @@ services:
       authz-repository:
         condition: service_healthy
 
-  # APISIX - API Gateway with OPA plugin
-  apisix:
-    image: apache/apisix:3.14.0-debian
-    container_name: civitas-apisix-authz
-    restart: always
+  # One-shot: Seed dev admin data after Flyway migrations complete.
+  # Requires portal-backend (Flyway creates tables) and AuthZ Repository to be healthy.
+  # In full-Docker mode (backend/docker-compose.yml), these are in the same project.
+  # In dev mode, start-portal-dev.sh handles ordering.
+  authz-seed:
+    image: postgres:17-alpine
+    container_name: civitas-authz-seed
+    restart: "no"
     volumes:
-      - ./apisix-config.yaml:/usr/local/apisix/conf/config.yaml:ro
-      - ./apisix-routes.yaml:/usr/local/apisix/conf/apisix.yaml:ro
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "9080:9080"
-      - "9443:9443"
+      - ./seed-dev-admin.sql:/seed-dev-admin.sql:ro
+    command: >
+      psql -h postgres-portal -U ${POSTGRES_USER:-admin} -d portal_backend -f /seed-dev-admin.sql
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-admin}
     networks:
       - civitas-network
     depends_on:
-      opa:
+      authz-repository:
         condition: service_healthy
 
 networks:

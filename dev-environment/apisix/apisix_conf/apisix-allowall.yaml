@@ -1,0 +1,70 @@
+# APISIX Routes — ALLOW-ALL Mode
+# DEV-ONLY: Injects X-Allowed-Scope-Ids: * for all requests.
+#
+# Differences from apisix.yaml:
+#   - proxy-rewrite SETS X-Allowed-Scope-Ids: * instead of REMOVING it
+#
+# This gives every authenticated user wildcard scope access.
+# OPA still runs (with null-permission data.json → Rule 1: authenticated_endpoint).
+# The injected header ensures the backend treats every request as TENANT-scoped.
+#
+# NEVER deploy this config to production.
+
+services:
+  - id: svc-portal-backend
+    name: portal-backend
+    desc: "Portal Backend API Service"
+    upstream:
+      type: roundrobin
+      nodes:
+        "portal-backend:8089": 1
+      timeout:
+        connect: 6
+        send: 6
+        read: 6
+
+plugin_configs:
+  - id: 1
+    desc: "Allow-all auth (JWT + OPA + wildcard scope header)"
+    plugins:
+      # 1. JWT validation — same as full mode
+      openid-connect:
+        client_id: "apisix-validator"
+        client_secret: "unused-for-jwks-validation"
+        discovery: "http://civitas-keycloak:8080/realms/civitas-core/.well-known/openid-configuration"
+        bearer_only: true
+        use_jwks: true
+        ssl_verify: false
+        set_userinfo_header: true
+
+      # 2. OPA authorization — same as full mode
+      opa:
+        host: "http://civitas-opa:8181"
+        policy: "civitas/authz/decision"
+        with_route: true
+        with_service: true
+        with_consumer: false
+        send_headers_upstream:
+          - "X-Allowed-Scope-Ids"
+
+      # 3. ALLOW-ALL: Inject wildcard scope header.
+      # In full mode this REMOVES the client-supplied header.
+      # In allow-all mode we SET it to * so the backend sees wildcard scope
+      # regardless of what OPA returns (OPA returns no headers for null-permission).
+      proxy-rewrite:
+        headers:
+          set:
+            X-Allowed-Scope-Ids: "*"
+
+      # 4. Request ID for tracing
+      request-id:
+        include_in_response: true
+
+routes:
+  - id: portal-backend-api
+    name: "Portal Backend API (Allow-All)"
+    uri: /v2/*
+    service_id: svc-portal-backend
+    plugin_config_id: 1
+
+#END

@@ -82,7 +82,7 @@ public class UserContextService {
         .roleName(role != null ? role.getName() : null)
         .roleType(role != null && role.getRoleType() != null ? role.getRoleType().name() : null)
         .scopeType(assignment.getScopeType() != null ? assignment.getScopeType().name() : null)
-        .scopeId(assignment.getScopeId() != null ? assignment.getScopeId().toString() : null)
+        .scopeId(assignment.getScope() != null ? assignment.getScope().getId().toString() : null)
         .permissions(permissionNames)
         .build();
   }

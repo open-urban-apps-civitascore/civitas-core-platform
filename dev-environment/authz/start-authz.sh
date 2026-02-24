@@ -148,13 +148,15 @@ echo ""
 
 # ---------- AuthZ Docker stack (AuthZ Repository + OPA + APISIX) ----------
 echo "--- AuthZ Docker stack ---"
-cd "$SCRIPT_DIR"
+cd "$PROJECT_ROOT/dev-environment/apisix"
 
-docker compose build --quiet 2>/dev/null
-docker compose up -d 2>/dev/null
+docker compose -f docker-compose.authz.yml build --quiet 2>/dev/null
+docker compose -f docker-compose.authz.yml up -d 2>/dev/null
 
 wait_for "AuthZ Repository" "http://localhost:8091/actuator/health" 60 || { fail "AuthZ Repository did not start"; exit 1; }
 wait_for "OPA" "http://localhost:8181/health" 30 || { fail "OPA did not start"; exit 1; }
+
+docker compose up -d 2>/dev/null
 wait_for_any_response "APISIX" "http://localhost:9080/v2/users" 30 || { fail "APISIX did not start"; exit 1; }
 echo ""
 

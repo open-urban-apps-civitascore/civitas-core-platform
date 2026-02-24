@@ -10,6 +10,37 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ---- CLI Arguments ---------------------------------------------------
+
+authz_arg=""
+
+usage() {
+    echo "Usage: start-portal-dev.sh [options]"
+    echo
+    echo "Options:"
+    echo "  --authz=full       Full AuthZ (enforce permissions per endpoint)"
+    echo "  --authz=allowall   Allow-all (any logged-in user can do anything)"
+    echo "  -h, --help         Show this help"
+    echo
+    echo "If --authz is not provided, you'll be prompted interactively."
+    exit 0
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --authz=*)
+            val="${1#*=}"
+            case "$val" in
+                full)     authz_arg="1" ;;
+                allowall) authz_arg="2" ;;
+                *) echo "ERROR: --authz must be 'full' or 'allowall'"; exit 1 ;;
+            esac ;;
+        -h|--help) usage ;;
+        *) echo "ERROR: Unknown option: $1"; exit 1 ;;
+    esac
+    shift
+done
+
 echo "======================================================"
 echo "CIVITAS CORE Platform - Portal Development Setup"
 echo "======================================================"
@@ -118,6 +149,44 @@ cd "$SCRIPT_DIR/keycloak"
 $DOCKER_COMPOSE up -d
 echo "  Keycloak started"
 
+# ---- AuthZ Mode Selection -------------------------------------------
+
+echo
+echo "======================================================"
+echo "Authorization Mode"
+echo "======================================================"
+echo
+
+if [ -n "$authz_arg" ]; then
+    authz_option="$authz_arg"
+    echo "  Mode: $([ "$authz_option" = "1" ] && echo 'full' || echo 'allowall') (--authz)"
+else
+    echo "How should authorization work?"
+    echo
+    echo "  1) Full AuthZ (enforce permissions per endpoint)"
+    echo "  2) Allow-all (any logged-in user can do anything)"
+    echo
+    read -p "Select option [1/2]: " authz_option
+fi
+
+echo
+
+if [ "$authz_option" = "2" ]; then
+    echo "  Starting in ALLOW-ALL mode (wildcard scope, null-permission data)"
+    export OPA_DATA_DIR="../../authz/rego/data/backends-allowall"
+    export APISIX_CONFIG="./apisix_conf/apisix-allowall.yaml"
+else
+    echo "  Starting in FULL AUTHZ mode (enforce permissions)"
+fi
+
+echo
+
+# Start AuthZ services (OPA + AuthZ Repository)
+cd "$SCRIPT_DIR/apisix"
+$DOCKER_COMPOSE -f docker-compose.authz.yml up -d
+echo "  AuthZ services started (OPA + AuthZ Repository)"
+
+# Start APISIX gateway
 cd "$SCRIPT_DIR/apisix"
 $DOCKER_COMPOSE up -d
 echo "  APISIX started"
@@ -171,6 +240,8 @@ wait_for_service() {
 
 wait_for_service "Keycloak" "http://localhost:8080/realms/master" 60
 wait_for_service "Kafka UI" "http://localhost:8090" 30
+wait_for_service "OPA" "http://localhost:8181/health" 30
+wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 60
 
 echo
 
@@ -326,11 +397,14 @@ fi
 if [ "$backend_option" = "1" ]; then
     echo "Starting Portal Backend..."
     cd "$SCRIPT_DIR/../portal-backend"
-    gnome-terminal --title="Portal Backend" -- bash -c "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; exec bash" 2>/dev/null || \
-    xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; bash" 2>/dev/null || \
+    # Override issuer to match APISIX's Keycloak discovery URL (civitas-keycloak hostname).
+    # Requires /etc/hosts: 127.0.0.1 civitas-keycloak
+    BACKEND_KEYCLOAK_ARGS='--keycloak.issuer-uri=http://civitas-keycloak:8080 --keycloak.auth-server-url=http://civitas-keycloak:8080'
+    gnome-terminal --title="Portal Backend" -- bash -c "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dspring-boot.run.arguments=\"$BACKEND_KEYCLOAK_ARGS\"; exec bash" 2>/dev/null || \
+    xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dspring-boot.run.arguments=\"$BACKEND_KEYCLOAK_ARGS\"; bash" 2>/dev/null || \
     {
         echo "Could not open new terminal. Starting in background..."
-        mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION &
+        mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dspring-boot.run.arguments="$BACKEND_KEYCLOAK_ARGS" &
     }
     echo
 else
@@ -347,6 +421,8 @@ else
     echo "  Project: portal-backend"
     echo "  Main class: de.civitascore.portal.PortalBackendApplication"
     echo "  Profiles: local,local-init,postgres"
+    echo "  VM args: -Dkeycloak.issuer-uri=http://civitas-keycloak:8080 -Dkeycloak.auth-server-url=http://civitas-keycloak:8080"
+    echo "  (Requires /etc/hosts: 127.0.0.1 civitas-keycloak)"
     echo
 fi
 
@@ -450,6 +526,8 @@ echo "  Keycloak Admin:   http://localhost:8080 (admin/admin)"
 echo "  Kafka UI:         http://localhost:8090"
 echo "  FROST Server:     http://localhost:1883"
 echo "  APISIX Gateway:   http://localhost:9080"
+echo "  OPA:              http://localhost:8181"
+echo "  AuthZ Repository: http://localhost:8091"
 echo
 echo "======================================================"
 echo "Default Development User"

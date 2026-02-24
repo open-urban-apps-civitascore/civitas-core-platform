@@ -29,6 +29,9 @@ $COMPOSE_DOWN 2>/dev/null && echo "  FROST Server stopped" || true
 cd "$SCRIPT_DIR/apisix"
 $COMPOSE_DOWN 2>/dev/null && echo "  APISIX stopped" || true
 
+cd "$SCRIPT_DIR/apisix"
+docker compose -f docker-compose.authz.yml down $([[ "$remove_volumes" =~ ^[Yy]$ ]] && echo "-v") 2>/dev/null && echo "  AuthZ services stopped" || true
+
 cd "$SCRIPT_DIR/keycloak"
 $COMPOSE_DOWN 2>/dev/null && echo "  Keycloak stopped" || true
 
