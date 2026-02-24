@@ -111,6 +111,9 @@ class AdapterExceptionTest {
     assertTrue(AdapterErrorCode.KEYCLOAK_ERROR.getCode() >= 3000);
     assertTrue(AdapterErrorCode.KEYCLOAK_ERROR.getCode() < 4000);
 
+    // 3xxx: REDPANDA_ERROR is retryable (used for HTTP 5xx via RetryableAdapterException)
+    assertTrue(AdapterErrorCode.REDPANDA_ERROR.isRetryable());
+
     // 9xxx = Unknown
     assertFalse(AdapterErrorCode.UNKNOWN_ERROR.isRetryable());
     assertTrue(AdapterErrorCode.UNKNOWN_ERROR.getCode() >= 9000);

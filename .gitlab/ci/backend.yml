@@ -297,6 +297,10 @@ deploy-backend:
     - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/backend-portal:${REVISION}-scan
     - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/backend-portal:$REVISION
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/backend-portal:$REVISION --tag $CI_REGISTRY_IMAGE/backend-portal:$CI_COMMIT_BRANCH
+      fi
 
 sbom-backend-image:
   extends: .only-backend-changes

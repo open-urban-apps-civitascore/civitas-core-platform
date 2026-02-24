@@ -129,6 +129,13 @@ class TopicsTest {
   }
 
   @Test
+  void getValue_whenPipelineTopics_shouldReturnCorrectValues() {
+    assertEquals("de.civitascore.data.pipeline.created", Topics.PIPELINE_CREATED.getValue());
+    assertEquals("de.civitascore.data.pipeline.updated", Topics.PIPELINE_UPDATED.getValue());
+    assertEquals("de.civitascore.data.pipeline.deleted", Topics.PIPELINE_DELETED.getValue());
+  }
+
+  @Test
   void isValidTopic_whenValidTopic_shouldReturnTrue() {
     assertTrue(Topics.isValidTopic("de.civitascore.api.backend.created"));
     assertTrue(Topics.isValidTopic("de.civitascore.api.route.created"));
@@ -230,10 +237,17 @@ class TopicsTest {
   }
 
   @Test
-  void values_whenCounted_shouldReturn43() {
+  void allTopics_whenAccessed_shouldContainPipelineTopics() {
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.pipeline.created"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.pipeline.updated"));
+    assertTrue(Topics.ALL_TOPICS.contains("de.civitascore.data.pipeline.deleted"));
+  }
+
+  @Test
+  void values_whenCounted_shouldReturn46() {
     // User: 7, Realm: 3, Client: 3, Group: 3, Role: 3, Backend: 3, Route: 3,
     // Thing: 3, Location: 3, Sensor: 3, ObservedProperty: 3, Datastream: 3,
-    // FROST Project: 3 = 43
-    assertEquals(43, Topics.values().length);
+    // FROST Project: 3, Pipeline: 3 = 46
+    assertEquals(46, Topics.values().length);
   }
 }
