@@ -1,31 +1,23 @@
 import { AxiosRequestConfig } from 'axios'
 import { InputHTMLAttributes } from 'react'
-
-import { enumFromConst } from '@/utils/common'
+import z from 'zod'
 
 export type Item = {
   id: string
   title: string
 }
 
-export type Item2 = {
-  id: string
-  name: string
-}
+export const ItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+})
+
+export type ItemType = z.infer<typeof ItemSchema>
 
 export type SelectOption = {
   value: string
   label: string
 }
-
-export const STATUS_TYPES = {
-  DRAFT: 'DRAFT',
-  AVAILABLE: 'AVAILABLE',
-} as const
-
-export const StatusEnum = enumFromConst(STATUS_TYPES)
-
-export type Status = (typeof STATUS_TYPES)[keyof typeof STATUS_TYPES]
 
 export type InputPropsWithoutForm = Omit<InputHTMLAttributes<HTMLInputElement>, 'form' | 'onChange'>
 

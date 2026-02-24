@@ -40,10 +40,10 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
 
             <DetailsFieldContainer className="max-w-300">
               <TextField
-                id="versionNumber"
+                id="version"
                 form={form}
                 label={t('versionInfo.versionNumber')}
-                name="versionNumber"
+                name="version"
                 placeholder={t('versionInfo.versionNumberPlaceholder')}
                 disabled={isReadOnly}
                 required
@@ -67,10 +67,10 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
 
             <DetailsFieldContainer className="max-w-300">
               <TextField
-                id="source"
+                id="dataStructureVersionSource"
                 form={form}
                 label={t('versionInfo.source')}
-                name="source"
+                name="dataStructureVersionSource"
                 placeholder={t('source.OWN')}
                 disabled={true}
                 required

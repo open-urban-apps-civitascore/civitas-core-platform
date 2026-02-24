@@ -17,14 +17,15 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Form } from '@/components/ui/form'
-import { Status, STATUS_TYPES } from '@/types/common'
 import { ConnectorApiToFormSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
   Datasource,
+  DATASOURCE_STATUS_TYPES,
   DatasourceFormAvailableSchema,
   DatasourceFormDraft,
   DatasourceFormDraftSchema,
   DatasourceFormToApiSchema,
+  DatasourceStatusType,
   DatasourceTab,
 } from '@/types/datasources'
 import { getConnectorFormData } from '@/utils/connectors'
@@ -65,7 +66,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     id: datasource.id,
     name: datasource.name ?? '',
     description: datasource.description ?? '',
-    status: datasource.status ?? STATUS_TYPES.DRAFT,
+    status: datasource.status ?? DATASOURCE_STATUS_TYPES.DRAFT,
     connector: ConnectorApiToFormSchema.safeParse(datasource.connector).data ?? null,
   }
 
@@ -95,7 +96,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const descriptionWatch = form.watch('description')
   const connectorTypeWatch = form.watch('connector.type')
 
-  const isDraftMode = statusWatch === STATUS_TYPES.DRAFT
+  const isDraftMode = statusWatch === DATASOURCE_STATUS_TYPES.DRAFT
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
@@ -112,8 +113,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
   // Auto-revert status to draft when required fields become empty
   const revalidateDraftMode = () => {
-    if (statusWatch === STATUS_TYPES.AVAILABLE && !canSetAvailable) {
-      form.setValue('status', STATUS_TYPES.DRAFT, { shouldDirty: true })
+    if (statusWatch === DATASOURCE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+      form.setValue('status', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
   }
@@ -151,7 +152,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   // Tabs that are disabled (for future implementation)
   const disabledTabs: DatasourceTab[] = ['dataStructure', 'accessPermissions']
 
-  const handleStatusChange = (newStatus: Status) => {
+  const handleStatusChange = (newStatus: DatasourceStatusType) => {
     form.setValue('status', newStatus, { shouldDirty: true })
   }
 
@@ -226,7 +227,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         isConfirmButtonDisabled={
           !form.formState.isDirty ||
           !!form.formState.errors.name ||
-          (statusWatch !== STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
+          (statusWatch !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
           isLoading
         }
         isCancelButtonDisabled={isLoading}

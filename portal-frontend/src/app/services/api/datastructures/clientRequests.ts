@@ -1,12 +1,12 @@
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
-import { Datastructure, DatastructureCreateJsonServerData, DatastructureUpdateData } from '@/types/datastructures'
+import { Datastructure, DatastructureCreateData, DatastructureUpdateData } from '@/types/datastructures'
 
 const key = 'datastructures'
 
 // TODO: use renamed DatastructureCreateApiData when API is connected
 export const useCreateDatastructure = () =>
-  useCreateMutation<Datastructure, DatastructureCreateJsonServerData>({
+  useCreateMutation<Datastructure, DatastructureCreateData>({
     key,
     errorMessage: 'An error occurred while creating datastructure',
   })

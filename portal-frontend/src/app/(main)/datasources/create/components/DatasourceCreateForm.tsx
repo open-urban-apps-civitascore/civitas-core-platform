@@ -17,8 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { CONNECTION_TYPES } from '@/const/connectors'
 import { cn } from '@/lib/utils'
-import { STATUS_TYPES } from '@/types/common'
-import { DatasourceCreateFormData, DatasourceCreateFormSchema } from '@/types/datasources'
+import { DATASOURCE_STATUS_TYPES, DatasourceCreateFormData, DatasourceCreateFormSchema } from '@/types/datasources'
 
 export const DatasourceCreateForm = () => {
   const t = useTranslations('datasources')
@@ -42,7 +41,7 @@ export const DatasourceCreateForm = () => {
       {
         name: formData.name,
         description: '',
-        status: STATUS_TYPES.DRAFT,
+        status: DATASOURCE_STATUS_TYPES.DRAFT,
         connector: null,
         connection: CONNECTION_TYPES.INACTIVE,
         lastActive: new Date().toISOString(),

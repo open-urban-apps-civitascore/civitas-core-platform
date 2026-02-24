@@ -2,7 +2,7 @@ import z from 'zod'
 
 import { CONNECTION_TYPES, CONNECTOR_TYPES } from '@/const/connectors'
 
-import { STATUS_TYPES, WithId } from './common'
+import { WithId } from './common'
 import {
   ConnectorApiResponseSchema,
   ConnectorFormToApiSchema,
@@ -16,14 +16,19 @@ export type DatasourceTabKeys = 'basicInfo' | 'connector' | 'dataStructure' | 'a
 
 export type ConnectionType = (typeof CONNECTION_TYPES)[keyof typeof CONNECTION_TYPES]
 
-export type DatasourceStatusType = (typeof STATUS_TYPES)[keyof typeof STATUS_TYPES]
+export const DATASOURCE_STATUS_TYPES = {
+  DRAFT: 'DRAFT',
+  AVAILABLE: 'AVAILABLE',
+} as const
+
+export type DatasourceStatusType = (typeof DATASOURCE_STATUS_TYPES)[keyof typeof DATASOURCE_STATUS_TYPES]
 
 const enumFromConst = <T extends Record<string, string>>(obj: T) =>
   z.enum(Object.values(obj) as [T[keyof T], ...T[keyof T][]])
 
 export const ConnectorTypeSchema = enumFromConst(CONNECTOR_TYPES)
 export const ConnectionTypeSchema = enumFromConst(CONNECTION_TYPES)
-export const DatasourceStatusSchema = enumFromConst(STATUS_TYPES)
+export const DatasourceStatusSchema = enumFromConst(DATASOURCE_STATUS_TYPES)
 
 export type FormFieldType = 'input' | 'textArea' | 'select' | 'checkbox'
 

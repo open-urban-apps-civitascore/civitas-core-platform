@@ -2,7 +2,7 @@ import { CheckedState } from '@radix-ui/react-checkbox'
 import { JSX } from 'react'
 import { z } from 'zod'
 
-import { Item2, WithId } from './common'
+import { ItemType, WithId } from './common'
 
 export const DATASET_STATUS = {
   DRAFT: 'draft',
@@ -38,7 +38,7 @@ export type Dataset = {
   lastUpdated: string
   access: boolean
   status: DatasetStatus
-  dataspace: Item2 | null
+  dataspace: ItemType | null
 }
 
 export type CreateDatasetData = Omit<Dataset, 'id'>
@@ -48,7 +48,7 @@ export type PatchDatasetData = Partial<Dataset> & WithId
 export type DatasetTableData = {
   id: string
   name: string
-  dataspace: Item2 | null
+  dataspace: ItemType | null
   contact: Contact | null
   lastUpdated: string
   access: boolean

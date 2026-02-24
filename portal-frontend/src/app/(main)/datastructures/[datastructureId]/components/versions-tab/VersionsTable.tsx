@@ -5,8 +5,7 @@ import { useTranslations } from 'next-intl'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { STATUS_TYPES } from '@/types/common'
-import { DatastructureVersionsListData } from '@/types/datastructures'
+import { DATASTRUCTURE_STATUS_TYPES, DatastructureVersionsListData } from '@/types/datastructures'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
@@ -80,7 +79,7 @@ export const VersionsTable = (props: VersionsTableProps) => {
         const status = info.getValue()
         return (
           <div className="flex items-center gap-2">
-            {status === STATUS_TYPES.DRAFT ? (
+            {status === DATASTRUCTURE_STATUS_TYPES.DRAFT ? (
               <CircleDashed className="text-muted-foreground" size={16} />
             ) : (
               <CircleCheckBig className="text-muted-foreground" size={16} />

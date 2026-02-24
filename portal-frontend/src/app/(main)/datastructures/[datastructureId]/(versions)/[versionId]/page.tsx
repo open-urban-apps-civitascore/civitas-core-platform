@@ -4,7 +4,6 @@ import { getDatastructureVersion } from '@/app/services/api/datastructures/versi
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { DatastructureApiResponseSchema } from '@/types/datastructures'
 
-import { defaultVersion } from '../createVersion/page'
 import { VersionOverview } from '../VersionOverview'
 
 interface EditDatastructureVersionPage {
@@ -21,11 +20,17 @@ const EditDatastructureVersionPage = async ({ params }: EditDatastructureVersion
     return <NoDataPage title={t('errors.loadingError')} />
   }
 
+  const currentVersion = parsedDatastructure.data.dataStructureVersions.find(version => version.id === versionId)
+
+  if (!currentVersion) {
+    throw new Error()
+  }
+
   return (
     <VersionOverview
-      title=""
+      title={`Version ${currentVersion.version}`}
       datastructureId={datastructureId}
-      version={parsedDatastructure.data.versions.find(version => version.id === versionId) || defaultVersion}
+      version={currentVersion}
       isCreateMode={false}
       testId="editDatastructureVersionOverview"
     />

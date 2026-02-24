@@ -1,44 +1,46 @@
 import {
   Datastructure,
-  DatastructureCreateFormData,
-  DatastructureCreateJsonServerData,
   DatastructuresListData,
-  DatastructureVersionSummary,
+  DatastructureVersion,
+  DatastructureVersionsListData,
 } from '@/types/datastructures'
 
 export const mapDatastructuresApiToListData = (datastructures: Datastructure[]): DatastructuresListData[] => {
   return datastructures.map(datastructure => {
-    const highestVersion = datastructure.versions.reduce<DatastructureVersionSummary | null>((highest, current) => {
-      if (!highest) return current
-      return current.versionNumber.localeCompare(highest.versionNumber, undefined, { numeric: true }) > 0
-        ? current
-        : highest
-    }, null)
+    const highestVersion: DatastructureVersion | null =
+      datastructure.dataStructureVersions.reduce<DatastructureVersion | null>((highest, current) => {
+        if (!highest) return current
+        return current.version.localeCompare(highest.version, undefined, { numeric: true }) > 0 ? current : highest
+      }, null)
     return {
       id: datastructure.id,
       name: datastructure.name,
       description: datastructure.description,
-      status: datastructure.status,
-      versionNumber: highestVersion?.versionNumber || null,
-      source: highestVersion?.source || null,
+      status: datastructure.dataStructureStatus,
+      versionNumber: highestVersion?.version || null,
+      source: highestVersion?.dataStructureVersionSource || null,
       // add versions field to versions for showing subrows in table
-      versions: datastructure.versions.map(version => ({
-        ...version,
+      versions: datastructure.dataStructureVersions.map(version => ({
+        id: version.id,
+        versionNumber: version.version,
+        name: `Version ${version.version}`,
+        description: version.description,
+        status: version.dataStructureVersionStatus,
+        source: version.dataStructureVersionSource,
         versions: [],
-        name: `Version ${version.versionNumber}`,
       })),
     }
   })
 }
 
-// TODO: This mapper is needed for creating json-server data. remove it when API is implemented
-export const mapdatastructureFormToApiData = (
-  datastructure: DatastructureCreateFormData,
-): DatastructureCreateJsonServerData => ({
-  name: datastructure.name,
-  description: '',
-  source: 'OWN',
-  status: 'DRAFT',
-  inUse: false,
-  versions: [],
-})
+export const mapDatastructureVersionsApiToListData = (
+  versions: DatastructureVersion[],
+): DatastructureVersionsListData[] =>
+  versions.map(version => ({
+    id: version.id,
+    versionNumber: version.version,
+    name: `Version ${version.version}`,
+    description: version.description,
+    status: version.dataStructureVersionStatus,
+    source: version.dataStructureVersionSource,
+  }))

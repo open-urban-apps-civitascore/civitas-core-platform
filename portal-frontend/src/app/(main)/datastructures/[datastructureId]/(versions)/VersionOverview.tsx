@@ -20,18 +20,32 @@ import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Status, STATUS_TYPES } from '@/types/common'
 import {
+  DATASTRUCTURE_STATUS_TYPES,
+  DATASTRUCTURE_VERSION_SOURCE,
   DatastructureFormAvailableSchema,
+  DatastructureStatus,
+  DatastructureVersion,
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionFormData,
   DatastructureVersionFormDraftSchema,
-  DatastructureVersionSummary,
   DatastructureVersionTab,
 } from '@/types/datastructures'
 
 import { StructureDefinitionTab } from './components/structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './components/version-info-tab/VersionInfoTab'
+
+export const defaultFormData: DatastructureVersionFormData = {
+  id: '',
+  version: '',
+  description: '',
+  dataStructureVersionSource: DATASTRUCTURE_VERSION_SOURCE.OWN,
+  dataStructureVersionStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
+  modelAtlasUri: null,
+  modelName: null,
+  model: null,
+  styles: null,
+}
 
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
@@ -49,7 +63,7 @@ const DEFAULT_TAB = tabs[0]
 interface VersionOverviewProps {
   title: string
   datastructureId: string
-  version: DatastructureVersionSummary
+  version: DatastructureVersion | null
   isCreateMode: boolean
   testId: string
 }
@@ -71,24 +85,26 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const createVersion = useCreateDatastructureVersion(datastructureId)
   const isLoading = updateVersion.isPending
 
+  const initialFormValues = version || defaultFormData
+
   const form = useForm<DatastructureVersionFormData>({
     resolver: zodResolver(DatastructureVersionFormDraftSchema),
     mode: 'onChange',
-    defaultValues: version,
+    defaultValues: initialFormValues,
   })
 
   useEffect(() => {
-    form.reset(version)
+    form.reset(initialFormValues)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version])
 
   const formValues = useWatch({ control: form.control })
   const descriptionWatch = form.watch('description')
-  const statusWatch = form.watch('status')
-  const versionNumberWatch = form.watch('versionNumber')
-  const sourceWatch = form.watch('source')
+  const statusWatch = form.watch('dataStructureVersionStatus')
+  const versionNumberWatch = form.watch('version')
+  const sourceWatch = form.watch('dataStructureVersionSource')
 
-  const isDraftMode = statusWatch === STATUS_TYPES.DRAFT
+  const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
@@ -102,8 +118,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }
   // Auto-revert status to draft when required fields become empty
   const revalidateDraftMode = () => {
-    if (statusWatch === STATUS_TYPES.AVAILABLE && !canSetAvailable) {
-      form.setValue('status', STATUS_TYPES.DRAFT, { shouldDirty: true })
+    if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+      form.setValue('dataStructureVersionStatus', DATASTRUCTURE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
   }
@@ -131,8 +147,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
 
-  const handleStatusChange = (newStatus: Status) => {
-    form.setValue('status', newStatus, { shouldDirty: true })
+  const handleStatusChange = (newStatus: DatastructureStatus) => {
+    form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
   }
 
   const handleCreateUser = () => {
@@ -193,8 +209,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const isConfirmButtonDisabled = useMemo(
     () =>
       !form.formState.isDirty ||
-      !!form.formState.errors.versionNumber ||
-      (statusWatch !== STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
+      !!form.formState.errors.version ||
+      (statusWatch !== DATASTRUCTURE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
       isLoading,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isLoading, statusWatch, formValues],

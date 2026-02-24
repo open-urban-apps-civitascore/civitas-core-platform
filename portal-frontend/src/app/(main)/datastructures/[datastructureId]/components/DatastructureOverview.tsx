@@ -18,14 +18,16 @@ import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
-import { Status, STATUS_TYPES } from '@/types/common'
 import {
   Datastructure,
+  DATASTRUCTURE_STATUS_TYPES,
   DatastructureFormAvailableSchema,
   DatastructureFormDraft,
   DatastructureFormDraftSchema,
+  DatastructureStatus,
   DatastructureTab,
 } from '@/types/datastructures'
+import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
 
 import { BasicInfoTab } from './basic-info-tab/BasicInfoTab'
 import { VersionsTab } from './versions-tab/VersionsTab'
@@ -62,7 +64,9 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     id: datastructure.id,
     name: datastructure.name ?? '',
     description: datastructure.description ?? '',
-    status: datastructure.status ?? STATUS_TYPES.DRAFT,
+    dataStructureStatus: datastructure.dataStructureStatus ?? DATASTRUCTURE_STATUS_TYPES.DRAFT,
+    dataStructureVersionIds: [],
+    assignments: [],
   }
 
   const router = useRouter()
@@ -86,19 +90,21 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   }, [datastructure])
 
   const formValues = useWatch({ control: form.control })
-  const statusWatch = form.watch('status')
+  const statusWatch = form.watch('dataStructureStatus')
   const nameWatch = form.watch('name')
   const descriptionWatch = form.watch('description')
 
-  const isDraftMode = statusWatch === STATUS_TYPES.DRAFT
+  const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
     return (
       DatastructureFormAvailableSchema.safeParse(formValues).success &&
-      !!datastructure.versions.find(version => version.status === STATUS_TYPES.AVAILABLE)
+      !!datastructure.dataStructureVersions.find(
+        version => version.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+      )
     )
-  }, [formValues, datastructure.versions])
+  }, [formValues, datastructure.dataStructureVersions])
 
   const revalidateForm = () => {
     if (!isDraftMode) {
@@ -107,8 +113,8 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   }
   // Auto-revert status to draft when required fields become empty
   const revalidateDraftMode = () => {
-    if (statusWatch === STATUS_TYPES.AVAILABLE && !canSetAvailable) {
-      form.setValue('status', STATUS_TYPES.DRAFT, { shouldDirty: true })
+    if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+      form.setValue('dataStructureStatus', DATASTRUCTURE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
   }
@@ -136,8 +142,8 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
 
-  const handleStatusChange = (newStatus: Status) => {
-    form.setValue('status', newStatus, { shouldDirty: true })
+  const handleStatusChange = (newStatus: DatastructureStatus) => {
+    form.setValue('dataStructureStatus', newStatus, { shouldDirty: true })
   }
 
   const submitDatastructure = () => {
@@ -180,7 +186,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     () =>
       !form.formState.isDirty ||
       !!form.formState.errors.name ||
-      (statusWatch !== STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
+      (statusWatch !== DATASTRUCTURE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
       isLoading,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isLoading, statusWatch, formValues],
@@ -216,8 +222,8 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
         return (
           <VersionsTab
             datastructureId={datastructure.id}
-            versions={datastructure.versions}
-            rowCount={datastructure.versions.length}
+            versions={mapDatastructureVersionsApiToListData(datastructure.dataStructureVersions)}
+            rowCount={datastructure.dataStructureVersions.length}
             isReadOnly={isReadOnly}
           />
         )

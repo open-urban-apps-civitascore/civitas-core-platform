@@ -9,7 +9,7 @@
  */
 import { useTranslations } from 'next-intl'
 
-import { STATUS_TYPES } from '@/types/common'
+import { DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 
 import { datasourceToSelectable, useDataSourceEntities } from '../../../_services/entityService'
 import type { DataSourceNodeData } from '../../../_types/nodes'
@@ -52,7 +52,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
   }
 
   const selectableEntities = entities
-    .filter(entity => entity.status === STATUS_TYPES.AVAILABLE)
+    .filter(entity => entity.status === DATASOURCE_STATUS_TYPES.AVAILABLE)
     .map(datasourceToSelectable)
 
   return (

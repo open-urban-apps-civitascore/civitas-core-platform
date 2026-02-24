@@ -1,17 +1,6 @@
 import { getTranslations } from 'next-intl/server'
 
-import { STATUS_TYPES } from '@/types/common'
-import { DatastructureVersionSummary, SOURCE } from '@/types/datastructures'
-
 import { VersionOverview } from '../VersionOverview'
-
-export const defaultVersion: DatastructureVersionSummary = {
-  id: '',
-  versionNumber: '',
-  description: '',
-  source: SOURCE.OWN,
-  status: STATUS_TYPES.DRAFT,
-}
 
 interface CreateDatastructureVersionPage {
   params: Promise<{ versionId: string; datastructureId: string }>
@@ -25,7 +14,7 @@ const CreateDatastructureVersionPage = async ({ params }: CreateDatastructureVer
   return (
     <VersionOverview
       testId="createDatastructureVersionOverview"
-      version={defaultVersion}
+      version={null}
       datastructureId={datastructureId}
       title={t('newVersion')}
       isCreateMode

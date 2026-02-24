@@ -6,8 +6,7 @@ import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { STATUS_TYPES } from '@/types/common'
-import { DatasourceStatusType } from '@/types/datasources'
+import { DATASOURCE_STATUS_TYPES, DatasourceStatusType } from '@/types/datasources'
 
 interface StatusDropdownProps {
   status: DatasourceStatusType
@@ -32,7 +31,7 @@ export const StatusDropdown = (props: StatusDropdownProps) => {
           className="flex items-center gap-2 min-w-[140px] justify-between"
         >
           <div className="flex items-center gap-2">
-            {status === STATUS_TYPES.DRAFT ? (
+            {status === DATASOURCE_STATUS_TYPES.DRAFT ? (
               <CircleDashed className="w-4 h-4 text-muted-foreground" />
             ) : (
               <CircleCheckBig className="w-4 h-4 text-muted-foreground" />
@@ -45,23 +44,23 @@ export const StatusDropdown = (props: StatusDropdownProps) => {
       <DropdownMenuContent align="end">
         <DropdownMenuItem
           data-testid="statusOption-draft"
-          onClick={() => onStatusChange(STATUS_TYPES.DRAFT)}
-          className={cn(status === STATUS_TYPES.DRAFT && 'bg-accent')}
+          onClick={() => onStatusChange(DATASOURCE_STATUS_TYPES.DRAFT)}
+          className={cn(status === DATASOURCE_STATUS_TYPES.DRAFT && 'bg-accent')}
         >
           <CircleDashed className="w-4 h-4 text-muted-foreground mr-2" />
-          {getStatusLabel(STATUS_TYPES.DRAFT)}
+          {getStatusLabel(DATASOURCE_STATUS_TYPES.DRAFT)}
         </DropdownMenuItem>
         <DropdownMenuItem
           data-testid="statusOption-available"
-          onClick={() => canSetAvailable && onStatusChange(STATUS_TYPES.AVAILABLE)}
+          onClick={() => canSetAvailable && onStatusChange(DATASOURCE_STATUS_TYPES.AVAILABLE)}
           disabled={!canSetAvailable}
           className={cn(
-            status === STATUS_TYPES.AVAILABLE && 'bg-accent',
+            status === DATASOURCE_STATUS_TYPES.AVAILABLE && 'bg-accent',
             !canSetAvailable && 'opacity-50 cursor-not-allowed',
           )}
         >
           <CircleCheckBig className="w-4 h-4 text-muted-foreground mr-2" />
-          {getStatusLabel(STATUS_TYPES.AVAILABLE)}
+          {getStatusLabel(DATASOURCE_STATUS_TYPES.AVAILABLE)}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

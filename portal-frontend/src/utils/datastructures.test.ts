@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Datastructure } from '@/types/datastructures'
+import type { DatastructuresResponse } from '@/types/datastructures'
 
 import { mapDatastructuresApiToListData } from './datastructures'
 
-type Version = Datastructure['versions'][number]
+type Version = DatastructuresResponse['versions'][number]
 
 const createVersion = (versionNumber: string): Version => ({
   id: versionNumber,
   description: `Test Description ${versionNumber}`,
   status: 'DRAFT',
   versionNumber,
-  source: 'OWN',
+  createdFromDataSource: 'OWN',
 })
 
-const createDatastructure = (versions: string[], datastructureId = 'ds1'): Datastructure => ({
+const createDatastructure = (versions: string[], datastructureId = 'ds1'): DatastructuresResponse => ({
   id: datastructureId,
   name: `Datastructure ${datastructureId}`,
   description: 'Datastructure Description',
-  source: 'OWN',
+  createdFromDataSource: 'OWN',
   status: 'DRAFT',
   inUse: false,
   versions: versions.map(version => createVersion(version)),
@@ -26,7 +26,7 @@ const createDatastructure = (versions: string[], datastructureId = 'ds1'): Datas
 
 describe('mapDatastructuresApiToListData', () => {
   it('maps basic fields correctly', () => {
-    const datastructure: Datastructure = createDatastructure(['1.0'])
+    const datastructure: DatastructuresResponse = createDatastructure(['1.0'])
 
     const result = mapDatastructuresApiToListData([datastructure])
 
@@ -37,7 +37,7 @@ describe('mapDatastructuresApiToListData', () => {
   })
 
   it('maps versions correctly', () => {
-    const datastructure: Datastructure = createDatastructure(['1.0'])
+    const datastructure: DatastructuresResponse = createDatastructure(['1.0'])
 
     const result = mapDatastructuresApiToListData([datastructure])
 
@@ -49,7 +49,7 @@ describe('mapDatastructuresApiToListData', () => {
   })
 
   it('selects the highest numeric version', () => {
-    const datastructure: Datastructure = createDatastructure(['1.0', '1.1', '2.0'])
+    const datastructure: DatastructuresResponse = createDatastructure(['1.0', '1.1', '2.0'])
 
     const result = mapDatastructuresApiToListData([datastructure])
 
@@ -57,7 +57,7 @@ describe('mapDatastructuresApiToListData', () => {
   })
 
   it('adds empty versions array to each version', () => {
-    const datastructure: Datastructure = createDatastructure(['1.0'])
+    const datastructure: DatastructuresResponse = createDatastructure(['1.0'])
 
     const result = mapDatastructuresApiToListData([datastructure])
 
@@ -68,7 +68,7 @@ describe('mapDatastructuresApiToListData', () => {
   })
 
   it('handles multiple datastructures', () => {
-    const datastructures: Datastructure[] = [
+    const datastructures: DatastructuresResponse[] = [
       createDatastructure(['1.0', '1.1', '2.0'], 'ds1'),
       createDatastructure(['1.0', '1.1', '1.2'], 'ds2'),
     ]
@@ -83,13 +83,13 @@ describe('mapDatastructuresApiToListData', () => {
   })
 
   it('returns null for versionNumber and source when versions array is empty', () => {
-    const datastructure: Datastructure = createDatastructure([])
+    const datastructure: DatastructuresResponse = createDatastructure([])
 
     const result = mapDatastructuresApiToListData([datastructure])
 
     expect(result).toHaveLength(1)
     expect(result[0].versionNumber).toBeNull()
-    expect(result[0].source).toBeNull()
+    expect(result[0].createdFromDataSource).toBeNull()
     expect(result[0].versions).toEqual([])
   })
 })
