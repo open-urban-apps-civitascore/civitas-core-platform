@@ -46,13 +46,8 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
   @BeforeEach
   void setUp() {
     log.debug("=== Test Setup Starting ===");
-    assignmentRepository.deleteAll();
-    groupRepository.deleteAll();
-    userRepository.deleteAll();
 
     ensureCivitasCoreRealmExists();
-    cleanupKeycloakUsers();
-
     configAdapterHelper =
         new ConfigAdapterTestHelper(KEYCLOAK, embeddedKafkaBrokers, kafkaTemplate);
 
@@ -70,7 +65,8 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
         log.warn("Error closing config adapter helper: {}", e.getMessage());
       }
     }
-
+    assignmentRepository.deleteAll();
+    groupRepository.deleteAll();
     userRepository.deleteAll();
     cleanupKeycloakUsers();
     log.debug("=== Test Teardown Complete ===");
