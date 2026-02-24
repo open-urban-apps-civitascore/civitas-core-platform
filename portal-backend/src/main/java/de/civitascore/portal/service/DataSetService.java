@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.input.DataSetInputDTO;
@@ -26,6 +27,7 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
 
+  private final AssignmentService assignmentService;
   private final DistributionService distributionService;
 
   private final ObjectMapper objectMapper;
@@ -59,6 +61,15 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
   @Override
   protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
     return super.postConvertToEntity(entity, input);
+  }
+
+  @Override
+  protected DataSet postSave(DataSet entity, DataSetInputDTO input) {
+    if (input.getAssignments() != null) {
+      assignmentService.replaceAllByScopeTypeAndScopeId(
+          input.getAssignments(), ScopeType.DATASET, entity.getId());
+    }
+    return entity;
   }
 
   @Override

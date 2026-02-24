@@ -27,6 +27,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.RoleRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.List;
 import java.util.UUID;
@@ -194,8 +195,9 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(assignment.getScopeType()).isEqualTo(ScopeType.DATASET);
     }
 
+    // TODO v2.1: re-enable when DATASPACE scope is available
     @Test
-    @DisplayName("Should set dataspace when scopeType is DATASPACE")
+    @DisplayName("Should reject DATASPACE scope (not available in this release)")
     void shouldSetDataspaceWhenScopeTypeIsDataspace() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
@@ -203,15 +205,13 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeType(ScopeType.DATASPACE);
       input.setScopeId(testDataSpace.getId());
 
-      Assignment assignment = assignmentService.create(input);
-
-      assertThat(assignment.getDataSpace()).isNotNull();
-      assertThat(assignment.getDataSpace().getId()).isEqualTo(testDataSpace.getId());
-      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.DATASPACE);
+      assertThatThrownBy(() -> assignmentService.create(input))
+          .isInstanceOf(InvalidInputException.class);
     }
 
+    // TODO v2.1: re-enable when CATALOG scope is available
     @Test
-    @DisplayName("Should set catalog when scopeType is CATALOG")
+    @DisplayName("Should reject CATALOG scope (not available in this release)")
     void shouldSetCatalogWhenScopeTypeIsCatalog() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
@@ -219,11 +219,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeType(ScopeType.CATALOG);
       input.setScopeId(testCatalog.getId());
 
-      Assignment assignment = assignmentService.create(input);
-
-      assertThat(assignment.getCatalog()).isNotNull();
-      assertThat(assignment.getCatalog().getId()).isEqualTo(testCatalog.getId());
-      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.CATALOG);
+      assertThatThrownBy(() -> assignmentService.create(input))
+          .isInstanceOf(InvalidInputException.class);
     }
 
     @Test
@@ -270,8 +267,10 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
           .hasMessageContaining("DataSet");
     }
 
+    // TODO v2.1: expect ResourceNotFoundException("DataSpace") once DATASPACE scope is re-enabled
     @Test
-    @DisplayName("Should throw ResourceNotFoundException for non-existent dataspace")
+    @DisplayName(
+        "Should throw InvalidInputException for DATASPACE scope (not available in this release)")
     void shouldThrowExceptionForNonExistentDataspace() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
@@ -280,12 +279,13 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeId(UUID.randomUUID());
 
       assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(ResourceNotFoundException.class)
-          .hasMessageContaining("DataSpace");
+          .isInstanceOf(InvalidInputException.class);
     }
 
+    // TODO v2.1: expect ResourceNotFoundException("Catalog") once CATALOG scope is re-enabled
     @Test
-    @DisplayName("Should throw ResourceNotFoundException for non-existent catalog")
+    @DisplayName(
+        "Should throw InvalidInputException for CATALOG scope (not available in this release)")
     void shouldThrowExceptionForNonExistentCatalog() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
@@ -294,8 +294,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeId(UUID.randomUUID());
 
       assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(ResourceNotFoundException.class)
-          .hasMessageContaining("Catalog");
+          .isInstanceOf(InvalidInputException.class);
     }
 
     @Test
@@ -372,8 +371,9 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(assignment.getCatalog()).isNull();
     }
 
+    // TODO v2.1: re-enable when DATASPACE scope is available
     @Test
-    @DisplayName("Should succeed when scopeType is DATASPACE and dataspace is set")
+    @DisplayName("Should reject DATASPACE scope (not available in this release)")
     void shouldSucceedWhenScopeTypeIsDataspaceAndDataspaceIsSet() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
@@ -381,17 +381,13 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeType(ScopeType.DATASPACE);
       input.setScopeId(testDataSpace.getId());
 
-      Assignment assignment = assignmentService.create(input);
-
-      assertThat(assignment).isNotNull();
-      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.DATASPACE);
-      assertThat(assignment.getDataSpace()).isNotNull();
-      assertThat(assignment.getDataset()).isNull();
-      assertThat(assignment.getCatalog()).isNull();
+      assertThatThrownBy(() -> assignmentService.create(input))
+          .isInstanceOf(InvalidInputException.class);
     }
 
+    // TODO v2.1: re-enable when CATALOG scope is available
     @Test
-    @DisplayName("Should succeed when scopeType is CATALOG and catalog is set")
+    @DisplayName("Should reject CATALOG scope (not available in this release)")
     void shouldSucceedWhenScopeTypeIsCatalogAndCatalogIsSet() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
@@ -399,13 +395,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeType(ScopeType.CATALOG);
       input.setScopeId(testCatalog.getId());
 
-      Assignment assignment = assignmentService.create(input);
-
-      assertThat(assignment).isNotNull();
-      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.CATALOG);
-      assertThat(assignment.getCatalog()).isNotNull();
-      assertThat(assignment.getDataset()).isNull();
-      assertThat(assignment.getDataSpace()).isNull();
+      assertThatThrownBy(() -> assignmentService.create(input))
+          .isInstanceOf(InvalidInputException.class);
     }
   }
 
@@ -601,12 +592,16 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       Assignment assignment1 = assignmentService.create(input1);
 
-      // Create assignment with DATASPACE scope
+      // TODO v2.1: switch back to DATASPACE scope
+      // AssignmentInputDTO input2 = new AssignmentInputDTO();
+      // input2.setGroupId(testGroup.getId());
+      // input2.setRoleId(testDataRole.getId());
+      // input2.setScopeType(ScopeType.DATASPACE);
+      // input2.setScopeId(testDataSpace.getId());
       AssignmentInputDTO input2 = new AssignmentInputDTO();
       input2.setGroupId(testGroup.getId());
       input2.setRoleId(testDataRole.getId());
-      input2.setScopeType(ScopeType.DATASPACE);
-      input2.setScopeId(testDataSpace.getId());
+      input2.setScopeType(ScopeType.TENANT);
 
       Assignment assignment2 = assignmentService.create(input2);
 
@@ -637,8 +632,9 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(assignment.getDataset().getId()).isEqualTo(testDataSet.getId());
     }
 
+    // TODO v2.1: re-enable when DATASPACE scope is available
     @Test
-    @DisplayName("Should map scope to dataspace when scopeType is DATASPACE")
+    @DisplayName("Should reject DATASPACE scope (not available in this release)")
     void shouldMapScopeToDataspace() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
@@ -646,16 +642,13 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeType(ScopeType.DATASPACE);
       input.setScopeId(testDataSpace.getId());
 
-      Assignment assignment = assignmentService.create(input);
-
-      assertThat(assignment.getScope()).isNotNull();
-      assertThat(assignment.getScope().getId()).isEqualTo(testDataSpace.getId());
-      assertThat(assignment.getDataSpace()).isNotNull();
-      assertThat(assignment.getDataSpace().getId()).isEqualTo(testDataSpace.getId());
+      assertThatThrownBy(() -> assignmentService.create(input))
+          .isInstanceOf(InvalidInputException.class);
     }
 
+    // TODO v2.1: re-enable when CATALOG scope is available
     @Test
-    @DisplayName("Should map scope to catalog when scopeType is CATALOG")
+    @DisplayName("Should reject CATALOG scope (not available in this release)")
     void shouldMapScopeToCatalog() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
@@ -663,12 +656,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeType(ScopeType.CATALOG);
       input.setScopeId(testCatalog.getId());
 
-      Assignment assignment = assignmentService.create(input);
-
-      assertThat(assignment.getScope()).isNotNull();
-      assertThat(assignment.getScope().getId()).isEqualTo(testCatalog.getId());
-      assertThat(assignment.getCatalog()).isNotNull();
-      assertThat(assignment.getCatalog().getId()).isEqualTo(testCatalog.getId());
+      assertThatThrownBy(() -> assignmentService.create(input))
+          .isInstanceOf(InvalidInputException.class);
     }
 
     @Test
@@ -748,41 +737,41 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(results.getFirst().getDataset().getId()).isEqualTo(testDataSet.getId());
     }
 
+    // TODO v2.1: re-enable when DATASPACE scope is available
     @Test
-    @DisplayName("Should return assignments matching DATASPACE scope type and scope ID")
+    @DisplayName("Should return empty list for DATASPACE scope (not available in this release)")
     void shouldReturnAssignmentsMatchingDataspaceScope() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
       input.setScopeType(ScopeType.DATASPACE);
       input.setScopeId(testDataSpace.getId());
-      assignmentService.create(input);
+
+      assertThatThrownBy(() -> assignmentService.create(input))
+          .isInstanceOf(InvalidInputException.class);
 
       List<Assignment> results =
           assignmentService.findAllByScopeTypeAndScopeId(
               ScopeType.DATASPACE, testDataSpace.getId());
-
-      assertThat(results).hasSize(1);
-      assertThat(results.getFirst().getScopeType()).isEqualTo(ScopeType.DATASPACE);
-      assertThat(results.getFirst().getDataSpace().getId()).isEqualTo(testDataSpace.getId());
+      assertThat(results).isEmpty();
     }
 
+    // TODO v2.1: re-enable when CATALOG scope is available
     @Test
-    @DisplayName("Should return assignments matching CATALOG scope type and scope ID")
+    @DisplayName("Should return empty list for CATALOG scope (not available in this release)")
     void shouldReturnAssignmentsMatchingCatalogScope() {
       AssignmentInputDTO input = new AssignmentInputDTO();
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
       input.setScopeType(ScopeType.CATALOG);
       input.setScopeId(testCatalog.getId());
-      assignmentService.create(input);
+
+      assertThatThrownBy(() -> assignmentService.create(input))
+          .isInstanceOf(InvalidInputException.class);
 
       List<Assignment> results =
           assignmentService.findAllByScopeTypeAndScopeId(ScopeType.CATALOG, testCatalog.getId());
-
-      assertThat(results).hasSize(1);
-      assertThat(results.getFirst().getScopeType()).isEqualTo(ScopeType.CATALOG);
-      assertThat(results.getFirst().getCatalog().getId()).isEqualTo(testCatalog.getId());
+      assertThat(results).isEmpty();
     }
 
     @Test
@@ -842,9 +831,11 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeId(testDataSet.getId());
       assignmentService.create(input);
 
-      // Query with DATASPACE scope type using the dataset's ID — should find nothing
+      // TODO v2.1: switch back to DATASPACE scope query
+      // Query with DATASTRUCTURE scope type using the dataset's ID — should find nothing
       List<Assignment> results =
-          assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASPACE, testDataSet.getId());
+          assignmentService.findAllByScopeTypeAndScopeId(
+              ScopeType.DATASTRUCTURE, testDataSet.getId());
 
       assertThat(results).isEmpty();
     }
@@ -985,32 +976,30 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
           .containsExactlyInAnyOrder(testGroup.getId(), secondGroup.getId());
     }
 
+    // TODO v2.1: re-enable when DATASPACE scope is available
     @Test
-    @DisplayName("Should work with DATASPACE scope type")
+    @DisplayName("Should reject replaceAll with DATASPACE scope (not available in this release)")
     void shouldWorkWithDataspaceScope() {
-      List<Assignment> result =
-          assignmentService.replaceAllByScopeTypeAndScopeId(
-              List.of(scopedInput(testGroup.getId(), testDataRole.getId())),
-              ScopeType.DATASPACE,
-              testDataSpace.getId());
-
-      assertThat(result).hasSize(1);
-      assertThat(result.getFirst().getScopeType()).isEqualTo(ScopeType.DATASPACE);
-      assertThat(result.getFirst().getDataSpace().getId()).isEqualTo(testDataSpace.getId());
+      assertThatThrownBy(
+              () ->
+                  assignmentService.replaceAllByScopeTypeAndScopeId(
+                      List.of(scopedInput(testGroup.getId(), testDataRole.getId())),
+                      ScopeType.DATASPACE,
+                      testDataSpace.getId()))
+          .isInstanceOf(InvalidInputException.class);
     }
 
+    // TODO v2.1: re-enable when CATALOG scope is available
     @Test
-    @DisplayName("Should work with CATALOG scope type")
+    @DisplayName("Should reject replaceAll with CATALOG scope (not available in this release)")
     void shouldWorkWithCatalogScope() {
-      List<Assignment> result =
-          assignmentService.replaceAllByScopeTypeAndScopeId(
-              List.of(scopedInput(testGroup.getId(), testDataRole.getId())),
-              ScopeType.CATALOG,
-              testCatalog.getId());
-
-      assertThat(result).hasSize(1);
-      assertThat(result.getFirst().getScopeType()).isEqualTo(ScopeType.CATALOG);
-      assertThat(result.getFirst().getCatalog().getId()).isEqualTo(testCatalog.getId());
+      assertThatThrownBy(
+              () ->
+                  assignmentService.replaceAllByScopeTypeAndScopeId(
+                      List.of(scopedInput(testGroup.getId(), testDataRole.getId())),
+                      ScopeType.CATALOG,
+                      testCatalog.getId()))
+          .isInstanceOf(InvalidInputException.class);
     }
 
     @Test
@@ -1113,13 +1102,19 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       datasetInput.setScopeId(testDataSet.getId());
       assignmentService.create(datasetInput);
 
-      // Create assignment on DATASPACE scope
-      AssignmentInputDTO dataspaceInput = new AssignmentInputDTO();
-      dataspaceInput.setGroupId(testGroup.getId());
-      dataspaceInput.setRoleId(testDataRole.getId());
-      dataspaceInput.setScopeType(ScopeType.DATASPACE);
-      dataspaceInput.setScopeId(testDataSpace.getId());
-      assignmentService.create(dataspaceInput);
+      // TODO v2.1: switch back to DATASPACE scope
+      // AssignmentInputDTO dataspaceInput = new AssignmentInputDTO();
+      // dataspaceInput.setGroupId(testGroup.getId());
+      // dataspaceInput.setRoleId(testDataRole.getId());
+      // dataspaceInput.setScopeType(ScopeType.DATASPACE);
+      // dataspaceInput.setScopeId(testDataSpace.getId());
+      // assignmentService.create(dataspaceInput);
+      AssignmentInputDTO datastructureInput = new AssignmentInputDTO();
+      datastructureInput.setGroupId(testGroup.getId());
+      datastructureInput.setRoleId(testDataRole.getId());
+      datastructureInput.setScopeType(ScopeType.DATASTRUCTURE);
+      datastructureInput.setScopeId(testDataStructure.getId());
+      assignmentService.create(datastructureInput);
 
       // Replace only the DATASET scope assignments with empty list
       assignmentService.replaceAllByScopeTypeAndScopeId(
@@ -1131,10 +1126,11 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
                   ScopeType.DATASET, testDataSet.getId()))
           .isEmpty();
 
-      // DATASPACE scope should be untouched
+      // DATASTRUCTURE scope should be untouched
+      // TODO v2.1: switch back to DATASPACE scope check
       assertThat(
               assignmentService.findAllByScopeTypeAndScopeId(
-                  ScopeType.DATASPACE, testDataSpace.getId()))
+                  ScopeType.DATASTRUCTURE, testDataStructure.getId()))
           .hasSize(1);
     }
   }
@@ -1143,14 +1139,12 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @DisplayName("Edge Cases and Error Handling")
   class EdgeCasesTests {
 
+    // TODO v2.1: add DATASPACE and CATALOG back to scope types array
     @Test
-    @DisplayName("Should handle creation with all scope types")
+    @DisplayName("Should handle creation with all available scope types")
     void shouldHandleCreationWithAllScopeTypes() {
-      // Test with each valid scope type
-      ScopeType[] scopeTypes =
-          new ScopeType[] {
-            ScopeType.TENANT, ScopeType.DATASET, ScopeType.DATASPACE, ScopeType.CATALOG
-          };
+      // Test with each valid scope type (DATASPACE and CATALOG excluded until v2.1)
+      ScopeType[] scopeTypes = new ScopeType[] {ScopeType.TENANT, ScopeType.DATASET};
 
       for (ScopeType scopeType : scopeTypes) {
         AssignmentInputDTO input = new AssignmentInputDTO();
@@ -1160,10 +1154,6 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
         if (scopeType == ScopeType.DATASET) {
           input.setScopeId(testDataSet.getId());
-        } else if (scopeType == ScopeType.DATASPACE) {
-          input.setScopeId(testDataSpace.getId());
-        } else if (scopeType == ScopeType.CATALOG) {
-          input.setScopeId(testCatalog.getId());
         }
 
         Assignment assignment = assignmentService.create(input);

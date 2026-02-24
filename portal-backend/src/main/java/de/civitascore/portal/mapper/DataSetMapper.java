@@ -26,6 +26,7 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "distributions", ignore = true)
   @Mapping(target = "catalogs", ignore = true)
   @Mapping(target = "pipelines", ignore = true)
+  @Mapping(target = "assignments", ignore = true)
   @Override
   DataSet toEntity(DataSetInputDTO input);
 
@@ -45,6 +46,7 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "distributions", ignore = true)
   @Mapping(target = "catalogs", ignore = true)
   @Mapping(target = "pipelines", ignore = true)
+  @Mapping(target = "assignments", ignore = true)
   @Override
   void updateEntity(@MappingTarget DataSet entity, DataSetInputDTO input);
 }

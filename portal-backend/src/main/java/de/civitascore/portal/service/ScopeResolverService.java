@@ -7,6 +7,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,16 +34,11 @@ public class ScopeResolverService {
               dataSetRepository
                   .findById(scopeId)
                   .orElseThrow(() -> new ResourceNotFoundException("DataSet", scopeId)));
-      case DATASPACE ->
-          entity.setDataSpace(
-              dataSpaceRepository
-                  .findById(scopeId)
-                  .orElseThrow(() -> new ResourceNotFoundException("DataSpace", scopeId)));
-      case CATALOG ->
-          entity.setCatalog(
-              catalogRepository
-                  .findById(scopeId)
-                  .orElseThrow(() -> new ResourceNotFoundException("Catalog", scopeId)));
+      case DATASPACE, CATALOG ->
+          throw new InvalidInputException(
+              "Assignment",
+              scopeType.name(),
+              scopeType + " scope is not available in this release");
       case DATASOURCE ->
           entity.setDataSource(
               dataSourceRepository

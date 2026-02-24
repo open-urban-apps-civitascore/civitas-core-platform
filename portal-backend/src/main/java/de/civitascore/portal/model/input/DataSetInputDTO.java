@@ -2,6 +2,7 @@ package de.civitascore.portal.model.input;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -13,5 +14,6 @@ public class DataSetInputDTO extends BaseInputDTO {
 
   private String description;
 
-  private Boolean openDataAccess = false;
+  private Boolean openDataAccess;
+  private List<AssignmentScopedInputDTO> assignments;
 }
