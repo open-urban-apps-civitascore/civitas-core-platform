@@ -17,6 +17,5 @@ public class DataSetInputDTO extends BaseInputDTO {
 
   private List<UUID> pipelineIds;
 
-  private Long persistenceId;
   private Boolean openDataAccess;
 }

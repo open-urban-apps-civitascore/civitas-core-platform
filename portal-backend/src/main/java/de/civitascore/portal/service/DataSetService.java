@@ -89,9 +89,8 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
             "name", existingEntity.getId(), "Name cannot be null or blank");
       }
 
-      // Prevent changes to persistenceId and pipelineIds if status is not DRAFT
+      // Prevent changes to pipelineIds if status is not DRAFT
       if (existingEntity.getDataSetStatus() != DataSetStatus.DRAFT) {
-        input.setPersistenceId(existingEntity.getPersistenceId());
         input.setPipelineIds(existingEntity.getPipelines().stream().map(Pipeline::getId).toList());
       }
 
