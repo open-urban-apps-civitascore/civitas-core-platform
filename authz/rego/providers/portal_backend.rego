@@ -59,14 +59,15 @@ path_parts := restmapper.parse_path(input.request.path)
 # Maps resources to their expected scope types and extracts resource IDs
 # for scope enforcement on resource endpoints.
 #
-# Scope model (without inheritance):
+# Scope model (with TENANT inheritance per ADM spec):
 #   - TENANT resources: users, groups, roles, permissions, assignments
-#   - DATASET resources: datasets
-#   - DATASOURCE resources: datasources
-#   - DATASTRUCTURE resources: datastructures
+#   - DATASET resources: datasets (TENANT scope inherits down)
+#   - DATASOURCE resources: datasources (TENANT scope inherits down)
+#   - DATASTRUCTURE resources: datastructures (TENANT scope inherits down)
 #
 # For resource endpoints (/v2/resource/{id}), the {id} IS the scopeId.
-# TENANT-scoped resources don't require specific scopeId matching (Q-005 pending).
+# TENANT scope cascades to all resource endpoints (Q-005 resolved).
+# DATASPACE → child inheritance deferred (not in v2.0).
 
 # Map resource name to expected scope type
 resource_scope_type := {

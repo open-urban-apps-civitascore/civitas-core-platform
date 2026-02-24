@@ -144,8 +144,8 @@ evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
 # for that specific scope ID.
 
 # Check if user has TENANT scope for ALL required permissions (AND semantics)
-# TENANT scope acts as wildcard for collection endpoint filtering only.
-# Does NOT cascade to resource endpoints (v2.0: no scope inheritance, see Q-005).
+# TENANT scope acts as wildcard for collection endpoint filtering.
+# Also cascades to resource endpoints via scope inheritance (Q-005 resolved).
 has_tenant_scope if {
 	count(permission_eval.required_permissions) > 0
 	every perm in permission_eval.required_permissions {
@@ -190,7 +190,7 @@ scope_has_permission(perm, target_scope_id) if {
 # Generate the header value based on user's scopes
 default allowed_scope_ids_header := ""
 
-# TENANT scope = wildcard for collection filtering (not resource access)
+# TENANT scope = wildcard (header used for collection filtering by backend)
 allowed_scope_ids_header := "*" if {
 	has_tenant_scope
 }

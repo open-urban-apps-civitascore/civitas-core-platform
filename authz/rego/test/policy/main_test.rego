@@ -916,15 +916,13 @@ test_published_meta_and_perm if {
 }
 
 # =============================================================================
-# TENANT SCOPE NON-CASCADING REGRESSION TESTS
+# TENANT SCOPE INHERITANCE TESTS
 # =============================================================================
-# v2.0 design decision: TENANT scope does NOT cascade to DATASET/DATASOURCE/
-# DATASTRUCTURE resource endpoints. TENANT applies only to tenant-level resources
-# (users, groups, roles, permissions, assignments).
-#
-# The ADM spec defines inheritance (TENANT → DATASPACE → DATASET) but this was
-# cut from v2.0 (see Q-001, Q-005 in BACKLOG.md). These tests lock in the
-# non-cascading behavior to prevent accidental "fixes" without a design decision.
+# ADM spec: TENANT scope cascades to all resource endpoints (Q-005 resolved).
+# DATASPACE → child resource inheritance is deferred (not in v2.0).
+# These tests verify TENANT-scoped permissions grant access to resource endpoints
+# for datasets, datasources, and datastructures, and that narrow scopes do NOT
+# inherit upward.
 
 # Helper: User with DATASET_READ at TENANT scope (not DATASET scope)
 user_context_tenant_dataset_read := {
@@ -946,14 +944,14 @@ user_context_tenant_dataset_read := {
 
 mock_send_tenant_dataset_read(_) := {"status_code": 200, "body": user_context_tenant_dataset_read}
 
-# Test: TENANT-scoped DATASET_READ does NOT grant access to a specific dataset
-# (TENANT does not cascade to DATASET resource endpoints in v2.0)
-test_tenant_scope_no_cascade_to_dataset_resource if {
+# Test: TENANT-scoped DATASET_READ grants access to a specific dataset resource
+# (TENANT cascades to DATASET resource endpoints per ADM spec)
+test_tenant_scope_cascades_to_dataset_resource if {
 	result := authz.decision with http.send as mock_send_tenant_dataset_read
 		with data.config as mock_http.mock_config
 		with input as portal_request("GET", "/v2/datasets/some-dataset-id")
-	result.allow == false
-	result.reason == "permission_denied"
+	result.allow == true
+	result.reason == "permission_granted"
 }
 
 # Test: TENANT-scoped DATASET_READ DOES grant access to dataset collection
@@ -964,6 +962,94 @@ test_tenant_scope_allows_dataset_collection if {
 		with input as portal_request("GET", "/v2/datasets")
 	result.allow == true
 	result.reason == "permission_granted"
+}
+
+# Helper: User with DATASOURCE_READ at TENANT scope
+user_context_tenant_datasource_read := {
+	"userId": "user-1",
+	"externalId": "keycloak-sub-1",
+	"groups": [{
+		"id": "group-1",
+		"name": "Admin Group",
+		"assignments": [{
+			"roleId": "role-1",
+			"roleName": "Admin",
+			"roleType": "SYSTEM",
+			"scopeType": "TENANT",
+			"scopeId": "tenant-1",
+			"permissions": ["DATASOURCE_READ"],
+		}],
+	}],
+}
+
+mock_send_tenant_datasource_read(_) := {"status_code": 200, "body": user_context_tenant_datasource_read}
+
+# Test: TENANT-scoped DATASOURCE_READ grants access to a specific datasource resource
+test_tenant_scope_cascades_to_datasource_resource if {
+	result := authz.decision with http.send as mock_send_tenant_datasource_read
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v2/datasources/some-datasource-id")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+# Helper: User with DATASTRUCTURE_READ at TENANT scope
+user_context_tenant_datastructure_read := {
+	"userId": "user-1",
+	"externalId": "keycloak-sub-1",
+	"groups": [{
+		"id": "group-1",
+		"name": "Admin Group",
+		"assignments": [{
+			"roleId": "role-1",
+			"roleName": "Admin",
+			"roleType": "SYSTEM",
+			"scopeType": "TENANT",
+			"scopeId": "tenant-1",
+			"permissions": ["DATASTRUCTURE_READ"],
+		}],
+	}],
+}
+
+mock_send_tenant_datastructure_read(_) := {"status_code": 200, "body": user_context_tenant_datastructure_read}
+
+# Test: TENANT-scoped DATASTRUCTURE_READ grants access to a specific datastructure resource
+test_tenant_scope_cascades_to_datastructure_resource if {
+	result := authz.decision with http.send as mock_send_tenant_datastructure_read
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v2/datastructures/some-ds-id")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+# Helper: User with USER_READ at DATASET scope (narrow scope, wrong direction)
+user_context_dataset_scoped_user_read := {
+	"userId": "user-1",
+	"externalId": "keycloak-sub-1",
+	"groups": [{
+		"id": "group-1",
+		"name": "Group",
+		"assignments": [{
+			"roleId": "role-1",
+			"roleName": "Role",
+			"roleType": "DATA",
+			"scopeType": "DATASET",
+			"scopeId": "dataset-1",
+			"permissions": ["USER_READ"],
+		}],
+	}],
+}
+
+mock_send_dataset_scoped_user_read(_) := {"status_code": 200, "body": user_context_dataset_scoped_user_read}
+
+# Test: No upward inheritance — DATASET-scoped USER_READ does NOT grant access
+# to tenant-level resource endpoints. Inheritance is downward only.
+test_no_upward_inheritance if {
+	result := authz.decision with http.send as mock_send_dataset_scoped_user_read
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v2/users/user-123")
+	result.allow == false
+	result.reason == "permission_denied"
 }
 
 # Helper: AND-permission with mixed scopes — DATASET_UPDATE at TENANT, DATASET_RELEASE at DATASET
@@ -1001,13 +1087,52 @@ user_context_and_mixed_scopes := {
 
 mock_send_and_mixed_scopes(_) := {"status_code": 200, "body": user_context_and_mixed_scopes}
 
-# Test: AND-permission with TENANT UPDATE + DATASET RELEASE → denied
-# TENANT-scoped DATASET_UPDATE does not satisfy the DATASET-scope requirement
-# for resource endpoints. Both permissions must be at DATASET scope.
-test_and_mixed_scopes_denied if {
+# Test: AND-permission with TENANT UPDATE + DATASET RELEASE → allowed
+# TENANT-scoped DATASET_UPDATE inherits to resource endpoint, DATASET RELEASE
+# matches directly. Both permissions satisfied.
+test_and_mixed_scopes_allowed if {
 	result := authz.decision with http.send as mock_send_and_mixed_scopes
 		with data.config as mock_http.mock_config
 		with input as portal_request("PUT", "/v2/datasets/ds-1/published/meta")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+# Helper: User with both AND-permissions at TENANT scope
+user_context_tenant_both_and_perms := {
+	"userId": "user-1",
+	"externalId": "keycloak-sub-1",
+	"groups": [{
+		"id": "group-1",
+		"name": "Admin Group",
+		"assignments": [{
+			"roleId": "role-1",
+			"roleName": "Admin",
+			"roleType": "SYSTEM",
+			"scopeType": "TENANT",
+			"scopeId": "tenant-1",
+			"permissions": ["DATASET_UPDATE", "DATASET_RELEASE"],
+		}],
+	}],
+}
+
+mock_send_tenant_both_and_perms(_) := {"status_code": 200, "body": user_context_tenant_both_and_perms}
+
+# Test: AND-permission with both permissions at TENANT scope → allowed
+# TENANT inheritance satisfies both UPDATE and RELEASE for resource endpoint
+test_tenant_and_permission_both_tenant if {
+	result := authz.decision with http.send as mock_send_tenant_both_and_perms
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v2/datasets/abc/published/meta")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+# Test: AND-permission with only UPDATE at TENANT, no RELEASE anywhere → denied
+test_tenant_and_permission_one_missing if {
+	result := authz.decision with http.send as mock_send_tenant_missing_one
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v2/datasets/abc/published/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }

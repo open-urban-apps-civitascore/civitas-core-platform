@@ -319,3 +319,33 @@ test_is_not_authenticated_empty_context if {
 		with input as {"request": {"headers": {"x-userinfo": mock_http.encode_userinfo("test-user")}}}
 	result == false
 }
+
+# =============================================================================
+# SCOPE INHERITANCE TESTS
+# =============================================================================
+
+# Mock: User with DATASET_READ at TENANT scope
+mock_send_tenant_dataset_read(_) := {"status_code": 200, "body": {
+	"userId": "user-1",
+	"externalId": "ext-1",
+	"groups": [{
+		"id": "group-1",
+		"name": "Admin Group",
+		"assignments": [{
+			"roleId": "role-1",
+			"roleName": "Admin",
+			"roleType": "SYSTEM",
+			"scopeType": "TENANT",
+			"scopeId": "tenant-1",
+			"permissions": ["DATASET_READ"],
+		}],
+	}],
+}}
+
+# Test: TENANT scope cascades to DATASET resource endpoint (direct unit test of inheritance rule)
+test_user_has_permission_tenant_cascades_to_dataset if {
+	result := permission_eval.has_permission with http.send as mock_send_tenant_dataset_read
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v2/datasets/some-dataset-id")
+	result == true
+}

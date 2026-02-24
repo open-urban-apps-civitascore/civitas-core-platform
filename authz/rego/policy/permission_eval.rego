@@ -151,9 +151,9 @@ has_permission if {
 #   - TENANT-scoped resources: assignment.scopeType must be TENANT (no scopeId check)
 #   - Collection endpoints: TENANT scope or matching scope type required (Q-006: fail-secure)
 #
-# v2.0 decision (Q-005): TENANT scope applies only to tenant-level resources.
-# Does NOT cascade to DATASET/DATASOURCE/DATASTRUCTURE resource endpoints.
-# ADM spec defines inheritance (TENANT → DATASPACE → DATASET) but cut from v2.0.
+# SCOPE INHERITANCE (Q-005 resolved): TENANT scope cascades to all resource
+# endpoints per ADM spec. DATASPACE → child resource inheritance is deferred
+# (dataspaces not implemented in v2.0).
 
 # For collection endpoints with TENANT scope: always allowed
 # (TENANT scope users can see all resources in list endpoints)
@@ -196,6 +196,19 @@ user_has_permission(permission) if {
 	permission in assignment.permissions
 	assignment.scopeType == resource_mapping.expected_scope_type
 	assignment.scopeId == resource_mapping.resource_id
+}
+
+# SCOPE INHERITANCE: TENANT scope cascades to all resource endpoints (ADM spec).
+# A TENANT-scoped assignment satisfies any resource endpoint, regardless of the
+# resource's expected scope type. No upward inheritance — narrow scopes cannot
+# access broader resources.
+user_has_permission(permission) if {
+	resource_mapping.is_resource_endpoint
+	resource_mapping.expected_scope_type != "TENANT"
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	assignment.scopeType == "TENANT"
 }
 
 # =============================================================================
