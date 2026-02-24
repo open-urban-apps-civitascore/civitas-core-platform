@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.civitas</groupId>
+        <groupId>de.civitas-core</groupId>
         <artifactId>config-adapter-parent</artifactId>
         <version>${revision}</version>
     </parent>
@@ -18,7 +18,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.civitas</groupId>
+            <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-api</artifactId>
             <version>${revision}</version>
         </dependency>
@@ -87,13 +87,13 @@
 
         <!-- Testing -->
         <dependency>
-            <groupId>com.civitas</groupId>
+            <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-configuration</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.civitas</groupId>
+            <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-orchestrator</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>

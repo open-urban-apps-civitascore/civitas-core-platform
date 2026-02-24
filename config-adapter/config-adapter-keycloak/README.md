@@ -500,7 +500,7 @@ Realm Role 'admin' not found, skipping assignment.
 ### Enable Debug Logging
 
 ```properties
-logging.level.com.civitas.configadapter.keycloak=DEBUG
+logging.level.de.civitascore.configadapter.keycloak=DEBUG
 ```
 
 Or via environment:
