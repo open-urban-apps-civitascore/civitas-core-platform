@@ -135,11 +135,13 @@ integration-test-backend:
       optional: true
     - job: publish-portal-model
   services:
-    - docker:27-dind
+    - name: docker:27-dind
+      command: ["--registry-mirror", "https://docker-mirror01.extern.frachtwerk.de"]
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_DRIVER: overlay2
     DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
   cache:
     key:
       prefix: backend-maven
@@ -223,7 +225,7 @@ build-backend:
 
 build-backend-image:
   extends: .only-backend-changes
-  image: docker:27-dind
+  image: docker:27
   stage: build
   needs:
     - job: setup-version
@@ -237,8 +239,13 @@ build-backend-image:
     DOCKER_BUILDKIT: 1
   before_script:
     - docker info
+    - |
+      cat > /tmp/buildkitd.toml <<'EOF'
+      [registry."docker.io"]
+        mirrors = ["docker-mirror01.extern.frachtwerk.de", "docker-mirror02.extern.frachtwerk.de"]
+      EOF
     - docker context create buildx-context
-    - docker buildx create --use --driver docker-container --name multiarch buildx-context
+    - docker buildx create --use --driver docker-container --name multiarch --config /tmp/buildkitd.toml buildx-context
     - docker buildx inspect --bootstrap
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
@@ -279,7 +286,7 @@ container-scan-backend:
 
 deploy-backend:
   extends: .only-backend-changes
-  image: docker:27-dind
+  image: docker:27
   stage: deploy
   needs:
     - job: setup-version
@@ -304,7 +311,7 @@ deploy-backend:
 
 sbom-backend-image:
   extends: .only-backend-changes
-  image: docker:27-dind
+  image: docker:27
   stage: report
   needs:
     - job: setup-version
