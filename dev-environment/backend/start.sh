@@ -55,27 +55,6 @@ if ! command -v mvn >/dev/null 2>&1; then
 fi
 echo "✓ Maven found"
 
-# /etc/hosts — civitas-keycloak must resolve to 127.0.0.1
-# Required because Keycloak dev mode uses the request hostname as the JWT issuer.
-# Docker, APISIX, the backend, and the browser all need to agree on the hostname.
-if command -v getent >/dev/null 2>&1; then
-    KEYCLOAK_IP=$(getent hosts civitas-keycloak 2>/dev/null | awk '{print $1}')
-else
-    if [ "$(uname)" = "Darwin" ]; then
-        KEYCLOAK_IP=$(ping -c 1 -t 1 civitas-keycloak 2>/dev/null | head -1 | sed -n 's/^PING [^ ]* (\([0-9.]*\)).*/\1/p')
-    else
-        KEYCLOAK_IP=$(ping -c 1 -W 1 civitas-keycloak 2>/dev/null | head -1 | sed -n 's/^PING [^ ]* (\([0-9.]*\)).*/\1/p')
-    fi
-fi
-if [ -z "$KEYCLOAK_IP" ]; then
-    echo "ERROR: 'civitas-keycloak' does not resolve."
-    echo "       Add this line to /etc/hosts:"
-    echo "         127.0.0.1 civitas-keycloak"
-    echo "       This is required for JWT issuer alignment across all services."
-    exit 1
-fi
-echo "✓ civitas-keycloak resolves ($KEYCLOAK_IP)"
-
 # Docker
 if ! command -v docker >/dev/null 2>&1; then
     echo "ERROR: Docker is not installed."

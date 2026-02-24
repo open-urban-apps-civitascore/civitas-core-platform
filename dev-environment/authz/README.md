@@ -89,8 +89,8 @@ Requires:
 
 ```bash
 # Get JWT for admin user
-# IMPORTANT: Use civitas-keycloak hostname so the JWT issuer matches APISIX's expectation.
-# Prerequisite: /etc/hosts must contain: 127.0.0.1 civitas-keycloak
+# Keycloak is configured with KC_HOSTNAME=localhost, so tokens from localhost:8080 are
+# accepted by APISIX (which discovers Keycloak via Docker DNS at civitas-keycloak:8080).
 TOKEN=$(curl -sf -X POST "http://civitas-keycloak:8080/realms/civitas-core/protocol/openid-connect/token" \
   -d "grant_type=password&client_id=portal-frontend&client_secret=dev-only-portal-frontend-secret&username=authz.admin@e2e.civitas.dev&password=test123" \
   | jq -r '.access_token')
@@ -153,6 +153,6 @@ curl http://localhost:8091/api/v1/user-context/{keycloak-user-id}
 ## Notes
 
 - APISIX uses dynamic JWKS discovery (`use_jwks: true`) for JWT validation — no static keys
-- All Keycloak access uses the `civitas-keycloak` hostname (requires `/etc/hosts: 127.0.0.1 civitas-keycloak`)
+- Keycloak uses `KC_HOSTNAME=localhost` so browser tokens match APISIX's issuer expectation without `/etc/hosts` changes
 - AuthZ Repository uses port 8091 to avoid conflict with Kafka-UI (8090)
 - The AuthZ Repository Dockerfile uses a pre-built JAR approach because `portal-model:1.0.0-SNAPSHOT` is not in Maven Central — see Dockerfile comments

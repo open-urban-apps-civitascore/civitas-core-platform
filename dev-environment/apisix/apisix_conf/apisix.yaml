@@ -15,12 +15,10 @@
 # =============================================================================
 # JWT VALIDATION NOTES
 # =============================================================================
-# Uses dynamic JWKS discovery via the civitas-keycloak hostname. This works
-# because both Docker DNS and /etc/hosts resolve civitas-keycloak to the same
-# Keycloak instance, so the JWT issuer claim matches in all contexts.
-#
-# Prerequisite: /etc/hosts must contain: 127.0.0.1 civitas-keycloak
-# (see dev-environment/keycloak/docker-compose.yml for details)
+# APISIX discovers Keycloak via Docker DNS (civitas-keycloak:8080). Keycloak is
+# configured with KC_HOSTNAME=localhost + KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true,
+# so the discovery response reports issuer=localhost (matching browser tokens)
+# but jwks_uri=civitas-keycloak (reachable from Docker). No /etc/hosts needed.
 
 # =============================================================================
 # SERVICES - Backend upstream definitions

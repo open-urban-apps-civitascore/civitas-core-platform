@@ -397,14 +397,11 @@ fi
 if [ "$backend_option" = "1" ]; then
     echo "Starting Portal Backend..."
     cd "$SCRIPT_DIR/../portal-backend"
-    # Override issuer to match APISIX's Keycloak discovery URL (civitas-keycloak hostname).
-    # Requires /etc/hosts: 127.0.0.1 civitas-keycloak
-    BACKEND_KEYCLOAK_ARGS='--keycloak.issuer-uri=http://civitas-keycloak:8080 --keycloak.auth-server-url=http://civitas-keycloak:8080'
-    gnome-terminal --title="Portal Backend" -- bash -c "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dspring-boot.run.arguments=\"$BACKEND_KEYCLOAK_ARGS\"; exec bash" 2>/dev/null || \
-    xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dspring-boot.run.arguments=\"$BACKEND_KEYCLOAK_ARGS\"; bash" 2>/dev/null || \
+    gnome-terminal --title="Portal Backend" -- bash -c "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; exec bash" 2>/dev/null || \
+    xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; bash" 2>/dev/null || \
     {
         echo "Could not open new terminal. Starting in background..."
-        mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dspring-boot.run.arguments="$BACKEND_KEYCLOAK_ARGS" &
+        mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION &
     }
     echo
 else
@@ -421,8 +418,6 @@ else
     echo "  Project: portal-backend"
     echo "  Main class: de.civitascore.portal.PortalBackendApplication"
     echo "  Profiles: local,local-init,postgres"
-    echo "  VM args: -Dkeycloak.issuer-uri=http://civitas-keycloak:8080 -Dkeycloak.auth-server-url=http://civitas-keycloak:8080"
-    echo "  (Requires /etc/hosts: 127.0.0.1 civitas-keycloak)"
     echo
 fi
 

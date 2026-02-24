@@ -21,8 +21,6 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     container_name: civitas-keycloak
-    # Production mode with strict hostname - ensures all URLs use civitas-keycloak
-    # Requires host entry: 127.0.0.1 civitas-keycloak (in /etc/hosts)
     command: start-dev --import-realm
     ports:
       - "8080:8080"
@@ -40,6 +38,12 @@ services:
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
       KC_LOG_LEVEL: info
+      # Force issuer to localhost so browser-issued JWTs match what APISIX expects.
+      # Without this, Keycloak mirrors the request hostname into the issuer claim,
+      # causing a mismatch between browser (localhost) and APISIX (civitas-keycloak).
+      # Override KC_HOSTNAME for VM/remote access: export KC_HOSTNAME=http://<vm-ip>:8080
+      KC_HOSTNAME: ${KC_HOSTNAME:-http://localhost:8080}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     depends_on:
       postgres-keycloak:
         condition: service_healthy

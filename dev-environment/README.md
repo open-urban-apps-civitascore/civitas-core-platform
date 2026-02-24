@@ -26,7 +26,6 @@ dev-environment/
 * Java 21 JDK
 * Maven 3.9+
 * jq (for dev-mode scripts)
-* `/etc/hosts` entry: `127.0.0.1 civitas-keycloak`
 
 ---
 
