@@ -52,10 +52,10 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
   return {
     name: pipeline.name,
     description: pipeline.description || '-',
-    styles: JSON.stringify(styles),
+    styles: styles,
     dataSources,
     apis,
     persistences,
-    model: model ? JSON.stringify(model) : '',
+    model: model || {},
   }
 }

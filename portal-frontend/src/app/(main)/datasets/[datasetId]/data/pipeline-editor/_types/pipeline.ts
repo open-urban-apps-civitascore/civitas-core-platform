@@ -113,11 +113,11 @@ export interface PipelinePayload {
   name: string
   description: string
   /** JSON-stringified PipelineStylesPayload — backend stores as opaque string */
-  styles: string
+  styles: PipelineStylesPayload
   dataSources: number[] // IDs extracted from DataSource nodes
   apis: string[] // endpoint paths from ApiRequest/ApiResponse nodes
   persistences: number[] // persistence config IDs (Long[] in backend)
-  model: string // Pipeline graph serialized in RedPandaConnect syntax
+  model: object // Pipeline graph serialized in RedPandaConnect syntax
 }
 
 // ============================================================================
@@ -134,11 +134,11 @@ export interface PipelineOutputDTO {
   modifiedAt: string
   name: string
   description: string
-  styles: string
+  styles: PipelineStylesPayload
   dataSources: number[]
   apis: string[]
   persistences: number[]
-  model: string
+  model: object
 }
 
 // ============================================================================

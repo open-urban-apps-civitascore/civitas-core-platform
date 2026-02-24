@@ -51,7 +51,7 @@ export const createSessionFromBackendDTO = (dto: PipelineOutputDTO): PipelineSes
 
   try {
     if (dto.styles) {
-      parsedStyles = JSON.parse(dto.styles) as PipelineStylesPayload
+      parsedStyles = dto.styles as PipelineStylesPayload
     }
   } catch {
     console.error(`Failed to parse styles for pipeline ${dto.id}:`, dto.styles)
