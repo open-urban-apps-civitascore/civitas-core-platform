@@ -200,10 +200,14 @@ test_all_resource_paths if {
 test_sub_resource_paths if {
 	patterns := [
 		["/v2/datasets/abc/publish", "/v2/datasets/{id}/publish"],
+		["/v2/datasets/abc/unpublish", "/v2/datasets/{id}/unpublish"],
 		["/v2/datasets/abc/assignments", "/v2/datasets/{id}/assignments"],
-		["/v2/datasets/abc/assignments/xyz", "/v2/datasets/{id}/assignments/{id}"],
+		["/v2/datasets/abc/pipelines", "/v2/datasets/{id}/pipelines"],
 		["/v2/datasources/abc/publish", "/v2/datasources/{id}/publish"],
-		["/v2/datastructures/abc/assignments/xyz", "/v2/datastructures/{id}/assignments/{id}"],
+		["/v2/datasources/abc/unpublish", "/v2/datasources/{id}/unpublish"],
+		["/v2/datastructures/abc/publish", "/v2/datastructures/{id}/publish"],
+		["/v2/datastructures/abc/unpublish", "/v2/datastructures/{id}/unpublish"],
+		["/v2/datastructures/abc/versions", "/v2/datastructures/{id}/versions"],
 	]
 	every pattern in patterns {
 		actual := resource_mapping.path_pattern with input as portal_request("POST", pattern[0])
@@ -211,16 +215,28 @@ test_sub_resource_paths if {
 	}
 }
 
-# Test: 5-segment literal tail paths resolve correctly
-test_5_segment_literal_tail_paths if {
-	result := resource_mapping.path_pattern with input as portal_request("GET", "/v2/datasets/abc/published/meta")
-	result == "/v2/datasets/{id}/published/meta"
+# Test: 5-segment paths resolve correctly (both literal-tail and both-{id} variants)
+test_5_segment_paths if {
+	# Literal tail: published/meta
+	result1 := resource_mapping.path_pattern with input as portal_request("PUT", "/v2/datasets/abc/published/meta")
+	result1 == "/v2/datasets/{id}/published/meta"
+
+	# Both-{id}: pipelines/{id}
+	result2 := resource_mapping.path_pattern with input as portal_request("GET", "/v2/datasets/abc/pipelines/pipe-1")
+	result2 == "/v2/datasets/{id}/pipelines/{id}"
+
+	# Both-{id}: versions/{id}
+	result3 := resource_mapping.path_pattern with input as portal_request("GET", "/v2/datastructures/abc/versions/v1")
+	result3 == "/v2/datastructures/{id}/versions/{id}"
 }
 
 # Test: 6-segment paths resolve correctly
 test_6_segment_paths if {
-	result := resource_mapping.path_pattern with input as portal_request("POST", "/v2/datastructures/abc/versions/xyz/publish")
-	result == "/v2/datastructures/{id}/versions/{id}/publish"
+	result1 := resource_mapping.path_pattern with input as portal_request("POST", "/v2/datastructures/abc/versions/xyz/publish")
+	result1 == "/v2/datastructures/{id}/versions/{id}/publish"
+
+	result2 := resource_mapping.path_pattern with input as portal_request("POST", "/v2/datastructures/abc/versions/xyz/unpublish")
+	result2 == "/v2/datastructures/{id}/versions/{id}/unpublish"
 }
 
 # Test: Dataspaces and catalogs resolve (null-permission endpoints)

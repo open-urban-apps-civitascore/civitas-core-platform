@@ -91,13 +91,13 @@ test_path_pattern_4_segment_publish if {
 }
 
 test_path_pattern_4_segment_assignments if {
-	result := portal_backend.path_pattern with input as portal_request("POST", "/v2/datasets/abc-123/assignments")
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v2/datasets/abc-123/assignments")
 	result == "/v2/datasets/{id}/assignments"
 }
 
-test_path_pattern_5_segment_assignment_delete if {
-	result := portal_backend.path_pattern with input as portal_request("DELETE", "/v2/datasets/abc-123/assignments/assign-456")
-	result == "/v2/datasets/{id}/assignments/{id}"
+test_path_pattern_4_segment_pipelines if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v2/datasets/abc-123/pipelines")
+	result == "/v2/datasets/{id}/pipelines"
 }
 
 test_path_pattern_datasource_publish if {
@@ -106,17 +106,27 @@ test_path_pattern_datasource_publish if {
 }
 
 test_path_pattern_datastructure_assignments if {
-	result := portal_backend.path_pattern with input as portal_request("POST", "/v2/datastructures/dstr-123/assignments")
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v2/datastructures/dstr-123/assignments")
 	result == "/v2/datastructures/{id}/assignments"
 }
 
 # =============================================================================
-# 5-SEGMENT LITERAL TAIL TESTS
+# 5-SEGMENT PATH TESTS
 # =============================================================================
 
 test_path_pattern_5_segment_published_meta if {
-	result := portal_backend.path_pattern with input as portal_request("GET", "/v2/datasets/abc-123/published/meta")
+	result := portal_backend.path_pattern with input as portal_request("PUT", "/v2/datasets/abc-123/published/meta")
 	result == "/v2/datasets/{id}/published/meta"
+}
+
+test_path_pattern_5_segment_pipelines_id if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v2/datasets/abc-123/pipelines/pipe-456")
+	result == "/v2/datasets/{id}/pipelines/{id}"
+}
+
+test_path_pattern_5_segment_versions_id if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v2/datastructures/dstr-123/versions/v-456")
+	result == "/v2/datastructures/{id}/versions/{id}"
 }
 
 # =============================================================================
@@ -126,6 +136,11 @@ test_path_pattern_5_segment_published_meta if {
 test_path_pattern_6_segment_versions_publish if {
 	result := portal_backend.path_pattern with input as portal_request("POST", "/v2/datastructures/dstr-123/versions/v-456/publish")
 	result == "/v2/datastructures/{id}/versions/{id}/publish"
+}
+
+test_path_pattern_6_segment_versions_unpublish if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v2/datastructures/dstr-123/versions/v-456/unpublish")
+	result == "/v2/datastructures/{id}/versions/{id}/unpublish"
 }
 
 # =============================================================================

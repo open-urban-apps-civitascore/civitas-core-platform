@@ -155,8 +155,9 @@ has_permission if {
 #   - TENANT-scoped resources: assignment.scopeType must be TENANT (no scopeId check)
 #   - Collection endpoints: TENANT scope or matching scope type required (Q-006: fail-secure)
 #
-# See Q-005 in BACKLOG.md: Pending PO clarification on whether TENANT scope
-# should act as wildcard (access all) or only for tenant-level resources.
+# v2.0 decision (Q-005): TENANT scope applies only to tenant-level resources.
+# Does NOT cascade to DATASET/DATASOURCE/DATASTRUCTURE resource endpoints.
+# ADM spec defines inheritance (TENANT → DATASPACE → DATASET) but cut from v2.0.
 
 # For collection endpoints with TENANT scope: always allowed
 # (TENANT scope users can see all resources in list endpoints)

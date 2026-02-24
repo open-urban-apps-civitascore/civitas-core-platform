@@ -90,12 +90,13 @@ user_minimal := {
 }
 
 # Admin user with TENANT-scoped permissions (for tenant-level resources like users)
+# Must match permissions defined in data/backends/portal_backend/data.json
 user_admin := user_with_permissions([
 	"USER_READ", "USER_CREATE", "USER_UPDATE", "USER_DELETE",
 	"GROUP_READ", "GROUP_CREATE", "GROUP_UPDATE", "GROUP_DELETE",
 	"ROLE_READ", "ROLE_CREATE", "ROLE_UPDATE", "ROLE_DELETE",
-	"PERMISSION_READ", "PERMISSION_CREATE", "PERMISSION_UPDATE", "PERMISSION_DELETE",
-	"ASSIGNMENT_READ", "ASSIGNMENT_CREATE", "ASSIGNMENT_UPDATE", "ASSIGNMENT_DELETE",
+	"PERMISSION_READ",
+	"ASSIGNMENT_READ", "ASSIGNMENT_CREATE", "ASSIGNMENT_DELETE",
 ])
 
 # Reader user with TENANT-scoped read permissions

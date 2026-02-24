@@ -17,11 +17,12 @@ mock_endpoints := {
 	"/v2/users/me": {"GET": null},
 	"/v2/datasets": {"GET": "DATASET_READ"},
 	"/v2/datasets/{id}": {"GET": "DATASET_READ", "DELETE": "DATASET_DELETE"},
-	"/v2/datasets/{id}/publish": {"POST": ["DATASET_UPDATE", "DATASET_PUBLISH"]},
-	"/v2/datasets/{id}/assignments": {"POST": "DATASET_UPDATE"},
-	"/v2/datasets/{id}/assignments/{id}": {"DELETE": "DATASET_UPDATE"},
-	"/v2/datasets/{id}/published/meta": {"GET": "DATASET_READ"},
-	"/v2/datastructures/{id}/versions/{id}/publish": {"POST": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_PUBLISH"]},
+	"/v2/datasets/{id}/publish": {"POST": "DATASET_RELEASE"},
+	"/v2/datasets/{id}/assignments": {"GET": "DATASET_READ"},
+	"/v2/datasets/{id}/pipelines/{id}": {"GET": "DATASET_READ", "PUT": "DATASET_UPDATE"},
+	"/v2/datasets/{id}/published/meta": {"PUT": ["DATASET_UPDATE", "DATASET_RELEASE"]},
+	"/v2/datastructures/{id}/versions/{id}/publish": {"POST": "DATASTRUCTURE_RELEASE"},
+	"/v2/datastructures/{id}/versions/{id}/unpublish": {"POST": "DATASTRUCTURE_UPDATE"},
 }
 
 # =============================================================================
@@ -211,27 +212,27 @@ test_match_pattern_4_segment_reserved_id if {
 # 5-SEGMENT SUB-RESOURCE PATTERN MATCHING TESTS (both-{id} variant)
 # =============================================================================
 
-# Pattern match - 5-segment sub-resource (/v2/datasets/{id}/assignments/{id})
+# Pattern match - 5-segment sub-resource (/v2/datasets/{id}/pipelines/{id})
 test_match_pattern_5_segment_subresource if {
-	result := restmapper.match_pattern("/v2/datasets/abc-123/assignments/assign-456", mock_endpoints)
-	result == "/v2/datasets/{id}/assignments/{id}"
+	result := restmapper.match_pattern("/v2/datasets/abc-123/pipelines/pipe-456", mock_endpoints)
+	result == "/v2/datasets/{id}/pipelines/{id}"
 }
 
 # Pattern match - 5-segment with UUIDs
 test_match_pattern_5_segment_uuids if {
-	result := restmapper.match_pattern("/v2/datasets/550e8400-e29b-41d4-a716-446655440000/assignments/660e8400-e29b-41d4-a716-446655440000", mock_endpoints)
-	result == "/v2/datasets/{id}/assignments/{id}"
+	result := restmapper.match_pattern("/v2/datasets/550e8400-e29b-41d4-a716-446655440000/pipelines/660e8400-e29b-41d4-a716-446655440000", mock_endpoints)
+	result == "/v2/datasets/{id}/pipelines/{id}"
 }
 
 # No match - 5-segment with empty sub-resource ID (trailing slash)
 test_match_pattern_5_segment_trailing_slash if {
-	result := restmapper.match_pattern("/v2/datasets/abc-123/assignments/", mock_endpoints)
+	result := restmapper.match_pattern("/v2/datasets/abc-123/pipelines/", mock_endpoints)
 	result == ""
 }
 
 # No match - 5-segment with reserved segment as sub-resource ID
 test_match_pattern_5_segment_reserved_subid if {
-	result := restmapper.match_pattern("/v2/datasets/abc-123/assignments/me", mock_endpoints)
+	result := restmapper.match_pattern("/v2/datasets/abc-123/pipelines/me", mock_endpoints)
 	result == ""
 }
 
@@ -277,4 +278,10 @@ test_match_pattern_6_segment_unknown_action if {
 test_match_pattern_6_segment_reserved_id if {
 	result := restmapper.match_pattern("/v2/datastructures/me/versions/v-456/publish", mock_endpoints)
 	result == ""
+}
+
+# Pattern match - 6-segment unpublish
+test_match_pattern_6_segment_unpublish if {
+	result := restmapper.match_pattern("/v2/datastructures/dstr-123/versions/v-456/unpublish", mock_endpoints)
+	result == "/v2/datastructures/{id}/versions/{id}/unpublish"
 }

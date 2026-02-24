@@ -135,6 +135,12 @@ match_pattern(path, endpoints) := pattern if {
 # e.g., /v2/datasets/{id}/published/meta (only parts[2] is {id})
 # Guard: only fires if the both-{id} variant does NOT exist in endpoints,
 # preventing conflict with rule 4.
+#
+# KNOWN LIMITATION (TD-024): Rules 4 and 5 are mutually exclusive per prefix.
+# If data.json contains BOTH /v2/foo/{id}/bar/{id} AND /v2/foo/{id}/bar/literal,
+# the guard suppresses rule 5 and rule 4 treats the literal as an {id}.
+# Fix: replace positional heuristics with pattern-iterating matcher (iterate
+# all patterns, match {id} as wildcard, literals as exact). See BACKLOG.md.
 match_pattern(path, endpoints) := pattern if {
 	is_valid_path(path)
 	not endpoints[path]

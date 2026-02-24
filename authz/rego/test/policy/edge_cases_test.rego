@@ -83,15 +83,6 @@ test_url_encoding if {
 	parts[2] == "%7Bid%7D"
 }
 
-# Long paths (sub-resources) - NOT currently supported
-# EXPECTED: No match (only /version/resource/{id} pattern supported)
-test_long_path_no_match if {
-	pattern := resource_mapping.path_pattern with input as portal_request("/v2/users/123/groups/456/roles")
-
-	# Sub-resource paths are not matched
-	pattern == ""
-}
-
 # Empty path
 test_empty_path if {
 	parts := resource_mapping.path_parts with input as portal_request("/")

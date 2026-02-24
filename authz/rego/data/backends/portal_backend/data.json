@@ -1,6 +1,6 @@
 {
   "_comment": "Portal Backend API permission mappings. Owner: Team 2",
-  "_version": "2.0.0",
+  "_version": "1.0.0",
   "_backend_id": "portal-backend",
 
   "endpoints": {
@@ -62,10 +62,10 @@
       "DELETE": "DATASET_DELETE"
     },
     "/v2/datasets/{id}/publish": {
-      "POST": ["DATASET_UPDATE", "DATASET_PUBLISH"]
+      "POST": "DATASET_RELEASE"
     },
     "/v2/datasets/{id}/unpublish": {
-      "POST": ["DATASET_UPDATE", "DATASET_PUBLISH"]
+      "POST": "DATASET_UPDATE"
     },
     "/v2/datasets/{id}/ready": {
       "POST": "DATASET_UPDATE"
@@ -74,20 +74,20 @@
       "POST": "DATASET_UPDATE"
     },
     "/v2/datasets/{id}/published/meta": {
+      "PUT": ["DATASET_UPDATE", "DATASET_RELEASE"]
+    },
+    "/v2/datasets/{id}/assignments": {
       "GET": "DATASET_READ"
     },
     "/v2/datasets/{id}/pipelines": {
       "GET": "DATASET_READ",
-      "POST": "DATASET_UPDATE"
+      "POST": "DATASET_CREATE"
     },
-    "/v2/datasets/{id}/versions": {
-      "GET": "DATASET_READ"
-    },
-    "/v2/datasets/{id}/assignments": {
-      "POST": "DATASET_UPDATE"
-    },
-    "/v2/datasets/{id}/assignments/{id}": {
-      "DELETE": "DATASET_UPDATE"
+    "/v2/datasets/{id}/pipelines/{id}": {
+      "GET": "DATASET_READ",
+      "PUT": "DATASET_UPDATE",
+      "PATCH": "DATASET_UPDATE",
+      "DELETE": "DATASET_DELETE"
     },
     "/v2/datasources": {
       "GET": "DATASOURCE_READ",
@@ -100,13 +100,16 @@
       "DELETE": "DATASOURCE_DELETE"
     },
     "/v2/datasources/{id}/publish": {
-      "POST": ["DATASOURCE_UPDATE", "DATASOURCE_PUBLISH"]
+      "POST": "DATASOURCE_RELEASE"
     },
-    "/v2/datasources/{id}/assignments": {
+    "/v2/datasources/{id}/unpublish": {
       "POST": "DATASOURCE_UPDATE"
     },
-    "/v2/datasources/{id}/assignments/{id}": {
-      "DELETE": "DATASOURCE_UPDATE"
+    "/v2/datasources/{id}/published/meta": {
+      "PUT": ["DATASOURCE_UPDATE", "DATASOURCE_RELEASE"]
+    },
+    "/v2/datasources/{id}/assignments": {
+      "GET": "DATASOURCE_READ"
     },
     "/v2/datastructures": {
       "GET": "DATASTRUCTURE_READ",
@@ -119,28 +122,52 @@
       "DELETE": "DATASTRUCTURE_DELETE"
     },
     "/v2/datastructures/{id}/publish": {
-      "POST": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_PUBLISH"]
+      "POST": "DATASTRUCTURE_RELEASE"
     },
-    "/v2/datastructures/{id}/assignments": {
+    "/v2/datastructures/{id}/unpublish": {
       "POST": "DATASTRUCTURE_UPDATE"
     },
-    "/v2/datastructures/{id}/assignments/{id}": {
-      "DELETE": "DATASTRUCTURE_UPDATE"
+    "/v2/datastructures/{id}/published/meta": {
+      "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
+    },
+    "/v2/datastructures/{id}/assignments": {
+      "GET": "DATASTRUCTURE_READ"
+    },
+    "/v2/datastructures/{id}/versions": {
+      "GET": "DATASTRUCTURE_READ",
+      "POST": "DATASTRUCTURE_CREATE"
+    },
+    "/v2/datastructures/{id}/versions/{id}": {
+      "GET": "DATASTRUCTURE_READ",
+      "PUT": "DATASTRUCTURE_UPDATE",
+      "PATCH": "DATASTRUCTURE_UPDATE",
+      "DELETE": "DATASTRUCTURE_DELETE"
     },
     "/v2/datastructures/{id}/versions/{id}/publish": {
-      "POST": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_PUBLISH"]
+      "POST": "DATASTRUCTURE_RELEASE"
     },
-    "/v2/dataspaces": {
-      "GET": null
-    },
-    "/v2/dataspaces/{id}": {
-      "GET": null
+    "/v2/datastructures/{id}/versions/{id}/unpublish": {
+      "POST": "DATASTRUCTURE_UPDATE"
     },
     "/v2/catalogs": {
-      "GET": null
+      "GET": null,
+      "POST": null
     },
     "/v2/catalogs/{id}": {
-      "GET": null
+      "GET": null,
+      "PUT": null,
+      "PATCH": null,
+      "DELETE": null
+    },
+    "/v2/dataspaces": {
+      "GET": null,
+      "POST": null
+    },
+    "/v2/dataspaces/{id}": {
+      "GET": null,
+      "PUT": null,
+      "PATCH": null,
+      "DELETE": null
     }
   }
 }

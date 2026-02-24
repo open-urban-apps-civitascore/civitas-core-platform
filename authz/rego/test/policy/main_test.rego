@@ -567,7 +567,7 @@ user_context_tenant_and_perms := {
 				"roleType": "DATA",
 				"scopeType": "TENANT",
 				"scopeId": "tenant-1",
-				"permissions": ["DATASET_UPDATE", "DATASET_PUBLISH", "DATASET_READ"],
+				"permissions": ["DATASET_UPDATE", "DATASET_RELEASE", "DATASET_READ"],
 			},
 			{
 				"roleId": "role-2",
@@ -575,7 +575,7 @@ user_context_tenant_and_perms := {
 				"roleType": "DATA",
 				"scopeType": "DATASET",
 				"scopeId": "abc",
-				"permissions": ["DATASET_UPDATE", "DATASET_PUBLISH"],
+				"permissions": ["DATASET_UPDATE", "DATASET_RELEASE"],
 			},
 		],
 	}],
@@ -590,7 +590,7 @@ mock_send_tenant_and_perms(_) := {"status_code": 200, "body": user_context_tenan
 test_scope_header_and_tenant_wildcard if {
 	result := authz.decision with http.send as mock_send_tenant_and_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v2/datasets/abc/publish")
+		with input as portal_request("PUT", "/v2/datasets/abc/published/meta")
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "*"
 }
@@ -619,7 +619,7 @@ mock_send_tenant_missing_one(_) := {"status_code": 200, "body": user_context_ten
 test_scope_header_and_tenant_missing_one if {
 	result := authz.decision with http.send as mock_send_tenant_missing_one
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v2/datasets/abc/publish")
+		with input as portal_request("PUT", "/v2/datasets/abc/published/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -637,7 +637,7 @@ user_context_specific_and_perms := {
 			"roleType": "DATA",
 			"scopeType": "DATASET",
 			"scopeId": "dataset-abc",
-			"permissions": ["DATASET_UPDATE", "DATASET_PUBLISH"],
+			"permissions": ["DATASET_UPDATE", "DATASET_RELEASE"],
 		}],
 	}],
 }
@@ -648,7 +648,7 @@ mock_send_specific_and_perms(_) := {"status_code": 200, "body": user_context_spe
 test_scope_header_and_specific_both if {
 	result := authz.decision with http.send as mock_send_specific_and_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v2/datasets/dataset-abc/publish")
+		with input as portal_request("PUT", "/v2/datasets/dataset-abc/published/meta")
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "dataset-abc"
 }
@@ -677,7 +677,337 @@ mock_send_specific_partial(_) := {"status_code": 200, "body": user_context_speci
 test_scope_header_and_specific_partial if {
 	result := authz.decision with http.send as mock_send_specific_partial
 		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v2/datasets/dataset-abc/published/meta")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# =============================================================================
+# AND-PERMISSION CROSS-GROUP TESTS
+# =============================================================================
+# Tests that AND-permissions work when required permissions come from different
+# groups/assignments, and that scope intersection is correct.
+
+# Helper: User with AND-permissions split across two groups, same scope ID
+user_context_and_cross_group := {
+	"userId": "user-1",
+	"externalId": "keycloak-sub-1",
+	"groups": [
+		{
+			"id": "group-1",
+			"name": "Editors",
+			"assignments": [{
+				"roleId": "role-1",
+				"roleName": "Editor",
+				"roleType": "DATA",
+				"scopeType": "DATASET",
+				"scopeId": "dataset-abc",
+				"permissions": ["DATASET_UPDATE"],
+			}],
+		},
+		{
+			"id": "group-2",
+			"name": "Releasers",
+			"assignments": [{
+				"roleId": "role-2",
+				"roleName": "Releaser",
+				"roleType": "DATA",
+				"scopeType": "DATASET",
+				"scopeId": "dataset-abc",
+				"permissions": ["DATASET_RELEASE"],
+			}],
+		},
+	],
+}
+
+mock_send_and_cross_group(_) := {"status_code": 200, "body": user_context_and_cross_group}
+
+# Test: AND-permission satisfied across different groups for same scope
+test_and_cross_group_allowed if {
+	result := authz.decision with http.send as mock_send_and_cross_group
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v2/datasets/dataset-abc/published/meta")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.headers["X-Allowed-Scope-Ids"] == "dataset-abc"
+}
+
+# Helper: User with AND-permissions split across groups, different scope IDs
+# DATASET_UPDATE for {ds-1, ds-2}, DATASET_RELEASE for {ds-2, ds-3}
+# Expected intersection: {ds-2}
+user_context_and_partial_overlap := {
+	"userId": "user-1",
+	"externalId": "keycloak-sub-1",
+	"groups": [
+		{
+			"id": "group-1",
+			"name": "Editors",
+			"assignments": [
+				{
+					"roleId": "role-1",
+					"roleName": "Editor",
+					"roleType": "DATA",
+					"scopeType": "DATASET",
+					"scopeId": "ds-1",
+					"permissions": ["DATASET_UPDATE"],
+				},
+				{
+					"roleId": "role-1",
+					"roleName": "Editor",
+					"roleType": "DATA",
+					"scopeType": "DATASET",
+					"scopeId": "ds-2",
+					"permissions": ["DATASET_UPDATE"],
+				},
+			],
+		},
+		{
+			"id": "group-2",
+			"name": "Releasers",
+			"assignments": [
+				{
+					"roleId": "role-2",
+					"roleName": "Releaser",
+					"roleType": "DATA",
+					"scopeType": "DATASET",
+					"scopeId": "ds-2",
+					"permissions": ["DATASET_RELEASE"],
+				},
+				{
+					"roleId": "role-2",
+					"roleName": "Releaser",
+					"roleType": "DATA",
+					"scopeType": "DATASET",
+					"scopeId": "ds-3",
+					"permissions": ["DATASET_RELEASE"],
+				},
+			],
+		},
+	],
+}
+
+mock_send_and_partial_overlap(_) := {"status_code": 200, "body": user_context_and_partial_overlap}
+
+# Test: AND-permission scope intersection — only ds-2 has both permissions
+test_and_scope_intersection if {
+	result := authz.decision with http.send as mock_send_and_partial_overlap
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v2/datasets/ds-2/published/meta")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.headers["X-Allowed-Scope-Ids"] == "ds-2"
+}
+
+# Test: AND-permission scope intersection — ds-1 only has UPDATE, not RELEASE
+test_and_scope_intersection_denied_missing_release if {
+	result := authz.decision with http.send as mock_send_and_partial_overlap
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v2/datasets/ds-1/published/meta")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# Test: AND-permission scope intersection — ds-3 only has RELEASE, not UPDATE
+test_and_scope_intersection_denied_missing_update if {
+	result := authz.decision with http.send as mock_send_and_partial_overlap
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v2/datasets/ds-3/published/meta")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# Helper: User with disjoint scopes — no overlap at all
+# DATASET_UPDATE for {ds-1}, DATASET_RELEASE for {ds-2}
+user_context_and_disjoint := {
+	"userId": "user-1",
+	"externalId": "keycloak-sub-1",
+	"groups": [
+		{
+			"id": "group-1",
+			"name": "Editors",
+			"assignments": [{
+				"roleId": "role-1",
+				"roleName": "Editor",
+				"roleType": "DATA",
+				"scopeType": "DATASET",
+				"scopeId": "ds-1",
+				"permissions": ["DATASET_UPDATE"],
+			}],
+		},
+		{
+			"id": "group-2",
+			"name": "Releasers",
+			"assignments": [{
+				"roleId": "role-2",
+				"roleName": "Releaser",
+				"roleType": "DATA",
+				"scopeType": "DATASET",
+				"scopeId": "ds-2",
+				"permissions": ["DATASET_RELEASE"],
+			}],
+		},
+	],
+}
+
+mock_send_and_disjoint(_) := {"status_code": 200, "body": user_context_and_disjoint}
+
+# Test: AND-permission with completely disjoint scopes — denied everywhere
+test_and_disjoint_scopes_denied if {
+	result := authz.decision with http.send as mock_send_and_disjoint
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v2/datasets/ds-1/published/meta")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# =============================================================================
+# NEW ENDPOINT INTEGRATION TESTS
+# =============================================================================
+# End-to-end tests for unpublish, ready, unready endpoints.
+
+# Test: POST /datasets/{id}/unpublish requires only DATASET_UPDATE
+test_unpublish_allowed if {
+	result := authz.decision with http.send as mock_send_specific_partial
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v2/datasets/dataset-abc/unpublish")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {"DATASET_UPDATE"}
+}
+
+# Test: POST /datasets/{id}/publish requires DATASET_RELEASE (single-perm)
+test_publish_single_perm if {
+	result := authz.decision with http.send as mock_send_specific_and_perms
+		with data.config as mock_http.mock_config
 		with input as portal_request("POST", "/v2/datasets/dataset-abc/publish")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {"DATASET_RELEASE"}
+}
+
+# Test: POST /datasets/{id}/ready requires only DATASET_UPDATE
+test_ready_allowed if {
+	result := authz.decision with http.send as mock_send_specific_partial
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v2/datasets/dataset-abc/ready")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {"DATASET_UPDATE"}
+}
+
+# Test: POST /datasets/{id}/unready requires only DATASET_UPDATE
+test_unready_allowed if {
+	result := authz.decision with http.send as mock_send_specific_partial
+		with data.config as mock_http.mock_config
+		with input as portal_request("POST", "/v2/datasets/dataset-abc/unready")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {"DATASET_UPDATE"}
+}
+
+# Test: PUT /datasets/{id}/published/meta requires AND-permission
+test_published_meta_and_perm if {
+	result := authz.decision with http.send as mock_send_specific_and_perms
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v2/datasets/dataset-abc/published/meta")
+	result.allow == true
+	result.reason == "permission_granted"
+	result.required_permissions == {"DATASET_UPDATE", "DATASET_RELEASE"}
+}
+
+# =============================================================================
+# TENANT SCOPE NON-CASCADING REGRESSION TESTS
+# =============================================================================
+# v2.0 design decision: TENANT scope does NOT cascade to DATASET/DATASOURCE/
+# DATASTRUCTURE resource endpoints. TENANT applies only to tenant-level resources
+# (users, groups, roles, permissions, assignments).
+#
+# The ADM spec defines inheritance (TENANT → DATASPACE → DATASET) but this was
+# cut from v2.0 (see Q-001, Q-005 in BACKLOG.md). These tests lock in the
+# non-cascading behavior to prevent accidental "fixes" without a design decision.
+
+# Helper: User with DATASET_READ at TENANT scope (not DATASET scope)
+user_context_tenant_dataset_read := {
+	"userId": "user-1",
+	"externalId": "keycloak-sub-1",
+	"groups": [{
+		"id": "group-1",
+		"name": "Admin Group",
+		"assignments": [{
+			"roleId": "role-1",
+			"roleName": "Admin",
+			"roleType": "SYSTEM",
+			"scopeType": "TENANT",
+			"scopeId": "tenant-1",
+			"permissions": ["DATASET_READ"],
+		}],
+	}],
+}
+
+mock_send_tenant_dataset_read(_) := {"status_code": 200, "body": user_context_tenant_dataset_read}
+
+# Test: TENANT-scoped DATASET_READ does NOT grant access to a specific dataset
+# (TENANT does not cascade to DATASET resource endpoints in v2.0)
+test_tenant_scope_no_cascade_to_dataset_resource if {
+	result := authz.decision with http.send as mock_send_tenant_dataset_read
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v2/datasets/some-dataset-id")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# Test: TENANT-scoped DATASET_READ DOES grant access to dataset collection
+# (collection endpoints allow TENANT scope — list filtering via header)
+test_tenant_scope_allows_dataset_collection if {
+	result := authz.decision with http.send as mock_send_tenant_dataset_read
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v2/datasets")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+# Helper: AND-permission with mixed scopes — DATASET_UPDATE at TENANT, DATASET_RELEASE at DATASET
+# Tests published/meta PUT which requires ["DATASET_UPDATE", "DATASET_RELEASE"]
+user_context_and_mixed_scopes := {
+	"userId": "user-1",
+	"externalId": "keycloak-sub-1",
+	"groups": [
+		{
+			"id": "group-1",
+			"name": "Admins",
+			"assignments": [{
+				"roleId": "role-1",
+				"roleName": "Admin",
+				"roleType": "SYSTEM",
+				"scopeType": "TENANT",
+				"scopeId": "tenant-1",
+				"permissions": ["DATASET_UPDATE"],
+			}],
+		},
+		{
+			"id": "group-2",
+			"name": "Publishers",
+			"assignments": [{
+				"roleId": "role-2",
+				"roleName": "Publisher",
+				"roleType": "DATA",
+				"scopeType": "DATASET",
+				"scopeId": "ds-1",
+				"permissions": ["DATASET_RELEASE"],
+			}],
+		},
+	],
+}
+
+mock_send_and_mixed_scopes(_) := {"status_code": 200, "body": user_context_and_mixed_scopes}
+
+# Test: AND-permission with TENANT UPDATE + DATASET RELEASE → denied
+# TENANT-scoped DATASET_UPDATE does not satisfy the DATASET-scope requirement
+# for resource endpoints. Both permissions must be at DATASET scope.
+test_and_mixed_scopes_denied if {
+	result := authz.decision with http.send as mock_send_and_mixed_scopes
+		with data.config as mock_http.mock_config
+		with input as portal_request("PUT", "/v2/datasets/ds-1/published/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
