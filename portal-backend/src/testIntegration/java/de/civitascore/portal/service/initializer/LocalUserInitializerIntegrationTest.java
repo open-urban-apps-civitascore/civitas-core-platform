@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ActiveProfiles;
 
-@ActiveProfiles({"test-integration", "local-init"})
+@ActiveProfiles({"test-integration", "local-init", "local-init-test"})
 @DisplayName("LocalUserInitializer Integration Tests")
 class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest {
 
