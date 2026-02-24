@@ -57,6 +57,25 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
     return postLoad(entity);
   }
 
+  public Pipeline findByIdAndDataSetOrThrow(UUID id, UUID dataSetId) {
+    Pipeline pipeline = findByIdOrThrow(id);
+    if (!dataSetId.equals(pipeline.getDataSet().getId())) {
+      throw new ResourceNotFoundException(getEntityName(), id);
+    }
+    return pipeline;
+  }
+
+  @Override
+  protected PipelineInputDTO preProcessUpdateInput(
+      PipelineInputDTO input, Pipeline existingEntity) {
+    if (input.getDataSetId() != null
+        && existingEntity.getDataSet() != null
+        && !input.getDataSetId().equals(existingEntity.getDataSet().getId())) {
+      throw new ResourceNotFoundException(getEntityName(), existingEntity.getId());
+    }
+    return super.preProcessUpdateInput(input, existingEntity);
+  }
+
   @Override
   protected Pipeline postConvertToEntity(Pipeline entity, PipelineInputDTO input) {
     // Set the DataSet relationship
