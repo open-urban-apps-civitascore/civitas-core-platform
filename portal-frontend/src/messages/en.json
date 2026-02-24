@@ -1,4 +1,9 @@
 {
+  "welcome": {
+    "title": "Welcome to CIVITAS/CORE 2.0",
+    "subtitle": "New here?",
+    "docsButton": "Documentation"
+  },
   "common": {
     "type-to-search": "Type to search",
     "search": "Search",
