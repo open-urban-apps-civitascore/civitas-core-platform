@@ -19,8 +19,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -67,6 +70,21 @@ public class PipelineController
   @Override
   protected PipelineAssembler getAssembler() {
     return pipelineAssembler;
+  }
+
+  @Override
+  public ResponseEntity<PipelineOutputDTO> getById(@PathVariable UUID id) {
+    UUID dataSetId = UUID.fromString(extractPathVariables().get("dataSetId"));
+    Pipeline pipeline = pipelineService.findByIdAndDataSetOrThrow(id, dataSetId);
+    return ResponseEntity.ok(pipelineAssembler.toOutput(pipeline));
+  }
+
+  @Override
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void delete(@PathVariable UUID id) {
+    UUID dataSetId = UUID.fromString(extractPathVariables().get("dataSetId"));
+    pipelineService.findByIdAndDataSetOrThrow(id, dataSetId);
+    super.delete(id);
   }
 
   @Override

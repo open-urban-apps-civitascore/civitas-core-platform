@@ -1024,5 +1024,90 @@ class PipelineControllerIntegrationTest
           .as("Should return NOT_FOUND for non-existent dataset")
           .isEqualTo(HttpStatus.NOT_FOUND);
     }
+
+    @Test
+    @DisplayName("Should only return pipelines belonging to the specified dataset")
+    void shouldOnlyReturnPipelinesForSpecifiedDataset() {
+      performCreate(createValidInput());
+
+      DataSet dataSet2 = createTestDataSet();
+      PipelineInputDTO input2 = createValidInput();
+      input2.setName("pipeline_in_other_dataset_" + System.currentTimeMillis());
+      exchange(
+          "/datasets/" + dataSet2.getId() + "/pipelines",
+          org.springframework.http.HttpMethod.POST,
+          createAuthHeaders(),
+          input2,
+          getOutputTypeReference());
+
+      ResponseEntity<RestPage<PipelineOutputDTO>> response = performGetAll();
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getTotalElements())
+          .as("Should only return pipelines belonging to the test dataset")
+          .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when getting pipeline from wrong dataset")
+    void shouldReturn404WhenGettingPipelineFromWrongDataset() {
+      UUID pipelineId = createTestEntity();
+      DataSet otherDataSet = createTestDataSet();
+
+      ResponseEntity<PipelineOutputDTO> response =
+          exchange(
+              "/datasets/" + otherDataSet.getId() + "/pipelines/" + pipelineId,
+              org.springframework.http.HttpMethod.GET,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("Should return NOT_FOUND for pipeline from wrong dataset")
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when updating pipeline from wrong dataset via PUT")
+    void shouldReturn404WhenUpdatingPipelineFromWrongDataset() {
+      UUID pipelineId = createTestEntity();
+      DataSet otherDataSet = createTestDataSet();
+
+      ResponseEntity<PipelineOutputDTO> response =
+          exchange(
+              "/datasets/" + otherDataSet.getId() + "/pipelines/" + pipelineId,
+              org.springframework.http.HttpMethod.PUT,
+              createAuthHeaders(),
+              createUpdateInput(),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("Should return NOT_FOUND for PUT from wrong dataset")
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when deleting pipeline from wrong dataset")
+    void shouldReturn404WhenDeletingPipelineFromWrongDataset() {
+      UUID pipelineId = createTestEntity();
+      DataSet otherDataSet = createTestDataSet();
+
+      ResponseEntity<Void> response =
+          exchange(
+              "/datasets/" + otherDataSet.getId() + "/pipelines/" + pipelineId,
+              org.springframework.http.HttpMethod.DELETE,
+              createAuthHeaders(),
+              null,
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(response.getStatusCode())
+          .as("Should return NOT_FOUND for DELETE from wrong dataset")
+          .isEqualTo(HttpStatus.NOT_FOUND);
+
+      assertThat(pipelineRepository.findById(pipelineId))
+          .as("Pipeline should still exist after failed cross-dataset delete")
+          .isPresent();
+    }
   }
 }

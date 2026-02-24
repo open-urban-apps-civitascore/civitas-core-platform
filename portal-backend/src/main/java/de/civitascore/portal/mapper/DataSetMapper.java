@@ -15,12 +15,7 @@ import org.mapstruct.ReportingPolicy;
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
     uses = {
-      UserMapper.class,
-      DataSpaceMapper.class,
-      DataSetSeriesMapper.class,
-      AgentMapper.class,
       DistributionMapper.class,
-      CatalogMapper.class
     },
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputDTO, DataSet> {
@@ -37,7 +32,6 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Override
   DataSetOutputDTO toOutput(DataSet entity);
 
-  @Mapping(target = "pipelineIds", ignore = true)
   @Override
   DataSetInputDTO toInput(DataSet entity);
 

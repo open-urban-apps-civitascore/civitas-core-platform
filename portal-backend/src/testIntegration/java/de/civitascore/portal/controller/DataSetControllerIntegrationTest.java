@@ -332,22 +332,9 @@ class DataSetControllerIntegrationTest
           .containsExactlyInAnyOrder(
               "http://localhost:8080/api/v1/traffic", "http://localhost:8080/api/v1/weather");
 
-      assertThat(output.getDataSpaces())
-          .as("DataSpaces should be included in the response")
-          .isNotNull()
-          .hasSize(1)
-          .allMatch(dataSpace -> dataSpace.getId() != null)
-          .allMatch(dataSpace -> dataSpace.getName() != null)
-          .allMatch(dataSpace -> dataSpace.getName().startsWith("test_dataspace_"));
-
-      assertThat(output.getOwner()).as("Owner should be included in the response").isNotNull();
-      assertThat(output.getOwner().getId()).as("Owner ID should be set").isNotNull();
-      assertThat(output.getOwner().getName()).as("Owner name should be set").isNotNull();
-
       assertThat(output.getDataSetStatus())
           .as("Status should be DRAFT")
           .isEqualTo(DataSetStatus.DRAFT);
-      assertThat(output.getPersistenceId()).as("Persistence ID should be set").isEqualTo(12345L);
     }
 
     @Test
@@ -481,7 +468,6 @@ class DataSetControllerIntegrationTest
       dataSet = dataSetRepository.save(dataSet);
 
       UUID dataSetId = dataSet.getId();
-      Long originalPersistenceId = dataSet.getPersistenceId();
       List<UUID> originalPipelineIds =
           dataSet.getPipelines().stream().map(Pipeline::getId).toList();
 
@@ -489,8 +475,6 @@ class DataSetControllerIntegrationTest
       updateInput.setName("Updated Published Dataset");
       updateInput.setDescription("Updated description for published dataset");
       updateInput.setOpenDataAccess(false);
-      updateInput.setPersistenceId(99999L); // Try to change (should be ignored)
-      updateInput.setPipelineIds(Collections.emptyList()); // Try to change (should be ignored)
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
@@ -514,9 +498,6 @@ class DataSetControllerIntegrationTest
       assertThat(output.getDescription())
           .as("Description should be updated")
           .isEqualTo("Updated description for published dataset");
-      assertThat(output.getPersistenceId())
-          .as("PersistenceId should remain unchanged")
-          .isEqualTo(originalPersistenceId);
       assertThat(output.getPipelines())
           .as("Pipelines should remain unchanged")
           .hasSize(2)
