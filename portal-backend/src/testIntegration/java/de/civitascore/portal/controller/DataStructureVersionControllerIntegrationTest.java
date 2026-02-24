@@ -809,4 +809,512 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .isEqualTo(HttpStatus.NOT_FOUND);
     }
   }
+
+  @Nested
+  @DisplayName("Publish DataStructureVersion Tests")
+  class PublishDataStructureVersionTests {
+
+    @Test
+    @DisplayName("Should publish version with modelAtlasUri successfully")
+    void shouldPublishVersionWithModelAtlasUri() {
+      DataStructureVersion version =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      assertThat(version.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+      assertThat(version.getModelAtlasUri()).isNotBlank();
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1 + "/publish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).as("Response body should not be null").isNotNull();
+
+      DataStructureVersionOutputDTO output = response.getBody();
+      assertThat(output.getId()).isEqualTo(versionId1);
+      assertThat(output.getDataStructureVersionStatus())
+          .as("Status should be AVAILABLE after publishing")
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+      assertThat(output.getVersion()).isEqualTo("1.0.0");
+      assertThat(output.getModelAtlasUri()).isEqualTo("https://modelatlas.example.com/model1");
+
+      DataStructureVersion reloadedVersion =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      assertThat(reloadedVersion.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("Should fail to publish version without modelAtlasUri")
+    void shouldFailToPublishVersionWithoutModelAtlasUri() {
+      DataStructureVersion versionWithoutUri = new DataStructureVersion();
+      versionWithoutUri.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      versionWithoutUri.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      versionWithoutUri.setVersion("3.0.0");
+      versionWithoutUri.setModelName("TestModel3");
+      versionWithoutUri.setDataStructure(
+          dataStructureRepository.findById(dataStructureId).orElseThrow());
+      versionWithoutUri = dataStructureVersionRepository.save(versionWithoutUri);
+      UUID versionWithoutUriId = versionWithoutUri.getId();
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionWithoutUriId + "/publish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+
+      DataStructureVersion reloadedVersion =
+          dataStructureVersionRepository.findById(versionWithoutUriId).orElseThrow();
+      assertThat(reloadedVersion.getDataStructureVersionStatus())
+          .as("Status should remain DRAFT")
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Should fail to publish already published version")
+    void shouldFailToPublishAlreadyPublishedVersion() {
+      DataStructureVersion version1 =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(version1);
+
+      // Try to publish again via API
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1 + "/publish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when publishing non-existent version")
+    void shouldReturn404WhenPublishingNonExistentVersion() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + UUID.randomUUID() + "/publish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return NOT_FOUND status")
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should fail to publish without authentication")
+    void shouldFailToPublishWithoutAuth() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1 + "/publish",
+              HttpMethod.POST,
+              new HttpEntity<>(null),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return UNAUTHORIZED status")
+          .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+  }
+
+  @Nested
+  @DisplayName("Unpublish DataStructureVersion Tests")
+  class UnpublishDataStructureVersionTests {
+
+    @Test
+    @DisplayName("Should unpublish published version successfully")
+    void shouldUnpublishPublishedVersionSuccessfully() {
+      DataStructureVersion version1 =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(version1);
+
+      DataStructureVersion publishedVersion =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      assertThat(publishedVersion.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1 + "/unpublish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).as("Response body should not be null").isNotNull();
+
+      DataStructureVersionOutputDTO output = response.getBody();
+      assertThat(output.getId()).isEqualTo(versionId1);
+      assertThat(output.getDataStructureVersionStatus())
+          .as("Status should be DRAFT after unpublishing")
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+
+      DataStructureVersion reloadedVersion =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      assertThat(reloadedVersion.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Should fail to unpublish already unpublished version")
+    void shouldFailToUnpublishDraftVersion() {
+      DataStructureVersion version =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      assertThat(version.getDataStructureVersionStatus())
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1 + "/unpublish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when unpublishing non-existent version")
+    void shouldReturn404WhenUnpublishingNonExistentVersion() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + UUID.randomUUID() + "/unpublish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return NOT_FOUND status")
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should fail to unpublish without authentication")
+    void shouldFailToUnpublishWithoutAuth() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1 + "/unpublish",
+              HttpMethod.POST,
+              new HttpEntity<>(null),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return UNAUTHORIZED status")
+          .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("Should fail to unpublish the only published version of a published DataStructure")
+    void shouldFailToUnpublishOnlyPublishedVersionOfPublishedDataStructure() {
+      DataStructureVersion version1 =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(version1);
+
+      DataStructure dataStructure = dataStructureRepository.findById(dataStructureId).orElseThrow();
+      dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      dataStructureRepository.save(dataStructure);
+
+      // Try to unpublish the only published version - should fail
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1 + "/unpublish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+
+      // Verify version is still published
+      DataStructureVersion reloadedVersion =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      assertThat(reloadedVersion.getDataStructureVersionStatus())
+          .as("Version should remain published")
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName(
+        "Should allow unpublishing when DataStructure has multiple published versions and is published")
+    void shouldAllowUnpublishingWhenMultiplePublishedVersionsExist() {
+      DataStructureVersion version3 = new DataStructureVersion();
+      version3.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      version3.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      version3.setVersion("3.0.0");
+      version3.setModelAtlasUri("https://modelatlas.example.com/model3");
+      version3.setModelName("TestModel3");
+      version3.setDataStructure(dataStructureRepository.findById(dataStructureId).orElseThrow());
+      version3 = dataStructureVersionRepository.save(version3);
+      UUID version3Id = version3.getId();
+
+      DataStructureVersion version1 =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(version1);
+
+      version3.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(version3);
+
+      DataStructure dataStructure = dataStructureRepository.findById(dataStructureId).orElseThrow();
+      dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      dataStructureRepository.save(dataStructure);
+
+      // Now unpublish one version - should succeed because there's another published version
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1 + "/unpublish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+
+      // Verify version1 is unpublished
+      DataStructureVersion reloadedVersion1 =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      assertThat(reloadedVersion1.getDataStructureVersionStatus())
+          .as("Version 1 should be unpublished")
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+
+      // Verify version3 is still published
+      DataStructureVersion reloadedVersion3 =
+          dataStructureVersionRepository.findById(version3Id).orElseThrow();
+      assertThat(reloadedVersion3.getDataStructureVersionStatus())
+          .as("Version 3 should still be published")
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+
+      // Verify DataStructure is still published
+      DataStructure reloadedDataStructure =
+          dataStructureRepository.findById(dataStructureId).orElseThrow();
+      assertThat(reloadedDataStructure.getDataStructureStatus())
+          .as("DataStructure should remain published")
+          .isEqualTo(DataStructureStatus.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("Should allow unpublishing when DataStructure is in DRAFT status")
+    void shouldAllowUnpublishingWhenDataStructureIsDraft() {
+      DataStructureVersion version1 =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(version1);
+
+      DataStructure dataStructure = dataStructureRepository.findById(dataStructureId).orElseThrow();
+      assertThat(dataStructure.getDataStructureStatus()).isEqualTo(DataStructureStatus.DRAFT);
+
+      // Unpublish the version - should succeed because DataStructure is DRAFT
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1 + "/unpublish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+
+      // Verify version is unpublished
+      DataStructureVersion reloadedVersion =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      assertThat(reloadedVersion.getDataStructureVersionStatus())
+          .as("Version should be unpublished")
+          .isEqualTo(DataStructureVersionStatus.DRAFT);
+    }
+  }
+
+  @Nested
+  @DisplayName("Update Published Meta Tests")
+  class UpdatePublishedMetaTests {
+
+    private UUID publishedVersionId;
+
+    @BeforeEach
+    void publishVersion() {
+      DataStructureVersion version1 =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(version1);
+
+      publishedVersionId = versionId1;
+    }
+
+    @Test
+    @DisplayName("Should update metadata of published version successfully")
+    void shouldUpdatePublishedMetaSuccessfully() {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setVersion("1.1.0");
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setModelName("UpdatedPublishedModel");
+
+      Map<String, Object> newStyles = new HashMap<>();
+      newStyles.put("color", "red");
+      newStyles.put("size", 30);
+      input.setStyles(newStyles);
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + publishedVersionId + "/published/meta",
+              HttpMethod.PUT,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).as("Response body should not be null").isNotNull();
+
+      DataStructureVersionOutputDTO output = response.getBody();
+      assertThat(output.getId()).isEqualTo(publishedVersionId);
+      assertThat(output.getVersion()).as("Version should be updated").isEqualTo("1.1.0");
+      assertThat(output.getModelName())
+          .as("Model name should be updated")
+          .isEqualTo("UpdatedPublishedModel");
+      assertThat(output.getStyles().get("color")).as("Styles should be updated").isEqualTo("red");
+      assertThat(output.getDataStructureVersionStatus())
+          .as("Status should remain AVAILABLE")
+          .isEqualTo(DataStructureVersionStatus.AVAILABLE);
+      assertThat(output.getModelAtlasUri())
+          .as("ModelAtlasUri should remain unchanged")
+          .isEqualTo("https://modelatlas.example.com/model1");
+    }
+
+    @Test
+    @DisplayName("Should protect modelAtlasUri when updating published meta")
+    void shouldProtectModelAtlasUriWhenUpdatingPublishedMeta() {
+      String originalModelAtlasUri =
+          dataStructureVersionRepository
+              .findById(publishedVersionId)
+              .orElseThrow()
+              .getModelAtlasUri();
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setVersion("1.2.0");
+      input.setModelAtlasUri("https://modelatlas.example.com/SHOULD_NOT_CHANGE");
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + publishedVersionId + "/published/meta",
+              HttpMethod.PUT,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      DataStructureVersionOutputDTO output = response.getBody();
+      assertThat(output).isNotNull();
+      assertThat(output.getModelAtlasUri())
+          .as("ModelAtlasUri should not change")
+          .isEqualTo(originalModelAtlasUri);
+    }
+
+    @Test
+    @DisplayName("Should fail to update published meta for DRAFT version")
+    void shouldFailToUpdatePublishedMetaForDraftVersion() {
+      DataStructureVersion draftVersion = new DataStructureVersion();
+      draftVersion.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      draftVersion.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      draftVersion.setVersion("4.0.0");
+      draftVersion.setModelAtlasUri("https://modelatlas.example.com/model4");
+      draftVersion.setModelName("TestModel4");
+      draftVersion.setDataStructure(
+          dataStructureRepository.findById(dataStructureId).orElseThrow());
+      draftVersion = dataStructureVersionRepository.save(draftVersion);
+      UUID draftVersionId = draftVersion.getId();
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setVersion("4.1.0");
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + draftVersionId + "/published/meta",
+              HttpMethod.PUT,
+              new HttpEntity<>(input, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should return 404 when updating published meta for non-existent version")
+    void shouldReturn404WhenUpdatingPublishedMetaForNonExistentVersion() {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setVersion("99.0.0");
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + UUID.randomUUID() + "/published/meta",
+              HttpMethod.PUT,
+              new HttpEntity<>(input, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return NOT_FOUND status")
+          .isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should fail to update published meta without authentication")
+    void shouldFailToUpdatePublishedMetaWithoutAuth() {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setVersion("1.2.0");
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + publishedVersionId + "/published/meta",
+              HttpMethod.PUT,
+              new HttpEntity<>(input),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return UNAUTHORIZED status")
+          .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+  }
+
+  @Nested
+  @DisplayName("Regular Update Restrictions Tests")
+  class RegularUpdateRestrictionsTests {
+
+    @Test
+    @DisplayName("Should fail to update published version with regular PUT endpoint")
+    void shouldFailToUpdatePublishedVersionWithRegularPut() {
+      DataStructureVersion version1 =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(version1);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setVersion("2.0.0");
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.PUT,
+              new HttpEntity<>(input, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
 }
