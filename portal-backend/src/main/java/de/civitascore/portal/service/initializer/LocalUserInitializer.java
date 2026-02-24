@@ -1,6 +1,6 @@
 package de.civitascore.portal.service.initializer;
 
-import com.civitas.configadapter.model.idm.UserConfig;
+import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.portal.configuration.LocalInitProperties;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
