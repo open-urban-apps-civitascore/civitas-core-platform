@@ -87,6 +87,57 @@ fi
 
 echo
 
+# ---- Terminal Detection --------------------------------------------
+
+# Detect available terminal emulator and define launch_in_terminal().
+# Usage: launch_in_terminal <title> <command string>
+# Priority: multiplexer (tmux/screen) > terminal emulators > macOS terminals > fallback
+detect_terminal() {
+    # 1. Terminal multiplexers — open a new window/tab in the current session
+    if [ -n "$TMUX" ]; then
+        launch_in_terminal() { tmux new-window -n "$1" "bash -c '${*:2}; exec bash'"; }
+    elif [ -n "$ZELLIJ" ]; then
+        launch_in_terminal() { zellij action new-tab --name "$1" -- bash -c "${*:2}; exec bash"; }
+    elif [ -n "$STY" ]; then
+        launch_in_terminal() { screen -t "$1" bash -c "${*:2}; exec bash"; }
+    # 2. Cross-platform terminal emulators
+    elif command -v ghostty >/dev/null 2>&1; then
+        launch_in_terminal() { ghostty -e bash -c "${*:2}; exec bash" --title="$1" & }
+    elif command -v kitty >/dev/null 2>&1; then
+        launch_in_terminal() { kitty --title "$1" -- bash -c "${*:2}; exec bash"; }
+    elif command -v alacritty >/dev/null 2>&1; then
+        launch_in_terminal() { alacritty --title "$1" -e bash -c "${*:2}; exec bash" & }
+    elif command -v wezterm >/dev/null 2>&1; then
+        launch_in_terminal() { wezterm start --cwd "$(pwd)" -- bash -c "${*:2}; exec bash" & }
+    # 3. Linux terminal emulators
+    elif command -v foot >/dev/null 2>&1; then
+        launch_in_terminal() { foot --title "$1" bash -c "${*:2}; exec bash" & }
+    elif command -v konsole >/dev/null 2>&1; then
+        launch_in_terminal() { konsole --new-tab -p tabtitle="$1" -e bash -c "${*:2}; exec bash" & }
+    elif command -v xfce4-terminal >/dev/null 2>&1; then
+        launch_in_terminal() { xfce4-terminal --title "$1" -e "bash -c '${*:2}; exec bash'" & }
+    elif command -v gnome-terminal >/dev/null 2>&1; then
+        launch_in_terminal() { gnome-terminal --title "$1" -- bash -c "${*:2}; exec bash"; }
+    elif command -v xterm >/dev/null 2>&1; then
+        launch_in_terminal() { xterm -T "$1" -e bash -c "${*:2}; exec bash" & }
+    # 4. macOS terminals
+    elif command -v osascript >/dev/null 2>&1; then
+        launch_in_terminal() {
+            local title="$1"; shift
+            osascript -e "
+                tell application \"Terminal\"
+                    activate
+                    do script \"$*; exec bash\"
+                    set custom title of front window to \"$title\"
+                end tell" &
+        }
+    else
+        launch_in_terminal() { return 1; }
+    fi
+}
+
+detect_terminal
+
 # ---- Create Docker Network ----------------------------------------
 
 echo "Ensuring Docker network exists..."
@@ -284,8 +335,7 @@ exec bash
 SCRIPT_EOF
     chmod +x /tmp/start-config-adapter.sh
 
-    gnome-terminal --title="Config Adapter" -- /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" 2>/dev/null || \
-    xterm -T "Config Adapter" -e /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" 2>/dev/null || \
+    launch_in_terminal "Config Adapter" "/tmp/start-config-adapter.sh '$CONFIG_ADAPTER_JAR'" || \
     {
         echo "Could not open new terminal. Starting in background..."
         /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" &
@@ -326,8 +376,7 @@ fi
 if [ "$backend_option" = "1" ]; then
     echo "Starting Portal Backend..."
     cd "$SCRIPT_DIR/../portal-backend"
-    gnome-terminal --title="Portal Backend" -- bash -c "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; exec bash" 2>/dev/null || \
-    xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; bash" 2>/dev/null || \
+    launch_in_terminal "Portal Backend" "cd '$(pwd)' && mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION" || \
     {
         echo "Could not open new terminal. Starting in background..."
         mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION &
@@ -414,8 +463,7 @@ if [ "$NODE_AVAILABLE" = true ] && [ "$PNPM_AVAILABLE" = true ]; then
             pnpm install
         fi
 
-        gnome-terminal --title="Portal Frontend" -- bash -c "pnpm dev; exec bash" 2>/dev/null || \
-        xterm -T "Portal Frontend" -e "pnpm dev; bash" 2>/dev/null || \
+        launch_in_terminal "Portal Frontend" "cd '$(pwd)' && pnpm dev" || \
         {
             echo "Could not open new terminal. Starting in background..."
             pnpm dev &
