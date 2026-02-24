@@ -241,6 +241,7 @@ build-backend-image:
     - docker info
     - |
       cat > /tmp/buildkitd.toml <<'EOF'
+      debug = true
       [registry."docker.io"]
         mirrors = ["docker-mirror01.extern.frachtwerk.de", "docker-mirror02.extern.frachtwerk.de"]
       EOF
