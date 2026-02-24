@@ -475,7 +475,6 @@ class DataSetControllerIntegrationTest
       updateInput.setName("Updated Published Dataset");
       updateInput.setDescription("Updated description for published dataset");
       updateInput.setOpenDataAccess(false);
-      updateInput.setPipelineIds(Collections.emptyList()); // Try to change (should be ignored)
 
       ResponseEntity<DataSetOutputDTO> response =
           exchange(
