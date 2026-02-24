@@ -116,11 +116,7 @@ is_null_permission_endpoint if {
 default is_authenticated := false
 
 is_authenticated if {
-	user_context_fetcher.user_context.userId != null
-}
-
-is_authenticated if {
-	user_context_fetcher.user_context.externalId != null
+	user_context_fetcher.has_valid_identity
 }
 
 # =============================================================================

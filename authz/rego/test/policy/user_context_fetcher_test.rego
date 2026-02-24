@@ -65,6 +65,43 @@ mock_http_send_empty(_) := {"status_code": 200, "body": {}}
 mock_http_send_null_ids(_) := {"status_code": 200, "body": {"userId": null, "externalId": null, "groups": []}}
 
 # =============================================================================
+# HAS_VALID_IDENTITY TESTS
+# =============================================================================
+
+# Test: has_valid_identity is true when both userId and externalId are present
+test_has_valid_identity_both_ids if {
+	user_context_fetcher.has_valid_identity with http.send as mock_http_send_success
+		with data.config as mock_http.mock_config
+		with input as {"request": {"headers": {"x-userinfo": mock_http.encode_userinfo("keycloak-sub-123")}}}
+}
+
+# Test: has_valid_identity is true when only externalId is present
+test_has_valid_identity_external_id_only if {
+	user_context_fetcher.has_valid_identity with http.send as mock_http_send_minimal
+		with data.config as mock_http.mock_config
+		with input as {"request": {"headers": {"x-userinfo": mock_http.encode_userinfo("keycloak-sub-456")}}}
+}
+
+# Test: has_valid_identity is false when both ids are null
+test_has_valid_identity_false_null_ids if {
+	not user_context_fetcher.has_valid_identity with http.send as mock_http_send_null_ids
+		with data.config as mock_http.mock_config
+		with input as {"request": {"headers": {"x-userinfo": mock_http.encode_userinfo("some-user")}}}
+}
+
+# Test: has_valid_identity is false when fetch fails
+test_has_valid_identity_false_fetch_error if {
+	not user_context_fetcher.has_valid_identity with http.send as mock_http_send_error
+		with data.config as mock_http.mock_config
+		with input as {"request": {"headers": {"x-userinfo": mock_http.encode_userinfo("some-user")}}}
+}
+
+# Test: has_valid_identity is false when no header present
+test_has_valid_identity_false_no_header if {
+	not user_context_fetcher.has_valid_identity with input as {"request": {"headers": {}}}
+}
+
+# =============================================================================
 # USER CONTEXT FETCH TESTS
 # =============================================================================
 

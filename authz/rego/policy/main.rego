@@ -215,12 +215,7 @@ default has_user_context := false
 
 has_user_context if {
 	user_context_fetcher.user_context
-	user_context_fetcher.user_context.userId != null
-}
-
-has_user_context if {
-	user_context_fetcher.user_context
-	user_context_fetcher.user_context.externalId != null
+	user_context_fetcher.has_valid_identity
 }
 
 # =============================================================================

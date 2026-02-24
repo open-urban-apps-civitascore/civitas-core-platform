@@ -165,16 +165,22 @@ fetched_user_context := response.body if {
 # Tests mock http.send() using OPA's `with http.send as mock_fn` syntax.
 # This eliminates any code path that could bypass the fetch logic.
 
-# Use fetched user_context when userId is non-null
-user_context := fetched_user_context if {
+# Shared identity check: fetched response has a non-null userId or externalId.
+# Used by user_context assignment (below), main.rego's has_user_context,
+# and permission_eval.rego's is_authenticated.
+default has_valid_identity := false
+
+has_valid_identity if {
 	fetched_user_context.userId != null
 }
 
-# Alternative: externalId is non-null (even if userId is null/missing)
-# Note: Both rules can fire if both IDs are non-null, but they produce the
-# same value (fetched_user_context) so Rego allows this.
-user_context := fetched_user_context if {
+has_valid_identity if {
 	fetched_user_context.externalId != null
+}
+
+# Use fetched user_context when identity is valid
+user_context := fetched_user_context if {
+	has_valid_identity
 }
 
 # =============================================================================
@@ -208,11 +214,7 @@ default external_id_or_null := null
 # Tests mock http.send() to provide test data.
 # Determine source of user_context for debugging
 user_context_source := "fetched" if {
-	fetched_user_context.userId != null
-}
-
-user_context_source := "fetched" if {
-	fetched_user_context.externalId != null
+	has_valid_identity
 }
 
 default user_context_source := "none"
