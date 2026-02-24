@@ -235,7 +235,7 @@ curl http://localhost:8091/api/v1/user-context/{keycloak-user-id}
 | `docker-compose.yml` | AuthZ Repository + OPA + APISIX |
 | `apisix-config.yaml` | APISIX config with OPA plugin enabled |
 | `apisix-routes.yaml` | Routes with openid-connect + opa plugins |
-| `opa-config.json` | OPA data config (AuthZ Repository URL) |
+| `../apisix/opa-config/data.json` | OPA data config (AuthZ Repository URL) — mounted as directory so OPA loads it at `data.config` |
 | `seed-authz-data.sql` | Test data for database |
 | `seed-keycloak-users.sh` | Creates test users in Keycloak |
 | `integration-test.sh` | 20-scenario integration test suite |
