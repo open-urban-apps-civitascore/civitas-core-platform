@@ -108,6 +108,36 @@ cd postgres  && docker compose down
 cd frost     && docker compose down
 ```
 
+## Troubleshooting
+
+**Something isn't working after pulling new changes?**
+
+```bash
+./stop-portal-dev.sh            # say "yes" to remove volumes
+./start-portal-dev.sh
+```
+
+This wipes stale Keycloak state, database data, and cached configs. Fixes most issues.
+
+**Keycloak login redirects fail or tokens are rejected?**
+
+Re-copy the frontend env template — the Keycloak issuer URL may have changed:
+
+```bash
+cp portal-frontend/.env.local.template portal-frontend/.env.local
+```
+
+**Running from a VM (not localhost)?**
+
+Override the Keycloak hostname before starting:
+
+```bash
+export KC_HOSTNAME=http://<your-vm-ip>:8080
+./start-portal-dev.sh
+```
+
+---
+
 ## Common Commands
 
 ```bash
