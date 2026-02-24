@@ -22,6 +22,10 @@ test_masks_userinfo if {
 	"/input/request/headers/X-Userinfo" in log.mask
 }
 
+test_masks_userinfo_lowercase if {
+	"/input/request/headers/x-userinfo" in log.mask
+}
+
 test_masks_authorization_lowercase if {
 	"/input/request/headers/authorization" in log.mask
 }
@@ -31,5 +35,5 @@ test_masks_authorization_titlecase if {
 }
 
 test_mask_count if {
-	count(log.mask) == 5
+	count(log.mask) == 6
 }

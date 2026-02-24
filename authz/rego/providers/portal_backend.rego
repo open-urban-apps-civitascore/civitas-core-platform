@@ -67,7 +67,7 @@ path_parts := restmapper.parse_path(input.request.path)
 #
 # For resource endpoints (/v2/resource/{id}), the {id} IS the scopeId.
 # TENANT scope cascades to all resource endpoints (Q-005 resolved).
-# DATASPACE → child inheritance deferred (not in v2.0).
+# Dataspaces and catalogs are null-permission endpoints (excluded from V2 scope model, see #989).
 
 # Map resource name to expected scope type
 resource_scope_type := {
@@ -79,8 +79,6 @@ resource_scope_type := {
 	"datasets": "DATASET",
 	"datasources": "DATASOURCE",
 	"datastructures": "DATASTRUCTURE",
-	"dataspaces": "DATASPACE",
-	"catalogs": "CATALOG",
 }
 
 # Extract resource name from path (second segment: /v2/{resource}/...)

@@ -147,7 +147,7 @@ resource_id := frost_server.resource_id if {
 	backend_data_key == "frost_server"
 }
 
-# Expected scope type for the resource (TENANT, DATASPACE, or DATASET)
+# Expected scope type for the resource (TENANT, DATASET, DATASOURCE, or DATASTRUCTURE)
 expected_scope_type := portal_backend.expected_scope_type if {
 	backend_data_key == "portal_backend"
 }

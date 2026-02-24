@@ -20,6 +20,7 @@ mask contains "/input/request/headers/x-access-token"
 
 # Base64-encoded user claims (contains sub, email, name) — PII
 mask contains "/input/request/headers/X-Userinfo"
+mask contains "/input/request/headers/x-userinfo"
 
 # Belt-and-suspenders: mask Authorization header if APISIX ever forwards it
 mask contains "/input/request/headers/authorization"

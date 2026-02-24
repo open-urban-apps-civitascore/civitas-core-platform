@@ -203,9 +203,10 @@ echo ""
 
 echo "=== Test 7: Null-Permission Endpoints (Dataspaces/Catalogs) ==="
 # Dataspaces and catalogs are null-permission endpoints (GET only, any authenticated user).
-# Backend may not have controllers yet (404), but OPA should allow (not 403).
-test_endpoint "GET /v2/dataspaces (null-permission - backend 404)" "GET" "/v2/dataspaces" "$ADMIN_TOKEN" "404"
-test_endpoint "GET /v2/catalogs (null-permission - backend 404)" "GET" "/v2/catalogs" "$ADMIN_TOKEN" "404"
+# Backend still has these controllers (scheduled for removal in #989).
+# OPA allows (null-permission), backend returns 200.
+test_endpoint "GET /v2/dataspaces (null-permission - 200)" "GET" "/v2/dataspaces" "$ADMIN_TOKEN" "200"
+test_endpoint "GET /v2/catalogs (null-permission - 200)" "GET" "/v2/catalogs" "$ADMIN_TOKEN" "200"
 echo ""
 
 # =============================================================================

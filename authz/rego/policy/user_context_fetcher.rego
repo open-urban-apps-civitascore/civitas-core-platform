@@ -39,9 +39,7 @@ import rego.v1
 # Step 1: Create a JSON file with the URL:
 #
 #   {
-#     "config": {
-#       "authz_repository_url": "http://authz-repository:8091/api/v1/user-context"
-#     }
+#     "authz_repository_url": "http://authz-repository:8091/api/v1/user-context"
 #   }
 #
 # Step 2: Mount it into the OPA container at /data/config.json:
