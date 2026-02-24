@@ -21,10 +21,10 @@ import org.springframework.test.context.TestPropertySource;
     partitions = 1,
     brokerProperties = {"listeners=PLAINTEXT://localhost:0", "port=0"},
     topics = {
-      "core.civitas.idm.user.created",
-      "core.civitas.idm.user.updated",
-      "core.civitas.idm.user.deleted",
-      "core.civitas.config.results"
+      "de.civitascore.idm.user.created",
+      "de.civitascore.idm.user.updated",
+      "de.civitascore.idm.user.deleted",
+      "de.civitascore.config.results"
     })
 @TestPropertySource(properties = {"kafka.enabled=true"})
 @Slf4j
