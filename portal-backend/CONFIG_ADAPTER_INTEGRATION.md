@@ -108,19 +108,19 @@ kafka:
 ## Published Topics
 
 ### User Events
-- `core.civitas.idm.user.created` - User creation
-- `core.civitas.idm.user.updated` - User updates
-- `core.civitas.idm.user.deleted` - User deletion
+- `de.civitascore.idm.user.created` - User creation
+- `de.civitascore.idm.user.updated` - User updates
+- `de.civitascore.idm.user.deleted` - User deletion
 
 ### Group Events
-- `core.civitas.idm.group.created` - Group creation
-- `core.civitas.idm.group.updated` - Group updates
-- `core.civitas.idm.group.deleted` - Group deletion
+- `de.civitascore.idm.group.created` - Group creation
+- `de.civitascore.idm.group.updated` - Group updates
+- `de.civitascore.idm.group.deleted` - Group deletion
 
 ### Role Events
-- `core.civitas.idm.role.created` - Role creation
-- `core.civitas.idm.role.updated` - Role updates
-- `core.civitas.idm.role.deleted` - Role deletion
+- `de.civitascore.idm.role.created` - Role creation
+- `de.civitascore.idm.role.updated` - Role updates
+- `de.civitascore.idm.role.deleted` - Role deletion
 
 ## Event Format
 
@@ -133,9 +133,9 @@ Events are published as CloudEvents with the following structure:
   "specversion": "1.0",
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "source": "urn:civitas:portal-backend",
-  "type": "core.civitas.config.event",
+  "type": "de.civitascore.config.event",
   "datacontenttype": "application/json",
-  "topic": "core.civitas.idm.user.created",
+  "topic": "de.civitascore.idm.user.created",
   "operation": "CREATE",
   "targetcomponent": "keycloak",
   "targetresource": "civitas-core",
@@ -218,7 +218,7 @@ docker exec -it kafka kafka-topics --list \
 # Consume user creation events
 docker exec -it kafka kafka-console-consumer \
   --bootstrap-server localhost:9092 \
-  --topic core.civitas.idm.user.created \
+  --topic de.civitascore.idm.user.created \
   --from-beginning
 ```
 
@@ -261,10 +261,10 @@ kafka:
     partitions = 1,
     brokerProperties = {"listeners=PLAINTEXT://localhost:0", "port=0"},
     topics = {
-      "core.civitas.idm.user.created",
-      "core.civitas.idm.user.updated",
-      "core.civitas.idm.user.deleted",
-      "core.civitas.config.results"
+      "de.civitascore.idm.user.created",
+      "de.civitascore.idm.user.updated",
+      "de.civitascore.idm.user.deleted",
+      "de.civitascore.config.results"
     })
 @TestPropertySource(properties = {"kafka.enabled=true"})  // ← Enable Kafka for this test
 class EventPublishingIntegrationTest extends BaseKeycloakIntegrationTest {
@@ -621,9 +621,9 @@ The service logs key events at different levels:
 
 Example:
 ```
-INFO  ConfigEventPublisherService - Publishing ConfigEvent: topic=core.civitas.idm.user.created, operation=CREATE, targetComponent=keycloak, targetResource=civitas-core, messageId=abc-123
-INFO  ConfigEventPublisherService - Successfully published ConfigEvent to Kafka: messageId=abc-123, topic=core.civitas.idm.user.created
-DEBUG ConfigEventPublisherService - CloudEvent sent to Kafka successfully: messageId=abc-123, topic=core.civitas.idm.user.created, partition=0, offset=42
+INFO  ConfigEventPublisherService - Publishing ConfigEvent: topic=de.civitascore.idm.user.created, operation=CREATE, targetComponent=keycloak, targetResource=civitas-core, messageId=abc-123
+INFO  ConfigEventPublisherService - Successfully published ConfigEvent to Kafka: messageId=abc-123, topic=de.civitascore.idm.user.created
+DEBUG ConfigEventPublisherService - CloudEvent sent to Kafka successfully: messageId=abc-123, topic=de.civitascore.idm.user.created, partition=0, offset=42
 ```
 
 ### Kafka Metrics
@@ -637,14 +637,14 @@ The Kafka integration requires:
 ```xml
 <!-- Config adapter API -->
 <dependency>
-    <groupId>com.civitas</groupId>
+    <groupId>de.civitas-core</groupId>
     <artifactId>config-adapter-api</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
 
 <!-- Kafka event handler with CloudEvents support -->
 <dependency>
-    <groupId>com.civitas</groupId>
+    <groupId>de.civitas-core</groupId>
     <artifactId>event-handler-kafka</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
