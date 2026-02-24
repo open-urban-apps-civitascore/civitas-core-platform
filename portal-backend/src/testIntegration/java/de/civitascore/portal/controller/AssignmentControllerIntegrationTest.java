@@ -97,12 +97,16 @@ class AssignmentControllerIntegrationTest
     return groupRepository.save(group).getId();
   }
 
-  private UUID createTestRole() {
+  private UUID createTestRole(String name) {
     Role role = new Role();
-    role.setName("Test Role " + System.currentTimeMillis());
+    role.setName(name);
     role.setDescription("Test role for assignment");
     role.setRoleType(RoleType.DATA);
     return roleRepository.save(role).getId();
+  }
+
+  private UUID createTestRole() {
+    return createTestRole("Test Role " + System.currentTimeMillis());
   }
 
   private UUID createTestDataSpace() {
@@ -447,8 +451,8 @@ class AssignmentControllerIntegrationTest
     @DisplayName("Should handle multiple assignments for same group")
     void shouldHandleMultipleAssignmentsForSameGroup() {
       UUID groupId = createTestGroup();
-      UUID role1Id = createTestRole();
-      UUID role2Id = createTestRole();
+      UUID role1Id = createTestRole("role1");
+      UUID role2Id = createTestRole("role2");
 
       AssignmentInputDTO input1 = new AssignmentInputDTO();
       input1.setGroupId(groupId);
