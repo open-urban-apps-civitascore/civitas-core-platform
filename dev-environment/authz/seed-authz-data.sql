@@ -150,13 +150,14 @@ ON CONFLICT DO NOTHING;
 -- =============================================================================
 -- USERS
 -- =============================================================================
--- external_id values must match Keycloak user IDs (set by seed-keycloak-users.sh)
+-- external_id values are pinned UUIDs matching realm-export.json (e2e00000-...-{1,2,3})
+-- No manual sync needed — Keycloak imports these users with deterministic IDs.
 
 INSERT INTO users (id, external_id, first_name, last_name, email, active, created_at)
 VALUES
-    ('30000000-0000-0000-0000-000000000001', 'fcb661c1-eb24-434e-8952-9826df11c29b', 'Authz', 'Admin', 'authz.admin@e2e.civitas.dev', true, NOW()),
-    ('30000000-0000-0000-0000-000000000002', '81320fd4-3de4-41c7-8360-da7ae0ed7caa', 'Authz', 'Reader', 'authz.reader@e2e.civitas.dev', true, NOW()),
-    ('30000000-0000-0000-0000-000000000003', '83029c07-282c-44ae-a675-9db7a00b1929', 'Authz', 'NoPerms', 'authz.none@e2e.civitas.dev', true, NOW())
+    ('30000000-0000-0000-0000-000000000001', 'e2e00000-0000-0000-0000-000000000001', 'Authz', 'Admin', 'authz.admin@e2e.civitas.dev', true, NOW()),
+    ('30000000-0000-0000-0000-000000000002', 'e2e00000-0000-0000-0000-000000000002', 'Authz', 'Reader', 'authz.reader@e2e.civitas.dev', true, NOW()),
+    ('30000000-0000-0000-0000-000000000003', 'e2e00000-0000-0000-0000-000000000003', 'Authz', 'NoPerms', 'authz.none@e2e.civitas.dev', true, NOW())
 ON CONFLICT (email) DO UPDATE SET
     external_id = EXCLUDED.external_id,
     first_name = EXCLUDED.first_name,

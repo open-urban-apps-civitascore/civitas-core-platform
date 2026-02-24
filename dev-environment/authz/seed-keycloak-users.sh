@@ -1,8 +1,13 @@
 #!/bin/bash
 # M5: Create Keycloak test users for AuthZ integration testing
 #
-# Creates three test users in Keycloak with matching external_id values
-# that correspond to the seed-authz-data.sql entries.
+# NOTE: These users are now pre-provisioned in realm-export.json with
+# pinned UUIDs (e2e00000-...-{1,2,3}). seed-authz-data.sql uses these
+# same UUIDs as external_id. No manual sync needed.
+#
+# This script is kept as a fallback for environments where realm-export
+# was imported before the users were added. It will detect existing users
+# and skip creation.
 #
 # Test Users:
 #   - authz.admin@e2e.civitas.dev: Full permissions (DataArchitect)
@@ -15,9 +20,6 @@
 #
 # Usage:
 #   ./seed-keycloak-users.sh
-#
-# The script outputs the Keycloak user IDs which must be updated in
-# seed-authz-data.sql for the external_id values.
 
 set -e
 
