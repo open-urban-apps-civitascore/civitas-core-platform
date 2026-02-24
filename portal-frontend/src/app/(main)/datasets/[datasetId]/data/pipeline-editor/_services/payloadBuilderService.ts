@@ -11,7 +11,7 @@
  */
 
 import type { ApiNodeData, DataSourceNodeData } from '../_types/nodes'
-import { isApiNodeData, isDataSourceNodeData, isFrostNodeData } from '../_types/nodes'
+import { isApiNodeData, isDataSourceNodeData } from '../_types/nodes'
 import type { Pipeline, PipelinePayload, PipelineStylesPayload } from '../_types/pipeline'
 import { buildRedPandaConnectModel } from './modelBuilderService'
 
@@ -22,10 +22,12 @@ import { buildRedPandaConnectModel } from './modelBuilderService'
  * @returns The payload ready to be sent to `POST /pipeline`
  */
 export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
-  // 1. Extract styles (viewport + node positions for reload)
+  // 1. Extract styles (viewport + node positions + full graph for round-tripping)
   const styles: PipelineStylesPayload = {
     viewport: pipeline.viewport,
     nodePositions: Object.fromEntries(pipeline.nodes.map(node => [node.id, node.position])),
+    nodes: pipeline.nodes,
+    edges: pipeline.edges,
   }
 
   // 2. Extract entity data by node type
@@ -40,18 +42,17 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
     ...new Set(pipeline.nodes.filter(n => isApiNodeData(n.data)).map(n => (n.data as ApiNodeData).apiPath)),
   ]
 
-  // Persistences: hardcoded ["frost"] if any FROST node exists
-  const hasFrostNode = pipeline.nodes.some(n => isFrostNodeData(n.data))
-  const persistences: string[] = hasFrostNode ? ['frost'] : []
+  // Persistences: numeric IDs (Long[] in backend). Currently empty array.
+  const persistences: number[] = []
 
   // 3. Build RedPandaConnect model
   const model = buildRedPandaConnectModel(pipeline)
 
-  // 4. Assemble payload
+  // 4. Assemble payload — styles is JSON-stringified for the backend
   return {
     name: pipeline.name,
-    description: '-',
-    styles,
+    description: pipeline.description || '-',
+    styles: JSON.stringify(styles),
     dataSources,
     apis,
     persistences,

@@ -81,6 +81,8 @@ export interface PipelineSessionActions {
   getActiveSession: () => PipelineSession | null
   /** Gets all sessions */
   getAllSessions: () => PipelineSession[]
+  /** Loads sessions from backend (replaces all current sessions) */
+  loadSessions: (sessions: PipelineSession[], activeSessionId: string | null) => void
 }
 
 // ============================================================================
