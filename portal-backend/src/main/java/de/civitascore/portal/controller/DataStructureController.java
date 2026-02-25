@@ -1,0 +1,70 @@
+package de.civitascore.portal.controller;
+
+import de.civitascore.portal.model.entity.DataStructure;
+import de.civitascore.portal.model.input.DataStructureInputDTO;
+import de.civitascore.portal.model.output.DataStructureOutputDTO;
+import de.civitascore.portal.model.output.assembler.DataStructureAssembler;
+import de.civitascore.portal.repository.specification.DataStructureSpec;
+import de.civitascore.portal.service.DataStructureService;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.Parameters;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/datastructures")
+@RequiredArgsConstructor
+@Tag(name = "Data Structures", description = "Data structure management endpoints")
+public class DataStructureController
+    extends BaseController<
+        DataStructureInputDTO, DataStructureOutputDTO, DataStructure, DataStructureSpec> {
+
+  private final DataStructureService dataStructureService;
+  private final DataStructureAssembler dataStructureAssembler;
+
+  @Parameters({
+    @Parameter(
+        name = "name",
+        description = "Filter by name (partial match, case-insensitive).",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "string", example = "My Data Structure")),
+    @Parameter(
+        name = "description",
+        description = "Filter by description (partial match, case-insensitive).",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "string", example = "Data structure description")),
+    @Parameter(
+        name = "q",
+        description = "Search in name or description (partial match, case-insensitive).",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "string", example = "structure"))
+  })
+  @Override
+  public ResponseEntity<Page<DataStructureOutputDTO>> getAll(
+      @ParameterObject @Parameter(description = "Search/filter spec") DataStructureSpec spec,
+      @ParameterObject
+          @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    return super.getAll(spec, pageable);
+  }
+
+  @Override
+  protected DataStructureService getService() {
+    return dataStructureService;
+  }
+
+  @Override
+  protected DataStructureAssembler getAssembler() {
+    return dataStructureAssembler;
+  }
+}

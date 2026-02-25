@@ -6,6 +6,7 @@ import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSpace;
+import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
 import de.civitascore.portal.model.input.AssignmentScopedInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
@@ -30,6 +31,7 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   private final RoleService roleService;
   private final DataSetService datasetService;
   private final DataSpaceService dataSpaceService;
+  private final DataStructureService dataStructureService;
 
   @Override
   protected AssignmentRepository getRepository() {
@@ -82,9 +84,9 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
     if (scopeType == ScopeType.DATASOURCE) {
       throw new ResourceNotFoundException("Datasource", scopeId);
     }
-    // TODO: set dataStructure
     if (scopeType == ScopeType.DATASTRUCTURE) {
-      throw new ResourceNotFoundException("Datastructure", scopeId);
+      DataStructure dataStructure = dataStructureService.findByIdOrThrow(scopeId);
+      entity.setDataStructure(dataStructure);
     }
 
     return super.postConvertToEntity(entity, input);

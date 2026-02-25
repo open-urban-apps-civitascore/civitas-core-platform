@@ -7,5 +7,4 @@ import lombok.Data;
 @Data
 public abstract class BaseSummaryDTO implements Serializable {
   private UUID id;
-  private String name;
 }
