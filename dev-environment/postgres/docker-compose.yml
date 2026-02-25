@@ -6,6 +6,15 @@ services:
       POSTGRES_DB: portal_backend
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
+      # Use md5 instead of scram-sha-256 for local dev only.
+      # Reason: PostgreSQL JDBC driver 42.7.x SCRAM authentication fails on
+      # Java 25 ("Protocol error. Session setup failed"). No upstream fix as of
+      # pgjdbc 42.7.10 / Feb 2026. md5 is safe here (localhost, throwaway creds).
+      # Revisit when pgjdbc ships a Java 25-compatible SCRAM implementation.
+      # NOTE: Changing auth method requires removing existing volumes:
+      #   docker compose down -v
+      POSTGRES_HOST_AUTH_METHOD: md5
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
     ports:
       - "5432:5432"
     volumes:
