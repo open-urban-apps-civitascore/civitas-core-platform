@@ -7,7 +7,9 @@ import de.civitascore.portal.model.output.assembler.DataStructureVersionAssemble
 import de.civitascore.portal.repository.specification.DataStructureVersionSpec;
 import de.civitascore.portal.service.DataStructureVersionService;
 import de.civitascore.portal.util.InvalidInputException;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +21,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.MethodNotAllowedException;
@@ -75,5 +80,47 @@ public class DataStructureVersionController
                   "Missing or invalid dataStructureId in path variables");
             });
     return super.preProcessInput(input);
+  }
+
+  @PutMapping("/{versionId}/published/meta")
+  @Operation(
+      summary = "Update metadata of a published data structure version",
+      description =
+          "Updates only the metadata (version, modelName, styles) of a published data structure version (AVAILABLE status). Cannot modify modelAtlasUri or model. For DRAFT versions, use PUT /datastructures/{dataStructureId}/versions/{versionId} instead.")
+  public ResponseEntity<DataStructureVersionOutputDTO> updatePublishedMeta(
+      @PathVariable UUID dataStructureId,
+      @PathVariable UUID versionId,
+      @Valid @RequestBody DataStructureVersionInputDTO input) {
+    DataStructureVersionInputDTO preProcessedInput = preProcessInput(input);
+    DataStructureVersion updated =
+        dataStructureVersionService.updatePublishedMeta(versionId, preProcessedInput);
+    DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(updated);
+    return ResponseEntity.ok(output);
+  }
+
+  @PostMapping("/{versionId}/publish")
+  @Operation(
+      summary = "Publish a data structure version",
+      description =
+          "Publishes a data structure version by setting status to AVAILABLE. Requires modelAtlasUri to be present.")
+  public ResponseEntity<DataStructureVersionOutputDTO> publishDataStructureVersion(
+      @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
+    DataStructureVersion published = dataStructureVersionService.publish(versionId);
+    DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(published);
+    return ResponseEntity.ok(output);
+  }
+
+  @PostMapping("/{versionId}/unpublish")
+  @Operation(
+      summary = "Unpublish a data structure version",
+      description =
+          "Unpublishes a data structure version by setting status back to DRAFT. "
+              + "Cannot unpublish if this is the only published version of a published DataStructure - "
+              + "unpublish the DataStructure first in that case.")
+  public ResponseEntity<DataStructureVersionOutputDTO> unpublishDataStructureVersion(
+      @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
+    DataStructureVersion unpublished = dataStructureVersionService.unpublish(versionId);
+    DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(unpublished);
+    return ResponseEntity.ok(output);
   }
 }

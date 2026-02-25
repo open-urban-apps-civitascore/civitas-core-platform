@@ -2,6 +2,7 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.DataStructureMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
@@ -15,6 +16,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -101,5 +103,100 @@ public class DataStructureService extends BaseService<DataStructure, DataStructu
           "name", existingEntity.getId(), "Name cannot be null or blank");
     }
     return input;
+  }
+
+  /**
+   * Override update to ensure it can only be called for DRAFT data structures. For published data
+   * structures, use updatePublishedMeta instead.
+   *
+   * @param id the data structure ID
+   * @param input the update input
+   * @return the updated data structure
+   * @throws InvalidInputException if trying to update a non-DRAFT data structure
+   */
+  @Override
+  public DataStructure update(UUID id, DataStructureInputDTO input) {
+    DataStructure existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataStructureStatus() != DataStructureStatus.DRAFT) {
+      throw new InvalidInputException(
+          "dataStructureStatus", id, "Cannot update non-DRAFT DataStructure.");
+    }
+    return super.update(id, input);
+  }
+
+  /**
+   * Updates only the metadata (name, description) of a published data structure. Cannot modify
+   * status or createdFromDataSource.
+   *
+   * @param id the data structure ID
+   * @param input the update input
+   * @return the updated data structure
+   * @throws InvalidInputException if trying to update a DRAFT data structure
+   */
+  @Transactional
+  public DataStructure updatePublishedMeta(UUID id, DataStructureInputDTO input) {
+    DataStructure existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataStructureStatus() == DataStructureStatus.DRAFT) {
+      throw new InvalidInputException(
+          "dataStructureStatus", id, "Cannot use updatePublishedMeta for DRAFT DataStructure.");
+    }
+
+    return super.update(id, input);
+  }
+
+  /**
+   * Publishes a data structure by validating it has at least one published version and setting
+   * status to AVAILABLE.
+   *
+   * @param id the data structure ID
+   * @return the published data structure
+   * @throws InvalidInputException if data structure has no published versions or is already
+   *     published
+   */
+  @Transactional
+  public DataStructure publish(UUID id) {
+    DataStructure dataStructure = findByIdOrThrow(id);
+
+    // Validate that data structure is currently in DRAFT status
+    if (dataStructure.getDataStructureStatus() != DataStructureStatus.DRAFT) {
+      throw new InvalidInputException(
+          "dataStructureStatus", id, "DataStructure is already published");
+    }
+
+    // Validate that data structure has at least one published version (any non-DRAFT version)
+    boolean hasPublishedVersion =
+        dataStructure.getDataStructureVersions().stream()
+            .anyMatch(
+                version ->
+                    version.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT);
+
+    if (!hasPublishedVersion) {
+      throw new InvalidInputException(
+          "dataStructureVersions",
+          id,
+          "DataStructure must contain at least one published DataStructureVersion before publishing");
+    }
+
+    dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+    return dataStructureRepository.save(dataStructure);
+  }
+
+  /**
+   * Unpublishes a data structure by setting status back to DRAFT. Always allowed.
+   *
+   * @param id the data structure ID
+   * @return the unpublished data structure
+   */
+  @Transactional
+  public DataStructure unpublish(UUID id) {
+    DataStructure dataStructure = findByIdOrThrow(id);
+
+    if (dataStructure.getDataStructureStatus() == DataStructureStatus.DRAFT) {
+      throw new InvalidInputException(
+          "dataStructureStatus", id, "DataStructure is already in DRAFT status");
+    }
+
+    dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
+    return dataStructureRepository.save(dataStructure);
   }
 }
