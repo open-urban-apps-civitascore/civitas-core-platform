@@ -7,19 +7,21 @@ import de.civitascore.portal.model.output.assembler.DataStructureVersionAssemble
 import de.civitascore.portal.repository.specification.DataStructureVersionSpec;
 import de.civitascore.portal.service.DataStructureVersionService;
 import de.civitascore.portal.util.InvalidInputException;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.MethodNotAllowedException;
 
 @RestController
 @RequestMapping("/datastructures/{dataStructureId}/versions")
@@ -37,11 +39,8 @@ public class DataStructureVersionController
 
   @Override
   public ResponseEntity<Page<DataStructureVersionOutputDTO>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") DataStructureVersionSpec spec,
-      @ParameterObject
-          @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
-          Pageable pageable) {
-    return super.getAll(spec, pageable);
+      @ParameterObject DataStructureVersionSpec spec, @ParameterObject Pageable pageable) {
+    throw new MethodNotAllowedException(HttpMethod.GET, Collections.emptySet());
   }
 
   @Override
@@ -52,6 +51,15 @@ public class DataStructureVersionController
   @Override
   protected DataStructureVersionAssembler getAssembler() {
     return dataStructureVersionAssembler;
+  }
+
+  @Override
+  @GetMapping("/{id}")
+  public ResponseEntity<DataStructureVersionOutputDTO> getById(@PathVariable UUID id) {
+    DataStructureVersion entity = getService().findByIdOrThrow(id);
+    DataStructureVersionOutputDTO output = getAssembler().toOutput(entity);
+    getService().findModelForDataStructureVersion(entity).ifPresent(output::setModel);
+    return ResponseEntity.ok(output);
   }
 
   @Override

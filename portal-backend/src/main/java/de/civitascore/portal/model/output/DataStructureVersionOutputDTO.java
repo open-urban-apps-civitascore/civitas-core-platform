@@ -21,4 +21,5 @@ public class DataStructureVersionOutputDTO extends BaseOutputDTO {
   private String modelAtlasUri;
   private String modelName;
   private Map<String, Object> styles;
+  private String model;
 }
