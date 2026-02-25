@@ -22,7 +22,7 @@ usage() {
     echo "  --authz=allowall   Allow-all (any logged-in user can do anything)"
     echo "  -h, --help         Show this help"
     echo
-    echo "If --authz is not provided, you'll be prompted interactively."
+    echo "If --authz is not provided, defaults to allow-all (press Enter to accept)."
     exit 0
 }
 
@@ -164,9 +164,10 @@ else
     echo "How should authorization work?"
     echo
     echo "  1) Full AuthZ (enforce permissions per endpoint)"
-    echo "  2) Allow-all (any logged-in user can do anything)"
+    echo "  2) Allow-all (any logged-in user can do anything)  [default]"
     echo
-    read -p "Select option [1/2]: " authz_option
+    read -p "Select option [1/2] (default: 2): " authz_option
+    authz_option="${authz_option:-2}"
 fi
 
 echo
