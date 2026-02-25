@@ -68,7 +68,15 @@ const eslintConfig = [
           selector: 'objectLiteralProperty',
           format: null, // no check
           filter: {
-            regex: '^--', // Properties starting with "--"
+            regex: '^--', // CSS custom properties starting with "--"
+            match: true,
+          },
+        },
+        {
+          selector: 'objectLiteralProperty',
+          format: null, // no check - HTTP headers use kebab-case
+          filter: {
+            regex: '-', // Properties containing hyphens (e.g., 'Cache-Control', 'x-api-request')
             match: true,
           },
         },

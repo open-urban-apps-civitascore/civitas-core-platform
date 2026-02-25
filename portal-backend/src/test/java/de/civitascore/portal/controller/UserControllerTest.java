@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import de.civitascore.portal.model.embedded.UserTitleType;
 import de.civitascore.portal.model.output.PrincipalUserOutput;
 import de.civitascore.portal.model.output.assembler.UserAssembler;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
 import de.civitascore.portal.service.UserService;
 import java.util.List;
@@ -35,6 +36,7 @@ class UserControllerTest {
 
   @MockitoBean private UserService userService;
   @MockitoBean private UserAssembler userAssembler;
+  @MockitoBean private AllowedScopes allowedScopes;
 
   @Test
   @DisplayName("Authenticated user should get current user profile with roles")

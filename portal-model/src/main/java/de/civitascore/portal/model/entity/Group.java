@@ -61,6 +61,9 @@ public class Group extends NamedEntity {
   @Setter(AccessLevel.NONE) // Custom setter needed for orphanRemoval
   private Set<Group> childGroups = new HashSet<>();
 
+  @OneToMany(mappedBy = "group", fetch = FetchType.LAZY)
+  private Set<Assignment> assignments = new HashSet<>();
+
   /**
    * Custom setter for childGroups to properly handle orphanRemoval. Hibernate requires that the
    * collection instance remains the same, while only its contents are modified.
@@ -77,6 +80,10 @@ public class Group extends NamedEntity {
    *
    * @return a set of all child groups
    */
+  // TODO SECURITY (low): No cycle detection — a cycle in parentGroup/childGroups
+  // (e.g. from data corruption) causes unbounded recursion (StackOverflowError).
+  // Also triggers N+1 lazy-loading queries per recursion level. Consider adding a
+  // visited-set or depth limit if group hierarchies grow.
   public Set<Group> getChildGroupsRecursive() {
     Set<Group> allChildGroups = new HashSet<>(childGroups);
     for (Group child : childGroups) {

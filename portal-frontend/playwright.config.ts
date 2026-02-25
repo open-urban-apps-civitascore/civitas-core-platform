@@ -77,43 +77,27 @@ export default defineConfig({
       dependencies: ['authSetup'],
     },
 
-    {
-      name: 'firefox',
-      use: {
-        ...devices['Desktop Firefox'],
-        storageState: './playwright/.auth/user.json',
-      },
-      dependencies: ['authSetup'],
-    },
-
-    {
-      name: 'webkit',
-      use: {
-        ...devices['Desktop Safari'],
-        storageState: './playwright/.auth/user.json',
-      },
-      dependencies: ['authSetup'],
-    },
-
-    /* Test against mobile viewports. */
-    // {
-    //   name: 'Mobile Chrome',
-    //   use: { ...devices['Pixel 5'] },
-    // },
-    // {
-    //   name: 'Mobile Safari',
-    //   use: { ...devices['iPhone 12'] },
-    // },
-
-    /* Test against branded browsers. */
-    // {
-    //   name: 'Microsoft Edge',
-    //   use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    // },
-    // {
-    //   name: 'Google Chrome',
-    //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    // },
+    // Firefox and WebKit run in CI only — chromium is sufficient for local dev
+    ...(process.env.CI
+      ? [
+          {
+            name: 'firefox',
+            use: {
+              ...devices['Desktop Firefox'],
+              storageState: './playwright/.auth/user.json',
+            },
+            dependencies: ['authSetup'],
+          },
+          {
+            name: 'webkit',
+            use: {
+              ...devices['Desktop Safari'],
+              storageState: './playwright/.auth/user.json',
+            },
+            dependencies: ['authSetup'],
+          },
+        ]
+      : []),
   ],
 
   /* Run your local dev server before starting the tests */
