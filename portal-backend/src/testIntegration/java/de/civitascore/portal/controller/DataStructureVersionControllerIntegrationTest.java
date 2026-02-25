@@ -1180,11 +1180,14 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output.getId()).isEqualTo(publishedVersionId);
-      assertThat(output.getVersion()).as("Version should be updated").isEqualTo("1.1.0");
       assertThat(output.getModelName())
           .as("Model name should be updated")
           .isEqualTo("UpdatedPublishedModel");
-      assertThat(output.getStyles().get("color")).as("Styles should be updated").isEqualTo("red");
+
+      assertThat(output.getVersion()).as("Version should not be updated").isEqualTo("1.0.0");
+      assertThat(output.getStyles().get("color"))
+          .as("Styles should not be updated")
+          .isEqualTo("blue");
       assertThat(output.getDataStructureVersionStatus())
           .as("Status should remain AVAILABLE")
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);

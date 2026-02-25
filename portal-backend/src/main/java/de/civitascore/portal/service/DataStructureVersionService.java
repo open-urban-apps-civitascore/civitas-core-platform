@@ -7,6 +7,7 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -103,6 +104,9 @@ public class DataStructureVersionService
       // Prevent changes to modelAtlasUri if status is not DRAFT
       if (existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT) {
         input.setModelAtlasUri(existingEntity.getModelAtlasUri());
+        input.setVersion(existingEntity.getVersion());
+        input.setStyles(new HashMap<>(existingEntity.getStyles()));
+
         // Also clear the model to prevent uploads for non-DRAFT versions
         input.setModel(null);
       } else {
