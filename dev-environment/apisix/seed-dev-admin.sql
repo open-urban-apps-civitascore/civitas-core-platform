@@ -1,21 +1,16 @@
 -- Dev Admin Seed Data for Backend Dev Environment
--- Creates a dev admin user with ALL permissions so developers get
--- authorization "for free" when starting the dev environment.
+-- Grants the dev user ALL permissions so developers get authorization "for free"
+-- when starting the dev environment with full authz mode.
 --
 -- Dev Admin User:
 --   - Email: dev@civitas.local
 --   - Password: dev123 (set in Keycloak realm-export.json)
---   - Has ALL permissions via DevAdmin role
+--   - Has ALL permissions via DevAdmin role + DevAdminGroup
 --
--- ID prefix A0000000-... to avoid conflicts with authz test seed (10000000-...)
---
--- Permission naming: ENTITY_ACTION convention (e.g., USER_READ, DATASET_CREATE).
--- Must match permission strings in authz/rego/data/backends/portal_backend/data.json.
---
--- IMPORTANT: This seed does NOT create permissions — those are created by the
--- portal-backend's PermissionRoleInitializer at startup. This seed only creates
--- the user, group, role, assignment, and role_permission links.
--- The start script runs this AFTER the backend is healthy so permissions exist.
+-- IMPORTANT: This seed does NOT create permissions or the user — those are created
+-- by portal-backend's PermissionRoleInitializer and LocalUserInitializer at startup.
+-- This seed only creates the DevAdmin role, group, assignment, and permission links.
+-- The start script runs this AFTER the backend is healthy so those exist.
 --
 -- Usage (runs automatically via start-portal-dev.sh after backend starts):
 --   psql -h postgres-portal -U admin -d portal_backend -f seed-dev-admin.sql
@@ -29,19 +24,6 @@ VALUES ('A0000000-0000-0000-0000-000000000001', 'DevAdmin', 'Dev environment adm
 ON CONFLICT (name) DO NOTHING;
 
 -- =============================================================================
--- USER (dev@civitas.local)
--- =============================================================================
--- external_id matches the pinned UUID in Keycloak realm-export.json
-
-INSERT INTO users (id, external_id, first_name, last_name, email, active, created_at)
-VALUES ('A0000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Developer', 'User', 'dev@civitas.local', true, NOW())
-ON CONFLICT (email) DO UPDATE SET
-    external_id = EXCLUDED.external_id,
-    first_name = EXCLUDED.first_name,
-    last_name = EXCLUDED.last_name,
-    active = EXCLUDED.active;
-
--- =============================================================================
 -- GROUP
 -- =============================================================================
 
@@ -50,11 +32,12 @@ VALUES ('A0000000-0000-0000-0000-000000000003', 'DevAdminGroup', 'Dev environmen
 ON CONFLICT (name) DO NOTHING;
 
 -- =============================================================================
--- GROUP MEMBER
+-- GROUP MEMBER (look up user by email — ID may vary depending on who created it)
 -- =============================================================================
 
 INSERT INTO group_members (group_id, user_id)
-VALUES ('A0000000-0000-0000-0000-000000000003', 'A0000000-0000-0000-0000-000000000002')
+SELECT 'A0000000-0000-0000-0000-000000000003', id FROM users
+WHERE email = 'dev@civitas.local'
 ON CONFLICT DO NOTHING;
 
 -- =============================================================================
@@ -95,4 +78,4 @@ ON CONFLICT DO NOTHING;
 SELECT 'Dev admin seed complete' AS status,
        (SELECT COUNT(*) FROM permissions) AS permissions,
        (SELECT COUNT(*) FROM role_permissions WHERE role_id = 'A0000000-0000-0000-0000-000000000001') AS dev_admin_perms,
-       (SELECT email FROM users WHERE id = 'A0000000-0000-0000-0000-000000000002') AS dev_admin_email;
+       (SELECT email FROM users WHERE email = 'dev@civitas.local') AS dev_admin_email;
