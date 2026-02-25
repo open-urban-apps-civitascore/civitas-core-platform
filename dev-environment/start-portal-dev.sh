@@ -326,11 +326,11 @@ fi
 if [ "$backend_option" = "1" ]; then
     echo "Starting Portal Backend..."
     cd "$SCRIPT_DIR/../portal-backend"
-    gnome-terminal --title="Portal Backend" -- bash -c "mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres -Dconfig-adapter.version=$DEV_VERSION; exec bash" 2>/dev/null || \
-    xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres -Dconfig-adapter.version=$DEV_VERSION; bash" 2>/dev/null || \
+    gnome-terminal --title="Portal Backend" -- bash -c "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; exec bash" 2>/dev/null || \
+    xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; bash" 2>/dev/null || \
     {
         echo "Could not open new terminal. Starting in background..."
-        mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres -Dconfig-adapter.version=$DEV_VERSION &
+        mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION &
     }
     echo
 else
@@ -346,7 +346,7 @@ else
     echo "Then start in your IDE:"
     echo "  Project: portal-backend"
     echo "  Main class: de.civitascore.portal.PortalBackendApplication"
-    echo "  Profiles: local,postgres"
+    echo "  Profiles: local,local-init,postgres"
     echo
 fi
 
