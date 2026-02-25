@@ -131,15 +131,47 @@ echo
 
 echo "Starting infrastructure services..."
 echo "  - Kafka + Zookeeper + Kafka UI"
-echo "  - PostgreSQL (Portal + Keycloak)"
+echo "  - PostgreSQL (Portal + Keycloak) + Flyway migrations"
 echo "  - Keycloak"
 echo "  - APISIX + etcd"
+echo "  - OPA + AuthZ Repository + seed"
 echo "  - FROST Server"
 echo
 
 cd "$SCRIPT_DIR/postgres"
 $DOCKER_COMPOSE up -d
 echo "  PostgreSQL started"
+
+# Run Flyway migrations to ensure database schema exists.
+# AuthZ Repository shares the portal_backend database but doesn't own the schema —
+# portal-backend's Flyway migrations create the tables. Running them here ensures
+# AuthZ services can query the database on a cold start (before the backend runs).
+# Skip if tables already exist (volume persists between restarts).
+# Wait for postgres to be ready before checking tables / running Flyway
+for i in $(seq 1 20); do
+    docker exec civitas-postgres-portal pg_isready -U admin -d portal_backend -q 2>/dev/null && break
+    sleep 1
+done
+TABLES_EXIST=$(docker exec civitas-postgres-portal \
+    psql -U admin -d portal_backend -tAc \
+    "SELECT 1 FROM information_schema.tables WHERE table_name='users' LIMIT 1" 2>/dev/null)
+if [ "$TABLES_EXIST" = "1" ]; then
+    echo "  Database schema already exists (skipping migrations)"
+else
+    echo "  Running database migrations (first start)..."
+    FLYWAY_MIGRATIONS="$SCRIPT_DIR/../portal-backend/src/main/resources/db/migration"
+    if docker run --rm --network civitas-network \
+        -v "$FLYWAY_MIGRATIONS:/flyway/sql:ro" \
+        flyway/flyway:11-alpine \
+        -url=jdbc:postgresql://postgres-portal:5432/portal_backend \
+        -user=admin -password=admin \
+        -locations=filesystem:/flyway/sql \
+        migrate 2>&1 | tail -1; then
+        echo "  Database migrations complete"
+    else
+        echo "  WARNING: Database migrations failed (AuthZ services may not work until backend starts)"
+    fi
+fi
 
 cd "$SCRIPT_DIR/kafka"
 $DOCKER_COMPOSE up -d
@@ -193,8 +225,12 @@ $DOCKER_COMPOSE up -d
 echo "  APISIX started"
 
 cd "$SCRIPT_DIR/frost"
-$DOCKER_COMPOSE up -d
-echo "  FROST Server started"
+if $DOCKER_COMPOSE up -d 2>&1; then
+    echo "  FROST Server started"
+else
+    echo "  WARNING: FROST Server failed to start (may not support this architecture)"
+    echo "           Portal development works fine without it."
+fi
 
 cd "$SCRIPT_DIR"
 
