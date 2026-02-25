@@ -32,6 +32,7 @@ services:
 
   database:
     image: postgis/postgis:16-3.4-alpine
+    platform: linux/amd64
     container_name: civitas-frost-db
     environment:
       - POSTGRES_DB=sensorthings
