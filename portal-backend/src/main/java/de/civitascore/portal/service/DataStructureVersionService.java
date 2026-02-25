@@ -90,6 +90,13 @@ public class DataStructureVersionService
   }
 
   @Override
+  protected DataStructureVersionInputDTO preProcessUpdateInput(
+      DataStructureVersionInputDTO input, DataStructureVersion existingEntity) {
+    validateModelAndAtlasUri(input);
+    return super.preProcessUpdateInput(input, existingEntity);
+  }
+
+  @Override
   protected DataStructureVersion postSave(
       DataStructureVersion entity, DataStructureVersionInputDTO input) {
     if (StringUtils.isNotBlank(input.getModel())

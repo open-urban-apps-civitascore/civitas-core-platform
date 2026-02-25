@@ -550,6 +550,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @DisplayName("Should update data structure version successfully")
     void shouldUpdateDataStructureVersionSuccessfully() {
       stubModelDownload("https://modelatlas.example.com/model1-updated");
+      String expectedUploadPath = stubModelUpload("https://modelatlas.example.com/model1-updated");
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
@@ -557,6 +558,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       input.setDescription("Updated description for version 1.1.0");
       input.setModelAtlasUri("https://modelatlas.example.com/model1-updated");
       input.setModelName("TestModel1-Updated");
+      input.setModel(modelContent);
 
       Map<String, Object> styles = new HashMap<>();
       styles.put("color", "purple");
@@ -585,6 +587,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(output.getModelName()).isEqualTo("TestModel1-Updated");
       assertThat(output.getStyles().get("color")).isEqualTo("purple");
       assertThat(output.getStyles().get("size")).isEqualTo(25);
+
+      verify(
+          postRequestedFor(urlEqualTo(expectedUploadPath)).withRequestBody(equalTo(modelContent)));
     }
 
     @Test
@@ -624,38 +629,14 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should not upload model to Model Atlas when model is not provided")
-    void shouldNotUploadModelWhenNotProvided() {
-      stubModelDownload("https://modelatlas.example.com/model1-updated");
-
-      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setVersion("1.1.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/model1-updated");
-      input.setModelName("UpdatedModel");
-      // No model content
-
-      ResponseEntity<DataStructureVersionOutputDTO> response =
-          restTemplate.exchange(
-              getEndpoint() + "/" + versionId1,
-              HttpMethod.PUT,
-              new HttpEntity<>(input, createAuthHeaders()),
-              getOutputTypeReference());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      verify(0, postRequestedFor(urlMatching("/atlas/rest/.*/schema/stages/.*")));
-    }
-
-    @Test
-    @DisplayName("Should skip upload when model is provided but modelAtlasUri is missing")
-    void shouldSkipUploadWhenModelProvidedButNoModelAtlasUri() {
-      // The mapper's SET_TO_NULL policy clears an existing modelAtlasUri when not in input
+    @DisplayName("Should fail upload when model is provided but modelAtlasUri is missing")
+    void shouldFailUploadWhenModelProvidedButNoModelAtlasUri() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setVersion("1.1.0");
       input.setModelName("TestModel");
       input.setModel(modelContent);
-      // No modelAtlasUri — upload must be skipped, not fail
+      // No modelAtlasUri
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
@@ -664,7 +645,28 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
               new HttpEntity<>(input, createAuthHeaders()),
               getOutputTypeReference());
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      verify(0, postRequestedFor(urlMatching("/atlas/rest/.*/schema/stages/.*")));
+    }
+
+    @Test
+    @DisplayName("Should fail upload when modelAtlasUri is provided but model is missing")
+    void shouldFailUploadWhenModelAtlasUriProvidedButNoModel() {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setVersion("1.1.0");
+      input.setModelName("TestModel");
+      input.setModelAtlasUri(TEST_NS_URI);
+      // No model
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.PUT,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       verify(0, postRequestedFor(urlMatching("/atlas/rest/.*/schema/stages/.*")));
     }
 
@@ -743,7 +745,6 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("1.2.0");
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-      input.setModelAtlasUri("https://modelatlas.example.com/model");
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
