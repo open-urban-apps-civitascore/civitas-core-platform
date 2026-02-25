@@ -44,6 +44,16 @@ export const DatastructureVersionApiResponseSchema = z.object({
   modifiedAt: z.string(),
 })
 
+export const DatastructureVersionSummaryApiResponseSchema = z.object({
+  id: z.string(),
+  version: z.string(),
+  description: z.string(),
+  dataStructureVersionStatus: DatastructureStatusEnum,
+  dataStructureVersionSource: DatastructureVersionSourceEnum,
+  createdAt: z.string(),
+  modifiedAt: z.string(),
+})
+
 export const DatastructureVersionFormDraftSchema = z.object({
   id: z.string(),
   version: z.string().trim().min(1, 'common.errors.required'),
@@ -65,6 +75,7 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
 })
 
 export type DatastructureVersion = z.infer<typeof DatastructureVersionApiResponseSchema>
+export type DatastructureVersionSummary = z.infer<typeof DatastructureVersionSummaryApiResponseSchema>
 
 export type DatastructureVersionFormData = z.infer<typeof DatastructureVersionFormDraftSchema>
 export type DatastructureVersionCreateData = Omit<DatastructureVersionFormData, 'id'>
@@ -92,7 +103,7 @@ export const DatastructureApiResponseSchema = z.object({
   inUse: z.boolean(),
   createdAt: z.string(),
   modifiedAt: z.string(),
-  dataStructureVersions: z.array(DatastructureVersionApiResponseSchema),
+  dataStructureVersions: z.array(DatastructureVersionSummaryApiResponseSchema),
 })
 
 export type Datastructure = z.infer<typeof DatastructureApiResponseSchema>

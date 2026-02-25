@@ -25,10 +25,10 @@ import {
   DATASTRUCTURE_VERSION_SOURCE,
   DatastructureFormAvailableSchema,
   DatastructureStatus,
-  DatastructureVersion,
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionFormData,
   DatastructureVersionFormDraftSchema,
+  DatastructureVersionSummary,
   DatastructureVersionTab,
 } from '@/types/datastructures'
 
@@ -63,7 +63,7 @@ const DEFAULT_TAB = tabs[0]
 interface VersionOverviewProps {
   title: string
   datastructureId: string
-  version: DatastructureVersion | null
+  version: DatastructureVersionSummary | null
   isCreateMode: boolean
   testId: string
 }

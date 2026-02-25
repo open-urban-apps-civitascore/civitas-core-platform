@@ -1,14 +1,14 @@
 import {
   Datastructure,
   DatastructuresListData,
-  DatastructureVersion,
   DatastructureVersionsListData,
+  DatastructureVersionSummary,
 } from '@/types/datastructures'
 
 export const mapDatastructuresApiToListData = (datastructures: Datastructure[]): DatastructuresListData[] => {
   return datastructures.map(datastructure => {
-    const highestVersion: DatastructureVersion | null =
-      datastructure.dataStructureVersions.reduce<DatastructureVersion | null>((highest, current) => {
+    const highestVersion: DatastructureVersionSummary | null =
+      datastructure.dataStructureVersions.reduce<DatastructureVersionSummary | null>((highest, current) => {
         if (!highest) return current
         return current.version.localeCompare(highest.version, undefined, { numeric: true }) > 0 ? current : highest
       }, null)
@@ -34,7 +34,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
 }
 
 export const mapDatastructureVersionsApiToListData = (
-  versions: DatastructureVersion[],
+  versions: DatastructureVersionSummary[],
 ): DatastructureVersionsListData[] =>
   versions.map(version => ({
     id: version.id,
