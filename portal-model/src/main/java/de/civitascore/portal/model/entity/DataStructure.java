@@ -2,11 +2,9 @@ package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.entity.base.NamedEntity;
-
+import jakarta.persistence.*;
 import java.util.HashSet;
 import java.util.Set;
-
-import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,10 +21,18 @@ public class DataStructure extends NamedEntity {
   @Column(name = "created_from_data_source", nullable = false)
   private Boolean createdFromDataSource = false;
 
-  @OneToMany(mappedBy = "dataStructure", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(
+      mappedBy = "dataStructure",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
   private Set<Assignment> assignments = new HashSet<>();
 
-  @OneToMany(mappedBy = "dataStructure", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(
+      mappedBy = "dataStructure",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
   private Set<DataStructureVersion> dataStructureVersions = new HashSet<>();
 
   public void setAssignments(Set<Assignment> assignments) {
