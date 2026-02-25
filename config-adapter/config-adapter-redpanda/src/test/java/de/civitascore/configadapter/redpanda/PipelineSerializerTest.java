@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 class PipelineSerializerTest {
 
   private static final byte[] MASTER_KEY = new byte[32];
-  private static final byte[] SALT = new byte[8];
+  private static final byte[] SALT = new byte[16];
 
   @Test
   @DisplayName("throws FatalAdapterException when ENC() values present but master key is empty")

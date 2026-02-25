@@ -61,6 +61,8 @@ Core interfaces and models that define the adapter contract. **No implementation
 - `ConfigResultEvent` - Output result event model with status, correlation, and error details
 - `Config` - Data model for configuration values within events (path and value)
 - `Topics` - Constants for all valid Kafka topic names
+- `CredentialDecryptor` - AES-256-GCM decryption with PBKDF2 key derivation (BSI TR-02102 compliant)
+- `CredentialEncryptor` - AES-256-GCM encryption counterpart, produces output compatible with `CredentialDecryptor`
 
 **Dependency Principle:**
 - Adapters use `AdapterConfig` interface for property access
@@ -641,6 +643,8 @@ Contains:
 - `ConfigResultEvent` record for adapter processing results (output events)
 - `Topics` class with centralized topic constants
 - `CloudEventProcessor` internal helper for deserialization (throws exceptions on failure)
+- `CredentialDecryptor` for AES-256-GCM decryption of `ENC(...)` credential values
+- `CredentialEncryptor` for AES-256-GCM encryption, producing `ENC(...)` wrapped values
 
 No dependencies on implementation modules - pure interfaces only.
 
