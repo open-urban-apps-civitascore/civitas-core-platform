@@ -5,4 +5,4 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class DataEntitySummaryDTO extends BaseSummaryDTO {}
+public class DataEntitySummaryDTO extends BaseSummaryNamedDTO {}

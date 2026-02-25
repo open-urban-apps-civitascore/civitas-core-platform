@@ -6,6 +6,7 @@ import de.civitascore.portal.model.output.PipelineOutputDTO;
 import de.civitascore.portal.model.output.assembler.PipelineAssembler;
 import de.civitascore.portal.repository.specification.PipelineSpec;
 import de.civitascore.portal.service.PipelineService;
+import de.civitascore.portal.util.InvalidInputException;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -91,7 +92,12 @@ public class PipelineController
   protected PipelineInputDTO preProcessInput(PipelineInputDTO input) {
     Optional.of(extractPathVariables().get("dataSetId"))
         .map(UUID::fromString)
-        .ifPresent(input::setDataSetId);
+        .ifPresentOrElse(
+            input::setDataSetId,
+            () -> {
+              throw new InvalidInputException(
+                  "Pipeline", "dataSetId", "Missing or invalid dataSetId in path variables");
+            });
     return super.preProcessInput(input);
   }
 }

@@ -6,6 +6,6 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class PermissionSummaryDTO extends BaseSummaryDTO {
+public class PermissionSummaryDTO extends BaseSummaryNamedDTO {
   private PermissionType permissionType;
 }

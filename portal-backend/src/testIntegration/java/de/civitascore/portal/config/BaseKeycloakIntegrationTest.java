@@ -20,8 +20,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -32,12 +32,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Slf4j(access = AccessLevel.PROTECTED)
 public abstract class BaseKeycloakIntegrationTest {
 
-  protected static final PostgreSQLContainer<?> POSTGRES;
+  protected static final PostgreSQLContainer POSTGRES;
   protected static final KeycloakContainer KEYCLOAK;
 
   static {
     POSTGRES =
-        new PostgreSQLContainer<>("postgres:15")
+        new PostgreSQLContainer("postgres:15")
             .withDatabaseName("iot_schema")
             .withUsername("iot")
             .withPassword("iot");
