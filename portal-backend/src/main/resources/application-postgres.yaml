@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/portal_backend
+    url: jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable
     username: admin
     password: admin
     driver-class-name: org.postgresql.Driver
