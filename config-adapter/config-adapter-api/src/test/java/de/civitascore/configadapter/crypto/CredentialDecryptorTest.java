@@ -12,6 +12,7 @@ package de.civitascore.configadapter.crypto;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -20,7 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.security.GeneralSecurityException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import javax.crypto.SecretKeyFactory;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 class CredentialDecryptorTest {
 
@@ -328,6 +332,23 @@ class CredentialDecryptorTest {
   @Test
   void isEncrypted_missingSuffix_shouldReturnFalse() {
     assertFalse(CryptoUtils.isEncrypted("ENC(abc"));
+  }
+
+  // ─── deriveKey RuntimeException wrapping ────────────────────────────────────
+
+  @Test
+  void deriveKey_runtimeException_shouldWrapAsGeneralSecurityException() {
+    try (MockedStatic<SecretKeyFactory> mocked = Mockito.mockStatic(SecretKeyFactory.class)) {
+      mocked
+          .when(() -> SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256"))
+          .thenThrow(new RuntimeException("simulated failure"));
+
+      GeneralSecurityException ex =
+          assertThrows(
+              GeneralSecurityException.class, () -> CryptoUtils.deriveKey(MASTER_KEY, SALT));
+      assertEquals("Key derivation failed", ex.getMessage());
+      assertInstanceOf(RuntimeException.class, ex.getCause());
+    }
   }
 
   // ─── Test helper ─────────────────────────────────────────────────────────────

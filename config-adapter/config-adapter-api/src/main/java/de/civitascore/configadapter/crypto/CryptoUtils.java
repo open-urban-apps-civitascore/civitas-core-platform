@@ -69,6 +69,8 @@ final class CryptoUtils {
       SecretKeySpec secretKey = new SecretKeySpec(derivedKey, "AES");
       Arrays.fill(derivedKey, (byte) 0);
       return secretKey;
+    } catch (RuntimeException e) {
+      throw new GeneralSecurityException("Key derivation failed", e);
     } finally {
       if (spec != null) {
         spec.clearPassword();

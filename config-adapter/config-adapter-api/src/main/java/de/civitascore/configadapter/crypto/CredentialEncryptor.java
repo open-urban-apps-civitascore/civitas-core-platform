@@ -14,7 +14,6 @@ import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -90,7 +89,7 @@ public final class CredentialEncryptor {
    * @param map the map containing values to encrypt (may be {@code null})
    * @param masterKey the master key bytes
    * @param salt the salt bytes
-   * @return a new map with encrypted String values
+   * @return the same map instance with values encrypted in-place
    * @throws GeneralSecurityException if any encryption fails
    */
   @SuppressWarnings("unchecked")
@@ -100,23 +99,15 @@ public final class CredentialEncryptor {
       return Map.of();
     }
 
-    Map<String, Object> result = new LinkedHashMap<>();
     for (Map.Entry<String, Object> entry : map.entrySet()) {
       Object value = entry.getValue();
-      if (value instanceof String s) {
-        if (s.isEmpty() || CryptoUtils.isEncrypted(s)) {
-          result.put(entry.getKey(), s);
-        } else {
-          result.put(
-              entry.getKey(),
-              CryptoUtils.ENC_PREFIX + encrypt(s, masterKey, salt) + CryptoUtils.ENC_SUFFIX);
-        }
-      } else if (value instanceof Map<?, ?> nested) {
-        result.put(entry.getKey(), encryptMapValues((Map<String, Object>) nested, masterKey, salt));
-      } else {
-        result.put(entry.getKey(), value);
+      if (value instanceof Map<?, ?> nested) {
+        encryptMapValues((Map<String, Object>) nested, masterKey, salt);
+      } else if (value instanceof String s && !s.isEmpty() && !CryptoUtils.isEncrypted(s)) {
+        entry.setValue(
+            CryptoUtils.ENC_PREFIX + encrypt(s, masterKey, salt) + CryptoUtils.ENC_SUFFIX);
       }
     }
-    return result;
+    return map;
   }
 }
