@@ -45,8 +45,8 @@
 
 | Property / Env Var | Example Value | Description |
 |---|---|---|
-| `KEYCLOAK_AUTH_SERVER_URL` | `https://keycloak.example.com` | Keycloak base URL — used to build the JWK-set URI |
-| `KEYCLOAK_ISSUER_URI` | `https://keycloak.example.com` | Used for JWT `iss` claim validation. **Can differ from `AUTH_SERVER_URL`** when the container accesses Keycloak on an internal hostname but tokens are issued to an external one. |
+| `KEYCLOAK_AUTH_SERVER_URL` | `https://keycloak.example.com` | Keycloak base URL — JWK-set URI is derived from this |
+| `KEYCLOAK_ISSUER_URI` | `https://keycloak.example.com` | JWT `iss` claim validation. **Can differ from `KEYCLOAK_AUTH_SERVER_URL`** when the container reaches Keycloak on an internal hostname but tokens carry an external issuer. |
 | `KEYCLOAK_REALM` | `civitas-core` | Realm name |
 | `KEYCLOAK_TARGET_REALM` | `civitas-core` | Realm used when provisioning users/groups/roles via config-adapter |
 
@@ -56,9 +56,9 @@
 
 | Property / Env Var | Default | Description |
 |---|---|---|
-| `KAFKA_BOOTSTRAP_SERVERS` | *(required)* | Covers both `spring.kafka.bootstrap-servers` (via `${KAFKA_BOOTSTRAP_SERVERS}` placeholder) and `kafka.bootstrap-servers` (via Spring relaxed binding) — only this one env var needed |
+| `KAFKA_BOOTSTRAP_SERVERS` | *(required)* | Sets both `spring.kafka.bootstrap-servers` and `kafka.bootstrap-servers` — only one env var needed |
 | `kafka.enabled` | `false` | **Must be `true`.** Enables the Kafka CloudEvent publisher. Without it, events are only logged, never sent. |
-| `kafka.result-topic` | `de.civitascore.config.results` | Topic consumed for config-adapter processing results |
+| `kafka.result-topic` | `de.civitascore.config.results` | Topic on which config-adapter publishes processing results |
 
 ---
 
@@ -79,7 +79,7 @@
 | Property | Default | Description |
 |---|---|---|
 | `event.config-adapter-timeout-seconds` | `10` | Seconds to wait for config-adapter to reply before throwing `ExternalSystemTimeoutException` |
-| `kafka.result-timeout-ms` | `30000` | Ms the CloudEvent publisher waits for a result |
+| `kafka.result-timeout-ms` | `30000` | How long (ms) the CloudEvent publisher waits for a config-adapter result |
 | `kafka.acks` | `all` | Producer ack mode for the CloudEvent publisher |
 | `kafka.retries` | `3` | Retry count for the CloudEvent publisher |
 
@@ -87,11 +87,11 @@
 
 ### 2.3 Kafka Producer Tuning
 
-Defaults are production-grade. Only change for specific throughput/latency requirements.
+Defaults are tuned for production. Only adjust for specific throughput/latency requirements.
 
 | Property | Default | Description |
 |---|---|---|
-| `spring.kafka.producer.acks` | `all` | Wait for all in-sync replicas |
+| `spring.kafka.producer.acks` | `all` | All in-sync replicas must acknowledge |
 | `spring.kafka.producer.retries` | `2147483647` | Unlimited retries |
 | `spring.kafka.producer.batch-size` | `16384` | Batch size in bytes |
 | `spring.kafka.producer.buffer-memory` | `33554432` | Producer buffer in bytes |
@@ -108,7 +108,6 @@ Defaults are production-grade. Only change for specific throughput/latency requi
 |---|---|---|
 | `spring.kafka.consumer.group-id` | `civitas-portal-backend` | Consumer group ID |
 | `spring.kafka.consumer.auto-offset-reset` | `earliest` | Offset reset when no committed offset exists |
-| `spring.kafka.topics.config-adapter-result` | `civitas.config.result` | Result topic consumed by `KafkaConfigResultListener` |
 
 ---
 
@@ -139,7 +138,7 @@ Defaults are production-grade. Only change for specific throughput/latency requi
 | Property | Default | Description |
 |---|---|---|
 | `app.url` | `http://localhost:8089` | Server URL shown in Swagger UI — set to the external-facing URL |
-| `springdoc.swagger-ui.enabled` | `true` | Disable in production if desired |
+| `springdoc.swagger-ui.enabled` | `true` | Set to `false` in production to hide API docs |
 | `springdoc.api-docs.path` | `/v2/api-docs` | OpenAPI JSON path |
 | `springdoc.swagger-ui.path` | `/swagger-ui.html` | Swagger UI path |
 
