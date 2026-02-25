@@ -95,10 +95,9 @@ export const serverFetch = async <TResponse>({
   const fetchOptions: RequestInit = {
     method,
     headers: {
-      /* eslint-disable @typescript-eslint/naming-convention */
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
-      /* eslint-enable @typescript-eslint/naming-convention */
+
       ...headers,
     },
     cache: 'no-store', // Equivalent to Cache-Control: no-store
