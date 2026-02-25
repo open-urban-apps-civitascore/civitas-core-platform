@@ -315,9 +315,21 @@ else
     echo "  Configuring FULL AUTHZ mode (enforce permissions)"
 fi
 
+# Build AuthZ Repository JAR (required by its Dockerfile)
+echo "Building AuthZ Repository..."
+cd "$SCRIPT_DIR/../portal-model"
+mvn clean install -DskipTests -q
+cd "$SCRIPT_DIR/../authz/repository"
+mvn clean package -DskipTests -q
+if [ $? -ne 0 ]; then
+    echo "ERROR: AuthZ Repository build failed"
+    exit 1
+fi
+echo "  AuthZ Repository built successfully"
+
 # Start AuthZ services (OPA + AuthZ Repository)
 cd "$SCRIPT_DIR/apisix"
-$DOCKER_COMPOSE -f docker-compose.authz.yml up -d
+$DOCKER_COMPOSE -f docker-compose.authz.yml up -d --build
 echo "  AuthZ services started (OPA + AuthZ Repository)"
 
 # Start APISIX gateway
@@ -412,19 +424,6 @@ if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
         exit 1
     fi
     echo "  Config Adapter built successfully"
-    echo
-fi
-
-# Build portal-model (shared JPA entities required by portal-backend)
-if [ "$backend_option" = "1" ]; then
-    echo "Building Portal Model..."
-    cd "$SCRIPT_DIR/../portal-model"
-    mvn clean install -DskipTests
-    if [ $? -ne 0 ]; then
-        echo "ERROR: Portal Model build failed"
-        exit 1
-    fi
-    echo "  Portal Model built successfully"
     echo
 fi
 
