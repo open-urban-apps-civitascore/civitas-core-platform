@@ -795,6 +795,35 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
+    @DisplayName("Should fail to delete last published version of a published data structure")
+    void shouldFailToDeleteLastPublishedVersionOfPublishedDataStructure() {
+      DataStructureVersion version1 =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      version1.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      dataStructureVersionRepository.save(version1);
+
+      DataStructure dataStructure = dataStructureRepository.findById(dataStructureId).orElseThrow();
+      dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      dataStructureRepository.save(dataStructure);
+
+      // Try to delete the only published version - should fail
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.DELETE,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return BAD_REQUEST status")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
+
+      // Verify dataStructure and version still exist
+      assertThat(dataStructureRepository.existsById(dataStructureId)).isTrue();
+      assertThat(dataStructureVersionRepository.existsById(versionId1)).isTrue();
+    }
+
+    @Test
     @DisplayName("Should return 404 when deleting non-existent version")
     void shouldReturn404WhenDeletingNonExistent() {
       ResponseEntity<Void> response =

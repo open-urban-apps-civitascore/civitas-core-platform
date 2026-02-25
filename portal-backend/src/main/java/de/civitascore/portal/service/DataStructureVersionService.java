@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
@@ -247,27 +248,38 @@ public class DataStructureVersionService
           "dataStructureVersionStatus", id, "DataStructureVersion is already in DRAFT status");
     }
 
-    // Check if parent DataStructure is published (any status other than DRAFT is considered
-    // published)
-    if (version.getDataStructure().getDataStructureStatus() != DataStructureStatus.DRAFT) {
-
-      // Count how many published versions this DataStructure has (excluding the current one)
-      // Any version not in DRAFT status is considered published
-      long publishedVersionCount =
-          version.getDataStructure().getDataStructureVersions().stream()
-              .filter(v -> !v.getId().equals(id))
-              .filter(v -> v.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT)
-              .count();
-
-      if (publishedVersionCount == 0) {
-        throw new InvalidInputException(
-            "dataStructureVersionStatus",
-            id,
-            "Cannot unpublish this DataStructureVersion because it is the only published version of a published DataStructure. Please unpublish the DataStructure first.");
-      }
-    }
+    validateExistenceOfOtherPublishedVersion(
+        version,
+        "Cannot unpublish this DataStructureVersion because it is the only published version of a published DataStructure. Please unpublish the DataStructure first.");
 
     version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
     return dataStructureVersionRepository.save(version);
+  }
+
+  @Override
+  protected DataStructureVersion preProcessDelete(UUID id) {
+    DataStructureVersion version = findByIdOrThrow(id);
+    validateExistenceOfOtherPublishedVersion(
+        version,
+        "Cannot delete this DataStructureVersion because it is the only published version of a published DataStructure. Please unpublish the DataStructure first.");
+
+    return version;
+  }
+
+  private void validateExistenceOfOtherPublishedVersion(
+      DataStructureVersion version, String errorMessage) {
+    DataStructure dataStructure = version.getDataStructure();
+    if (dataStructure.getDataStructureStatus() == DataStructureStatus.DRAFT) {
+      return;
+    }
+
+    boolean hasOtherPublishedVersions =
+        dataStructure.getDataStructureVersions().stream()
+            .filter(v -> !v.getId().equals(version.getId()))
+            .anyMatch(v -> v.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT);
+
+    if (!hasOtherPublishedVersions) {
+      throw new InvalidInputException("dataStructureVersionStatus", version.getId(), errorMessage);
+    }
   }
 }
