@@ -4,6 +4,14 @@
 # This script starts the infrastructure services required for portal development
 # and optionally starts the config-adapter and portal-backend either via command
 # line or allows manual startup in an IDE for debugging.
+#
+# Structure:
+#   Phase 1: Prerequisites check
+#   Phase 2: Interactive questions (collected up front, before any Docker output)
+#   Phase 3: Infrastructure startup (Docker services)
+#   Phase 4: Application build & start
+#   Phase 5: Smoke test
+#   Phase 6: Service URLs & info
 
 set -e
 
@@ -46,7 +54,7 @@ echo "CIVITAS CORE Platform - Portal Development Setup"
 echo "======================================================"
 echo
 
-# ---- Prerequisites -------------------------------------------------
+# ---- Phase 1: Prerequisites -----------------------------------------
 
 echo "Checking prerequisites..."
 
@@ -128,7 +136,117 @@ fi
 
 echo
 
-# ---- Create Docker Network ----------------------------------------
+# ---- Phase 2: Interactive Questions (all up front) -------------------
+
+echo "======================================================"
+echo "Configuration"
+echo "======================================================"
+echo
+
+# Q1: AuthZ mode
+if [ -n "$authz_arg" ]; then
+    authz_option="$authz_arg"
+    echo "Authorization: $([ "$authz_option" = "1" ] && echo 'full' || echo 'allow-all') (--authz)"
+else
+    echo "How should authorization work?"
+    echo
+    echo "  1) Full AuthZ (enforce permissions per endpoint)"
+    echo "  2) Allow-all (any logged-in user can do anything)  [default]"
+    echo
+    read -p "Select option [1/2] (default: 2): " authz_option
+    authz_option="${authz_option:-2}"
+fi
+
+echo
+
+# Q2: Config Adapter mode
+echo "How would you like to start the Config Adapter?"
+echo
+echo "  1) Automatic (command line: build & run)"
+echo "  2) Manual / IDE (for debugging)"
+echo
+read -p "Select option [1/2]: " config_adapter_option
+
+echo
+
+# Q3: Backend mode
+echo "How would you like to start the Portal Backend?"
+echo
+echo "  1) Automatic (command line: build & run)"
+echo "  2) Manual / IDE (for debugging)"
+echo
+read -p "Select option [1/2]: " backend_option
+
+echo
+
+# Q4: Frontend — .env.local setup + Keycloak secret + mode
+FRONTEND_DIR="$SCRIPT_DIR/../portal-frontend"
+keycloak_secret=""
+
+if [ ! -f "$FRONTEND_DIR/.env.local" ]; then
+    if [ -f "$FRONTEND_DIR/.env.local.template" ]; then
+        echo "Creating .env.local from template..."
+        cp "$FRONTEND_DIR/.env.local.template" "$FRONTEND_DIR/.env.local"
+        echo "  .env.local created"
+    else
+        echo "WARNING: .env.local.template not found in portal-frontend/"
+    fi
+fi
+
+if [ -f "$FRONTEND_DIR/.env.local" ]; then
+    CURRENT_SECRET=$(grep '^KEYCLOAK_CLIENT_SECRET=' "$FRONTEND_DIR/.env.local" | cut -d'=' -f2)
+    if [ "$CURRENT_SECRET" = "XXXXXXXXXXXXXXXXXXX" ] || [ -z "$CURRENT_SECRET" ]; then
+        echo
+        echo "The Keycloak client secret is not configured in .env.local."
+        echo "You can find it in Keycloak Admin (http://localhost:8080):"
+        echo "  Realm: civitas-core > Clients > portal-frontend > Credentials"
+        echo
+        read -p "Enter Keycloak client secret (or press Enter to skip): " keycloak_secret
+        if [ -n "$keycloak_secret" ]; then
+            sed -i "s|^KEYCLOAK_CLIENT_SECRET=.*|KEYCLOAK_CLIENT_SECRET=$keycloak_secret|" "$FRONTEND_DIR/.env.local"
+            echo "  Keycloak client secret updated in .env.local"
+        else
+            echo "  Skipped. Update KEYCLOAK_CLIENT_SECRET in portal-frontend/.env.local before using the frontend."
+        fi
+    fi
+fi
+
+echo
+
+frontend_option=""
+if [ "$NODE_AVAILABLE" = true ] && [ "$PNPM_AVAILABLE" = true ]; then
+    echo "How would you like to start the Portal Frontend?"
+    echo
+    echo "  1) Command line (pnpm dev)"
+    echo "  2) Manual (start later)"
+    echo "  3) Skip (not needed)"
+    echo
+    read -p "Select option [1/2/3]: " frontend_option
+else
+    frontend_option="skip_unavailable"
+fi
+
+# Print configuration summary
+echo
+echo "------------------------------------------------------"
+echo "Configuration Summary"
+echo "------------------------------------------------------"
+echo "  AuthZ mode:      $([ "$authz_option" = "1" ] && echo 'Full AuthZ' || echo 'Allow-all')"
+echo "  Config Adapter:  $([ "$config_adapter_option" = "1" ] && echo 'Auto' || echo 'Manual/IDE')"
+echo "  Portal Backend:  $([ "$backend_option" = "1" ] && echo 'Auto' || echo 'Manual/IDE')"
+if [ "$frontend_option" = "skip_unavailable" ]; then
+    echo "  Portal Frontend: N/A (Node.js/pnpm not available)"
+elif [ "$frontend_option" = "1" ]; then
+    echo "  Portal Frontend: Auto"
+elif [ "$frontend_option" = "2" ]; then
+    echo "  Portal Frontend: Manual"
+else
+    echo "  Portal Frontend: Skip"
+fi
+echo "------------------------------------------------------"
+echo
+
+# ---- Phase 3: Infrastructure Startup --------------------------------
 
 echo "Ensuring Docker network exists..."
 docker network create civitas-network 2>/dev/null && \
@@ -136,9 +254,6 @@ docker network create civitas-network 2>/dev/null && \
     echo "  civitas-network already exists"
 
 echo
-
-# ---- Start Infrastructure Services --------------------------------
-
 echo "Starting infrastructure services..."
 echo "  - Kafka + Zookeeper + Kafka UI"
 echo "  - PostgreSQL (Portal + Keycloak) + Flyway migrations"
@@ -191,38 +306,14 @@ cd "$SCRIPT_DIR/keycloak"
 $DOCKER_COMPOSE up -d
 echo "  Keycloak started"
 
-# ---- AuthZ Mode Selection -------------------------------------------
-
-echo
-echo "======================================================"
-echo "Authorization Mode"
-echo "======================================================"
-echo
-
-if [ -n "$authz_arg" ]; then
-    authz_option="$authz_arg"
-    echo "  Mode: $([ "$authz_option" = "1" ] && echo 'full' || echo 'allowall') (--authz)"
-else
-    echo "How should authorization work?"
-    echo
-    echo "  1) Full AuthZ (enforce permissions per endpoint)"
-    echo "  2) Allow-all (any logged-in user can do anything)  [default]"
-    echo
-    read -p "Select option [1/2] (default: 2): " authz_option
-    authz_option="${authz_option:-2}"
-fi
-
-echo
-
+# Apply AuthZ mode configuration
 if [ "$authz_option" = "2" ]; then
-    echo "  Starting in ALLOW-ALL mode (wildcard scope, null-permission data)"
+    echo "  Configuring ALLOW-ALL mode (wildcard scope, null-permission data)"
     export OPA_DATA_DIR="../../authz/rego/data/backends-allowall"
     export APISIX_CONFIG="./apisix_conf/apisix-allowall.yaml"
 else
-    echo "  Starting in FULL AUTHZ mode (enforce permissions)"
+    echo "  Configuring FULL AUTHZ mode (enforce permissions)"
 fi
-
-echo
 
 # Start AuthZ services (OPA + AuthZ Repository)
 cd "$SCRIPT_DIR/apisix"
@@ -263,7 +354,7 @@ fi
 
 echo
 
-# ---- Wait for services to be healthy ------------------------------
+# ---- Wait for infrastructure to be healthy -------------------------
 
 echo "Waiting for services to be healthy..."
 
@@ -292,36 +383,24 @@ wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 60
 
 echo
 
-# ---- Backend Services Selection -----------------------------------
+# ---- Phase 4: Application Build & Start -----------------------------
 
 DEV_VERSION="1.0.0-dev"
 
-echo "======================================================"
-echo "Config Adapter Startup"
-echo "======================================================"
+# Kill any leftover processes from a previous run to avoid port conflicts.
+# Without this, the health check may hit an old backend and falsely report success.
+echo "Checking for leftover application processes..."
+for port in 8088 8089 3000; do
+    pid=$(fuser "$port/tcp" 2>/dev/null | awk '{print $1}')
+    if [ -n "$pid" ]; then
+        echo "  Killing leftover process on port $port (PID $pid)"
+        kill "$pid" 2>/dev/null
+        sleep 1
+        # Force-kill if still alive
+        kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null
+    fi
+done
 echo
-echo "How would you like to start the Config Adapter?"
-echo
-echo "  1) Automatic (command line: build & run)"
-echo "  2) Manual / IDE (for debugging)"
-echo
-read -p "Select option [1/2]: " config_adapter_option
-
-echo
-echo "======================================================"
-echo "Portal Backend Startup"
-echo "======================================================"
-echo
-echo "How would you like to start the Portal Backend?"
-echo
-echo "  1) Automatic (command line: build & run)"
-echo "  2) Manual / IDE (for debugging)"
-echo
-read -p "Select option [1/2]: " backend_option
-
-echo
-
-# ---- Build Phase ---------------------------------------------------
 
 # Build config-adapter if command line option selected
 if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
@@ -362,7 +441,7 @@ if [ "$backend_option" = "1" ]; then
     echo
 fi
 
-# ---- Config Adapter Startup ----------------------------------------
+# ---- Start Config Adapter -------------------------------------------
 
 if [ "$config_adapter_option" = "1" ]; then
     echo "Starting Config Adapter..."
@@ -405,8 +484,8 @@ SCRIPT_EOF
     gnome-terminal --title="Config Adapter" -- /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" 2>/dev/null || \
     xterm -T "Config Adapter" -e /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" 2>/dev/null || \
     {
-        echo "Could not open new terminal. Starting in background..."
-        /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" &
+        echo "  No terminal emulator available. Starting in background (log: /tmp/config-adapter.log)..."
+        /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" > /tmp/config-adapter.log 2>&1 &
     }
 
     echo "Waiting for Config Adapter to start..."
@@ -439,7 +518,7 @@ else
     echo
 fi
 
-# ---- Portal Backend Startup ----------------------------------------
+# ---- Start Portal Backend -------------------------------------------
 
 if [ "$backend_option" = "1" ]; then
     echo "Starting Portal Backend..."
@@ -447,8 +526,8 @@ if [ "$backend_option" = "1" ]; then
     gnome-terminal --title="Portal Backend" -- bash -c "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; exec bash" 2>/dev/null || \
     xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; bash" 2>/dev/null || \
     {
-        echo "Could not open new terminal. Starting in background..."
-        mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION &
+        echo "  No terminal emulator available. Starting in background (log: /tmp/portal-backend.log)..."
+        mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION > /tmp/portal-backend.log 2>&1 &
     }
     echo
 else
@@ -470,21 +549,34 @@ fi
 
 cd "$SCRIPT_DIR"
 
+# ---- Wait for Backend Health (both authz modes) ---------------------
+# LocalUserInitializer must complete before OPA's is_authenticated check
+# can find the dev user. Without this wait, requests get 403 in allow-all mode.
+
+if [ "$backend_option" = "1" ]; then
+    echo "Waiting for Portal Backend to be healthy..."
+    BACKEND_READY=false
+    for i in $(seq 1 60); do
+        if curl -s -f "http://localhost:8089/v2/actuator/health" >/dev/null 2>&1; then
+            echo "  Portal Backend is ready"
+            BACKEND_READY=true
+            break
+        fi
+        sleep 2
+    done
+    if [ "$BACKEND_READY" = false ]; then
+        echo "  WARNING: Portal Backend may not be ready yet (timeout after 120s)"
+        echo "           Check /tmp/portal-backend.log if running in background"
+    fi
+    echo
+fi
+
 # ---- Seed Dev Admin Data -------------------------------------------
 # Must run AFTER backend starts because PermissionRoleInitializer creates
 # the permissions table rows. The seed links DevAdmin role to those permissions.
 
 if [ "$authz_option" = "1" ]; then
     echo "Seeding dev admin data (full authz mode)..."
-    if [ "$backend_option" = "1" ]; then
-        echo "  Waiting for Portal Backend to be healthy..."
-        for i in $(seq 1 60); do
-            if curl -s -f "http://localhost:8089/actuator/health" >/dev/null 2>&1; then
-                break
-            fi
-            sleep 2
-        done
-    fi
 
     SEED_SQL="$SCRIPT_DIR/apisix/seed-dev-admin.sql"
     if [ -f "$SEED_SQL" ]; then
@@ -496,93 +588,120 @@ if [ "$authz_option" = "1" ]; then
     echo
 fi
 
-# ---- Frontend Startup ----------------------------------------------
+# ---- Start Frontend --------------------------------------------------
 
-echo
-echo "======================================================"
-echo "Portal Frontend Startup"
-echo "======================================================"
-echo
+if [ "$frontend_option" = "1" ]; then
+    echo "Starting Portal Frontend..."
+    cd "$SCRIPT_DIR/../portal-frontend"
 
-FRONTEND_DIR="$SCRIPT_DIR/../portal-frontend"
-
-# Ensure .env.local exists
-if [ ! -f "$FRONTEND_DIR/.env.local" ]; then
-    if [ -f "$FRONTEND_DIR/.env.local.template" ]; then
-        echo "Creating .env.local from template..."
-        cp "$FRONTEND_DIR/.env.local.template" "$FRONTEND_DIR/.env.local"
-        echo "  .env.local created"
-    else
-        echo "WARNING: .env.local.template not found in portal-frontend/"
+    # Install dependencies if node_modules doesn't exist
+    if [ ! -d "node_modules" ]; then
+        echo "Installing dependencies (pnpm install)..."
+        pnpm install
     fi
-fi
 
-# Check if Keycloak client secret needs to be configured
-if [ -f "$FRONTEND_DIR/.env.local" ]; then
-    CURRENT_SECRET=$(grep '^KEYCLOAK_CLIENT_SECRET=' "$FRONTEND_DIR/.env.local" | cut -d'=' -f2)
-    if [ "$CURRENT_SECRET" = "XXXXXXXXXXXXXXXXXXX" ] || [ -z "$CURRENT_SECRET" ]; then
-        echo
-        echo "The Keycloak client secret is not configured in .env.local."
-        echo "You can find it in Keycloak Admin (http://localhost:8080):"
-        echo "  Realm: civitas-core > Clients > portal-frontend > Credentials"
-        echo
-        read -p "Enter Keycloak client secret (or press Enter to skip): " keycloak_secret
-        if [ -n "$keycloak_secret" ]; then
-            sed -i "s|^KEYCLOAK_CLIENT_SECRET=.*|KEYCLOAK_CLIENT_SECRET=$keycloak_secret|" "$FRONTEND_DIR/.env.local"
-            echo "  Keycloak client secret updated in .env.local"
-        else
-            echo "  Skipped. Update KEYCLOAK_CLIENT_SECRET in portal-frontend/.env.local before using the frontend."
-        fi
-    fi
-fi
-
-echo
-
-if [ "$NODE_AVAILABLE" = true ] && [ "$PNPM_AVAILABLE" = true ]; then
-    echo "How would you like to start the Portal Frontend?"
-    echo
-    echo "  1) Command line (pnpm dev)"
-    echo "  2) Manual (start later)"
-    echo "  3) Skip (not needed)"
-    echo
-    read -p "Select option [1/2/3]: " frontend_option
-
-    if [ "$frontend_option" = "1" ]; then
-        echo
-        echo "Starting Portal Frontend..."
-        cd "$SCRIPT_DIR/../portal-frontend"
-
-        # Install dependencies if node_modules doesn't exist
-        if [ ! -d "node_modules" ]; then
-            echo "Installing dependencies (pnpm install)..."
-            pnpm install
-        fi
-
-        gnome-terminal --title="Portal Frontend" -- bash -c "pnpm dev; exec bash" 2>/dev/null || \
-        xterm -T "Portal Frontend" -e "pnpm dev; bash" 2>/dev/null || \
-        {
-            echo "Could not open new terminal. Starting in background..."
-            pnpm dev &
-        }
-        echo "  Frontend started on http://localhost:3000"
-        cd "$SCRIPT_DIR"
-    elif [ "$frontend_option" = "2" ]; then
-        echo
-        echo "To start the frontend later, run:"
-        echo "  cd portal-frontend"
-        echo "  pnpm install    # if not done yet"
-        echo "  pnpm dev"
-    else
-        echo "  Frontend skipped"
-    fi
-else
+    gnome-terminal --title="Portal Frontend" -- bash -c "pnpm dev; exec bash" 2>/dev/null || \
+    xterm -T "Portal Frontend" -e "pnpm dev; bash" 2>/dev/null || \
+    {
+        echo "  No terminal emulator available. Starting in background (log: /tmp/portal-frontend.log)..."
+        pnpm dev > /tmp/portal-frontend.log 2>&1 &
+    }
+    echo "  Frontend started on http://localhost:3000"
+    cd "$SCRIPT_DIR"
+elif [ "$frontend_option" = "2" ]; then
+    echo "To start the frontend later, run:"
+    echo "  cd portal-frontend"
+    echo "  pnpm install    # if not done yet"
+    echo "  pnpm dev"
+elif [ "$frontend_option" = "skip_unavailable" ]; then
     echo "Node.js/pnpm not available. To start the frontend manually:"
     echo "  cd portal-frontend"
     echo "  pnpm install    # if not done yet"
     echo "  pnpm dev"
+else
+    echo "  Frontend skipped"
 fi
 
 echo
+
+# ---- Phase 5: Smoke Test --------------------------------------------
+# Quick verification that the backend responds correctly.
+# Only runs when backend was auto-started. Non-fatal (warnings only).
+
+if [ "$backend_option" = "1" ] && [ "$BACKEND_READY" = true ]; then
+    echo "======================================================"
+    echo "Smoke Test"
+    echo "======================================================"
+    echo
+
+    SMOKE_PASS=0
+    SMOKE_FAIL=0
+    SMOKE_SKIP=0
+
+    smoke_test() {
+        local description=$1
+        local expected=$2
+        local actual=$3
+
+        if [ "$actual" = "$expected" ]; then
+            echo "  PASS  $description (HTTP $actual)"
+            SMOKE_PASS=$((SMOKE_PASS + 1))
+        else
+            echo "  FAIL  $description (expected $expected, got $actual)"
+            SMOKE_FAIL=$((SMOKE_FAIL + 1))
+        fi
+    }
+
+    # Get a token from Keycloak using resource owner password grant.
+    # MUST use civitas-keycloak:8080 (not localhost:8080) so the JWT issuer claim
+    # matches what APISIX expects from its OIDC discovery URL.
+    # Requires /etc/hosts: 127.0.0.1 civitas-keycloak
+    TOKEN_RESPONSE=$(curl -s -X POST "http://civitas-keycloak:8080/realms/civitas-core/protocol/openid-connect/token" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "grant_type=password" \
+        -d "client_id=portal-frontend" \
+        -d "client_secret=dev-only-portal-frontend-secret" \
+        -d "username=dev@civitas.local" \
+        -d "password=dev123" 2>/dev/null) || true
+
+    ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4) || true
+
+    if [ -z "$ACCESS_TOKEN" ]; then
+        echo "  SKIP  Could not obtain token from Keycloak (is civitas-core realm configured?)"
+        echo "        Token endpoint response: $(echo "$TOKEN_RESPONSE" | head -c 200)"
+        SMOKE_SKIP=3
+    else
+        # Test 1: Unauthenticated request should be rejected
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:9080/v2/users/me" 2>/dev/null) || true
+        smoke_test "Unauthenticated /v2/users/me -> 401" "401" "$STATUS"
+
+        # Test 2: Authenticated /users/me should succeed
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            "http://localhost:9080/v2/users/me" 2>/dev/null) || true
+        smoke_test "Authenticated /v2/users/me -> 200" "200" "$STATUS"
+
+        # Test 3: Authenticated /users list should succeed
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $ACCESS_TOKEN" \
+            "http://localhost:9080/v2/users" 2>/dev/null) || true
+        smoke_test "Authenticated /v2/users -> 200" "200" "$STATUS"
+    fi
+
+    echo
+    echo "  Results: $SMOKE_PASS passed, $SMOKE_FAIL failed, $SMOKE_SKIP skipped"
+    if [ "$SMOKE_FAIL" -gt 0 ]; then
+        echo "  WARNING: Some smoke tests failed. The backend may need more time to initialize."
+        echo "           Check /tmp/portal-backend.log or OPA logs for details."
+    fi
+    echo
+elif [ "$backend_option" != "1" ]; then
+    echo "Smoke test skipped (backend started manually)."
+    echo
+fi
+
+# ---- Phase 6: Service URLs & Info -----------------------------------
+
 echo "======================================================"
 echo "Service URLs"
 echo "======================================================"
@@ -604,6 +723,16 @@ echo
 echo "  Email:    dev@civitas.local"
 echo "  Password: dev123"
 echo
+if [ "$backend_option" = "1" ]; then
+    echo "======================================================"
+    echo "Application Logs (background mode)"
+    echo "======================================================"
+    echo
+    [ "$config_adapter_option" = "1" ] && echo "  Config Adapter:  /tmp/config-adapter.log"
+    echo "  Portal Backend:  /tmp/portal-backend.log"
+    [ "$frontend_option" = "1" ] && echo "  Portal Frontend: /tmp/portal-frontend.log"
+    echo
+fi
 echo "======================================================"
 echo "Cleanup"
 echo "======================================================"

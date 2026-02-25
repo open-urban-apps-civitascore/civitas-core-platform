@@ -23,10 +23,25 @@ else
 fi
 echo
 
-# Stop Java backend processes (started by start-portal-dev.sh in background)
-echo "Stopping backend processes..."
-pkill -f "spring-boot:run.*portal-backend" 2>/dev/null && echo "  Portal Backend stopped" || true
-pkill -f "config-adapter-application.*\.jar" 2>/dev/null && echo "  Config Adapter stopped" || true
+# Stop application processes (started by start-portal-dev.sh in background)
+# Kill by port — this is reliable regardless of how the process was started
+# (Maven forks child JVMs that don't match pkill patterns)
+echo "Stopping application processes..."
+for port_info in "8088:Config Adapter" "8089:Portal Backend" "3000:Portal Frontend"; do
+    port="${port_info%%:*}"
+    name="${port_info##*:}"
+    pid=$(fuser "$port/tcp" 2>/dev/null | awk '{print $1}')
+    if [ -n "$pid" ]; then
+        kill "$pid" 2>/dev/null
+        sleep 1
+        # Force-kill if still running
+        kill -0 "$pid" 2>/dev/null && kill -9 "$pid" 2>/dev/null
+        echo "  $name stopped (port $port, PID $pid)"
+    fi
+done
+# Also catch any stragglers by pattern (belt + suspenders)
+pkill -f "spring-boot:run.*portal-backend" 2>/dev/null || true
+pkill -f "config-adapter-application" 2>/dev/null || true
 sleep 1
 
 echo
