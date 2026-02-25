@@ -580,7 +580,7 @@ if [ "$authz_option" = "1" ]; then
 
     SEED_SQL="$SCRIPT_DIR/apisix/seed-dev-admin.sql"
     if [ -f "$SEED_SQL" ]; then
-        docker exec civitas-postgres-portal psql -U admin -d portal_backend -f /dev/stdin < "$SEED_SQL" 2>&1 | tail -5
+        docker exec -i civitas-postgres-portal psql -U admin -d portal_backend -f /dev/stdin < "$SEED_SQL" 2>&1 | tail -5
         echo "  Dev admin seeding complete"
     else
         echo "  WARNING: seed-dev-admin.sql not found"
