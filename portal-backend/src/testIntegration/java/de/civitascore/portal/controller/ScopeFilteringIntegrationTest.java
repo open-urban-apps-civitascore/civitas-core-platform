@@ -49,6 +49,7 @@ class ScopeFilteringIntegrationTest
     DataSetInputDTO input = new DataSetInputDTO();
     input.setName("scope_test_dataset_" + System.currentTimeMillis());
     input.setDescription("Dataset for scope filtering test");
+    input.setOpenDataAccess(false);
     return input;
   }
 
@@ -62,6 +63,7 @@ class ScopeFilteringIntegrationTest
     DataSetInputDTO input = new DataSetInputDTO();
     input.setName("updated_scope_dataset");
     input.setDescription("Updated");
+    input.setOpenDataAccess(false);
     return input;
   }
 
@@ -226,6 +228,7 @@ class ScopeFilteringIntegrationTest
     DataSetInputDTO input = new DataSetInputDTO();
     input.setName(name);
     input.setDescription("Test dataset");
+    input.setOpenDataAccess(false);
 
     ResponseEntity<DataSetOutputDTO> response = performCreate(input);
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
