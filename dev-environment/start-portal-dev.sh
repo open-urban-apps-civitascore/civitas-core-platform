@@ -18,19 +18,30 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+OS_TYPE=$(uname -s)
+
 # ---- CLI Arguments ---------------------------------------------------
 
 authz_arg=""
+config_adapter_arg=""
+backend_arg=""
+frontend_arg=""
+keycloak_secret_arg=""
 
 usage() {
-    echo "Usage: start-portal-dev.sh [options]"
+    echo "Usage: $(basename "$0") [OPTIONS]"
     echo
     echo "Options:"
-    echo "  --authz=full       Full AuthZ (enforce permissions per endpoint)"
-    echo "  --authz=allowall   Allow-all (any logged-in user can do anything)"
-    echo "  -h, --help         Show this help"
+    echo "  --authz=full|allowall        AuthZ mode (default: prompt, default answer: allowall)"
+    echo "  --config-adapter=auto|ide    Config Adapter startup (default: prompt)"
+    echo "  --backend=auto|ide           Portal Backend startup (default: prompt)"
+    echo "  --frontend=auto|manual|skip  Portal Frontend startup (default: prompt)"
+    echo "  --keycloak-secret=SECRET     Keycloak client secret for portal-frontend"
+    echo "  -h, --help                   Show this help message"
     echo
-    echo "If --authz is not provided, defaults to allow-all (press Enter to accept)."
+    echo "Examples:"
+    echo "  $0 --authz=allowall --config-adapter=auto --backend=auto --frontend=skip"
+    echo "  $0 --backend=auto --keycloak-secret=abc123"
     exit 0
 }
 
@@ -43,8 +54,35 @@ while [ $# -gt 0 ]; do
                 allowall) authz_arg="2" ;;
                 *) echo "ERROR: --authz must be 'full' or 'allowall'"; exit 1 ;;
             esac ;;
+        --config-adapter=*)
+            val="${1#*=}"
+            case "$val" in
+                auto) config_adapter_arg="1" ;;
+                ide)  config_adapter_arg="2" ;;
+                *) echo "ERROR: --config-adapter must be 'auto' or 'ide'"; exit 1 ;;
+            esac ;;
+        --backend=*)
+            val="${1#*=}"
+            case "$val" in
+                auto) backend_arg="1" ;;
+                ide)  backend_arg="2" ;;
+                *) echo "ERROR: --backend must be 'auto' or 'ide'"; exit 1 ;;
+            esac ;;
+        --frontend=*)
+            val="${1#*=}"
+            case "$val" in
+                auto)   frontend_arg="1" ;;
+                manual) frontend_arg="2" ;;
+                skip)   frontend_arg="3" ;;
+                *) echo "ERROR: --frontend must be 'auto', 'manual', or 'skip'"; exit 1 ;;
+            esac ;;
+        --keycloak-secret=*)
+            keycloak_secret_arg="${1#*=}" ;;
         -h|--help) usage ;;
-        *) echo "ERROR: Unknown option: $1"; exit 1 ;;
+        *)
+            echo "ERROR: Unknown option: $1"
+            echo "Run with --help for usage."
+            exit 1 ;;
     esac
     shift
 done
@@ -136,6 +174,30 @@ fi
 
 echo
 
+# ---- Terminal Helper -----------------------------------------------
+# Opens a command in a new terminal window, with platform-specific support.
+# Falls back to background execution with log redirection.
+
+start_in_new_terminal() {
+    local title="$1"
+    local script="$2"
+    local logfile="$3"  # optional: log file for background fallback
+    if [ "$OS_TYPE" = "Darwin" ]; then
+        osascript -e "tell application \"Terminal\" to do script \"bash '$script'\"" 2>/dev/null && return 0
+    else
+        gnome-terminal --title="$title" -- bash "$script" 2>/dev/null && return 0
+        xterm -T "$title" -e "bash '$script'" 2>/dev/null && return 0
+    fi
+    # Fallback: run in background with log redirection
+    if [ -n "$logfile" ]; then
+        echo "  No terminal emulator available. Starting in background (log: $logfile)..."
+        bash "$script" > "$logfile" 2>&1 &
+    else
+        echo "  No terminal emulator available. Starting in background..."
+        bash "$script" &
+    fi
+}
+
 # ---- Phase 2: Interactive Questions (all up front) -------------------
 
 echo "======================================================"
@@ -160,22 +222,32 @@ fi
 echo
 
 # Q2: Config Adapter mode
-echo "How would you like to start the Config Adapter?"
-echo
-echo "  1) Automatic (command line: build & run)"
-echo "  2) Manual / IDE (for debugging)"
-echo
-read -p "Select option [1/2]: " config_adapter_option
+if [ -n "$config_adapter_arg" ]; then
+    config_adapter_option="$config_adapter_arg"
+    echo "Config Adapter: $([ "$config_adapter_option" = "1" ] && echo 'auto' || echo 'ide') (--config-adapter)"
+else
+    echo "How would you like to start the Config Adapter?"
+    echo
+    echo "  1) Automatic (command line: build & run)"
+    echo "  2) Manual / IDE (for debugging)"
+    echo
+    read -p "Select option [1/2]: " config_adapter_option
+fi
 
 echo
 
 # Q3: Backend mode
-echo "How would you like to start the Portal Backend?"
-echo
-echo "  1) Automatic (command line: build & run)"
-echo "  2) Manual / IDE (for debugging)"
-echo
-read -p "Select option [1/2]: " backend_option
+if [ -n "$backend_arg" ]; then
+    backend_option="$backend_arg"
+    echo "Portal Backend: $([ "$backend_option" = "1" ] && echo 'auto' || echo 'ide') (--backend)"
+else
+    echo "How would you like to start the Portal Backend?"
+    echo
+    echo "  1) Automatic (command line: build & run)"
+    echo "  2) Manual / IDE (for debugging)"
+    echo
+    read -p "Select option [1/2]: " backend_option
+fi
 
 echo
 
@@ -196,14 +268,18 @@ fi
 if [ -f "$FRONTEND_DIR/.env.local" ]; then
     CURRENT_SECRET=$(grep '^KEYCLOAK_CLIENT_SECRET=' "$FRONTEND_DIR/.env.local" | cut -d'=' -f2)
     if [ "$CURRENT_SECRET" = "XXXXXXXXXXXXXXXXXXX" ] || [ -z "$CURRENT_SECRET" ]; then
-        echo
-        echo "The Keycloak client secret is not configured in .env.local."
-        echo "You can find it in Keycloak Admin (http://localhost:8080):"
-        echo "  Realm: civitas-core > Clients > portal-frontend > Credentials"
-        echo
-        read -p "Enter Keycloak client secret (or press Enter to skip): " keycloak_secret
+        if [ -n "$keycloak_secret_arg" ]; then
+            keycloak_secret="$keycloak_secret_arg"
+        else
+            echo
+            echo "The Keycloak client secret is not configured in .env.local."
+            echo "You can find it in Keycloak Admin (http://localhost:8080):"
+            echo "  Realm: civitas-core > Clients > portal-frontend > Credentials"
+            echo
+            read -p "Enter Keycloak client secret (or press Enter to skip): " keycloak_secret
+        fi
         if [ -n "$keycloak_secret" ]; then
-            sed -i "s|^KEYCLOAK_CLIENT_SECRET=.*|KEYCLOAK_CLIENT_SECRET=$keycloak_secret|" "$FRONTEND_DIR/.env.local"
+            perl -i -pe "s|^KEYCLOAK_CLIENT_SECRET=.*|KEYCLOAK_CLIENT_SECRET=$keycloak_secret|" "$FRONTEND_DIR/.env.local"
             echo "  Keycloak client secret updated in .env.local"
         else
             echo "  Skipped. Update KEYCLOAK_CLIENT_SECRET in portal-frontend/.env.local before using the frontend."
@@ -215,13 +291,19 @@ echo
 
 frontend_option=""
 if [ "$NODE_AVAILABLE" = true ] && [ "$PNPM_AVAILABLE" = true ]; then
-    echo "How would you like to start the Portal Frontend?"
-    echo
-    echo "  1) Command line (pnpm dev)"
-    echo "  2) Manual (start later)"
-    echo "  3) Skip (not needed)"
-    echo
-    read -p "Select option [1/2/3]: " frontend_option
+    if [ -n "$frontend_arg" ]; then
+        frontend_option="$frontend_arg"
+        label=$([ "$frontend_option" = "1" ] && echo 'auto' || { [ "$frontend_option" = "2" ] && echo 'manual' || echo 'skip'; })
+        echo "Portal Frontend: $label (--frontend)"
+    else
+        echo "How would you like to start the Portal Frontend?"
+        echo
+        echo "  1) Command line (pnpm dev)"
+        echo "  2) Manual (start later)"
+        echo "  3) Skip (not needed)"
+        echo
+        read -p "Select option [1/2/3]: " frontend_option
+    fi
 else
     frontend_option="skip_unavailable"
 fi
@@ -449,7 +531,7 @@ if [ "$config_adapter_option" = "1" ]; then
     CONFIG_ADAPTER_JAR="$(pwd)/config-adapter-application/target/config-adapter-application-$DEV_VERSION.jar"
 
     # Create a startup script with environment variables
-    cat > /tmp/start-config-adapter.sh << 'SCRIPT_EOF'
+    cat > /tmp/start-config-adapter.sh << SCRIPT_EOF
 #!/bin/bash
 # Config Adapter environment variables (from application.properties)
 export HEALTHCHECK_PORT=8088
@@ -474,18 +556,12 @@ export FROST_API_KEY=dev-frost-api-key
 export FROST_API_KEY_HEADER=X-API-Key
 export FROST_TOPICS=de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
 
-
-java -jar "$1"
+java -jar "$CONFIG_ADAPTER_JAR"
 exec bash
 SCRIPT_EOF
     chmod +x /tmp/start-config-adapter.sh
 
-    gnome-terminal --title="Config Adapter" -- /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" 2>/dev/null || \
-    xterm -T "Config Adapter" -e /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" 2>/dev/null || \
-    {
-        echo "  No terminal emulator available. Starting in background (log: /tmp/config-adapter.log)..."
-        /tmp/start-config-adapter.sh "$CONFIG_ADAPTER_JAR" > /tmp/config-adapter.log 2>&1 &
-    }
+    start_in_new_terminal "Config Adapter" "/tmp/start-config-adapter.sh" "/tmp/config-adapter.log"
 
     echo "Waiting for Config Adapter to start..."
     sleep 10
@@ -522,12 +598,17 @@ fi
 if [ "$backend_option" = "1" ]; then
     echo "Starting Portal Backend..."
     cd "$SCRIPT_DIR/../portal-backend"
-    gnome-terminal --title="Portal Backend" -- bash -c "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; exec bash" 2>/dev/null || \
-    xterm -T "Portal Backend" -e "mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION; bash" 2>/dev/null || \
-    {
-        echo "  No terminal emulator available. Starting in background (log: /tmp/portal-backend.log)..."
-        mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION > /tmp/portal-backend.log 2>&1 &
-    }
+
+    BACKEND_DIR="$(pwd)"
+    cat > /tmp/start-portal-backend.sh << SCRIPT_EOF
+#!/bin/bash
+cd "$BACKEND_DIR"
+mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION
+exec bash
+SCRIPT_EOF
+    chmod +x /tmp/start-portal-backend.sh
+
+    start_in_new_terminal "Portal Backend" "/tmp/start-portal-backend.sh" "/tmp/portal-backend.log"
     echo
 else
     echo "======================================================"
@@ -599,12 +680,16 @@ if [ "$frontend_option" = "1" ]; then
         pnpm install
     fi
 
-    gnome-terminal --title="Portal Frontend" -- bash -c "pnpm dev; exec bash" 2>/dev/null || \
-    xterm -T "Portal Frontend" -e "pnpm dev; bash" 2>/dev/null || \
-    {
-        echo "  No terminal emulator available. Starting in background (log: /tmp/portal-frontend.log)..."
-        pnpm dev > /tmp/portal-frontend.log 2>&1 &
-    }
+    FRONTEND_START_DIR="$(pwd)"
+    cat > /tmp/start-portal-frontend.sh << SCRIPT_EOF
+#!/bin/bash
+cd "$FRONTEND_START_DIR"
+pnpm dev
+exec bash
+SCRIPT_EOF
+    chmod +x /tmp/start-portal-frontend.sh
+
+    start_in_new_terminal "Portal Frontend" "/tmp/start-portal-frontend.sh" "/tmp/portal-frontend.log"
     echo "  Frontend started on http://localhost:3000"
     cd "$SCRIPT_DIR"
 elif [ "$frontend_option" = "2" ]; then
