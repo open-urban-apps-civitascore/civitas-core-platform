@@ -56,6 +56,16 @@ if ! command -v java >/dev/null 2>&1; then
     exit 1
 fi
 
+# Auto-detect Temurin JDK if JAVA_HOME not set (system OpenJDK may be broken on ARM64)
+if [ -z "$JAVA_HOME" ]; then
+    for jdk_path in /usr/lib/jvm/temurin-21-jdk-*; do
+        if [ -x "$jdk_path/bin/java" ]; then
+            export JAVA_HOME="$jdk_path"
+            export PATH="$JAVA_HOME/bin:$PATH"
+            break
+        fi
+    done
+fi
 JAVA_VERSION=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
 if [ "$JAVA_VERSION" -lt 21 ] 2>/dev/null; then
     echo "ERROR: Java 21 or higher is required. Found Java $JAVA_VERSION."
@@ -134,7 +144,7 @@ echo "  - Kafka + Zookeeper + Kafka UI"
 echo "  - PostgreSQL (Portal + Keycloak) + Flyway migrations"
 echo "  - Keycloak"
 echo "  - APISIX + etcd"
-echo "  - OPA + AuthZ Repository + seed"
+echo "  - OPA + AuthZ Repository"
 echo "  - FROST Server"
 echo
 
@@ -459,6 +469,32 @@ else
 fi
 
 cd "$SCRIPT_DIR"
+
+# ---- Seed Dev Admin Data -------------------------------------------
+# Must run AFTER backend starts because PermissionRoleInitializer creates
+# the permissions table rows. The seed links DevAdmin role to those permissions.
+
+if [ "$authz_option" = "1" ]; then
+    echo "Seeding dev admin data (full authz mode)..."
+    if [ "$backend_option" = "1" ]; then
+        echo "  Waiting for Portal Backend to be healthy..."
+        for i in $(seq 1 60); do
+            if curl -s -f "http://localhost:8089/actuator/health" >/dev/null 2>&1; then
+                break
+            fi
+            sleep 2
+        done
+    fi
+
+    SEED_SQL="$SCRIPT_DIR/apisix/seed-dev-admin.sql"
+    if [ -f "$SEED_SQL" ]; then
+        docker exec civitas-postgres-portal psql -U admin -d portal_backend -f /dev/stdin < "$SEED_SQL" 2>&1 | tail -5
+        echo "  Dev admin seeding complete"
+    else
+        echo "  WARNING: seed-dev-admin.sql not found"
+    fi
+    echo
+fi
 
 # ---- Frontend Startup ----------------------------------------------
 
