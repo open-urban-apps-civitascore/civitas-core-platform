@@ -25,7 +25,7 @@ final class CryptoUtils {
   static final String ALGORITHM = "AES/GCM/NoPadding";
   static final int GCM_TAG_LENGTH_BITS = 128;
   static final int GCM_IV_LENGTH_BYTES = 12;
-  static final int PBKDF2_ITERATIONS = 310_000;
+  static final int PBKDF2_ITERATIONS = 600_000;
   static final int KEY_LENGTH_BITS = 256;
   static final int MIN_SALT_LENGTH_BYTES = 16;
   static final String ENC_PREFIX = "ENC(";

@@ -41,7 +41,7 @@ class CredentialDecryptorTest {
   // Static test vector: generated with MASTER_KEY + SALT, plaintext "my-secret-password".
   // Hardcoded to decouple decryptor tests from CredentialEncryptor correctness.
   private static final String KNOWN_CIPHERTEXT =
-      "FH1mNqq2m9tY0SJtJZb7j4uJFWHa+lWYd8p8I2qM1qWFrOnn3lCS4NFxrKST0g==";
+      "iKmUc5RdKvNVH3fHYn6S8q+uSR7zJdrrtaC7xq0fdRsYveQf71iU5wVcY0qcwA==";
 
   @Test
   void decrypt_knownCiphertext_shouldReturnExpectedPlaintext() throws GeneralSecurityException {
