@@ -84,6 +84,7 @@ public class DataStructureVersionService
   protected DataStructureVersionInputDTO preProcessCreateInput(DataStructureVersionInputDTO input) {
     // Set DRAFT status for newly created data structure versions
     input.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+    validateModelAndAtlasUri(input);
 
     return super.preProcessCreateInput(input);
   }
@@ -103,5 +104,24 @@ public class DataStructureVersionService
     }
 
     return super.postSave(entity, input);
+  }
+
+  private void validateModelAndAtlasUri(DataStructureVersionInputDTO input) {
+    boolean hasModel = StringUtils.isNotBlank(input.getModel());
+    boolean hasModelAtlasUri = StringUtils.isNotBlank(input.getModelAtlasUri());
+
+    if (hasModel && !hasModelAtlasUri) {
+      throw new InvalidInputException(
+          "DataStructureVersion",
+          "modelAtlasUri",
+          "modelAtlasUri cannot be null or blank if model is provided");
+    }
+
+    if (!hasModel && hasModelAtlasUri) {
+      throw new InvalidInputException(
+          "DataStructureVersion",
+          "model",
+          "model cannot be null or blank if modelAtlasUri is provided");
+    }
   }
 }

@@ -1,6 +1,7 @@
 package de.civitascore.portal.controller;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.binaryEqualTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
@@ -63,13 +64,20 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   private static final String TEST_MODEL_FILE_PATH = "mocks/models/Simple_model.xmi";
   private static final String TEST_SCOPE = "default";
   private static final String TEST_STAGE = "draft";
-  private static final String TEST_MODEL_CONTENT = "<xml>mock model content</xml>";
+  private static final String MOCK_MODEL_RESPONSE = "<xml>mock model content</xml>";
+
+  private String modelContent;
+  private byte[] modelContentBinary;
 
   private UUID dataStructureId;
   private UUID versionId1;
 
   @BeforeEach
-  void initTestData() {
+  void initTestData() throws IOException {
+    ClassPathResource modelFile = new ClassPathResource(TEST_MODEL_FILE_PATH);
+    modelContentBinary = modelFile.getContentAsByteArray();
+    modelContent = new String(modelContentBinary, StandardCharsets.UTF_8);
+
     // Create parent data structure
     DataStructure dataStructure = new DataStructure();
     dataStructure.setName("Test Data Structure");
@@ -120,7 +128,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     dataStructureRepository.deleteAll();
   }
 
-  private void stubModelDownload(String nsUri) {
+  private String stubModelDownload(String nsUri) {
     String downloadPath =
         String.format(
             "/atlas/rest/%s/schema/stages/%s/content?nsUri=%s", TEST_SCOPE, TEST_STAGE, nsUri);
@@ -130,7 +138,28 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
                 aResponse()
                     .withStatus(200)
                     .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML_VALUE)
-                    .withBody(TEST_MODEL_CONTENT)));
+                    .withBody(MOCK_MODEL_RESPONSE)));
+
+    return downloadPath;
+  }
+
+  private String stubModelUpload(String nsUri) {
+    String expectedPath =
+        String.format(
+            "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
+            TEST_SCOPE, TEST_STAGE, nsUri);
+
+    stubFor(
+        post(urlEqualTo(expectedPath))
+            .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml"))
+            .withRequestBody(binaryEqualTo(modelContentBinary))
+            .willReturn(
+                aResponse()
+                    .withStatus(200)
+                    .withHeader(HttpHeaders.CONTENT_TYPE, "application/uml")
+                    .withBody(MOCK_MODEL_RESPONSE)));
+
+    return expectedPath;
   }
 
   private HttpHeaders createAuthHeaders() {
@@ -157,12 +186,14 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @DisplayName("Should create data structure version successfully with valid data")
     void shouldCreateDataStructureVersionSuccessfully() {
       stubModelDownload("https://modelatlas.example.com/model3");
+      String expectedUploadPath = stubModelUpload("https://modelatlas.example.com/model3");
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setVersion("3.0.0");
       input.setDescription("Third version with new features");
       input.setModelAtlasUri("https://modelatlas.example.com/model3");
+      input.setModel(modelContent);
       input.setModelName("TestModel3");
 
       Map<String, Object> styles = new HashMap<>();
@@ -209,6 +240,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getHeaders().getLocation())
           .as("Location header should be present")
           .isNotNull();
+
+      verify(
+          postRequestedFor(urlEqualTo(expectedUploadPath)).withRequestBody(equalTo(modelContent)));
     }
 
     @Test
@@ -250,23 +284,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
     @Test
     @DisplayName("Should upload model to Model Atlas when model is provided on create")
-    void shouldUploadModelWhenProvidedOnCreate() throws IOException {
-      ClassPathResource modelFile = new ClassPathResource(TEST_MODEL_FILE_PATH);
-      String modelContent = new String(modelFile.getContentAsByteArray(), StandardCharsets.UTF_8);
-
-      String expectedPath =
-          String.format(
-              "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
-              TEST_SCOPE, TEST_STAGE, TEST_NS_URI);
-
-      stubFor(
-          post(urlEqualTo(expectedPath))
-              .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml"))
-              .willReturn(
-                  aResponse()
-                      .withStatus(200)
-                      .withHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-                      .withBody("{\"result\": \"ok\"}")));
+    void shouldUploadModelWhenProvidedOnCreate() {
+      String expectedUploadPath = stubModelUpload(TEST_NS_URI);
       stubModelDownload(TEST_NS_URI);
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
@@ -284,21 +303,19 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
               getOutputTypeReference());
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      verify(postRequestedFor(urlEqualTo(expectedPath)).withRequestBody(equalTo(modelContent)));
+      verify(
+          postRequestedFor(urlEqualTo(expectedUploadPath)).withRequestBody(equalTo(modelContent)));
     }
 
     @Test
-    @DisplayName("Should skip upload when model is provided but modelAtlasUri is missing on create")
-    void shouldSkipUploadWhenModelProvidedButNoModelAtlasUriOnCreate() throws IOException {
-      ClassPathResource modelFile = new ClassPathResource(TEST_MODEL_FILE_PATH);
-      String modelContent = new String(modelFile.getContentAsByteArray(), StandardCharsets.UTF_8);
-
+    @DisplayName(
+        "Should fail creation when model is provided but modelAtlasUri is missing on create")
+    void shouldFailWhenModelProvidedButNoModelAtlasUriOnCreate() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setVersion("3.0.0");
       input.setModelName("TestModel3");
       input.setModel(modelContent);
-      // No modelAtlasUri — upload must be skipped, not fail
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
@@ -307,16 +324,34 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
               new HttpEntity<>(input, createAuthHeaders()),
               getOutputTypeReference());
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      verify(0, postRequestedFor(urlMatching("/atlas/rest/.*/schema/stages/.*")));
+    }
+
+    @Test
+    @DisplayName(
+        "Should fail creation when modelAtlasUri is provided but model is missing on create")
+    void shouldFailWhenModelAtlasUriProvidedButNoModelOnCreate() {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setVersion("3.0.0");
+      input.setModelName("TestModel3");
+      input.setModelAtlasUri(TEST_NS_URI);
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint(),
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
       verify(0, postRequestedFor(urlMatching("/atlas/rest/.*/schema/stages/.*")));
     }
 
     @Test
     @DisplayName("Should roll back create when Model Atlas upload fails")
-    void shouldRollBackCreateWhenModelAtlasUploadFails() throws IOException {
-      ClassPathResource modelFile = new ClassPathResource(TEST_MODEL_FILE_PATH);
-      String modelContent = new String(modelFile.getContentAsByteArray(), StandardCharsets.UTF_8);
-
+    void shouldRollBackCreateWhenModelAtlasUploadFails() {
       String expectedPath =
           String.format(
               "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
@@ -351,6 +386,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @DisplayName("Should set dataStructureId from path variable, not from payload")
     void shouldSetDataStructureIdFromPathVariable() {
       stubModelDownload("https://modelatlas.example.com/model");
+      stubModelUpload("https://modelatlas.example.com/model");
 
       // Create another data structure
       DataStructure otherDataStructure = new DataStructure();
@@ -365,6 +401,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       input.setVersion("5.0.0");
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setModelAtlasUri("https://modelatlas.example.com/model");
+      input.setModel(modelContent);
       // Try to set a different dataStructureId - should be ignored due to @JsonIgnore
       input.setDataStructureId(otherDataStructureId);
 
@@ -418,7 +455,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(output.getStyles().get("color")).isEqualTo("blue");
       assertThat(output.getModel())
           .as("Model should be auto-downloaded from Model Atlas")
-          .isEqualTo(TEST_MODEL_CONTENT);
+          .isEqualTo(MOCK_MODEL_RESPONSE);
 
       DataStructureSummaryDTO dataStructureSummary = output.getDataStructure();
       assertThat(dataStructureSummary).isNotNull();
@@ -444,7 +481,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(output).isNotNull();
       assertThat(output.getModel())
           .as("Model content should be fetched from Model Atlas via modelAtlasUri")
-          .isEqualTo(TEST_MODEL_CONTENT);
+          .isEqualTo(MOCK_MODEL_RESPONSE);
 
       String expectedDownloadPath =
           String.format(
@@ -552,10 +589,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
     @Test
     @DisplayName("Should upload model to Model Atlas when model is provided")
-    void shouldUploadModelWhenProvided() throws IOException {
-      ClassPathResource modelFile = new ClassPathResource(TEST_MODEL_FILE_PATH);
-      String modelContent = new String(modelFile.getContentAsByteArray(), StandardCharsets.UTF_8);
-
+    void shouldUploadModelWhenProvided() {
       String expectedPath =
           String.format(
               "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
@@ -614,10 +648,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
     @Test
     @DisplayName("Should skip upload when model is provided but modelAtlasUri is missing")
-    void shouldSkipUploadWhenModelProvidedButNoModelAtlasUri() throws IOException {
-      ClassPathResource modelFile = new ClassPathResource(TEST_MODEL_FILE_PATH);
-      String modelContent = new String(modelFile.getContentAsByteArray(), StandardCharsets.UTF_8);
-
+    void shouldSkipUploadWhenModelProvidedButNoModelAtlasUri() {
       // The mapper's SET_TO_NULL policy clears an existing modelAtlasUri when not in input
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
@@ -639,10 +670,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
     @Test
     @DisplayName("Should roll back update when Model Atlas upload fails")
-    void shouldRollBackUpdateWhenModelAtlasUploadFails() throws IOException {
-      ClassPathResource modelFile = new ClassPathResource(TEST_MODEL_FILE_PATH);
-      String modelContent = new String(modelFile.getContentAsByteArray(), StandardCharsets.UTF_8);
-
+    void shouldRollBackUpdateWhenModelAtlasUploadFails() {
       String expectedPath =
           String.format(
               "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
