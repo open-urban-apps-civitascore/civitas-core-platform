@@ -23,6 +23,15 @@ else
 fi
 echo
 
+# Stop Java backend processes (started by start-portal-dev.sh in background)
+echo "Stopping backend processes..."
+pkill -f "spring-boot:run.*portal-backend" 2>/dev/null && echo "  Portal Backend stopped" || true
+pkill -f "config-adapter-application.*\.jar" 2>/dev/null && echo "  Config Adapter stopped" || true
+sleep 1
+
+echo
+echo "Stopping Docker services..."
+
 cd "$SCRIPT_DIR/frost"
 $COMPOSE_DOWN 2>/dev/null && echo "  FROST Server stopped" || true
 
@@ -66,7 +75,4 @@ if [[ "$prune_images" =~ ^[Yy]$ ]]; then
         echo "  Could not prune images"
 fi
 
-echo
-echo "Note: If you started backend services via command line,"
-echo "      please stop them manually (Ctrl+C in their terminals)."
 echo
