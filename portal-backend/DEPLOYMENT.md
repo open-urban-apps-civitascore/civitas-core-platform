@@ -33,11 +33,11 @@
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://postgres:5432/portal_backend` | JDBC connection URL |
 | `SPRING_DATASOURCE_USERNAME` | `admin` | Database username |
 | `SPRING_DATASOURCE_PASSWORD` | `secret` | Database password |
-| `DATASOURCE_ENCRYPTION_KEY` | *(required)* | Key used to encrypt sensitive datasource fields. No default in production config. |
-| `DATASOURCE_ENCRYPTION_SALT` | *(required)* | Salt for datasource field encryption. No default in production config. |
+| `CIVITAS_MASTER_KEY` | `0000...0000` (64 hex chars) | 256-bit master key for credential encryption, hex-encoded. Shared with config-adapter. |
+| `CIVITAS_MASTER_SALT` | `0000...0000` (32+ hex chars) | Salt for PBKDF2 key derivation, hex-encoded (min 16 bytes, NIST SP 800-132). Shared with config-adapter. |
 
 > `application-postgres.yaml` defaults to `localhost:5432 / admin / admin` — always override in production.
-> `application-local.yaml` sets fallback values for `DATASOURCE_ENCRYPTION_KEY` and `DATASOURCE_ENCRYPTION_SALT` — never use these in production.
+> `application-local.yaml` sets fallback values for `CIVITAS_MASTER_KEY` and `CIVITAS_MASTER_SALT` — never use these in production.
 
 ---
 
@@ -219,8 +219,10 @@ environment:
   SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/portal_backend
   SPRING_DATASOURCE_USERNAME: portal_user
   SPRING_DATASOURCE_PASSWORD: <secret>
-  DATASOURCE_ENCRYPTION_KEY: <secret>
-  DATASOURCE_ENCRYPTION_SALT: <secret>
+
+  # Credential Encryption (shared with config-adapter)
+  CIVITAS_MASTER_KEY: <hex-encoded 256-bit key>
+  CIVITAS_MASTER_SALT: <hex-encoded 16+ byte salt>
 
   # Keycloak
   KEYCLOAK_AUTH_SERVER_URL: https://keycloak.example.com
