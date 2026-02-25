@@ -55,8 +55,8 @@ import rego.v1
 #       subPath: config.json
 #       readOnly: true
 #
-# For a working example, see: dev-environment/authz/docker-compose.yml
-# and dev-environment/authz/opa-config.json
+# For a working example, see: dev-environment/apisix/docker-compose.authz.yml
+# and dev-environment/apisix/opa-config/data.json
 authz_repository_url := data.config.authz_repository_url if {
 	data.config.authz_repository_url
 }

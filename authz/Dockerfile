@@ -40,12 +40,13 @@ FROM alpine:3.23.3 AS fetcher
 COPY authz/rego/bundle.tar.gz /bundle.tar.gz
 RUN mkdir /out && \
     tar -xzf /bundle.tar.gz -C /out && \
-    chmod -R a+rX /out
+    chmod -R a+rX /out && \
+    printf '{\n  "authz_repository_url": "http://civitas-authz-repository:8091/api/v1/user-context",\n  "authz_cache_duration_seconds": 0\n}\n' > /out/config.json
 
 
 FROM openpolicyagent/opa:1.4.2-static AS opa
 
-COPY ./dev-environment/authz/opa-config.json /data/config.json
+COPY --from=fetcher /out/config.json /data/config.json
 COPY --from=fetcher /out/tmp/bundle/policy /policies
 COPY --from=fetcher /out/tmp/bundle/lib /lib
 COPY --from=fetcher /out/tmp/bundle/providers /providers
