@@ -58,8 +58,7 @@
 |---|---|---|
 | `KAFKA_BOOTSTRAP_SERVERS` | *(required)* | Covers both `spring.kafka.bootstrap-servers` (via `${KAFKA_BOOTSTRAP_SERVERS}` placeholder) and `kafka.bootstrap-servers` (via Spring relaxed binding) — only this one env var needed |
 | `kafka.enabled` | `false` | **Must be `true`.** Enables the Kafka CloudEvent publisher. Without it, events are only logged, never sent. |
-| `kafka.result-topic` | `core.civitas.config.results` | Topic consumed for config-adapter processing results |
-| `KAFKA_TOPIC_PREFIX` | `""` | Optional prefix for all Kafka topic names |
+| `kafka.result-topic` | `de.civitascore.config.results` | Topic consumed for config-adapter processing results |
 
 ---
 
@@ -71,6 +70,7 @@
 |---|---|---|
 | `SERVER_PORT` | `8089` | HTTP port |
 | `server.servlet.context-path` | `/v2` | API path prefix |
+| `server.max-http-request-header-size` | `32KB` | Max HTTP request header size — increase if users belong to many dataspaces (large `X-Allowed-Scope-Ids` header from OPA) |
 
 ---
 
@@ -79,8 +79,6 @@
 | Property | Default | Description |
 |---|---|---|
 | `event.config-adapter-timeout-seconds` | `10` | Seconds to wait for config-adapter to reply before throwing `ExternalSystemTimeoutException` |
-| `event.publish-timeout-seconds` | `5` | Seconds to wait for broker acknowledgement |
-| `event.target-component` | `keycloak` | Target component sent in config events (e.g. `keycloak`, `ldap`) |
 | `kafka.result-timeout-ms` | `30000` | Ms the CloudEvent publisher waits for a result |
 | `kafka.acks` | `all` | Producer ack mode for the CloudEvent publisher |
 | `kafka.retries` | `3` | Retry count for the CloudEvent publisher |
@@ -163,7 +161,6 @@ Set by `application-local.yaml` and `application-postgres.yaml`. Override via en
 | `keycloak.issuer-uri` | `http://localhost:8080` | `KEYCLOAK_ISSUER_URI` |
 | `keycloak.realm` | `civitas-core` | `KEYCLOAK_REALM` |
 | `keycloak.target-realm` | `civitas-core` | `KEYCLOAK_TARGET_REALM` |
-| `kafka.async-publish` | `true` | Not wired in Java — has no effect |
 | `spring.jpa.hibernate.ddl-auto` | `validate` | — |
 | `spring.jpa.properties.hibernate.format_sql` | `true` | — |
 
