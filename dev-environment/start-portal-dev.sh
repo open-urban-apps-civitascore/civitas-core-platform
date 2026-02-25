@@ -185,6 +185,10 @@ start_in_new_terminal() {
     if [ "$OS_TYPE" = "Darwin" ]; then
         osascript -e "tell application \"Terminal\" to do script \"bash '$script'\"" 2>/dev/null && return 0
     else
+        if command -v ptyxis >/dev/null 2>&1; then
+            ptyxis -- bash "$script" >/dev/null 2>&1 & disown
+            return 0
+        fi
         gnome-terminal --title="$title" -- bash "$script" 2>/dev/null && return 0
         xterm -T "$title" -e "bash '$script'" 2>/dev/null && return 0
     fi
@@ -353,31 +357,32 @@ echo "  PostgreSQL started"
 # AuthZ Repository shares the portal_backend database but doesn't own the schema —
 # portal-backend's Flyway migrations create the tables. Running them here ensures
 # AuthZ services can query the database on a cold start (before the backend runs).
-# Skip if tables already exist (volume persists between restarts).
-# Wait for postgres to be ready before checking tables / running Flyway
-for i in $(seq 1 20); do
-    docker exec civitas-postgres-portal pg_isready -U admin -d portal_backend -q 2>/dev/null && break
+# Flyway is idempotent — already-applied migrations are skipped automatically.
+PG_READY=false
+for i in $(seq 1 30); do
+    if docker exec civitas-postgres-portal pg_isready -U admin -d portal_backend -q 2>/dev/null; then
+        PG_READY=true
+        break
+    fi
     sleep 1
 done
-TABLES_EXIST=$(docker exec civitas-postgres-portal \
-    psql -U admin -d portal_backend -tAc \
-    "SELECT 1 FROM information_schema.tables WHERE table_name='users' LIMIT 1" 2>/dev/null)
-if [ "$TABLES_EXIST" = "1" ]; then
-    echo "  Database schema already exists (skipping migrations)"
+if [ "$PG_READY" = false ]; then
+    echo "  ERROR: PostgreSQL not ready after 30s"
+    exit 1
+fi
+
+echo "  Running database migrations..."
+FLYWAY_MIGRATIONS="$SCRIPT_DIR/../portal-backend/src/main/resources/db/migration"
+if docker run --rm --network civitas-network \
+    -v "$FLYWAY_MIGRATIONS:/flyway/sql:ro" \
+    flyway/flyway:11-alpine \
+    -url=jdbc:postgresql://postgres-portal:5432/portal_backend \
+    -user=admin -password=admin \
+    -locations=filesystem:/flyway/sql \
+    migrate; then
+    echo "  Database migrations complete"
 else
-    echo "  Running database migrations (first start)..."
-    FLYWAY_MIGRATIONS="$SCRIPT_DIR/../portal-backend/src/main/resources/db/migration"
-    if docker run --rm --network civitas-network \
-        -v "$FLYWAY_MIGRATIONS:/flyway/sql:ro" \
-        flyway/flyway:11-alpine \
-        -url=jdbc:postgresql://postgres-portal:5432/portal_backend \
-        -user=admin -password=admin \
-        -locations=filesystem:/flyway/sql \
-        migrate 2>&1 | tail -1; then
-        echo "  Database migrations complete"
-    else
-        echo "  WARNING: Database migrations failed (AuthZ services may not work until backend starts)"
-    fi
+    echo "  WARNING: Database migrations failed (AuthZ services may not work until backend starts)"
 fi
 
 cd "$SCRIPT_DIR/kafka"
@@ -400,10 +405,12 @@ fi
 # Build AuthZ Repository JAR (required by its Dockerfile)
 echo "Building AuthZ Repository..."
 cd "$SCRIPT_DIR/../portal-model"
-mvn clean install -DskipTests -q
+if ! mvn clean install -DskipTests -q; then
+    echo "ERROR: Portal Model build failed"
+    exit 1
+fi
 cd "$SCRIPT_DIR/../authz/repository"
-mvn clean package -DskipTests -q
-if [ $? -ne 0 ]; then
+if ! mvn clean package -DskipTests -q; then
     echo "ERROR: AuthZ Repository build failed"
     exit 1
 fi
@@ -466,8 +473,8 @@ wait_for_service() {
         sleep 2
         attempt=$((attempt + 1))
     done
-    echo "  WARNING: $name may not be ready yet (timeout after $max_attempts attempts)"
-    return 1
+    echo "  ERROR: $name did not become ready (timeout after $max_attempts attempts)"
+    exit 1
 }
 
 wait_for_service "Keycloak" "http://localhost:8080/realms/master" 60
@@ -485,7 +492,11 @@ DEV_VERSION="1.0.0-dev"
 # Without this, the health check may hit an old backend and falsely report success.
 echo "Checking for leftover application processes..."
 for port in 8088 8089 3000; do
-    pid=$(fuser "$port/tcp" 2>/dev/null | awk '{print $1}')
+    if [ "$OS_TYPE" = "Darwin" ]; then
+        pid=$(lsof -ti :"$port" 2>/dev/null | head -1)
+    else
+        pid=$(fuser "$port/tcp" 2>/dev/null | awk '{print $1}')
+    fi
     if [ -n "$pid" ]; then
         echo "  Killing leftover process on port $port (PID $pid)"
         kill "$pid" 2>/dev/null
@@ -500,8 +511,7 @@ echo
 if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
     echo "Building Config Adapter (version: $DEV_VERSION)..."
     cd "$SCRIPT_DIR/../config-adapter"
-    mvn clean install -DskipTests -Drevision=$DEV_VERSION
-    if [ $? -ne 0 ]; then
+    if ! mvn clean install -DskipTests -Drevision=$DEV_VERSION; then
         echo "ERROR: Config Adapter build failed"
         exit 1
     fi
@@ -513,8 +523,7 @@ fi
 if [ "$backend_option" = "1" ]; then
     echo "Building Portal Backend (config-adapter version: $DEV_VERSION)..."
     cd "$SCRIPT_DIR/../portal-backend"
-    mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION
-    if [ $? -ne 0 ]; then
+    if ! mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION; then
         echo "ERROR: Portal Backend build failed"
         exit 1
     fi
@@ -603,7 +612,7 @@ if [ "$backend_option" = "1" ]; then
     cat > /tmp/start-portal-backend.sh << SCRIPT_EOF
 #!/bin/bash
 cd "$BACKEND_DIR"
-mvn spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION
+mvn clean spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION
 exec bash
 SCRIPT_EOF
     chmod +x /tmp/start-portal-backend.sh
