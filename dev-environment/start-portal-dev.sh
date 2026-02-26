@@ -26,7 +26,7 @@ authz_arg=""
 config_adapter_arg=""
 backend_arg=""
 frontend_arg=""
-keycloak_secret_arg=""
+keycloak_secret_arg="dev-only-portal-frontend-secret"
 
 usage() {
     echo "Usage: $(basename "$0") [OPTIONS]"
@@ -296,7 +296,7 @@ fi
 
 if [ -f "$FRONTEND_DIR/.env.local" ]; then
     CURRENT_SECRET=$(grep '^KEYCLOAK_CLIENT_SECRET=' "$FRONTEND_DIR/.env.local" | cut -d'=' -f2)
-    if [ "$CURRENT_SECRET" = "XXXXXXXXXXXXXXXXXXX" ] || [ -z "$CURRENT_SECRET" ]; then
+    if [ "$CURRENT_SECRET" = "dev-only-portal-frontend-secret" ] || [ -z "$CURRENT_SECRET" ]; then
         if [ -n "$keycloak_secret_arg" ]; then
             keycloak_secret="$keycloak_secret_arg"
         else
@@ -510,6 +510,12 @@ wait_for_service "Keycloak" "http://localhost:8080/realms/master" 60
 wait_for_service "Kafka UI" "http://localhost:8090" 30
 wait_for_service "OPA" "http://localhost:8181/health" 30
 wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 60
+
+# macOS: disable Keycloak https requirement on master realm on macos
+if [ "$OS_TYPE" = "Darwin" ]; then
+    docker exec -it civitas-keycloak /opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080 --realm master --user admin --password admin
+    docker exec civitas-keycloak /opt/keycloak/bin/kcadm.sh update realms/master -s sslRequired=NONE
+fi
 
 echo
 
