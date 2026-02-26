@@ -64,6 +64,27 @@ public abstract class AbstractConnectorHandler implements ConnectorHandler {
     return objectMapper.convertValue(pojo, Map.class);
   }
 
+  @Override
+  @SuppressWarnings("unchecked")
+  public Map<String, Object> normalizeAndValidate(Map<String, Object> rawConfig, Class<?>... groups) {
+    ConnectorConfiguration pojo;
+    try {
+      pojo = objectMapper.convertValue(rawConfig, configurationClass);
+    } catch (IllegalArgumentException e) {
+      String detail = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+      throw new InvalidInputException("configuration", (String) null, detail);
+    }
+    Class<?>[] effectiveGroups = groups.length > 0 ? groups : new Class<?>[] {Default.class};
+    Set<? extends ConstraintViolation<?>> violations = VALIDATOR.validate(pojo, effectiveGroups);
+    if (!violations.isEmpty()) {
+      List<String> errors =
+          violations.stream().map(ConstraintViolation::getMessage).sorted().toList();
+      throw new InvalidInputException(
+          "configuration", (String) null, "Invalid configuration: " + String.join("; ", errors));
+    }
+    return objectMapper.convertValue(pojo, Map.class);
+  }
+
   // --- Encryption / masking ---
 
   @Override

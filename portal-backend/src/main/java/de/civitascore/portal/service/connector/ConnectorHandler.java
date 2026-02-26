@@ -28,17 +28,17 @@ public interface ConnectorHandler {
   Map<String, Object> normalizeToEntity(Map<String, Object> rawConfig);
 
   /**
-   * Reconstruct the output representation: mask sensitive fields, keep user visible, keep URLs/DSN
-   * as clean values.
+   * Normalize and validate in one pass: deserializes into the typed POJO, runs Bean Validation,
+   * throws {@link de.civitascore.portal.util.InvalidInputException} on any error, then returns the
+   * canonical map form.
    */
-  Map<String, Object> reconstructForOutput(Map<String, Object> entityConfig);
+  Map<String, Object> normalizeAndValidate(Map<String, Object> rawConfig, Class<?>... groups);
 
   Map<String, Object> encryptSensitiveFields(Map<String, Object> configuration);
 
   Map<String, Object> maskSensitiveFields(Map<String, Object> configuration);
 
-  /** Masks sensitive fields and reconstructs the output representation in one step. */
   default Map<String, Object> prepareForOutput(Map<String, Object> entityConfig) {
-    return reconstructForOutput(maskSensitiveFields(entityConfig));
+    return maskSensitiveFields(entityConfig);
   }
 }
