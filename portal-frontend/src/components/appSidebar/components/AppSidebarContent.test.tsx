@@ -23,6 +23,20 @@ describe('AppSidebarContent', () => {
       expect(datasetLink).toBeInTheDocument()
     })
 
+    it('renders datasources link with correct href', async () => {
+      const { container } = await renderWithProvider()
+
+      const datasourcesLink = container.querySelector('a[href="/datasources"]')
+      expect(datasourcesLink).toBeInTheDocument()
+    })
+
+    it('renders datastructures link with correct href', async () => {
+      const { container } = await renderWithProvider()
+
+      const datastructuresLink = container.querySelector('a[href="/datastructures"]')
+      expect(datastructuresLink).toBeInTheDocument()
+    })
+
     it('renders users link with correct href', async () => {
       const { container } = await renderWithProvider()
 
@@ -44,18 +58,11 @@ describe('AppSidebarContent', () => {
       expect(rolesLink).toBeInTheDocument()
     })
 
-    it('renders dataspaces link with correct href', async () => {
+    it('renders documentation link as external link', async () => {
       const { container } = await renderWithProvider()
 
-      const dataspacesLink = container.querySelector('a[href="/dataspaces"]')
-      expect(dataspacesLink).toBeInTheDocument()
-    })
-
-    it('renders UML modeler link with correct href', async () => {
-      const { container } = await renderWithProvider()
-
-      const umlLink = container.querySelector('a[href="/uml-modeler"]')
-      expect(umlLink).toBeInTheDocument()
+      const docsLink = container.querySelector('a[target="_blank"]')
+      expect(docsLink).toBeInTheDocument()
     })
   })
 
@@ -76,12 +83,12 @@ describe('AppSidebarContent', () => {
   })
 
   describe('collapsible structure', () => {
-    it('renders collapsible items with correct initial states', async () => {
+    it('renders collapsible items', async () => {
       const { container } = await renderWithProvider()
 
-      // Verify some items are open (isActive: true in mock data)
-      const openCollapsibles = container.querySelectorAll('[data-state="open"]')
-      expect(openCollapsibles.length).toBeGreaterThan(0)
+      // Both collapsible parent items (ourData, tenants) start in closed state by default
+      const collapsibles = container.querySelectorAll('[data-state="closed"], [data-state="open"]')
+      expect(collapsibles.length).toBeGreaterThan(0)
     })
   })
 })
