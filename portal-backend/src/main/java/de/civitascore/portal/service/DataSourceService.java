@@ -13,7 +13,6 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import de.civitascore.portal.util.InvalidInputException;
-import jakarta.validation.groups.Default;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,11 +47,14 @@ public class DataSourceService extends BaseService<DataSource, DataSourceInputDT
 
   @Override
   protected DataSourceInputDTO preProcessCreateInput(DataSourceInputDTO input) {
-    if (input.getConfiguration() != null && input.getConnectorType() != null) {
+    if (input.getConfiguration() != null) {
+      if (input.getConnectorType() == null) {
+        throw new InvalidInputException(
+            getEntityName(), (UUID) null, "Cannot set configuration without a connector type");
+      }
       ConnectorHandler handler =
           connectorHandlerRegistry.getHandlerOrThrow(input.getConnectorType());
-      Map<String, Object> normalized = handler.normalizeToEntity(input.getConfiguration());
-      validateTypeConstraints(handler, normalized);
+      Map<String, Object> normalized = handler.normalizeAndValidate(input.getConfiguration());
       input.setConfiguration(handler.encryptSensitiveFields(normalized));
     }
     return input;
@@ -69,23 +71,26 @@ public class DataSourceService extends BaseService<DataSource, DataSourceInputDT
 
     if (input.getConfiguration() != null) {
       ConnectorType type = resolveConnectorType(input, existingEntity);
-      if (type != null) {
-        ConnectorHandler handler = connectorHandlerRegistry.getHandlerOrThrow(type);
-
-        // Defensive copy: MapStruct's updateEntity does clear() + putAll() on the entity's map.
-        // If the DTO shares the same map reference, clear() empties both.
-        Map<String, Object> existingConfig = copyConfiguration(existingEntity.getConfiguration());
-
-        Map<String, Object> normalized = handler.normalizeToEntity(input.getConfiguration());
-        validateTypeConstraints(handler, normalized);
-        // Encrypt first, then restore: masked "********" values get encrypted to a garbage value,
-        // which is then overwritten with the original encrypted value from the existing entity.
-        Map<String, Object> encrypted = handler.encryptSensitiveFields(normalized);
-        if (existingConfig != null) {
-          restoreMaskedValues(encrypted, existingConfig, handler, normalized);
-        }
-        input.setConfiguration(encrypted);
+      if (type == null) {
+        throw new InvalidInputException(
+            getEntityName(),
+            existingEntity.getId(),
+            "Cannot set configuration without a connector type");
       }
+      ConnectorHandler handler = connectorHandlerRegistry.getHandlerOrThrow(type);
+
+      // Defensive copy: MapStruct's updateEntity does clear() + putAll() on the entity's map.
+      // If the DTO shares the same map reference, clear() empties both.
+      Map<String, Object> existingConfig = copyConfiguration(existingEntity.getConfiguration());
+
+      Map<String, Object> normalized = handler.normalizeAndValidate(input.getConfiguration());
+      // Encrypt first, then restore: masked "********" values get encrypted to a garbage value,
+      // which is then overwritten with the original encrypted value from the existing entity.
+      Map<String, Object> encrypted = handler.encryptSensitiveFields(normalized);
+      if (existingConfig != null) {
+        restoreMaskedValues(encrypted, existingConfig, handler, normalized);
+      }
+      input.setConfiguration(encrypted);
     }
     return input;
   }
@@ -99,7 +104,7 @@ public class DataSourceService extends BaseService<DataSource, DataSourceInputDT
     JsonNode configPatch = rawPatch.path("configuration");
     Map<String, Object> existingConfig = copyConfiguration(existing.getConfiguration());
 
-    if (configPatch.isMissingNode() || existing.getConnectorType() == null) {
+    if (configPatch.isMissingNode()) {
       patchedDto.setConfiguration(existingConfig);
       return;
     }
@@ -268,11 +273,4 @@ public class DataSourceService extends BaseService<DataSource, DataSourceInputDT
     }
   }
 
-  private void validateTypeConstraints(ConnectorHandler handler, Map<String, Object> config) {
-    List<String> errors = handler.validate(config, Default.class);
-    if (!errors.isEmpty()) {
-      throw new InvalidInputException(
-          getEntityName(), (UUID) null, "Invalid configuration: " + String.join("; ", errors));
-    }
-  }
 }
