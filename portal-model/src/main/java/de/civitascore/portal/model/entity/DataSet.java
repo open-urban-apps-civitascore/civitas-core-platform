@@ -16,14 +16,10 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-
 import lombok.Getter;
 import lombok.Setter;
 
@@ -43,22 +39,20 @@ import lombok.Setter;
 @Setter
 public class DataSet extends NamedEntity {
 
-  /**
-   * Status of the dataset in its lifecycle.
-   * Default is DRAFT.
-   */
+  /** Status of the dataset in its lifecycle. Default is DRAFT. */
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 20)
   private DataSetStatus dataSetStatus = DataSetStatus.DRAFT;
 
-  /**
-   * Master persistence ID (FROST ID).
-   * Required for publishing the dataset.
-   */
+  /** Master persistence ID (FROST ID). Required for publishing the dataset. */
   @Column(name = "persistence_id")
   private Long persistenceId;
 
-  @OneToMany(mappedBy = "dataSet", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
   private Set<Pipeline> pipelines = new HashSet<>();
 
   @Column(name = "identifier")
@@ -97,7 +91,11 @@ public class DataSet extends NamedEntity {
       })
   private Set<Agent> agents = new HashSet<>();
 
-  @OneToMany(mappedBy = "dataSet", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
   private Set<Distribution> distributions = new HashSet<>();
 
   @ManyToMany(mappedBy = "dataSets", fetch = FetchType.LAZY)

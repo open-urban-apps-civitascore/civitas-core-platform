@@ -30,7 +30,11 @@ echo "Stopping application processes..."
 for port_info in "8088:Config Adapter" "8089:Portal Backend" "3000:Portal Frontend"; do
     port="${port_info%%:*}"
     name="${port_info##*:}"
-    pid=$(fuser "$port/tcp" 2>/dev/null | awk '{print $1}')
+    if [ "$(uname -s)" = "Darwin" ]; then
+        pid=$(lsof -ti :"$port" 2>/dev/null | head -1)
+    else
+        pid=$(fuser "$port/tcp" 2>/dev/null | awk '{print $1}')
+    fi
     if [ -n "$pid" ]; then
         kill "$pid" 2>/dev/null
         sleep 1
