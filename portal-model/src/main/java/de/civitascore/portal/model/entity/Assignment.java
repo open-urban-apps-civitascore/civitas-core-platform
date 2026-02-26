@@ -137,4 +137,32 @@ public class Assignment extends BaseEntity {
       throw new IllegalStateException("SYSTEM roles cannot have scope");
     }
   }
+
+  // Convenience setters used by BaseDataEntity.linkAssignment implementations.
+  // Each overload sets both the FK reference and the scopeType atomically.
+
+  public void setScope(DataStructure scope) {
+    this.dataStructure = scope;
+    this.scopeType = ScopeType.DATASTRUCTURE;
+  }
+
+  public void setScope(DataSet scope) {
+    this.dataset = scope;
+    this.scopeType = ScopeType.DATASET;
+  }
+
+  public void setScope(DataSource scope) {
+    this.dataSource = scope;
+    this.scopeType = ScopeType.DATASOURCE;
+  }
+
+  public void setScope(DataSpace scope) {
+    this.dataSpace = scope;
+    this.scopeType = ScopeType.DATASPACE;
+  }
+
+  public void setScope(Catalog scope) {
+    this.catalog = scope;
+    this.scopeType = ScopeType.CATALOG;
+  }
 }

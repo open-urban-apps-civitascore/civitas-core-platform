@@ -2,10 +2,8 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
-import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -17,9 +15,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ScopeResolverService {
 
-  private final CatalogRepository catalogRepository;
   private final DataSetRepository dataSetRepository;
-  private final DataSpaceRepository dataSpaceRepository;
   private final DataSourceRepository dataSourceRepository;
   private final DataStructureRepository dataStructureRepository;
 

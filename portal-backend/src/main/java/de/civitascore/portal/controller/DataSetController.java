@@ -1,15 +1,11 @@
 package de.civitascore.portal.controller;
 
 import de.civitascore.portal.model.embedded.ScopeType;
-import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
-import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
-import de.civitascore.portal.model.output.assembler.AssignmentAssembler;
 import de.civitascore.portal.model.output.assembler.DataSetAssembler;
 import de.civitascore.portal.repository.specification.DataSetSpec;
-import de.civitascore.portal.service.AssignmentService;
 import de.civitascore.portal.service.DataSetService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -18,7 +14,6 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -27,7 +22,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -40,12 +34,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "DataSets", description = "Dataset management endpoints")
 public class DataSetController
-    extends BaseController<DataSetInputDTO, DataSetOutputDTO, DataSet, DataSetSpec> {
+    extends BaseDataEntityController<DataSetInputDTO, DataSetOutputDTO, DataSet, DataSetSpec> {
 
   private final DataSetService dataSetService;
   private final DataSetAssembler dataSetAssembler;
-  private final AssignmentService assignmentService;
-  private final AssignmentAssembler assignmentAssembler;
 
   @Parameters({
     @Parameter(
@@ -107,17 +99,9 @@ public class DataSetController
     return ResponseEntity.ok(output);
   }
 
-  @GetMapping("/{id}/assignments")
-  @Operation(
-      summary = "Get assignments for a dataset",
-      description = "Returns all role assignments scoped to the specified dataset.")
-  public ResponseEntity<List<AssignmentOutputDTO>> getAssignments(@PathVariable UUID id) {
-    getService().findByIdOrThrow(id);
-    List<Assignment> assignments =
-        assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, id);
-    List<AssignmentOutputDTO> output =
-        assignments.stream().map(assignmentAssembler::toOutput).toList();
-    return ResponseEntity.ok(output);
+  @Override
+  protected ScopeType getScopeType() {
+    return ScopeType.DATASET;
   }
 
   @PostMapping("/{id}/publish")

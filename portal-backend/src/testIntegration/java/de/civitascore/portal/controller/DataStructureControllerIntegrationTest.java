@@ -13,6 +13,7 @@ import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.input.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
@@ -24,6 +25,7 @@ import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -998,6 +1000,157 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
       assertThat(response.getStatusCode())
           .as("Should return BAD_REQUEST status")
           .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("Assignment Tests")
+  class AssignmentTests {
+
+    private UUID createTestGroup() {
+      Group group = new Group();
+      group.setName("Test Group " + UUID.randomUUID());
+      group.setDescription("Test group for assignments");
+      return groupRepository.save(group).getId();
+    }
+
+    private UUID createTestRole() {
+      Role role = new Role();
+      role.setName("Test Role " + UUID.randomUUID());
+      role.setDescription("Test role for assignments");
+      role.setRoleType(RoleType.DATA);
+      return roleRepository.save(role).getId();
+    }
+
+    @Test
+    @DisplayName("Should return empty list when no assignments exist for data structure")
+    void shouldReturnEmptyAssignmentsList() {
+      ResponseEntity<List<AssignmentOutputDTO>> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + dataStructureId1 + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull().isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should return 404 when data structure does not exist")
+    void shouldReturn404ForNonExistentDataStructure() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + UUID.randomUUID() + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should return 401 when not authenticated")
+    void shouldReturn401WhenNotAuthenticated() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + dataStructureId1 + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(new HttpHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("Should create data structure with assignments")
+    void shouldCreateDataStructureWithAssignments() {
+      AssignmentScopedInputDTO assignment = new AssignmentScopedInputDTO();
+      assignment.setGroupId(createTestGroup());
+      assignment.setRoleId(createTestRole());
+
+      DataStructureInputDTO input = new DataStructureInputDTO();
+      input.setName("Data Structure With Assignments");
+      input.setDescription("Test");
+      input.setCreatedFromDataSource(false);
+      input.setAssignments(List.of(assignment));
+
+      ResponseEntity<DataStructureOutputDTO> createResponse =
+          restTemplate.exchange(
+              ENDPOINT,
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID id = createResponse.getBody().getId();
+
+      ResponseEntity<List<AssignmentOutputDTO>> assignmentsResponse =
+          restTemplate.exchange(
+              ENDPOINT + "/" + id + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(assignmentsResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(assignmentsResponse.getBody()).hasSize(1);
+      assertThat(assignmentsResponse.getBody().getFirst().getScopeType())
+          .isEqualTo(ScopeType.DATASTRUCTURE);
+    }
+
+    @Test
+    @DisplayName("Should replace assignments when updating data structure")
+    void shouldReplaceAssignmentsOnUpdate() {
+      UUID groupId1 = createTestGroup();
+      UUID groupId2 = createTestGroup();
+      UUID roleId = createTestRole();
+
+      // Create with one assignment
+      AssignmentScopedInputDTO assignment1 = new AssignmentScopedInputDTO();
+      assignment1.setGroupId(groupId1);
+      assignment1.setRoleId(roleId);
+
+      DataStructureInputDTO createInput = new DataStructureInputDTO();
+      createInput.setName("Data Structure For Update " + System.currentTimeMillis());
+      createInput.setDescription("Test");
+      createInput.setCreatedFromDataSource(false);
+      createInput.setAssignments(List.of(assignment1));
+
+      ResponseEntity<DataStructureOutputDTO> createResponse =
+          restTemplate.exchange(
+              ENDPOINT,
+              HttpMethod.POST,
+              new HttpEntity<>(createInput, createAuthHeaders()),
+              getOutputTypeReference());
+
+      UUID id = createResponse.getBody().getId();
+
+      // Update with a different assignment
+      AssignmentScopedInputDTO assignment2 = new AssignmentScopedInputDTO();
+      assignment2.setGroupId(groupId2);
+      assignment2.setRoleId(roleId);
+
+      DataStructureInputDTO updateInput = new DataStructureInputDTO();
+      updateInput.setName(createInput.getName());
+      updateInput.setDescription("Updated");
+      updateInput.setCreatedFromDataSource(false);
+      updateInput.setAssignments(List.of(assignment2));
+
+      restTemplate.exchange(
+          ENDPOINT + "/" + id,
+          HttpMethod.PUT,
+          new HttpEntity<>(updateInput, createAuthHeaders()),
+          getOutputTypeReference());
+
+      ResponseEntity<List<AssignmentOutputDTO>> assignmentsResponse =
+          restTemplate.exchange(
+              ENDPOINT + "/" + id + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(assignmentsResponse.getBody()).hasSize(1);
+      assertThat(assignmentsResponse.getBody().getFirst().getGroup().getId()).isEqualTo(groupId2);
     }
   }
 }

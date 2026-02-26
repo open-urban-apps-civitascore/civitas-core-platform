@@ -33,6 +33,7 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Override
   DataSetOutputDTO toOutput(DataSet entity);
 
+  @Mapping(target = "assignments", ignore = true)
   @Override
   DataSetInputDTO toInput(DataSet entity);
 

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
-import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.input.DataSetInputDTO;
@@ -22,12 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
+public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputDTO> {
 
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
 
-  private final AssignmentService assignmentService;
+  private final AssignmentBuilderService assignmentBuilderService;
   private final DistributionService distributionService;
 
   private final ObjectMapper objectMapper;
@@ -47,6 +46,11 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
     return DataSet.class.getSimpleName();
   }
 
+  @Override
+  protected AssignmentBuilderService getAssignmentBuilderService() {
+    return assignmentBuilderService;
+  }
+
   /**
    * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
    * DataSet along with owner and dataSpaces in a single JOIN query, preventing N+1 query problems
@@ -56,20 +60,6 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
   public Optional<DataSet> findById(UUID id) {
     Optional<DataSet> entity = dataSetRepository.findByIdWithRelations(id);
     return postLoad(entity);
-  }
-
-  @Override
-  protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
-    return super.postConvertToEntity(entity, input);
-  }
-
-  @Override
-  protected DataSet postSave(DataSet entity, DataSetInputDTO input) {
-    if (input.getAssignments() != null) {
-      assignmentService.replaceAllByScopeTypeAndScopeId(
-          input.getAssignments(), ScopeType.DATASET, entity.getId());
-    }
-    return entity;
   }
 
   @Override

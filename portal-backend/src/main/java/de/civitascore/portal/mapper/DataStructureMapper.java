@@ -27,8 +27,8 @@ public interface DataStructureMapper
   @Override
   DataStructureOutputDTO toOutput(DataStructure entity);
 
-  @Mapping(target = "assignmentIds", ignore = true)
   @Mapping(target = "dataStructureVersionIds", ignore = true)
+  @Mapping(target = "assignments", ignore = true)
   @Override
   DataStructureInputDTO toInput(DataStructure entity);
 
