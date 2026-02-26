@@ -13,6 +13,7 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import de.civitascore.portal.util.InvalidInputException;
+import jakarta.validation.groups.Default;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -272,5 +273,4 @@ public class DataSourceService extends BaseService<DataSource, DataSourceInputDT
           getEntityName(), entity.getId(), "Invalid configuration: " + String.join("; ", errors));
     }
   }
-
 }

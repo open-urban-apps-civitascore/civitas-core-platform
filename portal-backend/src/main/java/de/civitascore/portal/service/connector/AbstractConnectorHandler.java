@@ -53,20 +53,8 @@ public abstract class AbstractConnectorHandler implements ConnectorHandler {
 
   @Override
   @SuppressWarnings("unchecked")
-  public Map<String, Object> normalizeToEntity(Map<String, Object> rawConfig) {
-    ConnectorConfiguration pojo;
-    try {
-      pojo = objectMapper.convertValue(rawConfig, configurationClass);
-    } catch (IllegalArgumentException e) {
-      String detail = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
-      throw new InvalidInputException("configuration", (String) null, detail);
-    }
-    return objectMapper.convertValue(pojo, Map.class);
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public Map<String, Object> normalizeAndValidate(Map<String, Object> rawConfig, Class<?>... groups) {
+  public Map<String, Object> normalizeAndValidate(
+      Map<String, Object> rawConfig, Class<?>... groups) {
     ConnectorConfiguration pojo;
     try {
       pojo = objectMapper.convertValue(rawConfig, configurationClass);

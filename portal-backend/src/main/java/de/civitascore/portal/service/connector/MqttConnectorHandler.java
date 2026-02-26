@@ -18,5 +18,4 @@ public class MqttConnectorHandler extends AbstractConnectorHandler {
         MqttConnectorConfiguration.class,
         Set.of("password"));
   }
-
 }

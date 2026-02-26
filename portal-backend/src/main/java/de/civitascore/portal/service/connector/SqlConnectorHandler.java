@@ -18,5 +18,4 @@ public class SqlConnectorHandler extends AbstractConnectorHandler {
         SqlConnectorConfiguration.class,
         Set.of("password"));
   }
-
 }

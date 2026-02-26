@@ -63,6 +63,18 @@ class DataSourceServiceTest {
 
       assertThat(result.getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
     }
+
+    @Test
+    @DisplayName("Should reject configuration when no connector type is set")
+    void shouldRejectConfigurationWithoutConnectorType() {
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("test-source");
+      input.setConfiguration(Map.of("password", "secret"));
+
+      assertThatThrownBy(() -> dataSourceService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Cannot set configuration without a connector type");
+    }
   }
 
   @Nested
@@ -427,8 +439,7 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.SQL)).thenReturn(sqlHandler);
-      when(sqlHandler.normalizeToEntity(any())).thenReturn(normalized);
-      when(sqlHandler.validate(any(), any(Class[].class))).thenReturn(Collections.emptyList());
+      when(sqlHandler.normalizeAndValidate(any())).thenReturn(normalized);
       when(sqlHandler.getSensitiveFields()).thenReturn(Set.of("password"));
       when(sqlHandler.encryptSensitiveFields(any())).thenReturn(encrypted);
 
@@ -476,8 +487,7 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.SQL)).thenReturn(sqlHandler);
-      when(sqlHandler.normalizeToEntity(any())).thenReturn(normalized);
-      when(sqlHandler.validate(any(), any(Class[].class))).thenReturn(Collections.emptyList());
+      when(sqlHandler.normalizeAndValidate(any())).thenReturn(normalized);
       when(sqlHandler.getSensitiveFields()).thenReturn(Set.of("password"));
       when(sqlHandler.encryptSensitiveFields(any())).thenAnswer(inv -> inv.getArgument(0));
 

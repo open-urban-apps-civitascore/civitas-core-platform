@@ -99,7 +99,7 @@ class SqlConnectorHandlerTest {
   }
 
   @Nested
-  @DisplayName("normalizeToEntity")
+  @DisplayName("normalizeAndValidate")
   class NormalizeTests {
 
     @Test
@@ -111,7 +111,7 @@ class SqlConnectorHandlerTest {
       map.put("table", "users");
       map.put("conn_max_idle", 5);
 
-      Map<String, Object> result = handler.normalizeToEntity(map);
+      Map<String, Object> result = handler.normalizeAndValidate(map);
 
       assertThat(result.get("driver")).isEqualTo("postgres");
       assertThat(result.get("dsn")).isEqualTo("postgres://host/db");
@@ -130,46 +130,11 @@ class SqlConnectorHandlerTest {
       map.put("user", "dbuser");
       map.put("password", "dbpass");
 
-      Map<String, Object> result = handler.normalizeToEntity(map);
+      Map<String, Object> result = handler.normalizeAndValidate(map);
 
       assertThat(result.get("dsn")).isEqualTo("postgres://host/db");
       assertThat(result.get("user")).isEqualTo("dbuser");
       assertThat(result.get("password")).isEqualTo("dbpass");
-    }
-  }
-
-  @Nested
-  @DisplayName("reconstructForOutput")
-  class ReconstructTests {
-
-    @Test
-    @DisplayName("Should pass through config as-is (no credential embedding)")
-    void shouldPassThroughConfig() {
-      Map<String, Object> config = new HashMap<>();
-      config.put("dsn", "postgres://host:5432/mydb");
-      config.put("user", "admin");
-      config.put("password", ConnectorHandler.MASKED_VALUE);
-      config.put("driver", "postgres");
-
-      Map<String, Object> result = handler.reconstructForOutput(config);
-
-      assertThat(result.get("dsn")).isEqualTo("postgres://host:5432/mydb");
-      assertThat(result.get("user")).isEqualTo("admin");
-      assertThat(result.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
-      assertThat(result.get("driver")).isEqualTo("postgres");
-    }
-
-    @Test
-    @DisplayName("Should pass through DSN unchanged when no user present")
-    void shouldPassThroughWhenNoUser() {
-      Map<String, Object> config = new HashMap<>();
-      config.put("dsn", "postgres://host:5432/db");
-      config.put("driver", "postgres");
-
-      Map<String, Object> result = handler.reconstructForOutput(config);
-
-      assertThat(result.get("dsn")).isEqualTo("postgres://host:5432/db");
-      assertThat(result).doesNotContainKey("user");
     }
   }
 

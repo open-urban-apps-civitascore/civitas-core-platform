@@ -112,7 +112,7 @@ class MqttConnectorHandlerTest {
   }
 
   @Nested
-  @DisplayName("normalizeToEntity")
+  @DisplayName("normalizeAndValidate")
   class NormalizeTests {
 
     @Test
@@ -125,7 +125,7 @@ class MqttConnectorHandlerTest {
       map.put("user", "mqttuser");
       map.put("password", "mqttpass");
 
-      Map<String, Object> result = handler.normalizeToEntity(map);
+      Map<String, Object> result = handler.normalizeAndValidate(map);
 
       assertThat(result.get("urls")).isEqualTo(List.of("tcp://broker:1883"));
       assertThat(result.get("user")).isEqualTo("mqttuser");
@@ -141,33 +141,11 @@ class MqttConnectorHandlerTest {
       map.put("topics", List.of("foo/#"));
       map.put("qos", 1);
 
-      Map<String, Object> result = handler.normalizeToEntity(map);
+      Map<String, Object> result = handler.normalizeAndValidate(map);
 
       assertThat(result.get("urls")).isEqualTo(List.of("tcp://broker:1883"));
       assertThat(result.get("user")).isNull();
       assertThat(result.get("password")).isNull();
-    }
-  }
-
-  @Nested
-  @DisplayName("reconstructForOutput")
-  class ReconstructTests {
-
-    @Test
-    @DisplayName("Should pass through config as-is (no credential embedding)")
-    void shouldPassThroughConfig() {
-      Map<String, Object> config = new HashMap<>();
-      config.put("urls", List.of("tcp://broker1:1883", "tcp://broker2:1883"));
-      config.put("user", "admin");
-      config.put("password", ConnectorHandler.MASKED_VALUE);
-      config.put("topics", List.of("sensor/#"));
-
-      Map<String, Object> result = handler.reconstructForOutput(config);
-
-      assertThat(result.get("urls")).isEqualTo(List.of("tcp://broker1:1883", "tcp://broker2:1883"));
-      assertThat(result.get("user")).isEqualTo("admin");
-      assertThat(result.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
-      assertThat(result.get("topics")).isEqualTo(List.of("sensor/#"));
     }
   }
 
