@@ -1,4 +1,4 @@
-import { UmlModeler } from '@/app/(main)/uml-modeler/page'
+import { UmlModeler } from '@/components/uml-modeler/page'
 import { PageBackground } from '@/components/page-background/PageBackground'
 
 interface StructureDefinitionTabProps {

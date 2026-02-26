@@ -1,4 +1,4 @@
-import type { UMLModelPayload } from '@/app/(main)/uml-modeler/services/modelUploadService'
+import type { UMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 
 const key = 'models'
