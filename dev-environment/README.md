@@ -23,11 +23,11 @@ dev-environment/
 ## Prerequisites
 
 * Docker + Docker Compose v2
-* Java 21 JDK
+* Java 21+ JDK (any distribution: Temurin, OpenJDK, Oracle, GraalVM)
 * Maven 3.9+
 * jq (for dev-mode scripts)
 
-Supported platforms: **Linux** and **macOS** (including Apple Silicon / ARM).
+Supported platforms: **Linux**, **macOS** (including Apple Silicon / ARM), and **Windows** (WSL / Git Bash).
 
 ---
 

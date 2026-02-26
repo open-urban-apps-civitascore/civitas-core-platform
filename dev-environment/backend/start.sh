@@ -14,38 +14,59 @@ echo "Checking prerequisites..."
 
 # Java
 if ! command -v java >/dev/null 2>&1; then
-    echo "ERROR: Java is not installed. Please install Java 21."
+    echo "ERROR: Java is not installed. Please install a Java 21+ JDK."
     exit 1
 fi
 
 JAVA_VERSION=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
-if [ "$JAVA_VERSION" -lt 21 ]; then
+if [ "$JAVA_VERSION" -lt 21 ] 2>/dev/null; then
     echo "ERROR: Java 21 or higher is required. Found Java $JAVA_VERSION."
     exit 1
 fi
 echo "✓ Java $JAVA_VERSION found"
 
-# Ensure JAVA_HOME points to a full JDK (not JRE) — needed for maven-compiler-plugin --release flag
+OS_TYPE=$(uname -s)
+
+# Ensure JAVA_HOME points to a full JDK (not JRE) — needed for maven-compiler-plugin --release flag.
+# Supports Temurin, OpenJDK, Oracle, GraalVM, SDKMAN-installed JDKs (21+).
 if [ -z "$JAVA_HOME" ] || [ ! -f "$JAVA_HOME/lib/ct.sym" ]; then
-    # macOS: use /usr/libexec/java_home if available
-    if [ -x /usr/libexec/java_home ]; then
-        JAVA_HOME=$(/usr/libexec/java_home -v 21 2>/dev/null || true)
-    fi
-    # Linux: search common JDK locations
-    if [ -z "$JAVA_HOME" ] || [ ! -f "$JAVA_HOME/lib/ct.sym" ]; then
-        for jdk_dir in /usr/lib/jvm/temurin-*-jdk-* /usr/lib/jvm/java-21-openjdk-*; do
+    JAVA_HOME=""
+    if [ "$OS_TYPE" = "Darwin" ]; then
+        # macOS: java_home returns the highest installed JDK
+        if [ -x /usr/libexec/java_home ]; then
+            candidate=$(/usr/libexec/java_home 2>/dev/null || true)
+            if [ -n "$candidate" ] && [ -f "$candidate/lib/ct.sym" ]; then
+                JAVA_HOME="$candidate"
+            fi
+        fi
+    else
+        # Linux / WSL: search common JDK locations, pick newest >= 21 with ct.sym
+        best_ver=0
+        for jdk_dir in /usr/lib/jvm/temurin-*-jdk-* \
+                        /usr/lib/jvm/java-*-openjdk-* \
+                        /usr/lib/jvm/jdk-* \
+                        /usr/lib/jvm/graalvm-* \
+                        "$HOME/.sdkman/candidates/java"/*/; do
             if [ -f "$jdk_dir/lib/ct.sym" ]; then
-                JAVA_HOME="$jdk_dir"
-                break
+                ver=$("$jdk_dir/bin/java" -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
+                if [ "$ver" -ge 21 ] 2>/dev/null && [ "$ver" -gt "$best_ver" ]; then
+                    best_ver=$ver
+                    JAVA_HOME="$jdk_dir"
+                fi
             fi
         done
     fi
     if [ -z "$JAVA_HOME" ] || [ ! -f "$JAVA_HOME/lib/ct.sym" ]; then
-        echo "ERROR: No JDK found (JRE is not sufficient). Install a Java 21 JDK."
+        echo "ERROR: No JDK found (JRE is not sufficient)."
+        echo "       Install any Java 21+ JDK (Temurin, OpenJDK, Oracle, GraalVM) or set JAVA_HOME."
         exit 1
     fi
     export JAVA_HOME
+    export PATH="$JAVA_HOME/bin:$PATH"
     echo "✓ JAVA_HOME set to $JAVA_HOME"
+else
+    # JAVA_HOME was already set — ensure PATH is consistent
+    export PATH="$JAVA_HOME/bin:$PATH"
 fi
 
 # Maven

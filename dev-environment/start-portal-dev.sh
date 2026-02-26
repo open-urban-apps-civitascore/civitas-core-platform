@@ -102,22 +102,47 @@ if ! command -v java >/dev/null 2>&1; then
     exit 1
 fi
 
-# Auto-detect Temurin JDK if JAVA_HOME not set (system OpenJDK may be broken on ARM64)
-if [ -z "$JAVA_HOME" ]; then
-    for jdk_path in /usr/lib/jvm/temurin-21-jdk-*; do
-        if [ -x "$jdk_path/bin/java" ]; then
-            export JAVA_HOME="$jdk_path"
-            export PATH="$JAVA_HOME/bin:$PATH"
-            break
+# Auto-detect JDK if JAVA_HOME not set or invalid.
+# Supports Temurin, OpenJDK, Oracle, GraalVM, SDKMAN-installed JDKs (21+).
+if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
+    JAVA_HOME=""
+    if [ "$OS_TYPE" = "Darwin" ]; then
+        # macOS: java_home returns the highest installed JDK
+        if [ -x /usr/libexec/java_home ]; then
+            JAVA_HOME=$(/usr/libexec/java_home 2>/dev/null || true)
         fi
-    done
+    else
+        # Linux / WSL: search common JDK locations, pick newest >= 21
+        best_ver=0
+        for jdk_dir in /usr/lib/jvm/temurin-*-jdk-* \
+                        /usr/lib/jvm/java-*-openjdk-* \
+                        /usr/lib/jvm/jdk-* \
+                        /usr/lib/jvm/graalvm-* \
+                        "$HOME/.sdkman/candidates/java"/*/; do
+            if [ -x "$jdk_dir/bin/java" ]; then
+                ver=$("$jdk_dir/bin/java" -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
+                if [ "$ver" -ge 21 ] 2>/dev/null && [ "$ver" -gt "$best_ver" ]; then
+                    best_ver=$ver
+                    JAVA_HOME="$jdk_dir"
+                fi
+            fi
+        done
+    fi
+    if [ -n "$JAVA_HOME" ]; then
+        export JAVA_HOME
+        export PATH="$JAVA_HOME/bin:$PATH"
+    fi
+else
+    # JAVA_HOME was already set — ensure PATH is consistent
+    export PATH="$JAVA_HOME/bin:$PATH"
 fi
 JAVA_VERSION=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | cut -d'.' -f1)
 if [ "$JAVA_VERSION" -lt 21 ] 2>/dev/null; then
     echo "ERROR: Java 21 or higher is required. Found Java $JAVA_VERSION."
+    echo "       Install any JDK >= 21 (Temurin, OpenJDK, Oracle, GraalVM) or set JAVA_HOME."
     exit 1
 fi
-echo "  Java $JAVA_VERSION found"
+echo "  Java $JAVA_VERSION found (JAVA_HOME=${JAVA_HOME:-system default})"
 
 # Maven
 if ! command -v mvn >/dev/null 2>&1; then
