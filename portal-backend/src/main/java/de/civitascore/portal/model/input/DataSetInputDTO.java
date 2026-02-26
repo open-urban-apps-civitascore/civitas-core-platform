@@ -13,5 +13,5 @@ public class DataSetInputDTO extends BaseInputDTO {
 
   private String description;
 
-  private Boolean openDataAccess;
+  private Boolean openDataAccess = false;
 }
