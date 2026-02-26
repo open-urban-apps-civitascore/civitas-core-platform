@@ -1,6 +1,7 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.AssignmentScopedInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.RoleRepository;
@@ -10,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class AssignmentBuilderService {
+public class ScopedAssignmentBuilderService {
 
   private final GroupRepository groupRepository;
   private final RoleRepository roleRepository;
@@ -21,10 +22,11 @@ public class AssignmentBuilderService {
         groupRepository
             .findById(dto.getGroupId())
             .orElseThrow(() -> new ResourceNotFoundException("Group", dto.getGroupId())));
-    assignment.setRole(
+    Role role =
         roleRepository
             .findById(dto.getRoleId())
-            .orElseThrow(() -> new ResourceNotFoundException("Role", dto.getRoleId())));
+            .orElseThrow(() -> new ResourceNotFoundException("Role", dto.getRoleId()));
+    assignment.setRole(role);
     return assignment;
   }
 }

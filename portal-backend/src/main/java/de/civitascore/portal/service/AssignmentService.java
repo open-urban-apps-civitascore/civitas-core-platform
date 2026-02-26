@@ -4,15 +4,15 @@ import de.civitascore.portal.mapper.AssignmentMapper;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
-import de.civitascore.portal.model.input.AssignmentScopedInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +22,9 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   private final AssignmentMapper assignmentMapper;
   private final GroupService groupService;
   private final RoleService roleService;
-  private final ScopeResolverService scopeResolverService;
+  private final DataSetService dataSetService;
+  private final DataStructureService dataStructureService;
+  private final DataSourceRepository dataSourceRepository;
 
   @Override
   protected AssignmentRepository getRepository() {
@@ -54,7 +56,25 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
       entity.setRole(null);
     }
 
-    entity = scopeResolverService.resolveScope(entity, input.getScopeType(), input.getScopeId());
+    if (input.getScopeId() != null) {
+      switch (input.getScopeType()) {
+        case DATASET -> entity.setDataset(dataSetService.findByIdOrThrow(input.getScopeId()));
+        case DATASTRUCTURE ->
+            entity.setDataStructure(dataStructureService.findByIdOrThrow(input.getScopeId()));
+        case DATASOURCE ->
+            entity.setDataSource(
+                dataSourceRepository
+                    .findById(input.getScopeId())
+                    .orElseThrow(
+                        () -> new ResourceNotFoundException("DataSource", input.getScopeId())));
+        case DATASPACE, CATALOG ->
+            throw new InvalidInputException(
+                "Assignment",
+                input.getScopeType().name(),
+                input.getScopeType() + " scope is not available in this release");
+        default -> {}
+      }
+    }
 
     return super.postConvertToEntity(entity, input);
   }
@@ -85,36 +105,5 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
       default ->
           throw new InvalidInputException("Assignment", scopeType.name(), "Unsupported scope type");
     };
-  }
-
-  /**
-   * Replace all assignments for the given scope with new assignments. Deletes all existing
-   * assignments matching the scopeType and scopeId, then creates new ones from the input list.
-   *
-   * @param inputs the new assignments to create
-   * @param scopeType the scope type to replace assignments for
-   * @param scopeId the scope ID to replace assignments for
-   * @return the newly created assignments
-   */
-  @Transactional
-  public List<Assignment> replaceAllByScopeTypeAndScopeId(
-      List<AssignmentScopedInputDTO> inputs, ScopeType scopeType, UUID scopeId) {
-
-    // Delete existing assignments
-    List<Assignment> existing = findAllByScopeTypeAndScopeId(scopeType, scopeId);
-    existing.forEach(entity -> deleteById(entity.getId()));
-
-    return inputs.stream()
-        .map(
-            scopedInput -> {
-              AssignmentInputDTO input = new AssignmentInputDTO();
-              input.setGroupId(scopedInput.getGroupId());
-              input.setRoleId(scopedInput.getRoleId());
-              input.setScopeType(scopeType);
-              input.setScopeId(scopeId);
-
-              return create(input);
-            })
-        .toList();
   }
 }

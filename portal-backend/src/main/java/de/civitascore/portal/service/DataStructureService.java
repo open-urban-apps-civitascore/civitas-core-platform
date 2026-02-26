@@ -25,7 +25,7 @@ public class DataStructureService
   private final DataStructureRepository dataStructureRepository;
   private final DataStructureMapper dataStructureMapper;
   private final DataStructureVersionRepository dataStructureVersionRepository;
-  private final AssignmentBuilderService assignmentBuilderService;
+  private final ScopedAssignmentBuilderService assignmentBuilderService;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -43,7 +43,7 @@ public class DataStructureService
   }
 
   @Override
-  protected AssignmentBuilderService getAssignmentBuilderService() {
+  protected ScopedAssignmentBuilderService getAssignmentBuilderService() {
     return assignmentBuilderService;
   }
 
