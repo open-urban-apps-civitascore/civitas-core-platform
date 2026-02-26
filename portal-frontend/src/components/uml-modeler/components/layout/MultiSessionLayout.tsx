@@ -1,9 +1,13 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useTranslations } from 'next-intl'
+import { useCallback, useMemo, useState } from 'react'
+
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 
 import { useMultiSessionManager } from '../../hooks/use-multi-session-manager'
 import { useReadOnly } from '../../hooks/use-read-only'
+import { UseMultiSessionReturn } from '../../types/session'
 import { PropertyInspector } from '../inspector/PropertyInspector'
 import { ElementPalette } from '../palette/ElementPalette'
 import { ActiveDiagramProviderComponent } from '../providers/ActiveDiagramProvider'
@@ -13,13 +17,19 @@ import { Toolbar } from '../tabs/Toolbar'
 
 interface MultiSessionLayoutProps {
   className?: string
+  externalSessionManager?: UseMultiSessionReturn
+  isMultiSessionMode: boolean
 }
 
 export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
-  const { className } = props
+  const { className, externalSessionManager, isMultiSessionMode } = props
+  const t = useTranslations('common')
   const { isReadOnly } = useReadOnly()
-  const sessionManager = useMultiSessionManager()
+  const sessionManager = useMultiSessionManager({ sessionManager: externalSessionManager })
+  const isControlledExternally = !!externalSessionManager
+  const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
 
+  const activeSessionId = useMemo(() => sessionManager.activeSessionId || '', [sessionManager.activeSessionId])
   // Tab management handlers
   const handleCreateSession = useCallback(() => {
     sessionManager.createSession('Untitled Diagram')
@@ -29,16 +39,20 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     (sessionId: string) => {
       const session = sessionManager.sessions.find(s => s.id === sessionId)
 
-      if (session?.isDirty) {
-        // TODO: Show confirmation dialog for unsaved changes
-        const shouldClose = window.confirm(`"${session.name}" has unsaved changes. Close anyway?`)
-        if (!shouldClose) return
-      }
-
-      sessionManager.closeSession(sessionId)
+      if (session?.isDirty) setIsWarningModalOpen(true)
+      else sessionManager.closeSession(sessionId)
     },
     [sessionManager],
   )
+
+  const handleConfirmCloseSession = () => {
+    setIsWarningModalOpen(false)
+    sessionManager.closeSession(activeSessionId)
+  }
+
+  const handleDiscardCloseSession = () => {
+    setIsWarningModalOpen(false)
+  }
 
   const handleSelectSession = useCallback(
     (sessionId: string) => {
@@ -90,11 +104,16 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
             onCloseSession={handleCloseSession}
             onRenameSession={handleRenameSession}
             onCreateSession={handleCreateSession}
+            isMultiSessionMode={isMultiSessionMode}
           />
 
           {/* Toolbar */}
           {!isReadOnly && (
-            <Toolbar onSave={handleSave} onExport={handleExport} hasUnsavedChanges={activeSession?.isDirty || false} />
+            <Toolbar
+              onSave={isControlledExternally ? undefined : handleSave}
+              onExport={handleExport}
+              hasUnsavedChanges={activeSession?.isDirty || false}
+            />
           )}
 
           {/* Tab Content Area */}
@@ -108,6 +127,15 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
         {/* Property Inspector - Right Sidebar */}
         <PropertyInspector className="flex-shrink-0" />
       </div>
+      <WarningModal
+        title={t('closeTabModal.title')}
+        description={t('closeTabModal.description')}
+        confirmButtonTitle={t('actions.close')}
+        open={isWarningModalOpen}
+        onOpenChange={() => setIsWarningModalOpen(false)}
+        onDiscard={handleDiscardCloseSession}
+        onConfirm={handleConfirmCloseSession}
+      />
     </ActiveDiagramProviderComponent>
   )
 }

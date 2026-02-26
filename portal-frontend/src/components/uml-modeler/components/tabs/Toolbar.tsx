@@ -91,17 +91,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onSave, hasUnsavedChanges = fa
 
       {/* File Operations */}
       <div className="flex items-center gap-1 mr-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleSave}
-          disabled={isSaving}
-          className={`h-8 px-2 ${hasUnsavedChanges ? 'text-blue-600' : ''}`}
-          title={isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save changes' : 'Save'}
-        >
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          <span className="ml-1 text-xs">{isSaving ? 'Saving...' : 'Save'}</span>
-        </Button>
+        {onSave && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSave}
+            disabled={isSaving}
+            className={`h-8 px-2 ${hasUnsavedChanges ? 'text-blue-600' : ''}`}
+            title={isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save changes' : 'Save'}
+          >
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            <span className="ml-1 text-xs">{isSaving ? 'Saving...' : 'Save'}</span>
+          </Button>
+        )}
 
         <Button variant="ghost" size="sm" onClick={handleImportClick} className="h-8 px-2" title="Import XMI file">
           <FileUp className="h-4 w-4" />

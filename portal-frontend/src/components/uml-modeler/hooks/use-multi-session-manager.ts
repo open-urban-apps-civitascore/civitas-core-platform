@@ -11,7 +11,15 @@ import {
 import type { UMLDiagram } from '../types/diagram'
 import type { DiagramSession, UseMultiSessionReturn } from '../types/session'
 
-export const useMultiSessionManager = (initialSession?: DiagramSession): UseMultiSessionReturn => {
+interface MultiSessionManagerInput {
+  initialSession?: DiagramSession
+  sessionManager?: UseMultiSessionReturn
+}
+
+export const useMultiSessionManager = ({
+  initialSession,
+  sessionManager: externalSessionManager,
+}: MultiSessionManagerInput): UseMultiSessionReturn => {
   const [state, dispatch] = useReducer(sessionReducer, undefined, () => createInitialSessionState(initialSession))
 
   const createSession = useCallback(
@@ -96,18 +104,20 @@ export const useMultiSessionManager = (initialSession?: DiagramSession): UseMult
 
   const activeSession = getActiveSession()
 
-  return {
-    sessions: state.sessions,
-    activeSessionId: state.activeSessionId,
-    activeSession,
-    createSession,
-    closeSession,
-    switchToSession,
-    updateSessionName,
-    updateSessionDiagram,
-    markSessionDirty,
-    markSessionClean,
-    getActiveSession,
-    getAllSessions,
-  }
+  return (
+    externalSessionManager || {
+      sessions: state.sessions,
+      activeSessionId: state.activeSessionId,
+      activeSession,
+      createSession,
+      closeSession,
+      switchToSession,
+      updateSessionName,
+      updateSessionDiagram,
+      markSessionDirty,
+      markSessionClean,
+      getActiveSession,
+      getAllSessions,
+    }
+  )
 }
