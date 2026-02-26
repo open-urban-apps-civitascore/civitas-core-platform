@@ -10,7 +10,9 @@ vi.mock('next-intl/server', () => ({
 vi.mock('@/components/ui/collapsible', () => ({
   Collapsible: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
   CollapsibleTrigger: ({ children, ...props }: React.HTMLAttributes<HTMLButtonElement>) => (
-    <button data-slot="collapsible-trigger" {...props}>{children}</button>
+    <button data-slot="collapsible-trigger" {...props}>
+      {children}
+    </button>
   ),
   CollapsibleContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
