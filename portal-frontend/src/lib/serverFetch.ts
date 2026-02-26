@@ -117,7 +117,7 @@ export const serverFetch = async <TResponse>({
 
     const res = await response.json()
 
-    const data = res.content
+    const data: ApiResponse<TResponse> = res.content
       ? res
       : {
           content: res,
@@ -125,7 +125,7 @@ export const serverFetch = async <TResponse>({
         }
 
     return {
-      data: data.content as TResponse,
+      data: data.content,
       totalElements: data.totalElements,
       totalPages: data.totalPages,
     }

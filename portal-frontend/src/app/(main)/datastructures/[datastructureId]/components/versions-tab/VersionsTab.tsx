@@ -41,7 +41,7 @@ export const VersionsTab = (props: VersionsTabProps) => {
   const CustomElement = (
     <Button
       data-testid="addVersionButton"
-      onClick={() => router.push(`/datastructures/${datastructureId}/createVersion`)}
+      onClick={() => router.push(`/datastructures/${datastructureId}/createVersion?mode=edit`)}
     >
       <Plus />
       {t('newVersion')}

@@ -1,13 +1,15 @@
-import { DatastructureVersion } from '@/types/datastructures'
+import { serverFetch } from '@/lib/serverFetch'
+import { Datastructure } from '@/types/datastructures'
 
-import { apiRequest } from '../../request/apiRequest'
-import { getServerRequestHeaders } from '../../request/getServerRequestHeaders'
-
-export const getDatastructureVersion = async (datastructureId: string, versionId: string, params?: URLSearchParams) =>
-  apiRequest<DatastructureVersion>({
-    endpoint: `/datastructures/${datastructureId}/versions/${versionId}`,
-    method: 'GET',
-    params,
-    headers: await getServerRequestHeaders(),
-    errorMessage: 'An error occurred while fetching datastructure version.',
-  })
+export const getDatastructureVersion = async (datastructureId: string, versionId: string) => {
+  try {
+    return await serverFetch<Datastructure[]>({
+      endpoint: `datastructures/${datastructureId}/versions/${versionId}`,
+      method: 'GET',
+      isApiBackend: true,
+    })
+  } catch (error) {
+    console.error(`An error occurred while fetching datastructure version.`, error)
+    throw new Error('An error occurred while fetching datastructure version.')
+  }
+}

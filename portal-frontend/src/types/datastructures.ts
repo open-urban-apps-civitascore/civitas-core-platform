@@ -100,7 +100,7 @@ export const DatastructureApiResponseSchema = z.object({
   dataStructureStatus: DatastructureStatusEnum,
   createdFromDataSource: z.boolean(),
   assignments: z.array(AssignmentSchema),
-  inUse: z.boolean(),
+  inUse: z.boolean().optional(),
   createdAt: z.string(),
   modifiedAt: z.string(),
   dataStructureVersions: z.array(DatastructureVersionSummaryApiResponseSchema),
@@ -130,8 +130,19 @@ export const DatastructureFormAvailableSchema = DatastructureFormDraftSchema.ext
 export type DatastructureFormDraft = z.infer<typeof DatastructureFormDraftSchema>
 export type DatastructureFormAvailable = z.infer<typeof DatastructureFormAvailableSchema>
 
-export const DatastructureCreateFormSchema = DatastructureFormDraftSchema.omit({ id: true })
-export type DatastructureCreateData = z.infer<typeof DatastructureCreateFormSchema>
+export const DatastructureCreateFormSchema = z.object({
+  name: z.string().trim().min(1, 'common.errors.required'),
+})
+
+export const DatastructureCreateDataSchema = DatastructureFormDraftSchema.omit({
+  id: true,
+  dataStructureStatus: true,
+}).extend({
+  createdFromDataSource: z.boolean(),
+})
+
+export type DatastructureCreateFormData = z.infer<typeof DatastructureCreateFormSchema>
+export type DatastructureCreateData = z.infer<typeof DatastructureCreateDataSchema>
 
 export type DatastructureUpdateData = DatastructureFormDraft
 

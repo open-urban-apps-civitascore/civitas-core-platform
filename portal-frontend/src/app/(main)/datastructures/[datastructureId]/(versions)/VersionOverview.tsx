@@ -13,6 +13,7 @@ import {
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
+import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
@@ -33,7 +34,6 @@ import {
 
 import { StructureDefinitionTab } from './components/structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './components/version-info-tab/VersionInfoTab'
-import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 
 export const defaultFormData: DatastructureVersionFormData = {
   id: '',
@@ -151,7 +151,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
   }
 
-  const handleCreateUser = () => {
+  const handleCreateVersion = () => {
     const values = form.getValues()
     const parsed = isDraftMode
       ? DatastructureVersionFormDraftSchema.safeParse(values)
@@ -172,7 +172,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     })
   }
 
-  const handleUpdateUser = () => {
+  const handleUpdateVersion = () => {
     const values = form.getValues()
     const parsed = isDraftMode
       ? DatastructureVersionFormDraftSchema.safeParse(values)
@@ -193,7 +193,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     })
   }
 
-  const handleSave = isCreateMode ? handleCreateUser : handleUpdateUser
+  const handleSave = isCreateMode ? handleCreateVersion : handleUpdateVersion
 
   const handleExit = () => {
     form.reset()
