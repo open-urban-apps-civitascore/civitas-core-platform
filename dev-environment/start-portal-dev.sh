@@ -452,6 +452,10 @@ $DOCKER_COMPOSE up -d
 echo "  APISIX started"
 
 cd "$SCRIPT_DIR/frost"
+if [ ! -f .env ] && [ -f .env.example ]; then
+    cp .env.example .env
+    echo "  Created frost/.env from .env.example (set FROST_DB_PASSWORD to change the password)"
+fi
 if $DOCKER_COMPOSE up -d 2>&1; then
     echo "  FROST Server started"
 else
