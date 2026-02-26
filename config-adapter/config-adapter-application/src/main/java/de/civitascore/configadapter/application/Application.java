@@ -142,13 +142,13 @@ public class Application {
         consumer.start();
       }
 
-      if (sagaCommandConsumer != null) {
-        sagaCommandConsumer.start();
-      }
-
       if (sagaOrchestrator != null) {
         sagaOrchestrator.start();
         sagaTriggerConsumer.start();
+      }
+
+      if (sagaCommandConsumer != null) {
+        sagaCommandConsumer.start();
       }
 
       healthCheckServer.markReady();
