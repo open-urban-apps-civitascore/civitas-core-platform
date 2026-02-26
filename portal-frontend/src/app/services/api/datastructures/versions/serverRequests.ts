@@ -1,10 +1,10 @@
 import { serverFetch } from '@/lib/serverFetch'
-import { Datastructure } from '@/types/datastructures'
+import { DatastructureVersion } from '@/types/datastructures'
 
 export const getDatastructureVersion = async (datastructureId: string, versionId: string) => {
   try {
-    return await serverFetch<Datastructure[]>({
-      endpoint: `datastructures/${datastructureId}/versions/${versionId}`,
+    return await serverFetch<DatastructureVersion[]>({
+      endpoint: `/datastructures/${datastructureId}/versions/${versionId}`,
       method: 'GET',
       isApiBackend: true,
     })

@@ -22,6 +22,11 @@ export const DATASTRUCTURE_VERSION_SOURCE = {
   OWN: 'OWN',
 } as const
 
+export const UMLModelStylesPayloadSchema = z.object({
+  viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).optional(),
+  nodePositions: z.record(z.string(), z.object({ x: z.number(), y: z.number() })),
+})
+
 export const DatastructureVersionSourceEnum = enumFromConst(DATASTRUCTURE_VERSION_SOURCE)
 
 export type DatastructureVersionSource =
@@ -32,14 +37,14 @@ export type DatastructureVersionSource =
 export const DatastructureVersionApiResponseSchema = z.object({
   id: z.string(),
   version: z.string(),
-  description: z.string(),
+  description: z.string().optional(),
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   modelAtlasUri: z.string().nullable(),
   modelName: z.string().nullable(),
-  styles: z.record(z.string(), z.unknown()).nullable(),
-  inUse: z.boolean(),
-  datastructure: ItemSchema,
+  styles: UMLModelStylesPayloadSchema.nullable(),
+  inUse: z.boolean().optional(),
+  dataStructure: ItemSchema,
   createdAt: z.string(),
   modifiedAt: z.string(),
 })
@@ -47,7 +52,7 @@ export const DatastructureVersionApiResponseSchema = z.object({
 export const DatastructureVersionSummaryApiResponseSchema = z.object({
   id: z.string(),
   version: z.string(),
-  description: z.string(),
+  description: z.string().optional(),
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   createdAt: z.string(),
@@ -63,7 +68,7 @@ export const DatastructureVersionFormDraftSchema = z.object({
   modelAtlasUri: z.string().trim().nullable(),
   modelName: z.string().trim().nullable(),
   model: z.string().trim().nullable(),
-  styles: z.record(z.string(), z.unknown()).nullable(),
+  styles: UMLModelStylesPayloadSchema.nullable(),
 })
 
 export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormDraftSchema.extend({
@@ -71,7 +76,7 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
   modelAtlasUri: z.string().trim().min(1, 'common.errors.required'),
   modelName: z.string().trim().min(1, 'common.errors.required'),
   model: z.string().trim().min(1, 'common.errors.required'),
-  styles: z.record(z.string(), z.unknown()),
+  styles: UMLModelStylesPayloadSchema,
 })
 
 export type DatastructureVersion = z.infer<typeof DatastructureVersionApiResponseSchema>

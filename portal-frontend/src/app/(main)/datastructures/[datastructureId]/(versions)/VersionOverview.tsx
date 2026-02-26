@@ -19,18 +19,22 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
+import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
+import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { useQueryParams } from '@/hooks/use-query-params'
 import {
   DATASTRUCTURE_STATUS_TYPES,
   DATASTRUCTURE_VERSION_SOURCE,
   DatastructureFormAvailableSchema,
   DatastructureStatus,
+  DatastructureVersionCreateData,
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionFormData,
   DatastructureVersionFormDraftSchema,
   DatastructureVersionSummary,
   DatastructureVersionTab,
 } from '@/types/datastructures'
+import { pickDirtyValues } from '@/utils/form'
 
 import { StructureDefinitionTab } from './components/structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './components/version-info-tab/VersionInfoTab'
@@ -75,6 +79,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const t = useTranslations('datastructureVersion')
   const tCommon = useTranslations('common')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
+  const modelSessionManager = useMultiSessionManager({})
 
   const router = useRouter()
 
@@ -101,10 +106,12 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const formValues = useWatch({ control: form.control })
   const descriptionWatch = form.watch('description')
   const statusWatch = form.watch('dataStructureVersionStatus')
-  const versionNumberWatch = form.watch('version')
+  const versionWatch = form.watch('version')
   const sourceWatch = form.watch('dataStructureVersionSource')
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
+
+  const hasDiagramChanges = modelSessionManager.activeSession?.isDirty
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
@@ -140,7 +147,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const completedTabs = useMemo((): DatastructureVersionTab[] => {
     const completed: DatastructureVersionTab[] = []
-    if (versionNumberWatch.length > 0 && descriptionWatch.length > 0 && sourceWatch) {
+    if (versionWatch.length > 0 && descriptionWatch.length > 0 && sourceWatch) {
       completed.push('versionInfo')
     }
     return completed
@@ -151,22 +158,40 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
   }
 
+  const getUmlModelData = (formValues: DatastructureVersionFormData) => {
+    const diagram = modelSessionManager.activeSession?.diagram
+
+    const diagramUpdateData = diagram ? buildUMLModelPayload(diagram) : null
+    const data: DatastructureVersionCreateData = {
+      ...formValues,
+      model: diagramUpdateData?.model || null,
+      modelName: diagramUpdateData?.name || null,
+      styles: diagramUpdateData?.styles || null,
+      modelAtlasUri: diagramUpdateData?.model ? `http://civitas.org/model/${datastructureId}+${versionWatch}` : null,
+    }
+    return data
+  }
+
   const handleCreateVersion = () => {
     const values = form.getValues()
+    const completeData = hasDiagramChanges ? getUmlModelData(values) : values
+
     const parsed = isDraftMode
-      ? DatastructureVersionFormDraftSchema.safeParse(values)
-      : DatastructureVersionFormAvailableSchema.safeParse(values)
+      ? DatastructureVersionFormDraftSchema.safeParse(completeData)
+      : DatastructureVersionFormAvailableSchema.safeParse(completeData)
     if (!parsed.success) {
       console.error(parsed.error)
       toast.error(tCommon('errors.formInvalid'))
       return
     }
 
-    createVersion.mutate(parsed.data, {
-      onSuccess: ({ data }) => {
+    const { id, ...createData } = parsed.data
+
+    createVersion.mutate(createData, {
+      onSuccess: async ({ data }) => {
         toast.success(t('messages.createSuccess'))
         setIsExitModalOpen(false)
-        router.push(`/datasructues/${datastructureId}/${data.id}`)
+        router.push(`/datastructures/${datastructureId}/versions/${data.id}?mode=edit`)
       },
       onError: () => toast.error(tCommon('errors.unexpectedError')),
     })
@@ -174,23 +199,29 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const handleUpdateVersion = () => {
     const values = form.getValues()
+    const updateData = getUmlModelData(values)
     const parsed = isDraftMode
-      ? DatastructureVersionFormDraftSchema.safeParse(values)
-      : DatastructureVersionFormAvailableSchema.safeParse(values)
+      ? DatastructureVersionFormDraftSchema.safeParse(updateData)
+      : DatastructureVersionFormAvailableSchema.safeParse(updateData)
     if (!parsed.success) {
       console.error(parsed.error)
       toast.error(tCommon('errors.formInvalid'))
       return
     }
+    const dirtyFields = form.formState.dirtyFields
+    const fieldsToUpdate = pickDirtyValues(parsed, dirtyFields)
 
-    updateVersion.mutate(parsed.data, {
-      onSuccess: () => {
-        toast.success(t('messages.updateSuccess'))
-        setIsExitModalOpen(false)
-        router.refresh()
+    updateVersion.mutate(
+      { ...fieldsToUpdate, id: values.id },
+      {
+        onSuccess: () => {
+          toast.success(t('messages.updateSuccess'))
+          setIsExitModalOpen(false)
+          router.refresh()
+        },
+        onError: () => toast.error(tCommon('errors.unexpectedError')),
       },
-      onError: () => toast.error(tCommon('errors.unexpectedError')),
-    })
+    )
   }
 
   const handleSave = isCreateMode ? handleCreateVersion : handleUpdateVersion
@@ -244,7 +275,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         return <VersionInfoTab form={form} isReadOnly={isReadOnly} />
       case 'structure':
       default:
-        return <StructureDefinitionTab isReadOnly={isReadOnly} />
+        return <StructureDefinitionTab isReadOnly={isReadOnly} modelSessionManager={modelSessionManager} />
     }
   }
 

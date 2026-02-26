@@ -14,6 +14,7 @@
     "form": "Form",
     "actions": {
       "submit": "Save",
+      "close": "Close",
       "cancel": "Cancel",
       "delete": "Delete",
       "deleteItem": "Delete {item}",
@@ -74,6 +75,10 @@
       "title": "Vor dem Beenden speichern?",
       "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
       "discard": "Verwerfen"
+    },
+    "closeTabModal": {
+      "title": "Unsaved changes",
+      "description": "You have unsaved changes. Do you really want to close the tab?"
     }
   },
   "languages": {

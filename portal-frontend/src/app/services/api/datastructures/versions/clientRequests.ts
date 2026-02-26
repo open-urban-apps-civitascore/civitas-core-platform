@@ -8,7 +8,7 @@ import {
 
 export const useCreateDatastructureVersion = (datastructureId: string) =>
   useCreateMutation<DatastructureVersion, DatastructureVersionCreateData>({
-    key: `datastructures${datastructureId}/versions`,
+    key: `datastructures/${datastructureId}/versions`,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while creating datastructure version',
   })

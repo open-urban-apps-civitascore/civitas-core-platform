@@ -15,6 +15,7 @@
     "actions": {
       "submit": "Speichern",
       "cancel": "Abbrechen",
+      "close": "Schließen",
       "delete": "Löschen",
       "deleteItem": "{item} löschen",
       "remove": "Entfernen",
@@ -73,6 +74,10 @@
       "title": "Vor dem Beenden speichern?",
       "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
       "discard": "Verwerfen"
+    },
+    "closeTabModal": {
+      "title": "Ungespeicherte Änderungen",
+      "description": "Sie haben ungespeicherte Änderungen. Wollen Sie den Tab wirklich schließen?"
     }
   },
   "languages": {
