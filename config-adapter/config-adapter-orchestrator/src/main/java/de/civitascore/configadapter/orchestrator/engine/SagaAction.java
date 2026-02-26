@@ -42,6 +42,7 @@ public sealed interface SagaAction {
   /** Saga failed. Publish failure result to backend with cleanup details. */
   record FailSaga(
       String sagaId,
+      String datasetId,
       String failedStep,
       String error,
       boolean compensated,
