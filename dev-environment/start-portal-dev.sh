@@ -208,22 +208,22 @@ start_in_new_terminal() {
     local script="$2"
     local logfile="$3"  # optional: log file for background fallback
     if [ "$OS_TYPE" = "Darwin" ]; then
-        osascript -e "tell application \"Terminal\" to do script \"bash '$script'\"" 2>/dev/null && return 0
+        osascript -e "tell application \"Terminal\" to do script \"bash -l '$script'\"" 2>/dev/null && return 0
     else
         if command -v ptyxis >/dev/null 2>&1; then
-            ptyxis -- bash "$script" >/dev/null 2>&1 & disown
+            ptyxis -- bash -l "$script" >/dev/null 2>&1 & disown
             return 0
         fi
-        gnome-terminal --title="$title" -- bash "$script" 2>/dev/null && return 0
-        xterm -T "$title" -e "bash '$script'" 2>/dev/null && return 0
+        gnome-terminal --title="$title" -- bash -l "$script" 2>/dev/null && return 0
+        xterm -T "$title" -e "bash -l '$script'" 2>/dev/null && return 0
     fi
     # Fallback: run in background with log redirection
     if [ -n "$logfile" ]; then
         echo "  No terminal emulator available. Starting in background (log: $logfile)..."
-        bash "$script" > "$logfile" 2>&1 &
+        bash -l "$script" > "$logfile" 2>&1 &
     else
         echo "  No terminal emulator available. Starting in background..."
-        bash "$script" &
+        bash -l "$script" &
     fi
 }
 
