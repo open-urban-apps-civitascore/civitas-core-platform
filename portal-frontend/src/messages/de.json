@@ -1,4 +1,9 @@
 {
+  "welcome": {
+    "title": "Willkommen in CIVITAS/CORE 2.0",
+    "subtitle": "Neu hier?",
+    "docsButton": "Dokumentation"
+  },
   "common": {
     "type-to-search": "Zum Suchen tippen",
     "search": "Durchsuchen",
@@ -11,12 +16,17 @@
       "submit": "Speichern",
       "cancel": "Abbrechen",
       "delete": "Löschen",
+      "deleteItem": "{item} löschen",
+      "remove": "Entfernen",
+      "removeItem": "{item} entfernen",
       "add": "Hinzufügen",
       "edit": "Bearbeiten",
       "editBase": "Basis bearbeiten",
       "open": "öffnen",
       "saveAndContinue": "Erstellen und weiter",
-      "exit": "Beenden"
+      "exit": "Beenden",
+      "assignItem": "{item} hinzufügen",
+      "assignTo": "zu {item}"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -40,6 +50,7 @@
       "users": "Users",
       "user": "User",
       "groups": "Gruppen",
+      "group": "Gruppe",
       "roles": "Rollen",
       "datasets": "Datensätze",
       "dataspaces": "Datenräume",
@@ -57,6 +68,11 @@
     "status": {
       "DRAFT": "Entwurf",
       "AVAILABLE": "Verfügbar"
+    },
+    "exitModal": {
+      "title": "Vor dem Beenden speichern?",
+      "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
+      "discard": "Verwerfen"
     }
   },
   "languages": {
@@ -203,10 +219,9 @@
       "title": "Gruppenmitgliedschaft",
       "addGroup": "Gruppe hinzufügen",
       "name": "Name",
-      "memberSince": "Mitglied seit",
+      "membersCount": "Anzahl User",
       "contact": "Ansprechpartner",
-      "description": "Beschreibung",
-      "roles": "Rollen"
+      "description": "Beschreibung"
     },
     "messages": {
       "createSuccess": "User wurde erfolgreich angelegt.",
@@ -252,7 +267,15 @@
       "toGroup": "zur Gruppe",
       "assignedAt": "Mitglied seit",
       "noUsers": "Keine User",
-      "noUsersSub": "Keine User in dieser Gruppe enthalten"
+      "noUsersSub": "Keine User in dieser Gruppe enthalten",
+      "removeUserModal": {
+        "title": "User aus Gruppe entfernen?",
+        "description": "Diese Aktion löst die Zuordnung zwischen dem User, der Gruppe und ihre Rollen-Zuordnung auf."
+      }
+    },
+    "messages": {
+      "createSuccess": "Gruppe wurde erfolgreich angelegt.",
+      "updateSuccess": "Gruppe wurde erfolgreich aktualisiert."
     }
   },
   "pagination": {
@@ -427,11 +450,6 @@
       "dataStructure": "Datenstruktur",
       "accessPermissions": "Zugriffsberechtigungen",
       "dataspaces": "Datenräume"
-    },
-    "exitModal": {
-      "title": "Vor dem Beenden speichern?",
-      "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
-      "discard": "Verwerfen"
     },
     "connectorTab": {
       "title1": "Konnektor",

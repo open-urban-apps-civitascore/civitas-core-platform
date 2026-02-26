@@ -1,4 +1,9 @@
 {
+  "welcome": {
+    "title": "Welcome to CIVITAS/CORE 2.0",
+    "subtitle": "New here?",
+    "docsButton": "Documentation"
+  },
   "common": {
     "type-to-search": "Type to search",
     "search": "Search",
@@ -11,12 +16,17 @@
       "submit": "Save",
       "cancel": "Cancel",
       "delete": "Delete",
+      "deleteItem": "Delete {item}",
+      "remove": "Remove",
+      "removeItem": "Remove {item}",
       "add": "Add",
       "edit": "Edit",
       "editBase": "Edit base",
       "open": "open",
       "saveAndContinue": "Save and continue",
-      "exit": "Exit"
+      "exit": "Exit",
+      "assignItem": "Assign {item}",
+      "assignTo": "to {item}"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
@@ -41,6 +51,7 @@
       "users": "Users",
       "user": "User",
       "groups": "Groups",
+      "group": "Group",
       "roles": "Roles",
       "datasets": "Datasets",
       "dataspaces": "Dataspaces",
@@ -58,6 +69,11 @@
     "status": {
       "DRAFT": "Draft",
       "AVAILABLE": "Available"
+    },
+    "exitModal": {
+      "title": "Vor dem Beenden speichern?",
+      "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
+      "discard": "Verwerfen"
     }
   },
   "languages": {
@@ -201,10 +217,9 @@
       "title": "Group Membership",
       "addGroup": "Add Group",
       "name": "Name",
-      "memberSince": "Member since",
+      "membersCount": "Users count",
       "contact": "Contact",
-      "description": "Description",
-      "roles": "Roles"
+      "description": "Description"
     },
     "messages": {
       "createSuccess": "User has been successfully created.",
@@ -250,7 +265,15 @@
       "toGroup": "to group",
       "assignedAt": "Member since",
       "noUsers": "No Users",
-      "noUsersSub": "No users assigned to this group"
+      "noUsersSub": "No users assigned to this group",
+      "removeUserModal": {
+        "title": "Remove User from Group?",
+        "description": "This action removes the association between the user, the group, and their role assignment."
+      }
+    },
+    "messages": {
+      "createSuccess": "Group has been successfully created.",
+      "updateSuccess": "Group has been successfully updated."
     }
   },
   "pagination": {

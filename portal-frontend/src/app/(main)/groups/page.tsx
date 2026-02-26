@@ -54,10 +54,8 @@ const GroupsPage = () => {
   }, [rowCount, pageSize, setTotalPages])
 
   const handleRowClick = (row: Row<Group>) => {
-    if (row.id && !row.original.parent) {
-      const params = getApiRequestParamsByUrl()
-      router.push(`groups/${row.id}?${params}`)
-    }
+    const params = getApiRequestParamsByUrl()
+    router.push(`groups/${row.id}?${params}`)
   }
 
   const CustomElement = () => {

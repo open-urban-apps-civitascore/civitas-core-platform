@@ -76,6 +76,5 @@ services:
 networks:
   civitas-network:
     name: civitas-network
-    driver: bridge
     external: true
 

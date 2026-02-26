@@ -3,55 +3,32 @@ package de.civitascore.portal.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.input.DataSetInputDTO;
-import de.civitascore.portal.repository.AgentRepository;
-import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.repository.DataSetSeriesRepository;
-import de.civitascore.portal.repository.DataSpaceRepository;
-import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
 
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
-  private final UserService userService;
-  private final DataSpaceRepository dataSpaceRepository;
-  private final DataSetSeriesRepository dataSetSeriesRepository;
-  private final AgentRepository agentRepository;
-  private final DistributionRepository distributionRepository;
-  private final CatalogRepository catalogRepository;
-  private final ObjectMapper objectMapper;
 
-  public DataSetService(
-      DataSetRepository dataSetRepository,
-      DataSetMapper dataSetMapper,
-      UserService userService,
-      DataSpaceRepository dataSpaceRepository,
-      DataSetSeriesRepository dataSetSeriesRepository,
-      AgentRepository agentRepository,
-      DistributionRepository distributionRepository,
-      CatalogRepository catalogRepository,
-      ObjectMapper objectMapper) {
-    this.dataSetRepository = dataSetRepository;
-    this.dataSetMapper = dataSetMapper;
-    this.userService = userService;
-    this.dataSpaceRepository = dataSpaceRepository;
-    this.dataSetSeriesRepository = dataSetSeriesRepository;
-    this.agentRepository = agentRepository;
-    this.distributionRepository = distributionRepository;
-    this.catalogRepository = catalogRepository;
-    this.objectMapper = objectMapper;
-  }
+  private final DistributionService distributionService;
+
+  private final ObjectMapper objectMapper;
 
   @Override
   protected DataSetRepository getRepository() {
@@ -81,39 +58,6 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
 
   @Override
   protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
-    Optional.ofNullable(input.getOwnerUserId())
-        .map(userService::findByIdOrThrow)
-        .ifPresentOrElse(entity::setOwner, () -> entity.setOwner(null));
-
-    // Set dataSetSeries
-    Optional.ofNullable(input.getDataSetSeriesId())
-        .flatMap(dataSetSeriesRepository::findById)
-        .ifPresentOrElse(entity::setDataSetSeries, () -> entity.setDataSetSeries(null));
-
-    // Set dataSpaces
-    Optional.ofNullable(input.getDataSpaceIds())
-        .map(dataSpaceRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setDataSpaces);
-
-    // Set agents
-    Optional.ofNullable(input.getAgentIds())
-        .map(agentRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setAgents);
-
-    // Set distributions
-    Optional.ofNullable(input.getDistributionIds())
-        .map(distributionRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setDistributions);
-
-    // Set catalogs
-    Optional.ofNullable(input.getCatalogIds())
-        .map(catalogRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setCatalogs);
-
     return super.postConvertToEntity(entity, input);
   }
 
@@ -145,11 +89,103 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
         throw new InvalidInputException(
             "name", existingEntity.getId(), "Name cannot be null or blank");
       }
+
     } catch (InvalidInputException e) {
       throw e;
     } catch (Exception e) {
       throw new RuntimeException("Failed to process update input", e);
     }
     return super.preProcessUpdateInput(input, existingEntity);
+  }
+
+  /**
+   * Override update to ensure it can only be called for DRAFT datasets. For published datasets, use
+   * updatePublishedMeta instead.
+   *
+   * @param id the dataset ID
+   * @param input the update input
+   * @return the updated dataset
+   * @throws UniqueConstraintViolationException if trying to update a non-DRAFT dataset
+   */
+  @Override
+  public DataSet update(UUID id, DataSetInputDTO input) {
+    DataSet existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataSetStatus() != DataSetStatus.DRAFT) {
+      throw new UniqueConstraintViolationException(
+          "DataSet", "id", id.toString(), "status", existingEntity.getDataSetStatus().toString());
+    }
+    return super.update(id, input);
+  }
+
+  /**
+   * Updates only the metadata (name, description) of a published dataset. Cannot modify
+   * persistenceId or pipelines.
+   *
+   * @param id the dataset ID
+   * @param input the update input
+   * @return the updated dataset
+   * @throws UniqueConstraintViolationException if trying to update a DRAFT dataset
+   */
+  @Transactional
+  public DataSet updatePublishedMeta(UUID id, DataSetInputDTO input) {
+    DataSet existingEntity = findByIdOrThrow(id);
+    if (existingEntity.getDataSetStatus() == DataSetStatus.DRAFT) {
+      throw new UniqueConstraintViolationException(
+          "DataSet", "id", id.toString(), "status", existingEntity.getDataSetStatus().toString());
+    }
+
+    return super.update(id, input);
+  }
+
+  /**
+   * Publishes a dataset by validating it has at least one pipeline, generating distributions from
+   * pipeline APIs, and setting status to READY.
+   *
+   * @param id the dataset ID
+   * @return the published dataset
+   * @throws InvalidInputException if dataset has no pipelines or is already published
+   */
+  @Transactional
+  public DataSet publish(UUID id) {
+    DataSet dataSet = findByIdOrThrow(id);
+
+    // Validate that dataset is not already published
+    if (dataSet.getDataSetStatus() == DataSetStatus.READY) {
+      throw new InvalidInputException("dataSetStatus", id, "DataSet is already published");
+    }
+
+    // Validate that dataset has at least one pipeline
+    if (dataSet.getPipelines() == null || dataSet.getPipelines().isEmpty()) {
+      throw new InvalidInputException(
+          "pipelines", id, "DataSet must contain at least one Pipeline before publishing");
+    }
+
+    // Generate distributions from pipeline APIs
+    dataSet.getPipelines().stream()
+        .filter(pipeline -> pipeline.getApis() != null)
+        .flatMap(pipeline -> pipeline.getApis().stream())
+        .distinct()
+        .forEach(
+            apiPath -> {
+              Distribution distribution =
+                  distributionService.createFromApiUrlAndDataSet(apiPath, dataSet);
+              dataSet.getDistributions().add(distribution);
+            });
+
+    dataSet.setDataSetStatus(DataSetStatus.READY);
+    return dataSetRepository.save(dataSet);
+  }
+
+  @Override
+  protected DataSet preProcessDelete(UUID id) {
+    DataSet dataSet = super.preProcessDelete(id);
+    if (dataSet != null && dataSet.getDataSetStatus() != DataSetStatus.DRAFT) {
+      throw new InvalidInputException(
+          "dataSetStatus",
+          id,
+          "DataSet can only be deleted when in DRAFT status. Current status: "
+              + dataSet.getDataSetStatus());
+    }
+    return dataSet;
   }
 }

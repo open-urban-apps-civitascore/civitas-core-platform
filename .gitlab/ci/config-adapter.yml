@@ -137,6 +137,7 @@ test-config-adapter:
   services:
     - name: docker:27-dind
       alias: docker
+      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
     DOCKER_HOST: tcp://docker:2375
@@ -239,15 +240,21 @@ build-config-adapter-image:
     - job: publish-config-adapter
     - job: build-config-adapter
   services:
-    - docker:27-dind
+    - name: docker:27-dind
+      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
   variables:
     DOCKER_DRIVER: overlay2
     DOCKER_TLS_CERTDIR: '/certs'
     DOCKER_BUILDKIT: 1
   before_script:
     - docker info
+    - |
+      cat > /tmp/buildkitd.toml <<'EOF'
+      [registry."docker.io"]
+        mirrors = ["docker-mirror01.extern.frachtwerk.de"]
+      EOF
     - docker context create buildx-context
-    - docker buildx create --use --driver docker-container --name multiarch buildx-context
+    - docker buildx create --use --driver docker-container --name multiarch --config /tmp/buildkitd.toml buildx-context
     - docker buildx inspect --bootstrap
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
@@ -304,6 +311,10 @@ deploy-config-adapter:
     - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/config-adapter:${CONFIG_ADAPTER_VERSION}-scan
     - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/config-adapter:$CONFIG_ADAPTER_VERSION
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/config-adapter:$CONFIG_ADAPTER_VERSION --tag $CI_REGISTRY_IMAGE/config-adapter:$CI_COMMIT_BRANCH
+      fi
 
 sbom-config-adapter-image:
   extends: .only-config-adapter-changes

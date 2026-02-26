@@ -1,7 +1,6 @@
 # CIVITAS CORE – Development Environment
 
 Docker Compose setup for running the **CIVITAS CORE Platform** locally.
-You can run the **full backend stack** or use the **portal development mode** for IDE debugging.
 
 ---
 
@@ -9,15 +8,14 @@ You can run the **full backend stack** or use the **portal development mode** fo
 
 ```
 dev-environment/
-├── backend/           # Full backend stack (all in Docker)
-├── kafka/             # Kafka + Zookeeper + Kafka UI
-├── postgres/          # PostgreSQL (Portal + Keycloak databases)
-├── keycloak/          # Keycloak Identity Provider
-├── apisix/            # API Gateway + etcd
-├── frost/             # FROST SensorThings API Server
-├── modelatlas/        # Model Atlas Service
-├── start-portal-dev.sh   # Portal development startup script
-└── stop-portal-dev.sh    # Portal development stop script
+├── backend/    # Full backend stack — all services in Docker
+├── authz/      # AuthZ test data and integration tests
+├── kafka/      # Kafka only
+├── postgres/   # PostgreSQL only
+├── keycloak/   # Keycloak only
+├── apisix/     # API Gateway + Authorization (OPA, AuthZ Repository)
+├── frost/      # FROST IoT Server
+└── modelatlas/ # Model Atlas
 ```
 
 ---
@@ -25,128 +23,129 @@ dev-environment/
 ## Prerequisites
 
 * Docker + Docker Compose v2
-* Java 21+
-* Maven 3.6+
-* Node.js 18+ and pnpm (for frontend)
+* Java 21 JDK
+* Maven 3.9+
+* jq (for dev-mode scripts)
 
 ---
 
-## Portal Development Mode (Recommended for Debugging)
+## Quick Start
 
-Use this mode when you want to run and debug the backend services in your IDE.
+### Option A: Full Docker (CI, demos)
 
-```bash
-cd dev-environment
-./start-portal-dev.sh
-```
-
-This script:
-1. Starts all infrastructure services (Kafka, PostgreSQL, Keycloak, APISIX, FROST)
-2. Asks how you want to start the backend services:
-   - **Command line**: Starts config-adapter and portal-backend via Maven
-   - **Manual/IDE**: Shows instructions for starting in Eclipse/IntelliJ for debugging
-
-After infrastructure is running, start the frontend:
-```bash
-cd portal-frontend
-pnpm install   # first time only
-pnpm dev
-```
-
-To stop all services:
-```bash
-cd dev-environment
-./stop-portal-dev.sh
-```
-
----
-
-## Full Stack Mode (All in Docker)
-
-Start everything in Docker containers:
+All services run in Docker containers. No hot-reload for backend changes.
 
 ```bash
 cd backend
 ./start.sh
 ```
 
-This builds the apps and starts:
-Kafka, PostgreSQL, Keycloak, APISIX, Portal Backend, and Config Adapter.
+Starts: Kafka, PostgreSQL, Keycloak, APISIX, OPA, AuthZ Repository,
+Portal Backend, and Config Adapter.
+
+### Option B: Portal Dev Mode (recommended for development)
+
+Starts all infrastructure in Docker, prompts for backend/frontend startup
+and authorization mode.
+
+```bash
+./start-portal-dev.sh                # Interactive prompts
+./start-portal-dev.sh --authz=full   # Full AuthZ (enforce permissions)
+./start-portal-dev.sh --authz=allowall  # Allow-all (any logged-in user can do anything)
+```
+
+### Authorization Modes
+
+| Mode | Flag | Behavior |
+|------|------|----------|
+| **Full** | `--authz=full` | OPA enforces per-endpoint permissions. Users need role assignments. |
+| **Allow-all** | `--authz=allowall` | Any logged-in user can access all endpoints. OPA still runs (logs decisions) but uses null-permission data. APISIX injects wildcard scope header. |
+
+Both modes require a valid JWT (Keycloak login). Allow-all is useful when
+working on features unrelated to authorization. Integration tests
+(`authz/integration-test.sh`) require full mode.
 
 ---
 
 ## Run Individual Services
-
-All services share a Docker network. Create it first:
-
-```bash
-docker network create civitas-network
-```
-
-Then start the services:
 
 ```bash
 cd kafka     && docker compose up -d
 cd postgres  && docker compose up -d
 cd keycloak  && docker compose up -d
 cd apisix    && docker compose up -d
-cd frost     && docker compose up -d
 ```
-
-### FROST APISIX Route Setup
-
-When running services individually, you need to configure the APISIX route for FROST manually:
-
-```bash
-cd frost
-./setup-apisix-route.sh
-```
-
-This sets up API key authentication for FROST through APISIX. After setup:
-- FROST is accessible at: `http://localhost:9080/FROST-Server/v1.1`
-- API Key header: `X-API-Key`
-- API Key value: `dev-frost-api-key`
-
-Test with:
-```bash
-curl -H 'X-API-Key: dev-frost-api-key' http://localhost:9080/FROST-Server/v1.1
-```
-
-> **Note:** The `start-portal-dev.sh` script runs this automatically.
 
 ---
 
 ## Key URLs
 
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| Portal Frontend | http://localhost:3000 | dev@civitas.local / dev123 |
-| Portal Backend | http://localhost:8089 | - |
-| Config Adapter | http://localhost:8088 | - |
-| Keycloak Admin | http://localhost:8080 | admin / admin |
-| Kafka UI | http://localhost:8090 | - |
-| FROST Server | http://localhost:1883 | - |
-| APISIX Gateway | http://localhost:9080 | - |
+| Service | URL | Notes |
+|---------|-----|-------|
+| Keycloak | http://localhost:8080 | admin / admin |
+| Portal Backend | http://localhost:8089 | Swagger: /v2/swagger-ui.html |
+| Config Adapter | http://localhost:8088 | |
+| APISIX Gateway | http://localhost:9080 | Routes to backend via OPA authz |
+| OPA | http://localhost:8181 | Policy decision point |
+| AuthZ Repository | http://localhost:8091 | User authorization context |
+| Kafka UI | http://localhost:8090 | |
 
-### Default Development User
+---
 
-A default user is automatically created in Keycloak for development:
+## Stopping
 
-- **Email/Username:** `dev@civitas.local`
-- **Password:** `dev123`
+```bash
+./stop-portal-dev.sh            # Stop all services (prompts to remove volumes)
+```
 
-Use these credentials to log in to the Portal Frontend.
+Or manually per service:
+
+```bash
+cd apisix    && docker compose down && docker compose -f docker-compose.authz.yml down
+cd kafka     && docker compose down
+cd keycloak  && docker compose down
+cd postgres  && docker compose down
+cd frost     && docker compose down
+```
+
+## Troubleshooting
+
+**Something isn't working after pulling new changes?**
+
+```bash
+./stop-portal-dev.sh            # say "yes" to remove volumes
+./start-portal-dev.sh
+```
+
+This wipes stale Keycloak state, database data, and cached configs. Fixes most issues.
+
+**Keycloak login redirects fail or tokens are rejected?**
+
+Re-copy the frontend env template — the Keycloak issuer URL may have changed:
+
+```bash
+cp portal-frontend/.env.local.template portal-frontend/.env.local
+```
+
+**Running from a VM (not localhost)?**
+
+Override the Keycloak hostname before starting:
+
+```bash
+export KC_HOSTNAME=http://<your-vm-ip>:8080
+./start-portal-dev.sh
+```
 
 ---
 
 ## Common Commands
 
 ```bash
-docker compose up --build
-docker compose down
-docker compose down -v
-docker compose logs -f
-docker compose ps
+docker compose up --build       # Rebuild and start
+docker compose down             # Stop services
+docker compose down -v          # Stop and remove volumes
+docker compose logs -f          # Follow logs
+docker compose ps               # List running services
 ```
 
 ---

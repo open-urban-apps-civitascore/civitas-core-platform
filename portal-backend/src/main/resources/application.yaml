@@ -8,10 +8,11 @@ server:
   port: 8089
   servlet:
     context-path: /v2
+  # M5.5: Increase max header size for X-Allowed-Scope-Ids from OPA
+  # When users have many dataspaces, the scope ID list can be large
+  max-http-request-header-size: 32KB
 
 spring:
-  profiles:
-    active: local, postgres
   application:
     name: "CIVITAS/CORE Data Management API"
   security:

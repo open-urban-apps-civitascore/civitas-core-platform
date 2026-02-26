@@ -26,6 +26,18 @@ public class ModelService {
   }
 
   /**
+   * Process and forward the model string to the external Model Atlas service.
+   *
+   * @param modelContent the stringified XML model content
+   * @param nsUri the namespace URI of the model
+   * @return response from the external service
+   */
+  public String uploadModelString(String modelContent, String nsUri) {
+    log.info("Processing model string upload: {}", Encode.forJava(nsUri));
+    return modelRestClientRequestService.uploadModelString(modelContent, nsUri);
+  }
+
+  /**
    * Process and forward the model file download request to the external Model Atlas service.
    *
    * @param nsUri the namespace URI of the model to download

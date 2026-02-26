@@ -11,3 +11,12 @@ gl-dependency-scanning.json
 **/maven.graph.json
 
 /.idea/
+/test-results/
+**/.DS_Store
+errorlogs.txt
+.vscode
+
+# Claude Code state (symlinked to private archive repo)
+/CLAUDE.md
+/.claude
+/docs/claude

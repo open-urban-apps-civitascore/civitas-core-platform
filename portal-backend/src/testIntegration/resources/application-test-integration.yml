@@ -19,6 +19,7 @@ spring:
     enabled: true
     baseline-on-migrate: true
     clean-disabled: false
+    locations: classpath:db/migration
 
   # Kafka Test Configuration
   # Note: spring.embedded.kafka.brokers is only available in tests with @EmbeddedKafka
@@ -42,11 +43,11 @@ kafka:
   bootstrap-servers: ${spring.embedded.kafka.brokers:localhost:9092}
   acks: all
   retries: 3
-  result-topic: core.civitas.config.results
+  result-topic: de.civitascore.config.results
   result-timeout-ms: 10000
   topic-prefix: # Explicitly empty - no prefix for test environment
   topics:
-    config-adapter-result: civitas.config.result
+    config-adapter-result: de.civitascore.config.result
 
 # Event Configuration for Tests
 event:

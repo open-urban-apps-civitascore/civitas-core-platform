@@ -3,6 +3,8 @@ package de.civitascore.portal.service.event;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.ConfigAdapterTestHelper;
 import de.civitascore.portal.model.input.UserInputDTO;
+import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.UserService;
 import java.util.List;
@@ -21,10 +23,10 @@ import org.springframework.test.context.TestPropertySource;
     partitions = 1,
     brokerProperties = {"listeners=PLAINTEXT://localhost:0", "port=0"},
     topics = {
-      "core.civitas.idm.user.created",
-      "core.civitas.idm.user.updated",
-      "core.civitas.idm.user.deleted",
-      "core.civitas.config.results"
+      "de.civitascore.idm.user.created",
+      "de.civitascore.idm.user.updated",
+      "de.civitascore.idm.user.deleted",
+      "de.civitascore.config.results"
     })
 @TestPropertySource(properties = {"kafka.enabled=true"})
 @Slf4j
@@ -38,15 +40,14 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
   private String embeddedKafkaBrokers;
 
   private ConfigAdapterTestHelper configAdapterHelper;
+  @Autowired private GroupRepository groupRepository;
+  @Autowired private AssignmentRepository assignmentRepository;
 
   @BeforeEach
   void setUp() {
     log.debug("=== Test Setup Starting ===");
-    userRepository.deleteAll();
 
     ensureCivitasCoreRealmExists();
-    cleanupKeycloakUsers();
-
     configAdapterHelper =
         new ConfigAdapterTestHelper(KEYCLOAK, embeddedKafkaBrokers, kafkaTemplate);
 
@@ -64,7 +65,8 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
         log.warn("Error closing config adapter helper: {}", e.getMessage());
       }
     }
-
+    assignmentRepository.deleteAll();
+    groupRepository.deleteAll();
     userRepository.deleteAll();
     cleanupKeycloakUsers();
     log.debug("=== Test Teardown Complete ===");

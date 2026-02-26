@@ -10,6 +10,7 @@ import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSpace;
+import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
@@ -17,6 +18,7 @@ import de.civitascore.portal.model.input.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.input.CatalogInputDTO;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
+import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
@@ -53,6 +55,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSpaceRepository dataSpaceRepository;
   @Autowired private CatalogRepository catalogRepository;
+  @Autowired private DataStructureService dataStructureService;
 
   private Group testGroup;
   private Role testDataRole;
@@ -60,6 +63,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   private DataSpace testDataSpace;
   private DataSet testDataSet;
   private Catalog testCatalog;
+  private DataStructure testDataStructure;
 
   @BeforeEach
   void setUp() {
@@ -93,7 +97,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSetInputDTO dataSetInput = new DataSetInputDTO();
     dataSetInput.setName("Test DataSet " + System.currentTimeMillis());
     dataSetInput.setDescription("Test dataset for assignment testing");
-    dataSetInput.setDataSpaceIds(List.of(testDataSpace.getId()));
+    dataSetInput.setOpenDataAccess(false);
     testDataSet = dataSetService.create(dataSetInput);
 
     // Create test Catalog
@@ -101,6 +105,13 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     catalogInput.setName("Test Catalog " + System.currentTimeMillis());
     catalogInput.setDescription("Test catalog for assignment testing");
     testCatalog = catalogService.create(catalogInput);
+
+    // Create test dataStructure
+    DataStructureInputDTO dataStructureInput = new DataStructureInputDTO();
+    dataStructureInput.setName("Test DataStructure " + System.currentTimeMillis());
+    dataStructureInput.setDescription("Test datastructure for assignment testing");
+    dataStructureInput.setCreatedFromDataSource(false);
+    testDataStructure = dataStructureService.create(dataStructureInput);
   }
 
   @AfterEach
@@ -236,11 +247,13 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setGroupId(testGroup.getId());
       input.setRoleId(testDataRole.getId());
       input.setScopeType(ScopeType.DATASTRUCTURE);
-      input.setScopeId(UUID.randomUUID());
+      input.setScopeId(testDataStructure.getId());
 
-      assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(ResourceNotFoundException.class)
-          .hasMessageContaining("Datastructure");
+      Assignment assignment = assignmentService.create(input);
+
+      assertThat(assignment.getDataStructure()).isNotNull();
+      assertThat(assignment.getDataStructure().getId()).isEqualTo(testDataStructure.getId());
+      assertThat(assignment.getScopeType()).isEqualTo(ScopeType.DATASTRUCTURE);
     }
 
     @Test
@@ -729,8 +742,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
           assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, testDataSet.getId());
 
       assertThat(results).hasSize(1);
-      assertThat(results.get(0).getScopeType()).isEqualTo(ScopeType.DATASET);
-      assertThat(results.get(0).getDataset().getId()).isEqualTo(testDataSet.getId());
+      assertThat(results.getFirst().getScopeType()).isEqualTo(ScopeType.DATASET);
+      assertThat(results.getFirst().getDataset().getId()).isEqualTo(testDataSet.getId());
     }
 
     @Test
@@ -748,8 +761,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
               ScopeType.DATASPACE, testDataSpace.getId());
 
       assertThat(results).hasSize(1);
-      assertThat(results.get(0).getScopeType()).isEqualTo(ScopeType.DATASPACE);
-      assertThat(results.get(0).getDataSpace().getId()).isEqualTo(testDataSpace.getId());
+      assertThat(results.getFirst().getScopeType()).isEqualTo(ScopeType.DATASPACE);
+      assertThat(results.getFirst().getDataSpace().getId()).isEqualTo(testDataSpace.getId());
     }
 
     @Test
@@ -766,8 +779,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
           assignmentService.findAllByScopeTypeAndScopeId(ScopeType.CATALOG, testCatalog.getId());
 
       assertThat(results).hasSize(1);
-      assertThat(results.get(0).getScopeType()).isEqualTo(ScopeType.CATALOG);
-      assertThat(results.get(0).getCatalog().getId()).isEqualTo(testCatalog.getId());
+      assertThat(results.getFirst().getScopeType()).isEqualTo(ScopeType.CATALOG);
+      assertThat(results.getFirst().getCatalog().getId()).isEqualTo(testCatalog.getId());
     }
 
     @Test
@@ -848,7 +861,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
           assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, testDataSet.getId());
 
       assertThat(results).hasSize(1);
-      Assignment result = results.get(0);
+      Assignment result = results.getFirst();
       // These should not throw LazyInitializationException
       assertThat(result.getGroup()).isNotNull();
       assertThat(result.getGroup().getId()).isEqualTo(testGroup.getId());
@@ -896,8 +909,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
               testDataSet.getId());
 
       assertThat(result).hasSize(1);
-      assertThat(result.get(0).getGroup().getId()).isEqualTo(replacementGroup.getId());
-      assertThat(result.get(0).getId()).isNotEqualTo(existingId);
+      assertThat(result.getFirst().getGroup().getId()).isEqualTo(replacementGroup.getId());
+      assertThat(result.getFirst().getId()).isNotEqualTo(existingId);
 
       // Verify old assignment is gone
       assertThat(assignmentService.findById(existingId)).isEmpty();
@@ -913,10 +926,10 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
               testDataSet.getId());
 
       assertThat(result).hasSize(1);
-      assertThat(result.get(0).getGroup().getId()).isEqualTo(testGroup.getId());
-      assertThat(result.get(0).getRole().getId()).isEqualTo(testDataRole.getId());
-      assertThat(result.get(0).getScopeType()).isEqualTo(ScopeType.DATASET);
-      assertThat(result.get(0).getDataset().getId()).isEqualTo(testDataSet.getId());
+      assertThat(result.getFirst().getGroup().getId()).isEqualTo(testGroup.getId());
+      assertThat(result.getFirst().getRole().getId()).isEqualTo(testDataRole.getId());
+      assertThat(result.getFirst().getScopeType()).isEqualTo(ScopeType.DATASET);
+      assertThat(result.getFirst().getDataset().getId()).isEqualTo(testDataSet.getId());
     }
 
     @Test
@@ -980,8 +993,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
               testDataSpace.getId());
 
       assertThat(result).hasSize(1);
-      assertThat(result.get(0).getScopeType()).isEqualTo(ScopeType.DATASPACE);
-      assertThat(result.get(0).getDataSpace().getId()).isEqualTo(testDataSpace.getId());
+      assertThat(result.getFirst().getScopeType()).isEqualTo(ScopeType.DATASPACE);
+      assertThat(result.getFirst().getDataSpace().getId()).isEqualTo(testDataSpace.getId());
     }
 
     @Test
@@ -994,8 +1007,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
               testCatalog.getId());
 
       assertThat(result).hasSize(1);
-      assertThat(result.get(0).getScopeType()).isEqualTo(ScopeType.CATALOG);
-      assertThat(result.get(0).getCatalog().getId()).isEqualTo(testCatalog.getId());
+      assertThat(result.getFirst().getScopeType()).isEqualTo(ScopeType.CATALOG);
+      assertThat(result.getFirst().getCatalog().getId()).isEqualTo(testCatalog.getId());
     }
 
     @Test
@@ -1022,7 +1035,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       List<Assignment> remaining =
           assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, testDataSet.getId());
       assertThat(remaining).hasSize(1);
-      assertThat(remaining.get(0).getGroup().getId()).isEqualTo(testGroup.getId());
+      assertThat(remaining.getFirst().getGroup().getId()).isEqualTo(testGroup.getId());
     }
 
     @Test
@@ -1084,7 +1097,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       List<Assignment> remaining =
           assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASET, testDataSet.getId());
       assertThat(remaining).hasSize(1);
-      assertThat(remaining.get(0).getGroup().getId()).isEqualTo(testGroup.getId());
+      assertThat(remaining.getFirst().getGroup().getId()).isEqualTo(testGroup.getId());
     }
 
     @Test

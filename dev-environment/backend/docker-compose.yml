@@ -11,6 +11,7 @@ include:
   - path: ../postgres/docker-compose.yml
   - path: ../keycloak/docker-compose.yml
   - path: ../modelatlas/docker-compose.yml
+  - path: ../apisix/docker-compose.authz.yml
   - path: ../apisix/docker-compose.yml
 
 services:
@@ -34,13 +35,13 @@ services:
       SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:29092
       SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KEYCLOAK_AUTH_SERVER_URL: http://keycloak:8080
-      KEYCLOAK_ISSUER_URI: http://localhost:8080
+      KEYCLOAK_AUTH_SERVER_URL: http://civitas-keycloak:8080
+      KEYCLOAK_ISSUER_URI: http://civitas-keycloak:8080
       KEYCLOAK_REALM: civitas-core
       KEYCLOAK_TARGET_REALM: civitas-core
       APP_URL: http://localhost:8089
       SERVER_PORT: 8089
-      SPRING_PROFILES_ACTIVE: local,postgres
+      SPRING_PROFILES_ACTIVE: local,postgres,local-init
     depends_on:
       postgres-portal:
         condition: service_healthy
@@ -51,7 +52,7 @@ services:
     networks:
       - civitas-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8089/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8089/v2/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -89,5 +90,5 @@ services:
 networks:
   civitas-network:
     name: civitas-network
-    driver: bridge
+    external: true
 

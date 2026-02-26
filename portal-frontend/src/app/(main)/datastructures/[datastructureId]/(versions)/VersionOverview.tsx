@@ -12,7 +12,6 @@ import {
   useUpdateDatastructureVersion,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
-import { ExitWarningModal } from '@/components/exit-warning-modal/ExitWarningModal'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -34,6 +33,7 @@ import {
 
 import { StructureDefinitionTab } from './components/structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './components/version-info-tab/VersionInfoTab'
+import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 
 export const defaultFormData: DatastructureVersionFormData = {
   id: '',
@@ -264,10 +264,10 @@ export const VersionOverview = (props: VersionOverviewProps) => {
       {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
 
       <ExitWarningModal
-        isOpen={isExitModalOpen}
-        onClose={() => setIsExitModalOpen(false)}
+        open={isExitModalOpen}
+        onOpenChange={() => setIsExitModalOpen(false)}
         onDiscard={handleExit}
-        onSave={handleSave}
+        onConfirm={handleSave}
         isLoading={isLoading}
       />
     </PageContainer>

@@ -16,6 +16,17 @@ public class ModelRestClientRequestService {
   private final ModelAtlasConfig modelAtlasConfig;
   private final RestClient.Builder restClientBuilder;
 
+  private String getBaseUrl() {
+    return String.format("%s/atlas/rest", modelAtlasConfig.getBaseUrl());
+  }
+
+  private String getUploadEndpoint(String nsUri) {
+    // Param `overwrite` is set to true to allow updating existing models
+    return String.format(
+        "/%s/schema/stages/%s?nsUri=%s&overwrite=true",
+        modelAtlasConfig.getScope(), modelAtlasConfig.getStage(), nsUri);
+  }
+
   /**
    * Upload a model file to the external Model Atlas service.
    *
@@ -23,20 +34,12 @@ public class ModelRestClientRequestService {
    * @return response from the external service
    */
   public String uploadModelFile(MultipartFile modelFile, String nsUri) {
-    String baseUrl = String.format("%s/atlas/rest", modelAtlasConfig.getBaseUrl());
-
-    // Param `overwrite` is set to true to allow updating existing models
-    String endpoint =
-        String.format(
-            "/%s/schema/stages/%s?nsUri=%s&overwrite=true",
-            modelAtlasConfig.getScope(), modelAtlasConfig.getStage(), nsUri);
-
     try {
-      RestClient restClient = restClientBuilder.baseUrl(baseUrl).build();
+      RestClient restClient = restClientBuilder.baseUrl(getBaseUrl()).build();
 
       return restClient
           .post()
-          .uri(endpoint)
+          .uri(getUploadEndpoint(nsUri))
           .contentType(MediaType.parseMediaType("application/uml"))
           .body(modelFile.getResource())
           .retrieve()
@@ -49,6 +52,31 @@ public class ModelRestClientRequestService {
   }
 
   /**
+   * Upload a model as a string to the external Model Atlas service.
+   *
+   * @param modelContent the stringified XML model content to upload
+   * @param nsUri the namespace URI of the model
+   * @return response from the external service
+   */
+  public String uploadModelString(String modelContent, String nsUri) {
+    try {
+      RestClient restClient = restClientBuilder.baseUrl(getBaseUrl()).build();
+
+      return restClient
+          .post()
+          .uri(getUploadEndpoint(nsUri))
+          .contentType(MediaType.parseMediaType("application/uml"))
+          .body(modelContent)
+          .retrieve()
+          .body(String.class);
+
+    } catch (Exception e) {
+      log.error("Failed to upload model string to Model Atlas", e);
+      throw new RuntimeException("Failed to upload model string to Model Atlas", e);
+    }
+  }
+
+  /**
    * Download a model file from the external Model Atlas service.
    *
    * @param nsUri the namespace URI of the model to download
@@ -56,15 +84,13 @@ public class ModelRestClientRequestService {
    * @return response from the external service in the requested format
    */
   public String downloadModelFile(String nsUri, String acceptHeader) {
-    String baseUrl = String.format("%s/atlas/rest", modelAtlasConfig.getBaseUrl());
-
     String endpoint =
         String.format(
             "/%s/schema/stages/%s/content?nsUri=%s",
             modelAtlasConfig.getScope(), modelAtlasConfig.getStage(), nsUri);
 
     try {
-      RestClient restClient = restClientBuilder.baseUrl(baseUrl).build();
+      RestClient restClient = restClientBuilder.baseUrl(getBaseUrl()).build();
 
       return restClient
           .get()

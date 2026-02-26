@@ -2,8 +2,10 @@
 
 import { RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 
 import { usePatchGroup } from '@/app/services/api/groups/clientRequests'
 import { useGetUsers } from '@/app/services/api/users/clientRequests'
@@ -12,21 +14,20 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Group, GroupTabProps } from '@/types/groups'
+import { Group } from '@/types/groups'
 import { mapGroupListUsers } from '@/utils/users'
 
 import { AssignUsersModal } from './AssignUsersModal'
 import { UsersTable } from './UsersTable'
 
-interface UsersTabProps extends GroupTabProps {
+interface UsersTabProps {
   groupData: Group
 }
 export const UsersTab = (props: UsersTabProps) => {
   const { groupData } = props
-  const originalUsers = groupData.users
   const t = useTranslations('groups')
-  const updateGroup = usePatchGroup()
-
+  const tCommon = useTranslations('common')
+  const router = useRouter()
   const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false)
 
   const {
@@ -42,18 +43,22 @@ export const UsersTab = (props: UsersTabProps) => {
     totalPages,
   } = useQueryParams()
 
+  const originalUsers = useMemo(() => groupData.members || [], [groupData])
+  const shouldLoadUsers = originalUsers?.length > 0
   const userRequestParams = useMemo(() => {
     const params = new URLSearchParams(getApiRequestParamsByUrl())
-    originalUsers.forEach(user => {
-      params.append('id', String(user.id))
+    originalUsers?.forEach(user => {
+      params.append('id', user.id)
     })
     return params
   }, [getApiRequestParamsByUrl, originalUsers])
 
   const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
     params: userRequestParams,
-    isEnabled: originalUsers.length > 0,
+    isEnabled: shouldLoadUsers,
   })
+
+  const updateGroup = usePatchGroup()
 
   const isLoading = isFetchingUsers || updateGroup.isPending
   const rowCount = usersData?.totalElements || 0
@@ -63,8 +68,8 @@ export const UsersTab = (props: UsersTabProps) => {
   }, [rowCount, setTotalPages, pageSize])
 
   const users = useMemo(
-    () => (isLoading ? [] : mapGroupListUsers(usersData?.data || [], originalUsers)),
-    [usersData?.data, originalUsers, isLoading],
+    () => (isLoading ? [] : mapGroupListUsers(shouldLoadUsers && usersData?.data ? usersData?.data : [])),
+    [usersData?.data, isLoading, shouldLoadUsers],
   )
 
   // closes the user assignment modal after update
@@ -76,9 +81,17 @@ export const UsersTab = (props: UsersTabProps) => {
 
   const handleUpdateGroupUsers = async (userSelection: RowSelectionState) => {
     const selectedUserIds = Object.keys(userSelection).filter(key => userSelection[key])
-    const selectedUserInfo = selectedUserIds.map(userId => ({ id: userId, assignedAt: new Date().toISOString() }))
-    const updateUserData = selectedUserInfo.concat(originalUsers)
-    updateGroup.mutate({ id: groupData.id, users: updateUserData })
+    const updateUserData = selectedUserIds.concat(originalUsers.map(user => user.id))
+    updateGroup.mutate(
+      { id: groupData.id, memberIds: updateUserData },
+      {
+        onSuccess: () => {
+          toast.success(t('messages.updateSuccess'))
+          router.refresh()
+        },
+        onError: () => toast.error(tCommon('errors.unexpectedError')),
+      },
+    )
   }
 
   const CustomElement = (
@@ -100,7 +113,7 @@ export const UsersTab = (props: UsersTabProps) => {
         <AssignUsersModal
           isUpdating={updateGroup.isPending}
           originalUsers={originalUsers}
-          groupTitle={groupData.title}
+          groupTitle={groupData.name}
           open={isAssignUsersOpen}
           onOpenChange={setIsAssignUsersOpen}
           onUpdateUsers={handleUpdateGroupUsers}
@@ -128,7 +141,7 @@ export const UsersTab = (props: UsersTabProps) => {
       <AssignUsersModal
         isUpdating={updateGroup.isPending}
         originalUsers={originalUsers}
-        groupTitle={groupData.title}
+        groupTitle={groupData.name}
         open={isAssignUsersOpen}
         onOpenChange={setIsAssignUsersOpen}
         onUpdateUsers={handleUpdateGroupUsers}

@@ -1,35 +1,29 @@
-services:
-  etcd:
-    image: quay.io/coreos/etcd:v3.6.6
-    container_name: civitas-etcd
-    environment:
-      ETCD_ENABLE_V2: "true"
-      ALLOW_NONE_AUTHENTICATION: "yes"
-      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
-      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
-    ports:
-      - "2379:2379"
-      - "2380:2380"
-    networks:
-      - civitas-network
+# APISIX Gateway
+#
+# Gateway-only compose file. AuthZ services (OPA, AuthZ Repository)
+# are in docker-compose.authz.yml and started separately.
+#
+# Environment variables (set by start script):
+#   APISIX_CONFIG — path to APISIX route config (default: full authz mode)
+#                   Set to apisix-allowall.yaml for allow-all mode.
 
+services:
+  # APISIX - API Gateway with JWT validation + OPA authorization
   apisix:
     image: apache/apisix:3.14.0-debian
     container_name: civitas-apisix
     restart: always
     volumes:
       - ./apisix_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
-    depends_on:
-      - etcd
+      - ${APISIX_CONFIG:-./apisix_conf/apisix.yaml}:/usr/local/apisix/conf/apisix.yaml:ro
     ports:
-      - "9080:80"
-      - "9180:9180"
-      - "9443:443"
+      - "9080:9080"
+      - "9443:9443"
+    extra_hosts:
+      - "portal-backend:host-gateway"
     networks:
       - civitas-network
-
 networks:
   civitas-network:
     name: civitas-network
-    driver: bridge
     external: true

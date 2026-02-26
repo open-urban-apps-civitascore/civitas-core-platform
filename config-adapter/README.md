@@ -61,6 +61,8 @@ Core interfaces and models that define the adapter contract. **No implementation
 - `ConfigResultEvent` - Output result event model with status, correlation, and error details
 - `Config` - Data model for configuration values within events (path and value)
 - `Topics` - Constants for all valid Kafka topic names
+- `CredentialDecryptor` - AES-256-GCM decryption with PBKDF2 key derivation (BSI TR-02102 compliant)
+- `CredentialEncryptor` - AES-256-GCM encryption counterpart, produces output compatible with `CredentialDecryptor`
 
 **Dependency Principle:**
 - Adapters use `AdapterConfig` interface for property access
@@ -275,7 +277,7 @@ public class MyAdapter extends AbstractConfigAdapter {
 
 ```xml
 <dependency>
-    <groupId>com.civitas</groupId>
+    <groupId>de.civitascore</groupId>
     <artifactId>config-adapter-api</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
@@ -284,9 +286,9 @@ public class MyAdapter extends AbstractConfigAdapter {
 ### 2. Implement ConfigAdapter
 
 ```java
-import com.civitas.configadapter.adapter.AbstractConfigAdapter;
-import com.civitas.configadapter.model.ConfigEvent;
-import com.civitas.configadapter.messaging.EventPublisher;
+import de.civitascore.configadapter.adapter.AbstractConfigAdapter;
+import de.civitascore.configadapter.model.ConfigEvent;
+import de.civitascore.configadapter.messaging.EventPublisher;
 
 import java.util.List;
 
@@ -356,7 +358,7 @@ public class MyServiceAdapter extends AbstractConfigAdapter {
 
 ### 3. Register via ServiceLoader
 
-Create file `src/main/resources/META-INF/services/com.civitas.configadapter.adapter.ConfigAdapter`:
+Create file `src/main/resources/META-INF/services/de.civitascore.configadapter.adapter.ConfigAdapter`:
 ```
 com.mycompany.MyServiceAdapter
 ```
@@ -390,10 +392,10 @@ The `Application` class from `config-adapter-application` will automatically:
 ### 1. Implement EventConsumer
 
 ```java
-import com.civitas.configadapter.adapter.ConfigAdapter;
-import com.civitas.configadapter.configuration.ApplicationConfig;
-import com.civitas.configadapter.messaging.EventConsumer;
-import com.civitas.event.handler.kafka.CloudEventProcessor;
+import de.civitascore.configadapter.adapter.ConfigAdapter;
+import de.civitascore.configadapter.configuration.ApplicationConfig;
+import de.civitascore.configadapter.messaging.EventConsumer;
+import de.civitascore.event.handler.kafka.CloudEventProcessor;
 
 public class RabbitMQEventConsumer implements EventConsumer {
 
@@ -437,7 +439,7 @@ public class RabbitMQEventConsumer implements EventConsumer {
 
 ### 2. Register via ServiceLoader
 
-Create file `src/main/resources/META-INF/services/com.civitas.configadapter.messaging.EventConsumer`:
+Create file `src/main/resources/META-INF/services/de.civitascore.configadapter.messaging.EventConsumer`:
 ```
 com.mycompany.RabbitMQEventConsumer
 ```
@@ -470,7 +472,7 @@ Examples (from `Topics` constants):
 - `de.civitascore.idm.realm.created`
 - `de.civitascore.idm.client.updated`
 
-All available topic constants are defined in `com.civitas.configadapter.Topics`.
+All available topic constants are defined in `de.civitascore.configadapter.Topics`.
 
 ### Configuration Split Pattern
 
@@ -641,6 +643,8 @@ Contains:
 - `ConfigResultEvent` record for adapter processing results (output events)
 - `Topics` class with centralized topic constants
 - `CloudEventProcessor` internal helper for deserialization (throws exceptions on failure)
+- `CredentialDecryptor` for AES-256-GCM decryption of `ENC(...)` credential values
+- `CredentialEncryptor` for AES-256-GCM encryption, producing `ENC(...)` wrapped values
 
 No dependencies on implementation modules - pure interfaces only.
 
@@ -924,6 +928,10 @@ When an event fails all retry attempts or encounters a fatal error, it is sent t
 
 **Important:** DLQ publishing is synchronous to ensure no message loss. If DLQ send fails, the original event will be reprocessed on the next poll.
 
+#### Saga Consumer Retry Behavior
+
+The saga consumers (`SagaResultConsumer`, `SagaTriggerConsumer`, `KafkaSagaCommandConsumer`) use the same retry algorithm via `ConsumerRecordRetry`. Permanent errors (e.g., malformed JSON → `IOException`) are skipped immediately. Transient errors (e.g., engine/publish failures → `RuntimeException`) are retried with exponential backoff up to 3 attempts. After max retries, the record is skipped and committed. All saga consumers use **per-record commits** (not batch commits) to ensure a single poison-pill record cannot block the consumer. The saga timeout mechanism handles recovery by triggering compensation. No DLQ is used for saga consumers.
+
 #### Failure Result Event
 
 In addition to DLQ, a failure result event is published to the `resultTopic` (if specified in the original event metadata):
@@ -999,7 +1007,7 @@ Error codes are categorized by type and severity:
 
 ### Valid Kafka Topics
 
-All topics are defined in `com.civitas.configadapter.Topics` and validated at startup.
+All topics are defined in `de.civitascore.configadapter.Topics` and validated at startup.
 
 #### User Events
 

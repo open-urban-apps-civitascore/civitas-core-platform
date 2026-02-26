@@ -24,6 +24,7 @@ export type InputPropsWithoutForm = Omit<InputHTMLAttributes<HTMLInputElement>, 
 export type GetListInput = {
   params?: URLSearchParams
   isEnabled?: boolean
+  queryKey?: string
 }
 
 export type GetItemInput = {
@@ -33,12 +34,12 @@ export type GetItemInput = {
 
 export type DataQueryInput = {
   key: string
+  queryKey?: string
   errorMessage: string
-  endpoint?: string
+  headers?: AxiosRequestConfig['headers']
   id?: string
   params?: URLSearchParams
   isEnabled?: boolean
-  headers?: AxiosRequestConfig['headers']
 }
 
 export type WithId<T = string> = { id: T }

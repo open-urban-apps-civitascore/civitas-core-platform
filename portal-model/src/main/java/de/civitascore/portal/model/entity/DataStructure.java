@@ -1,12 +1,12 @@
 package de.civitascore.portal.model.entity;
 
+import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.entity.base.NamedEntity;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+
 import java.util.HashSet;
 import java.util.Set;
+
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,6 +15,37 @@ import lombok.Setter;
 @Getter
 @Setter
 public class DataStructure extends NamedEntity {
-  @OneToMany(mappedBy = "dataStructure", fetch = FetchType.LAZY)
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "data_structure_status", nullable = false)
+  private DataStructureStatus dataStructureStatus;
+
+  @Column(name = "created_from_data_source", nullable = false)
+  private Boolean createdFromDataSource = false;
+
+  @OneToMany(mappedBy = "dataStructure", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
   private Set<Assignment> assignments = new HashSet<>();
+
+  @OneToMany(mappedBy = "dataStructure", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+  private Set<DataStructureVersion> dataStructureVersions = new HashSet<>();
+
+  public void setAssignments(Set<Assignment> assignments) {
+    this.assignments.clear();
+    if (assignments != null) {
+      this.assignments.addAll(assignments);
+      for (Assignment assignment : assignments) {
+        assignment.setDataStructure(this);
+      }
+    }
+  }
+
+  public void setDataStructureVersions(Set<DataStructureVersion> dataStructureVersions) {
+    this.dataStructureVersions.clear();
+    if (dataStructureVersions != null) {
+      this.dataStructureVersions.addAll(dataStructureVersions);
+      for (DataStructureVersion dataStructureVersion : dataStructureVersions) {
+        dataStructureVersion.setDataStructure(this);
+      }
+    }
+  }
 }
