@@ -1,4 +1,4 @@
-import { UmlModeler } from '@/components/uml-modeler/UmlModeler'
+import { UmlModeler } from "@/app/(main)/uml-modeler/page"
 
 interface StructureDefinitionTabProps {
   isReadOnly: boolean
