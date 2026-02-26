@@ -1,6 +1,7 @@
 package de.civitascore.portal.service;
 
 import de.civitascore.portal.mapper.AssignmentMapper;
+import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
@@ -51,7 +52,11 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
     }
 
     if (input.getRoleId() != null) {
-      entity.setRole(roleService.findByIdOrThrow(input.getRoleId()));
+      var role = roleService.findByIdOrThrow(input.getRoleId());
+      if (role.getRoleType() == RoleType.SYSTEM && input.getScopeId() != null) {
+        throw new InvalidInputException("Assignment", "roleId", "SYSTEM roles cannot be scoped");
+      }
+      entity.setRole(role);
     } else {
       entity.setRole(null);
     }
