@@ -138,6 +138,7 @@ public class KafkaSagaActionDispatcher implements SagaActionDispatcher {
     message.put("type", "SAGA_FAILED");
     message.put("messageId", UUID.randomUUID().toString());
     message.put("sagaId", fail.sagaId());
+    message.put("datasetId", fail.datasetId());
     message.put("status", fail.compensated() ? "COMPENSATED" : "FAILED");
     message.put("failedStep", fail.failedStep());
     message.put("error", fail.error());
