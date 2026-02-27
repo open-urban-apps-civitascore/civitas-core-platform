@@ -1110,11 +1110,8 @@ class SagaStateMachineTest {
       assertEquals(0, fail.cleanedResources().size());
     }
 
-    // ─── pipelineIds-only trigger (DELETE saga from unrelease) ────────────────
-
     @Test
-    @DisplayName(
-        "8.8: DELETE trigger with only pipelineIds (no dataPipelines) runs delete-pipelines")
+    @DisplayName("DELETE trigger with only pipelineIds (no dataPipelines) runs delete-pipelines")
     void startSaga_deleteWithOnlyPipelineIds_shouldRunDeletePipelinesStep() {
       var r = sm.startSaga(def, DATASET_ID, deleteTriggerWithOnlyPipelineIds(), NOW);
 
