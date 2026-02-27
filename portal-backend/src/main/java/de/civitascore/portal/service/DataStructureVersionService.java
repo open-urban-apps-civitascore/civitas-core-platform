@@ -6,8 +6,10 @@ import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
+import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,6 +28,7 @@ public class DataStructureVersionService
 
   private final DataStructureService dataStructureService;
   private final ModelService modelService;
+  private final DataSourceRepository dataSourceRepository;
 
   @Override
   protected DataStructureVersionRepository getRepository() {
@@ -248,6 +251,7 @@ public class DataStructureVersionService
           "dataStructureVersionStatus", id, "DataStructureVersion is already in DRAFT status");
     }
 
+    validateNotInUse(id);
     validateExistenceOfOtherPublishedVersion(
         version,
         "Cannot unpublish this DataStructureVersion because it is the only published version of a published DataStructure. Please unpublish the DataStructure first.");
@@ -259,11 +263,21 @@ public class DataStructureVersionService
   @Override
   protected DataStructureVersion preProcessDelete(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
+    validateNotInUse(id);
     validateExistenceOfOtherPublishedVersion(
         version,
         "Cannot delete this DataStructureVersion because it is the only published version of a published DataStructure. Please unpublish the DataStructure first.");
 
     return version;
+  }
+
+  private void validateNotInUse(UUID versionId) {
+    if (dataSourceRepository.existsByDataStructureVersionId(versionId)) {
+      throw new ResourceInUseException(
+          "DataStructureVersion",
+          versionId,
+          "Cannot modify DataStructureVersion because it is referenced by one or more DataSources.");
+    }
   }
 
   private void validateExistenceOfOtherPublishedVersion(

@@ -14,4 +14,5 @@ public class DataStructureOutputDTO extends BaseOutputDTO {
   private DataStructureStatus dataStructureStatus;
   private Boolean createdFromDataSource;
   private List<DataStructureVersionSummaryDTO> dataStructureVersions;
+  private boolean inUse;
 }
