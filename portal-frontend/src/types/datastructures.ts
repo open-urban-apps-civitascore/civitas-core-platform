@@ -42,6 +42,7 @@ export const DatastructureVersionApiResponseSchema = z.object({
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   modelAtlasUri: z.string().nullable(),
   modelName: z.string().nullable(),
+  model: z.string().nullable(),
   styles: UMLModelStylesPayloadSchema.nullable(),
   inUse: z.boolean().optional(),
   dataStructure: ItemSchema,
@@ -52,7 +53,7 @@ export const DatastructureVersionApiResponseSchema = z.object({
 export const DatastructureVersionSummaryApiResponseSchema = z.object({
   id: z.string(),
   version: z.string(),
-  description: z.string().optional(),
+  description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   createdAt: z.string(),
@@ -123,7 +124,7 @@ export type Datastructure = z.infer<typeof DatastructureApiResponseSchema>
 export const DatastructureApiResponseSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
-  description: z.string(),
+  description: z.string().nullable(),
 })
 
 export const DatastructureFormDraftSchema = z.object({

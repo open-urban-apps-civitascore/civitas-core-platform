@@ -13,7 +13,12 @@ export const StructureDefinitionTab = (props: StructureDefinitionTabProps) => {
     <UmlModeler isReadOnly={isReadOnly} modelSessionManager={modelSessionManager} isMultiSessionMode={false} />
   ) : (
     <PageBackground className="overflow-y-auto p-0" hasBackground={!isReadOnly}>
-      <UmlModeler isReadOnly={isReadOnly} modelSessionManager={modelSessionManager} isMultiSessionMode={false} />
+      <UmlModeler
+        isReadOnly={isReadOnly}
+        modelSessionManager={modelSessionManager}
+        isMultiSessionMode={false}
+        canExportXmi={false}
+      />
     </PageBackground>
   )
 }

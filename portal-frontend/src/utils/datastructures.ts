@@ -15,7 +15,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
     return {
       id: datastructure.id,
       name: datastructure.name,
-      description: datastructure.description,
+      description: datastructure.description || '-',
       status: datastructure.dataStructureStatus,
       versionNumber: highestVersion?.version || null,
       source: highestVersion?.dataStructureVersionSource || null,
@@ -24,7 +24,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
         id: version.id,
         versionNumber: version.version,
         name: `Version ${version.version}`,
-        description: version.description,
+        description: version.description || '-',
         status: version.dataStructureVersionStatus,
         source: version.dataStructureVersionSource,
         versions: [],
@@ -40,7 +40,7 @@ export const mapDatastructureVersionsApiToListData = (
     id: version.id,
     versionNumber: version.version,
     name: `Version ${version.version}`,
-    description: version.description,
+    description: version.description || '-',
     status: version.dataStructureVersionStatus,
     source: version.dataStructureVersionSource,
   }))

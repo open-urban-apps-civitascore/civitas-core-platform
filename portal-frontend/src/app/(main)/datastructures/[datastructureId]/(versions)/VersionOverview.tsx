@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -21,24 +21,25 @@ import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
+import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
+import { importFromXmi } from '@/components/uml-modeler/services/xmiImportService'
+import { DirtyField } from '@/components/uml-modeler/types/session'
 import { useQueryParams } from '@/hooks/use-query-params'
 import {
   DATASTRUCTURE_STATUS_TYPES,
   DATASTRUCTURE_VERSION_SOURCE,
   DatastructureFormAvailableSchema,
   DatastructureStatus,
-  DatastructureVersionCreateData,
+  DatastructureVersion,
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionFormData,
   DatastructureVersionFormDraftSchema,
-  DatastructureVersionSummary,
   DatastructureVersionTab,
 } from '@/types/datastructures'
 import { pickDirtyValues } from '@/utils/form'
 
 import { StructureDefinitionTab } from './components/structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './components/version-info-tab/VersionInfoTab'
-import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 
 export const defaultFormData: DatastructureVersionFormData = {
   id: '',
@@ -68,7 +69,7 @@ const DEFAULT_TAB = tabs[0]
 interface VersionOverviewProps {
   title: string
   datastructureId: string
-  version: DatastructureVersionSummary | null
+  version: DatastructureVersion | null
   isCreateMode: boolean
   testId: string
 }
@@ -80,15 +81,27 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const t = useTranslations('datastructureVersion')
   const tCommon = useTranslations('common')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
-  const modelSessionManager = useMultiSessionManager({})
-  const initialUmlModelData = useMemo(
-    () => buildUMLModelPayload(modelSessionManager.activeSession?.diagram as UMLDiagram),
-    [],
+  const initialFormValues = useRef<DatastructureVersionFormData>(
+    version ? { ...version, description: version?.description || '' } : defaultFormData,
   )
+  const initialSession = useMemo(() => {
+    const values = initialFormValues.current
+    const importResult = importFromXmi(values?.model || '')
+    const diagram = importResult.diagram
+    if (!diagram && !values?.modelName) return undefined
+    if (!diagram) return createEmptySession(values.modelName as string)
+    return {
+      id: diagram.id,
+      name: values?.modelName || 'Untitled Diagram',
+      diagram: diagram,
+      isDirty: false,
+      dirtyFields: new Set<DirtyField>(),
+      lastModified: diagram.lastModified,
+      created: diagram.lastModified,
+    }
+  }, [initialFormValues])
 
-  useEffect(() => {
-    console.log('dirtyFields', modelSessionManager.activeSession?.dirtyFields)
-  }, [modelSessionManager.activeSession?.dirtyFields])
+  const modelSessionManager = useMultiSessionManager({ initialSession })
 
   const router = useRouter()
 
@@ -99,25 +112,19 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const createVersion = useCreateDatastructureVersion(datastructureId)
   const isLoading = updateVersion.isPending
 
-  const initialFormValues = version || defaultFormData
-
   const form = useForm<DatastructureVersionFormData>({
     resolver: zodResolver(DatastructureVersionFormDraftSchema),
     mode: 'onChange',
-    defaultValues: initialFormValues,
+    defaultValues: initialFormValues.current,
   })
 
   const dirtyModelFields = modelSessionManager.activeSession?.dirtyFields
-
-  useEffect(() => {
-    form.reset(initialFormValues)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version])
 
   const formValues = useWatch({ control: form.control })
   const descriptionWatch = form.watch('description')
   const statusWatch = form.watch('dataStructureVersionStatus')
   const versionWatch = form.watch('version')
+  const modelWatch = form.watch('model')
   const sourceWatch = form.watch('dataStructureVersionSource')
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
@@ -170,7 +177,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }
 
   useEffect(() => {
-    console.log('dirtyModelFields', 'diagram changed')
     const diagram = modelSessionManager.activeSession?.diagram
     const hasNameChanges = dirtyModelFields?.has('modelName')
     const hasModelChanges = dirtyModelFields?.has('model')
@@ -185,12 +191,17 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         shouldDirty: true,
       })
     }
-  }, [dirtyModelFields])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirtyModelFields, versionWatch])
 
   useEffect(() => {
-    console.log('form watch', formValues)
-    console.log('form form.formState.dirtyFields', form.formState.dirtyFields)
-  }, [formValues])
+    if (versionWatch && modelWatch) {
+      form.setValue('modelAtlasUri', `http://civitas.org/model/${datastructureId}+${versionWatch}`, {
+        shouldDirty: true,
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versionWatch, modelWatch])
 
   const handleCreateVersion = () => {
     const values = form.getValues()
@@ -203,6 +214,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
       return
     }
 
+    // eslint-disable-next-line unused-imports/no-unused-vars
     const { id, ...createData } = parsed.data
 
     createVersion.mutate(createData, {
@@ -211,7 +223,10 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         setIsExitModalOpen(false)
         router.push(`/datastructures/${datastructureId}/${data.id}?mode=edit`)
       },
-      onError: () => toast.error(tCommon('errors.unexpectedError')),
+      onError: () => {
+        toast.error(tCommon('errors.unexpectedError'))
+        setIsExitModalOpen(false)
+      },
     })
   }
 
@@ -236,7 +251,10 @@ export const VersionOverview = (props: VersionOverviewProps) => {
           setIsExitModalOpen(false)
           router.refresh()
         },
-        onError: () => toast.error(tCommon('errors.unexpectedError')),
+        onError: () => {
+          toast.error(tCommon('errors.unexpectedError'))
+          setIsExitModalOpen(false)
+        },
       },
     )
   }
@@ -244,7 +262,13 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const handleSave = isCreateMode ? handleCreateVersion : handleUpdateVersion
 
   const handleExit = () => {
-    form.reset()
+    if (modelSessionManager.activeSessionId) {
+      modelSessionManager.closeSession(
+        modelSessionManager.activeSessionId,
+        initialFormValues.current.modelName || undefined,
+      )
+    }
+    form.reset(initialFormValues.current)
     setIsReadOnly(true)
     setIsExitModalOpen(false)
   }

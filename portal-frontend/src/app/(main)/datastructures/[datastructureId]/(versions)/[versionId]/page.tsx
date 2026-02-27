@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server'
 
 import { getDatastructureVersion } from '@/app/services/api/datastructures/versions/serverRequests'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
-import { DatastructureApiResponseSchema, DatastructureVersionApiResponseSchema } from '@/types/datastructures'
+import { DatastructureVersionApiResponseSchema } from '@/types/datastructures'
 
 import { VersionOverview } from '../VersionOverview'
 

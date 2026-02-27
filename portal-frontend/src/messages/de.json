@@ -520,6 +520,10 @@
     },
     "source": {
       "OWN": "Eigene"
+    },
+    "messages": {
+      "createSuccess": "Die Version der Datenstruktur wurde erfolgreich angelegt.",
+      "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert."
     }
   },
   "pipelineEditor": {

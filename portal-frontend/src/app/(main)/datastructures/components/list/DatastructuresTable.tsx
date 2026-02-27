@@ -49,11 +49,15 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
       cell: ({ row }: CellContext<DatastructuresListData, unknown>) => (
         <ExpanderCell row={row} className="font-medium">
-          {row.depth > 0 ? (
-            row.original.name
-          ) : (
-            <LinkCell href={`datastructures/${row.original.id}`}>{row.original.name}</LinkCell>
-          )}
+          <LinkCell
+            href={
+              row.depth === 0
+                ? `datastructures/${row.original.id}`
+                : `datastructures/${row.parentId}/${row.original.id}`
+            }
+          >
+            {row.original.name}
+          </LinkCell>
         </ExpanderCell>
       ),
       meta: {
