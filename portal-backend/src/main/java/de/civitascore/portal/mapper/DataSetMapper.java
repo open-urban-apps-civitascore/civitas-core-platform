@@ -26,6 +26,13 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "distributions", ignore = true)
   @Mapping(target = "catalogs", ignore = true)
   @Mapping(target = "pipelines", ignore = true)
+  @Mapping(target = "projectId", ignore = true)
+  @Mapping(target = "frostBaseUrl", ignore = true)
+  @Mapping(target = "routeId", ignore = true)
+  @Mapping(target = "serviceId", ignore = true)
+  @Mapping(target = "publicUrl", ignore = true)
+  @Mapping(target = "pipelineIds", ignore = true)
+  @Mapping(target = "pendingSagaType", ignore = true)
   @Mapping(target = "assignments", ignore = true)
   @Override
   DataSet toEntity(DataSetInputDTO input);
@@ -48,6 +55,13 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Mapping(target = "catalogs", ignore = true)
   @Mapping(target = "pipelines", ignore = true)
   @Mapping(target = "assignments", ignore = true)
+  @Mapping(target = "projectId", ignore = true)
+  @Mapping(target = "frostBaseUrl", ignore = true)
+  @Mapping(target = "routeId", ignore = true)
+  @Mapping(target = "serviceId", ignore = true)
+  @Mapping(target = "publicUrl", ignore = true)
+  @Mapping(target = "pipelineIds", ignore = true)
+  @Mapping(target = "pendingSagaType", ignore = true)
   @Override
   void updateEntity(@MappingTarget DataSet entity, DataSetInputDTO input);
 }

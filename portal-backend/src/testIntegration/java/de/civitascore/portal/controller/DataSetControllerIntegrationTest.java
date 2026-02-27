@@ -83,6 +83,15 @@ class DataSetControllerIntegrationTest
     userRepository.deleteAll();
   }
 
+  /** Seeds the minimum publish requirement: one datasource linked to the first pipeline. */
+  private void seedPublishRequirements(Pipeline... pipelines) {
+    DataSource dataSource = new DataSource();
+    dataSource.setName("publish-datasource-" + System.nanoTime());
+    dataSource = dataSourceRepository.save(dataSource);
+    pipelines[0].getDataSources().add(dataSource);
+    pipelineRepository.save(pipelines[0]);
+  }
+
   @Override
   protected DataSetInputDTO createValidInput() {
     DataSetInputDTO input = new DataSetInputDTO();
@@ -440,8 +449,8 @@ class DataSetControllerIntegrationTest
       ResponseEntity<DataSetOutputDTO> response = performUpdate(dataSetId, updateInput);
 
       assertThat(response.getStatusCode())
-          .as("Should return CONFLICT status for %s dataset", status)
-          .isEqualTo(HttpStatus.CONFLICT);
+          .as("Should return BAD_REQUEST status for %s dataset", status)
+          .isEqualTo(HttpStatus.BAD_REQUEST);
 
       // Verify dataset was not modified
       DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElse(null);
@@ -523,8 +532,8 @@ class DataSetControllerIntegrationTest
               getOutputTypeReference());
 
       assertThat(response.getStatusCode())
-          .as("Should return CONFLICT status for DRAFT dataset")
-          .isEqualTo(HttpStatus.CONFLICT);
+          .as("Should return BAD_REQUEST status for DRAFT dataset")
+          .isEqualTo(HttpStatus.BAD_REQUEST);
 
       // Verify dataset was not modified
       DataSet unchangedDataSet = dataSetRepository.findById(dataSetId).orElse(null);
@@ -872,6 +881,8 @@ class DataSetControllerIntegrationTest
       pipeline2.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline2);
 
+      seedPublishRequirements(pipeline1, pipeline2);
+
       UUID dataSetId = dataSet.getId();
 
       ResponseEntity<DataSetOutputDTO> response =
@@ -997,6 +1008,8 @@ class DataSetControllerIntegrationTest
       pipeline2.setApis(Collections.singletonList("/api/v1/traffic")); // Same as in pipeline1
       pipeline2.setPersistences(Collections.singletonList(12345L));
       pipelineRepository.save(pipeline2);
+
+      seedPublishRequirements(pipeline1, pipeline2);
 
       UUID dataSetId = dataSet.getId();
 

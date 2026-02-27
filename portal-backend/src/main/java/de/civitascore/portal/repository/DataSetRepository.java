@@ -21,4 +21,8 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
   @EntityGraph(attributePaths = {"owner", "pipelines", "distributions"})
   @Query("SELECT d FROM DataSet d WHERE d.id = :id")
   Optional<DataSet> findByIdWithRelations(@Param("id") UUID id);
+
+  @EntityGraph(attributePaths = {"owner", "pipelines", "pipelines.dataSources", "distributions"})
+  @Query("SELECT d FROM DataSet d WHERE d.id = :id")
+  Optional<DataSet> findByIdWithPipelineDataSources(@Param("id") UUID id);
 }

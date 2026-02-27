@@ -40,7 +40,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 @DisplayName("DataSet Service Integration Tests")
-class DataSetServiceIT extends BaseKeycloakIntegrationTest {
+class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @Autowired private DataSetService dataSetService;
 
@@ -193,7 +193,6 @@ class DataSetServiceIT extends BaseKeycloakIntegrationTest {
   }
 
   private Pipeline createPipelineForDataSet(DataSet dataSet, String name) {
-    // Create data sources for the pipeline
     DataSource dataSource1 = new DataSource();
     dataSource1.setName("test_ds_1_" + System.currentTimeMillis());
     dataSource1 = dataSourceRepository.save(dataSource1);
