@@ -271,6 +271,40 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Config adapter - Saga orchestrator + adapters for E2E saga integration tests -->
+        <dependency>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-orchestrator</artifactId>
+            <version>${config-adapter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-frost</artifactId>
+            <version>${config-adapter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-apisix</artifactId>
+            <version>${config-adapter.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.civitas-core</groupId>
+            <artifactId>config-adapter-redpanda</artifactId>
+            <version>${config-adapter.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Testcontainers Kafka for saga E2E tests (real broker, not EmbeddedKafka) -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-kafka</artifactId>
+            <version>${testcontainers.version}</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -469,6 +503,7 @@
                     <includes>
                         <include>**/*IntegrationTest.java</include>
                     </includes>
+                    <excludedGroups>saga</excludedGroups>
                 </configuration>
             </plugin>
 
@@ -542,4 +577,25 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>saga</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-failsafe-plugin</artifactId>
+                        <configuration combine.self="override">
+                            <includes>
+                                <include>**/*IntegrationTest.java</include>
+                            </includes>
+                            <groups>saga</groups>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
