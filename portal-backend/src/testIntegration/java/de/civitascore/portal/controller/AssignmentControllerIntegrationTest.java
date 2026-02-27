@@ -92,7 +92,7 @@ class AssignmentControllerIntegrationTest
 
   private UUID createTestGroup() {
     Group group = new Group();
-    group.setName("Test Group " + System.currentTimeMillis());
+    group.setName("Test Group " + UUID.randomUUID().toString().substring(0, 8));
     group.setDescription("Test group for assignment");
     return groupRepository.save(group).getId();
   }
@@ -115,7 +115,7 @@ class AssignmentControllerIntegrationTest
 
   private DataSpace createTestDataSpaceEntity() {
     DataSpace dataSpace = new DataSpace();
-    dataSpace.setName("Test DataSpace " + System.currentTimeMillis());
+    dataSpace.setName("Test DataSpace " + UUID.randomUUID().toString().substring(0, 8));
     dataSpace.setDescription("Test dataspace for assignment");
     return dataSpaceRepository.save(dataSpace);
   }
@@ -123,7 +123,7 @@ class AssignmentControllerIntegrationTest
   private UUID createTestDataSet(UUID dataSpaceId) {
     DataSpace dataSpace = dataSpaceRepository.findById(dataSpaceId).orElseThrow();
     DataSet dataSet = new DataSet();
-    dataSet.setName("Test DataSet " + System.currentTimeMillis());
+    dataSet.setName("Test DataSet " + UUID.randomUUID().toString().substring(0, 8));
     dataSet.setDescription("Test dataset for assignment");
     dataSet.setDataSpaces(Set.of(dataSpace));
     return dataSetRepository.save(dataSet).getId();
@@ -131,7 +131,7 @@ class AssignmentControllerIntegrationTest
 
   private UUID createTestCatalog() {
     Catalog catalog = new Catalog();
-    catalog.setName("Test Catalog " + System.currentTimeMillis());
+    catalog.setName("Test Catalog " + UUID.randomUUID().toString().substring(0, 8));
     catalog.setDescription("Test catalog for assignment");
     return catalogRepository.save(catalog).getId();
   }

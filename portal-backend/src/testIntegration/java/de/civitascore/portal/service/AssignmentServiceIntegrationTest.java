@@ -69,40 +69,40 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   void setUp() {
     // Create test group
     GroupInputDTO groupInput = new GroupInputDTO();
-    groupInput.setName("Test Group " + System.currentTimeMillis());
+    groupInput.setName("Test Group " + UUID.randomUUID().toString().substring(0, 8));
     groupInput.setDescription("Test group for assignment testing");
     testGroup = groupService.create(groupInput);
 
     // Create test DATA role
     RoleInputDTO dataRoleInput = new RoleInputDTO();
-    dataRoleInput.setName("test_data_role_" + System.currentTimeMillis());
+    dataRoleInput.setName("test_data_role_" + UUID.randomUUID().toString().substring(0, 8));
     dataRoleInput.setDescription("Test DATA role for assignment testing");
     dataRoleInput.setRoleType(RoleType.DATA);
     testDataRole = roleService.create(dataRoleInput);
 
     // Create test SYSTEM role
     RoleInputDTO systemRoleInput = new RoleInputDTO();
-    systemRoleInput.setName("test_system_role_" + System.currentTimeMillis());
+    systemRoleInput.setName("test_system_role_" + UUID.randomUUID().toString().substring(0, 8));
     systemRoleInput.setDescription("Test SYSTEM role for assignment testing");
     systemRoleInput.setRoleType(RoleType.SYSTEM);
     testSystemRole = roleService.create(systemRoleInput);
 
     // Create test DataSpace
     DataSpaceInputDTO dataSpaceInput = new DataSpaceInputDTO();
-    dataSpaceInput.setName("Test DataSpace " + System.currentTimeMillis());
+    dataSpaceInput.setName("Test DataSpace " + UUID.randomUUID().toString().substring(0, 8));
     dataSpaceInput.setDescription("Test dataspace for assignment testing");
     testDataSpace = dataSpaceService.create(dataSpaceInput);
 
     // Create test DataSet
     DataSetInputDTO dataSetInput = new DataSetInputDTO();
-    dataSetInput.setName("Test DataSet " + System.currentTimeMillis());
+    dataSetInput.setName("Test DataSet " + UUID.randomUUID().toString().substring(0, 8));
     dataSetInput.setDescription("Test dataset for assignment testing");
     dataSetInput.setOpenDataAccess(false);
     testDataSet = dataSetService.create(dataSetInput);
 
     // Create test Catalog
     CatalogInputDTO catalogInput = new CatalogInputDTO();
-    catalogInput.setName("Test Catalog " + System.currentTimeMillis());
+    catalogInput.setName("Test Catalog " + UUID.randomUUID().toString().substring(0, 8));
     catalogInput.setDescription("Test catalog for assignment testing");
     testCatalog = catalogService.create(catalogInput);
 
@@ -237,7 +237,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       assertThatThrownBy(() -> assignmentService.create(input))
           .isInstanceOf(ResourceNotFoundException.class)
-          .hasMessageContaining("Datasource");
+          .hasMessageContaining("DataSource");
     }
 
     @Test
@@ -474,7 +474,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     void shouldSucceedWhenGovernanceRoleHasNonNullScope() {
       // Create GOVERNANCE role
       RoleInputDTO governanceRoleInput = new RoleInputDTO();
-      governanceRoleInput.setName("test_governance_role_" + System.currentTimeMillis());
+      governanceRoleInput.setName(
+          "test_governance_role_" + UUID.randomUUID().toString().substring(0, 8));
       governanceRoleInput.setDescription("Test GOVERNANCE role");
       governanceRoleInput.setRoleType(RoleType.GOVERNANCE);
       Role governanceRole = roleService.create(governanceRoleInput);
@@ -496,7 +497,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     void shouldFailWhenGovernanceRoleHasNullScope() {
       // Create GOVERNANCE role
       RoleInputDTO governanceRoleInput = new RoleInputDTO();
-      governanceRoleInput.setName("test_governance_role_" + System.currentTimeMillis());
+      governanceRoleInput.setName(
+          "test_governance_role_" + UUID.randomUUID().toString().substring(0, 8));
       governanceRoleInput.setDescription("Test GOVERNANCE role");
       governanceRoleInput.setRoleType(RoleType.GOVERNANCE);
       Role governanceRole = roleService.create(governanceRoleInput);
@@ -797,7 +799,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     void shouldReturnMultipleAssignmentsForSameScope() {
       // Create second group
       GroupInputDTO groupInput = new GroupInputDTO();
-      groupInput.setName("Second Group " + System.currentTimeMillis());
+      groupInput.setName("Second Group " + UUID.randomUUID().toString().substring(0, 8));
       groupInput.setDescription("Second test group");
       Group secondGroup = groupService.create(groupInput);
 
@@ -897,7 +899,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       // Create a second group for the replacement
       GroupInputDTO groupInput = new GroupInputDTO();
-      groupInput.setName("Replacement Group " + System.currentTimeMillis());
+      groupInput.setName("Replacement Group " + UUID.randomUUID().toString().substring(0, 8));
       groupInput.setDescription("Group for replacement");
       Group replacementGroup = groupService.create(groupInput);
 
@@ -959,7 +961,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     void shouldCreateMultipleAssignmentsForSameScope() {
       // Create a second group
       GroupInputDTO groupInput = new GroupInputDTO();
-      groupInput.setName("Second Group " + System.currentTimeMillis());
+      groupInput.setName("Second Group " + UUID.randomUUID().toString().substring(0, 8));
       groupInput.setDescription("Second group");
       Group secondGroup = groupService.create(groupInput);
 
@@ -1079,7 +1081,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
       // First input is valid, second has non-existent group
       GroupInputDTO groupInput = new GroupInputDTO();
-      groupInput.setName("Valid Group " + System.currentTimeMillis());
+      groupInput.setName("Valid Group " + UUID.randomUUID().toString().substring(0, 8));
       groupInput.setDescription("Valid group");
       Group validGroup = groupService.create(groupInput);
 
@@ -1199,7 +1201,7 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     void shouldHandleMultipleAssignmentsForSameGroupWithDifferentRoles() {
       // Create second DATA role
       RoleInputDTO roleInput = new RoleInputDTO();
-      roleInput.setName("test_data_role_2_" + System.currentTimeMillis());
+      roleInput.setName("test_data_role_2_" + UUID.randomUUID().toString().substring(0, 8));
       roleInput.setDescription("Second test DATA role");
       roleInput.setRoleType(RoleType.DATA);
       Role secondDataRole = roleService.create(roleInput);

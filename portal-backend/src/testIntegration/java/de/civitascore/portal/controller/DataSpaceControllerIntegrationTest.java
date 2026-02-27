@@ -41,7 +41,7 @@ class DataSpaceControllerIntegrationTest
   @Override
   protected DataSpaceInputDTO createValidInput() {
     DataSpaceInputDTO input = new DataSpaceInputDTO();
-    input.setName("test_dataspace_" + System.currentTimeMillis());
+    input.setName("test_dataspace_" + UUID.randomUUID().toString().substring(0, 8));
     input.setDescription("A test dataspace for integration testing");
     input.setExternalId("ext-" + System.currentTimeMillis());
     return input;

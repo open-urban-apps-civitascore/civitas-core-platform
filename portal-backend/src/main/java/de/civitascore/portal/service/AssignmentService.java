@@ -3,15 +3,10 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.AssignmentMapper;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
-import de.civitascore.portal.model.entity.Catalog;
-import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.DataSpace;
-import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
 import de.civitascore.portal.model.input.AssignmentScopedInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,15 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AssignmentService extends BaseService<Assignment, AssignmentInputDTO> {
 
-  private final CatalogService catalogService;
-
   private final AssignmentRepository assignmentRepository;
   private final AssignmentMapper assignmentMapper;
   private final GroupService groupService;
   private final RoleService roleService;
-  private final DataSetService datasetService;
-  private final DataSpaceService dataSpaceService;
-  private final DataStructureService dataStructureService;
+  private final ScopeResolverService scopeResolverService;
 
   @Override
   protected AssignmentRepository getRepository() {
@@ -63,31 +54,7 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
       entity.setRole(null);
     }
 
-    ScopeType scopeType = input.getScopeType();
-    UUID scopeId = input.getScopeId();
-
-    if (scopeId == null) return super.postConvertToEntity(entity, input);
-
-    if (scopeType == ScopeType.DATASET) {
-      DataSet dataset = datasetService.findByIdOrThrow(scopeId);
-      entity.setDataset(dataset);
-    }
-    if (scopeType == ScopeType.DATASPACE) {
-      DataSpace dataSpace = dataSpaceService.findByIdOrThrow(scopeId);
-      entity.setDataSpace(dataSpace);
-    }
-    if (scopeType == ScopeType.CATALOG) {
-      Catalog catalog = catalogService.findByIdOrThrow(scopeId);
-      entity.setCatalog(catalog);
-    }
-    // TODO: set dataSource
-    if (scopeType == ScopeType.DATASOURCE) {
-      throw new ResourceNotFoundException("Datasource", scopeId);
-    }
-    if (scopeType == ScopeType.DATASTRUCTURE) {
-      DataStructure dataStructure = dataStructureService.findByIdOrThrow(scopeId);
-      entity.setDataStructure(dataStructure);
-    }
+    entity = scopeResolverService.resolveScope(entity, input.getScopeType(), input.getScopeId());
 
     return super.postConvertToEntity(entity, input);
   }
