@@ -4,9 +4,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionSource;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.entity.DataStructure;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.repository.DataSourceRepository;
+import de.civitascore.portal.repository.DataStructureRepository;
+import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
@@ -30,6 +37,8 @@ class DataSourceControllerIntegrationTest
   private static final String DATASOURCES_ENDPOINT = "/datasources";
 
   @Autowired private DataSourceRepository dataSourceRepository;
+  @Autowired private DataStructureRepository dataStructureRepository;
+  @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -39,6 +48,23 @@ class DataSourceControllerIntegrationTest
   @Override
   protected void performAdditionalCleanup() {
     dataSourceRepository.deleteAll();
+    dataStructureVersionRepository.deleteAll();
+    dataStructureRepository.deleteAll();
+  }
+
+  private UUID createAvailableDataStructureVersionId() {
+    DataStructure ds = new DataStructure();
+    ds.setName("ds_" + UUID.randomUUID().toString().substring(0, 8));
+    ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+    ds = dataStructureRepository.save(ds);
+
+    DataStructureVersion dsv = new DataStructureVersion();
+    dsv.setVersion("1.0.0");
+    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+    dsv.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+    dsv.setDataStructure(ds);
+    dsv = dataStructureVersionRepository.save(dsv);
+    return dsv.getId();
   }
 
   @Override
@@ -83,6 +109,22 @@ class DataSourceControllerIntegrationTest
     return output.getId();
   }
 
+  private UUID createPublishableTestEntity() {
+    UUID dsvId = createAvailableDataStructureVersionId();
+    DataSourceInputDTO input = createValidInput();
+    input.setDataStructureVersionId(dsvId);
+    ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
+    return response.getBody().getId();
+  }
+
+  private UUID createPublishableSqlTestEntity() {
+    UUID dsvId = createAvailableDataStructureVersionId();
+    DataSourceInputDTO input = createValidSqlInput();
+    input.setDataStructureVersionId(dsvId);
+    ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
+    return response.getBody().getId();
+  }
+
   private ResponseEntity<DataSourceOutputDTO> performPublish(UUID id) {
     String url = DATASOURCES_ENDPOINT + "/" + id + "/publish";
     return exchange(url, HttpMethod.POST, createAuthHeaders(), null, getOutputTypeReference());
@@ -98,6 +140,36 @@ class DataSourceControllerIntegrationTest
     String url = DATASOURCES_ENDPOINT + "/" + id;
     return restTemplate.exchange(
         url, HttpMethod.GET, new HttpEntity<>(createAuthHeaders()), String.class);
+  }
+
+  private UUID createDraftDataStructureVersionId() {
+    DataStructure ds = new DataStructure();
+    ds.setName("ds_" + UUID.randomUUID().toString().substring(0, 8));
+    ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+    ds = dataStructureRepository.save(ds);
+
+    DataStructureVersion dsv = new DataStructureVersion();
+    dsv.setVersion("1.0.0");
+    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+    dsv.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+    dsv.setDataStructure(ds);
+    dsv = dataStructureVersionRepository.save(dsv);
+    return dsv.getId();
+  }
+
+  private UUID createDsvWithDraftParentDataStructure() {
+    DataStructure ds = new DataStructure();
+    ds.setName("ds_" + UUID.randomUUID().toString().substring(0, 8));
+    ds.setDataStructureStatus(DataStructureStatus.DRAFT);
+    ds = dataStructureRepository.save(ds);
+
+    DataStructureVersion dsv = new DataStructureVersion();
+    dsv.setVersion("1.0.0");
+    dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+    dsv.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+    dsv.setDataStructure(ds);
+    dsv = dataStructureVersionRepository.save(dsv);
+    return dsv.getId();
   }
 
   private DataSourceInputDTO createValidSqlInput() {
@@ -292,7 +364,7 @@ class DataSourceControllerIntegrationTest
     @Test
     @DisplayName("Should publish valid MQTT data source")
     void shouldPublishValidMqttDataSource() {
-      UUID id = createTestEntity();
+      UUID id = createPublishableTestEntity();
 
       ResponseEntity<DataSourceOutputDTO> response = performPublish(id);
 
@@ -304,9 +376,7 @@ class DataSourceControllerIntegrationTest
     @Test
     @DisplayName("Should publish valid SQL data source")
     void shouldPublishValidSqlDataSource() {
-      DataSourceInputDTO input = createValidSqlInput();
-      ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
-      UUID id = createResponse.getBody().getId();
+      UUID id = createPublishableSqlTestEntity();
 
       ResponseEntity<DataSourceOutputDTO> response = performPublish(id);
 
@@ -317,7 +387,7 @@ class DataSourceControllerIntegrationTest
     @Test
     @DisplayName("Should fail to publish already AVAILABLE data source")
     void shouldFailToPublishAvailableDataSource() {
-      UUID id = createTestEntity();
+      UUID id = createPublishableTestEntity();
       performPublish(id);
 
       ResponseEntity<String> response = performPublishExpectingError(id);
@@ -369,7 +439,7 @@ class DataSourceControllerIntegrationTest
     @Test
     @DisplayName("Should fail to delete AVAILABLE data source")
     void shouldFailToDeleteAvailableDataSource() {
-      UUID id = createTestEntity();
+      UUID id = createPublishableTestEntity();
       performPublish(id);
 
       ResponseEntity<Void> response = performDelete(id);
@@ -519,9 +589,7 @@ class DataSourceControllerIntegrationTest
     @Test
     @DisplayName("PATCH then publish should work")
     void patchThenPublishShouldWork() {
-      DataSourceInputDTO input = createValidSqlInput();
-      ResponseEntity<DataSourceOutputDTO> createResponse = performCreate(input);
-      UUID id = createResponse.getBody().getId();
+      UUID id = createPublishableSqlTestEntity();
 
       Map<String, Object> patch = Map.of("description", "Published via patch");
       ResponseEntity<DataSourceOutputDTO> patchResponse = performPatch(id, patch);
@@ -614,9 +682,7 @@ class DataSourceControllerIntegrationTest
       String existingName = first.getName();
       performCreate(first);
 
-      DataSourceInputDTO second = createValidInput();
-      ResponseEntity<DataSourceOutputDTO> secondResponse = performCreate(second);
-      UUID secondId = secondResponse.getBody().getId();
+      UUID secondId = createPublishableTestEntity();
       performPublish(secondId);
 
       Map<String, Object> metaUpdate = Map.of("name", existingName);
@@ -644,6 +710,107 @@ class DataSourceControllerIntegrationTest
       ResponseEntity<DataSourceOutputDTO> updateResponse = performUpdate(id, update);
 
       assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+  }
+
+  @Nested
+  @DisplayName("DataStructureVersion Linking Tests")
+  class DataStructureVersionLinkingTests {
+
+    @Test
+    @DisplayName("Should create data source with dataStructureVersionId")
+    void shouldCreateWithDataStructureVersionId() {
+      UUID dsvId = createAvailableDataStructureVersionId();
+      DataSourceInputDTO input = createValidInput();
+      input.setDataStructureVersionId(dsvId);
+
+      ResponseEntity<DataSourceOutputDTO> response = performCreate(input);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody().getDataStructureVersion().getId()).isEqualTo(dsvId);
+    }
+
+    @Test
+    @DisplayName("Should reject linking a DRAFT DataStructureVersion")
+    void shouldRejectLinkingDraftDataStructureVersion() {
+      UUID dsvId = createDraftDataStructureVersionId();
+      DataSourceInputDTO input = createValidInput();
+      input.setDataStructureVersionId(dsvId);
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath(),
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject linking when parent DataStructure is DRAFT")
+    void shouldRejectLinkingWhenParentDataStructureIsDraft() {
+      UUID dsvId = createDsvWithDraftParentDataStructure();
+      DataSourceInputDTO input = createValidInput();
+      input.setDataStructureVersionId(dsvId);
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath(),
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject changing DSV on published data source via PUT")
+    void shouldRejectChangingDsvWhenPublished() {
+      UUID id = createPublishableTestEntity();
+      performPublish(id);
+
+      UUID newDsvId = createAvailableDataStructureVersionId();
+      DataSourceInputDTO update = createUpdateInput();
+      update.setDataStructureVersionId(newDsvId);
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + id,
+              HttpMethod.PUT,
+              new HttpEntity<>(update, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject removing DSV from published data source via PUT")
+    void shouldRejectRemovingDsvWhenPublished() {
+      UUID id = createPublishableTestEntity();
+      performPublish(id);
+
+      DataSourceInputDTO update = createUpdateInput();
+      update.setDataStructureVersionId(null);
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + id,
+              HttpMethod.PUT,
+              new HttpEntity<>(update, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should fail to publish without DataStructureVersion")
+    void shouldFailToPublishWithoutDataStructureVersion() {
+      UUID id = createTestEntity();
+
+      ResponseEntity<String> response = performPublishExpectingError(id);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
   }
 

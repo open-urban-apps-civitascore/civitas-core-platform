@@ -10,6 +10,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
@@ -31,7 +33,10 @@ import org.hibernate.type.SqlTypes;
             columnNames = {"name"}),
     indexes = {
       @Index(name = "idx_data_sources_status", columnList = "data_source_status"),
-      @Index(name = "idx_data_sources_connector_type", columnList = "connector_type")
+      @Index(name = "idx_data_sources_connector_type", columnList = "connector_type"),
+      @Index(
+          name = "idx_data_sources_data_structure_version",
+          columnList = "data_structure_version_id")
     })
 @Getter
 @Setter
@@ -48,6 +53,10 @@ public class DataSource extends BaseDataEntity {
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "configuration", columnDefinition = "jsonb")
   private Map<String, Object> configuration;
+
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "data_structure_version_id")
+  private DataStructureVersion dataStructureVersion;
 
   @OneToMany(
       mappedBy = "dataSource",

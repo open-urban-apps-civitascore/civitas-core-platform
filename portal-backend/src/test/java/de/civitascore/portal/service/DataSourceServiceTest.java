@@ -8,7 +8,11 @@ import static org.mockito.Mockito.when;
 import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.DataStructure;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -40,6 +44,7 @@ class DataSourceServiceTest {
   @Mock private ConnectorHandler mqttHandler;
   @Mock private ConnectorHandler sqlHandler;
   @Mock private AssignmentService assignmentService;
+  @Mock private DataStructureVersionService dataStructureVersionService;
 
   @InjectMocks private DataSourceService dataSourceService;
 
@@ -145,6 +150,23 @@ class DataSourceServiceTest {
     }
 
     @Test
+    @DisplayName("Should fail to publish without data structure version")
+    void shouldFailToPublishWithoutDataStructureVersion() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.DRAFT);
+      entity.setConnectorType(ConnectorType.MQTT);
+      entity.setDataStructureVersion(null);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      assertThatThrownBy(() -> dataSourceService.publish(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Data structure version");
+    }
+
+    @Test
     @DisplayName("Should fail to publish MQTT source without urls")
     void shouldFailToPublishMqttWithoutUrls() {
       UUID id = UUID.randomUUID();
@@ -153,6 +175,7 @@ class DataSourceServiceTest {
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
       entity.setConfiguration(Map.of("topics", List.of("sensor/data"), "qos", 1));
+      entity.setDataStructureVersion(createDataStructureVersion());
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.MQTT)).thenReturn(mqttHandler);
@@ -173,6 +196,7 @@ class DataSourceServiceTest {
       entity.setConnectorType(ConnectorType.MQTT);
       entity.setConfiguration(
           Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("sensor/data"), "qos", 5));
+      entity.setDataStructureVersion(createDataStructureVersion());
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.MQTT)).thenReturn(mqttHandler);
@@ -194,6 +218,7 @@ class DataSourceServiceTest {
       entity.setConnectorType(ConnectorType.SQL);
       entity.setConfiguration(
           Map.of("dsn", "postgres://host/db", "table", "users", "columns", List.of("id")));
+      entity.setDataStructureVersion(createDataStructureVersion());
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.SQL)).thenReturn(sqlHandler);
@@ -214,6 +239,7 @@ class DataSourceServiceTest {
       entity.setDataSourceStatus(DataSourceStatus.DRAFT);
       entity.setConnectorType(ConnectorType.MQTT);
       entity.setConfiguration(Map.of());
+      entity.setDataStructureVersion(createDataStructureVersion());
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
 
@@ -370,6 +396,144 @@ class DataSourceServiceTest {
   }
 
   @Nested
+  @DisplayName("DataStructureVersion Linking")
+  class DataStructureVersionLinkingTests {
+
+    @Test
+    @DisplayName("Should reject linking a DRAFT DataStructureVersion")
+    void shouldRejectLinkingDraftDataStructureVersion() {
+      UUID dsvId = UUID.randomUUID();
+      DataStructureVersion dsv = createDataStructureVersion();
+      dsv.setId(dsvId);
+      dsv.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      DataStructure ds = new DataStructure();
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      dsv.setDataStructure(ds);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("test");
+      input.setDataStructureVersionId(dsvId);
+
+      DataSource entity = new DataSource();
+      entity.setId(UUID.randomUUID());
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+
+      assertThatThrownBy(() -> dataSourceService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("AVAILABLE status");
+    }
+
+    @Test
+    @DisplayName("Should reject linking when parent DataStructure is DRAFT")
+    void shouldRejectLinkingWhenParentDataStructureIsDraft() {
+      UUID dsvId = UUID.randomUUID();
+      DataStructureVersion dsv = createDataStructureVersion();
+      dsv.setId(dsvId);
+      dsv.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      DataStructure ds = new DataStructure();
+      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
+      dsv.setDataStructure(ds);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("test");
+      input.setDataStructureVersionId(dsvId);
+
+      DataSource entity = new DataSource();
+      entity.setId(UUID.randomUUID());
+
+      when(dataSourceMapper.toEntity(any())).thenReturn(entity);
+      when(dataStructureVersionService.findByIdOrThrow(dsvId)).thenReturn(dsv);
+
+      assertThatThrownBy(() -> dataSourceService.create(input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("parent DataStructure");
+    }
+
+    @Test
+    @DisplayName("Should reject changing DSV on AVAILABLE data source")
+    void shouldRejectChangingDsvWhenAvailable() {
+      UUID id = UUID.randomUUID();
+      DataStructureVersion existingDsv = createDataStructureVersion();
+
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setConnectorType(ConnectorType.MQTT);
+      entity.setDataStructureVersion(existingDsv);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("updated");
+      input.setConnectorType(ConnectorType.MQTT);
+      input.setDataStructureVersionId(UUID.randomUUID());
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      assertThatThrownBy(() -> dataSourceService.update(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Cannot change data structure version");
+    }
+
+    @Test
+    @DisplayName("Should reject removing DSV from AVAILABLE data source")
+    void shouldRejectRemovingDsvWhenAvailable() {
+      UUID id = UUID.randomUUID();
+      DataStructureVersion existingDsv = createDataStructureVersion();
+
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setConnectorType(ConnectorType.MQTT);
+      entity.setDataStructureVersion(existingDsv);
+
+      DataSourceInputDTO input = new DataSourceInputDTO();
+      input.setName("updated");
+      input.setConnectorType(ConnectorType.MQTT);
+      input.setDataStructureVersionId(null);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      assertThatThrownBy(() -> dataSourceService.update(id, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Cannot remove data structure version");
+    }
+
+    @Test
+    @DisplayName("Should return null when no DSV linked")
+    void shouldReturnNullWhenNoDsvLinked() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataStructureVersion(null);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+
+      DataStructureVersion result = dataSourceService.findLinkedDataStructureVersion(id);
+
+      assertThat(result).isNull();
+    }
+
+    @Test
+    @DisplayName("Should return DSV when linked")
+    void shouldReturnDsvWhenLinked() {
+      UUID id = UUID.randomUUID();
+      DataStructureVersion dsv = createDataStructureVersion();
+
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataStructureVersion(dsv);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(dataStructureVersionService.findByIdOrThrow(dsv.getId())).thenReturn(dsv);
+
+      DataStructureVersion result = dataSourceService.findLinkedDataStructureVersion(id);
+
+      assertThat(result).isEqualTo(dsv);
+    }
+  }
+
+  @Nested
   @DisplayName("Update DataSource")
   class UpdateTests {
 
@@ -507,6 +671,7 @@ class DataSourceServiceTest {
     entity.setConnectorType(ConnectorType.MQTT);
     entity.setConfiguration(
         Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("sensor/data"), "qos", 1));
+    entity.setDataStructureVersion(createDataStructureVersion());
     return entity;
   }
 
@@ -524,6 +689,13 @@ class DataSourceServiceTest {
             "columns", List.of("id", "name"),
             "user", "dbuser",
             "password", "dbpass"));
+    entity.setDataStructureVersion(createDataStructureVersion());
     return entity;
+  }
+
+  private DataStructureVersion createDataStructureVersion() {
+    DataStructureVersion dsv = new DataStructureVersion();
+    dsv.setId(UUID.randomUUID());
+    return dsv;
   }
 }

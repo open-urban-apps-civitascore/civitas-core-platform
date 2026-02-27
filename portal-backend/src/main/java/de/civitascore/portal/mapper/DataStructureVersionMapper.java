@@ -29,6 +29,7 @@ public interface DataStructureVersionMapper
   @Override
   DataStructureVersionInputDTO toInput(DataStructureVersion entity);
 
+  @Mapping(source = "dataStructure.id", target = "dataStructureId")
   DataStructureVersionSummaryDTO toSummary(DataStructureVersion entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
