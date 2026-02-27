@@ -17,7 +17,7 @@ import java.util.Map;
  * Typed, immutable connector configuration for a Redpanda Connect input block.
  *
  * <p>Created by {@link DatasourceParser}, consumed by {@link DatasourceInjector}. Each record
- * serializes itself via {@link #toInputMap()} into the structure expected by {@link
+ * serializes itself via {@link #toInputMap(String)} into the structure expected by {@link
  * PipelineSerializer}.
  */
 sealed interface ConnectorConfig permits ConnectorConfig.Mqtt, ConnectorConfig.Sql {
@@ -74,7 +74,7 @@ sealed interface ConnectorConfig permits ConnectorConfig.Mqtt, ConnectorConfig.S
       Map<String, Object> sql = new LinkedHashMap<>();
       sql.put("driver", driver != null ? driver : "postgres");
       if (dsn != null) sql.put("dsn", dsn);
-      if (query != null) sql.put("queries", List.of(Map.of("query", query)));
+      if (query != null) sql.put("query", query);
 
       Map<String, Object> input = new LinkedHashMap<>();
       input.put("label", label);
