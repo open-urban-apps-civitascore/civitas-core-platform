@@ -26,6 +26,7 @@ public interface DataSourceMapper
   @Override
   DataSourceOutputDTO toOutput(DataSource entity);
 
+  @Mapping(target = "assignments", ignore = true)
   @Override
   DataSourceInputDTO toInput(DataSource entity);
 
