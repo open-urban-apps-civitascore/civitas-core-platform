@@ -57,7 +57,11 @@ class SagaStateMachineTest {
   private static final Predicate<Map<String, Object>> HAS_PIPELINES =
       payload -> {
         Object pipelines = payload.get("dataPipelines");
-        return pipelines instanceof List<?> list && !list.isEmpty();
+        if (pipelines instanceof List<?> list && !list.isEmpty()) {
+          return true;
+        }
+        Object pipelineIds = payload.get("pipelineIds");
+        return pipelineIds instanceof List<?> idList && !idList.isEmpty();
       };
 
   private SagaStateMachine sm;
@@ -102,6 +106,10 @@ class SagaStateMachineTest {
 
   private Map<String, Object> deleteTriggerWithoutPipelines() {
     return Map.of("id", DATASET_ID, "dataPipelines", List.of());
+  }
+
+  private Map<String, Object> deleteTriggerWithOnlyPipelineIds() {
+    return Map.of("id", DATASET_ID, "pipelineIds", List.of("pl-001"));
   }
 
   // ─── Action Helpers ───────────────────────────────────────────────────────
@@ -1100,6 +1108,27 @@ class SagaStateMachineTest {
       var fail = findAction(r.actions(), SagaAction.FailSaga.class);
       assertEquals(2, fail.staleResources().size());
       assertEquals(0, fail.cleanedResources().size());
+    }
+
+    // ─── pipelineIds-only trigger (DELETE saga from unrelease) ────────────────
+
+    @Test
+    @DisplayName(
+        "8.8: DELETE trigger with only pipelineIds (no dataPipelines) runs delete-pipelines")
+    void startSaga_deleteWithOnlyPipelineIds_shouldRunDeletePipelinesStep() {
+      var r = sm.startSaga(def, DATASET_ID, deleteTriggerWithOnlyPipelineIds(), NOW);
+
+      assertEquals("delete-pipelines", r.context().currentStepId());
+      assertNotNull(findAction(r.actions(), SagaAction.ExecuteStep.class));
+
+      r =
+          sm.handleStepCompleted(
+              r.context(), def, "delete-pipelines", EMPTY_RESULT, EMPTY_COMP, NOW);
+      r = sm.handleStepCompleted(r.context(), def, "delete-route", EMPTY_RESULT, EMPTY_COMP, NOW);
+      r = sm.handleStepCompleted(r.context(), def, "delete-project", EMPTY_RESULT, EMPTY_COMP, NOW);
+
+      assertEquals(SagaStatus.COMPLETED, r.context().status());
+      assertEquals(SagaStepStatus.SUCCESS, stepStatus(r.context(), "delete-pipelines"));
     }
   }
 
