@@ -1,22 +1,24 @@
-import { DatasetTableData } from '@/types/datasets'
+import { DATASET_STATUS_TYPES, DatasetTableData } from '@/types/datasets'
 
 export const mappedDatasets: DatasetTableData[] = [
   {
     id: '1',
     name: 'Test Dataset 1',
-    dataspace: { id: '1', name: 'Dataspace 1' },
-    contact: { id: '1', firstName: 'Test', lastName: 'User1' },
-    lastUpdated: '2023-09-10T08:00:00Z',
-    status: 'draft',
-    access: true,
+    createdBy: {
+      id: 'user1',
+      name: 'Max Mustermann',
+    },
+    modifiedAt: '2023-09-10T08:00:00Z',
+    dataSetStatus: DATASET_STATUS_TYPES.DRAFT,
   },
   {
     id: '2',
     name: 'Test Dataset 2',
-    dataspace: null,
-    contact: { id: '2', firstName: 'Test', lastName: 'User2' },
-    lastUpdated: '2023-01-01T08:00:00Z',
-    status: 'published',
-    access: false,
+    createdBy: {
+      id: 'user2',
+      name: 'Erika Musterfrau',
+    },
+    modifiedAt: '2023-01-01T08:00:00Z',
+    dataSetStatus: DATASET_STATUS_TYPES.AVAILABLE,
   },
 ]
