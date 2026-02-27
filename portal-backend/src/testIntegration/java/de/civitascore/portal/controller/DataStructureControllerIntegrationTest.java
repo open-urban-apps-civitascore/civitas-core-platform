@@ -3,12 +3,14 @@ package de.civitascore.portal.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Group;
@@ -19,6 +21,7 @@ import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.GroupRepository;
@@ -52,6 +55,8 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
   @Autowired private AssignmentRepository assignmentRepository;
 
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
+
+  @Autowired private DataSourceRepository dataSourceRepository;
 
   @Autowired private GroupRepository groupRepository;
 
@@ -154,6 +159,7 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
 
   @AfterEach
   void cleanup() {
+    dataSourceRepository.deleteAll();
     assignmentRepository.deleteAll();
     dataStructureVersionRepository.deleteAll();
     dataStructureRepository.deleteAll();
@@ -1141,6 +1147,114 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
 
       assertThat(assignmentsResponse.getBody()).hasSize(1);
       assertThat(assignmentsResponse.getBody().getFirst().getGroup().getId()).isEqualTo(groupId2);
+    }
+  }
+
+  @Nested
+  @DisplayName("InUse Guard Tests")
+  class InUseGuardTests {
+
+    private UUID inUseDataStructureId;
+    private UUID inUseVersionId;
+
+    @BeforeEach
+    void setupInUseDataStructure() {
+      cleanup();
+
+      DataStructure ds = new DataStructure();
+      ds.setName("InUse Data Structure");
+      ds.setDescription("Data structure with a version referenced by a DataSource");
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      ds.setCreatedFromDataSource(false);
+      ds = dataStructureRepository.save(ds);
+      inUseDataStructureId = ds.getId();
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setDataStructure(ds);
+      version.setVersion("1.0.0");
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      version.setModelAtlasUri("http://modelatlas.example.com/models/inuse");
+      version.setModelName("InUse Model");
+      version = dataStructureVersionRepository.save(version);
+      inUseVersionId = version.getId();
+
+      DataSource dataSource = new DataSource();
+      dataSource.setName("ds_referencing_" + UUID.randomUUID().toString().substring(0, 8));
+      dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
+      dataSource.setDataStructureVersion(version);
+      dataSourceRepository.save(dataSource);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when unpublishing in-use data structure")
+    void shouldReturn409WhenUnpublishingInUseDataStructure() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + inUseDataStructureId + "/unpublish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when deleting in-use data structure")
+    void shouldReturn409WhenDeletingInUseDataStructure() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + inUseDataStructureId,
+              HttpMethod.DELETE,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Should return inUse=true in output DTO when DataSource references a version")
+    void shouldReturnInUseTrueInOutputDTO() {
+      ResponseEntity<DataStructureOutputDTO> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + inUseDataStructureId,
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isInUse())
+          .as("inUse should be true when a DataSource references a version")
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("Should return inUse=false when no DataSource references any version")
+    void shouldReturnInUseFalseWhenNoDataSourceReferences() {
+      DataStructure ds = new DataStructure();
+      ds.setName("Not InUse Data Structure");
+      ds.setDescription("No DataSources reference this");
+      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
+      ds.setCreatedFromDataSource(false);
+      ds = dataStructureRepository.save(ds);
+
+      ResponseEntity<DataStructureOutputDTO> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + ds.getId(),
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isInUse())
+          .as("inUse should be false when no DataSource references any version")
+          .isFalse();
     }
   }
 }

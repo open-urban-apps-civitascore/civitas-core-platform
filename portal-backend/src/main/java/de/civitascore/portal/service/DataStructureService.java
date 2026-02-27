@@ -4,14 +4,19 @@ import de.civitascore.portal.mapper.DataStructureMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
+import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -26,6 +31,7 @@ public class DataStructureService
   private final DataStructureMapper dataStructureMapper;
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final ScopedAssignmentBuilderService assignmentBuilderService;
+  private final DataSourceRepository dataSourceRepository;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -196,7 +202,32 @@ public class DataStructureService
           "dataStructureStatus", id, "DataStructure is already in DRAFT status");
     }
 
+    validateNoVersionInUse(dataStructure);
+
     dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
     return dataStructureRepository.save(dataStructure);
+  }
+
+  @Override
+  protected DataStructure preProcessDelete(UUID id) {
+    DataStructure dataStructure = findByIdOrThrow(id);
+    validateNoVersionInUse(dataStructure);
+    return dataStructure;
+  }
+
+  private void validateNoVersionInUse(DataStructure dataStructure) {
+    Set<UUID> versionIds =
+        dataStructure.getDataStructureVersions().stream()
+            .map(DataStructureVersion::getId)
+            .collect(Collectors.toSet());
+    if (versionIds.isEmpty()) {
+      return;
+    }
+    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)) {
+      throw new ResourceInUseException(
+          "DataStructure",
+          dataStructure.getId(),
+          "Cannot modify DataStructure because one or more of its versions is referenced by a DataSource.");
+    }
   }
 }

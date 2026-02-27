@@ -5,8 +5,11 @@ import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.connector.OnPublish;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.embedded.DataStructureStatus;
+import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
 import de.civitascore.portal.repository.DataSourceRepository;
@@ -32,6 +35,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final DataSourceMapper dataSourceMapper;
   private final ConnectorHandlerRegistry connectorHandlerRegistry;
   private final ScopedAssignmentBuilderService assignmentBuilderService;
+  private final DataStructureVersionService dataStructureVersionService;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -51,6 +55,19 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   @Override
   protected ScopedAssignmentBuilderService getAssignmentBuilderService() {
     return assignmentBuilderService;
+  }
+
+  @Override
+  protected DataSource postConvertToEntity(DataSource entity, DataSourceInputDTO input) {
+    if (input.getDataStructureVersionId() != null) {
+      DataStructureVersion dsv =
+          dataStructureVersionService.findByIdOrThrow(input.getDataStructureVersionId());
+      validateDataStructureVersionLinkable(dsv);
+      entity.setDataStructureVersion(dsv);
+    } else {
+      entity.setDataStructureVersion(null);
+    }
+    return entity;
   }
 
   @Override
@@ -76,6 +93,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   protected DataSourceInputDTO preProcessUpdateInput(
       DataSourceInputDTO input, DataSource existingEntity) {
     validateConnectorTypeChange(input, existingEntity);
+    validateDataStructureVersionChange(input, existingEntity);
 
     if (input.getConfiguration() != null) {
       ConnectorType type = resolveConnectorType(input, existingEntity);
@@ -195,6 +213,11 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
           getEntityName(), id, "Connector type must be set before publishing");
     }
 
+    if (entity.getDataStructureVersion() == null) {
+      throw new InvalidInputException(
+          getEntityName(), id, "Data structure version must be set before publishing");
+    }
+
     validateConfiguration(entity);
 
     entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
@@ -273,6 +296,55 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     if (!errors.isEmpty()) {
       throw new InvalidInputException(
           getEntityName(), entity.getId(), "Invalid configuration: " + String.join("; ", errors));
+    }
+  }
+
+  @Transactional(readOnly = true)
+  public DataStructureVersion findLinkedDataStructureVersion(UUID dataSourceId) {
+    DataSource dataSource = findByIdOrThrow(dataSourceId);
+    if (dataSource.getDataStructureVersion() == null) {
+      return null;
+    }
+    return dataStructureVersionService.findByIdOrThrow(
+        dataSource.getDataStructureVersion().getId());
+  }
+
+  private void validateDataStructureVersionLinkable(DataStructureVersion dsv) {
+    if (dsv.getDataStructureVersionStatus() != DataStructureVersionStatus.AVAILABLE) {
+      throw new InvalidInputException(
+          getEntityName(),
+          dsv.getId(),
+          "DataStructureVersion must be in AVAILABLE status to be linked to a DataSource");
+    }
+    if (dsv.getDataStructure().getDataStructureStatus() != DataStructureStatus.AVAILABLE) {
+      throw new InvalidInputException(
+          getEntityName(),
+          dsv.getId(),
+          "The parent DataStructure must be in AVAILABLE status to be linked to a DataSource");
+    }
+  }
+
+  private void validateDataStructureVersionChange(
+      DataSourceInputDTO input, DataSource existingEntity) {
+    if (existingEntity.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
+      return;
+    }
+    UUID existingDsvId =
+        existingEntity.getDataStructureVersion() != null
+            ? existingEntity.getDataStructureVersion().getId()
+            : null;
+    if (input.getDataStructureVersionId() != null
+        && !input.getDataStructureVersionId().equals(existingDsvId)) {
+      throw new InvalidInputException(
+          getEntityName(),
+          existingEntity.getId(),
+          "Cannot change data structure version of an AVAILABLE data source");
+    }
+    if (input.getDataStructureVersionId() == null && existingDsvId != null) {
+      throw new InvalidInputException(
+          getEntityName(),
+          existingEntity.getId(),
+          "Cannot remove data structure version from an AVAILABLE data source");
     }
   }
 }

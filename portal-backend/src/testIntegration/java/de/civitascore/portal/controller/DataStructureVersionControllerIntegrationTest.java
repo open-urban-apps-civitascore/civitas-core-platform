@@ -14,14 +14,17 @@ import static com.github.tomakehurst.wiremock.client.WireMock.verify;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureSummaryDTO;
+import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.io.IOException;
@@ -59,6 +62,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   @Autowired private DataStructureRepository dataStructureRepository;
 
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
+
+  @Autowired private DataSourceRepository dataSourceRepository;
 
   private static final String TEST_NS_URI = "http://test/test/myuml/1.0.0";
   private static final String TEST_MODEL_FILE_PATH = "mocks/models/Simple_model.xmi";
@@ -124,6 +129,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
   @AfterEach
   void cleanup() {
+    dataSourceRepository.deleteAll();
     dataStructureVersionRepository.deleteAll();
     dataStructureRepository.deleteAll();
   }
@@ -1347,6 +1353,124 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getStatusCode())
           .as("Should return BAD_REQUEST status")
           .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("InUse Guard Tests")
+  class InUseGuardTests {
+
+    private UUID inUseDataStructureId;
+    private UUID inUseVersionId;
+
+    @BeforeEach
+    void setupInUseVersion() {
+      cleanup();
+
+      DataStructure ds = new DataStructure();
+      ds.setName("InUse Data Structure");
+      ds.setDescription("Data structure with in-use version");
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      ds.setCreatedFromDataSource(false);
+      ds = dataStructureRepository.save(ds);
+      inUseDataStructureId = ds.getId();
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setDataStructure(ds);
+      version.setVersion("1.0.0");
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      version.setModelAtlasUri("http://modelatlas.example.com/models/inuse");
+      version.setModelName("InUse Model");
+      version = dataStructureVersionRepository.save(version);
+      inUseVersionId = version.getId();
+
+      DataSource dataSource = new DataSource();
+      dataSource.setName("ds_referencing_" + UUID.randomUUID().toString().substring(0, 8));
+      dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
+      dataSource.setDataStructureVersion(version);
+      dataSourceRepository.save(dataSource);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when unpublishing in-use version")
+    void shouldReturn409WhenUnpublishingInUseVersion() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              "/datastructures/"
+                  + inUseDataStructureId
+                  + "/versions"
+                  + "/"
+                  + inUseVersionId
+                  + "/unpublish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when deleting in-use version")
+    void shouldReturn409WhenDeletingInUseVersion() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              "/datastructures/" + inUseDataStructureId + "/versions" + "/" + inUseVersionId,
+              HttpMethod.DELETE,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Should return inUse=true in version output DTO")
+    void shouldReturnInUseTrueInVersionOutputDTO() {
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              "/datastructures/" + inUseDataStructureId + "/versions" + "/" + inUseVersionId,
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isInUse())
+          .as("inUse should be true when a DataSource references this version")
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("Should return inUse=false when no DataSource references version")
+    void shouldReturnInUseFalseWhenNoDataSourceReferences() {
+      DataStructureVersion notInUseVersion = new DataStructureVersion();
+      notInUseVersion.setDataStructure(
+          dataStructureRepository.findById(inUseDataStructureId).orElseThrow());
+      notInUseVersion.setVersion("2.0.0");
+      notInUseVersion.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      notInUseVersion.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      notInUseVersion = dataStructureVersionRepository.save(notInUseVersion);
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              "/datastructures/"
+                  + inUseDataStructureId
+                  + "/versions"
+                  + "/"
+                  + notInUseVersion.getId(),
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isInUse())
+          .as("inUse should be false when no DataSource references this version")
+          .isFalse();
     }
   }
 }

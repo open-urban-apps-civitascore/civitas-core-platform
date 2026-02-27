@@ -4,6 +4,7 @@ import de.civitascore.portal.model.connector.MqttConnectorConfiguration;
 import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
+import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Map;
 import lombok.Data;
@@ -21,4 +22,6 @@ public class DataSourceOutputDTO extends BaseOutputDTO {
       oneOf = {MqttConnectorConfiguration.class, SqlConnectorConfiguration.class},
       description = "The configuration object, structure depends on the connector type")
   private Map<String, Object> configuration;
+
+  private DataStructureVersionSummaryDTO dataStructureVersion;
 }

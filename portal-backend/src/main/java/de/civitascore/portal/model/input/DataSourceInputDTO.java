@@ -5,6 +5,7 @@ import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Map;
+import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -17,4 +18,6 @@ public class DataSourceInputDTO extends DataSourceMetaInputDTO {
       oneOf = {MqttConnectorConfiguration.class, SqlConnectorConfiguration.class},
       description = "Connector-specific configuration. Structure depends on connectorType.")
   private Map<String, Object> configuration;
+
+  private UUID dataStructureVersionId;
 }
