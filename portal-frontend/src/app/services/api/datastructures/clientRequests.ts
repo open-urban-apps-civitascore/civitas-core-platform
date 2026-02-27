@@ -1,10 +1,19 @@
 import { useCreateMutation } from '@/hooks/use-create-mutation'
+import { useDataQuery } from '@/hooks/use-data-query'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
+import { GetItemInput } from '@/types/common'
 import { Datastructure, DatastructureCreateFormData, DatastructurePatchData } from '@/types/datastructures'
 
 const key = 'datastructures'
 
-// TODO: use renamed DatastructureCreateApiData when API is connected
+export const useGetDatastructure = ({ id }: GetItemInput) =>
+  useDataQuery<Datastructure>({
+    key,
+    id,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while loading datastructures.',
+  })
+
 export const useCreateDatastructure = () =>
   useCreateMutation<Datastructure, DatastructureCreateFormData>({
     key,
@@ -14,7 +23,6 @@ export const useCreateDatastructure = () =>
 
 export const useUpdateDatastructure = () =>
   useUpdateMutation<Datastructure, DatastructurePatchData>({
-    //TODO: switch to PUT method when API is connected
     method: 'PATCH',
     key,
     headers: { 'x-api-request': 'true' },

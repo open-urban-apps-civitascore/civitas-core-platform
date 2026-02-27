@@ -527,6 +527,9 @@
     "messages": {
       "createSuccess": "The version of the data structure has been successfully created.",
       "updateSuccess": "The version of the data has been successfully updated."
+    },
+    "errors": {
+      "versionAlreadyExists": "A version with the same version number already exists in this data structure."
     }
   },
   "pipelineEditor": {

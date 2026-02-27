@@ -17,10 +17,11 @@ import { DatastructureVersionFormData } from '@/types/datastructures'
 interface VersionInfoTabProps {
   form: UseFormReturn<DatastructureVersionFormData>
   isReadOnly?: boolean
+  versionAlreadyExistsError?: string
 }
 
 export const VersionInfoTab = (props: VersionInfoTabProps) => {
-  const { form, isReadOnly = false } = props
+  const { form, isReadOnly = false, versionAlreadyExistsError } = props
   const t = useTranslations('datastructureVersion')
   const tCommon = useTranslations('common')
 
@@ -47,6 +48,7 @@ export const VersionInfoTab = (props: VersionInfoTabProps) => {
                 placeholder={t('versionInfo.versionNumberPlaceholder')}
                 disabled={isReadOnly}
                 required
+                manualError={versionAlreadyExistsError}
               />
             </DetailsFieldContainer>
 

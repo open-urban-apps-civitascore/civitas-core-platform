@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
+import { useGetDatastructure } from '@/app/services/api/datastructures/clientRequests'
 import {
   useCreateDatastructureVersion,
   useUpdateDatastructureVersion,
@@ -28,7 +29,6 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import {
   DATASTRUCTURE_STATUS_TYPES,
   DATASTRUCTURE_VERSION_SOURCE,
-  DatastructureFormAvailableSchema,
   DatastructureStatus,
   DatastructureVersion,
   DatastructureVersionFormAvailableSchema,
@@ -72,10 +72,11 @@ interface VersionOverviewProps {
   version: DatastructureVersion | null
   isCreateMode: boolean
   testId: string
+  existingVersions: string[]
 }
 
 export const VersionOverview = (props: VersionOverviewProps) => {
-  const { title, datastructureId, version, isCreateMode, testId } = props
+  const { title, datastructureId, version, isCreateMode, testId, existingVersions } = props
   const params = useSearchParams()
   const mode = params.get('mode')
   const t = useTranslations('datastructureVersion')
@@ -108,9 +109,15 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
 
+  const {
+    data: datastructure,
+    isLoading: isLoadingDatastructure,
+    error: datastructureError,
+  } = useGetDatastructure({ id: datastructureId })
+
   const updateVersion = useUpdateDatastructureVersion(datastructureId)
   const createVersion = useCreateDatastructureVersion(datastructureId)
-  const isLoading = updateVersion.isPending
+  const isLoading = updateVersion.isPending || isLoadingDatastructure
 
   const form = useForm<DatastructureVersionFormData>({
     resolver: zodResolver(DatastructureVersionFormDraftSchema),
@@ -131,9 +138,20 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const isDiagramDirty = modelSessionManager.activeSession?.isDirty
 
+  const versionAlreadyExistsError = useMemo(() => {
+    const versionExists = datastructure?.data.dataStructureVersions.find(
+      version => version.version === versionWatch.trim() && version.id !== initialFormValues.current.id,
+    )
+    if (versionExists) {
+      return t('errors.versionAlreadyExists')
+    } else {
+      return undefined
+    }
+  }, [datastructure, versionWatch])
+
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
-    return DatastructureFormAvailableSchema.safeParse(formValues).success
+    return DatastructureVersionFormAvailableSchema.safeParse(formValues).success
   }, [formValues])
 
   const revalidateForm = () => {
@@ -196,7 +214,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   useEffect(() => {
     if (versionWatch && modelWatch) {
-      form.setValue('modelAtlasUri', `http://civitas.org/model/${datastructureId}+${versionWatch}`, {
+      form.setValue('modelAtlasUri', `http://civitas.org/model/${datastructureId}/${versionWatch}`, {
         shouldDirty: true,
       })
     }
@@ -279,7 +297,11 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }
 
   const isConfirmButtonDisabled = useMemo(
-    () => (!form.formState.isDirty && !isDiagramDirty) || !!form.formState.errors.version || isLoading,
+    () =>
+      (!form.formState.isDirty && !isDiagramDirty) ||
+      !!form.formState.errors.version ||
+      !!versionAlreadyExistsError ||
+      isLoading,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isLoading, statusWatch, formValues, isDiagramDirty],
   )
@@ -309,7 +331,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const renderTabContent = () => {
     switch (subTabValue) {
       case 'versionInfo':
-        return <VersionInfoTab form={form} isReadOnly={isReadOnly} />
+        return (
+          <VersionInfoTab form={form} isReadOnly={isReadOnly} versionAlreadyExistsError={versionAlreadyExistsError} />
+        )
       case 'structure':
       default:
         return <StructureDefinitionTab isReadOnly={isReadOnly} modelSessionManager={modelSessionManager} />
