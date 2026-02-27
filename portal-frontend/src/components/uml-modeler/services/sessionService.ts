@@ -9,6 +9,7 @@ export const createEmptySession = (name?: string): DiagramSession => {
     name: name || `Diagram ${Date.now()}`,
     diagram: createEmptyDiagram(),
     isDirty: false,
+    dirtyFields: new Set(),
     lastModified: now,
     created: now,
   }
@@ -109,22 +110,37 @@ export const sessionReducer = (state: MultiSessionState, action: SessionAction):
     }
 
     case 'MARK_SESSION_DIRTY': {
-      const { sessionId } = action.payload
+      const { sessionId, dirtyField } = action.payload
 
       return {
         ...state,
         sessions: state.sessions.map(session =>
-          session.id === sessionId ? { ...session, isDirty: true, lastModified: new Date() } : session,
+          session.id === sessionId
+            ? {
+                ...session,
+                isDirty: true,
+                dirtyFields: new Set([...session.dirtyFields, dirtyField]),
+                lastModified: new Date(),
+              }
+            : session,
         ),
       }
     }
 
     case 'MARK_SESSION_CLEAN': {
-      const { sessionId } = action.payload
+      const { sessionId, dirtyField } = action.payload
 
       return {
         ...state,
-        sessions: state.sessions.map(session => (session.id === sessionId ? { ...session, isDirty: false } : session)),
+        sessions: state.sessions.map(session =>
+          session.id === sessionId
+            ? {
+                ...session,
+                isDirty: false,
+                dirtyFields: new Set([...session.dirtyFields].filter(field => field !== dirtyField)),
+              }
+            : session,
+        ),
       }
     }
 

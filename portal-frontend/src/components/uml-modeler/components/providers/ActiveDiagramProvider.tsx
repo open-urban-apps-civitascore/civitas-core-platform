@@ -42,7 +42,7 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
       if (!activeSession) return
       const updatedDiagram = updater(activeSession.diagram)
       sessionManager.updateSessionDiagram(activeSession.id, updatedDiagram)
-      sessionManager.markSessionDirty(activeSession.id)
+      sessionManager.markSessionDirty(activeSession.id, 'model')
     },
     [activeSession, sessionManager],
   )
@@ -58,9 +58,9 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
 
       // Mark as dirty for most actions
       if (action.type !== 'MARK_CLEAN') {
-        sessionManager.markSessionDirty(activeSession.id)
+        sessionManager.markSessionDirty(activeSession.id, 'model')
       } else {
-        sessionManager.markSessionClean(activeSession.id)
+        sessionManager.markSessionClean(activeSession.id, 'model')
       }
     },
     [activeSession, sessionManager],

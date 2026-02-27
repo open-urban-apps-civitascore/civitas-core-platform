@@ -1,10 +1,12 @@
 import type { UMLDiagram } from './diagram'
 
+export type DirtyField = 'modelName' | 'model'
 export interface DiagramSession {
   id: string
   name: string
   diagram: UMLDiagram
   isDirty: boolean
+  dirtyFields: Set<DirtyField>
   lastModified: Date
   created: Date
 }
@@ -21,8 +23,8 @@ export type SessionAction =
   | { type: 'SWITCH_SESSION'; payload: { sessionId: string } }
   | { type: 'UPDATE_SESSION_NAME'; payload: { sessionId: string; name: string } }
   | { type: 'UPDATE_SESSION_DIAGRAM'; payload: { sessionId: string; diagram: UMLDiagram } }
-  | { type: 'MARK_SESSION_DIRTY'; payload: { sessionId: string } }
-  | { type: 'MARK_SESSION_CLEAN'; payload: { sessionId: string } }
+  | { type: 'MARK_SESSION_DIRTY'; payload: { sessionId: string; dirtyField: DirtyField } }
+  | { type: 'MARK_SESSION_CLEAN'; payload: { sessionId: string; dirtyField: DirtyField } }
   | { type: 'LOAD_SESSIONS'; payload: { sessions: DiagramSession[]; activeSessionId: string | null } }
 
 // Hook interface with actions as functions (for ease of use)
@@ -32,8 +34,8 @@ export interface MultiSessionActions {
   switchToSession: (sessionId: string) => void
   updateSessionName: (sessionId: string, name: string) => void
   updateSessionDiagram: (sessionId: string, diagram: UMLDiagram) => void
-  markSessionDirty: (sessionId: string) => void
-  markSessionClean: (sessionId: string) => void
+  markSessionDirty: (sessionId: string, dirtyField: DirtyField) => void
+  markSessionClean: (sessionId: string, dirtyField: DirtyField) => void
   getActiveSession: () => DiagramSession | null
   getAllSessions: () => DiagramSession[]
 }

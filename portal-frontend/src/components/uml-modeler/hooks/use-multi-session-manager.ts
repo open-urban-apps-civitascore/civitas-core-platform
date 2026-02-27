@@ -9,7 +9,7 @@ import {
   sessionReducer,
 } from '../services/sessionService'
 import type { UMLDiagram } from '../types/diagram'
-import type { DiagramSession, UseMultiSessionReturn } from '../types/session'
+import type { DiagramSession, DirtyField, UseMultiSessionReturn } from '../types/session'
 
 interface MultiSessionManagerInput {
   initialSession?: DiagramSession
@@ -75,20 +75,20 @@ export const useMultiSessionManager = ({
   )
 
   const markSessionDirty = useCallback(
-    (sessionId: string): void => {
+    (sessionId: string, dirtyField: DirtyField): void => {
       dispatch({
         type: 'MARK_SESSION_DIRTY',
-        payload: { sessionId },
+        payload: { sessionId, dirtyField },
       })
     },
     [dispatch],
   )
 
   const markSessionClean = useCallback(
-    (sessionId: string): void => {
+    (sessionId: string, dirtyField: DirtyField): void => {
       dispatch({
         type: 'MARK_SESSION_CLEAN',
-        payload: { sessionId },
+        payload: { sessionId, dirtyField },
       })
     },
     [dispatch],
