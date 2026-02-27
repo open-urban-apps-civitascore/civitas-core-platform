@@ -13,5 +13,5 @@ public class DataSetInputDTO extends BaseDataEntityInputDTO {
 
   private String description;
 
-  private Boolean openDataAccess;
+  private Boolean openDataAccess = false;
 }

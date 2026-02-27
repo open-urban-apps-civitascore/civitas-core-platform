@@ -2,16 +2,12 @@ package de.civitascore.portal.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.portal.model.embedded.ScopeType;
-import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
-import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
-import de.civitascore.portal.model.output.assembler.AssignmentAssembler;
 import de.civitascore.portal.model.output.assembler.DataSourceAssembler;
 import de.civitascore.portal.repository.specification.DataSourceSpec;
-import de.civitascore.portal.service.AssignmentService;
 import de.civitascore.portal.service.DataSourceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -21,7 +17,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.IOException;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -30,7 +25,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -43,12 +37,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "DataSources", description = "Data source management endpoints")
 public class DataSourceController
-    extends BaseController<DataSourceInputDTO, DataSourceOutputDTO, DataSource, DataSourceSpec> {
+    extends BaseDataEntityController<
+        DataSourceInputDTO, DataSourceOutputDTO, DataSource, DataSourceSpec> {
 
   private final DataSourceService dataSourceService;
   private final DataSourceAssembler dataSourceAssembler;
-  private final AssignmentService assignmentService;
-  private final AssignmentAssembler assignmentAssembler;
 
   @Override
   protected DataSourceService getService() {
@@ -58,6 +51,11 @@ public class DataSourceController
   @Override
   protected DataSourceAssembler getAssembler() {
     return dataSourceAssembler;
+  }
+
+  @Override
+  protected ScopeType getScopeType() {
+    return ScopeType.DATASOURCE;
   }
 
   @Parameters({
@@ -146,18 +144,5 @@ public class DataSourceController
     DataSource updated = getService().updatePublishedMeta(id, input);
     DataSourceOutputDTO output = dataSourceAssembler.toOutput(updated);
     return ResponseEntity.ok(output);
-  }
-
-  @GetMapping("/{id}/assignments")
-  @Operation(
-      summary = "Get assignments for a data source",
-      description = "Returns all role assignments scoped to the specified data source.")
-  public ResponseEntity<List<AssignmentOutputDTO>> getAssignments(@PathVariable UUID id) {
-    getService().findByIdOrThrow(id);
-    List<Assignment> assignments =
-        assignmentService.findAllByScopeTypeAndScopeId(ScopeType.DATASOURCE, id);
-    List<AssignmentOutputDTO> outputs =
-        assignments.stream().map(assignmentAssembler::toOutput).toList();
-    return ResponseEntity.ok(outputs);
   }
 }

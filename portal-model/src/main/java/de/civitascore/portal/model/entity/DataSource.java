@@ -2,7 +2,8 @@ package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.entity.base.NamedEntity;
+import de.civitascore.portal.model.entity.base.BaseDataEntity;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -15,6 +16,7 @@ import jakarta.persistence.UniqueConstraint;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -33,7 +35,7 @@ import org.hibernate.type.SqlTypes;
     })
 @Getter
 @Setter
-public class DataSource extends NamedEntity {
+public class DataSource extends BaseDataEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "data_source_status", nullable = false)
@@ -47,6 +49,16 @@ public class DataSource extends NamedEntity {
   @Column(name = "configuration", columnDefinition = "jsonb")
   private Map<String, Object> configuration;
 
-  @OneToMany(mappedBy = "dataSource", fetch = FetchType.LAZY)
+  @OneToMany(
+      mappedBy = "dataSource",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
   private Set<Assignment> assignments = new HashSet<>();
+
+  @Override
+  protected void linkAssignment(Assignment assignment) {
+    assignment.setScope(this);
+  }
 }
