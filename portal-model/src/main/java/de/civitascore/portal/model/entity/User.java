@@ -40,17 +40,13 @@ public class User extends BaseEntity {
   @Column(name = "title", nullable = false)
   private UserTitleType title = UserTitleType.OTHER;
 
-  @NotBlank
-  @Column(name = "first_name", nullable = false)
+  @NotBlank @Column(name = "first_name", nullable = false)
   private String firstName;
 
-  @NotBlank
-  @Column(name = "last_name", nullable = false)
+  @NotBlank @Column(name = "last_name", nullable = false)
   private String lastName;
 
-  @Email
-  @NotBlank
-  @Column(nullable = false)
+  @Email @NotBlank @Column(nullable = false)
   private String email;
 
   @Column(name = "phone")

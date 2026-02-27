@@ -26,9 +26,6 @@ spring:
   # Kafka Configuration
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
-    topics:
-      # Result topic where config-adapter sends processing results
-      config-adapter-result: civitas.config.result
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -71,26 +68,16 @@ spring:
         # Allows more records to accumulate in the batch for better throughput
         # Trade-off: slightly higher latency for better efficiency
         linger.ms: 10
-
-        # Native Kafka batch size (duplicates Spring Boot's batch-size setting)
-        # 16KB - producer groups multiple records into a single batch
-        batch.size: 16384
     consumer:
       group-id: civitas-portal-backend
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      properties:
-        spring.json.trusted.packages: de.civitascore.portal.model.output.event
 
 # Event publishing configuration
 event:
-  # Timeout for publishing to Kafka broker (seconds)
-  publish-timeout-seconds: 5
   # Timeout waiting for config-adapter to process event (seconds)
   config-adapter-timeout-seconds: 10
-  # Target component for config-adapter (keycloak, ldap, etc.)
-  target-component: keycloak
 
 management:
   endpoints:
@@ -110,22 +97,7 @@ springdoc:
     path: /swagger-ui.html
     enabled: true
 
-
-
-# Transactional Outbox Configuration
-outbox:
-  max-retries: 5
-  batch-size: 100
-  poll-delay: 5000  # in ms
-  publish-timeout-seconds: 5
-  payload-size-warning-bytes: 100000  # Warn if event payload exceeds 100KB
-
-# Kafka Topic Configuration
-kafka:
-  topic-prefix: ${KAFKA_TOPIC_PREFIX:""}
-  
 model-atlas:
   baseUrl: "http://model-atlas:8080"
   scope: default
   stage: draft
-

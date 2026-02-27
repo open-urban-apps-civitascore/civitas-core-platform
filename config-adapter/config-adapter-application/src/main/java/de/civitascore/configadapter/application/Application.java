@@ -24,6 +24,8 @@ import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.messaging.EventConsumer;
 import de.civitascore.configadapter.messaging.EventPublisher;
 import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.orchestrator.DatasetSagaOrchestrator;
+import de.civitascore.configadapter.orchestrator.kafka.SagaTriggerConsumer;
 import de.civitascore.event.handler.kafka.KafkaSagaCommandConsumer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -94,6 +96,8 @@ public class Application {
   private final AppConfig appConfig;
   private final List<EventConsumer> consumers;
   private KafkaSagaCommandConsumer sagaCommandConsumer;
+  private DatasetSagaOrchestrator sagaOrchestrator;
+  private SagaTriggerConsumer sagaTriggerConsumer;
 
   /**
    * Creates a new Application instance with the specified configuration file.
@@ -108,6 +112,7 @@ public class Application {
     appConfig = new AppConfig(requireNonNull(configFileName));
     consumers = createConsumers(appConfig);
     sagaCommandConsumer = createSagaCommandConsumer(appConfig);
+    initializeSagaOrchestrator(appConfig);
   }
 
   /**
@@ -137,6 +142,11 @@ public class Application {
         consumer.start();
       }
 
+      if (sagaOrchestrator != null) {
+        sagaOrchestrator.start();
+        sagaTriggerConsumer.start();
+      }
+
       if (sagaCommandConsumer != null) {
         sagaCommandConsumer.start();
       }
@@ -157,6 +167,22 @@ public class Application {
       System.exit(1);
     } finally {
       logger.info("Shutting down {} consumer(s)", consumers.size());
+
+      if (sagaTriggerConsumer != null) {
+        try {
+          sagaTriggerConsumer.stop();
+        } catch (Exception e) {
+          logger.error("Error stopping saga trigger consumer", e);
+        }
+      }
+
+      if (sagaOrchestrator != null) {
+        try {
+          sagaOrchestrator.stop();
+        } catch (Exception e) {
+          logger.error("Error stopping saga orchestrator", e);
+        }
+      }
 
       if (sagaCommandConsumer != null) {
         try {
@@ -324,6 +350,26 @@ public class Application {
       return ep;
     }
     return null;
+  }
+
+  private void initializeSagaOrchestrator(AppConfig config) {
+    String bootstrapServers = config.getProperty("kafka.bootstrap.servers", "localhost:9092");
+
+    try {
+      sagaOrchestrator = new DatasetSagaOrchestrator();
+      sagaOrchestrator.initialize(bootstrapServers);
+
+      KafkaConsumer<String, byte[]> triggerConsumer =
+          new KafkaConsumer<>(
+              createSagaConsumerProperties(bootstrapServers, "saga-orchestrator-trigger"));
+      sagaTriggerConsumer = new SagaTriggerConsumer(triggerConsumer, sagaOrchestrator);
+
+      logger.info("DatasetSagaOrchestrator initialized successfully");
+    } catch (Exception e) {
+      logger.error("Failed to initialize saga orchestrator: {}", e.getMessage(), e);
+      sagaOrchestrator = null;
+      sagaTriggerConsumer = null;
+    }
   }
 
   private KafkaSagaCommandConsumer createSagaCommandConsumer(AppConfig config) {

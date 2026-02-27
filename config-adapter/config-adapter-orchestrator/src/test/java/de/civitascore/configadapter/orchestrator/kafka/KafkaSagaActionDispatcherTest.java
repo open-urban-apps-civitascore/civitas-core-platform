@@ -162,6 +162,7 @@ class KafkaSagaActionDispatcherTest {
       var action =
           new SagaAction.FailSaga(
               "saga-1",
+              "ds-001",
               "create-route",
               "Connection refused",
               true,
@@ -172,6 +173,7 @@ class KafkaSagaActionDispatcherTest {
 
       Map<String, Object> msg = captureMessage();
       assertEquals("SAGA_FAILED", msg.get("type"));
+      assertEquals("ds-001", msg.get("datasetId"));
       assertEquals("COMPENSATED", msg.get("status"));
       assertEquals("create-route", msg.get("failedStep"));
       assertEquals(true, msg.get("compensated"));
@@ -183,6 +185,7 @@ class KafkaSagaActionDispatcherTest {
       var action =
           new SagaAction.FailSaga(
               "saga-1",
+              "ds-001",
               "create-project",
               "Error",
               false,

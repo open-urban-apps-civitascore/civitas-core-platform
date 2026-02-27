@@ -95,6 +95,7 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
     DataStructureVersion version1 = new DataStructureVersion();
     version1.setDataStructure(dataStructure);
     version1.setVersion("1.0.0");
+    version1.setDescription("Version 1 Description");
     version1.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
     version1.setDataStructureVersionSource(DataStructureVersionSource.OWN);
     version1.setModelAtlasUri("http://modelatlas.example.com/models/1");
@@ -108,6 +109,7 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
     DataStructureVersion version2 = new DataStructureVersion();
     version2.setDataStructure(dataStructure);
     version2.setVersion("2.0.0");
+    version2.setDescription("Version 2 Description");
     version2.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
     version2.setDataStructureVersionSource(DataStructureVersionSource.OWN);
     version2.setModelAtlasUri("http://modelatlas.example.com/models/2");
@@ -323,6 +325,9 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
       DataStructureVersionSummaryDTO version1 = output.getDataStructureVersions().getFirst();
       assertThat(version1.getId()).as("Version should have an ID").isNotNull();
       assertThat(version1.getVersion()).as("Version should have a version string").isNotNull();
+      assertThat(version1.getDescription())
+          .as("Version should have a description string")
+          .isNotNull();
       assertThat(version1.getDataStructureVersionStatus())
           .as("Version should have a status")
           .isNotNull();

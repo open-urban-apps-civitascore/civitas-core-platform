@@ -23,9 +23,11 @@ dev-environment/
 ## Prerequisites
 
 * Docker + Docker Compose v2
-* Java 21 JDK
+* Java 21+ JDK (any distribution: Temurin, OpenJDK, Oracle, GraalVM)
 * Maven 3.9+
 * jq (for dev-mode scripts)
+
+Supported platforms: **Linux**, **macOS** (including Apple Silicon / ARM), and **Windows** (WSL / Git Bash).
 
 ---
 
@@ -54,6 +56,38 @@ and authorization mode.
 ./start-portal-dev.sh --authz=allowall  # Allow-all (any logged-in user can do anything)
 ```
 
+On Linux, new terminal windows are opened via `gnome-terminal` or `xterm`.
+On macOS, new terminal windows are opened via `Terminal.app`.
+
+### Command-line Options
+
+All interactive prompts can be bypassed with command-line flags, which is useful for scripting or quick restarts:
+
+```
+Usage: start-portal-dev.sh [OPTIONS]
+
+Options:
+  --authz=full|allowall        AuthZ mode (default: prompt, default answer: allowall)
+  --config-adapter=auto|ide    Config Adapter startup (default: prompt)
+  --backend=auto|ide           Portal Backend startup (default: prompt)
+  --frontend=auto|manual|skip  Portal Frontend startup (default: prompt)
+  --keycloak-secret=SECRET     Keycloak client secret for portal-frontend
+  -h, --help                   Show this help message
+```
+
+**Examples:**
+
+```bash
+# Fully non-interactive: start everything automatically
+./start-portal-dev.sh --authz=allowall --config-adapter=auto --backend=auto --frontend=auto
+
+# Run backend in IDE, skip frontend
+./start-portal-dev.sh --config-adapter=ide --backend=ide --frontend=skip
+
+# Provide the Keycloak client secret directly
+./start-portal-dev.sh --backend=auto --keycloak-secret=<secret>
+```
+
 ### Authorization Modes
 
 | Mode | Flag | Behavior |
@@ -64,6 +98,14 @@ and authorization mode.
 Both modes require a valid JWT (Keycloak login). Allow-all is useful when
 working on features unrelated to authorization. Integration tests
 (`authz/integration-test.sh`) require full mode.
+
+### Keycloak Client Secret
+
+The portal frontend requires a Keycloak client secret. If not yet configured in
+`portal-frontend/.env.local`, the script will prompt for it (or accept it via
+`--keycloak-secret`). The secret can be found in the Keycloak Admin UI:
+
+> Realm: `civitas-core` → Clients → `portal-frontend` → Credentials
 
 ---
 

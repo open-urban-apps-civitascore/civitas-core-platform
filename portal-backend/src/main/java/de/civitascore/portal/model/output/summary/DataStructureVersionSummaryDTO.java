@@ -14,5 +14,7 @@ public class DataStructureVersionSummaryDTO extends BaseSummaryDTO {
 
   private DataStructureVersionStatus dataStructureVersionStatus;
   private DataStructureVersionSource dataStructureVersionSource;
+
+  private String description;
   private String version;
 }

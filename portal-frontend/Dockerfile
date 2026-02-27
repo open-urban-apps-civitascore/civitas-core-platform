@@ -33,5 +33,5 @@ ENV NODE_ENV=production
 
 # Temporary fix to run json-server alongside nextjs until proper backend is available
 # Using concurrently to run both services and crash container if either service fails
-CMD ["node_modules/.bin/concurrently", "--kill-others", "--names", "JSON-SERVER,NEXT", "-c", "blue,green", "node_modules/.bin/json-server json-server/db.json -p 3001", "node_modules/.bin/next start"]
+CMD ["node_modules/.bin/concurrently", "--kill-others", "--names", "JSON-SERVER,NEXT", "-c", "blue,green", "node_modules/.bin/json-server json-server/db.seed.json -p 3001", "node_modules/.bin/next start"]
 # CMD ["node_modules/.bin/next", "start"]

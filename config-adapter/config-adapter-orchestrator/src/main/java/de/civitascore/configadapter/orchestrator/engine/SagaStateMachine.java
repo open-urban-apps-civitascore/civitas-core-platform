@@ -328,6 +328,7 @@ public class SagaStateMachine {
       actions.add(
           new SagaAction.FailSaga(
               failedContext.sagaId(),
+              failedContext.datasetId(),
               failedContext.failure() != null ? failedContext.failure().stepId() : null,
               failedContext.failure() != null
                   ? failedContext.failure().error()
@@ -422,6 +423,7 @@ public class SagaStateMachine {
       actions.add(
           new SagaAction.FailSaga(
               failedContext.sagaId(),
+              failedContext.datasetId(),
               failedContext.failure() != null ? failedContext.failure().stepId() : null,
               failedContext.failure() != null
                   ? failedContext.failure().error()
@@ -439,6 +441,7 @@ public class SagaStateMachine {
     actions.add(
         new SagaAction.FailSaga(
             compensatedContext.sagaId(),
+            compensatedContext.datasetId(),
             compensatedContext.failure() != null ? compensatedContext.failure().stepId() : null,
             compensatedContext.failure() != null
                 ? compensatedContext.failure().error()
