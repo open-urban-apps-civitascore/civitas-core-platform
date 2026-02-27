@@ -37,7 +37,7 @@ export type DatastructureVersionSource =
 export const DatastructureVersionApiResponseSchema = z.object({
   id: z.string(),
   version: z.string(),
-  description: z.string().optional(),
+  description: z.string().nullable(),
   dataStructureVersionStatus: DatastructureStatusEnum,
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   modelAtlasUri: z.string().nullable(),
@@ -79,12 +79,19 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
   styles: UMLModelStylesPayloadSchema,
 })
 
+export const DatastructureVersionCreateSchema = DatastructureVersionFormDraftSchema.omit({ id: true })
+  .partial()
+  .extend({
+    version: z.string().trim().min(1, 'common.errors.required'),
+    dataStructureVersionSource: DatastructureVersionSourceEnum,
+  })
+
 export type DatastructureVersion = z.infer<typeof DatastructureVersionApiResponseSchema>
 export type DatastructureVersionSummary = z.infer<typeof DatastructureVersionSummaryApiResponseSchema>
 
 export type DatastructureVersionFormData = z.infer<typeof DatastructureVersionFormDraftSchema>
-export type DatastructureVersionCreateData = Omit<DatastructureVersionFormData, 'id'>
-export type DatastructureVersionPutData = DatastructureVersionFormData
+export type DatastructureVersionCreateData = z.infer<typeof DatastructureVersionCreateSchema>
+export type DatastructureVersionPutData = DatastructureVersionCreateData
 export type DatastructureVersionPatchData = Partial<DatastructureVersionCreateData> & WithId
 
 export type DatastructureVersionsListData = {
@@ -101,7 +108,7 @@ export type DatastructureVersionsListData = {
 export const DatastructureApiResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
-  description: z.string(),
+  description: z.string().nullable(),
   dataStructureStatus: DatastructureStatusEnum,
   createdFromDataSource: z.boolean(),
   assignments: z.array(AssignmentSchema),
@@ -139,17 +146,19 @@ export const DatastructureCreateFormSchema = z.object({
   name: z.string().trim().min(1, 'common.errors.required'),
 })
 
-export const DatastructureCreateDataSchema = DatastructureFormDraftSchema.omit({
-  id: true,
-  dataStructureStatus: true,
-}).extend({
+export const DatastructureCreateDataSchema = z.object({
+  name: z.string().trim().min(1, 'common.errors.required'),
   createdFromDataSource: z.boolean(),
+  description: z.string().trim().optional(),
+  dataStructureVersionIds: z.array(z.string()).optional(),
+  assignments: z.array(AssignmentSchema).optional(),
 })
 
 export type DatastructureCreateFormData = z.infer<typeof DatastructureCreateFormSchema>
 export type DatastructureCreateData = z.infer<typeof DatastructureCreateDataSchema>
 
-export type DatastructureUpdateData = DatastructureFormDraft
+export type DatastructurePutData = DatastructureFormDraft
+export type DatastructurePatchData = Partial<DatastructureCreateData> & WithId
 
 // DATASTRUCTURE LIST DATA
 

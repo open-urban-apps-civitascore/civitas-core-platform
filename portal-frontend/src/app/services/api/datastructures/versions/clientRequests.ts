@@ -16,7 +16,7 @@ export const useCreateDatastructureVersion = (datastructureId: string) =>
 export const useUpdateDatastructureVersion = (datastructureId: string) =>
   useUpdateMutation<DatastructureVersion, DatastructureVersionPatchData>({
     method: 'PATCH',
-    key: `datastructures${datastructureId}/versions`,
+    key: `datastructures/${datastructureId}/versions`,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating datastructure version',
   })

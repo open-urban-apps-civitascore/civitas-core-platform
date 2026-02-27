@@ -38,6 +38,7 @@ import { pickDirtyValues } from '@/utils/form'
 
 import { StructureDefinitionTab } from './components/structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './components/version-info-tab/VersionInfoTab'
+import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 
 export const defaultFormData: DatastructureVersionFormData = {
   id: '',
@@ -80,6 +81,14 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const tCommon = useTranslations('common')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const modelSessionManager = useMultiSessionManager({})
+  const initialUmlModelData = useMemo(
+    () => buildUMLModelPayload(modelSessionManager.activeSession?.diagram as UMLDiagram),
+    [],
+  )
+
+  useEffect(() => {
+    console.log('dirtyFields', modelSessionManager.activeSession?.dirtyFields)
+  }, [modelSessionManager.activeSession?.dirtyFields])
 
   const router = useRouter()
 
@@ -98,6 +107,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     defaultValues: initialFormValues,
   })
 
+  const dirtyModelFields = modelSessionManager.activeSession?.dirtyFields
+
   useEffect(() => {
     form.reset(initialFormValues)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,7 +122,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
-  const hasDiagramChanges = modelSessionManager.activeSession?.isDirty
+  const isDiagramDirty = modelSessionManager.activeSession?.isDirty
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
@@ -158,27 +169,34 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
   }
 
-  const getUmlModelData = (formValues: DatastructureVersionFormData) => {
+  useEffect(() => {
+    console.log('dirtyModelFields', 'diagram changed')
     const diagram = modelSessionManager.activeSession?.diagram
-
+    const hasNameChanges = dirtyModelFields?.has('modelName')
+    const hasModelChanges = dirtyModelFields?.has('model')
     const diagramUpdateData = diagram ? buildUMLModelPayload(diagram) : null
-    const data: DatastructureVersionCreateData = {
-      ...formValues,
-      model: diagramUpdateData?.model || null,
-      modelName: diagramUpdateData?.name || null,
-      styles: diagramUpdateData?.styles || null,
-      modelAtlasUri: diagramUpdateData?.model ? `http://civitas.org/model/${datastructureId}+${versionWatch}` : null,
+    if (hasNameChanges && diagramUpdateData) {
+      form.setValue('modelName', diagramUpdateData.name, { shouldDirty: true })
     }
-    return data
-  }
+    if (hasModelChanges && diagramUpdateData) {
+      form.setValue('model', diagramUpdateData.model, { shouldDirty: true })
+      form.setValue('styles', diagramUpdateData.styles, { shouldDirty: true })
+      form.setValue('modelAtlasUri', `http://civitas.org/model/${datastructureId}+${versionWatch}`, {
+        shouldDirty: true,
+      })
+    }
+  }, [dirtyModelFields])
+
+  useEffect(() => {
+    console.log('form watch', formValues)
+    console.log('form form.formState.dirtyFields', form.formState.dirtyFields)
+  }, [formValues])
 
   const handleCreateVersion = () => {
     const values = form.getValues()
-    const completeData = hasDiagramChanges ? getUmlModelData(values) : values
-
     const parsed = isDraftMode
-      ? DatastructureVersionFormDraftSchema.safeParse(completeData)
-      : DatastructureVersionFormAvailableSchema.safeParse(completeData)
+      ? DatastructureVersionFormDraftSchema.safeParse(values)
+      : DatastructureVersionFormAvailableSchema.safeParse(values)
     if (!parsed.success) {
       console.error(parsed.error)
       toast.error(tCommon('errors.formInvalid'))
@@ -191,7 +209,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
       onSuccess: async ({ data }) => {
         toast.success(t('messages.createSuccess'))
         setIsExitModalOpen(false)
-        router.push(`/datastructures/${datastructureId}/versions/${data.id}?mode=edit`)
+        router.push(`/datastructures/${datastructureId}/${data.id}?mode=edit`)
       },
       onError: () => toast.error(tCommon('errors.unexpectedError')),
     })
@@ -199,17 +217,16 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const handleUpdateVersion = () => {
     const values = form.getValues()
-    const updateData = getUmlModelData(values)
     const parsed = isDraftMode
-      ? DatastructureVersionFormDraftSchema.safeParse(updateData)
-      : DatastructureVersionFormAvailableSchema.safeParse(updateData)
+      ? DatastructureVersionFormDraftSchema.safeParse(values)
+      : DatastructureVersionFormAvailableSchema.safeParse(values)
     if (!parsed.success) {
       console.error(parsed.error)
       toast.error(tCommon('errors.formInvalid'))
       return
     }
     const dirtyFields = form.formState.dirtyFields
-    const fieldsToUpdate = pickDirtyValues(parsed, dirtyFields)
+    const fieldsToUpdate = pickDirtyValues(parsed.data, dirtyFields)
 
     updateVersion.mutate(
       { ...fieldsToUpdate, id: values.id },
@@ -238,13 +255,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }
 
   const isConfirmButtonDisabled = useMemo(
-    () =>
-      !form.formState.isDirty ||
-      !!form.formState.errors.version ||
-      (statusWatch !== DATASTRUCTURE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
-      isLoading,
+    () => (!form.formState.isDirty && !isDiagramDirty) || !!form.formState.errors.version || isLoading,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isLoading, statusWatch, formValues],
+    [isLoading, statusWatch, formValues, isDiagramDirty],
   )
 
   const ActionButtonsAndStatusSwitch = (

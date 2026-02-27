@@ -1,6 +1,6 @@
 import { PageBackground } from '@/components/page-background/PageBackground'
-import { UmlModeler } from '@/components/uml-modeler/page'
 import { UseMultiSessionReturn } from '@/components/uml-modeler/types/session'
+import { UmlModeler } from '@/components/uml-modeler/UmlModeler'
 
 interface StructureDefinitionTabProps {
   isReadOnly: boolean

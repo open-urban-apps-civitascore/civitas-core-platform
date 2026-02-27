@@ -1,6 +1,6 @@
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
-import { Datastructure, DatastructureCreateFormData, DatastructureUpdateData } from '@/types/datastructures'
+import { Datastructure, DatastructureCreateFormData, DatastructurePatchData } from '@/types/datastructures'
 
 const key = 'datastructures'
 
@@ -13,7 +13,7 @@ export const useCreateDatastructure = () =>
   })
 
 export const useUpdateDatastructure = () =>
-  useUpdateMutation<Datastructure, DatastructureUpdateData>({
+  useUpdateMutation<Datastructure, DatastructurePatchData>({
     //TODO: switch to PUT method when API is connected
     method: 'PATCH',
     key,
