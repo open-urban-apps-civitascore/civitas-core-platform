@@ -17,8 +17,8 @@ import java.util.Optional;
  * carries its Redpanda input key and the payload aliases it accepts.
  */
 enum ConnectorType {
-  MQTT("mqtt", "mqtt", "MQTT"),
-  SQL("sql_raw", "postgresql", "sql", "SQL");
+  MQTT("mqtt", "mqtt"),
+  SQL("sql_raw", "sql_raw", "postgresql", "sql");
 
   /** Redpanda Connect input key, e.g. {@code "mqtt"} or {@code "sql_raw"}. */
   final String redpandaKey;
