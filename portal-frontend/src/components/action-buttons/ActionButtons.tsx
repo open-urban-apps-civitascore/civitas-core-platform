@@ -25,6 +25,7 @@ export type ActionButtonsProps = (FormButtonProps | ConfirmButtons) & {
   confirmButtonTitle?: string
   cancelButtonTitle?: string
   wrapperClassname?: string
+  formId?: string
 }
 
 export const ActionButtons = (props: ActionButtonsProps) => {
@@ -38,6 +39,7 @@ export const ActionButtons = (props: ActionButtonsProps) => {
     className,
     wrapperClassname,
     hasCard = true,
+    formId,
   } = props
   const t = useTranslations('common')
 
@@ -57,6 +59,7 @@ export const ActionButtons = (props: ActionButtonsProps) => {
         type={confirmButtonType}
         onClick={confirmButtonType === 'button' ? props.onConfirmClick : undefined}
         disabled={isConfirmButtonDisabled}
+        form={formId}
       >
         {confirmButtonTitle || t('actions.submit')}
       </Button>
