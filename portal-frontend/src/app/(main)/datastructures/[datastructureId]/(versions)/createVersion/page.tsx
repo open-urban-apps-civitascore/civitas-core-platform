@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server'
 
-import { VersionOverview } from '../VersionOverview'
+import { VersionOverview } from '../components/VersionOverview'
 
 interface CreateDatastructureVersionPage {
   params: Promise<{ versionId: string; datastructureId: string }>

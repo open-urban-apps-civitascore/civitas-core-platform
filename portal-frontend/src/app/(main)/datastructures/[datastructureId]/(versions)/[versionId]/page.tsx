@@ -4,7 +4,7 @@ import { getDatastructureVersion } from '@/app/services/api/datastructures/versi
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { DatastructureVersionApiResponseSchema } from '@/types/datastructures'
 
-import { VersionOverview } from '../VersionOverview'
+import { VersionOverview } from '../components/VersionOverview'
 
 interface EditDatastructureVersionPage {
   params: Promise<{ versionId: string; datastructureId: string }>

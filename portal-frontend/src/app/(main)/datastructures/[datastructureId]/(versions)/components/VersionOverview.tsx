@@ -38,8 +38,8 @@ import {
 } from '@/types/datastructures'
 import { pickDirtyValues } from '@/utils/form'
 
-import { StructureDefinitionTab } from './components/structure-definition-tab/StructureDefinitionTab'
-import { VersionInfoTab } from './components/version-info-tab/VersionInfoTab'
+import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
+import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
 
 export const defaultFormData: DatastructureVersionFormData = {
   id: '',
