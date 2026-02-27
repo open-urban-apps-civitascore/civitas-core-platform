@@ -32,6 +32,9 @@ services:
       networks:
       - civitas-network
       environment:
-        - REGISTRY_API_URL=http://localhost:8081/apis/registry/v3
+        - REGISTRY_API_URL=http://localhost:8087/apis/registry/v3
 
-
+networks:
+  civitas-network:
+    name: civitas-network
+    external: true
