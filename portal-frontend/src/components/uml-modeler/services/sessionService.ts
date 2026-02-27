@@ -6,7 +6,7 @@ export const createEmptySession = (name?: string): DiagramSession => {
   const now = new Date()
   return {
     id: crypto.randomUUID(),
-    name: name || `Diagram ${Date.now()}`,
+    name: name || 'Untitled Diagram',
     diagram: createEmptyDiagram(),
     isDirty: false,
     dirtyFields: new Set(),
