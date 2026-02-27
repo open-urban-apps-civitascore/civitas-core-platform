@@ -337,17 +337,7 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
           .as("Version should have a source")
           .isNotNull();
 
-      // Check Assignments
-      assertThat(output.getAssignments()).as("Should have assignments field").isNotNull();
-      assertThat(output.getAssignments()).as("Should have 1 assignment").hasSize(1);
-
-      // Verify assignment details
-      AssignmentOutputDTO assignment = output.getAssignments().getFirst();
-      assertThat(assignment.getId()).as("Assignment should have an ID").isNotNull();
-      assertThat(assignment.getScopeType())
-          .as("Assignment scope type should be DATASTRUCTURE")
-          .isEqualTo(ScopeType.DATASTRUCTURE);
-      // FIXME: Nested dependencies of assignment are not yet being mapped in the outputDTO
+      // Assignments are not included in the output DTO — use GET /{id}/assignments instead
     }
 
     @Test

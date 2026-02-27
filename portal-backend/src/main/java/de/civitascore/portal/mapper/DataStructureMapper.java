@@ -14,7 +14,7 @@ import org.mapstruct.ReportingPolicy;
 @Mapper(
     componentModel = "spring",
     nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
-    uses = {AssignmentMapper.class, DataStructureVersionMapper.class},
+    uses = {DataStructureVersionMapper.class},
     unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface DataStructureMapper
     extends DtoMapper<DataStructureInputDTO, DataStructureOutputDTO, DataStructure> {
