@@ -197,11 +197,11 @@ class AssignmentControllerIntegrationTest
           .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
+    // TODO v2.1: add DATASPACE and CATALOG back to scope types list
     @Test
     @DisplayName("Should create assignment with different scope types")
     void shouldCreateAssignmentWithDifferentScopeTypes() {
-      for (ScopeType scopeType :
-          List.of(ScopeType.TENANT, ScopeType.DATASPACE, ScopeType.DATASET, ScopeType.CATALOG)) {
+      for (ScopeType scopeType : List.of(ScopeType.TENANT, ScopeType.DATASET)) {
         UUID groupId = createTestGroup();
         UUID roleId = createTestRole();
 
@@ -221,8 +221,9 @@ class AssignmentControllerIntegrationTest
       }
     }
 
+    // TODO v2.1: re-enable when DATASPACE scope is available
     @Test
-    @DisplayName("Should create assignment with dataspace scope and return scope summary")
+    @DisplayName("Should reject assignment with dataspace scope (not available in this release)")
     void shouldCreateAssignmentWithDataspaceScope() {
       DataSpace dataSpace = createTestDataSpaceEntity();
 
@@ -232,15 +233,7 @@ class AssignmentControllerIntegrationTest
 
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getScope()).as("Scope summary should be set").isNotNull();
-      assertThat(response.getBody().getScope().getId())
-          .as("Scope ID should match dataspace ID")
-          .isEqualTo(dataSpace.getId());
-      assertThat(response.getBody().getScope().getName())
-          .as("Scope name should match dataspace name")
-          .isEqualTo(dataSpace.getName());
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
@@ -459,11 +452,17 @@ class AssignmentControllerIntegrationTest
       input1.setRoleId(role1Id);
       input1.setScopeType(ScopeType.TENANT);
 
+      // TODO v2.1: switch back to DATASPACE scope
+      // AssignmentInputDTO input2 = new AssignmentInputDTO();
+      // input2.setGroupId(groupId);
+      // input2.setRoleId(role2Id);
+      // input2.setScopeType(ScopeType.DATASPACE);
+      // input2.setScopeId(createTestDataSpace());
       AssignmentInputDTO input2 = new AssignmentInputDTO();
       input2.setGroupId(groupId);
       input2.setRoleId(role2Id);
-      input2.setScopeType(ScopeType.DATASPACE);
-      input2.setScopeId(createTestDataSpace());
+      input2.setScopeType(ScopeType.DATASET);
+      input2.setScopeId(createTestDataSet(createTestDataSpace()));
 
       ResponseEntity<AssignmentOutputDTO> response1 = performCreate(input1);
       ResponseEntity<AssignmentOutputDTO> response2 = performCreate(input2);

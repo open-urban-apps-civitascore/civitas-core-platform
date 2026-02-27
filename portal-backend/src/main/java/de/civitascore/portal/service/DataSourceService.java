@@ -5,7 +5,7 @@ import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.connector.OnPublish;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
@@ -17,19 +17,21 @@ import jakarta.validation.groups.Default;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class DataSourceService extends BaseService<DataSource, DataSourceInputDTO> {
+public class DataSourceService extends BaseDataEntityService<DataSource, DataSourceInputDTO> {
 
   private final DataSourceRepository dataSourceRepository;
   private final DataSourceMapper dataSourceMapper;
   private final ConnectorHandlerRegistry connectorHandlerRegistry;
-  private final AssignmentService assignmentService;
+  private final ScopedAssignmentBuilderService assignmentBuilderService;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -44,6 +46,11 @@ public class DataSourceService extends BaseService<DataSource, DataSourceInputDT
   @Override
   protected String getEntityName() {
     return DataSource.class.getSimpleName();
+  }
+
+  @Override
+  protected ScopedAssignmentBuilderService getAssignmentBuilderService() {
+    return assignmentBuilderService;
   }
 
   @Override
@@ -167,15 +174,6 @@ public class DataSourceService extends BaseService<DataSource, DataSourceInputDT
   }
 
   @Override
-  protected DataSource postSave(DataSource entity, DataSourceInputDTO input) {
-    if (input.getAssignments() != null) {
-      assignmentService.replaceAllByScopeTypeAndScopeId(
-          input.getAssignments(), ScopeType.DATASOURCE, entity.getId());
-    }
-    return entity;
-  }
-
-  @Override
   protected DataSource preSave(DataSource entity) {
     if (entity.getDataSourceStatus() == DataSourceStatus.AVAILABLE) {
       validateConfiguration(entity);
@@ -233,8 +231,12 @@ public class DataSourceService extends BaseService<DataSource, DataSourceInputDT
     }
 
     if (input.getAssignments() != null) {
-      assignmentService.replaceAllByScopeTypeAndScopeId(
-          input.getAssignments(), ScopeType.DATASOURCE, id);
+      Set<Assignment> assignments =
+          input.getAssignments().stream()
+              .distinct()
+              .map(dto -> getAssignmentBuilderService().build(dto))
+              .collect(Collectors.toSet());
+      entity.setAssignments(assignments);
     }
 
     return save(entity);

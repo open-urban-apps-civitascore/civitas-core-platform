@@ -21,11 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
+public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputDTO> {
 
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
 
+  private final ScopedAssignmentBuilderService assignmentBuilderService;
   private final DistributionService distributionService;
 
   private final ObjectMapper objectMapper;
@@ -45,6 +46,11 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
     return DataSet.class.getSimpleName();
   }
 
+  @Override
+  protected ScopedAssignmentBuilderService getAssignmentBuilderService() {
+    return assignmentBuilderService;
+  }
+
   /**
    * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
    * DataSet along with owner and dataSpaces in a single JOIN query, preventing N+1 query problems
@@ -54,11 +60,6 @@ public class DataSetService extends BaseService<DataSet, DataSetInputDTO> {
   public Optional<DataSet> findById(UUID id) {
     Optional<DataSet> entity = dataSetRepository.findByIdWithRelations(id);
     return postLoad(entity);
-  }
-
-  @Override
-  protected DataSet postConvertToEntity(DataSet entity, DataSetInputDTO input) {
-    return super.postConvertToEntity(entity, input);
   }
 
   @Override

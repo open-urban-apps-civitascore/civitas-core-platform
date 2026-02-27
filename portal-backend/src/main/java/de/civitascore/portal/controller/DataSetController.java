@@ -1,5 +1,6 @@
 package de.civitascore.portal.controller;
 
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
@@ -33,7 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "DataSets", description = "Dataset management endpoints")
 public class DataSetController
-    extends BaseController<DataSetInputDTO, DataSetOutputDTO, DataSet, DataSetSpec> {
+    extends BaseDataEntityController<DataSetInputDTO, DataSetOutputDTO, DataSet, DataSetSpec> {
 
   private final DataSetService dataSetService;
   private final DataSetAssembler dataSetAssembler;
@@ -96,6 +97,11 @@ public class DataSetController
     DataSet updated = dataSetService.updatePublishedMeta(id, preProcessedInput);
     DataSetOutputDTO output = dataSetAssembler.toOutput(updated);
     return ResponseEntity.ok(output);
+  }
+
+  @Override
+  protected ScopeType getScopeType() {
+    return ScopeType.DATASET;
   }
 
   @PostMapping("/{id}/publish")

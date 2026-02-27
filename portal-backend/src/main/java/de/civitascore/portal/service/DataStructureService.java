@@ -5,7 +5,6 @@ import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
-import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
@@ -20,12 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class DataStructureService extends BaseService<DataStructure, DataStructureInputDTO> {
+public class DataStructureService
+    extends BaseDataEntityService<DataStructure, DataStructureInputDTO> {
 
   private final DataStructureRepository dataStructureRepository;
   private final DataStructureMapper dataStructureMapper;
-  private final AssignmentRepository assignmentRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
+  private final ScopedAssignmentBuilderService assignmentBuilderService;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -42,6 +42,11 @@ public class DataStructureService extends BaseService<DataStructure, DataStructu
     return DataStructure.class.getSimpleName();
   }
 
+  @Override
+  protected ScopedAssignmentBuilderService getAssignmentBuilderService() {
+    return assignmentBuilderService;
+  }
+
   /**
    * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
    * DataStructure along with dataStructureVersions in a single JOIN query, preventing N+1 query
@@ -55,19 +60,13 @@ public class DataStructureService extends BaseService<DataStructure, DataStructu
 
   @Override
   protected DataStructure postConvertToEntity(DataStructure entity, DataStructureInputDTO input) {
-    // Set assignments
-    Optional.ofNullable(input.getAssignmentIds())
-        .map(assignmentRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setAssignments);
-
     // Set dataStructureVersions
     Optional.ofNullable(input.getDataStructureVersionIds())
         .map(dataStructureVersionRepository::findAllById)
         .map(HashSet::new)
         .ifPresent(entity::setDataStructureVersions);
 
-    return super.postConvertToEntity(entity, input);
+    return super.postConvertToEntity(entity, input); // base handles assignments
   }
 
   @Override
@@ -174,7 +173,8 @@ public class DataStructureService extends BaseService<DataStructure, DataStructu
       throw new InvalidInputException(
           "dataStructureVersions",
           id,
-          "DataStructure must contain at least one published DataStructureVersion before publishing");
+          "DataStructure must contain at least one published DataStructureVersion before"
+              + " publishing");
     }
 
     dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
