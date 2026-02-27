@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.crypto.CredentialDecryptor;
 import de.civitascore.configadapter.crypto.CredentialEncryptor;
+import de.civitascore.configadapter.crypto.CryptoKeyLoader;
+import de.civitascore.portal.configuration.EncryptionConfig;
 import de.civitascore.portal.model.connector.OnPublish;
 import jakarta.validation.groups.Default;
 import java.security.GeneralSecurityException;
@@ -20,11 +22,19 @@ import org.springframework.security.crypto.encrypt.TextEncryptor;
 @DisplayName("MqttConnectorHandler Tests")
 class MqttConnectorHandlerTest {
 
-  private static final byte[] TEST_KEY =
-      CredentialDecryptor.hexStringToBytes(
-          "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
-  private static final byte[] TEST_SALT =
-      CredentialDecryptor.hexStringToBytes("00112233445566778899aabbccddeeff");
+  private static final byte[] TEST_STRETCHED_KEY;
+  private static final String TEST_CONTEXT = EncryptionConfig.CREDENTIAL_CONTEXT;
+
+  static {
+    try {
+      byte[] raw =
+          CryptoKeyLoader.hexStringToBytes(
+              "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+      TEST_STRETCHED_KEY = CryptoKeyLoader.stretchMasterKey(raw);
+    } catch (GeneralSecurityException e) {
+      throw new ExceptionInInitializerError(e);
+    }
+  }
 
   private MqttConnectorHandler handler;
   private TextEncryptor textEncryptor;
@@ -36,7 +46,7 @@ class MqttConnectorHandlerTest {
           @Override
           public String encrypt(String text) {
             try {
-              return CredentialEncryptor.encrypt(text, TEST_KEY, TEST_SALT);
+              return CredentialEncryptor.encrypt(text, TEST_STRETCHED_KEY, TEST_CONTEXT);
             } catch (GeneralSecurityException e) {
               throw new IllegalStateException(e);
             }
@@ -184,7 +194,7 @@ class MqttConnectorHandlerTest {
 
   private static String decrypt(String encrypted) {
     try {
-      return CredentialDecryptor.decrypt(encrypted, TEST_KEY, TEST_SALT);
+      return CredentialDecryptor.decrypt(encrypted, TEST_STRETCHED_KEY, TEST_CONTEXT);
     } catch (GeneralSecurityException e) {
       throw new IllegalStateException(e);
     }
