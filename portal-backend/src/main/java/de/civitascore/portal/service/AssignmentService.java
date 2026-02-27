@@ -6,9 +6,7 @@ import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.input.AssignmentInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
-import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,7 +23,7 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   private final RoleService roleService;
   private final DataSetService dataSetService;
   private final DataStructureService dataStructureService;
-  private final DataSourceRepository dataSourceRepository;
+  private final DataSourceService dataSourceService;
 
   @Override
   protected AssignmentRepository getRepository() {
@@ -67,11 +65,7 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
         case DATASTRUCTURE ->
             entity.setDataStructure(dataStructureService.findByIdOrThrow(input.getScopeId()));
         case DATASOURCE ->
-            entity.setDataSource(
-                dataSourceRepository
-                    .findById(input.getScopeId())
-                    .orElseThrow(
-                        () -> new ResourceNotFoundException("DataSource", input.getScopeId())));
+            entity.setDataSource(dataSourceService.findByIdOrThrow(input.getScopeId()));
         case DATASPACE, CATALOG ->
             throw new InvalidInputException(
                 "Assignment",
