@@ -95,12 +95,14 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
 
   private SagaCommandResult handleDeployPipelines(SagaCommandMessage command) {
     List<Map<String, Object>> dataPipelines = extractPipelineList(command, "dataPipelines");
+    List<Map<String, Object>> datasources = extractDatasources(command);
     List<String> deployedIds = new ArrayList<>();
 
     try {
       for (Map<String, Object> pipeline : dataPipelines) {
         String id = requirePipelineField(pipeline, "id");
         Map<String, Object> data = optionalPipelineMapField(pipeline, "data");
+        data = DatasourceInjector.resolve(data, datasources);
 
         redpandaClient.createPipeline(id, data);
         deployedIds.add(id);
@@ -129,6 +131,7 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
 
   private SagaCommandResult handleUpdatePipelines(SagaCommandMessage command) {
     List<Map<String, Object>> dataPipelines = extractPipelineList(command, "dataPipelines");
+    List<Map<String, Object>> datasources = extractDatasources(command);
     List<String> processedIds = new ArrayList<>();
     boolean isCompensation = "COMPENSATE_STEP".equals(command.type());
 
@@ -137,6 +140,7 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
         String id = requirePipelineField(pipeline, "id");
         String action = requirePipelineField(pipeline, "action");
         Map<String, Object> data = optionalPipelineMapField(pipeline, "data");
+        data = DatasourceInjector.resolve(data, datasources);
 
         switch (action) {
           case "ADD" -> redpandaClient.createPipeline(id, data);
@@ -203,11 +207,13 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
 
   private SagaCommandResult handleRestorePipelines(SagaCommandMessage command) {
     List<Map<String, Object>> dataPipelines = extractPipelineList(command, "dataPipelines");
+    List<Map<String, Object>> datasources = extractDatasources(command);
 
     try {
       for (Map<String, Object> pipeline : dataPipelines) {
         String id = requirePipelineField(pipeline, "id");
         Map<String, Object> data = optionalPipelineMapField(pipeline, "data");
+        data = DatasourceInjector.resolve(data, datasources);
         redpandaClient.updatePipeline(id, data);
       }
 
@@ -229,6 +235,18 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   }
 
   // ─── Payload validation helpers ──────────────────────────────────────────
+
+  @SuppressWarnings("unchecked")
+  private static List<Map<String, Object>> extractDatasources(SagaCommandMessage command) {
+    Object value = command.payload().getOrDefault("datasources", List.of());
+    if (!(value instanceof List<?> list) || list.isEmpty()) {
+      return List.of();
+    }
+    if (!(list.get(0) instanceof Map<?, ?>)) {
+      return List.of();
+    }
+    return (List<Map<String, Object>>) list;
+  }
 
   @SuppressWarnings("unchecked")
   private static List<Map<String, Object>> extractPipelineList(
