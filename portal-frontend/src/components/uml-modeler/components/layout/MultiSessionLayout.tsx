@@ -19,10 +19,11 @@ interface MultiSessionLayoutProps {
   className?: string
   externalSessionManager?: UseMultiSessionReturn
   isMultiSessionMode: boolean
+  canExportXmi: boolean
 }
 
 export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
-  const { className, externalSessionManager, isMultiSessionMode } = props
+  const { className, externalSessionManager, isMultiSessionMode, canExportXmi } = props
   const t = useTranslations('common')
   const { isReadOnly } = useReadOnly()
   const sessionManager = useMultiSessionManager({ sessionManager: externalSessionManager })
@@ -115,6 +116,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
               onSave={isControlledExternally ? undefined : handleSave}
               onExport={handleExport}
               hasUnsavedChanges={activeSession?.isDirty || false}
+              canExportXmi={canExportXmi}
             />
           )}
 

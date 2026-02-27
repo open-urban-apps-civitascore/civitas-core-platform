@@ -35,10 +35,10 @@ export const useMultiSessionManager = ({
   )
 
   const closeSession = useCallback(
-    (sessionId: string): void => {
+    (sessionId: string, sessionName?: string): void => {
       dispatch({
         type: 'CLOSE_SESSION',
-        payload: { sessionId },
+        payload: { sessionId, sessionName },
       })
     },
     [dispatch],

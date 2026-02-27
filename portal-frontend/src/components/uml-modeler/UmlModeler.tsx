@@ -12,10 +12,11 @@ interface UmlModelerProps {
   isReadOnly?: boolean
   isMultiSessionMode?: boolean
   modelSessionManager?: UseMultiSessionReturn
+  canExportXmi?: boolean
 }
 
 export const UmlModeler = (props: UmlModelerProps) => {
-  const { className, isReadOnly = false, isMultiSessionMode = true, modelSessionManager } = props
+  const { className, isReadOnly = false, isMultiSessionMode = true, modelSessionManager, canExportXmi = true } = props
   return (
     <div className={cn('flex h-full w-full flex-1 flex-col gap-4 p-4', className)}>
       <div className="h-full w-full rounded-xl border bg-background overflow-hidden">
@@ -24,6 +25,7 @@ export const UmlModeler = (props: UmlModelerProps) => {
             className="rounded-xl"
             externalSessionManager={modelSessionManager}
             isMultiSessionMode={isMultiSessionMode}
+            canExportXmi={canExportXmi}
           />
         </ReadOnlyProvider>
       </div>

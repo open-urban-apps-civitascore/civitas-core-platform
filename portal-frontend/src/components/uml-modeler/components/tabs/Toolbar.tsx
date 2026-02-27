@@ -16,9 +16,10 @@ interface ToolbarProps {
   hasUnsavedChanges?: boolean
   onExport?: () => void
   sessionName?: string
+  canExportXmi: boolean
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ onSave, hasUnsavedChanges = false, sessionName }) => {
+export const Toolbar: React.FC<ToolbarProps> = ({ onSave, hasUnsavedChanges = false, sessionName, canExportXmi }) => {
   const { diagram, dispatch } = useActiveDiagram()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const createModel = useCreateModel()
@@ -110,10 +111,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onSave, hasUnsavedChanges = fa
           <span className="ml-1 text-xs">Import</span>
         </Button>
 
-        <Button variant="ghost" size="sm" onClick={handleExportXmi} className="h-8 px-2" title="Export diagram as XMI">
-          <FileDown className="h-4 w-4" />
-          <span className="ml-1 text-xs">Export</span>
-        </Button>
+        {canExportXmi && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleExportXmi}
+            className="h-8 px-2"
+            title="Export diagram as XMI"
+          >
+            <FileDown className="h-4 w-4" />
+            <span className="ml-1 text-xs">Export</span>
+          </Button>
+        )}
       </div>
 
       {/* Spacer */}

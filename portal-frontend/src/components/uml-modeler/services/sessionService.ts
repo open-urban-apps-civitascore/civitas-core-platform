@@ -38,7 +38,7 @@ export const sessionReducer = (state: MultiSessionState, action: SessionAction):
     }
 
     case 'CLOSE_SESSION': {
-      const { sessionId } = action.payload
+      const { sessionId, sessionName } = action.payload
       const sessionIndex = state.sessions.findIndex(s => s.id === sessionId)
 
       if (sessionIndex === -1) return state
@@ -54,7 +54,7 @@ export const sessionReducer = (state: MultiSessionState, action: SessionAction):
           newActiveId = newSessions[nextIndex].id
         } else {
           // No sessions left, create a new one
-          const newSession = createEmptySession()
+          const newSession = createEmptySession(sessionName)
           return {
             sessions: [newSession],
             activeSessionId: newSession.id,
@@ -86,7 +86,9 @@ export const sessionReducer = (state: MultiSessionState, action: SessionAction):
       return {
         ...state,
         sessions: state.sessions.map(session =>
-          session.id === sessionId ? { ...session, name, lastModified: new Date() } : session,
+          session.id === sessionId
+            ? { ...session, name, lastModified: new Date(), diagram: { ...session.diagram, name } }
+            : session,
         ),
       }
     }
