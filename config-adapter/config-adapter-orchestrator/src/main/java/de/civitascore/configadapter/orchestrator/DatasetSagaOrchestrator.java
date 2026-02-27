@@ -57,8 +57,14 @@ public class DatasetSagaOrchestrator {
 
   private static final Predicate<Map<String, Object>> HAS_PIPELINES =
       payload -> {
+        // CREATE/UPDATE triggers use "dataPipelines"
         Object pipelines = payload.get("dataPipelines");
-        return pipelines instanceof List<?> list && !list.isEmpty();
+        if (pipelines instanceof List<?> list && !list.isEmpty()) {
+          return true;
+        }
+        // DELETE triggers use "pipelineIds"
+        Object pipelineIds = payload.get("pipelineIds");
+        return pipelineIds instanceof List<?> idList && !idList.isEmpty();
       };
 
   private SagaEngine engine;
