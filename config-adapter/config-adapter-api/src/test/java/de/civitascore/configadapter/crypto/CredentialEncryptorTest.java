@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,29 +33,35 @@ class CredentialEncryptorTest {
     0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20
   };
 
-  // 16 bytes salt (NIST SP 800-132)
-  private static final byte[] SALT = {
-    0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
-    0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F, 0x50
-  };
+  private static final byte[] STRETCHED_KEY;
+
+  static {
+    try {
+      STRETCHED_KEY = CryptoKeyLoader.stretchMasterKey(MASTER_KEY);
+    } catch (GeneralSecurityException e) {
+      throw new ExceptionInInitializerError(e);
+    }
+  }
+
+  private static final String TEST_CTX = "test-ctx";
 
   @Test
   void encrypt_shouldProduceDecryptableOutput() throws GeneralSecurityException {
     String plaintext = "my-secret-password";
 
-    String encrypted = CredentialEncryptor.encrypt(plaintext, MASTER_KEY, SALT);
+    String encrypted = CredentialEncryptor.encrypt(plaintext, STRETCHED_KEY, TEST_CTX);
 
     assertNotNull(encrypted);
     assertFalse(encrypted.isEmpty());
-    assertEquals(plaintext, CredentialDecryptor.decrypt(encrypted, MASTER_KEY, SALT));
+    assertEquals(plaintext, CredentialDecryptor.decrypt(encrypted, STRETCHED_KEY, TEST_CTX));
   }
 
   @Test
   void encrypt_unicode_shouldRoundTrip() throws GeneralSecurityException {
     String plaintext = "Ümlaute-äöü-日本語-\uD83D\uDD11";
 
-    String encrypted = CredentialEncryptor.encrypt(plaintext, MASTER_KEY, SALT);
-    String decrypted = CredentialDecryptor.decrypt(encrypted, MASTER_KEY, SALT);
+    String encrypted = CredentialEncryptor.encrypt(plaintext, STRETCHED_KEY, TEST_CTX);
+    String decrypted = CredentialDecryptor.decrypt(encrypted, STRETCHED_KEY, TEST_CTX);
 
     assertEquals(plaintext, decrypted);
   }
@@ -63,25 +70,41 @@ class CredentialEncryptorTest {
   void encrypt_samePlaintext_shouldProduceDifferentCiphertexts() throws GeneralSecurityException {
     String plaintext = "same-text";
 
-    String enc1 = CredentialEncryptor.encrypt(plaintext, MASTER_KEY, SALT);
-    String enc2 = CredentialEncryptor.encrypt(plaintext, MASTER_KEY, SALT);
+    String enc1 = CredentialEncryptor.encrypt(plaintext, STRETCHED_KEY, TEST_CTX);
+    String enc2 = CredentialEncryptor.encrypt(plaintext, STRETCHED_KEY, TEST_CTX);
 
     assertNotEquals(enc1, enc2, "Different IVs should produce different ciphertexts");
     assertEquals(
-        CredentialDecryptor.decrypt(enc1, MASTER_KEY, SALT),
-        CredentialDecryptor.decrypt(enc2, MASTER_KEY, SALT));
+        CredentialDecryptor.decrypt(enc1, STRETCHED_KEY, TEST_CTX),
+        CredentialDecryptor.decrypt(enc2, STRETCHED_KEY, TEST_CTX));
   }
 
   @Test
   void encrypt_null_shouldThrowIllegalArgumentException() {
     assertThrows(
-        IllegalArgumentException.class, () -> CredentialEncryptor.encrypt(null, MASTER_KEY, SALT));
+        IllegalArgumentException.class,
+        () -> CredentialEncryptor.encrypt(null, STRETCHED_KEY, TEST_CTX));
   }
 
   @Test
   void encrypt_empty_shouldThrowIllegalArgumentException() {
     assertThrows(
-        IllegalArgumentException.class, () -> CredentialEncryptor.encrypt("", MASTER_KEY, SALT));
+        IllegalArgumentException.class,
+        () -> CredentialEncryptor.encrypt("", STRETCHED_KEY, TEST_CTX));
+  }
+
+  @Test
+  void encrypt_nullContext_shouldThrowIllegalArgumentException() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> CredentialEncryptor.encrypt("secret", STRETCHED_KEY, null));
+  }
+
+  @Test
+  void encrypt_emptyContext_shouldThrowIllegalArgumentException() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> CredentialEncryptor.encrypt("secret", STRETCHED_KEY, ""));
   }
 
   @Test
@@ -91,7 +114,8 @@ class CredentialEncryptorTest {
     input.put("password", "secret");
     input.put("port", 8080);
 
-    Map<String, Object> result = CredentialEncryptor.encryptMapValues(input, MASTER_KEY, SALT);
+    Map<String, Object> result =
+        CredentialEncryptor.encryptMapValues(input, STRETCHED_KEY, TEST_CTX);
 
     assertTrue(((String) result.get("username")).startsWith("ENC("));
     assertTrue(((String) result.get("username")).endsWith(")"));
@@ -110,7 +134,8 @@ class CredentialEncryptorTest {
     input.put("outer", "value");
     input.put("inner", nested);
 
-    Map<String, Object> result = CredentialEncryptor.encryptMapValues(input, MASTER_KEY, SALT);
+    Map<String, Object> result =
+        CredentialEncryptor.encryptMapValues(input, STRETCHED_KEY, TEST_CTX);
 
     assertTrue(((String) result.get("outer")).startsWith("ENC("));
 
@@ -128,7 +153,8 @@ class CredentialEncryptorTest {
     input.put("password", alreadyEncrypted);
     input.put("plain", "not-encrypted");
 
-    Map<String, Object> result = CredentialEncryptor.encryptMapValues(input, MASTER_KEY, SALT);
+    Map<String, Object> result =
+        CredentialEncryptor.encryptMapValues(input, STRETCHED_KEY, TEST_CTX);
 
     assertEquals(alreadyEncrypted, result.get("password"));
     assertTrue(((String) result.get("plain")).startsWith("ENC("));
@@ -136,7 +162,8 @@ class CredentialEncryptorTest {
 
   @Test
   void encryptMapValues_nullMap_shouldReturnEmptyMap() throws GeneralSecurityException {
-    Map<String, Object> result = CredentialEncryptor.encryptMapValues(null, MASTER_KEY, SALT);
+    Map<String, Object> result =
+        CredentialEncryptor.encryptMapValues(null, STRETCHED_KEY, TEST_CTX);
 
     assertNotNull(result);
     assertTrue(result.isEmpty());
@@ -148,37 +175,11 @@ class CredentialEncryptorTest {
     input.put("password", "secret");
     input.put("nullable", null);
 
-    Map<String, Object> result = CredentialEncryptor.encryptMapValues(input, MASTER_KEY, SALT);
+    Map<String, Object> result =
+        CredentialEncryptor.encryptMapValues(input, STRETCHED_KEY, TEST_CTX);
 
     assertTrue(((String) result.get("password")).startsWith("ENC("));
     assertNull(result.get("nullable"));
-  }
-
-  @Test
-  void encrypt_nullMasterKey_shouldThrowIllegalArgumentException() {
-    assertThrows(
-        IllegalArgumentException.class, () -> CredentialEncryptor.encrypt("secret", null, SALT));
-  }
-
-  @Test
-  void encrypt_nullSalt_shouldThrowIllegalArgumentException() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> CredentialEncryptor.encrypt("secret", MASTER_KEY, null));
-  }
-
-  @Test
-  void encrypt_emptyMasterKey_shouldThrowIllegalArgumentException() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> CredentialEncryptor.encrypt("secret", new byte[0], SALT));
-  }
-
-  @Test
-  void encrypt_emptySalt_shouldThrowIllegalArgumentException() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> CredentialEncryptor.encrypt("secret", MASTER_KEY, new byte[0]));
   }
 
   @Test
@@ -187,7 +188,8 @@ class CredentialEncryptorTest {
     input.put("description", "");
     input.put("password", "secret");
 
-    Map<String, Object> result = CredentialEncryptor.encryptMapValues(input, MASTER_KEY, SALT);
+    Map<String, Object> result =
+        CredentialEncryptor.encryptMapValues(input, STRETCHED_KEY, TEST_CTX);
 
     assertEquals("", result.get("description"));
     assertTrue(((String) result.get("password")).startsWith("ENC("));
@@ -195,14 +197,14 @@ class CredentialEncryptorTest {
 
   @Test
   void encrypt_decryptWithWrongKey_shouldThrowException() throws GeneralSecurityException {
-    String encrypted = CredentialEncryptor.encrypt("secret", MASTER_KEY, SALT);
+    String encrypted = CredentialEncryptor.encrypt("secret", STRETCHED_KEY, TEST_CTX);
 
     byte[] wrongKey = new byte[32];
     wrongKey[0] = (byte) 0xFF;
 
     assertThrows(
         GeneralSecurityException.class,
-        () -> CredentialDecryptor.decrypt(encrypted, wrongKey, SALT));
+        () -> CredentialDecryptor.decrypt(encrypted, wrongKey, TEST_CTX));
   }
 
   @Test
@@ -217,9 +219,9 @@ class CredentialEncryptorTest {
     original.put("connection", nested);
 
     Map<String, Object> encrypted =
-        CredentialEncryptor.encryptMapValues(original, MASTER_KEY, SALT);
+        CredentialEncryptor.encryptMapValues(original, STRETCHED_KEY, TEST_CTX);
     Map<String, Object> decrypted =
-        CredentialDecryptor.decryptMapValues(encrypted, MASTER_KEY, SALT);
+        CredentialDecryptor.decryptMapValues(encrypted, STRETCHED_KEY, TEST_CTX);
 
     assertEquals("admin", decrypted.get("username"));
     assertEquals("my-secret", decrypted.get("password"));
@@ -228,5 +230,23 @@ class CredentialEncryptorTest {
     @SuppressWarnings("unchecked")
     Map<String, Object> decryptedNested = (Map<String, Object>) decrypted.get("connection");
     assertEquals("db-secret", decryptedNested.get("dbPassword"));
+  }
+
+  // ─── F3: encryptMapValues returns new map, original unmodified ────────────
+
+  @Test
+  void encryptMapValues_shouldReturnNewMap_originalUnmodified() throws GeneralSecurityException {
+    Map<String, Object> original = new LinkedHashMap<>();
+    original.put("password", "secret");
+    original.put("port", 8080);
+
+    Map<String, Object> result =
+        CredentialEncryptor.encryptMapValues(original, STRETCHED_KEY, TEST_CTX);
+
+    assertNotSame(original, result, "encryptMapValues must return a new map");
+    assertEquals("secret", original.get("password"), "Original map must not be modified");
+    assertTrue(
+        ((String) result.get("password")).startsWith("ENC("),
+        "Result map must contain encrypted values");
   }
 }
