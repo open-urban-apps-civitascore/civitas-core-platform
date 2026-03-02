@@ -2,24 +2,29 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { MutationData, UpdateMutationInput, WithId } from '@/types/common'
+import { getRequestEndpoint, isFn } from '@/utils/common'
 
-export const useUpdateMutation = <TResponse, TData extends WithId<string | number>>({
+export const useUpdateMutation = <TResponse, TData extends WithId<string>>({
   method,
   key: mutationKey,
+  endpoint,
   errorMessage,
   headers,
-}: UpdateMutationInput<TData>) => {
+}: UpdateMutationInput) => {
   const queryClient = useQueryClient()
 
   return useMutation<ApiServiceResponse<TResponse>, unknown, MutationData<TData>>({
-    mutationFn: (data: MutationData<TData>) =>
-      apiRequest<TResponse>({
+    mutationFn: (data: MutationData<TData>) => {
+      const url = isFn(endpoint) ? getRequestEndpoint(endpoint, data.id) : endpoint
+
+      return apiRequest<TResponse>({
         method: method,
-        endpoint: `/${mutationKey}/${data.id}`,
+        endpoint: url || `/${mutationKey}/${data.id}`,
         headers,
         data: data,
         errorMessage: errorMessage,
-      }),
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: [mutationKey],

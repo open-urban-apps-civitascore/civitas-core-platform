@@ -92,7 +92,7 @@ export type DatastructureVersionSummary = z.infer<typeof DatastructureVersionSum
 
 export type DatastructureVersionFormData = z.infer<typeof DatastructureVersionFormDraftSchema>
 export type DatastructureVersionCreateData = z.infer<typeof DatastructureVersionCreateSchema>
-export type DatastructureVersionPutData = DatastructureVersionCreateData
+export type DatastructureVersionPutData = DatastructureVersionCreateData & WithId
 export type DatastructureVersionPatchData = Partial<DatastructureVersionCreateData> & WithId
 
 export type DatastructureVersionsListData = {
@@ -112,7 +112,7 @@ export const DatastructureApiResponseSchema = z.object({
   description: z.string().nullable(),
   dataStructureStatus: DatastructureStatusEnum,
   createdFromDataSource: z.boolean(),
-  assignments: z.array(AssignmentSchema),
+  assignments: z.array(AssignmentSchema).optional(),
   inUse: z.boolean().optional(),
   createdAt: z.string(),
   modifiedAt: z.string(),

@@ -45,7 +45,9 @@
       "nameRequired": "Name ist erforderlich",
       "descriptionRequired": "Beschreibung ist erforderlich",
       "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
-      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden"
+      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden",
+      "statusChangeError": "Beim Ändern des Verfügbarkeitsstatus ist ein Fehler aufgetreten.",
+      "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten."
     },
     "items": {
       "data": "Daten",
@@ -67,7 +69,8 @@
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
-      "descriptionHint": "max. 150 Zeichen"
+      "descriptionHint": "max. 150 Zeichen",
+      "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert."
     },
     "status": {
       "DRAFT": "Entwurf",

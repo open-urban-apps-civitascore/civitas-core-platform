@@ -9,7 +9,10 @@ import { toast } from 'sonner'
 
 import {
   useCreateDatastructureVersion,
+  usePublishDatastructureVersion,
+  useUnpublishDatastructureVersion,
   useUpdateDatastructureVersion,
+  useUpdateDatastructureVersionPublished,
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
@@ -30,6 +33,7 @@ import {
   DATASTRUCTURE_VERSION_SOURCE,
   DatastructureStatusTypes,
   DatastructureVersion,
+  DatastructureVersionCreateData,
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionFormData,
   DatastructureVersionFormDraftSchema,
@@ -39,6 +43,9 @@ import { pickDirtyValues } from '@/utils/form'
 
 import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
+import { UseMutationResult } from '@tanstack/react-query'
+import { ApiServiceResponse } from '@/app/services/api/request/apiRequest'
+import { STATUS_TYPES, WithId } from '@/types/common'
 
 export const defaultFormData: DatastructureVersionFormData = {
   id: '',
@@ -109,8 +116,13 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
 
   const updateVersion = useUpdateDatastructureVersion(datastructureId)
+  const updatePublishedVersion = useUpdateDatastructureVersionPublished(datastructureId)
   const createVersion = useCreateDatastructureVersion(datastructureId)
-  const isLoading = updateVersion.isPending
+  const publishVersion = usePublishDatastructureVersion(datastructureId, version?.id || '')
+  const unpublishVersion = useUnpublishDatastructureVersion(datastructureId, version?.id || '')
+
+  const isLoading =
+    updateVersion.isPending || createVersion.isPending || publishVersion.isPending || unpublishVersion.isPending
 
   const form = useForm<DatastructureVersionFormData>({
     resolver: zodResolver(DatastructureVersionFormDraftSchema),
@@ -214,25 +226,34 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versionWatch, modelWatch])
 
-  const handleCreateVersion = () => {
-    const values = form.getValues()
-    const parsed = isDraftMode
-      ? DatastructureVersionFormDraftSchema.safeParse(values)
-      : DatastructureVersionFormAvailableSchema.safeParse(values)
-    if (!parsed.success) {
-      console.error(parsed.error)
-      toast.error(tCommon('errors.formInvalid'))
-      return
+  const handleStatusUpdate = async (
+    mutationFn: UseMutationResult<ApiServiceResponse<DatastructureVersion>, unknown, void, unknown>,
+  ) => {
+    try {
+      mutationFn.mutateAsync()
+      toast.success(tCommon('info.statusChangeSuccess'))
+    } catch (error) {
+      toast.error(tCommon('errors.statusChangeError'))
+      throw error
     }
+  }
 
-    // eslint-disable-next-line unused-imports/no-unused-vars
-    const { id, ...createData } = parsed.data
-
+  const handleCreateVersion = (createData: DatastructureVersionCreateData) => {
+    const isStausfieldDirty = form.formState.dirtyFields.dataStructureVersionStatus
+    const shouldPublish = !!isStausfieldDirty && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
     createVersion.mutate(createData, {
       onSuccess: async ({ data }) => {
         toast.success(t('messages.createSuccess'))
-        setIsExitModalOpen(false)
-        router.push(`/datastructures/${datastructureId}/${data.id}?mode=edit`)
+        if (shouldPublish) {
+          try {
+            await handleStatusUpdate(publishVersion)
+          } catch (error) {
+            console.error(error)
+          }
+        } else {
+          setIsExitModalOpen(false)
+          router.push(`/datastructures/${datastructureId}/${data.id}?mode=edit`)
+        }
       },
       onError: () => {
         toast.error(tCommon('errors.unexpectedError'))
@@ -241,7 +262,46 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     })
   }
 
-  const handleUpdateVersion = () => {
+  const handleUpdateValues = async (values: DatastructureVersionFormData) => {
+    try {
+      if (statusWatch === STATUS_TYPES.AVAILABLE) await updatePublishedVersion.mutateAsync({ ...values, id: values.id })
+      else await updateVersion.mutateAsync({ ...values, id: values.id })
+      toast.success(t('messages.updateSuccess'))
+    } catch (error) {
+      toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructureVersion') }))
+      throw error
+    }
+  }
+
+  const handleUpdateVersion = async (parsedValues: DatastructureVersionFormData) => {
+    try {
+      const dirtyFields = form.formState.dirtyFields
+
+      const shouldPublish =
+        !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+      const shouldUnpublish =
+        !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
+
+      const fieldsToUpdate = pickDirtyValues(parsedValues, dirtyFields)
+      const shouldUpdateValues = (Object.keys(fieldsToUpdate) as (keyof DatastructureVersionFormData)[]).some(
+        key => key !== 'dataStructureVersionStatus',
+      )
+      if (shouldUpdateValues) await handleUpdateValues(parsedValues)
+
+      if (shouldPublish) {
+        await handleStatusUpdate(publishVersion)
+      }
+      if (shouldUnpublish) {
+        await handleStatusUpdate(unpublishVersion)
+      }
+      router.refresh()
+    } catch (error) {
+      console.error('An error occurred while submitting datastructure version data.', error)
+    }
+    setIsExitModalOpen(false)
+  }
+
+  const handleSave = async () => {
     const values = form.getValues()
     const parsed = isDraftMode
       ? DatastructureVersionFormDraftSchema.safeParse(values)
@@ -251,26 +311,14 @@ export const VersionOverview = (props: VersionOverviewProps) => {
       toast.error(tCommon('errors.formInvalid'))
       return
     }
-    const dirtyFields = form.formState.dirtyFields
-    const fieldsToUpdate = pickDirtyValues(parsed.data, dirtyFields)
 
-    updateVersion.mutate(
-      { ...fieldsToUpdate, id: values.id },
-      {
-        onSuccess: () => {
-          toast.success(t('messages.updateSuccess'))
-          setIsExitModalOpen(false)
-          router.refresh()
-        },
-        onError: () => {
-          toast.error(tCommon('errors.unexpectedError'))
-          setIsExitModalOpen(false)
-        },
-      },
-    )
+    if (isCreateMode) {
+      const { id, ...createData } = parsed.data
+      handleCreateVersion(createData)
+    } else {
+      await handleUpdateVersion(parsed.data)
+    }
   }
-
-  const handleSave = isCreateMode ? handleCreateVersion : handleUpdateVersion
 
   const handleExit = () => {
     if (modelSessionManager.activeSessionId) {

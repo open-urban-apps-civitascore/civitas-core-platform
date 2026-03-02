@@ -46,7 +46,9 @@
       "nameRequired": "Name is required",
       "descriptionRequired": "Description is required",
       "descriptionMaxLength": "Description must be 150 characters or less",
-      "formInvalid": "All required information must be provided correctly."
+      "formInvalid": "All required information must be provided correctly.",
+      "statusChangeError": "An error occurred while changing the availability status.",
+      "updateError": "An error occurred while updating the {item}."
     },
     "items": {
       "data": "data",
@@ -68,7 +70,8 @@
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "commaSeparated": "comma-separated",
       "requiredInAvailable": "This field is required in the available mode.",
-      "descriptionHint": "max. 150 characters"
+      "descriptionHint": "max. 150 characters",
+      "statusChangeSuccess": "The availability status has been successfully updated."
     },
     "status": {
       "DRAFT": "Draft",

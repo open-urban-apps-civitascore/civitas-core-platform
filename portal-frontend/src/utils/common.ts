@@ -9,3 +9,14 @@ export const setFocus = (id: string) => {
     element?.focus()
   })
 }
+
+export const isFn = <TData>(x: string | ((data: TData) => string) | undefined): x is (data: TData) => string =>
+  typeof x === 'function'
+
+export const getRequestEndpoint = (endpointFn: (id: string) => string, id?: string) => {
+  if (!id) {
+    throw new Error('Error building request enpoint: Missing id.')
+  }
+
+  return endpointFn(id)
+}
