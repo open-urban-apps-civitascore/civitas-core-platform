@@ -190,6 +190,7 @@ test-authz:
     - job: setup-version
       artifacts: true
     - job: publish-portal-model
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -228,7 +229,8 @@ build-authz:
     - lint-authz
     - dependency-prune-authz
     - test-authz
-    # - job: publish-portal-model
+    - job: publish-portal-model
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
