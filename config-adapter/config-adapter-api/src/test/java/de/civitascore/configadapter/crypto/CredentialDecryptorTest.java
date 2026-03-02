@@ -12,7 +12,6 @@ package de.civitascore.configadapter.crypto;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,10 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.security.GeneralSecurityException;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import javax.crypto.SecretKeyFactory;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 
 class CredentialDecryptorTest {
 
@@ -36,28 +32,35 @@ class CredentialDecryptorTest {
     0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20
   };
 
-  // 16 bytes salt (NIST SP 800-132)
-  private static final byte[] SALT = {
-    0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
-    0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F, 0x50
-  };
+  private static final byte[] STRETCHED_KEY;
 
-  // Static test vector: generated with MASTER_KEY + SALT, plaintext "my-secret-password".
-  // Hardcoded to decouple decryptor tests from CredentialEncryptor correctness.
-  private static final String KNOWN_CIPHERTEXT =
-      "iKmUc5RdKvNVH3fHYn6S8q+uSR7zJdrrtaC7xq0fdRsYveQf71iU5wVcY0qcwA==";
+  static {
+    try {
+      STRETCHED_KEY = CryptoKeyLoader.stretchMasterKey(MASTER_KEY);
+    } catch (GeneralSecurityException e) {
+      throw new ExceptionInInitializerError(e);
+    }
+  }
+
+  private static final String TEST_CTX = "test-ctx";
+
+  // Static test vector: generated with STRETCHED_KEY + TEST_CTX, plaintext "my-secret-password".
+  // Hardcoded to decouple from encryptor and detect silent payload format changes.
+  private static final String KNOWN_CIPHERTEXT_V1 =
+      "AS+mXUDCXLWhH0x4aJ7mOEFIgjA3zz7AccTaAAZ6lpT1TknAdYDYhd2y4bN5o6Y=";
 
   @Test
-  void decrypt_knownCiphertext_shouldReturnExpectedPlaintext() throws GeneralSecurityException {
-    String decrypted = CredentialDecryptor.decrypt(KNOWN_CIPHERTEXT, MASTER_KEY, SALT);
-    assertEquals("my-secret-password", decrypted);
+  void decrypt_knownCiphertextV1_shouldProduceExpectedPlaintext() throws GeneralSecurityException {
+    assertEquals(
+        "my-secret-password",
+        CredentialDecryptor.decrypt(KNOWN_CIPHERTEXT_V1, STRETCHED_KEY, TEST_CTX));
   }
 
   @Test
   void decrypt_roundTrip_shouldRecoverOriginalPlaintext() throws GeneralSecurityException {
     String plaintext = "my-secret-password";
-    String encrypted = encrypt(plaintext, MASTER_KEY, SALT);
-    String decrypted = CredentialDecryptor.decrypt(encrypted, MASTER_KEY, SALT);
+    String encrypted = encrypt(plaintext, STRETCHED_KEY, TEST_CTX);
+    String decrypted = CredentialDecryptor.decrypt(encrypted, STRETCHED_KEY, TEST_CTX);
     assertEquals(plaintext, decrypted);
   }
 
@@ -65,72 +68,99 @@ class CredentialDecryptorTest {
   void decrypt_roundTripWithUnicode_shouldRecoverOriginalPlaintext()
       throws GeneralSecurityException {
     String plaintext = "Ümlaute-äöü-日本語-\uD83D\uDD11";
-    String encrypted = encrypt(plaintext, MASTER_KEY, SALT);
-    String decrypted = CredentialDecryptor.decrypt(encrypted, MASTER_KEY, SALT);
+    String encrypted = encrypt(plaintext, STRETCHED_KEY, TEST_CTX);
+    String decrypted = CredentialDecryptor.decrypt(encrypted, STRETCHED_KEY, TEST_CTX);
     assertEquals(plaintext, decrypted);
   }
 
   @Test
   void decrypt_wrongKey_shouldThrowException() throws GeneralSecurityException {
-    String encrypted = encrypt("secret", MASTER_KEY, SALT);
+    String encrypted = encrypt("secret", STRETCHED_KEY, TEST_CTX);
     byte[] wrongKey = new byte[32];
     wrongKey[0] = (byte) 0xFF;
     assertThrows(
         GeneralSecurityException.class,
-        () -> CredentialDecryptor.decrypt(encrypted, wrongKey, SALT));
+        () -> CredentialDecryptor.decrypt(encrypted, wrongKey, TEST_CTX));
   }
 
+  // ─── F4: Invalid Base64 produces GeneralSecurityException ─────────────────
+
   @Test
-  void decrypt_wrongSalt_shouldThrowException() throws GeneralSecurityException {
-    String encrypted = encrypt("secret", MASTER_KEY, SALT);
-    byte[] wrongSalt = {
-      0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-      0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10
-    };
+  void decrypt_invalidBase64_shouldThrowGeneralSecurityException() {
     assertThrows(
         GeneralSecurityException.class,
-        () -> CredentialDecryptor.decrypt(encrypted, MASTER_KEY, wrongSalt));
+        () -> CredentialDecryptor.decrypt("not!!!valid", STRETCHED_KEY, TEST_CTX));
   }
 
   @Test
   void decrypt_corruptData_shouldThrowException() {
     assertThrows(
-        Exception.class,
-        () -> CredentialDecryptor.decrypt("not-valid-base64!!!", MASTER_KEY, SALT));
+        GeneralSecurityException.class,
+        () -> CredentialDecryptor.decrypt("not-valid-base64!!!", STRETCHED_KEY, TEST_CTX));
   }
 
   @Test
   void decrypt_tooShortData_shouldThrowException() {
-    // Base64 of less than 13 bytes
+    // Base64 of less than 14 bytes (1 version + 12 IV + 1 ciphertext)
     String shortData = java.util.Base64.getEncoder().encodeToString(new byte[5]);
     assertThrows(
         GeneralSecurityException.class,
-        () -> CredentialDecryptor.decrypt(shortData, MASTER_KEY, SALT));
+        () -> CredentialDecryptor.decrypt(shortData, STRETCHED_KEY, TEST_CTX));
   }
 
   @Test
   void decrypt_null_shouldThrowIllegalArgumentException() {
     assertThrows(
-        IllegalArgumentException.class, () -> CredentialDecryptor.decrypt(null, MASTER_KEY, SALT));
+        IllegalArgumentException.class,
+        () -> CredentialDecryptor.decrypt(null, STRETCHED_KEY, TEST_CTX));
   }
 
   @Test
   void decrypt_empty_shouldThrowIllegalArgumentException() {
     assertThrows(
-        IllegalArgumentException.class, () -> CredentialDecryptor.decrypt("", MASTER_KEY, SALT));
+        IllegalArgumentException.class,
+        () -> CredentialDecryptor.decrypt("", STRETCHED_KEY, TEST_CTX));
   }
+
+  @Test
+  void decrypt_wrongVersion_shouldThrowGeneralSecurityException() {
+    // Build a payload with version byte 0x99 instead of 0x01
+    byte[] fakePayload = new byte[1 + 12 + 16]; // version + IV + fake ciphertext
+    fakePayload[0] = (byte) 0x99;
+    String encoded = java.util.Base64.getEncoder().encodeToString(fakePayload);
+
+    GeneralSecurityException ex =
+        assertThrows(
+            GeneralSecurityException.class,
+            () -> CredentialDecryptor.decrypt(encoded, STRETCHED_KEY, TEST_CTX));
+    assertTrue(ex.getMessage().contains("Unsupported payload version"));
+  }
+
+  // ─── Cross-decryption test: different contexts cannot decrypt each other ──
+
+  @Test
+  void decrypt_differentContext_shouldThrowException() throws GeneralSecurityException {
+    String encrypted = encrypt("secret", STRETCHED_KEY, "context-a");
+
+    assertThrows(
+        GeneralSecurityException.class,
+        () -> CredentialDecryptor.decrypt(encrypted, STRETCHED_KEY, "context-b"));
+  }
+
+  // ─── decryptMapValues tests ────────────────────────────────────────────────
 
   @Test
   void decryptMapValues_encryptedValues_shouldDecryptOnlyEncValues()
       throws GeneralSecurityException {
-    String encrypted = encrypt("secret-value", MASTER_KEY, SALT);
+    String encrypted = encrypt("secret-value", STRETCHED_KEY, TEST_CTX);
 
     Map<String, Object> input = new LinkedHashMap<>();
     input.put("username", "admin");
     input.put("password", "ENC(" + encrypted + ")");
     input.put("port", 8080);
 
-    Map<String, Object> result = CredentialDecryptor.decryptMapValues(input, MASTER_KEY, SALT);
+    Map<String, Object> result =
+        CredentialDecryptor.decryptMapValues(input, STRETCHED_KEY, TEST_CTX);
 
     assertEquals("admin", result.get("username"));
     assertEquals("secret-value", result.get("password"));
@@ -139,7 +169,7 @@ class CredentialDecryptorTest {
 
   @Test
   void decryptMapValues_nestedMap_shouldDecryptRecursively() throws GeneralSecurityException {
-    String encrypted = encrypt("nested-secret", MASTER_KEY, SALT);
+    String encrypted = encrypt("nested-secret", STRETCHED_KEY, TEST_CTX);
 
     Map<String, Object> nested = new LinkedHashMap<>();
     nested.put("key", "ENC(" + encrypted + ")");
@@ -149,7 +179,8 @@ class CredentialDecryptorTest {
     input.put("outer", "value");
     input.put("inner", nested);
 
-    Map<String, Object> result = CredentialDecryptor.decryptMapValues(input, MASTER_KEY, SALT);
+    Map<String, Object> result =
+        CredentialDecryptor.decryptMapValues(input, STRETCHED_KEY, TEST_CTX);
 
     @SuppressWarnings("unchecked")
     Map<String, Object> innerResult = (Map<String, Object>) result.get("inner");
@@ -159,7 +190,8 @@ class CredentialDecryptorTest {
 
   @Test
   void decryptMapValues_nullMap_shouldReturnEmptyMap() throws GeneralSecurityException {
-    Map<String, Object> result = CredentialDecryptor.decryptMapValues(null, MASTER_KEY, SALT);
+    Map<String, Object> result =
+        CredentialDecryptor.decryptMapValues(null, STRETCHED_KEY, TEST_CTX);
     assertNotNull(result);
     assertTrue(result.isEmpty());
   }
@@ -167,57 +199,37 @@ class CredentialDecryptorTest {
   @Test
   void decryptMapValues_noEncryptedValues_shouldPassThrough() throws GeneralSecurityException {
     Map<String, Object> input = Map.of("key1", "value1", "key2", 42);
-    Map<String, Object> result = CredentialDecryptor.decryptMapValues(input, MASTER_KEY, SALT);
+    Map<String, Object> result =
+        CredentialDecryptor.decryptMapValues(input, STRETCHED_KEY, TEST_CTX);
     assertEquals("value1", result.get("key1"));
     assertEquals(42, result.get("key2"));
   }
 
   @Test
-  void deriveKey_sameInputs_shouldProduceSameKey() throws GeneralSecurityException {
-    javax.crypto.SecretKey key1 = CryptoUtils.deriveKey(MASTER_KEY, SALT);
-    javax.crypto.SecretKey key2 = CryptoUtils.deriveKey(MASTER_KEY, SALT);
-    assertEquals(key1, key2);
+  void decryptMapValues_nullValueInMap_shouldPassThrough() throws GeneralSecurityException {
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("username", "admin");
+    input.put("nullable", null);
+
+    Map<String, Object> result =
+        CredentialDecryptor.decryptMapValues(input, STRETCHED_KEY, TEST_CTX);
+
+    assertEquals("admin", result.get("username"));
+    assertNull(result.get("nullable"));
   }
 
   @Test
-  void deriveKey_nullMasterKey_shouldThrowIllegalArgumentException() {
-    assertThrows(IllegalArgumentException.class, () -> CryptoUtils.deriveKey(null, SALT));
-  }
+  void decryptMapValues_wrongKey_shouldThrowException() throws GeneralSecurityException {
+    String encrypted = encrypt("secret", STRETCHED_KEY, TEST_CTX);
+    Map<String, Object> input = new LinkedHashMap<>();
+    input.put("password", "ENC(" + encrypted + ")");
 
-  @Test
-  void deriveKey_nullSalt_shouldThrowIllegalArgumentException() {
-    assertThrows(IllegalArgumentException.class, () -> CryptoUtils.deriveKey(MASTER_KEY, null));
-  }
+    byte[] wrongKey = new byte[32];
+    wrongKey[0] = (byte) 0xFF;
 
-  @Test
-  void deriveKey_emptyMasterKey_shouldThrowIllegalArgumentException() {
-    assertThrows(IllegalArgumentException.class, () -> CryptoUtils.deriveKey(new byte[0], SALT));
-  }
-
-  @Test
-  void deriveKey_emptySalt_shouldThrowIllegalArgumentException() {
     assertThrows(
-        IllegalArgumentException.class, () -> CryptoUtils.deriveKey(MASTER_KEY, new byte[0]));
-  }
-
-  @Test
-  void deriveKey_tooShortSalt_shouldThrowIllegalArgumentException() {
-    byte[] shortSalt = new byte[8];
-    assertThrows(
-        IllegalArgumentException.class, () -> CryptoUtils.deriveKey(MASTER_KEY, shortSalt));
-  }
-
-  @Test
-  void encrypt_differentCalls_shouldProduceDifferentCiphertexts() throws GeneralSecurityException {
-    String enc1 = encrypt("same-text", MASTER_KEY, SALT);
-    String enc2 = encrypt("same-text", MASTER_KEY, SALT);
-    // Different IVs means different ciphertexts
-    assertNotNull(enc1);
-    assertNotNull(enc2);
-    // Both should decrypt to the same value
-    assertEquals(
-        CredentialDecryptor.decrypt(enc1, MASTER_KEY, SALT),
-        CredentialDecryptor.decrypt(enc2, MASTER_KEY, SALT));
+        GeneralSecurityException.class,
+        () -> CredentialDecryptor.decryptMapValues(input, wrongKey, TEST_CTX));
   }
 
   // ─── containsEncryptedValues tests ─────────────────────────────────────────
@@ -239,33 +251,32 @@ class CredentialDecryptorTest {
     assertFalse(CredentialDecryptor.containsEncryptedValues(null));
   }
 
-  // ─── hexStringToBytes tests ────────────────────────────────────────────────
+  // ─── hexStringToBytes tests (via CryptoKeyLoader) ──────────────────────────
 
   @Test
   void hexStringToBytes_validHex_shouldDecodeCorrectly() {
-    byte[] result = CredentialDecryptor.hexStringToBytes("0102030405060708");
+    byte[] result = CryptoKeyLoader.hexStringToBytes("0102030405060708");
     assertArrayEquals(new byte[] {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}, result);
   }
 
   @Test
   void hexStringToBytes_upperAndLowerCase_shouldDecodeCorrectly() {
-    byte[] lower = CredentialDecryptor.hexStringToBytes("abcdef");
-    byte[] upper = CredentialDecryptor.hexStringToBytes("ABCDEF");
+    byte[] lower = CryptoKeyLoader.hexStringToBytes("abcdef");
+    byte[] upper = CryptoKeyLoader.hexStringToBytes("ABCDEF");
     assertArrayEquals(lower, upper);
     assertArrayEquals(new byte[] {(byte) 0xAB, (byte) 0xCD, (byte) 0xEF}, lower);
   }
 
   @Test
   void hexStringToBytes_emptyString_shouldReturnEmptyArray() {
-    byte[] result = CredentialDecryptor.hexStringToBytes("");
+    byte[] result = CryptoKeyLoader.hexStringToBytes("");
     assertEquals(0, result.length);
   }
 
   @Test
   void hexStringToBytes_oddLength_shouldThrowIllegalArgumentException() {
     IllegalArgumentException ex =
-        assertThrows(
-            IllegalArgumentException.class, () -> CredentialDecryptor.hexStringToBytes("abc"));
+        assertThrows(IllegalArgumentException.class, () -> CryptoKeyLoader.hexStringToBytes("abc"));
     assertTrue(ex.getMessage().contains("even length"));
   }
 
@@ -273,46 +284,19 @@ class CredentialDecryptorTest {
   void hexStringToBytes_nonHexCharacters_shouldThrowIllegalArgumentException() {
     IllegalArgumentException ex =
         assertThrows(
-            IllegalArgumentException.class, () -> CredentialDecryptor.hexStringToBytes("ZZZZ"));
+            IllegalArgumentException.class, () -> CryptoKeyLoader.hexStringToBytes("ZZZZ"));
     assertTrue(ex.getMessage().contains("Invalid hex character"));
   }
 
-  // ─── loadKeyFromEnv tests ─────────────────────────────────────────────────
+  // ─── loadKeyFromEnv tests (via CryptoKeyLoader) ────────────────────────────
 
   @Test
   void loadKeyFromEnv_undefinedVariable_shouldReturnEmptyArray() {
-    // Use a variable name that is very unlikely to exist
-    byte[] result = CredentialDecryptor.loadKeyFromEnv("CIVITAS_TEST_NONEXISTENT_KEY_12345");
+    byte[] result = CryptoKeyLoader.loadKeyFromEnv("CIVITAS_TEST_NONEXISTENT_KEY_12345");
     assertEquals(0, result.length);
   }
 
-  @Test
-  void decryptMapValues_nullValueInMap_shouldPassThrough() throws GeneralSecurityException {
-    Map<String, Object> input = new LinkedHashMap<>();
-    input.put("username", "admin");
-    input.put("nullable", null);
-
-    Map<String, Object> result = CredentialDecryptor.decryptMapValues(input, MASTER_KEY, SALT);
-
-    assertEquals("admin", result.get("username"));
-    assertNull(result.get("nullable"));
-  }
-
-  @Test
-  void decryptMapValues_wrongKey_shouldThrowException() throws GeneralSecurityException {
-    String encrypted = encrypt("secret", MASTER_KEY, SALT);
-    Map<String, Object> input = new LinkedHashMap<>();
-    input.put("password", "ENC(" + encrypted + ")");
-
-    byte[] wrongKey = new byte[32];
-    wrongKey[0] = (byte) 0xFF;
-
-    assertThrows(
-        GeneralSecurityException.class,
-        () -> CredentialDecryptor.decryptMapValues(input, wrongKey, SALT));
-  }
-
-  // ─── isEncrypted edge-case tests ─────────────────────────────────────────────
+  // ─── isEncrypted edge-case tests ──────────────────────────────────────────
 
   @Test
   void isEncrypted_validEncPrefix_shouldReturnTrue() {
@@ -334,27 +318,21 @@ class CredentialDecryptorTest {
     assertFalse(CryptoUtils.isEncrypted("ENC(abc"));
   }
 
-  // ─── deriveKey RuntimeException wrapping ────────────────────────────────────
-
   @Test
-  void deriveKey_runtimeException_shouldWrapAsGeneralSecurityException() {
-    try (MockedStatic<SecretKeyFactory> mocked = Mockito.mockStatic(SecretKeyFactory.class)) {
-      mocked
-          .when(() -> SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256"))
-          .thenThrow(new RuntimeException("simulated failure"));
-
-      GeneralSecurityException ex =
-          assertThrows(
-              GeneralSecurityException.class, () -> CryptoUtils.deriveKey(MASTER_KEY, SALT));
-      assertEquals("Key derivation failed", ex.getMessage());
-      assertInstanceOf(RuntimeException.class, ex.getCause());
-    }
+  void encrypt_differentCalls_shouldProduceDifferentCiphertexts() throws GeneralSecurityException {
+    String enc1 = encrypt("same-text", STRETCHED_KEY, TEST_CTX);
+    String enc2 = encrypt("same-text", STRETCHED_KEY, TEST_CTX);
+    assertNotNull(enc1);
+    assertNotNull(enc2);
+    assertEquals(
+        CredentialDecryptor.decrypt(enc1, STRETCHED_KEY, TEST_CTX),
+        CredentialDecryptor.decrypt(enc2, STRETCHED_KEY, TEST_CTX));
   }
 
-  // ─── Test helper ─────────────────────────────────────────────────────────────
+  // ─── Test helper ──────────────────────────────────────────────────────────
 
-  private static String encrypt(String plaintext, byte[] masterKey, byte[] salt)
+  private static String encrypt(String plaintext, byte[] stretchedKey, String credentialContext)
       throws GeneralSecurityException {
-    return CredentialEncryptor.encrypt(plaintext, masterKey, salt);
+    return CredentialEncryptor.encrypt(plaintext, stretchedKey, credentialContext);
   }
 }

@@ -110,8 +110,8 @@ REDPANDA_URL=http://redpanda-connect:4195
 REDPANDA_TOPICS=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
 
 # Credential decryption (optional, for ENC(...) values in pipeline configs)
+# Generate with: openssl rand -hex 32
 CIVITAS_MASTER_KEY=<256-bit hex-encoded key>
-CIVITAS_MASTER_SALT=<hex-encoded salt>
 ```
 
 ### Docker Compose Example
@@ -128,7 +128,6 @@ services:
       REDPANDA_URL: http://redpanda-connect:4195
       REDPANDA_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
       CIVITAS_MASTER_KEY: ${CIVITAS_MASTER_KEY}
-      CIVITAS_MASTER_SALT: ${CIVITAS_MASTER_SALT}
     depends_on:
       - kafka
       - redpanda-connect
@@ -288,9 +287,9 @@ Pipeline configurations may contain sensitive values (database connection string
 
 ### How It Works
 
-1. Encrypt the credential with AES-256-GCM using `CIVITAS_MASTER_KEY` and `CIVITAS_MASTER_SALT`
+1. Encrypt the credential with AES-256-GCM using `CIVITAS_MASTER_KEY` (PBKDF2 stretch + HKDF-Expand for per-pipeline key isolation)
 2. Wrap the Base64-encoded ciphertext in `ENC(...)` marker
-3. The `RedpandaConnectClient` decrypts all `ENC(...)` values recursively before YAML conversion
+3. The `RedpandaConnectClient` decrypts all `ENC(...)` values recursively before YAML conversion, using the pipeline ID as HKDF context
 
 ### Example
 
@@ -310,8 +309,7 @@ Non-`ENC(...)` string values pass through unchanged.
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `CIVITAS_MASTER_KEY` | 256-bit hex-encoded AES master key | Only if `ENC(...)` values are used |
-| `CIVITAS_MASTER_SALT` | Hex-encoded salt for PBKDF2 key derivation | Only if `ENC(...)` values are used |
+| `CIVITAS_MASTER_KEY` | 256-bit hex-encoded AES master key (generate with `openssl rand -hex 32`) | Only if `ENC(...)` values are used |
 
 ## Pipeline Model
 
@@ -456,7 +454,7 @@ RedPanda client error during delete for pipeline mqtt-pipeline: 404
 Credential decryption error: AES/GCM/NoPadding decryption failed
 ```
 
-**Solution:** Verify `CIVITAS_MASTER_KEY` and `CIVITAS_MASTER_SALT` environment variables match the key pair used to encrypt the credentials.
+**Solution:** Verify `CIVITAS_MASTER_KEY` environment variable matches the key used to encrypt the credentials.
 
 #### 5. YAML Serialization Error
 

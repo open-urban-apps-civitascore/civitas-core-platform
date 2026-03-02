@@ -47,7 +47,7 @@ class UserControllerIntegrationTest
     UserInputDTO input = new UserInputDTO();
     input.setFirstName("Test");
     input.setLastName("User " + System.currentTimeMillis());
-    input.setEmail("testuser" + System.currentTimeMillis() + "@example.com");
+    input.setEmail("testuser" + UUID.randomUUID().toString().substring(0, 8) + "@example.com");
     input.setPhone("+49123456789");
     input.setActive(true);
     return input;
@@ -627,8 +627,10 @@ class UserControllerIntegrationTest
     @Test
     @DisplayName("Should create user with group memberships")
     void shouldCreateUserWithGroups() {
-      Group group1 = createTestGroup("Test Group 1 " + System.currentTimeMillis());
-      Group group2 = createTestGroup("Test Group 2 " + System.currentTimeMillis());
+      Group group1 =
+          createTestGroup("Test Group 1 " + UUID.randomUUID().toString().substring(0, 8));
+      Group group2 =
+          createTestGroup("Test Group 2 " + UUID.randomUUID().toString().substring(0, 8));
 
       UserInputDTO input = createValidInput();
       input.setGroupIds(List.of(group1.getId(), group2.getId()));
@@ -649,7 +651,8 @@ class UserControllerIntegrationTest
     @DisplayName("Should update user groups with PUT")
     void shouldUpdateUserGroupsWithPut() {
       // Create initial groups
-      Group group1 = createTestGroup("Initial Group " + System.currentTimeMillis());
+      Group group1 =
+          createTestGroup("Initial Group " + UUID.randomUUID().toString().substring(0, 8));
 
       // Create user with initial group
       UserInputDTO createInput = createValidInput();
@@ -658,8 +661,10 @@ class UserControllerIntegrationTest
       UUID userId = createResponse.getBody().getId();
 
       // Create new groups for update
-      Group group2 = createTestGroup("Updated Group 1 " + System.currentTimeMillis());
-      Group group3 = createTestGroup("Updated Group 2 " + System.currentTimeMillis());
+      Group group2 =
+          createTestGroup("Updated Group 1 " + UUID.randomUUID().toString().substring(0, 8));
+      Group group3 =
+          createTestGroup("Updated Group 2 " + UUID.randomUUID().toString().substring(0, 8));
 
       // Update user with new groups
       UserInputDTO updateInput = createUpdateInput();
@@ -683,7 +688,8 @@ class UserControllerIntegrationTest
     @DisplayName("Should update user groups with PATCH")
     void shouldUpdateUserGroupsWithPatch() {
       // Create initial group
-      Group group1 = createTestGroup("Initial Group " + System.currentTimeMillis());
+      Group group1 =
+          createTestGroup("Initial Group " + UUID.randomUUID().toString().substring(0, 8));
 
       // Create user with initial group
       UserInputDTO createInput = createValidInput();
@@ -692,7 +698,7 @@ class UserControllerIntegrationTest
       UUID userId = createResponse.getBody().getId();
 
       // Create new group for update
-      Group group2 = createTestGroup("New Group " + System.currentTimeMillis());
+      Group group2 = createTestGroup("New Group " + UUID.randomUUID().toString().substring(0, 8));
 
       // PATCH user with new group
       Map<String, Object> patchMap = new HashMap<>();
@@ -711,7 +717,8 @@ class UserControllerIntegrationTest
     @DisplayName("Should remove all groups from user with empty list")
     void shouldRemoveAllGroupsFromUser() {
       // Create groups
-      Group group1 = createTestGroup("Group to Remove " + System.currentTimeMillis());
+      Group group1 =
+          createTestGroup("Group to Remove " + UUID.randomUUID().toString().substring(0, 8));
 
       // Create user with group
       UserInputDTO createInput = createValidInput();
@@ -744,7 +751,7 @@ class UserControllerIntegrationTest
       assertThat(createResponse.getBody().getGroups()).isNullOrEmpty();
 
       // Create group and add to user
-      Group group1 = createTestGroup("New Group " + System.currentTimeMillis());
+      Group group1 = createTestGroup("New Group " + UUID.randomUUID().toString().substring(0, 8));
 
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("groupIds", List.of(group1.getId()));
@@ -759,7 +766,8 @@ class UserControllerIntegrationTest
     @DisplayName("Should not modify groups when groupIds field is not provided in PATCH")
     void shouldNotModifyGroupsWhenNotProvided() {
       // Create group and user with that group
-      Group group1 = createTestGroup("Existing Group " + System.currentTimeMillis());
+      Group group1 =
+          createTestGroup("Existing Group " + UUID.randomUUID().toString().substring(0, 8));
 
       UserInputDTO createInput = createValidInput();
       createInput.setGroupIds(List.of(group1.getId()));
@@ -823,7 +831,8 @@ class UserControllerIntegrationTest
     @DisplayName("Should fail when one of multiple group IDs does not exist")
     void shouldFailWhenOneGroupIdDoesNotExist() {
       // Create one valid group
-      Group validGroup = createTestGroup("Valid Group " + System.currentTimeMillis());
+      Group validGroup =
+          createTestGroup("Valid Group " + UUID.randomUUID().toString().substring(0, 8));
       UUID nonExistentGroupId = UUID.randomUUID();
 
       UserInputDTO input = createValidInput();

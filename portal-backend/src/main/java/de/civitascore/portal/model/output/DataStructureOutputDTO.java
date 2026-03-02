@@ -13,6 +13,6 @@ public class DataStructureOutputDTO extends BaseOutputDTO {
   private String description;
   private DataStructureStatus dataStructureStatus;
   private Boolean createdFromDataSource;
-  private List<AssignmentOutputDTO> assignments;
   private List<DataStructureVersionSummaryDTO> dataStructureVersions;
+  private boolean inUse;
 }

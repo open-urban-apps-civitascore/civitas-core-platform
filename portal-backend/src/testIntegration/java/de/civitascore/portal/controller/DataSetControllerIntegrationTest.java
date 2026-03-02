@@ -88,7 +88,6 @@ class DataSetControllerIntegrationTest
     DataSetInputDTO input = new DataSetInputDTO();
     input.setName("test_dataset_" + System.currentTimeMillis());
     input.setDescription("A test dataset for integration testing");
-    input.setOpenDataAccess(false);
     return input;
   }
 
@@ -96,7 +95,6 @@ class DataSetControllerIntegrationTest
   protected DataSetInputDTO createInvalidInput() {
     DataSetInputDTO input = new DataSetInputDTO();
     input.setDescription("Invalid dataset without required fields");
-    input.setOpenDataAccess(false);
     return input;
   }
 

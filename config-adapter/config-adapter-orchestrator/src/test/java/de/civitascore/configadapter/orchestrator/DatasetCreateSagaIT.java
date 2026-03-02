@@ -351,10 +351,8 @@ class DatasetCreateSagaIT {
 
   private Map<String, Object> buildTriggerPayload(String datasetId) {
     var payload = new HashMap<String, Object>();
-    payload.put("id", datasetId);
     payload.put("datasetId", datasetId);
     payload.put("datasetName", "E2E Test Dataset");
-    payload.put("name", "E2E Test Dataset");
     payload.put("description", "Integration test dataset");
     payload.put("openDataAccess", true);
     payload.put("upstreamUrl", frostBaseUrl);

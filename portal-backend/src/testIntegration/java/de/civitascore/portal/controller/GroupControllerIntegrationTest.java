@@ -39,7 +39,7 @@ class GroupControllerIntegrationTest
   @Override
   protected GroupInputDTO createValidInput() {
     GroupInputDTO input = new GroupInputDTO();
-    input.setName("Test Group " + System.currentTimeMillis());
+    input.setName("Test Group " + UUID.randomUUID().toString().substring(0, 8));
     input.setDescription("A test group for integration testing");
     return input;
   }

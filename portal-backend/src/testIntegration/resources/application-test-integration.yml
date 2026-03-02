@@ -1,3 +1,6 @@
+civitas:
+  master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
 spring:
   datasource:
     # These will be overridden by @DynamicPropertySource

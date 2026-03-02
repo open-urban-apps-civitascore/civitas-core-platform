@@ -112,12 +112,9 @@ is_resource_endpoint if {
 	resource_id
 }
 
-# Is this a collection endpoint (no ID)?
+# Is this a collection endpoint?
+# Data-driven: reads _collection flag from endpoint data.json instead of
+# counting path segments.
 is_collection_endpoint if {
-	count(path_parts) == 2
-}
-
-is_collection_endpoint if {
-	count(path_parts) == 3
-	restmapper.is_reserved_segment(path_parts[2])
+	restmapper.is_collection_pattern(path_pattern, endpoints)
 }

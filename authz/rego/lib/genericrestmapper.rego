@@ -67,6 +67,19 @@ default is_reserved_segment(_) := false
 is_reserved_segment("me")
 
 # =============================================================================
+# COLLECTION CLASSIFICATION
+# =============================================================================
+
+# Check if a matched pattern is marked as a collection endpoint in endpoint data.
+# Collection endpoints have relaxed scope enforcement (no specific resource ID).
+# The _collection flag is set in data.json for each endpoint pattern.
+default is_collection_pattern(_, _) := false
+
+is_collection_pattern(pattern, endpoints) if {
+	endpoints[pattern]._collection == true
+}
+
+# =============================================================================
 # PATTERN MATCHING
 # =============================================================================
 

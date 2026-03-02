@@ -7,6 +7,9 @@ logging:
 app:
   url: http://localhost:8089
 
+civitas:
+  master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
 spring:
   jpa:
     hibernate:

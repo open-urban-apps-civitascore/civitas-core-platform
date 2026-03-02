@@ -1,4 +1,4 @@
-import type { PipelinePayload } from '@/app/(main)/datasets/[datasetId]/data/pipeline-editor/_types/pipeline'
+import { PipelinePayload } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 
 const key = 'pipeline'

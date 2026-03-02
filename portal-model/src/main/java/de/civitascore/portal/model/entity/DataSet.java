@@ -1,7 +1,7 @@
 package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
-import de.civitascore.portal.model.entity.base.NamedEntity;
+import de.civitascore.portal.model.entity.base.BaseDataEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -20,6 +20,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -37,7 +38,7 @@ import lombok.Setter;
     })
 @Getter
 @Setter
-public class DataSet extends NamedEntity {
+public class DataSet extends BaseDataEntity {
 
   /** Status of the dataset in its lifecycle. Default is DRAFT. */
   @Enumerated(EnumType.STRING)
@@ -110,8 +111,18 @@ public class DataSet extends NamedEntity {
   @Column(name = "open_data_access", nullable = false)
   private Boolean openDataAccess = false;
 
-  @OneToMany(mappedBy = "dataset", fetch = FetchType.LAZY)
+  @OneToMany(
+      mappedBy = "dataset",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
   private Set<Assignment> assignments = new HashSet<>();
+
+  @Override
+  protected void linkAssignment(Assignment assignment) {
+    assignment.setScope(this);
+  }
 
   public void setDistributions(Collection<Distribution> newDistributions) {
     this.distributions.clear();
