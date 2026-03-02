@@ -3,16 +3,16 @@ import z from 'zod'
 import { enumFromConst } from '@/utils/common'
 
 import { AssignmentSchema } from './assignments'
-import { ItemSchema, WithId } from './common'
+import { ItemSchema, STATUS_TYPES, WithId } from './common'
 
 export const DATASTRUCTURE_STATUS_TYPES = {
   DRAFT: 'DRAFT',
   AVAILABLE: 'AVAILABLE',
-} as const
+} as const satisfies Partial<typeof STATUS_TYPES>
 
 export const DatastructureStatusEnum = enumFromConst(DATASTRUCTURE_STATUS_TYPES)
 
-export type DatastructureStatus = (typeof DATASTRUCTURE_STATUS_TYPES)[keyof typeof DATASTRUCTURE_STATUS_TYPES]
+export type DatastructureStatusTypes = (typeof DATASTRUCTURE_STATUS_TYPES)[keyof typeof DATASTRUCTURE_STATUS_TYPES]
 
 export type DatastructureTab = 'basicInfo' | 'versions' | 'accessPermissions'
 
@@ -99,7 +99,7 @@ export type DatastructureVersionsListData = {
   id: string
   name: string
   description: string
-  status: DatastructureStatus
+  status: DatastructureStatusTypes
   source: DatastructureVersionSource
   versionNumber: string
 }
@@ -167,7 +167,7 @@ export type DatastructuresListData = {
   id: string
   name: string
   description: string
-  status: DatastructureStatus
+  status: DatastructureStatusTypes
   source: DatastructureVersionSource | null
   versionNumber: string | null
   versions: DatastructuresListData[]

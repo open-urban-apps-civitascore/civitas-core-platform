@@ -28,7 +28,7 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import {
   DATASTRUCTURE_STATUS_TYPES,
   DATASTRUCTURE_VERSION_SOURCE,
-  DatastructureStatus,
+  DatastructureStatusTypes,
   DatastructureVersion,
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionFormData,
@@ -183,7 +183,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
 
-  const handleStatusChange = (newStatus: DatastructureStatus) => {
+  const handleStatusChange = (newStatus: DatastructureStatusTypes) => {
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
   }
 
@@ -301,7 +301,12 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const ActionButtonsAndStatusSwitch = (
     <div className="flex gap-6">
-      <StatusDropdown status={statusWatch} onStatusChange={handleStatusChange} canSetAvailable={canSetAvailable} />
+      <StatusDropdown
+        statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
+        status={statusWatch}
+        onStatusChange={handleStatusChange}
+        canSetAvailable={canSetAvailable}
+      />
       <ActionButtons
         confirmButtonType="button"
         onCancelClick={handleExitButtonClick}

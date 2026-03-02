@@ -26,7 +26,7 @@ final class SagaPayloadBuilder {
 
   /**
    * Build the payload for a forward step command. Returns the trigger payload augmented with
-   * previous step results and saga envelope fields.
+   * previous step results, adapter-specific field mappings, and saga envelope fields.
    */
   static Map<String, Object> buildStepPayload(SagaContext context, SagaStepDefinition stepDef) {
     var payload = new HashMap<>(context.triggerPayload());
@@ -35,11 +35,34 @@ final class SagaPayloadBuilder {
         payload.putAll(step.result());
       }
     }
+
+    applyAdapterMappings(payload, stepDef);
+
     payload.put("sagaId", context.sagaId());
     payload.put("datasetId", context.datasetId());
     payload.put("_operation", stepDef.operation());
     payload.put("_stepId", stepDef.stepId());
     return Map.copyOf(payload);
+  }
+
+  /** Maps inter-step field names that differ between adapter handlers. */
+  private static void applyAdapterMappings(
+      Map<String, Object> payload, SagaStepDefinition stepDef) {
+    switch (stepDef.adapter()) {
+      case "apisix" -> {
+        // APISIX handler expects "upstreamUrl", FROST result provides "baseUrl"
+        if (payload.containsKey("baseUrl") && !payload.containsKey("upstreamUrl")) {
+          payload.put("upstreamUrl", payload.get("baseUrl"));
+        }
+      }
+      case "redpanda" -> {
+        // Redpanda handler expects "targetUrl", FROST result provides "baseUrl"
+        if (payload.containsKey("baseUrl") && !payload.containsKey("targetUrl")) {
+          payload.put("targetUrl", payload.get("baseUrl"));
+        }
+      }
+      default -> {}
+    }
   }
 
   /** Build the compensation payload from the step's stored compensation data. */

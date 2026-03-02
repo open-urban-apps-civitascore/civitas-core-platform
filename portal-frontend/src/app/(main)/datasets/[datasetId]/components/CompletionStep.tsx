@@ -18,6 +18,24 @@ export const CompletionStep = (props: CompletionStepProps) => {
   const { step, datasetId, disabled = false, className } = props
   const searchParams = useSearchParams()
 
+  const buildHref = (routeParam: CompletionStepParam, queryParam?: string) => {
+    const route = routeParam === 'data-flow' ? 'data-flow/pipeline-editor' : routeParam
+    const basePath = `/datasets/${datasetId}/${route}`
+
+    const searchParamsString = searchParams?.toString()
+
+    if (queryParam && searchParamsString) {
+      return `${basePath}?${queryParam}&${searchParamsString}`
+    }
+    if (queryParam) {
+      return `${basePath}?${queryParam}`
+    }
+    if (searchParamsString) {
+      return `${basePath}?${searchParamsString}`
+    }
+    return basePath
+  }
+
   const ButtonLink = ({
     buttonText,
     routeParam,
@@ -33,11 +51,7 @@ export const CompletionStep = (props: CompletionStepProps) => {
       </Button>
     ) : (
       <Button asChild variant="outline">
-        <Link
-          href={`/datasets/${datasetId}/${routeParam}?${queryParam ? `${queryParam}&` : ''}${searchParams?.toString()}`}
-        >
-          {buttonText}
-        </Link>
+        <Link href={buildHref(routeParam, queryParam)}>{buttonText}</Link>
       </Button>
     )
   return (

@@ -11,7 +11,7 @@ package de.civitascore.configadapter.redpanda;
 
 import de.civitascore.configadapter.adapter.AbstractConfigAdapter;
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import de.civitascore.configadapter.crypto.CredentialDecryptor;
+import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import de.civitascore.configadapter.model.AdapterErrorCode;
@@ -19,6 +19,7 @@ import de.civitascore.configadapter.model.ConfigEvent;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.redpanda.PipelineConfigValue;
+import java.util.Arrays;
 import java.util.Map;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
@@ -45,7 +46,6 @@ public class RedpandaAdapter extends AbstractConfigAdapter {
   private static final String DEFAULT_URL = "http://localhost:4195";
   private static final String URL_PROPERTY = "url";
   private static final String MASTER_KEY_ENV = "CIVITAS_MASTER_KEY";
-  private static final String MASTER_SALT_ENV = "CIVITAS_MASTER_SALT";
 
   private RedpandaConnectClient redpandaClient;
 
@@ -54,19 +54,16 @@ public class RedpandaAdapter extends AbstractConfigAdapter {
     super.initialize(config);
 
     String baseUrl = getAdapterProperty(URL_PROPERTY, DEFAULT_URL);
-    byte[] masterKey = CredentialDecryptor.loadKeyFromEnv(MASTER_KEY_ENV);
-    byte[] salt = CredentialDecryptor.loadKeyFromEnv(MASTER_SALT_ENV);
+    byte[] stretchedKey = CryptoKeyLoader.loadAndStretchKeyFromEnv(MASTER_KEY_ENV);
 
-    if (masterKey.length == 0 || salt.length == 0) {
-      logger.warn(
-          "{} or {} not set — encrypted credentials cannot be decrypted",
-          MASTER_KEY_ENV,
-          MASTER_SALT_ENV);
+    if (stretchedKey.length == 0) {
+      logger.warn("{} not set — encrypted credentials cannot be decrypted", MASTER_KEY_ENV);
     }
 
     if (this.redpandaClient == null) {
-      this.redpandaClient = new RedpandaConnectClient(baseUrl, masterKey, salt);
+      this.redpandaClient = new RedpandaConnectClient(baseUrl, stretchedKey);
     }
+    Arrays.fill(stretchedKey, (byte) 0);
 
     logger.info(
         "RedPanda adapter '{}' initialized for: {}",

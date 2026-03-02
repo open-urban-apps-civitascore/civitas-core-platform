@@ -33,7 +33,7 @@ describe('DatasetsTable', () => {
   })
 
   it('renders the header and header content correctly', async () => {
-    ;['Name', 'Datenraum', 'Ansprechperson', 'Zuletzt aktualisiert', 'Zugriff', 'Status'].forEach(headerText => {
+    ;['Name', 'Erstellt von', 'Aktualisiert', 'Status', 'Aktion'].forEach(headerText => {
       expect(screen.getByRole('columnheader', { name: headerText })).toBeDefined()
     })
     expect(screen.queryByRole('columnheader', { name: 'id' })).toBeNull()
@@ -47,22 +47,16 @@ describe('DatasetsTable', () => {
     const cells1 = within(dataRow1).getAllByRole('cell')
 
     expect(cells1[0]).toHaveTextContent(mappedDatasets[0].name)
-    expect(cells1[1]).toHaveTextContent(mappedDatasets[0].dataspace?.name as string)
-    expect(cells1[2]).toHaveTextContent(
-      `${mappedDatasets[0].contact?.firstName} ${mappedDatasets[0].contact?.lastName}`,
-    )
-    expect(cells1[3]).toHaveTextContent('10.09.2023')
-    expect(cells1[4].querySelector('svg')).toHaveClass('lucide-lock-open')
+    expect(cells1[1]).toHaveTextContent(mappedDatasets[0].createdBy.name)
+    expect(cells1[2]).toHaveTextContent('10.09.2023')
+    expect(cells1[3]).toHaveTextContent('Entwurf')
 
     const dataRow2 = rows[2]
     const cells2 = within(dataRow2).getAllByRole('cell')
 
     expect(cells2[0]).toHaveTextContent(mappedDatasets[1].name)
-    expect(cells2[1]).toHaveTextContent('-')
-    expect(cells2[2]).toHaveTextContent(
-      `${mappedDatasets[1].contact?.firstName} ${mappedDatasets[1].contact?.lastName}`,
-    )
-    expect(cells2[3]).toHaveTextContent('01.01.2023')
-    expect(cells2[4].querySelector('svg')).toHaveClass('lucide-lock-keyhole')
+    expect(cells2[1]).toHaveTextContent(mappedDatasets[1].createdBy.name)
+    expect(cells2[2]).toHaveTextContent('01.01.2023')
+    expect(cells2[3]).toHaveTextContent('Verfügbar')
   })
 })

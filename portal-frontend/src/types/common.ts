@@ -19,6 +19,14 @@ export type SelectOption = {
   label: string
 }
 
+export const STATUS_TYPES = {
+  DRAFT: 'DRAFT',
+  AVAILABLE: 'AVAILABLE',
+  READY: 'READY',
+} as const
+
+export type StatusTypes = (typeof STATUS_TYPES)[keyof typeof STATUS_TYPES]
+
 export type InputPropsWithoutForm = Omit<InputHTMLAttributes<HTMLInputElement>, 'form' | 'onChange'>
 
 export type GetListInput = {

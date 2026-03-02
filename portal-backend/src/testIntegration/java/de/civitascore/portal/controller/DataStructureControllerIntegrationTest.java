@@ -3,27 +3,32 @@ package de.civitascore.portal.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.input.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +55,8 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
   @Autowired private AssignmentRepository assignmentRepository;
 
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
+
+  @Autowired private DataSourceRepository dataSourceRepository;
 
   @Autowired private GroupRepository groupRepository;
 
@@ -152,6 +159,7 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
 
   @AfterEach
   void cleanup() {
+    dataSourceRepository.deleteAll();
     assignmentRepository.deleteAll();
     dataStructureVersionRepository.deleteAll();
     dataStructureRepository.deleteAll();
@@ -335,17 +343,7 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
           .as("Version should have a source")
           .isNotNull();
 
-      // Check Assignments
-      assertThat(output.getAssignments()).as("Should have assignments field").isNotNull();
-      assertThat(output.getAssignments()).as("Should have 1 assignment").hasSize(1);
-
-      // Verify assignment details
-      AssignmentOutputDTO assignment = output.getAssignments().getFirst();
-      assertThat(assignment.getId()).as("Assignment should have an ID").isNotNull();
-      assertThat(assignment.getScopeType())
-          .as("Assignment scope type should be DATASTRUCTURE")
-          .isEqualTo(ScopeType.DATASTRUCTURE);
-      // FIXME: Nested dependencies of assignment are not yet being mapped in the outputDTO
+      // Assignments are not included in the output DTO — use GET /{id}/assignments instead
     }
 
     @Test
@@ -998,6 +996,265 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
       assertThat(response.getStatusCode())
           .as("Should return BAD_REQUEST status")
           .isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
+  @DisplayName("Assignment Tests")
+  class AssignmentTests {
+
+    private UUID createTestGroup() {
+      Group group = new Group();
+      group.setName("Test Group " + UUID.randomUUID());
+      group.setDescription("Test group for assignments");
+      return groupRepository.save(group).getId();
+    }
+
+    private UUID createTestRole() {
+      Role role = new Role();
+      role.setName("Test Role " + UUID.randomUUID());
+      role.setDescription("Test role for assignments");
+      role.setRoleType(RoleType.DATA);
+      return roleRepository.save(role).getId();
+    }
+
+    @Test
+    @DisplayName("Should return empty list when no assignments exist for data structure")
+    void shouldReturnEmptyAssignmentsList() {
+      ResponseEntity<List<AssignmentOutputDTO>> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + dataStructureId1 + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull().isEmpty();
+    }
+
+    @Test
+    @DisplayName("Should return 404 when data structure does not exist")
+    void shouldReturn404ForNonExistentDataStructure() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + UUID.randomUUID() + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("Should return 401 when not authenticated")
+    void shouldReturn401WhenNotAuthenticated() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + dataStructureId1 + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(new HttpHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("Should create data structure with assignments")
+    void shouldCreateDataStructureWithAssignments() {
+      AssignmentScopedInputDTO assignment = new AssignmentScopedInputDTO();
+      assignment.setGroupId(createTestGroup());
+      assignment.setRoleId(createTestRole());
+
+      DataStructureInputDTO input = new DataStructureInputDTO();
+      input.setName("Data Structure With Assignments");
+      input.setDescription("Test");
+      input.setCreatedFromDataSource(false);
+      input.setAssignments(List.of(assignment));
+
+      ResponseEntity<DataStructureOutputDTO> createResponse =
+          restTemplate.exchange(
+              ENDPOINT,
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      UUID id = createResponse.getBody().getId();
+
+      ResponseEntity<List<AssignmentOutputDTO>> assignmentsResponse =
+          restTemplate.exchange(
+              ENDPOINT + "/" + id + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(assignmentsResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(assignmentsResponse.getBody()).hasSize(1);
+      assertThat(assignmentsResponse.getBody().getFirst().getScopeType())
+          .isEqualTo(ScopeType.DATASTRUCTURE);
+    }
+
+    @Test
+    @DisplayName("Should replace assignments when updating data structure")
+    void shouldReplaceAssignmentsOnUpdate() {
+      UUID groupId1 = createTestGroup();
+      UUID groupId2 = createTestGroup();
+      UUID roleId = createTestRole();
+
+      // Create with one assignment
+      AssignmentScopedInputDTO assignment1 = new AssignmentScopedInputDTO();
+      assignment1.setGroupId(groupId1);
+      assignment1.setRoleId(roleId);
+
+      DataStructureInputDTO createInput = new DataStructureInputDTO();
+      createInput.setName("Data Structure For Update " + System.currentTimeMillis());
+      createInput.setDescription("Test");
+      createInput.setCreatedFromDataSource(false);
+      createInput.setAssignments(List.of(assignment1));
+
+      ResponseEntity<DataStructureOutputDTO> createResponse =
+          restTemplate.exchange(
+              ENDPOINT,
+              HttpMethod.POST,
+              new HttpEntity<>(createInput, createAuthHeaders()),
+              getOutputTypeReference());
+
+      UUID id = createResponse.getBody().getId();
+
+      // Update with a different assignment
+      AssignmentScopedInputDTO assignment2 = new AssignmentScopedInputDTO();
+      assignment2.setGroupId(groupId2);
+      assignment2.setRoleId(roleId);
+
+      DataStructureInputDTO updateInput = new DataStructureInputDTO();
+      updateInput.setName(createInput.getName());
+      updateInput.setDescription("Updated");
+      updateInput.setCreatedFromDataSource(false);
+      updateInput.setAssignments(List.of(assignment2));
+
+      restTemplate.exchange(
+          ENDPOINT + "/" + id,
+          HttpMethod.PUT,
+          new HttpEntity<>(updateInput, createAuthHeaders()),
+          getOutputTypeReference());
+
+      ResponseEntity<List<AssignmentOutputDTO>> assignmentsResponse =
+          restTemplate.exchange(
+              ENDPOINT + "/" + id + "/assignments",
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(assignmentsResponse.getBody()).hasSize(1);
+      assertThat(assignmentsResponse.getBody().getFirst().getGroup().getId()).isEqualTo(groupId2);
+    }
+  }
+
+  @Nested
+  @DisplayName("InUse Guard Tests")
+  class InUseGuardTests {
+
+    private UUID inUseDataStructureId;
+    private UUID inUseVersionId;
+
+    @BeforeEach
+    void setupInUseDataStructure() {
+      cleanup();
+
+      DataStructure ds = new DataStructure();
+      ds.setName("InUse Data Structure");
+      ds.setDescription("Data structure with a version referenced by a DataSource");
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+      ds.setCreatedFromDataSource(false);
+      ds = dataStructureRepository.save(ds);
+      inUseDataStructureId = ds.getId();
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setDataStructure(ds);
+      version.setVersion("1.0.0");
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      version.setModelAtlasUri("http://modelatlas.example.com/models/inuse");
+      version.setModelName("InUse Model");
+      version = dataStructureVersionRepository.save(version);
+      inUseVersionId = version.getId();
+
+      DataSource dataSource = new DataSource();
+      dataSource.setName("ds_referencing_" + UUID.randomUUID().toString().substring(0, 8));
+      dataSource.setDataSourceStatus(DataSourceStatus.DRAFT);
+      dataSource.setDataStructureVersion(version);
+      dataSourceRepository.save(dataSource);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when unpublishing in-use data structure")
+    void shouldReturn409WhenUnpublishingInUseDataStructure() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + inUseDataStructureId + "/unpublish",
+              HttpMethod.POST,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when deleting in-use data structure")
+    void shouldReturn409WhenDeletingInUseDataStructure() {
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + inUseDataStructureId,
+              HttpMethod.DELETE,
+              new HttpEntity<>(createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT status")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Should return inUse=true in output DTO when DataSource references a version")
+    void shouldReturnInUseTrueInOutputDTO() {
+      ResponseEntity<DataStructureOutputDTO> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + inUseDataStructureId,
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isInUse())
+          .as("inUse should be true when a DataSource references a version")
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("Should return inUse=false when no DataSource references any version")
+    void shouldReturnInUseFalseWhenNoDataSourceReferences() {
+      DataStructure ds = new DataStructure();
+      ds.setName("Not InUse Data Structure");
+      ds.setDescription("No DataSources reference this");
+      ds.setDataStructureStatus(DataStructureStatus.DRAFT);
+      ds.setCreatedFromDataSource(false);
+      ds = dataStructureRepository.save(ds);
+
+      ResponseEntity<DataStructureOutputDTO> response =
+          restTemplate.exchange(
+              ENDPOINT + "/" + ds.getId(),
+              HttpMethod.GET,
+              new HttpEntity<>(createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().isInUse())
+          .as("inUse should be false when no DataSource references any version")
+          .isFalse();
     }
   }
 }

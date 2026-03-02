@@ -9,27 +9,42 @@
  */
 package de.civitascore.configadapter.crypto;
 
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
+import javax.crypto.Mac;
 import javax.crypto.SecretKey;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Package-private utilities and constants shared between {@link CredentialDecryptor} and {@link
  * CredentialEncryptor}.
+ *
+ * <p>Key derivation uses a two-phase approach:
+ *
+ * <ol>
+ *   <li><b>PBKDF2</b> (one-time stretch) — stretches the raw master key via {@link
+ *       CryptoKeyLoader#stretchMasterKey(byte[])} with a static salt. This is single-target key
+ *       stretching: the salt is intentionally static because the goal is CPU cost, not multi-target
+ *       resistance (we have exactly one master key per deployment).
+ *   <li><b>HKDF-Expand</b> (per-credential isolation) — derives a unique AES-256 key for each
+ *       credential context via {@link #hkdfExpand(byte[], String)}. Different contexts (e.g.
+ *       pipeline IDs) produce different keys, so compromising one ciphertext does not help decrypt
+ *       another.
+ * </ol>
  */
 final class CryptoUtils {
 
   static final String ALGORITHM = "AES/GCM/NoPadding";
   static final int GCM_TAG_LENGTH_BITS = 128;
   static final int GCM_IV_LENGTH_BYTES = 12;
-  static final int PBKDF2_ITERATIONS = 600_000;
-  static final int KEY_LENGTH_BITS = 256;
-  static final int MIN_SALT_LENGTH_BYTES = 16;
   static final String ENC_PREFIX = "ENC(";
   static final String ENC_SUFFIX = ")";
+
+  /** Version byte prepended to the ciphertext payload for crypto agility. */
+  static final byte PAYLOAD_VERSION = 0x01;
+
+  private static final int STRETCHED_KEY_LENGTH = 32;
 
   private CryptoUtils() {}
 
@@ -40,52 +55,39 @@ final class CryptoUtils {
   }
 
   /**
-   * Derives an AES-256 key from the master key and salt using PBKDF2WithHmacSHA256.
+   * HKDF-Expand (RFC 5869 Section 2.3) using HMAC-SHA256 for one-block expansion (32 bytes). The
+   * context string provides per-credential key isolation.
    *
-   * @param masterKey the master key bytes
-   * @param salt the salt bytes
-   * @return the derived SecretKey
-   * @throws GeneralSecurityException if key derivation fails
+   * @param stretchedKey 32-byte output of {@link CryptoKeyLoader#stretchMasterKey(byte[])}
+   * @param context a non-null, non-empty context string (e.g. pipeline ID)
+   * @return an AES-256 {@link SecretKey} unique to the given context
+   * @throws GeneralSecurityException if HMAC computation fails
+   * @throws IllegalArgumentException if {@code context} is null or empty
    */
-  static SecretKey deriveKey(byte[] masterKey, byte[] salt) throws GeneralSecurityException {
-    if (masterKey == null || masterKey.length == 0) {
-      throw new IllegalArgumentException("Master key must not be null or empty");
-    }
-    if (salt == null || salt.length < MIN_SALT_LENGTH_BYTES) {
+  static SecretKey hkdfExpand(byte[] stretchedKey, String context) throws GeneralSecurityException {
+    if (stretchedKey == null || stretchedKey.length != STRETCHED_KEY_LENGTH) {
       throw new IllegalArgumentException(
-          "Salt must be at least "
-              + MIN_SALT_LENGTH_BYTES
+          "Stretched key must be exactly "
+              + STRETCHED_KEY_LENGTH
               + " bytes, got "
-              + (salt == null ? "null" : salt.length));
+              + (stretchedKey == null ? "null" : stretchedKey.length));
     }
-    char[] keyChars = bytesToHexChars(masterKey);
-    PBEKeySpec spec = null;
-    try {
-      SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-      spec = new PBEKeySpec(keyChars, salt, PBKDF2_ITERATIONS, KEY_LENGTH_BITS);
-      byte[] derivedKey = factory.generateSecret(spec).getEncoded();
-      // SecretKeySpec clones the byte array internally (JCE design).
-      // We wipe our copy; the JCE-held copy cannot be cleared — known JDK limitation.
-      SecretKeySpec secretKey = new SecretKeySpec(derivedKey, "AES");
-      Arrays.fill(derivedKey, (byte) 0);
-      return secretKey;
-    } catch (RuntimeException e) {
-      throw new GeneralSecurityException("Key derivation failed", e);
-    } finally {
-      if (spec != null) {
-        spec.clearPassword();
-      }
-      Arrays.fill(keyChars, '\0');
+    if (context == null || context.isEmpty()) {
+      throw new IllegalArgumentException("Credential context must not be null or empty");
     }
-  }
 
-  private static char[] bytesToHexChars(byte[] bytes) {
-    char[] hexChars = new char[bytes.length * 2];
-    for (int i = 0; i < bytes.length; i++) {
-      int v = bytes[i] & 0xFF;
-      hexChars[i * 2] = Character.forDigit(v >>> 4, 16);
-      hexChars[i * 2 + 1] = Character.forDigit(v & 0x0F, 16);
+    byte[] info = context.getBytes(StandardCharsets.UTF_8);
+    Mac mac = Mac.getInstance("HmacSHA256");
+    mac.init(new SecretKeySpec(stretchedKey, "HmacSHA256"));
+    mac.update(info);
+    mac.update((byte) 0x01); // counter byte for single-block expand
+
+    byte[] okm = mac.doFinal();
+    try {
+      // SecretKeySpec clones the byte array internally (JCE design).
+      return new SecretKeySpec(okm, "AES");
+    } finally {
+      Arrays.fill(okm, (byte) 0);
     }
-    return hexChars;
   }
 }

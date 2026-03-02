@@ -1,4 +1,3 @@
-
 import { getDatastructure } from '@/app/services/api/datastructures/serverRequests'
 import { getDatastructureVersion } from '@/app/services/api/datastructures/versions/serverRequests'
 import { DatastructureApiResponseSchema, DatastructureVersionApiResponseSchema } from '@/types/datastructures'

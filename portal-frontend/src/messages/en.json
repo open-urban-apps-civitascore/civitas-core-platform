@@ -72,7 +72,8 @@
     },
     "status": {
       "DRAFT": "Draft",
-      "AVAILABLE": "Available"
+      "AVAILABLE": "Available",
+      "READY": "Ready"
     },
     "exitModal": {
       "title": "Vor dem Beenden speichern?",
@@ -109,12 +110,13 @@
     "dataspaces": "Data Spaces",
     "tenants": "Tenant Management",
     "uml-modeler": "UML Modeler",
-    "data": "Data",
+    "data-flow": "Data Flow",
     "table-editor": "Table Editor",
     "pipeline-editor": "Pipeline Editor",
     "data-management": "Data-Management",
     "datasources": "Datasources",
-    "datastructures": "Datastructures"
+    "datastructures": "Datastructures",
+    "access-management": "Access Management"
   },
   "datasets": {
     "title": "Datasets",
@@ -123,52 +125,52 @@
     "newDataset": "New Dataset",
     "tableHeaders": {
       "name": "Name",
-      "dataSpace": "Data Space",
-      "department": "Department",
-      "contact": "Contact Person",
+      "createdBy": "Created by",
       "lastUpdated": "Last Updated",
-      "access": "Access",
-      "status": "Status"
+      "status": "Status",
+      "action": "Action"
     },
     "tableValues": {
-      "status": {
-        "open": "open",
-        "closed": "closed"
+      "draft": "Draft",
+      "available": "Available",
+      "ready": "Ready",
+      "yesterday": "Yesterday"
+    },
+    "create": {
+      "title": "New Dataset",
+      "subtitle": "New datasets are only visible internally.",
+      "form": {
+        "title": "Basic Information",
+        "subtitle": "The name can be adjusted later.",
+        "name": "Name"
       }
     },
     "overview": {
-      "title": "Create: New Dataset",
-      "subtitle": "Enter the base information.",
       "info": {
         "title": "Base Information",
-        "dataspace": "Data Space",
-        "selectDataspace": "Select Data Space...",
-        "name": "Name of the Dataset",
-        "description": "Description"
+        "name": "Name",
+        "description": "Description",
+        "descriptionHint": "max. 150 characters"
       },
       "completion": {
         "title": "Creation Progress",
-        "metadata": { "title": "Metadata", "button": "Enter metadata", "requirementsMet": "Minimal requirements met" },
-        "accessPermissions": {
-          "title": "Access permissions",
-          "button": "Add roles and user groups",
-          "userGroups": "User groups"
+        "accessManagement": {
+          "title": "Access Management",
+          "button": "Edit groups and roles",
+          "assignments": "Groups and Roles",
+          "noAssignments": "No groups or roles available",
+          "groups": "Groups",
+          "roles": "Roles",
+          "openDataAccess": "Open Data",
+          "openDataAccessHint": "Allow access to this dataset’s payload data without authentication."
         },
-        "data": {
-          "title": "Data",
-          "button": "Ingest and map data",
-          "datasources": "Datenquellen",
-          "persistence": "Persistence"
-        },
-        "distribution": {
-          "title": "Distribution",
-          "button1": "Integrate APIs",
-          "button2": "Provide files",
-          "api": "API"
-        },
-        "usagePermissions": { "title": "Usage Permissions", "button": "Configure rate limiting" },
-        "applications": { "title": "Applications", "button": "Integrate applications" },
-        "publication": { "title": "Publications", "button": "Configure publication" }
+        "dataFlow": {
+          "title": "Data flow",
+          "button": "Load and provide data",
+          "pipeline": "Pipeline",
+          "sensorThingsAPI": "SensorThings API",
+          "noDataFlow": "No data flow available yet."
+        }
       }
     },
     "dataMode": {
@@ -177,6 +179,10 @@
       "pipelineEditor": "Pipeline Editor",
       "tableDescription": "An interface oriented towards Excel workflows. For datasets with a clear data flow – based on file imports, few data sources, few transformations, …",
       "pipelineDescription": "An interface oriented towards node based programming. For datasets with a complex data flow – based on many data sources, many transformations, …"
+    },
+    "messages": {
+      "createSuccess": "Dataset has been successfully created.",
+      "updateSuccess": "Dataset has been successfully updated."
     }
   },
   "users": {

@@ -10,7 +10,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class DataStructureInputDTO extends BaseInputDTO {
+public class DataStructureInputDTO extends BaseDataEntityInputDTO {
   @NotBlank(message = "Name is required") private String name;
 
   private String description;
@@ -18,6 +18,5 @@ public class DataStructureInputDTO extends BaseInputDTO {
   @JsonIgnore private DataStructureStatus dataStructureStatus;
 
   private Boolean createdFromDataSource;
-  private List<UUID> assignmentIds;
   private List<UUID> dataStructureVersionIds;
 }

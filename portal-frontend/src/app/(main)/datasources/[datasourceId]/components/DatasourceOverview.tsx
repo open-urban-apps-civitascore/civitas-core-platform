@@ -219,7 +219,12 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const ActionButtonsAndStatusSwitch = (
     <div className="flex gap-6">
-      <StatusDropdown status={statusWatch} onStatusChange={handleStatusChange} canSetAvailable={canSetAvailable} />
+      <StatusDropdown
+        statusOptions={Object.values(DATASOURCE_STATUS_TYPES)}
+        status={statusWatch}
+        onStatusChange={handleStatusChange}
+        canSetAvailable={canSetAvailable}
+      />
       <ActionButtons
         confirmButtonType="button"
         onCancelClick={handleExit}

@@ -59,7 +59,7 @@ const DataModePage = async ({ params, searchParams }: PageProps) => {
                 className="border-2 border-[#F59E0B] text-[#F59E0B] hover:bg-[#F59E0B]/10"
               >
                 <Link
-                  href={`/datasets/${datasetId}/data/table-editor${searchParamsString ? `?${searchParamsString}` : ''}`}
+                  href={`/datasets/${datasetId}/data-flow/table-editor${searchParamsString ? `?${searchParamsString}` : ''}`}
                 >
                   {t('dataMode.tableEditor')}
                 </Link>
@@ -73,7 +73,7 @@ const DataModePage = async ({ params, searchParams }: PageProps) => {
                 className="border-2 border-[#22C55E] text-[#22C55E] hover:bg-[#22C55E]/10"
               >
                 <Link
-                  href={`/datasets/${datasetId}/data/pipeline-editor${searchParamsString ? `?${searchParamsString}` : ''}`}
+                  href={`/datasets/${datasetId}/data-flow/pipeline-editor${searchParamsString ? `?${searchParamsString}` : ''}`}
                 >
                   {t('dataMode.pipelineEditor')}
                 </Link>
