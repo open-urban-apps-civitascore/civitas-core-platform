@@ -239,11 +239,11 @@ test_6_segment_paths if {
 	result2 == "/v2/datastructures/{id}/versions/{id}/unpublish"
 }
 
-# Test: Dataspaces and catalogs resolve (null-permission endpoints)
-test_dataspaces_resolve if {
+# Test: Dataspaces and catalogs do NOT resolve (removed from v2.0, see #989)
+test_dataspaces_do_not_resolve if {
 	patterns := ["/v2/dataspaces", "/v2/dataspaces/abc", "/v2/catalogs", "/v2/catalogs/c1"]
 	every path in patterns {
 		actual := resource_mapping.path_pattern with input as portal_request("GET", path)
-		actual != ""
+		actual == ""
 	}
 }

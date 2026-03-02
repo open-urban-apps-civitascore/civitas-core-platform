@@ -157,27 +157,6 @@
     "/v2/datastructures/{id}/versions/{id}/unpublish": {
       "POST": "DATASTRUCTURE_UPDATE"
     },
-    "/v2/catalogs": {
-      "_collection": true,
-      "GET": null,
-      "POST": null
-    },
-    "/v2/catalogs/{id}": {
-      "GET": null,
-      "PUT": null,
-      "PATCH": null,
-      "DELETE": null
-    },
-    "/v2/dataspaces": {
-      "_collection": true,
-      "GET": null,
-      "POST": null
-    },
-    "/v2/dataspaces/{id}": {
-      "GET": null,
-      "PUT": null,
-      "PATCH": null,
-      "DELETE": null
-    }
+    "_removed_for_v2": "catalogs and dataspaces removed — not implemented in v2.0 (see #989). OPA denies as unknown_endpoint."
   }
 }
