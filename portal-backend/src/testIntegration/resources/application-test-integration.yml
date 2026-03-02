@@ -1,7 +1,5 @@
-app:
-  encryption:
-    key: ${CIVITAS_MASTER_KEY:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
-    salt: ${CIVITAS_MASTER_SALT:00112233445566778899aabbccddeeff}
+civitas:
+  master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 spring:
   datasource:

@@ -48,7 +48,7 @@
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
-        <config-adapter.version>1.0.2-MR-222</config-adapter.version>
+        <config-adapter.version>1.0.2-MR-236</config-adapter.version>
         <portal-model.version>1.0.0-SNAPSHOT</portal-model.version>
     </properties>
 
