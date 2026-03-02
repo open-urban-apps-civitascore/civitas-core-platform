@@ -1,5 +1,6 @@
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
+import { WithId } from '@/types/common'
 import {
   Datastructure,
   DatastructureCreateFormData,
@@ -34,7 +35,7 @@ export const useUpdateDatastructurePublished = () =>
   })
 
 export const usePublishDatastructure = () =>
-  useCreateMutation<Datastructure, void>({
+  useCreateMutation<Datastructure, WithId>({
     key,
     endpoint: (datastructureId: string) => `datastructures/${datastructureId}/publish`,
     headers: { 'x-api-request': 'true' },
@@ -42,7 +43,7 @@ export const usePublishDatastructure = () =>
   })
 
 export const useUnpublishDatastructure = () =>
-  useCreateMutation<Datastructure, void>({
+  useCreateMutation<Datastructure, WithId>({
     key,
     endpoint: (datastructureId: string) => `datastructures/${datastructureId}/unpublish`,
     headers: { 'x-api-request': 'true' },

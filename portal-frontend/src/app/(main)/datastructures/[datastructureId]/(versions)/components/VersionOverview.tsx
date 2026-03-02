@@ -1,6 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { UseMutationResult } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -14,6 +15,7 @@ import {
   useUpdateDatastructureVersion,
   useUpdateDatastructureVersionPublished,
 } from '@/app/services/api/datastructures/versions/clientRequests'
+import { ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -28,6 +30,7 @@ import { createEmptySession } from '@/components/uml-modeler/services/sessionSer
 import { importFromXmi } from '@/components/uml-modeler/services/xmiImportService'
 import { DirtyField } from '@/components/uml-modeler/types/session'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { STATUS_TYPES, WithId } from '@/types/common'
 import {
   DATASTRUCTURE_STATUS_TYPES,
   DATASTRUCTURE_VERSION_SOURCE,
@@ -43,9 +46,6 @@ import { pickDirtyValues } from '@/utils/form'
 
 import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
-import { UseMutationResult } from '@tanstack/react-query'
-import { ApiServiceResponse } from '@/app/services/api/request/apiRequest'
-import { STATUS_TYPES, WithId } from '@/types/common'
 
 export const defaultFormData: DatastructureVersionFormData = {
   id: '',
@@ -227,10 +227,11 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }, [versionWatch, modelWatch])
 
   const handleStatusUpdate = async (
-    mutationFn: UseMutationResult<ApiServiceResponse<DatastructureVersion>, unknown, void, unknown>, versionId: string
+    mutationFn: UseMutationResult<ApiServiceResponse<DatastructureVersion>, unknown, WithId, unknown>,
+    versionId: string,
   ) => {
     try {
-      mutationFn.mutateAsync()
+      mutationFn.mutateAsync({ id: versionId })
       toast.success(tCommon('info.statusChangeSuccess'))
     } catch (error) {
       toast.error(tCommon('errors.statusChangeError'))
@@ -264,7 +265,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const handleUpdateValues = async (values: DatastructureVersionFormData) => {
     try {
-      if (initialFormValues.current.dataStructureVersionStatus === STATUS_TYPES.AVAILABLE) await updatePublishedVersion.mutateAsync({ ...values, id: values.id })
+      if (initialFormValues.current.dataStructureVersionStatus === STATUS_TYPES.AVAILABLE)
+        await updatePublishedVersion.mutateAsync({ ...values, id: values.id })
       else await updateVersion.mutateAsync({ ...values, id: values.id })
       toast.success(t('messages.updateSuccess'))
     } catch (error) {

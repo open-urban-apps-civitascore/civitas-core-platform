@@ -1,13 +1,20 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { UseMutationResult } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { useUpdateDatastructure } from '@/app/services/api/datastructures/clientRequests'
+import {
+  usePublishDatastructure,
+  useUnpublishDatastructure,
+  useUpdateDatastructure,
+  useUpdateDatastructurePublished,
+} from '@/app/services/api/datastructures/clientRequests'
+import { ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -18,6 +25,7 @@ import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { STATUS_TYPES, WithId } from '@/types/common'
 import {
   Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
@@ -28,6 +36,7 @@ import {
   DatastructureTab,
 } from '@/types/datastructures'
 import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
+import { pickDirtyValues } from '@/utils/form'
 
 import { BasicInfoTab } from './basic-info-tab/BasicInfoTab'
 import { VersionsTab } from './versions-tab/VersionsTab'
@@ -76,6 +85,9 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
 
   const updateDatastructure = useUpdateDatastructure()
+  const updatePublishedDatastructure = useUpdateDatastructurePublished()
+  const publishDatastructure = usePublishDatastructure()
+  const unpublishDatastructure = useUnpublishDatastructure()
   const isLoading = updateDatastructure.isPending
 
   const form = useForm<DatastructureFormDraft>({
@@ -146,7 +158,58 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     form.setValue('dataStructureStatus', newStatus, { shouldDirty: true })
   }
 
-  const submitDatastructure = () => {
+  const handleStatusUpdate = async (
+    mutationFn: UseMutationResult<ApiServiceResponse<Datastructure>, unknown, WithId, unknown>,
+    datastructureId: string,
+  ) => {
+    try {
+      mutationFn.mutateAsync({ id: datastructureId })
+      toast.success(tCommon('info.statusChangeSuccess'))
+    } catch (error) {
+      toast.error(tCommon('errors.statusChangeError'))
+      throw error
+    }
+  }
+
+  const handleUpdateValues = async (values: DatastructureFormDraft) => {
+    try {
+      if (datastructure.dataStructureStatus === STATUS_TYPES.AVAILABLE)
+        await updatePublishedDatastructure.mutateAsync({ ...values, id: values.id })
+      else await updateDatastructure.mutateAsync({ ...values, id: values.id })
+      toast.success(t('messages.updateSuccess'))
+    } catch (error) {
+      toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructure') }))
+      throw error
+    }
+  }
+
+  const handleUpdateDatastructure = async (parsedValues: DatastructureFormDraft) => {
+    try {
+      const dirtyFields = form.formState.dirtyFields
+
+      const shouldPublish = !!dirtyFields.dataStructureStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+      const shouldUnpublish = !!dirtyFields.dataStructureStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
+
+      const fieldsToUpdate = pickDirtyValues(parsedValues, dirtyFields)
+      const shouldUpdateValues = (Object.keys(fieldsToUpdate) as (keyof DatastructureFormDraft)[]).some(
+        key => key !== 'dataStructureStatus',
+      )
+      if (shouldUpdateValues) await handleUpdateValues(parsedValues)
+
+      if (shouldPublish) {
+        await handleStatusUpdate(publishDatastructure, parsedValues.id)
+      }
+      if (shouldUnpublish) {
+        await handleStatusUpdate(unpublishDatastructure, parsedValues.id)
+      }
+      router.refresh()
+    } catch (error) {
+      console.error('An error occurred while submitting datastructure data.', error)
+    }
+    setIsExitModalOpen(false)
+  }
+
+  const submitDatastructure = async () => {
     const values = form.getValues()
     const parsed = isDraftMode
       ? DatastructureFormDraftSchema.safeParse(values)
@@ -157,14 +220,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       return
     }
 
-    updateDatastructure.mutate(parsed.data, {
-      onSuccess: () => {
-        toast.success(t('messages.updateSuccess'))
-        setIsExitModalOpen(false)
-        router.refresh()
-      },
-      onError: () => toast.error(tCommon('errors.unexpectedError')),
-    })
+    await handleUpdateDatastructure(parsed.data)
   }
 
   const handleSave = () => {

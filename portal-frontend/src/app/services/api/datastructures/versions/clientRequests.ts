@@ -1,5 +1,6 @@
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
+import { WithId } from '@/types/common'
 import {
   DatastructureVersion,
   DatastructureVersionCreateData,
@@ -32,7 +33,7 @@ export const useUpdateDatastructureVersionPublished = (datastructureId: string) 
   })
 
 export const usePublishDatastructureVersion = (datastructureId: string) =>
-  useCreateMutation<DatastructureVersion, void>({
+  useCreateMutation<DatastructureVersion, WithId>({
     key: `datastructures/${datastructureId}/versions`,
     endpoint: (versionId: string) => `datastructures/${datastructureId}/versions/${versionId}/publish`,
     headers: { 'x-api-request': 'true' },
@@ -40,7 +41,7 @@ export const usePublishDatastructureVersion = (datastructureId: string) =>
   })
 
 export const useUnpublishDatastructureVersion = (datastructureId: string) =>
-  useCreateMutation<DatastructureVersion, void>({
+  useCreateMutation<DatastructureVersion, WithId>({
     key: `datastructures/${datastructureId}/versions`,
     endpoint: (versionId: string) => `datastructures/${datastructureId}/versions/${versionId}/unpublish`,
     headers: { 'x-api-request': 'true' },
