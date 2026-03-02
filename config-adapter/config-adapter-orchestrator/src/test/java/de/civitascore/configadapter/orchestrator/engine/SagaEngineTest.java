@@ -35,7 +35,11 @@ class SagaEngineTest {
   private static final Predicate<Map<String, Object>> HAS_PIPELINES =
       payload -> {
         Object pipelines = payload.get("dataPipelines");
-        return pipelines instanceof List<?> list && !list.isEmpty();
+        if (pipelines instanceof List<?> list && !list.isEmpty()) {
+          return true;
+        }
+        Object pipelineIds = payload.get("pipelineIds");
+        return pipelineIds instanceof List<?> idList && !idList.isEmpty();
       };
 
   private InMemorySagaStateStore stateStore;
@@ -79,6 +83,10 @@ class SagaEngineTest {
         "id", DATASET_ID,
         "dataPipelines", List.of(Map.of("id", "pl-001")),
         "pipelineIds", List.of("pl-001"));
+  }
+
+  private Map<String, Object> deleteTriggerWithOnlyPipelineIds() {
+    return Map.of("id", DATASET_ID, "pipelineIds", List.of("pl-001"));
   }
 
   // ─── Happy Path ─────────────────────────────────────────────────────────
@@ -153,6 +161,26 @@ class SagaEngineTest {
     void startSaga_deleteWith3Steps_shouldComplete() {
       var ctx = engine.startSaga(SagaType.DATASET_DELETE, DATASET_ID, deleteTrigger());
       String sagaId = ctx.get().sagaId();
+
+      engine.handleStepCompleted(sagaId, "delete-pipelines", Map.of(), Map.of());
+      engine.handleStepCompleted(sagaId, "delete-route", Map.of(), Map.of());
+      engine.handleStepCompleted(sagaId, "delete-project", Map.of(), Map.of());
+
+      assertNotNull(dispatcher.lastOfType(SagaAction.CompleteSaga.class));
+      assertFalse(stateStore.findById(sagaId).isPresent());
+    }
+
+    @Test
+    @DisplayName("Delete saga with only pipelineIds (no dataPipelines): delete-pipelines runs")
+    void startSaga_deleteWithOnlyPipelineIds_shouldRunDeletePipelinesStep() {
+      var ctx =
+          engine.startSaga(SagaType.DATASET_DELETE, DATASET_ID, deleteTriggerWithOnlyPipelineIds());
+      assertTrue(ctx.isPresent());
+      String sagaId = ctx.get().sagaId();
+
+      var exec = dispatcher.lastOfType(SagaAction.ExecuteStep.class);
+      assertNotNull(exec);
+      assertEquals("delete-pipelines", exec.stepId());
 
       engine.handleStepCompleted(sagaId, "delete-pipelines", Map.of(), Map.of());
       engine.handleStepCompleted(sagaId, "delete-route", Map.of(), Map.of());

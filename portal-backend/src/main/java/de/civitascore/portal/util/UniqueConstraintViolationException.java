@@ -6,6 +6,14 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 @ResponseStatus(HttpStatus.CONFLICT)
 public class UniqueConstraintViolationException extends RuntimeException {
 
+  public UniqueConstraintViolationException() {
+    super("A record with the same value already exists");
+  }
+
+  public UniqueConstraintViolationException(String field, String value) {
+    super(String.format("A record with %s '%s' already exists", field, value));
+  }
+
   public UniqueConstraintViolationException(String entityName, String field, String value) {
     super(String.format("%s with %s '%s' already exists", entityName, field, value));
   }

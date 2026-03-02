@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.orchestrator.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import de.civitascore.configadapter.model.saga.SagaContext;
@@ -137,6 +138,122 @@ class SagaPayloadBuilderTest {
 
       assertTrue(payload.containsKey("sagaId"));
       assertTrue(!payload.containsKey("projectId"));
+    }
+
+    @Test
+    @DisplayName("APISIX step: maps baseUrl from FROST result to upstreamUrl")
+    void shouldMapBaseUrlToUpstreamUrlForApisixStep() {
+      SagaContext context =
+          saga(
+              Map.of("datasetName", "Test"),
+              step(
+                  "create-project",
+                  "frost",
+                  SagaStepStatus.SUCCESS,
+                  Map.of("projectId", "42", "baseUrl", "http://frost/Projects(42)")),
+              step("create-route", "apisix", SagaStepStatus.PENDING, Map.of()));
+
+      SagaStepDefinition stepDef =
+          SagaStepDefinition.mandatory(
+              "create-route", "apisix", "CREATE_ROUTE", "DELETE_ROUTE", "exec", "comp");
+
+      Map<String, Object> payload = SagaPayloadBuilder.buildStepPayload(context, stepDef);
+
+      assertEquals("http://frost/Projects(42)", payload.get("upstreamUrl"));
+    }
+
+    @Test
+    @DisplayName("APISIX step: does not overwrite upstreamUrl when already present")
+    void shouldNotOverwriteUpstreamUrlWhenAlreadyPresent() {
+      SagaContext context =
+          saga(
+              Map.of("upstreamUrl", "http://explicit"),
+              step(
+                  "create-project",
+                  "frost",
+                  SagaStepStatus.SUCCESS,
+                  Map.of("baseUrl", "http://frost/Projects(42)")),
+              step("create-route", "apisix", SagaStepStatus.PENDING, Map.of()));
+
+      SagaStepDefinition stepDef =
+          SagaStepDefinition.mandatory(
+              "create-route", "apisix", "CREATE_ROUTE", "DELETE_ROUTE", "exec", "comp");
+
+      Map<String, Object> payload = SagaPayloadBuilder.buildStepPayload(context, stepDef);
+
+      assertEquals("http://explicit", payload.get("upstreamUrl"));
+    }
+
+    @Test
+    @DisplayName("Redpanda step: maps baseUrl from FROST result to targetUrl")
+    void shouldMapBaseUrlToTargetUrlForRedpandaStep() {
+      SagaContext context =
+          saga(
+              Map.of("datasetName", "Test"),
+              step(
+                  "create-project",
+                  "frost",
+                  SagaStepStatus.SUCCESS,
+                  Map.of("projectId", "42", "baseUrl", "http://frost/Projects(42)")),
+              step("deploy-pipelines", "redpanda", SagaStepStatus.PENDING, Map.of()));
+
+      SagaStepDefinition stepDef =
+          SagaStepDefinition.mandatory(
+              "deploy-pipelines",
+              "redpanda",
+              "DEPLOY_PIPELINES",
+              "DELETE_PIPELINES",
+              "exec",
+              "comp");
+
+      Map<String, Object> payload = SagaPayloadBuilder.buildStepPayload(context, stepDef);
+
+      assertEquals("http://frost/Projects(42)", payload.get("targetUrl"));
+    }
+
+    @Test
+    @DisplayName("Redpanda step: does not overwrite targetUrl when already present")
+    void shouldNotOverwriteTargetUrlWhenAlreadyPresent() {
+      SagaContext context =
+          saga(
+              Map.of("targetUrl", "http://explicit"),
+              step(
+                  "create-project",
+                  "frost",
+                  SagaStepStatus.SUCCESS,
+                  Map.of("baseUrl", "http://frost/Projects(42)")),
+              step("deploy-pipelines", "redpanda", SagaStepStatus.PENDING, Map.of()));
+
+      SagaStepDefinition stepDef =
+          SagaStepDefinition.mandatory(
+              "deploy-pipelines",
+              "redpanda",
+              "DEPLOY_PIPELINES",
+              "DELETE_PIPELINES",
+              "exec",
+              "comp");
+
+      Map<String, Object> payload = SagaPayloadBuilder.buildStepPayload(context, stepDef);
+
+      assertEquals("http://explicit", payload.get("targetUrl"));
+    }
+
+    @Test
+    @DisplayName("FROST step: baseUrl not remapped to upstreamUrl or targetUrl")
+    void shouldNotRemapBaseUrlForOtherAdapters() {
+      SagaContext context =
+          saga(
+              Map.of("baseUrl", "http://upstream"),
+              step("create-project", "frost", SagaStepStatus.PENDING, Map.of()));
+
+      SagaStepDefinition stepDef =
+          SagaStepDefinition.mandatory(
+              "create-project", "frost", "CREATE_PROJECT", "DELETE_PROJECT", "exec", "comp");
+
+      Map<String, Object> payload = SagaPayloadBuilder.buildStepPayload(context, stepDef);
+
+      assertFalse(payload.containsKey("upstreamUrl"));
+      assertFalse(payload.containsKey("targetUrl"));
     }
   }
 

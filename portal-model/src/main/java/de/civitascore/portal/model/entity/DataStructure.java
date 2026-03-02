@@ -1,10 +1,11 @@
 package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.DataStructureStatus;
-import de.civitascore.portal.model.entity.base.NamedEntity;
+import de.civitascore.portal.model.entity.base.BaseDataEntity;
 import jakarta.persistence.*;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -12,7 +13,7 @@ import lombok.Setter;
 @Table(name = "data_structures")
 @Getter
 @Setter
-public class DataStructure extends NamedEntity {
+public class DataStructure extends BaseDataEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "data_structure_status", nullable = false)
@@ -21,6 +22,7 @@ public class DataStructure extends NamedEntity {
   @Column(name = "created_from_data_source", nullable = false)
   private Boolean createdFromDataSource = false;
 
+  @Setter(AccessLevel.NONE)
   @OneToMany(
       mappedBy = "dataStructure",
       fetch = FetchType.LAZY,
@@ -35,14 +37,9 @@ public class DataStructure extends NamedEntity {
       orphanRemoval = true)
   private Set<DataStructureVersion> dataStructureVersions = new HashSet<>();
 
-  public void setAssignments(Set<Assignment> assignments) {
-    this.assignments.clear();
-    if (assignments != null) {
-      this.assignments.addAll(assignments);
-      for (Assignment assignment : assignments) {
-        assignment.setDataStructure(this);
-      }
-    }
+  @Override
+  protected void linkAssignment(Assignment assignment) {
+    assignment.setScope(this);
   }
 
   public void setDataStructureVersions(Set<DataStructureVersion> dataStructureVersions) {

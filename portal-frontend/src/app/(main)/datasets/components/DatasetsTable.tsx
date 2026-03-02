@@ -1,12 +1,12 @@
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
-import { LockKeyhole, LockOpen } from 'lucide-react'
+import { CheckIcon, CircleDashed, UserCheck } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
 
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { cn } from '@/lib/utils'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { DatasetTableData } from '@/types/datasets'
 import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
@@ -30,8 +30,23 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
     isLoading,
   } = props
   const t = useTranslations('datasets')
+  const tCommon = useTranslations('common')
   const locale = useLocale()
   const columnHelper = createColumnHelper<DatasetTableData>()
+
+  const statusCell = ({ value }: { value: string }) => {
+    const statusIconMap = {
+      DRAFT: <CircleDashed className="w-4 h-4 text-muted-foreground" />,
+      AVAILABLE: <UserCheck className="w-4 h-4 text-muted-foreground" />,
+      READY: <CheckIcon className="w-4 h-4 text-muted-foreground" />,
+    } as const
+
+    return (
+      <div className="flex items-center gap-2">
+        {statusIconMap[value as keyof typeof statusIconMap]} {t(`tableValues.${value.toLowerCase()}`)}
+      </div>
+    )
+  }
 
   const columns = [
     columnHelper.accessor('id', {
@@ -44,88 +59,73 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
       cell: info => (info.getValue() ? <LinkCell href={`datasets/${info.row.id}`}>{info.getValue()}</LinkCell> : '-'),
       meta: {
         style: {
-          minWidth: '250px',
+          width: '25%',
         },
       },
     }),
-    columnHelper.accessor('dataspace', {
-      header: t('tableHeaders.dataSpace'),
-      cell: info =>
-        info.getValue() ? (
-          <LinkCell href={`dataspaces/${info.getValue()?.id}`}>{info.getValue()?.name || ''}</LinkCell>
-        ) : (
-          '-'
-        ),
-      meta: {
-        style: {
-          minWidth: '150px',
-        },
-      },
-    }),
-    columnHelper.accessor('contact', {
-      header: t('tableHeaders.contact'),
-      cell: info =>
-        info.getValue() ? (
-          <LinkCell className="hover:no-underline" href={`users/${info.getValue()?.id}`}>
-            <div className="flex items-center gap-1.5">
-              <Avatar className="AvatarRoot border-1" style={{ textDecoration: 'none !important' }}>
-                <AvatarFallback
-                  className="AvatarFallback"
-                  style={{ textDecoration: 'none !important' }}
-                >{`${info.getValue()?.firstName.charAt(0)}${info.getValue()?.lastName.charAt(0)}`}</AvatarFallback>
-              </Avatar>
-              <span className="group-hover/link:underline decoration-outline decoration-1.5">{`${info.getValue()?.firstName} ${info.getValue()?.lastName}`}</span>
+    columnHelper.accessor('createdBy', {
+      header: t('tableHeaders.createdBy'),
+      cell: info => {
+        const user = info.getValue()
+        const userNameParts = user?.name.split(' ') || []
+        const firstName = userNameParts[0] || ''
+        const lastName = userNameParts[userNameParts.length - 1] || ''
+
+        return (
+          <LinkCell href={`users/${info.getValue()?.id}`}>
+            <div className="flex items-center gap-2">
+              {firstName && lastName ? (
+                <Avatar className="size-8 rounded-lg">
+                  <AvatarImage src="" alt={user?.name || ''} />
+                  <AvatarFallback className="rounded-lg">
+                    {`${firstName.charAt(0)}${lastName.charAt(0)}` || ''}
+                  </AvatarFallback>
+                </Avatar>
+              ) : null}
+
+              {info.getValue()?.name}
             </div>
           </LinkCell>
-        ) : (
-          '-'
-        ),
+        )
+      },
       meta: {
         style: {
-          minWidth: '230px',
+          width: '22%',
         },
       },
     }),
-    columnHelper.accessor('lastUpdated', {
-      header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.lastUpdated')} />,
-      cell: info => formatDate(info.getValue(), locale),
+    columnHelper.accessor('modifiedAt', {
+      header: t('tableHeaders.lastUpdated'),
+      cell: info => {
+        const yesterday = new Date().getDate() - 1
+        const isModifiedAtYesterday = new Date(info.getValue()).getDate() === yesterday
+        return isModifiedAtYesterday ? t('tableValues.yesterday') : formatDate(info.getValue(), locale)
+      },
       meta: {
         style: {
-          width: '150px',
+          width: '20%',
         },
       },
     }),
-    columnHelper.accessor('access', {
-      header: t('tableHeaders.access'),
-      cell: info => (
-        <div
-          className={cn(
-            'flex justify-center items-center rounded-md w-9 h-9 border-solid border-1 border-border',
-            info.getValue() ? 'bg-primary/20' : 'bg-secondary',
-          )}
-        >
-          {info.getValue() ? (
-            <LockOpen className="h-4 w-4 text-primary" />
-          ) : (
-            <LockKeyhole className="h-4 w-4 text-muted-foreground" />
-          )}
-        </div>
-      ),
-      meta: {
-        style: {
-          width: '100px',
-        },
-      },
-    }),
-    columnHelper.accessor('status', {
+    columnHelper.accessor('dataSetStatus', {
       header: t('tableHeaders.status'),
-      cell: info => info.getValue(),
+      cell: info => (info.getValue() ? statusCell({ value: info.getValue() }) : '-'),
       meta: {
         style: {
-          width: '150px',
+          width: '20%',
         },
       },
     }),
+    {
+      id: 'actions',
+      header: t('tableHeaders.action'),
+      cell: () => <TableDropdownMenu menuItems={[{ label: tCommon('actions.delete') }]} />,
+      meta: {
+        style: {
+          width: '8%',
+        },
+      },
+    },
   ]
 
   const table = useReactTable({

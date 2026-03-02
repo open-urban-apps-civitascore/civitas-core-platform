@@ -1,82 +1,20 @@
-'use client'
+import { getDatasets } from '@/app/services/api/datasets/serverRequests'
+import { getJsonServerRequestParams, JsonServerRequestParams } from '@/utils/requestParams'
 
-import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import DatasetsList from './components/DatasetsList'
 
-import { useGetDatasets } from '@/app/services/api/datasets/clientRequests'
-import { PageBackground } from '@/components/page-background/PageBackground'
-import { PageContainer } from '@/components/page-container/PageContainer'
-import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchHeader } from '@/components/search-area/SearchArea'
-import { TableContainer } from '@/components/table-container/TableContainer'
-import { Button } from '@/components/ui/button'
-import { useQueryParams } from '@/hooks/use-query-params'
-
-import { DatasetsTable } from './components/DatasetsTable'
-
-const DatasetsPage = () => {
-  const t = useTranslations('datasets')
-  const router = useRouter()
-  const [rowCount, setRowCount] = useState(0)
-
-  const {
-    setSortingParams,
-    setPaginationParams,
-    setSearchParam,
-    getApiRequestParamsByUrl,
-    setTotalPages,
-    pageIndex,
-    pageSize,
-    sorting,
-    search,
-    totalPages,
-  } = useQueryParams()
-
-  const { data: datasetsData, isFetching } = useGetDatasets({ params: getApiRequestParamsByUrl() })
-
-  useEffect(() => {
-    if (datasetsData) {
-      const totalCount = datasetsData.totalElements || 0
-      setRowCount(totalCount)
-      setTotalPages(Math.ceil(totalCount / pageSize))
-    }
-  }, [datasetsData, pageSize, setTotalPages])
-
-  const CustomElement = (
-    <Button onClick={() => router.push(`datasets/create?${getApiRequestParamsByUrl().toString()}`)}>
-      <Plus />
-      {t('newDataset')}
-    </Button>
-  )
-
-  return (
-    <PageContainer testId="datasetsPage" headerType="onlyTitle">
-      <PageHeader title={t('title')} />
-      <PageBackground>
-        <SearchHeader
-          searchString={search}
-          onChangeSearchString={setSearchParam}
-          aria-label={t('searchDatasets')}
-          customElement={CustomElement}
-        />
-        <TableContainer>
-          <DatasetsTable
-            datasets={datasetsData?.data && !isFetching ? datasetsData.data : []}
-            rowCount={rowCount}
-            pageIndex={pageIndex}
-            pageSize={pageSize}
-            sorting={sorting}
-            totalPages={totalPages}
-            onPaginationChange={setPaginationParams}
-            onSortingChange={setSortingParams}
-            isLoading={isFetching}
-          />
-        </TableContainer>
-      </PageBackground>
-    </PageContainer>
-  )
+type Props = {
+  searchParams: Promise<JsonServerRequestParams>
 }
 
-export default DatasetsPage
+const Datasets = async ({ searchParams }: Props) => {
+  const params = await searchParams
+  const { jsonServerParams } = getJsonServerRequestParams(params)
+
+  const datasetResponse = await getDatasets(jsonServerParams)
+  const datasets = datasetResponse.data
+
+  return <DatasetsList datasets={datasets} rowCount={datasetResponse.totalElements || 0} />
+}
+
+export default Datasets

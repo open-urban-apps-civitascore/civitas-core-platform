@@ -4,15 +4,19 @@ import de.civitascore.portal.mapper.DataStructureMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.entity.DataStructure;
+import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
-import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -20,12 +24,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class DataStructureService extends BaseService<DataStructure, DataStructureInputDTO> {
+public class DataStructureService
+    extends BaseDataEntityService<DataStructure, DataStructureInputDTO> {
 
   private final DataStructureRepository dataStructureRepository;
   private final DataStructureMapper dataStructureMapper;
-  private final AssignmentRepository assignmentRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
+  private final ScopedAssignmentBuilderService assignmentBuilderService;
+  private final DataSourceRepository dataSourceRepository;
 
   @Override
   protected DataStructureRepository getRepository() {
@@ -42,6 +48,11 @@ public class DataStructureService extends BaseService<DataStructure, DataStructu
     return DataStructure.class.getSimpleName();
   }
 
+  @Override
+  protected ScopedAssignmentBuilderService getAssignmentBuilderService() {
+    return assignmentBuilderService;
+  }
+
   /**
    * Override findById to use EntityGraph for efficient loading of relationships. This fetches the
    * DataStructure along with dataStructureVersions in a single JOIN query, preventing N+1 query
@@ -55,19 +66,13 @@ public class DataStructureService extends BaseService<DataStructure, DataStructu
 
   @Override
   protected DataStructure postConvertToEntity(DataStructure entity, DataStructureInputDTO input) {
-    // Set assignments
-    Optional.ofNullable(input.getAssignmentIds())
-        .map(assignmentRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setAssignments);
-
     // Set dataStructureVersions
     Optional.ofNullable(input.getDataStructureVersionIds())
         .map(dataStructureVersionRepository::findAllById)
         .map(HashSet::new)
         .ifPresent(entity::setDataStructureVersions);
 
-    return super.postConvertToEntity(entity, input);
+    return super.postConvertToEntity(entity, input); // base handles assignments
   }
 
   @Override
@@ -174,7 +179,8 @@ public class DataStructureService extends BaseService<DataStructure, DataStructu
       throw new InvalidInputException(
           "dataStructureVersions",
           id,
-          "DataStructure must contain at least one published DataStructureVersion before publishing");
+          "DataStructure must contain at least one published DataStructureVersion before"
+              + " publishing");
     }
 
     dataStructure.setDataStructureStatus(DataStructureStatus.AVAILABLE);
@@ -196,7 +202,32 @@ public class DataStructureService extends BaseService<DataStructure, DataStructu
           "dataStructureStatus", id, "DataStructure is already in DRAFT status");
     }
 
+    validateNoVersionInUse(dataStructure);
+
     dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
     return dataStructureRepository.save(dataStructure);
+  }
+
+  @Override
+  protected DataStructure preProcessDelete(UUID id) {
+    DataStructure dataStructure = findByIdOrThrow(id);
+    validateNoVersionInUse(dataStructure);
+    return dataStructure;
+  }
+
+  private void validateNoVersionInUse(DataStructure dataStructure) {
+    Set<UUID> versionIds =
+        dataStructure.getDataStructureVersions().stream()
+            .map(DataStructureVersion::getId)
+            .collect(Collectors.toSet());
+    if (versionIds.isEmpty()) {
+      return;
+    }
+    if (dataSourceRepository.existsByDataStructureVersionIdIn(versionIds)) {
+      throw new ResourceInUseException(
+          "DataStructure",
+          dataStructure.getId(),
+          "Cannot modify DataStructure because one or more of its versions is referenced by a DataSource.");
+    }
   }
 }

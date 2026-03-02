@@ -16,9 +16,9 @@ public interface DataStructureRepository extends NamedEntityRepository<DataStruc
    * problems when loading data structures with their relationships.
    *
    * @param id the data structure ID
-   * @return the data structure with eagerly fetched dataStructureVersions and assignments
+   * @return the data structure with eagerly fetched dataStructureVersions
    */
-  @EntityGraph(attributePaths = {"dataStructureVersions", "assignments"})
+  @EntityGraph(attributePaths = {"dataStructureVersions"})
   @Query("SELECT ds FROM DataStructure ds WHERE ds.id = :id")
   Optional<DataStructure> findByIdWithRelations(@Param("id") UUID id);
 }
