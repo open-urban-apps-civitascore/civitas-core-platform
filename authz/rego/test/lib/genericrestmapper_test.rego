@@ -111,6 +111,27 @@ test_is_reserved_segment_uuid if {
 }
 
 # =============================================================================
+# COLLECTION CLASSIFICATION TESTS
+# =============================================================================
+
+mock_endpoints_with_collection := {
+	"/v2/users": {"_collection": true, "GET": "USER_READ"},
+	"/v2/users/{id}": {"GET": "USER_READ", "PUT": "USER_UPDATE"},
+}
+
+test_is_collection_pattern_flagged if {
+	restmapper.is_collection_pattern("/v2/users", mock_endpoints_with_collection)
+}
+
+test_is_not_collection_pattern_unflagged if {
+	not restmapper.is_collection_pattern("/v2/users/{id}", mock_endpoints_with_collection)
+}
+
+test_is_not_collection_pattern_unknown if {
+	not restmapper.is_collection_pattern("/v2/unknown", mock_endpoints_with_collection)
+}
+
+# =============================================================================
 # PATTERN MATCHING TESTS
 # =============================================================================
 
