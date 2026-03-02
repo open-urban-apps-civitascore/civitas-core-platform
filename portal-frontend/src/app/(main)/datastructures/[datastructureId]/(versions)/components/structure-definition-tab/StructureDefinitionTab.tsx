@@ -18,6 +18,7 @@ export const StructureDefinitionTab = (props: StructureDefinitionTabProps) => {
         modelSessionManager={modelSessionManager}
         isMultiSessionMode={false}
         canExportXmi={false}
+        canImportXmi={false}
       />
     </PageBackground>
   )

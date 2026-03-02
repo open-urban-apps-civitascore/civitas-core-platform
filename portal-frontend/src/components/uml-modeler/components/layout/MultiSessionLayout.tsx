@@ -20,10 +20,11 @@ interface MultiSessionLayoutProps {
   externalSessionManager?: UseMultiSessionReturn
   isMultiSessionMode: boolean
   canExportXmi: boolean
+  canImportXmi: boolean
 }
 
 export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
-  const { className, externalSessionManager, isMultiSessionMode, canExportXmi } = props
+  const { className, externalSessionManager, isMultiSessionMode, canExportXmi, canImportXmi } = props
   const t = useTranslations('common')
   const { isReadOnly } = useReadOnly()
   const sessionManager = useMultiSessionManager({ sessionManager: externalSessionManager })
@@ -91,6 +92,8 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
 
   const activeSession = sessionManager.getActiveSession()
 
+  const shouldShowToolBar = !isReadOnly && (!isControlledExternally || canImportXmi || canExportXmi)
+
   return (
     <ActiveDiagramProviderComponent sessionManager={sessionManager}>
       <div className={`h-full flex bg-gray-100 ${className}`}>
@@ -111,12 +114,13 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
           />
 
           {/* Toolbar */}
-          {!isReadOnly && (
+          {shouldShowToolBar && (
             <Toolbar
               onSave={isControlledExternally ? undefined : handleSave}
               onExport={handleExport}
               hasUnsavedChanges={activeSession?.isDirty || false}
               canExportXmi={canExportXmi}
+              canImportXmi={canImportXmi}
             />
           )}
 
