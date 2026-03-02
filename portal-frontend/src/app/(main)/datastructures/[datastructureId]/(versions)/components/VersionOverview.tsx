@@ -46,6 +46,7 @@ import { pickDirtyValues } from '@/utils/form'
 
 import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
+import { QUERY_PARAMS } from '@/const/searchParams'
 
 export const defaultFormData: DatastructureVersionFormData = {
   id: '',
@@ -253,7 +254,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
           }
         } else {
           setIsExitModalOpen(false)
-          router.push(`/datastructures/${datastructureId}/${data.id}?mode=edit`)
+          router.push(
+            `/datastructures/${datastructureId}/${data.id}?mode=edit&${QUERY_PARAMS.subTabValue}=${subTabValue}`,
+          )
         }
       },
       onError: () => {
