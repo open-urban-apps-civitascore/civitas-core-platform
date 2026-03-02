@@ -115,20 +115,18 @@ export const serverFetch = async <TResponse>({
       throw new Error(`Backend responded with status ${response.status}`)
     }
 
-    const data = (await response.json()) as ApiResponse<TResponse>
+    const res = await response.json()
 
-    // Handle different response formats
-    // JSON Server returns data directly, API backend wraps in { content: ... }
-    if (isApiBackend) {
-      return {
-        data: data.content,
-        totalElements: data.totalElements,
-        totalPages: data.totalPages,
-      }
-    }
-    // JSON Server response doesn't have .content wrapper
+    const data: ApiResponse<TResponse> = res.content
+      ? res
+      : {
+          content: res,
+          totalElements: Array.isArray(res) ? Number(response.headers.get('x-total-count')) || 0 : undefined,
+        }
     return {
-      data: data as unknown as TResponse,
+      data: data.content,
+      totalElements: data.totalElements,
+      totalPages: data.totalPages,
     }
   } catch (error) {
     console.error(`Server fetch failed for ${endpoint}:`, error)

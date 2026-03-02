@@ -12,7 +12,7 @@ const EditGroupPage = async (props: PageProps) => {
 
   const groupData = await getGroup(groupId)
 
-  return <GroupDetails title={groupData?.data.name || ''} groupData={groupData?.data} isEditMode />
+  return <GroupDetails title={groupData?.data.name || ''} groupData={groupData?.data} isCreateMode={false} />
 }
 
 export default EditGroupPage

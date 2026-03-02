@@ -59,6 +59,10 @@
       "datasource": "Datenquelle",
       "datastructures": "Datenstrukturen"
     },
+    "messages": {
+      "updateSuccess": "{item} wurde erfolgreich aktualisiert",
+      "createSuccess": "{item} wurde erfolgreich angelegt"
+    },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
@@ -276,6 +280,10 @@
     "messages": {
       "createSuccess": "Gruppe wurde erfolgreich angelegt.",
       "updateSuccess": "Gruppe wurde erfolgreich aktualisiert."
+    },
+    "errors": {
+      "createError": "Beim Anlegen der Gruppe ist ein Fehler aufgetreten",
+      "updateError": "Beim Aktualisieren der Gruppe ist ein Fehler aufgetreten"
     }
   },
   "pagination": {

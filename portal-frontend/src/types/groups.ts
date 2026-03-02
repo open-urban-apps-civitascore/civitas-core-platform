@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 import { ItemScheme, WithId } from './common'
 
-export type GroupTab = 'info' | 'roles' | 'users' | 'subgroups'
+export type GroupTab = 'info' | 'roles' | 'users'
 
 export const GroupRoleTypes = z.enum(['system', 'data', 'governance'])
 
@@ -31,10 +31,10 @@ export type UserGroupsListData = Pick<Group, 'id' | 'name' | 'description' | 'co
 
 export const GroupApiDataSchema = z.object({
   id: z.string(),
-  name: z.string().min(2, {
+  name: z.string().trim().min(2, {
     message: 'common.errors.atLeast2',
   }),
-  description: z.string().optional(),
+  description: z.string().trim().optional(),
   contactUserId: z.string().optional(),
   roleIds: z.array(z.string()).optional(),
   memberIds: z.array(z.string()).optional(),

@@ -60,6 +60,10 @@
       "datasource": "Datasource",
       "datastructures": "Datastructures"
     },
+    "messages": {
+      "updateSuccess": "{item} has been successfully updated",
+      "createSuccess": "{item} has been successfully created"
+    },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "commaSeparated": "comma-separated",
@@ -278,6 +282,10 @@
     "messages": {
       "createSuccess": "Group has been successfully created.",
       "updateSuccess": "Group has been successfully updated."
+    },
+    "errors": {
+      "createError": "An error occurred while creating the group",
+      "updateError": "An error occurred while updating the group"
     }
   },
   "pagination": {
