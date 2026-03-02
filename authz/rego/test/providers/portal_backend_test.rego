@@ -230,11 +230,22 @@ test_is_resource_endpoint_6_segment if {
 	portal_backend.is_resource_endpoint with input as portal_request("POST", "/v2/datastructures/dstr-123/versions/v-456/publish")
 }
 
-# Sub-resource paths are NOT collection endpoints
-test_not_collection_endpoint_4_segment if {
+# =============================================================================
+# COLLECTION ENDPOINT CLASSIFICATION TESTS (data-driven)
+# =============================================================================
+
+test_is_collection_endpoint if {
+	portal_backend.is_collection_endpoint with input as portal_request("GET", "/v2/datasets")
+}
+
+test_not_collection_endpoint_resource if {
+	not portal_backend.is_collection_endpoint with input as portal_request("GET", "/v2/datasets/abc-123")
+}
+
+test_not_collection_endpoint_sub_resource if {
 	not portal_backend.is_collection_endpoint with input as portal_request("POST", "/v2/datasets/abc-123/publish")
 }
 
-test_not_collection_endpoint_5_segment if {
-	not portal_backend.is_collection_endpoint with input as portal_request("DELETE", "/v2/datasets/abc-123/assignments/assign-456")
+test_not_collection_endpoint_users_me if {
+	not portal_backend.is_collection_endpoint with input as portal_request("GET", "/v2/users/me")
 }

@@ -8,6 +8,7 @@
       "GET": null
     },
     "/v2/users": {
+      "_collection": true,
       "GET": "USER_READ",
       "POST": "USER_CREATE"
     },
@@ -18,6 +19,7 @@
       "DELETE": "USER_DELETE"
     },
     "/v2/assignments": {
+      "_collection": true,
       "GET": "ASSIGNMENT_READ",
       "POST": "ASSIGNMENT_CREATE"
     },
@@ -26,6 +28,7 @@
       "DELETE": "ASSIGNMENT_DELETE"
     },
     "/v2/groups": {
+      "_collection": true,
       "GET": "GROUP_READ",
       "POST": "GROUP_CREATE"
     },
@@ -36,12 +39,14 @@
       "DELETE": "GROUP_DELETE"
     },
     "/v2/permissions": {
+      "_collection": true,
       "GET": "PERMISSION_READ"
     },
     "/v2/permissions/{id}": {
       "GET": "PERMISSION_READ"
     },
     "/v2/roles": {
+      "_collection": true,
       "GET": "ROLE_READ",
       "POST": "ROLE_CREATE"
     },
@@ -52,6 +57,7 @@
       "DELETE": "ROLE_DELETE"
     },
     "/v2/datasets": {
+      "_collection": true,
       "GET": "DATASET_READ",
       "POST": "DATASET_CREATE"
     },
@@ -90,6 +96,7 @@
       "DELETE": "DATASET_DELETE"
     },
     "/v2/datasources": {
+      "_collection": true,
       "GET": "DATASOURCE_READ",
       "POST": "DATASOURCE_CREATE"
     },
@@ -112,6 +119,7 @@
       "GET": "DATASOURCE_READ"
     },
     "/v2/datastructures": {
+      "_collection": true,
       "GET": "DATASTRUCTURE_READ",
       "POST": "DATASTRUCTURE_CREATE"
     },
@@ -150,6 +158,7 @@
       "POST": "DATASTRUCTURE_UPDATE"
     },
     "/v2/catalogs": {
+      "_collection": true,
       "GET": null,
       "POST": null
     },
@@ -160,6 +169,7 @@
       "DELETE": null
     },
     "/v2/dataspaces": {
+      "_collection": true,
       "GET": null,
       "POST": null
     },
