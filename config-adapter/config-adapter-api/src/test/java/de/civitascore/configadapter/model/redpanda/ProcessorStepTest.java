@@ -10,6 +10,7 @@
 package de.civitascore.configadapter.model.redpanda;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -132,7 +133,8 @@ class ProcessorStepTest {
 
     String str = step.toString();
     assertTrue(str.contains("ProcessorStep"));
-    assertTrue(str.contains("..."));
+    assertTrue(str.contains(longMapping.substring(0, 50)));
+    assertFalse(str.contains(longMapping));
   }
 
   @Test

@@ -9,48 +9,34 @@
  */
 package de.civitascore.configadapter.model.redpanda;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import de.civitascore.configadapter.model.AbstractApiModel;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Output container for a RedPanda Connect pipeline. Supports HTTP client output and switch
- * (conditional routing) output.
- */
-public final class PipelineOutput extends AbstractApiModel {
+/** Switch output configuration for a RedPanda Connect pipeline with conditional routing. */
+public final class SwitchOutput extends AbstractApiModel {
 
-  @JsonProperty("http_client")
-  private HttpClientOutput httpClient;
+  private List<SwitchCase> cases;
 
-  @JsonProperty("switch")
-  private SwitchOutput switchOutput;
+  public SwitchOutput() {}
 
-  public PipelineOutput() {}
-
-  public HttpClientOutput getHttpClient() {
-    return httpClient;
+  public List<SwitchCase> getCases() {
+    return cases;
   }
 
-  public void setHttpClient(HttpClientOutput httpClient) {
-    this.httpClient = httpClient;
-  }
-
-  public SwitchOutput getSwitchOutput() {
-    return switchOutput;
-  }
-
-  public void setSwitchOutput(SwitchOutput switchOutput) {
-    this.switchOutput = switchOutput;
+  public void setCases(List<SwitchCase> cases) {
+    this.cases = cases;
   }
 
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (httpClient != null) map.put("http_client", httpClient.toApiMap());
-    if (switchOutput != null) map.put("switch", switchOutput.toApiMap());
+    if (cases != null) {
+      map.put("cases", cases.stream().map(SwitchCase::toApiMap).toList());
+    }
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }
@@ -59,24 +45,21 @@ public final class PipelineOutput extends AbstractApiModel {
   public boolean equals(Object obj) {
     if (obj == this) return true;
     if (obj == null || obj.getClass() != this.getClass()) return false;
-    var that = (PipelineOutput) obj;
-    return Objects.equals(this.httpClient, that.httpClient)
-        && Objects.equals(this.switchOutput, that.switchOutput)
+    var that = (SwitchOutput) obj;
+    return Objects.equals(this.cases, that.cases)
         && Objects.equals(this.additionalProperties(), that.additionalProperties());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(httpClient, switchOutput, additionalProperties());
+    return Objects.hash(cases, additionalProperties());
   }
 
   @Override
   public String toString() {
-    return "PipelineOutput["
-        + "httpClient="
-        + httpClient
-        + ", switch="
-        + switchOutput
+    return "SwitchOutput["
+        + "cases="
+        + (cases != null ? cases.size() : 0)
         + ", additionalProperties="
         + additionalProperties().keySet()
         + ']';

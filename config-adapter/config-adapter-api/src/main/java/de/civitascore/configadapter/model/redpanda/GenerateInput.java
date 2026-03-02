@@ -9,48 +9,51 @@
  */
 package de.civitascore.configadapter.model.redpanda;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import de.civitascore.configadapter.model.AbstractApiModel;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Output container for a RedPanda Connect pipeline. Supports HTTP client output and switch
- * (conditional routing) output.
- */
-public final class PipelineOutput extends AbstractApiModel {
+/** Generate input configuration for a RedPanda Connect pipeline (synthetic data generation). */
+public final class GenerateInput extends AbstractApiModel {
 
-  @JsonProperty("http_client")
-  private HttpClientOutput httpClient;
+  private String interval;
+  private Integer count;
+  private String mapping;
 
-  @JsonProperty("switch")
-  private SwitchOutput switchOutput;
+  public GenerateInput() {}
 
-  public PipelineOutput() {}
-
-  public HttpClientOutput getHttpClient() {
-    return httpClient;
+  public String getInterval() {
+    return interval;
   }
 
-  public void setHttpClient(HttpClientOutput httpClient) {
-    this.httpClient = httpClient;
+  public void setInterval(String interval) {
+    this.interval = interval;
   }
 
-  public SwitchOutput getSwitchOutput() {
-    return switchOutput;
+  public Integer getCount() {
+    return count;
   }
 
-  public void setSwitchOutput(SwitchOutput switchOutput) {
-    this.switchOutput = switchOutput;
+  public void setCount(Integer count) {
+    this.count = count;
+  }
+
+  public String getMapping() {
+    return mapping;
+  }
+
+  public void setMapping(String mapping) {
+    this.mapping = mapping;
   }
 
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (httpClient != null) map.put("http_client", httpClient.toApiMap());
-    if (switchOutput != null) map.put("switch", switchOutput.toApiMap());
+    if (interval != null) map.put("interval", interval);
+    if (count != null) map.put("count", count);
+    if (mapping != null) map.put("mapping", mapping);
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }
@@ -59,24 +62,25 @@ public final class PipelineOutput extends AbstractApiModel {
   public boolean equals(Object obj) {
     if (obj == this) return true;
     if (obj == null || obj.getClass() != this.getClass()) return false;
-    var that = (PipelineOutput) obj;
-    return Objects.equals(this.httpClient, that.httpClient)
-        && Objects.equals(this.switchOutput, that.switchOutput)
+    var that = (GenerateInput) obj;
+    return Objects.equals(this.interval, that.interval)
+        && Objects.equals(this.count, that.count)
+        && Objects.equals(this.mapping, that.mapping)
         && Objects.equals(this.additionalProperties(), that.additionalProperties());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(httpClient, switchOutput, additionalProperties());
+    return Objects.hash(interval, count, mapping, additionalProperties());
   }
 
   @Override
   public String toString() {
-    return "PipelineOutput["
-        + "httpClient="
-        + httpClient
-        + ", switch="
-        + switchOutput
+    return "GenerateInput["
+        + "interval="
+        + interval
+        + ", count="
+        + count
         + ", additionalProperties="
         + additionalProperties().keySet()
         + ']';

@@ -9,10 +9,14 @@
  */
 package de.civitascore.configadapter.redpanda;
 
+import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.Datasource;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,10 +45,12 @@ class DatasourceInjector {
   /**
    * Returns a copy of {@code pipelineData} with the input placeholder resolved, or the original map
    * unchanged if no placeholder is present.
+   *
+   * @throws FatalAdapterException if a placeholder references an unknown datasource ID
    */
   @SuppressWarnings("unchecked")
-  static Map<String, Object> resolve(
-      Map<String, Object> pipelineData, List<Map<String, Object>> datasources) {
+  static Map<String, Object> resolve(Map<String, Object> pipelineData, List<Datasource> datasources)
+      throws FatalAdapterException {
 
     if (pipelineData == null
         || pipelineData.isEmpty()
@@ -58,9 +64,11 @@ class DatasourceInjector {
       return pipelineData;
     }
 
-    return extractPlaceholder((Map<String, Object>) inputMap)
-        .map(placeholder -> inject(pipelineData, placeholder, datasources))
-        .orElse(pipelineData);
+    Optional<Placeholder> placeholderOpt = extractPlaceholder((Map<String, Object>) inputMap);
+    if (placeholderOpt.isEmpty()) {
+      return pipelineData;
+    }
+    return inject(pipelineData, placeholderOpt.get(), datasources);
   }
 
   // ─── Private ───────────────────────────────────────────────────────────────
@@ -84,32 +92,34 @@ class DatasourceInjector {
 
   /** Resolves the placeholder against the datasource list and injects the connector config. */
   private static Map<String, Object> inject(
-      Map<String, Object> pipelineData,
-      Placeholder placeholder,
-      List<Map<String, Object>> datasources) {
+      Map<String, Object> pipelineData, Placeholder placeholder, List<Datasource> datasources)
+      throws FatalAdapterException {
 
-    Optional<Map<String, Object>> matchOpt =
+    Optional<Datasource> matchOpt =
         datasources.stream()
-            .filter(ds -> placeholder.datasourceId().equals(ds.get("id")))
+            .filter(ds -> placeholder.datasourceId().equals(ds.getId()))
             .findFirst();
 
     if (matchOpt.isEmpty()) {
-      log.warn("Pipeline input references unknown datasource '{}'", placeholder.datasourceId());
-      return pipelineData;
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD,
+          "Pipeline input references unknown datasource '"
+              + Encode.forJava(placeholder.datasourceId())
+              + "'");
     }
 
     Optional<ConnectorConfig> configOpt = DatasourceParser.parse(matchOpt.get());
     if (configOpt.isEmpty()) {
       log.warn(
           "Unsupported datasource type for '{}' — placeholder not resolved",
-          placeholder.datasourceId());
+          Encode.forJava(placeholder.datasourceId()));
       return pipelineData;
     }
 
     ConnectorConfig config = configOpt.get();
     log.info(
         "Resolved datasource placeholder for '{}' → {}",
-        placeholder.datasourceId(),
+        Encode.forJava(placeholder.datasourceId()),
         config.getClass().getSimpleName());
 
     Map<String, Object> resolved = new LinkedHashMap<>(pipelineData);

@@ -9,50 +9,71 @@
  */
 package de.civitascore.configadapter.redpanda;
 
+import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.Datasource;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Parses a raw datasource payload map into a typed {@link ConnectorConfig}.
+ * Parses a typed {@link Datasource} into a {@link ConnectorConfig} for Redpanda Connect input
+ * injection.
  *
- * <p>This is the single place where raw Map keys are accessed — exclusively via {@link
- * DatasourceField} constants. All other classes work with typed records.
- *
- * <p>Expected payload shape:
- *
- * <pre>{@code
- * { "id": "uuid", "connectorType": "MQTT",
- *   "configuration": { "urls": [...], "topics": [...], ... } }
- * }</pre>
+ * <p>Configuration-specific fields (topics, urls, database, etc.) are read from the datasource's
+ * {@code additionalProperties}, optionally nested under a {@code "configuration"} key for
+ * portal-backend compatibility.
  */
 final class DatasourceParser {
 
+  private static final Logger log = LoggerFactory.getLogger(DatasourceParser.class);
+
+  private static final Set<String> VALID_SSL_MODES =
+      Set.of("disable", "allow", "prefer", "require", "verify-ca", "verify-full");
+
   private DatasourceParser() {}
 
-  /** Parses the raw datasource map. Returns empty if the type is unsupported or missing. */
-  static Optional<ConnectorConfig> parse(Map<String, Object> datasource) {
-    String rawType = ConnectorTypeField.asString(datasource);
-
-    return ConnectorType.fromRaw(rawType)
-        .map(
-            type ->
-                switch (type) {
-                  case MQTT -> parseMqtt(datasource);
-                  case SQL -> parseSql(datasource);
-                });
+  /**
+   * Parses the typed datasource. Returns empty if the type is unsupported or missing.
+   *
+   * @throws FatalAdapterException if the datasource configuration is invalid
+   */
+  static Optional<ConnectorConfig> parse(Datasource datasource) throws FatalAdapterException {
+    String rawType = datasource.getType();
+    Optional<ConnectorType> typeOpt = ConnectorType.fromRaw(rawType);
+    if (typeOpt.isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        switch (typeOpt.get()) {
+          case MQTT -> parseMqtt(datasource);
+          case SQL -> parseSql(datasource);
+        });
   }
 
   // ─── MQTT ──────────────────────────────────────────────────────────────────
 
-  private static ConnectorConfig.Mqtt parseMqtt(Map<String, Object> datasource) {
+  private static ConnectorConfig.Mqtt parseMqtt(Datasource datasource) {
     Map<String, Object> cfg = configuration(datasource);
 
     List<String> urls = DatasourceField.URLS.asList(cfg);
     if (urls.isEmpty()) {
-      String host = DatasourceField.HOST.asString(datasource, cfg).orElse(null);
-      int port = DatasourceField.PORT.asInt(datasource, cfg).orElse(1883);
+      String host = datasource.getHost();
+      int port = datasource.getPort() != null ? datasource.getPort() : 1883;
+      if (host == null) {
+        host = DatasourceField.HOST.asString(cfg).orElse(null);
+      }
       if (host != null) urls = List.of("tcp://" + host + ":" + port);
+    }
+
+    if (urls.isEmpty()) {
+      log.warn(
+          "MQTT datasource '{}' has no URLs configured and no host fallback", datasource.getId());
     }
 
     return new ConnectorConfig.Mqtt(
@@ -64,65 +85,109 @@ final class DatasourceParser {
         DatasourceField.CONNECT_TIMEOUT.asString(cfg).orElse(null),
         DatasourceField.USER.asString(cfg).orElse(null),
         DatasourceField.PASSWORD.asObject(cfg),
-        DatasourceField.TLS_ENABLED.asBoolean(cfg));
+        DatasourceField.TLS_ENABLED.asBooleanNested(cfg));
   }
 
   // ─── SQL ───────────────────────────────────────────────────────────────────
 
-  private static ConnectorConfig.Sql parseSql(Map<String, Object> datasource) {
+  private static ConnectorConfig.Sql parseSql(Datasource datasource) throws FatalAdapterException {
     Map<String, Object> cfg = configuration(datasource);
 
-    String dsn = DatasourceField.DSN.asString(cfg).orElseGet(() -> buildDsn(datasource, cfg));
+    String dsn = DatasourceField.DSN.asString(cfg).orElse(null);
+    if (dsn == null) {
+      dsn = buildDsn(datasource, cfg);
+    }
+    if (dsn == null) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD,
+          "SQL datasource '"
+              + datasource.getId()
+              + "' has no DSN and cannot build one (missing host, database, or username)");
+    }
     String driver = DatasourceField.DRIVER.asString(cfg).orElse("postgres");
     String query = DatasourceField.QUERY.asString(cfg).orElse(null);
 
     return new ConnectorConfig.Sql(driver, dsn, query);
   }
 
-  private static String buildDsn(Map<String, Object> datasource, Map<String, Object> cfg) {
-    String host = DatasourceField.HOST.asString(datasource, cfg).orElse(null);
-    int port = DatasourceField.PORT.asInt(datasource, cfg).orElse(5432);
+  /**
+   * Builds a DSN string from individual components. Handles null password correctly — if password
+   * is null, it is omitted from the credentials part.
+   *
+   * <p>The {@code ssl_mode} value is validated against PostgreSQL's allowed modes: {@code disable},
+   * {@code allow}, {@code prefer}, {@code require}, {@code verify-ca}, {@code verify-full}.
+   * Defaults to {@code disable} if not specified.
+   *
+   * @return the DSN string, or {@code null} if host, database, or username is missing
+   * @throws FatalAdapterException if {@code ssl_mode} is not in the whitelist
+   */
+  static String buildDsn(Datasource datasource, Map<String, Object> cfg)
+      throws FatalAdapterException {
+    String host = datasource.getHost();
+    if (host == null) host = DatasourceField.HOST.asString(cfg).orElse(null);
+    int port =
+        datasource.getPort() != null
+            ? datasource.getPort()
+            : DatasourceField.PORT.asInt(cfg).orElse(5432);
     String database = DatasourceField.DATABASE.asString(cfg).orElse(null);
     String username = DatasourceField.USERNAME.asString(cfg).orElse(null);
     Object password = DatasourceField.PASSWORD.asObject(cfg);
     String sslMode = DatasourceField.SSL_MODE.asString(cfg).orElse("disable");
+    if (!VALID_SSL_MODES.contains(sslMode)) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD,
+          "Invalid ssl_mode: '"
+              + sslMode
+              + "'. Must be one of: disable, allow, prefer, require, verify-ca, verify-full");
+    }
 
-    if (host == null || database == null || username == null) return null;
+    if (host == null || database == null || username == null) {
+      log.warn(
+          "Cannot build DSN: missing host={}, database={}, username={}",
+          host != null,
+          database != null,
+          username != null);
+      return null;
+    }
+    String encUser = URLEncoder.encode(username, StandardCharsets.UTF_8);
+    String credentials =
+        password != null
+            ? encUser + ":" + URLEncoder.encode(String.valueOf(password), StandardCharsets.UTF_8)
+            : encUser;
+    String encDatabase = URLEncoder.encode(database, StandardCharsets.UTF_8);
+    // Host is not URL-encoded: RFC 3986 hostnames are restricted to unreserved
+    // characters. IPv6 literals must be bracketed per RFC 3986 §3.2.2.
     return "postgres://"
-        + username
-        + ":"
-        + password
+        + credentials
         + "@"
         + host
         + ":"
         + port
         + "/"
-        + database
+        + encDatabase
         + "?sslmode="
         + sslMode;
   }
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-
-  /** Returns the nested {@code configuration} map, or the datasource map itself if flat. */
-  @SuppressWarnings("unchecked")
-  private static Map<String, Object> configuration(Map<String, Object> datasource) {
-    Object cfg = datasource.get("configuration");
-    return cfg instanceof Map<?, ?> m ? (Map<String, Object>) m : datasource;
+  /**
+   * Builds a DSN string from a typed {@link Datasource} for use by {@link PlaceholderResolver}.
+   * Falls back to configuration sub-map for fields not available on the core Datasource object.
+   */
+  static String buildDsnFromDatasource(Datasource datasource) throws FatalAdapterException {
+    Map<String, Object> cfg = configuration(datasource);
+    return buildDsn(datasource, cfg);
   }
 
-  /**
-   * Reads {@code connectorType} or {@code type} from the top-level datasource map. Kept as a small
-   * inner helper because these are envelope fields, not configuration fields.
-   */
-  private static final class ConnectorTypeField {
-    private ConnectorTypeField() {}
+  // ─── Helpers ───────────────────────────────────────────────────────────────
 
-    static String asString(Map<String, Object> datasource) {
-      Object v = datasource.get("connectorType");
-      if (v instanceof String s) return s;
-      v = datasource.get("type");
-      return v instanceof String s ? s : null;
-    }
+  /**
+   * Returns the nested {@code configuration} map from the datasource's additional properties, or
+   * the additional properties map itself if no {@code configuration} sub-key exists.
+   */
+  @SuppressWarnings("unchecked")
+  static Map<String, Object> configuration(Datasource datasource) {
+    Map<String, Object> props = datasource.getAdditionalProperties();
+    Object cfg = props.get("configuration");
+    return cfg instanceof Map<?, ?> m ? (Map<String, Object>) m : props;
   }
 }

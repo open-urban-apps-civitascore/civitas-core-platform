@@ -16,6 +16,9 @@ import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.crypto.CredentialDecryptor;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
+import de.civitascore.configadapter.model.AdapterErrorCode;
+import de.civitascore.configadapter.model.dataset.Datasource;
+import de.civitascore.configadapter.util.PayloadConverter;
 import jakarta.ws.rs.client.Client;
 import java.util.ArrayList;
 import java.util.List;
@@ -95,14 +98,14 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
 
   private SagaCommandResult handleDeployPipelines(SagaCommandMessage command) {
     List<Map<String, Object>> dataPipelines = extractPipelineList(command, "dataPipelines");
-    List<Map<String, Object>> datasources = extractDatasources(command);
+    String targetUrl = extractTargetUrl(command);
     List<String> deployedIds = new ArrayList<>();
 
     try {
+      List<Datasource> datasources = extractDatasources(command);
       for (Map<String, Object> pipeline : dataPipelines) {
         String id = requirePipelineField(pipeline, "id");
-        Map<String, Object> data = optionalPipelineMapField(pipeline, "data");
-        data = DatasourceInjector.resolve(data, datasources);
+        Map<String, Object> data = resolvePipelineData(pipeline, datasources, targetUrl);
 
         redpandaClient.createPipeline(id, data);
         deployedIds.add(id);
@@ -120,27 +123,22 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
           command.sagaId(), command.stepId(), resultData, compensationData);
 
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      log.error(
-          "DEPLOY_PIPELINES failed for saga {}: {}",
-          Encode.forJava(command.sagaId()),
-          Encode.forJava(e.getMessage()));
-      return SagaCommandResult.failure(
-          command.sagaId(), command.stepId(), "DEPLOY_PIPELINES failed: " + e.getMessage());
+      return pipelineError(command, "DEPLOY_PIPELINES", false, e);
     }
   }
 
   private SagaCommandResult handleUpdatePipelines(SagaCommandMessage command) {
     List<Map<String, Object>> dataPipelines = extractPipelineList(command, "dataPipelines");
-    List<Map<String, Object>> datasources = extractDatasources(command);
+    String targetUrl = extractTargetUrl(command);
     List<String> processedIds = new ArrayList<>();
     boolean isCompensation = "COMPENSATE_STEP".equals(command.type());
 
     try {
+      List<Datasource> datasources = extractDatasources(command);
       for (Map<String, Object> pipeline : dataPipelines) {
         String id = requirePipelineField(pipeline, "id");
         String action = requirePipelineField(pipeline, "action");
-        Map<String, Object> data = optionalPipelineMapField(pipeline, "data");
-        data = DatasourceInjector.resolve(data, datasources);
+        Map<String, Object> data = resolvePipelineData(pipeline, datasources, targetUrl);
 
         switch (action) {
           case "ADD" -> redpandaClient.createPipeline(id, data);
@@ -165,14 +163,7 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
           command.sagaId(), command.stepId(), resultData, compensationData);
 
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      String error = "UPDATE_PIPELINES failed: " + e.getMessage();
-      log.error(
-          "UPDATE_PIPELINES failed for saga {}: {}",
-          Encode.forJava(command.sagaId()),
-          Encode.forJava(e.getMessage()));
-      return isCompensation
-          ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)
-          : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
+      return pipelineError(command, "UPDATE_PIPELINES", isCompensation, e);
     }
   }
 
@@ -194,26 +185,19 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
       return SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
 
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      String error = "DELETE_PIPELINES failed: " + e.getMessage();
-      log.error(
-          "DELETE_PIPELINES failed for saga {}: {}",
-          Encode.forJava(command.sagaId()),
-          Encode.forJava(e.getMessage()));
-      return isCompensation
-          ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)
-          : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
+      return pipelineError(command, "DELETE_PIPELINES", isCompensation, e);
     }
   }
 
   private SagaCommandResult handleRestorePipelines(SagaCommandMessage command) {
     List<Map<String, Object>> dataPipelines = extractPipelineList(command, "dataPipelines");
-    List<Map<String, Object>> datasources = extractDatasources(command);
+    String targetUrl = extractTargetUrl(command);
 
     try {
+      List<Datasource> datasources = extractDatasources(command);
       for (Map<String, Object> pipeline : dataPipelines) {
         String id = requirePipelineField(pipeline, "id");
-        Map<String, Object> data = optionalPipelineMapField(pipeline, "data");
-        data = DatasourceInjector.resolve(data, datasources);
+        Map<String, Object> data = resolvePipelineData(pipeline, datasources, targetUrl);
         redpandaClient.updatePipeline(id, data);
       }
 
@@ -225,27 +209,58 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
       return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
 
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      log.error(
-          "RESTORE_PIPELINES failed for saga {}: {}",
-          Encode.forJava(command.sagaId()),
-          Encode.forJava(e.getMessage()));
-      return SagaCommandResult.compensationFailure(
-          command.sagaId(), command.stepId(), "RESTORE_PIPELINES failed: " + e.getMessage());
+      return pipelineError(command, "RESTORE_PIPELINES", true, e);
     }
   }
 
-  // ─── Payload validation helpers ──────────────────────────────────────────
+  // ─── Pipeline data resolution helpers ──────────────────────────────────────
 
-  @SuppressWarnings("unchecked")
-  private static List<Map<String, Object>> extractDatasources(SagaCommandMessage command) {
+  private Map<String, Object> resolvePipelineData(
+      Map<String, Object> pipeline, List<Datasource> datasources, String targetUrl)
+      throws FatalAdapterException {
+    Map<String, Object> data = optionalPipelineMapField(pipeline, "data");
+    data = DatasourceInjector.resolve(data, datasources);
+    return PlaceholderResolver.resolve(data, targetUrl, datasources);
+  }
+
+  private SagaCommandResult pipelineError(
+      SagaCommandMessage command, String operation, boolean isCompensation, Exception e) {
+    String error = operation + " failed: " + e.getMessage();
+    log.error(
+        "{} failed for saga {}: {}",
+        operation,
+        Encode.forJava(command.sagaId()),
+        Encode.forJava(e.getMessage()));
+    return isCompensation
+        ? SagaCommandResult.compensationFailure(command.sagaId(), command.stepId(), error)
+        : SagaCommandResult.failure(command.sagaId(), command.stepId(), error);
+  }
+
+  // ─── Payload validation helpers ───────────────────────────────────────────
+
+  private static List<Datasource> extractDatasources(SagaCommandMessage command)
+      throws FatalAdapterException {
     Object value = command.payload().getOrDefault("datasources", List.of());
     if (!(value instanceof List<?> list) || list.isEmpty()) {
       return List.of();
     }
-    if (!(list.get(0) instanceof Map<?, ?>)) {
-      return List.of();
+    List<Datasource> result = new ArrayList<>(list.size());
+    for (Object item : list) {
+      try {
+        result.add(PayloadConverter.fromValue(item, Datasource.class));
+      } catch (IllegalArgumentException e) {
+        throw new FatalAdapterException(
+            AdapterErrorCode.INVALID_PAYLOAD,
+            e,
+            "Invalid datasource entry in payload: " + e.getMessage());
+      }
     }
-    return (List<Map<String, Object>>) list;
+    return List.copyOf(result);
+  }
+
+  private static String extractTargetUrl(SagaCommandMessage command) {
+    Object value = command.payload().get("targetUrl");
+    return value instanceof String s ? s : null;
   }
 
   @SuppressWarnings("unchecked")
@@ -256,6 +271,7 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
       throw new IllegalArgumentException(
           command.operation() + " payload field '" + key + "' is not a List: " + value.getClass());
     }
+    // Spot-check first element type only — JSON deserialization produces homogeneous lists
     if (!list.isEmpty() && !(list.get(0) instanceof Map<?, ?>)) {
       throw new IllegalArgumentException(
           command.operation()
@@ -274,6 +290,7 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
       throw new IllegalArgumentException(
           command.operation() + " payload field '" + key + "' is not a List: " + value.getClass());
     }
+    // Spot-check first element type only — JSON deserialization produces homogeneous lists
     if (!list.isEmpty() && !(list.get(0) instanceof String)) {
       throw new IllegalArgumentException(
           command.operation()

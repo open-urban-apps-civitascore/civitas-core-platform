@@ -9,8 +9,11 @@
  */
 package de.civitascore.configadapter.redpanda;
 
+import static de.civitascore.configadapter.redpanda.RedpandaTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.civitascore.configadapter.exception.FatalAdapterException;
+import de.civitascore.configadapter.model.dataset.Datasource;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -33,29 +36,18 @@ class DatasourceInjectorTest {
 
     @Test
     @DisplayName("resolves MQTT placeholder with full configuration map")
-    void resolve_mqttPlaceholder_injectsFullMqttInput() {
+    void resolve_mqttPlaceholder_injectsFullMqttInput() throws Exception {
       String datasourceId = "06bfb6a4-3f05-445c-8ed7-e42275c571ad";
 
-      Map<String, Object> datasource =
-          Map.of(
-              "id",
+      Datasource datasource =
+          createMqttDatasourceWithDetails(
               datasourceId,
-              "type",
-              "mqtt",
-              "configuration",
-              Map.of(
-                  "urls",
-                  List.of("tcp://broker.local:1883"),
-                  "topics",
-                  List.of("sensor/#"),
-                  "client_id",
-                  "civitas-client-1",
-                  "qos",
-                  1,
-                  "user",
-                  "mqttuser",
-                  "password",
-                  "ENC(secret)"));
+              List.of("tcp://broker.local:1883"),
+              List.of("sensor/#"),
+              "civitas-client-1",
+              1,
+              "mqttuser",
+              "ENC(secret)");
 
       Map<String, Object> pipelineData =
           Map.of(
@@ -81,47 +73,16 @@ class DatasourceInjectorTest {
     }
 
     @Test
-    @DisplayName("resolves MQTT placeholder using connectorType (portal-backend naming)")
-    void resolve_mqttPlaceholder_withConnectorType_injectsMqtt() {
-      String datasourceId = "ds-mqtt-portal";
-
-      Map<String, Object> datasource =
-          Map.of(
-              "id",
-              datasourceId,
-              "connectorType",
-              "MQTT",
-              "configuration",
-              Map.of(
-                  "urls", List.of("tcp://broker:1883"),
-                  "topics", List.of("test/#")));
-
-      Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
-
-      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(datasource));
-
-      @SuppressWarnings("unchecked")
-      Map<String, Object> input = (Map<String, Object>) result.get("input");
-      assertTrue(input.containsKey("mqtt"));
-    }
-
-    @Test
     @DisplayName("builds URL from host+port when urls list is absent")
-    void resolve_mqttWithHostPort_buildsUrl() {
+    void resolve_mqttWithHostPort_buildsUrl() throws Exception {
       String datasourceId = "ds-host-port";
 
-      Map<String, Object> datasource =
-          Map.of(
-              "id",
-              datasourceId,
-              "type",
-              "mqtt",
-              "host",
-              "broker.example.com",
-              "port",
-              1883,
-              "configuration",
-              Map.of("topics", List.of("data/#")));
+      Datasource datasource = new Datasource();
+      datasource.setId(datasourceId);
+      datasource.setType("mqtt");
+      datasource.setHost("broker.example.com");
+      datasource.setPort(1883);
+      datasource.handleUnknownProperty("configuration", Map.of("topics", List.of("data/#")));
 
       Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
 
@@ -146,19 +107,14 @@ class DatasourceInjectorTest {
 
     @Test
     @DisplayName("resolves SQL placeholder with pre-built DSN")
-    void resolve_sqlPlaceholderWithDsn_injectsSqlRaw() {
+    void resolve_sqlPlaceholderWithDsn_injectsSqlRaw() throws Exception {
       String datasourceId = "ds-sql-1";
 
-      Map<String, Object> datasource =
-          Map.of(
-              "id",
+      Datasource datasource =
+          createSqlDatasource(
               datasourceId,
-              "type",
-              "postgresql",
-              "configuration",
-              Map.of(
-                  "dsn", "postgres://user:pass@db:5432/mydb?sslmode=disable",
-                  "query", "SELECT * FROM sensors"));
+              "postgres://user:pass@db:5432/mydb?sslmode=disable",
+              "SELECT * FROM sensors");
 
       Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
 
@@ -176,24 +132,20 @@ class DatasourceInjectorTest {
 
     @Test
     @DisplayName("builds DSN from host/port/database/user when dsn is absent")
-    void resolve_sqlWithHostConfig_buildsDsn() {
+    void resolve_sqlWithHostConfig_buildsDsn() throws Exception {
       String datasourceId = "ds-sql-host";
 
-      Map<String, Object> datasource =
+      Datasource datasource = new Datasource();
+      datasource.setId(datasourceId);
+      datasource.setType("sql");
+      datasource.setHost("db.local");
+      datasource.setPort(5432);
+      datasource.handleUnknownProperty(
+          "configuration",
           Map.of(
-              "id",
-              datasourceId,
-              "type",
-              "sql",
-              "host",
-              "db.local",
-              "port",
-              5432,
-              "configuration",
-              Map.of(
-                  "database", "sensordb",
-                  "username", "reader",
-                  "password", "secret"));
+              "database", "sensordb",
+              "username", "reader",
+              "password", "secret"));
 
       Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
 
@@ -210,6 +162,32 @@ class DatasourceInjectorTest {
       assertTrue(dsn.contains("sensordb"));
       assertTrue(dsn.contains("reader"));
     }
+
+    @Test
+    @DisplayName("builds DSN without password when password is null")
+    void resolve_sqlWithoutPassword_buildsDsnWithoutPassword() throws Exception {
+      String datasourceId = "ds-sql-nopass";
+
+      Datasource datasource = new Datasource();
+      datasource.setId(datasourceId);
+      datasource.setType("sql");
+      datasource.setHost("db.local");
+      datasource.setPort(5432);
+      datasource.handleUnknownProperty(
+          "configuration", Map.of("database", "testdb", "username", "admin"));
+
+      Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
+
+      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(datasource));
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> sqlRaw =
+          (Map<String, Object>) ((Map<String, Object>) result.get("input")).get("sql_raw");
+      String dsn = (String) sqlRaw.get("dsn");
+      assertNotNull(dsn);
+      assertTrue(dsn.contains("admin@db.local"));
+      assertFalse(dsn.contains(":null@"));
+    }
   }
 
   // ─── Edge Cases ───────────────────────────────────────────────────────────────
@@ -220,55 +198,53 @@ class DatasourceInjectorTest {
 
     @Test
     @DisplayName("returns unchanged when no label present")
-    void resolve_noPlaceholder_returnsUnchanged() {
+    void resolve_noPlaceholder_returnsUnchanged() throws Exception {
       Map<String, Object> pipelineData =
           Map.of("input", Map.of("generate", Map.of("interval", "1s", "count", 1)));
 
-      Map<String, Object> result =
-          DatasourceInjector.resolve(pipelineData, List.of(Map.of("id", "ds-1", "type", "mqtt")));
+      Datasource ds = new Datasource();
+      ds.setId("ds-1");
+      ds.setType("mqtt");
+
+      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(ds));
 
       assertSame(pipelineData, result);
     }
 
     @Test
     @DisplayName("returns unchanged when datasources list is empty")
-    void resolve_emptyDatasources_returnsUnchanged() {
+    void resolve_emptyDatasources_returnsUnchanged() throws Exception {
       Map<String, Object> pipelineData = Map.of("input", inputWithLabel("some-id"));
 
       assertSame(pipelineData, DatasourceInjector.resolve(pipelineData, List.of()));
     }
 
     @Test
-    @DisplayName("returns unchanged when datasource ID not found")
-    void resolve_unknownDatasourceId_returnsUnchanged() {
+    @DisplayName("throws FatalAdapterException when datasource ID not found")
+    void resolve_unknownDatasourceId_throwsFatalException() {
       Map<String, Object> pipelineData = Map.of("input", inputWithLabel("unknown-id"));
 
-      Map<String, Object> result =
-          DatasourceInjector.resolve(
-              pipelineData, List.of(Map.of("id", "other-id", "type", "mqtt")));
+      Datasource ds = new Datasource();
+      ds.setId("other-id");
+      ds.setType("mqtt");
 
-      assertSame(pipelineData, result);
+      assertThrows(
+          FatalAdapterException.class, () -> DatasourceInjector.resolve(pipelineData, List.of(ds)));
     }
 
     @Test
     @DisplayName("returns null when pipelineData is null")
-    void resolve_nullPipelineData_returnsNull() {
+    void resolve_nullPipelineData_returnsNull() throws Exception {
       assertNull(DatasourceInjector.resolve(null, List.of()));
     }
 
     @Test
     @DisplayName("nested label (non-spec format) is not resolved")
-    void resolve_nestedLabel_notResolved() {
+    void resolve_nestedLabel_notResolved() throws Exception {
       String datasourceId = "ds-nested";
 
-      Map<String, Object> datasource =
-          Map.of(
-              "id",
-              datasourceId,
-              "type",
-              "mqtt",
-              "configuration",
-              Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("t/#")));
+      Datasource datasource =
+          createMqttDatasource(datasourceId, List.of("tcp://broker:1883"), List.of("t/#"));
 
       // label nested inside connector — this is NOT the supported format
       Map<String, Object> pipelineData =
@@ -280,26 +256,27 @@ class DatasourceInjectorTest {
     }
 
     @Test
+    @DisplayName("returns unchanged for unsupported datasource type")
+    void resolve_unsupportedDatasourceType_returnsUnchanged() throws Exception {
+      String datasourceId = "ds-ftp";
+      Datasource ds = new Datasource();
+      ds.setId(datasourceId);
+      ds.setType("ftp");
+
+      Map<String, Object> pipelineData = Map.of("input", inputWithLabel(datasourceId));
+      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(ds));
+      assertSame(pipelineData, result);
+    }
+
+    @Test
     @DisplayName("resolves correct datasource from multiple datasources")
-    void resolve_multipleDatasources_resolvesCorrectOne() {
+    void resolve_multipleDatasources_resolvesCorrectOne() throws Exception {
       String targetId = "target-ds";
 
-      Map<String, Object> mqttDs =
-          Map.of(
-              "id",
-              targetId,
-              "type",
-              "mqtt",
-              "configuration",
-              Map.of(
-                  "urls", List.of("tcp://target:1883"),
-                  "topics", List.of("t/#")));
+      Datasource mqttDs =
+          createMqttDatasource(targetId, List.of("tcp://target:1883"), List.of("t/#"));
 
-      Map<String, Object> sqlDs =
-          Map.of(
-              "id", "other-ds",
-              "type", "postgresql",
-              "configuration", Map.of("dsn", "postgres://..."));
+      Datasource sqlDs = createSqlDatasource("other-ds", "postgres://...", null);
 
       Map<String, Object> pipelineData = Map.of("input", inputWithLabel(targetId));
 

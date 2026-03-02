@@ -9,16 +9,28 @@
  */
 package de.civitascore.configadapter.model.redpanda;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import de.civitascore.configadapter.model.AbstractApiModel;
+import de.civitascore.configadapter.util.StringUtils;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/** A single processor step in a RedPanda Connect pipeline (e.g. Bloblang mapping). */
+/**
+ * A single processor step in a RedPanda Connect pipeline. Supports Bloblang mapping, branch,
+ * unarchive, sql_select, and http processors.
+ */
 public final class ProcessorStep extends AbstractApiModel {
 
   private String mapping;
+  private BranchProcessor branch;
+  private UnarchiveProcessor unarchive;
+
+  @JsonProperty("sql_select")
+  private SqlSelectProcessor sqlSelect;
+
+  private HttpProcessor http;
 
   public ProcessorStep() {}
 
@@ -30,10 +42,46 @@ public final class ProcessorStep extends AbstractApiModel {
     this.mapping = mapping;
   }
 
+  public BranchProcessor getBranch() {
+    return branch;
+  }
+
+  public void setBranch(BranchProcessor branch) {
+    this.branch = branch;
+  }
+
+  public UnarchiveProcessor getUnarchive() {
+    return unarchive;
+  }
+
+  public void setUnarchive(UnarchiveProcessor unarchive) {
+    this.unarchive = unarchive;
+  }
+
+  public SqlSelectProcessor getSqlSelect() {
+    return sqlSelect;
+  }
+
+  public void setSqlSelect(SqlSelectProcessor sqlSelect) {
+    this.sqlSelect = sqlSelect;
+  }
+
+  public HttpProcessor getHttp() {
+    return http;
+  }
+
+  public void setHttp(HttpProcessor http) {
+    this.http = http;
+  }
+
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
     if (mapping != null) map.put("mapping", mapping);
+    if (branch != null) map.put("branch", branch.toApiMap());
+    if (unarchive != null) map.put("unarchive", unarchive.toApiMap());
+    if (sqlSelect != null) map.put("sql_select", sqlSelect.toApiMap());
+    if (http != null) map.put("http", http.toApiMap());
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }
@@ -44,19 +92,31 @@ public final class ProcessorStep extends AbstractApiModel {
     if (obj == null || obj.getClass() != this.getClass()) return false;
     var that = (ProcessorStep) obj;
     return Objects.equals(this.mapping, that.mapping)
+        && Objects.equals(this.branch, that.branch)
+        && Objects.equals(this.unarchive, that.unarchive)
+        && Objects.equals(this.sqlSelect, that.sqlSelect)
+        && Objects.equals(this.http, that.http)
         && Objects.equals(this.additionalProperties(), that.additionalProperties());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(mapping, additionalProperties());
+    return Objects.hash(mapping, branch, unarchive, sqlSelect, http, additionalProperties());
   }
 
   @Override
   public String toString() {
     return "ProcessorStep["
         + "mapping="
-        + (mapping != null ? mapping.substring(0, Math.min(50, mapping.length())) + "..." : null)
+        + StringUtils.truncate(mapping, 50)
+        + ", branch="
+        + branch
+        + ", unarchive="
+        + unarchive
+        + ", sqlSelect="
+        + sqlSelect
+        + ", http="
+        + http
         + ", additionalProperties="
         + additionalProperties().keySet()
         + ']';

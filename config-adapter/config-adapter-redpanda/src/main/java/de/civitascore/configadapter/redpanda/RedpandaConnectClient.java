@@ -184,6 +184,15 @@ class RedpandaConnectClient implements AutoCloseable {
       return;
     }
 
+    // DELETE idempotency: treat 404 as success (pipeline already gone)
+    if (status == 404 && operation == AdapterOperation.PIPELINE_DELETE) {
+      logger.info(
+          "Pipeline {} already absent (HTTP 404), treating {} as success",
+          Encode.forJava(pipelineId),
+          operation.getDescription());
+      return;
+    }
+
     String body = response.readEntity(String.class);
 
     if (status >= HTTP_SERVER_ERROR_MIN) {

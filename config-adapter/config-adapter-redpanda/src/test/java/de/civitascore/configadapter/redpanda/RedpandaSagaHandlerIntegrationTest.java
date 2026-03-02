@@ -9,23 +9,18 @@
  */
 package de.civitascore.configadapter.redpanda;
 
+import static de.civitascore.configadapter.redpanda.RedpandaTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -33,11 +28,6 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Integration test for {@link RedpandaSagaHandler} against a real RedPanda Connect instance.
@@ -48,33 +38,13 @@ import org.testcontainers.utility.DockerImageName;
  * trade-off: starting a fresh container per test adds ~10 s each. Guard methods like {@code
  * assertPipelineExists()} allow verifying preconditions when running tests individually.
  */
-@Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class RedpandaSagaHandlerIntegrationTest {
+class RedpandaSagaHandlerIntegrationTest extends AbstractRedpandaIntegrationTest {
 
-  private static final int CONNECT_PORT = 4195;
-
-  @Container
-  static final GenericContainer<?> redpandaConnect =
-      new GenericContainer<>(DockerImageName.parse("redpandadata/connect"))
-          .withCommand("streams")
-          .withExposedPorts(CONNECT_PORT)
-          .waitingFor(Wait.forHttp("/ready").forPort(CONNECT_PORT).forStatusCode(200));
-
-  private static String baseUrl;
-  private static Client httpClient;
   private static RedpandaSagaHandler handler;
 
   @BeforeAll
-  static void setUpContainer() {
-    baseUrl =
-        "http://" + redpandaConnect.getHost() + ":" + redpandaConnect.getMappedPort(CONNECT_PORT);
-    httpClient =
-        ClientBuilder.newBuilder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build();
-
+  static void setUpHandler() {
     handler = new RedpandaSagaHandler();
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("redpanda.url", "http://localhost:4195")).thenReturn(baseUrl);
@@ -82,12 +52,9 @@ class RedpandaSagaHandlerIntegrationTest {
   }
 
   @AfterAll
-  static void tearDown() {
+  static void tearDownHandler() {
     if (handler != null) {
       handler.close();
-    }
-    if (httpClient != null) {
-      httpClient.close();
     }
   }
 
@@ -96,7 +63,7 @@ class RedpandaSagaHandlerIntegrationTest {
   @DisplayName("DEPLOY_PIPELINES creates pipelines in RedPanda Connect")
   void handle_deployPipelines_pipelinesCreatedInRedpanda() {
     SagaCommandMessage command =
-        createCommand(
+        createIntegrationCommand(
             "EXECUTE_STEP",
             "DEPLOY_PIPELINES",
             Map.of(
@@ -136,7 +103,7 @@ class RedpandaSagaHandlerIntegrationTest {
   @DisplayName("UPDATE_PIPELINES modifies existing pipelines")
   void handle_updatePipelines_pipelinesUpdatedInRedpanda() {
     SagaCommandMessage command =
-        createCommand(
+        createIntegrationCommand(
             "EXECUTE_STEP",
             "UPDATE_PIPELINES",
             Map.of(
@@ -166,7 +133,7 @@ class RedpandaSagaHandlerIntegrationTest {
   @DisplayName("DELETE_PIPELINES removes pipelines from RedPanda Connect")
   void handle_deletePipelines_pipelinesRemovedFromRedpanda() {
     SagaCommandMessage command =
-        createCommand(
+        createIntegrationCommand(
             "EXECUTE_STEP",
             "DELETE_PIPELINES",
             Map.of("datasetId", "ds-it-1", "pipelineIds", List.of("it-pl-1", "it-pl-2")));
@@ -187,7 +154,7 @@ class RedpandaSagaHandlerIntegrationTest {
   void handle_deployThenCompensate_pipelinesRemovedAfterCompensation() {
     // Deploy
     SagaCommandMessage deployCommand =
-        createCommand(
+        createIntegrationCommand(
             "EXECUTE_STEP",
             "DEPLOY_PIPELINES",
             Map.of(
@@ -208,7 +175,7 @@ class RedpandaSagaHandlerIntegrationTest {
 
     // Compensate (DELETE)
     SagaCommandMessage compensateCommand =
-        createCommand(
+        createIntegrationCommand(
             "COMPENSATE_STEP",
             "DELETE_PIPELINES",
             Map.of("datasetId", "ds-it-2", "pipelineIds", List.of("it-comp-pl")));
@@ -220,52 +187,58 @@ class RedpandaSagaHandlerIntegrationTest {
 
   @Test
   @Order(5)
-  @DisplayName("DELETE non-existent pipeline returns STEP_FAILED")
-  void handle_deleteNonExistent_returnsStepFailed() {
+  @DisplayName("DELETE non-existent pipeline returns STEP_COMPLETED (idempotent)")
+  void handle_deleteNonExistent_returnsStepCompleted() {
     SagaCommandMessage command =
-        createCommand(
+        createIntegrationCommand(
             "EXECUTE_STEP",
             "DELETE_PIPELINES",
             Map.of("datasetId", "ds-it-3", "pipelineIds", List.of("non-existent-pipeline")));
 
     SagaCommandResult result = handler.handle(command);
 
-    assertEquals("STEP_FAILED", result.type());
-    assertNotNull(result.error());
+    assertEquals("STEP_COMPLETED", result.type());
+    assertNull(result.error());
   }
 
-  private SagaCommandMessage createCommand(
-      String type, String operation, Map<String, Object> payload) {
-    return new SagaCommandMessage(
-        type, "msg-it-001", "saga-it-001", "deploy-pipelines", "redpanda", operation, payload);
-  }
+  @Test
+  @Order(6)
+  @DisplayName("DEPLOY with ${FROST_BASE} placeholder resolves targetUrl")
+  void handle_deployWithFrostBase_resolvesPlaceholder() {
+    SagaCommandMessage command =
+        createIntegrationCommand(
+            "EXECUTE_STEP",
+            "DEPLOY_PIPELINES",
+            Map.of(
+                "datasetId",
+                "ds-it-frost",
+                "targetUrl",
+                "https://frost.example.com/FROST-Server/v1.1",
+                "dataPipelines",
+                List.of(
+                    Map.of(
+                        "id",
+                        "it-frost-pl",
+                        "data",
+                        Map.of(
+                            "input",
+                            Map.of("generate", Map.of("mapping", "root = \"test\"")),
+                            "output",
+                            Map.of(
+                                "http_client",
+                                Map.of("url", "${FROST_BASE}/Things", "verb", "POST")))))));
 
-  private void assertPipelineExists(String pipelineId) {
-    try (Response response =
-        httpClient
-            .target(baseUrl)
-            .path("streams")
-            .path(pipelineId)
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertTrue(
-          response.getStatus() == 200,
-          "Pipeline " + pipelineId + " should exist, got HTTP " + response.getStatus());
-    }
-  }
+    SagaCommandResult result = handler.handle(command);
 
-  private void assertPipelineNotExists(String pipelineId) {
-    try (Response response =
-        httpClient
-            .target(baseUrl)
-            .path("streams")
-            .path(pipelineId)
-            .request(MediaType.APPLICATION_JSON)
-            .get()) {
-      assertEquals(
-          404,
-          response.getStatus(),
-          "Pipeline " + pipelineId + " should not exist, got HTTP " + response.getStatus());
-    }
+    assertEquals("STEP_COMPLETED", result.type());
+    assertNull(result.error());
+    assertPipelineExists("it-frost-pl");
+
+    // Cleanup
+    handler.handle(
+        createIntegrationCommand(
+            "EXECUTE_STEP",
+            "DELETE_PIPELINES",
+            Map.of("datasetId", "ds-it-frost", "pipelineIds", List.of("it-frost-pl"))));
   }
 }

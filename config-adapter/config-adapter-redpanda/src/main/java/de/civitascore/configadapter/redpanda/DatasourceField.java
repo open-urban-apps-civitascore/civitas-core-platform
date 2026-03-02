@@ -83,11 +83,10 @@ enum DatasourceField {
   }
 
   /** Reads a {@code List<String>}, returning empty list if absent or wrong type. */
-  @SuppressWarnings("unchecked")
   List<String> asList(Map<String, Object> map) {
     for (String key : keys) {
       Object v = map.get(key);
-      if (v instanceof List<?> l) return (List<String>) l;
+      if (v instanceof List<?> l) return l.stream().map(String::valueOf).toList();
     }
     return List.of();
   }
@@ -106,6 +105,33 @@ enum DatasourceField {
     for (String key : keys) {
       Object v = map.get(key);
       if (Boolean.TRUE.equals(v)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Reads a {@code boolean} flag supporting both flat-key and nested-map formats. For example,
+   * {@code TLS_ENABLED} (key {@code "tls.enabled"}) matches both:
+   *
+   * <ul>
+   *   <li>Flat: {@code {"tls.enabled": true}}
+   *   <li>Nested: {@code {"tls": {"enabled": true}}}
+   * </ul>
+   */
+  @SuppressWarnings("unchecked")
+  boolean asBooleanNested(Map<String, Object> map) {
+    if (asBoolean(map)) return true;
+    for (String key : keys) {
+      int dot = key.indexOf('.');
+      if (dot > 0) {
+        String parent = key.substring(0, dot);
+        String child = key.substring(dot + 1);
+        Object nested = map.get(parent);
+        if (nested instanceof Map<?, ?> m) {
+          Object v = ((Map<String, Object>) m).get(child);
+          if (Boolean.TRUE.equals(v)) return true;
+        }
+      }
     }
     return false;
   }
