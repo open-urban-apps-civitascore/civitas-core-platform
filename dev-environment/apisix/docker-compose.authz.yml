@@ -35,7 +35,7 @@ services:
 
   # OPA - Policy Decision Point
   opa:
-    image: openpolicyagent/opa:1.4.2-static
+    image: openpolicyagent/opa:1.14.0-static
     container_name: civitas-opa
     restart: always
     command:

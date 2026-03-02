@@ -80,4 +80,7 @@ is_resource_endpoint if {
 	resource_id
 }
 
-# No collection endpoints — FROST is always accessed via dataset ID
+# Collection endpoint if marked in data (currently none — FROST is always dataset-scoped).
+is_collection_endpoint if {
+	restmapper.is_collection_pattern(path_pattern, endpoints)
+}
