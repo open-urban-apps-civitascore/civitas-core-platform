@@ -1,6 +1,6 @@
 {
   "_comment": "Portal Backend API permission mappings. Owner: Team 2",
-  "_version": "1.1.0",
+  "_version": "1.0.0",
   "_backend_id": "portal-backend",
 
   "endpoints": {
