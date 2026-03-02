@@ -118,8 +118,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const updateVersion = useUpdateDatastructureVersion(datastructureId)
   const updatePublishedVersion = useUpdateDatastructureVersionPublished(datastructureId)
   const createVersion = useCreateDatastructureVersion(datastructureId)
-  const publishVersion = usePublishDatastructureVersion(datastructureId, version?.id || '')
-  const unpublishVersion = useUnpublishDatastructureVersion(datastructureId, version?.id || '')
+  const publishVersion = usePublishDatastructureVersion(datastructureId)
+  const unpublishVersion = useUnpublishDatastructureVersion(datastructureId)
 
   const isLoading =
     updateVersion.isPending || createVersion.isPending || publishVersion.isPending || unpublishVersion.isPending
@@ -227,7 +227,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }, [versionWatch, modelWatch])
 
   const handleStatusUpdate = async (
-    mutationFn: UseMutationResult<ApiServiceResponse<DatastructureVersion>, unknown, void, unknown>,
+    mutationFn: UseMutationResult<ApiServiceResponse<DatastructureVersion>, unknown, void, unknown>, versionId: string
   ) => {
     try {
       mutationFn.mutateAsync()
@@ -246,7 +246,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         toast.success(t('messages.createSuccess'))
         if (shouldPublish) {
           try {
-            await handleStatusUpdate(publishVersion)
+            await handleStatusUpdate(publishVersion, data.id)
           } catch (error) {
             console.error(error)
           }
@@ -264,7 +264,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const handleUpdateValues = async (values: DatastructureVersionFormData) => {
     try {
-      if (statusWatch === STATUS_TYPES.AVAILABLE) await updatePublishedVersion.mutateAsync({ ...values, id: values.id })
+      if (initialFormValues.current.dataStructureVersionStatus === STATUS_TYPES.AVAILABLE) await updatePublishedVersion.mutateAsync({ ...values, id: values.id })
       else await updateVersion.mutateAsync({ ...values, id: values.id })
       toast.success(t('messages.updateSuccess'))
     } catch (error) {
@@ -289,10 +289,10 @@ export const VersionOverview = (props: VersionOverviewProps) => {
       if (shouldUpdateValues) await handleUpdateValues(parsedValues)
 
       if (shouldPublish) {
-        await handleStatusUpdate(publishVersion)
+        await handleStatusUpdate(publishVersion, parsedValues.id)
       }
       if (shouldUnpublish) {
-        await handleStatusUpdate(unpublishVersion)
+        await handleStatusUpdate(unpublishVersion, parsedValues.id)
       }
       router.refresh()
     } catch (error) {
