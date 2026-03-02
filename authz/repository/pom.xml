@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.7</version>
+        <version>3.5.11</version>
         <relativePath/>
     </parent>
 
@@ -22,6 +22,7 @@
         <testcontainers.version>1.21.0</testcontainers.version>
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <portal-model.version>1.0.0-SNAPSHOT</portal-model.version>
+        <assertj.version>3.27.7</assertj.version>
     </properties>
 
     <dependencyManagement>
@@ -32,6 +33,11 @@
                 <version>${testcontainers.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>1.26.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
