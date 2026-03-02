@@ -17,7 +17,14 @@ interface UmlModelerProps {
 }
 
 export const UmlModeler = (props: UmlModelerProps) => {
-  const { className, isReadOnly = false, isMultiSessionMode = true, modelSessionManager, canExportXmi = true, canImportXmi = true } = props
+  const {
+    className,
+    isReadOnly = false,
+    isMultiSessionMode = true,
+    modelSessionManager,
+    canExportXmi = true,
+    canImportXmi = true,
+  } = props
   return (
     <div className={cn('flex h-full w-full flex-1 flex-col gap-4 p-4', className)}>
       <div className="h-full w-full rounded-xl border bg-background overflow-hidden">
