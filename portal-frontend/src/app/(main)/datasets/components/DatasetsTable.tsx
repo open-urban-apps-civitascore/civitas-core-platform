@@ -97,8 +97,15 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
     columnHelper.accessor('modifiedAt', {
       header: t('tableHeaders.lastUpdated'),
       cell: info => {
-        const yesterday = new Date().getDate() - 1
-        const isModifiedAtYesterday = new Date(info.getValue()).getDate() === yesterday
+        const now = new Date()
+        const yesterday = new Date(now)
+        yesterday.setDate(yesterday.getDate() - 1)
+        yesterday.setHours(0, 0, 0, 0)
+
+        const modifiedDate = new Date(info.getValue())
+        modifiedDate.setHours(0, 0, 0, 0)
+
+        const isModifiedAtYesterday = modifiedDate.getTime() === yesterday.getTime()
         return isModifiedAtYesterday ? t('tableValues.yesterday') : formatDate(info.getValue(), locale)
       },
       meta: {
