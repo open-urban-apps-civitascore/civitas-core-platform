@@ -1,10 +1,10 @@
 import { FileQuestion, LucideProps, SquareMenu, UserCog } from 'lucide-react'
-import { ForwardRefExoticComponent, ReactNode, RefAttributes } from 'react'
+import { ForwardRefExoticComponent, RefAttributes } from 'react'
 
 export interface NavItem {
   title: string
   url: string
-  icon?: ReactNode | ForwardRefExoticComponent<Omit<LucideProps, 'ref'> & RefAttributes<SVGSVGElement>>
+  icon?: ForwardRefExoticComponent<Omit<LucideProps, 'ref'> & RefAttributes<SVGSVGElement>>
   isActive?: boolean
   external?: boolean
   items?: NavItem[]
