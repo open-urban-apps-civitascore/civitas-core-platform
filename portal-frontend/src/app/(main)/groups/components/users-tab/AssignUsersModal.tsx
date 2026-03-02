@@ -21,7 +21,7 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Item2 } from '@/types/common'
+import { ItemType } from '@/types/common'
 import { ListUser } from '@/types/users'
 import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
 import { mapListUsers } from '@/utils/users'
@@ -29,7 +29,7 @@ import { mapListUsers } from '@/utils/users'
 export type UserSelection = { selectAll: boolean; selectedIds: string[]; excludedIds: string[] }
 
 interface AssignUsersModalProps extends DialogProps {
-  originalUsers: Item2[]
+  originalUsers: ItemType[]
   groupTitle: string
   onUpdateUsers: (userSelection: RowSelectionState) => void
   isUpdating?: boolean

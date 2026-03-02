@@ -7,7 +7,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { useGetDatastructure } from '@/app/services/api/datastructures/clientRequests'
 import {
   useCreateDatastructureVersion,
   useUpdateDatastructureVersion,
@@ -72,7 +71,7 @@ interface VersionOverviewProps {
   version: DatastructureVersion | null
   isCreateMode: boolean
   testId: string
-  existingVersions: string[]
+  existingVersions: { id: string; version: string }[]
 }
 
 export const VersionOverview = (props: VersionOverviewProps) => {
@@ -109,15 +108,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
 
-  const {
-    data: datastructure,
-    isLoading: isLoadingDatastructure,
-    error: datastructureError,
-  } = useGetDatastructure({ id: datastructureId })
-
   const updateVersion = useUpdateDatastructureVersion(datastructureId)
   const createVersion = useCreateDatastructureVersion(datastructureId)
-  const isLoading = updateVersion.isPending || isLoadingDatastructure
+  const isLoading = updateVersion.isPending
 
   const form = useForm<DatastructureVersionFormData>({
     resolver: zodResolver(DatastructureVersionFormDraftSchema),
@@ -139,7 +132,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const isDiagramDirty = modelSessionManager.activeSession?.isDirty
 
   const versionAlreadyExistsError = useMemo(() => {
-    const versionExists = datastructure?.data.dataStructureVersions.find(
+    const versionExists = existingVersions.find(
       version => version.version === versionWatch.trim() && version.id !== initialFormValues.current.id,
     )
     if (versionExists) {
@@ -147,7 +140,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     } else {
       return undefined
     }
-  }, [datastructure, versionWatch])
+  }, [existingVersions, versionWatch, t])
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {

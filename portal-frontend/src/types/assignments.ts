@@ -10,8 +10,6 @@ export const ASSIGNMENT_SCOPE_TYPES = {
 
 export const AssignmentScopeEnum = enumFromConst(ASSIGNMENT_SCOPE_TYPES)
 
-export type AssignmentScope = (typeof ASSIGNMENT_SCOPE_TYPES)[keyof typeof ASSIGNMENT_SCOPE_TYPES]
-
 export const DatastructureAssignmentApiResponseSchema = z.object({
   id: z.string(),
   createdAt: z.string(),
@@ -21,11 +19,7 @@ export const DatastructureAssignmentApiResponseSchema = z.object({
   scopeType: AssignmentScopeEnum,
 })
 
-export type DatastructureAssignmentResponse = z.infer<typeof DatastructureAssignmentApiResponseSchema>
-
 export const AssignmentSchema = z.object({
   groupId: z.string(),
   roleId: z.string(),
 })
-
-export type DatastructureAssignment = z.infer<typeof AssignmentSchema>

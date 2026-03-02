@@ -48,6 +48,7 @@
       "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden"
     },
     "items": {
+      "data": "Daten",
       "users": "Users",
       "user": "User",
       "groups": "Gruppen",
@@ -58,7 +59,9 @@
       "permissions": "Berechtigungen",
       "datasources": "Datenquellen",
       "datasource": "Datenquelle",
-      "datastructures": "Datenstrukturen"
+      "datastructures": "Datenstrukturen",
+      "datastructure": "Datenstruktur",
+      "datastructureVersion": "Version"
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",

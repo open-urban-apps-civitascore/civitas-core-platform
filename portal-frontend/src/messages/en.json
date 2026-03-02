@@ -49,6 +49,7 @@
       "formInvalid": "All required information must be provided correctly."
     },
     "items": {
+      "data": "data",
       "users": "Users",
       "user": "User",
       "groups": "Groups",
@@ -59,7 +60,9 @@
       "permissions": "Permissions",
       "datasources": "Datasources",
       "datasource": "Datasource",
-      "datastructures": "Datastructures"
+      "datastructures": "Datastructures",
+      "datastructure": "Datastructure",
+      "datastructureVersion": "Version"
     },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
