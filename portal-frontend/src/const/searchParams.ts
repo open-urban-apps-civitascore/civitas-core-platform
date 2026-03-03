@@ -1,8 +1,7 @@
 export const QUERY_PARAMS = {
-  pageIndex: '_page',
-  pageSize: '_limit',
-  sortingId: '_sort',
-  order: '_order',
+  pageIndex: 'page',
+  pageSize: 'size',
+  sort: 'sort',
   search: 'q',
   tabValue: '_tab',
   subTabValue: '_subtab',
