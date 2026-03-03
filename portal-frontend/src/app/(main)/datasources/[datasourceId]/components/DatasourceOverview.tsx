@@ -65,8 +65,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     id: datasource.id,
     name: datasource.name ?? '',
     description: datasource.description ?? '',
-    status: datasource.status ?? STATUS_TYPES.DRAFT,
-    connector: ConnectorApiToFormSchema.safeParse(datasource.connector).data ?? null,
+    dataSourceStatus: datasource.dataSourceStatus ?? STATUS_TYPES.DRAFT,
+    connector: ConnectorApiToFormSchema.safeParse(datasource.connectorType).data ?? null,
   }
 
   const router = useRouter()
@@ -90,7 +90,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }, [datasource])
 
   const formValues = useWatch({ control: form.control })
-  const statusWatch = form.watch('status')
+  const statusWatch = form.watch('dataSourceStatus')
   const nameWatch = form.watch('name')
   const descriptionWatch = form.watch('description')
   const connectorTypeWatch = form.watch('connector.type')
@@ -113,7 +113,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   // Auto-revert status to draft when required fields become empty
   const revalidateDraftMode = () => {
     if (statusWatch === STATUS_TYPES.AVAILABLE && !canSetAvailable) {
-      form.setValue('status', STATUS_TYPES.DRAFT, { shouldDirty: true })
+      form.setValue('dataSourceStatus', STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
   }
@@ -152,7 +152,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const disabledTabs: DatasourceTab[] = ['dataStructure', 'accessPermissions']
 
   const handleStatusChange = (newStatus: Status) => {
-    form.setValue('status', newStatus, { shouldDirty: true })
+    form.setValue('dataSourceStatus', newStatus, { shouldDirty: true })
   }
 
   const submitDatasource = (onSuccess?: () => void) => {

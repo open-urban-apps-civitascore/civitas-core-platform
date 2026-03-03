@@ -15,7 +15,7 @@ vi.mock('next-intl', () => ({
 }))
 vi.mock('./connectorSources', () => ({
   CONNECTORS: {
-    mqtt: {
+    MQTT: {
       label: 'MQTT',
       properties: [
         {
@@ -49,7 +49,7 @@ vi.mock('./connectorSources', () => ({
         },
       ],
     },
-    sql: {
+    SQL: {
       label: 'SQL',
       properties: [
         {
@@ -91,10 +91,9 @@ const defaultValues: DatasourceFormDraft = {
   id: '1',
   name: '',
   description: '',
-  tags: [],
-  status: 'draft',
+  dataSourceStatus: 'DRAFT',
   connector: {
-    type: 'mqtt',
+    type: 'MQTT',
     config: {
       urls: '',
       topics: '',

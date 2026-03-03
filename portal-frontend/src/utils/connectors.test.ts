@@ -5,13 +5,13 @@ import { getConnectorDefaults, getConnectorFormData } from './connectors'
 
 vi.mock('@/app/(main)/datasources/[datasourceId]/components/connector-tab/connectorSources', () => ({
   CONNECTORS: {
-    mqtt: {
+    MQTT: {
       properties: [
         { key: 'urls', defaultValue: '' },
         { key: 'topics', defaultValue: '' },
       ],
     },
-    sql: {
+    SQL: {
       properties: [
         { key: 'columns', defaultValue: '' },
         { key: 'init_files', defaultValue: '' },
@@ -66,10 +66,10 @@ describe('getConnectorFormData', () => {
   })
 
   it('creates new connector when no existing data', () => {
-    const result = getConnectorFormData('mqtt', null)
+    const result = getConnectorFormData(CONNECTOR_TYPES.MQTT, null)
 
     expect(result).toEqual({
-      type: 'mqtt',
+      type: CONNECTOR_TYPES.MQTT,
       config: {
         urls: '',
         topics: '',

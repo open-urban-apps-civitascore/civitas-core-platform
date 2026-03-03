@@ -1,3 +1,5 @@
+import z from 'zod'
+
 export type Assignment = {
   id: string
   createdAt: string
@@ -11,3 +13,8 @@ export type Assignment = {
 export type CreateAssignmentData = { groupId: string; roleId: string }
 
 export type UpdateAssignmentData = CreateAssignmentData & { id: string }
+
+export const AssignmentScopedInputSchema = z.object({
+  groupId: z.string().trim().min(1, 'common.errors.required'),
+  roleId: z.string().trim().min(1, 'common.errors.required'),
+})
