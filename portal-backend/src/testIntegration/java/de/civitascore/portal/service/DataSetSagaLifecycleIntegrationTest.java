@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.github.dockerjava.api.model.ContainerNetwork;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.SagaInfraVerifier;
 import de.civitascore.portal.config.SagaOrchestratorTestHelper;
@@ -138,8 +139,17 @@ class DataSetSagaLifecycleIntegrationTest extends BaseKeycloakIntegrationTest {
     mosquitto.start();
     redpandaConnect.start();
 
+    // Use the sagaNetwork gateway IP so FROST is reachable from both the host (test process)
+    // and containers on sagaNetwork (Redpanda Connect). localhost would resolve to the
+    // container's own loopback inside Docker, making FROST unreachable from there.
+    String sagaGatewayIp =
+        frost.getContainerInfo().getNetworkSettings().getNetworks().values().stream()
+            .filter(net -> sagaNetwork.getId().equals(net.getNetworkID()))
+            .findFirst()
+            .map(ContainerNetwork::getGateway)
+            .orElse(frost.getHost());
     frostExternalUrl =
-        "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
+        "http://" + sagaGatewayIp + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
     redpandaExternalUrl =
         "http://" + redpandaConnect.getHost() + ":" + redpandaConnect.getMappedPort(4195);
 
