@@ -1,3 +1,6 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+
+import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
@@ -38,3 +41,20 @@ export const useUpdateDatasource = () =>
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating datasource',
   })
+
+export const useDeleteDatasource = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiRequest({
+        method: 'DELETE',
+        endpoint: `/${key}/${id}`,
+        headers: { 'x-api-request': 'true' },
+        errorMessage: 'An error occurred while deleting datasource',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [key] })
+    },
+  })
+}

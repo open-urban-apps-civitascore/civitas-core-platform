@@ -431,6 +431,10 @@
       "DRAFT": "Entwurf",
       "AVAILABLE": "Verfügbar"
     },
+    "deleteModal": {
+      "title": "Datenquelle wirklich löschen?",
+      "description": "Diese Aktion löscht die Datenquelle endgültig. Diese Aktion kann nicht rückgängig gemacht werden."
+    },
     "connection": {
       "active": "aktiv",
       "inactive": "inaktiv",

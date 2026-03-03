@@ -432,6 +432,10 @@
       "DRAFT": "Draft",
       "AVAILABLE": "Available"
     },
+    "deleteModal": {
+      "title": "Really delete data source?",
+      "description": "This action will permanently delete the data source. This action cannot be undone."
+    },
     "connection": {
       "active": "active",
       "inactive": "inactive",
