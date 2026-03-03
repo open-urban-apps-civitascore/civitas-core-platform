@@ -1,5 +1,7 @@
 package de.civitascore.portal.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.model.embedded.DataSetStatus;
@@ -33,19 +35,21 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   private final ScopedAssignmentBuilderService assignmentBuilderService;
   private final DistributionService distributionService;
+  private final ObjectMapper objectMapper;
 
   @Autowired(required = false)
   private DataSetSagaPublisher sagaPublisher;
 
   public DataSetService(
-      DataSetRepository dataSetRepository,
-      DataSetMapper dataSetMapper,
-      ScopedAssignmentBuilderService assignmentBuilderService,
-      DistributionService distributionService) {
+          DataSetRepository dataSetRepository,
+          DataSetMapper dataSetMapper,
+          ScopedAssignmentBuilderService assignmentBuilderService,
+          DistributionService distributionService, ObjectMapper objectMapper) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
     this.assignmentBuilderService = assignmentBuilderService;
     this.distributionService = distributionService;
+      this.objectMapper = objectMapper;
   }
 
   @Override
@@ -99,9 +103,19 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
   @Override
   protected DataSetInputDTO preProcessUpdateInput(DataSetInputDTO input, DataSet existingEntity) {
-    if (StringUtils.isBlank(input.getName())) {
-      throw new InvalidInputException(
-          "name", existingEntity.getId(), "Name cannot be null or blank");
+    try {
+      String inputJson = objectMapper.writeValueAsString(input);
+      JsonNode jsonNode = objectMapper.readTree(inputJson);
+
+      if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
+        throw new InvalidInputException(
+                "name", existingEntity.getId(), "Name cannot be null or blank");
+      }
+
+    } catch (InvalidInputException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to process update input", e);
     }
     return super.preProcessUpdateInput(input, existingEntity);
   }
