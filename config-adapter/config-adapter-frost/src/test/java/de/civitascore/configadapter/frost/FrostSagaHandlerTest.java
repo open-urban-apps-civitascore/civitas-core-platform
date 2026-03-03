@@ -46,8 +46,8 @@ class FrostSagaHandlerTest {
   }
 
   @Test
-  @DisplayName("initialize throws when API key is missing")
-  void shouldThrowWhenApiKeyMissing() {
+  @DisplayName("initialize throws when no auth is configured")
+  void shouldThrowWhenNoAuthIsConfigured() {
     try (FrostSagaHandler h = new FrostSagaHandler()) {
       AdapterConfig config = mock(AdapterConfig.class);
       when(config.getProperty("frost.url", "http://localhost:8080/v1.1"))
@@ -55,6 +55,23 @@ class FrostSagaHandlerTest {
       when(config.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
 
       assertThrows(IllegalArgumentException.class, () -> h.initialize(config));
+    }
+  }
+
+  @Test
+  @DisplayName("initialize succeeds with basic auth and no API key")
+  void shouldInitializeWithBasicAuthAndNoApiKey() {
+    try (FrostSagaHandler h = new FrostSagaHandler()) {
+      AdapterConfig config = mock(AdapterConfig.class);
+      when(config.getProperty("frost.url", "http://localhost:8080/v1.1"))
+          .thenReturn("http://frost:8080/v1.1");
+      when(config.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
+      when(config.getProperty("frost.basic.auth.username")).thenReturn("admin");
+      when(config.getProperty("frost.basic.auth.password")).thenReturn("secret");
+
+      h.initialize(config);
+
+      assertEquals("frost", h.adapter());
     }
   }
 
