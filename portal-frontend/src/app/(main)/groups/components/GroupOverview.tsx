@@ -20,7 +20,7 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { Group, GroupBaseFormData, GroupBaseFormDataSchema, GroupTab } from '@/types/groups'
 import { mapGroupApiToFormData } from '@/utils/groups'
 
-import { BaseInfoTab } from './BaseInfoTab'
+import { BaseInfoTab } from './base-info-tab/BaseInfoTab'
 import { RolesTab } from './roles-tab/RolesTab'
 import { UsersTab } from './users-tab/UsersTab'
 
@@ -44,7 +44,7 @@ interface GroupDetailsProps {
   groupData: Group
   isCreateMode: boolean
 }
-export const GroupDetails = (props: GroupDetailsProps) => {
+export const GroupOverview = (props: GroupDetailsProps) => {
   const { title, groupData, isCreateMode } = props
   const params = useSearchParams()
   const mode = params.get('mode')

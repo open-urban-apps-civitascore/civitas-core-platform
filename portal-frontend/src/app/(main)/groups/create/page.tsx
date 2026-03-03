@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server'
 
 import { Group } from '@/types/groups'
 
-import { GroupDetails } from '../components/GroupDetails'
+import { GroupOverview } from '../components/GroupOverview'
 
 const defaultGroup: Group = {
   id: '',
@@ -18,7 +18,7 @@ const defaultGroup: Group = {
 const CreateGroupPage = async () => {
   const t = await getTranslations('groups')
 
-  return <GroupDetails title={t('createGroup')} groupData={defaultGroup} isCreateMode={true} />
+  return <GroupOverview title={t('createGroup')} groupData={defaultGroup} isCreateMode={true} />
 }
 
 export default CreateGroupPage

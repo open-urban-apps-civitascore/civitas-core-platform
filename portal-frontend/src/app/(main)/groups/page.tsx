@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
 
-import { GroupsTable } from './components/GroupsTable'
+import { GroupsTable } from './components/groups-list/GroupsTable'
 
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {
