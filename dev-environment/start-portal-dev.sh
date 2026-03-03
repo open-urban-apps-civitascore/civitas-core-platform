@@ -542,26 +542,6 @@ fi
 echo
 
 # ---- Phase 4: Application Build & Start -----------------------------
-# ---- Terminal Helper -----------------------------------------------
-
-start_in_new_terminal() {
-    local title="$1"
-    local script="$2"
-    if [ "$OS_TYPE" = "Darwin" ]; then
-        osascript -e "tell application \"Terminal\" to do script \"bash '$script'\"" 2>/dev/null && return 0
-        echo "Could not open Terminal.app. Starting '$title' in background..."
-        bash "$script" &
-    else
-        gnome-terminal --title="$title" -- bash "$script" 2>/dev/null || \
-        xterm -T "$title" -e "bash '$script'" 2>/dev/null || \
-        {
-            echo "Could not open new terminal. Starting '$title' in background..."
-            bash "$script" &
-        }
-    fi
-}
-
-# ---- Backend Services Selection -----------------------------------
 
 # Kill any leftover processes from a previous run to avoid port conflicts.
 # Without this, the health check may hit an old backend and falsely report success.
@@ -788,7 +768,7 @@ if [ "$frontend_option" = "1" ]; then
     cd "$SCRIPT_DIR/../portal-frontend"
 
     # Install dependencies if node_modules doesn't exist
-    if [ ! -d "node_modules" ]; then                                                                                                                                                                                
+    if [ ! -d "node_modules" ]; then
         echo "Installing dependencies (pnpm install)..."
         pnpm install
     fi
