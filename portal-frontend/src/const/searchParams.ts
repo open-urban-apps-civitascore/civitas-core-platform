@@ -1,11 +1,13 @@
 export const QUERY_PARAMS = {
   pageIndex: 'page',
-  pageSize: 'pageSize',
-  sortingId: 'sort',
+  pageSize: 'size',
+  sort: 'sort',
   search: 'q',
   tabValue: 'tab',
   subTabValue: 'subtab',
-}
+} as const
+
+export type QueryParams = (typeof QUERY_PARAMS)[keyof typeof QUERY_PARAMS]
 
 export const QUERY_PARAMS_JSON_SERVER = {
   pageIndex: '_page',

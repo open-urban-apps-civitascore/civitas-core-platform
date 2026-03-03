@@ -46,7 +46,7 @@ describe('useQueryParams', () => {
 
   it('should parse sorting params correctly', () => {
     mockSearchParams = new URLSearchParams({
-      [QUERY_PARAMS.sortingId]: 'name',
+      [QUERY_PARAMS.sort]: 'name',
       [QUERY_PARAMS.order]: 'desc',
     })
     const { result } = renderHook(() => useQueryParams())
@@ -62,7 +62,7 @@ describe('useQueryParams', () => {
     })
 
     expect(push).toHaveBeenCalledWith(
-      `/test?${new URLSearchParams({ [QUERY_PARAMS.sortingId]: 'age', [QUERY_PARAMS.order]: 'asc' }).toString()}`,
+      `/test?${new URLSearchParams({ [QUERY_PARAMS.sort]: 'age', [QUERY_PARAMS.order]: 'asc' }).toString()}`,
     )
   })
 
@@ -106,7 +106,7 @@ describe('useQueryParams', () => {
     mockSearchParams = new URLSearchParams({
       [QUERY_PARAMS.pageIndex]: '1',
       [QUERY_PARAMS.pageSize]: '25',
-      [QUERY_PARAMS.sortingId]: 'title',
+      [QUERY_PARAMS.sort]: 'title',
       [QUERY_PARAMS.order]: 'asc',
       [QUERY_PARAMS.search]: 'foo',
     })
@@ -115,7 +115,7 @@ describe('useQueryParams', () => {
     const params = result.current.getApiRequestParamsByUrl()
     expect(params.get(QUERY_PARAMS.pageIndex)).toBe('1')
     expect(params.get(QUERY_PARAMS.pageSize)).toBe('25')
-    expect(params.get(QUERY_PARAMS.sortingId)).toBe('title')
+    expect(params.get(QUERY_PARAMS.sort)).toBe('title')
     expect(params.get(QUERY_PARAMS.order)).toBe('asc')
     expect(params.get(QUERY_PARAMS.search)).toBe('foo')
   })

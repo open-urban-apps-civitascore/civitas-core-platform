@@ -29,7 +29,7 @@ export const useQueryParams = () => {
 
   const pageSize = useMemo(() => Number(searchParams.get(QUERY_PARAMS.pageSize) ?? 10), [searchParams])
   const pageIndex = useMemo(
-    () => (Number(searchParams.get(QUERY_PARAMS.pageIndex)) ? Number(searchParams.get(QUERY_PARAMS.pageIndex)) - 1 : 0),
+    () => (Number(searchParams.get(QUERY_PARAMS.pageIndex)) ? Number(searchParams.get(QUERY_PARAMS.pageIndex)) : 0),
     [searchParams],
   )
   const sorting: SortingState = useMemo(() => getSortingState(searchParams), [searchParams])
@@ -81,7 +81,7 @@ export const useQueryParams = () => {
     (newPagination: PaginationState) => {
       const params = new URLSearchParams(searchParams)
       if (newPagination) {
-        params.set(QUERY_PARAMS.pageIndex, String(newPagination.pageIndex + 1))
+        params.set(QUERY_PARAMS.pageIndex, String(newPagination.pageIndex))
         params.set(QUERY_PARAMS.pageSize, String(newPagination.pageSize))
       }
       router.push(`${pathname}?${params.toString()}`)
@@ -119,7 +119,7 @@ export const useQueryParams = () => {
   const getApiRequestParams = useCallback((params: ApiRequestParams): URLSearchParams => {
     const apiParams = new URLSearchParams()
 
-    apiParams.set(QUERY_PARAMS.pageIndex, String(params.pageIndex + 1))
+    apiParams.set(QUERY_PARAMS.pageIndex, String(params.pageIndex))
     apiParams.set(QUERY_PARAMS.pageSize, String(params.pageSize))
 
     if (params.sorting && params.sorting.length > 0) {

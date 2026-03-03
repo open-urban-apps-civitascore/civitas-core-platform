@@ -1,11 +1,7 @@
+import { QUERY_PARAMS, QueryParams } from '@/const/searchParams'
+
 /* eslint-disable @typescript-eslint/naming-convention */
-export type ApiRequestParams = {
-  page?: string
-  pageSize?: string
-  sort?: string | string[]
-  order?: string
-  q?: string
-}
+export type ApiRequestParams = Record<QueryParams, string | undefined>
 
 export type JsonServerRequestParams = {
   _page?: string
@@ -17,18 +13,18 @@ export type JsonServerRequestParams = {
 
 export const getApiRequestParams = (params: ApiRequestParams) => {
   const pageIndex = parseInt(params.page || '0')
-  const pageSize = parseInt(params.pageSize || '10')
+  const pageSize = parseInt(params.size || '10')
   const sort = params.sort ? [params.sort].flatMap(entry => entry) : []
   const search = params.q || ''
 
   const apiParams = new URLSearchParams()
-  apiParams.set('page', String(pageIndex))
-  apiParams.set('size', String(pageSize))
+  apiParams.set(QUERY_PARAMS.pageIndex, String(pageIndex))
+  apiParams.set(QUERY_PARAMS.pageSize, String(pageSize))
 
-  sort.forEach(s => apiParams.append('sort', s))
+  sort.forEach(s => apiParams.append(QUERY_PARAMS.sort, s))
 
   if (search) {
-    apiParams.set('q', search)
+    apiParams.set(QUERY_PARAMS.search, search)
   }
 
   return { apiParams, pageIndex, pageSize, sort, search }

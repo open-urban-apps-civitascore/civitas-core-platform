@@ -4,10 +4,12 @@ import {
   getCoreRowModel,
   getExpandedRowModel,
   getSortedRowModel,
+  Row,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
@@ -17,6 +19,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface GroupsTableProps extends TableProps<Group> {
   groups: Group[]
+  onDeleteGroupClick: (groupId: string) => void
 }
 
 export const GroupsTable = (props: GroupsTableProps) => {
@@ -31,9 +34,11 @@ export const GroupsTable = (props: GroupsTableProps) => {
     onRowClick,
     onPaginationChange,
     onSortingChange,
+    onDeleteGroupClick,
     isLoading,
   } = props
   const t = useTranslations('groups')
+  const tCommon = useTranslations('common')
   const columnHelper = createColumnHelper<Group>()
 
   const columns = [
@@ -76,6 +81,24 @@ export const GroupsTable = (props: GroupsTableProps) => {
         },
       },
     }),
+    {
+      id: 'actions',
+      cell: ({ row }: { row: Row<Group> }) => (
+        <TableDropdownMenu
+          menuItems={[
+            {
+              label: tCommon('actions.removeItem', { item: tCommon('items.group') }),
+              onClick: () => onDeleteGroupClick(row.original.id),
+            },
+          ]}
+        />
+      ),
+      meta: {
+        style: {
+          width: '50px',
+        },
+      },
+    },
   ]
 
   const table = useReactTable({
