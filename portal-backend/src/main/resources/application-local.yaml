@@ -35,5 +35,5 @@ kafka:
 
 model-atlas:
   baseUrl: "http://localhost:8086"
-  scope: default
+  scope: civitas
   stage: draft
