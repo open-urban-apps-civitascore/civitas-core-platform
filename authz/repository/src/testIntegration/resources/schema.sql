@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS permissions
     created_by      UUID,
     modified_by     UUID,
     permission_type VARCHAR(255)                NOT NULL,
-    category        VARCHAR(255)                NOT NULL DEFAULT 'GENERAL',
+    category        VARCHAR(255)                NOT NULL DEFAULT 'DATA',
+    source          VARCHAR(255)                NOT NULL DEFAULT 'INTERNAL',
     CONSTRAINT pk_permissions PRIMARY KEY (id)
 );
 

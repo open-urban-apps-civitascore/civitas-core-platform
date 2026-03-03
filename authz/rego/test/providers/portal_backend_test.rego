@@ -164,23 +164,24 @@ test_endpoints_contains_datastructures_id if {
 }
 
 # =============================================================================
-# DATASPACES AND CATALOGS TESTS (null-permission endpoints)
+# DATASPACES AND CATALOGS — removed from v2.0 (see #989)
+# OPA should deny these as unknown_endpoint.
 # =============================================================================
 
-test_endpoints_contains_dataspaces if {
-	portal_backend.endpoints["/v2/dataspaces"]
+test_endpoints_does_not_contain_dataspaces if {
+	not portal_backend.endpoints["/v2/dataspaces"]
 }
 
-test_endpoints_contains_dataspaces_id if {
-	portal_backend.endpoints["/v2/dataspaces/{id}"]
+test_endpoints_does_not_contain_dataspaces_id if {
+	not portal_backend.endpoints["/v2/dataspaces/{id}"]
 }
 
-test_endpoints_contains_catalogs if {
-	portal_backend.endpoints["/v2/catalogs"]
+test_endpoints_does_not_contain_catalogs if {
+	not portal_backend.endpoints["/v2/catalogs"]
 }
 
-test_endpoints_contains_catalogs_id if {
-	portal_backend.endpoints["/v2/catalogs/{id}"]
+test_endpoints_does_not_contain_catalogs_id if {
+	not portal_backend.endpoints["/v2/catalogs/{id}"]
 }
 
 # =============================================================================

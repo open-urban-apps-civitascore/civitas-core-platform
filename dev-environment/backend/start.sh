@@ -98,24 +98,26 @@ echo
 
 # ---- Build ---------------------------------------------------------
 
+DEV_VERSION="1.0.0-dev"
+
 echo "Building Config Adapter..."
 cd ../../config-adapter
-mvn clean install -DskipTests -Drevision=1.0.1
+mvn clean install -DskipTests -Drevision=$DEV_VERSION
 cd ../dev-environment/backend
 
 echo "Building Portal Model..."
 cd ../../portal-model
-mvn clean install -DskipTests -Drevision=1.0.0-SNAPSHOT
+mvn clean install -DskipTests -Drevision=$DEV_VERSION
 cd ../dev-environment/backend
 
 echo "Building Portal Backend..."
 cd ../../portal-backend
-mvn clean package -DskipTests -Dconfig-adapter.version=1.0.1
+mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION
 cd ../dev-environment/backend
 
 echo "Building AuthZ Repository..."
 cd ../../authz/repository
-mvn clean package -DskipTests
+mvn clean package -DskipTests -Dportal-model.version=$DEV_VERSION
 cd ../../dev-environment/backend
 
 echo
