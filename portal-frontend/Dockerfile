@@ -7,6 +7,7 @@ RUN pnpm install --frozen-lockfile --prod
 
 # TO BE REMOVED. Part of JSON-Server below
 RUN pnpm add concurrently json-server
+RUN rm pnpm-lock.yaml
 
 FROM node:22-alpine
 WORKDIR /app
