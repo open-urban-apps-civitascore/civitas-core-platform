@@ -88,20 +88,10 @@ public class DataSetSagaPublisher {
     List<Map<String, Object>> datasources = new ArrayList<>();
 
     if (dataset.getPipelines() == null) {
-      log.warn("buildDatasourcesList: pipelines is null for dataset {}", dataset.getId());
       return datasources;
     }
 
-    log.info(
-        "buildDatasourcesList: dataset {} has {} pipelines",
-        dataset.getId(),
-        dataset.getPipelines().size());
-
     for (Pipeline pipeline : dataset.getPipelines()) {
-      log.info(
-          "buildDatasourcesList: pipeline {} dataSources={}",
-          pipeline.getId(),
-          pipeline.getDataSources());
       if (pipeline.getDataSources() == null) {
         continue;
       }
@@ -117,7 +107,6 @@ public class DataSetSagaPublisher {
       }
     }
 
-    log.info("buildDatasourcesList: returning {} datasources", datasources.size());
     return datasources;
   }
 
@@ -164,10 +153,12 @@ public class DataSetSagaPublisher {
   }
 
   /**
-   * Serializes and sends the saga trigger to Kafka synchronously (blocking). The blocking {@code
-   * .get()} ensures that if Kafka is unavailable, an exception is thrown before the calling
-   * {@code @Transactional} method returns, causing the transaction to roll back. This prevents the
-   * dual-write problem where the DB state is committed but the Kafka message is never delivered.
+   * Serializes and sends the saga trigger to Kafka synchronously (blocking). If Kafka rejects or
+   * times out, the exception propagates before {@code @Transactional} commits, rolling back the DB
+   * change. This guards against the "DB committed, Kafka missed" case. The inverse risk remains: if
+   * Kafka accepts the message but the DB commit subsequently fails, the trigger is already in
+   * flight with no corresponding DB state. Eliminating that would require
+   * {@code @TransactionalEventListener(AFTER_COMMIT)}, which is a larger structural change.
    */
   private void sendTrigger(String datasetId, Map<String, Object> trigger) {
     String sagaType = (String) trigger.get("sagaType");
