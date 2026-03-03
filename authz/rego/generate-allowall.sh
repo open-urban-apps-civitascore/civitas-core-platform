@@ -33,13 +33,15 @@ for backend_dir in "$BACKENDS_DIR"/*/; do
         "_comment": "\(._backend_id) — ALLOW-ALL mode. All endpoints null-permission. DEV-ONLY.",
         "_version": ._version,
         "_backend_id": ._backend_id,
-        "endpoints": (.endpoints | to_entries | map({
-            key: .key,
-            value: (.value | to_entries
-                | map(select(.key | startswith("_") | not))
-                | map(.value = null)
-                | from_entries)
-        }) | from_entries)
+        "endpoints": (.endpoints | to_entries
+            | map(select(.value | type == "object"))
+            | map({
+                key: .key,
+                value: (.value | to_entries
+                    | map(select(.key | startswith("_") | not))
+                    | map(.value = null)
+                    | from_entries)
+            }) | from_entries)
     }' "$src" > "$dest_dir/data.json"
 
     echo "Generated $dest_dir/data.json"
