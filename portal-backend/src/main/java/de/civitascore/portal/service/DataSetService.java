@@ -41,15 +41,16 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   private DataSetSagaPublisher sagaPublisher;
 
   public DataSetService(
-          DataSetRepository dataSetRepository,
-          DataSetMapper dataSetMapper,
-          ScopedAssignmentBuilderService assignmentBuilderService,
-          DistributionService distributionService, ObjectMapper objectMapper) {
+      DataSetRepository dataSetRepository,
+      DataSetMapper dataSetMapper,
+      ScopedAssignmentBuilderService assignmentBuilderService,
+      DistributionService distributionService,
+      ObjectMapper objectMapper) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
     this.assignmentBuilderService = assignmentBuilderService;
     this.distributionService = distributionService;
-      this.objectMapper = objectMapper;
+    this.objectMapper = objectMapper;
   }
 
   @Override
@@ -109,7 +110,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
 
       if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
         throw new InvalidInputException(
-                "name", existingEntity.getId(), "Name cannot be null or blank");
+            "name", existingEntity.getId(), "Name cannot be null or blank");
       }
 
     } catch (InvalidInputException e) {
