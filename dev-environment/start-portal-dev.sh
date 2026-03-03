@@ -423,6 +423,7 @@ echo "  Keycloak started"
 # Apply AuthZ mode configuration
 if [ "$authz_option" = "2" ]; then
     echo "  Configuring ALLOW-ALL mode (wildcard scope, null-permission data)"
+    bash "$SCRIPT_DIR/../authz/rego/generate-allowall.sh"
     export OPA_DATA_DIR="../../authz/rego/data/backends-allowall"
     export APISIX_CONFIG="./apisix_conf/apisix-allowall.yaml"
 else

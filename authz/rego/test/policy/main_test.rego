@@ -33,60 +33,84 @@ portal_request_no_auth(method, path) := {
 	"service": {"name": "portal-backend"},
 }
 
-# User context with TENANT-scoped permissions (for tenant-level resources)
-user_context_tenant_scoped(perms) := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Test Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Test Role",
-			"roleType": "SYSTEM",
-			"scopeType": "TENANT",
-			"scopeId": "tenant-1",
-			"permissions": perms,
-		}],
-	}],
-}
+# --- Permission-based access mocks ---
+mock_send_admin(_) := {"status_code": 200, "body": mock_http.user_with_permissions(["USER_READ", "USER_CREATE", "USER_DELETE"])}
+mock_send_reader(_) := {"status_code": 200, "body": mock_http.user_with_permissions(["USER_READ"])}
+mock_send_dataset_creator(_) := {"status_code": 200, "body": mock_http.user_with_permissions(["DATASET_CREATE"])}
+mock_send_datasource_updater(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASOURCE_UPDATE"], "DATASOURCE", "abc-123")}
+mock_send_all_read(_) := {"status_code": 200, "body": mock_http.user_with_permissions(["USER_READ", "DATASET_READ"])}
 
-# User context with permissions scoped to a specific resource (M5.1)
-user_context_with_scope(perms, scope_type, scope_id) := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Test Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Test Role",
-			"roleType": "DATA",
-			"scopeType": scope_type,
-			"scopeId": scope_id,
-			"permissions": perms,
-		}],
-	}],
-}
-
-# Mock http.send functions for TENANT-scoped resources (users, groups, roles, etc.)
-mock_send_admin(_) := {"status_code": 200, "body": user_context_tenant_scoped(["USER_READ", "USER_CREATE", "USER_DELETE"])}
-mock_send_reader(_) := {"status_code": 200, "body": user_context_tenant_scoped(["USER_READ"])}
-
-# Mock for collection endpoints (any scope works for collections)
-mock_send_dataset_creator(_) := {"status_code": 200, "body": user_context_tenant_scoped(["DATASET_CREATE"])}
-
-# Mock for DATASOURCE resource endpoint - must be scoped to the specific datasource ID
-mock_send_datasource_updater(_) := {"status_code": 200, "body": user_context_with_scope(["DATASOURCE_UPDATE"], "DATASOURCE", "abc-123")}
-
-# Mock for collection GET (any scope works)
-mock_send_all_read(_) := {"status_code": 200, "body": user_context_tenant_scoped(["USER_READ", "DATASET_READ"])}
-
+# --- Edge case mocks (minimal/malformed user contexts) ---
 mock_send_authenticated_no_groups(_) := {"status_code": 200, "body": {"userId": "123", "externalId": "keycloak-sub-123", "groups": []}}
 mock_send_authenticated_no_groups_field(_) := {"status_code": 200, "body": {"userId": "123", "externalId": "ext-123"}}
 mock_send_empty(_) := {"status_code": 200, "body": {}}
 mock_send_null_ids(_) := {"status_code": 200, "body": {"userId": null, "externalId": null, "groups": []}}
 mock_send_error(_) := {"status_code": 500, "body": {"error": "Internal server error"}}
+
+# --- Scope enforcement mocks ---
+mock_send_ds123_reader(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASOURCE_READ"], "DATASOURCE", "ds-123")}
+mock_send_dataset_abc_reader(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ"], "DATASET", "dataset-abc")}
+mock_send_wrong_scope(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASOURCE_READ"], "DATASOURCE", "other-ds")}
+
+# --- Scope header mocks ---
+mock_send_multi_datasource(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASOURCE_READ"], "scope_type": "DATASOURCE", "scope_id": "ds-aaa"},
+	{"perms": ["DATASOURCE_READ"], "scope_type": "DATASOURCE", "scope_id": "ds-zzz"},
+])}
+
+mock_send_tenant_and_datasource(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASOURCE_READ"], "scope_type": "TENANT", "scope_id": "tenant-1"},
+	{"perms": ["DATASOURCE_READ"], "scope_type": "DATASOURCE", "scope_id": "ds-123"},
+])}
+
+mock_send_multi_groups_datasource(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASOURCE_READ"], "scope_type": "DATASOURCE", "scope_id": "ds-from-group1"},
+	{"perms": ["DATASOURCE_READ"], "scope_type": "DATASOURCE", "scope_id": "ds-from-group2"},
+])}
+
+mock_send_dataset_scope(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ"], "DATASET", "dataset-123")}
+mock_send_no_matching_permission(_) := {"status_code": 200, "body": mock_http.user_with_permissions(["OTHER_PERMISSION"])}
+mock_send_dataset_scope_with_datasource_perm(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASOURCE_READ", "DATASET_READ"], "DATASET", "dataset-123")}
+
+# --- AND-permission scope header mocks ---
+mock_send_tenant_and_perms(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASET_UPDATE", "DATASET_RELEASE", "DATASET_READ"], "scope_type": "TENANT", "scope_id": "tenant-1"},
+	{"perms": ["DATASET_UPDATE", "DATASET_RELEASE"], "scope_type": "DATASET", "scope_id": "abc"},
+])}
+
+mock_send_tenant_missing_one(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_UPDATE"], "TENANT", "tenant-1")}
+mock_send_specific_and_perms(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_UPDATE", "DATASET_RELEASE"], "DATASET", "dataset-abc")}
+mock_send_specific_partial(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_UPDATE"], "DATASET", "dataset-abc")}
+
+# --- AND-permission cross-group mocks ---
+mock_send_and_cross_group(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASET_UPDATE"], "scope_type": "DATASET", "scope_id": "dataset-abc"},
+	{"perms": ["DATASET_RELEASE"], "scope_type": "DATASET", "scope_id": "dataset-abc"},
+])}
+
+mock_send_and_partial_overlap(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASET_UPDATE"], "scope_type": "DATASET", "scope_id": "ds-1"},
+	{"perms": ["DATASET_UPDATE"], "scope_type": "DATASET", "scope_id": "ds-2"},
+	{"perms": ["DATASET_RELEASE"], "scope_type": "DATASET", "scope_id": "ds-2"},
+	{"perms": ["DATASET_RELEASE"], "scope_type": "DATASET", "scope_id": "ds-3"},
+])}
+
+mock_send_and_disjoint(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASET_UPDATE"], "scope_type": "DATASET", "scope_id": "ds-1"},
+	{"perms": ["DATASET_RELEASE"], "scope_type": "DATASET", "scope_id": "ds-2"},
+])}
+
+# --- Tenant scope inheritance mocks ---
+mock_send_tenant_dataset_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ"], "TENANT", "tenant-1")}
+mock_send_tenant_datasource_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASOURCE_READ"], "TENANT", "tenant-1")}
+mock_send_tenant_datastructure_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASTRUCTURE_READ"], "TENANT", "tenant-1")}
+mock_send_dataset_scoped_user_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["USER_READ"], "DATASET", "dataset-1")}
+mock_send_and_mixed_scopes(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASET_UPDATE"], "scope_type": "TENANT", "scope_id": "tenant-1"},
+	{"perms": ["DATASET_RELEASE"], "scope_type": "DATASET", "scope_id": "ds-1"},
+])}
+
+mock_send_tenant_both_and_perms(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_UPDATE", "DATASET_RELEASE"], "TENANT", "tenant-1")}
 
 # =============================================================================
 # PERMISSION-BASED ACCESS TESTS
@@ -248,15 +272,6 @@ test_default_deny if {
 # SCOPE ENFORCEMENT TESTS (M5.1)
 # =============================================================================
 
-# Mock for user with DATASOURCE-scoped permission to ds-123
-mock_send_ds123_reader(_) := {"status_code": 200, "body": user_context_with_scope(["DATASOURCE_READ"], "DATASOURCE", "ds-123")}
-
-# Mock for user with DATASET-scoped permission to dataset-abc
-mock_send_dataset_abc_reader(_) := {"status_code": 200, "body": user_context_with_scope(["DATASET_READ"], "DATASET", "dataset-abc")}
-
-# Mock for user with wrong scope (has permission but for different resource)
-mock_send_wrong_scope(_) := {"status_code": 200, "body": user_context_with_scope(["DATASOURCE_READ"], "DATASOURCE", "other-ds")}
-
 # Test: User with correct DATASOURCE scope can access that datasource
 test_scope_datasource_correct if {
 	result := authz.decision with http.send as mock_send_ds123_reader
@@ -316,123 +331,6 @@ test_scope_collection_matching_scope if {
 # =============================================================================
 # These tests verify that the decision includes X-Allowed-Scope-Ids header
 # for backend collection filtering.
-
-# Helper: User context with multiple DATASOURCE-scoped assignments
-user_context_multi_datasource(perms) := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Test Group",
-		"assignments": [
-			{
-				"roleId": "role-1",
-				"roleName": "Reader",
-				"roleType": "DATA",
-				"scopeType": "DATASOURCE",
-				"scopeId": "ds-aaa",
-				"permissions": perms,
-			},
-			{
-				"roleId": "role-2",
-				"roleName": "Reader",
-				"roleType": "DATA",
-				"scopeType": "DATASOURCE",
-				"scopeId": "ds-zzz",
-				"permissions": perms,
-			},
-		],
-	}],
-}
-
-# Helper: User with both TENANT and DATASOURCE scopes (TENANT takes priority)
-user_context_tenant_and_datasource(perms) := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [
-		{
-			"id": "group-1",
-			"name": "Admin Group",
-			"assignments": [{
-				"roleId": "role-admin",
-				"roleName": "Admin",
-				"roleType": "SYSTEM",
-				"scopeType": "TENANT",
-				"scopeId": "tenant-1",
-				"permissions": perms,
-			}],
-		},
-		{
-			"id": "group-2",
-			"name": "Reader Group",
-			"assignments": [{
-				"roleId": "role-reader",
-				"roleName": "Reader",
-				"roleType": "DATA",
-				"scopeType": "DATASOURCE",
-				"scopeId": "ds-123",
-				"permissions": perms,
-			}],
-		},
-	],
-}
-
-# Helper: User with multiple groups with different scopes
-user_context_multiple_groups_datasource(perms) := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [
-		{
-			"id": "group-1",
-			"name": "Group A",
-			"assignments": [{
-				"roleId": "role-1",
-				"roleName": "Reader",
-				"roleType": "DATA",
-				"scopeType": "DATASOURCE",
-				"scopeId": "ds-from-group1",
-				"permissions": perms,
-			}],
-		},
-		{
-			"id": "group-2",
-			"name": "Group B",
-			"assignments": [{
-				"roleId": "role-2",
-				"roleName": "Reader",
-				"roleType": "DATA",
-				"scopeType": "DATASOURCE",
-				"scopeId": "ds-from-group2",
-				"permissions": perms,
-			}],
-		},
-	],
-}
-
-# User context with DATASET scope (not DATASOURCE)
-user_context_dataset_scope(perms) := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Test Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Reader",
-			"roleType": "DATA",
-			"scopeType": "DATASET",
-			"scopeId": "dataset-123",
-			"permissions": perms,
-		}],
-	}],
-}
-
-# Mock functions for header tests
-mock_send_multi_datasource(_) := {"status_code": 200, "body": user_context_multi_datasource(["DATASOURCE_READ"])}
-mock_send_tenant_and_datasource(_) := {"status_code": 200, "body": user_context_tenant_and_datasource(["DATASOURCE_READ"])}
-mock_send_multi_groups_datasource(_) := {"status_code": 200, "body": user_context_multiple_groups_datasource(["DATASOURCE_READ"])}
-mock_send_dataset_scope(_) := {"status_code": 200, "body": user_context_dataset_scope(["DATASET_READ"])}
-mock_send_no_matching_permission(_) := {"status_code": 200, "body": user_context_tenant_scoped(["OTHER_PERMISSION"])}
 
 # Test: TENANT scope returns wildcard "*" header
 test_scope_header_tenant_wildcard if {
@@ -506,25 +404,6 @@ test_scope_header_dataset_endpoint if {
 # Test: Q-006 fail-secure — scope type mismatch on collection endpoint denies access
 # User has DATASET scope with DATASOURCE_READ permission, but accessing /v2/datasources
 # which expects DATASOURCE scope type. Neither TENANT nor DATASOURCE match → denied.
-user_context_dataset_scope_with_datasource_perm := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Test Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Reader",
-			"roleType": "DATA",
-			"scopeType": "DATASET",
-			"scopeId": "dataset-123",
-			"permissions": ["DATASOURCE_READ", "DATASET_READ"],
-		}],
-	}],
-}
-
-mock_send_dataset_scope_with_datasource_perm(_) := {"status_code": 200, "body": user_context_dataset_scope_with_datasource_perm}
-
 test_scope_header_wrong_scope_type if {
 	result := authz.decision with http.send as mock_send_dataset_scope_with_datasource_perm
 		with data.config as mock_http.mock_config
@@ -552,37 +431,6 @@ test_scope_header_structure if {
 # Tests that AND-permissions interact correctly with scope header generation.
 # TENANT wildcard and specific scope IDs must satisfy ALL required permissions.
 
-# Helper: User with TENANT scope and both AND-permissions, plus DATASET scope
-# for the specific resource (TENANT alone doesn't grant DATASET resource access per S-2)
-user_context_tenant_and_perms := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Admin Group",
-		"assignments": [
-			{
-				"roleId": "role-1",
-				"roleName": "Admin",
-				"roleType": "DATA",
-				"scopeType": "TENANT",
-				"scopeId": "tenant-1",
-				"permissions": ["DATASET_UPDATE", "DATASET_RELEASE", "DATASET_READ"],
-			},
-			{
-				"roleId": "role-2",
-				"roleName": "DataSteward",
-				"roleType": "DATA",
-				"scopeType": "DATASET",
-				"scopeId": "abc",
-				"permissions": ["DATASET_UPDATE", "DATASET_RELEASE"],
-			},
-		],
-	}],
-}
-
-mock_send_tenant_and_perms(_) := {"status_code": 200, "body": user_context_tenant_and_perms}
-
 # Test: AND-permission with TENANT scope returns wildcard header
 # User has both TENANT and DATASET scoped assignments with both AND-permissions.
 # Permission check passes via DATASET scope (matching resource), but scope header
@@ -595,26 +443,6 @@ test_scope_header_and_tenant_wildcard if {
 	result.headers["X-Allowed-Scope-Ids"] == "*"
 }
 
-# Helper: User with TENANT scope but missing one AND-permission
-user_context_tenant_missing_one := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Role",
-			"roleType": "DATA",
-			"scopeType": "TENANT",
-			"scopeId": "tenant-1",
-			"permissions": ["DATASET_UPDATE"],
-		}],
-	}],
-}
-
-mock_send_tenant_missing_one(_) := {"status_code": 200, "body": user_context_tenant_missing_one}
-
 # Test: AND-permission with TENANT scope but missing one permission is denied
 test_scope_header_and_tenant_missing_one if {
 	result := authz.decision with http.send as mock_send_tenant_missing_one
@@ -624,26 +452,6 @@ test_scope_header_and_tenant_missing_one if {
 	result.reason == "permission_denied"
 }
 
-# Helper: User with specific scope and both AND-permissions
-user_context_specific_and_perms := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Role",
-			"roleType": "DATA",
-			"scopeType": "DATASET",
-			"scopeId": "dataset-abc",
-			"permissions": ["DATASET_UPDATE", "DATASET_RELEASE"],
-		}],
-	}],
-}
-
-mock_send_specific_and_perms(_) := {"status_code": 200, "body": user_context_specific_and_perms}
-
 # Test: AND-permission with specific scope - both permissions present
 test_scope_header_and_specific_both if {
 	result := authz.decision with http.send as mock_send_specific_and_perms
@@ -652,26 +460,6 @@ test_scope_header_and_specific_both if {
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "dataset-abc"
 }
-
-# Helper: User with specific scope but only one AND-permission
-user_context_specific_partial := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Role",
-			"roleType": "DATA",
-			"scopeType": "DATASET",
-			"scopeId": "dataset-abc",
-			"permissions": ["DATASET_UPDATE"],
-		}],
-	}],
-}
-
-mock_send_specific_partial(_) := {"status_code": 200, "body": user_context_specific_partial}
 
 # Test: AND-permission with specific scope - partial permissions denied
 test_scope_header_and_specific_partial if {
@@ -688,40 +476,6 @@ test_scope_header_and_specific_partial if {
 # Tests that AND-permissions work when required permissions come from different
 # groups/assignments, and that scope intersection is correct.
 
-# Helper: User with AND-permissions split across two groups, same scope ID
-user_context_and_cross_group := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [
-		{
-			"id": "group-1",
-			"name": "Editors",
-			"assignments": [{
-				"roleId": "role-1",
-				"roleName": "Editor",
-				"roleType": "DATA",
-				"scopeType": "DATASET",
-				"scopeId": "dataset-abc",
-				"permissions": ["DATASET_UPDATE"],
-			}],
-		},
-		{
-			"id": "group-2",
-			"name": "Releasers",
-			"assignments": [{
-				"roleId": "role-2",
-				"roleName": "Releaser",
-				"roleType": "DATA",
-				"scopeType": "DATASET",
-				"scopeId": "dataset-abc",
-				"permissions": ["DATASET_RELEASE"],
-			}],
-		},
-	],
-}
-
-mock_send_and_cross_group(_) := {"status_code": 200, "body": user_context_and_cross_group}
-
 # Test: AND-permission satisfied across different groups for same scope
 test_and_cross_group_allowed if {
 	result := authz.decision with http.send as mock_send_and_cross_group
@@ -731,62 +485,6 @@ test_and_cross_group_allowed if {
 	result.reason == "permission_granted"
 	result.headers["X-Allowed-Scope-Ids"] == "dataset-abc"
 }
-
-# Helper: User with AND-permissions split across groups, different scope IDs
-# DATASET_UPDATE for {ds-1, ds-2}, DATASET_RELEASE for {ds-2, ds-3}
-# Expected intersection: {ds-2}
-user_context_and_partial_overlap := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [
-		{
-			"id": "group-1",
-			"name": "Editors",
-			"assignments": [
-				{
-					"roleId": "role-1",
-					"roleName": "Editor",
-					"roleType": "DATA",
-					"scopeType": "DATASET",
-					"scopeId": "ds-1",
-					"permissions": ["DATASET_UPDATE"],
-				},
-				{
-					"roleId": "role-1",
-					"roleName": "Editor",
-					"roleType": "DATA",
-					"scopeType": "DATASET",
-					"scopeId": "ds-2",
-					"permissions": ["DATASET_UPDATE"],
-				},
-			],
-		},
-		{
-			"id": "group-2",
-			"name": "Releasers",
-			"assignments": [
-				{
-					"roleId": "role-2",
-					"roleName": "Releaser",
-					"roleType": "DATA",
-					"scopeType": "DATASET",
-					"scopeId": "ds-2",
-					"permissions": ["DATASET_RELEASE"],
-				},
-				{
-					"roleId": "role-2",
-					"roleName": "Releaser",
-					"roleType": "DATA",
-					"scopeType": "DATASET",
-					"scopeId": "ds-3",
-					"permissions": ["DATASET_RELEASE"],
-				},
-			],
-		},
-	],
-}
-
-mock_send_and_partial_overlap(_) := {"status_code": 200, "body": user_context_and_partial_overlap}
 
 # Test: AND-permission scope intersection — only ds-2 has both permissions
 test_and_scope_intersection if {
@@ -815,41 +513,6 @@ test_and_scope_intersection_denied_missing_update if {
 	result.allow == false
 	result.reason == "permission_denied"
 }
-
-# Helper: User with disjoint scopes — no overlap at all
-# DATASET_UPDATE for {ds-1}, DATASET_RELEASE for {ds-2}
-user_context_and_disjoint := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [
-		{
-			"id": "group-1",
-			"name": "Editors",
-			"assignments": [{
-				"roleId": "role-1",
-				"roleName": "Editor",
-				"roleType": "DATA",
-				"scopeType": "DATASET",
-				"scopeId": "ds-1",
-				"permissions": ["DATASET_UPDATE"],
-			}],
-		},
-		{
-			"id": "group-2",
-			"name": "Releasers",
-			"assignments": [{
-				"roleId": "role-2",
-				"roleName": "Releaser",
-				"roleType": "DATA",
-				"scopeType": "DATASET",
-				"scopeId": "ds-2",
-				"permissions": ["DATASET_RELEASE"],
-			}],
-		},
-	],
-}
-
-mock_send_and_disjoint(_) := {"status_code": 200, "body": user_context_and_disjoint}
 
 # Test: AND-permission with completely disjoint scopes — denied everywhere
 test_and_disjoint_scopes_denied if {
@@ -924,26 +587,6 @@ test_published_meta_and_perm if {
 # for datasets, datasources, and datastructures, and that narrow scopes do NOT
 # inherit upward.
 
-# Helper: User with DATASET_READ at TENANT scope (not DATASET scope)
-user_context_tenant_dataset_read := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Admin Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Admin",
-			"roleType": "SYSTEM",
-			"scopeType": "TENANT",
-			"scopeId": "tenant-1",
-			"permissions": ["DATASET_READ"],
-		}],
-	}],
-}
-
-mock_send_tenant_dataset_read(_) := {"status_code": 200, "body": user_context_tenant_dataset_read}
-
 # Test: TENANT-scoped DATASET_READ grants access to a specific dataset resource
 # (TENANT cascades to DATASET resource endpoints per ADM spec)
 test_tenant_scope_cascades_to_dataset_resource if {
@@ -964,26 +607,6 @@ test_tenant_scope_allows_dataset_collection if {
 	result.reason == "permission_granted"
 }
 
-# Helper: User with DATASOURCE_READ at TENANT scope
-user_context_tenant_datasource_read := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Admin Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Admin",
-			"roleType": "SYSTEM",
-			"scopeType": "TENANT",
-			"scopeId": "tenant-1",
-			"permissions": ["DATASOURCE_READ"],
-		}],
-	}],
-}
-
-mock_send_tenant_datasource_read(_) := {"status_code": 200, "body": user_context_tenant_datasource_read}
-
 # Test: TENANT-scoped DATASOURCE_READ grants access to a specific datasource resource
 test_tenant_scope_cascades_to_datasource_resource if {
 	result := authz.decision with http.send as mock_send_tenant_datasource_read
@@ -993,26 +616,6 @@ test_tenant_scope_cascades_to_datasource_resource if {
 	result.reason == "permission_granted"
 }
 
-# Helper: User with DATASTRUCTURE_READ at TENANT scope
-user_context_tenant_datastructure_read := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Admin Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Admin",
-			"roleType": "SYSTEM",
-			"scopeType": "TENANT",
-			"scopeId": "tenant-1",
-			"permissions": ["DATASTRUCTURE_READ"],
-		}],
-	}],
-}
-
-mock_send_tenant_datastructure_read(_) := {"status_code": 200, "body": user_context_tenant_datastructure_read}
-
 # Test: TENANT-scoped DATASTRUCTURE_READ grants access to a specific datastructure resource
 test_tenant_scope_cascades_to_datastructure_resource if {
 	result := authz.decision with http.send as mock_send_tenant_datastructure_read
@@ -1021,26 +624,6 @@ test_tenant_scope_cascades_to_datastructure_resource if {
 	result.allow == true
 	result.reason == "permission_granted"
 }
-
-# Helper: User with USER_READ at DATASET scope (narrow scope, wrong direction)
-user_context_dataset_scoped_user_read := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Role",
-			"roleType": "DATA",
-			"scopeType": "DATASET",
-			"scopeId": "dataset-1",
-			"permissions": ["USER_READ"],
-		}],
-	}],
-}
-
-mock_send_dataset_scoped_user_read(_) := {"status_code": 200, "body": user_context_dataset_scoped_user_read}
 
 # Test: No upward inheritance — DATASET-scoped USER_READ does NOT grant access
 # to tenant-level resource endpoints. Inheritance is downward only.
@@ -1052,41 +635,6 @@ test_no_upward_inheritance if {
 	result.reason == "permission_denied"
 }
 
-# Helper: AND-permission with mixed scopes — DATASET_UPDATE at TENANT, DATASET_RELEASE at DATASET
-# Tests published/meta PUT which requires ["DATASET_UPDATE", "DATASET_RELEASE"]
-user_context_and_mixed_scopes := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [
-		{
-			"id": "group-1",
-			"name": "Admins",
-			"assignments": [{
-				"roleId": "role-1",
-				"roleName": "Admin",
-				"roleType": "SYSTEM",
-				"scopeType": "TENANT",
-				"scopeId": "tenant-1",
-				"permissions": ["DATASET_UPDATE"],
-			}],
-		},
-		{
-			"id": "group-2",
-			"name": "Publishers",
-			"assignments": [{
-				"roleId": "role-2",
-				"roleName": "Publisher",
-				"roleType": "DATA",
-				"scopeType": "DATASET",
-				"scopeId": "ds-1",
-				"permissions": ["DATASET_RELEASE"],
-			}],
-		},
-	],
-}
-
-mock_send_and_mixed_scopes(_) := {"status_code": 200, "body": user_context_and_mixed_scopes}
-
 # Test: AND-permission with TENANT UPDATE + DATASET RELEASE → allowed
 # TENANT-scoped DATASET_UPDATE inherits to resource endpoint, DATASET RELEASE
 # matches directly. Both permissions satisfied.
@@ -1097,26 +645,6 @@ test_and_mixed_scopes_allowed if {
 	result.allow == true
 	result.reason == "permission_granted"
 }
-
-# Helper: User with both AND-permissions at TENANT scope
-user_context_tenant_both_and_perms := {
-	"userId": "user-1",
-	"externalId": "keycloak-sub-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Admin Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Admin",
-			"roleType": "SYSTEM",
-			"scopeType": "TENANT",
-			"scopeId": "tenant-1",
-			"permissions": ["DATASET_UPDATE", "DATASET_RELEASE"],
-		}],
-	}],
-}
-
-mock_send_tenant_both_and_perms(_) := {"status_code": 200, "body": user_context_tenant_both_and_perms}
 
 # Test: AND-permission with both permissions at TENANT scope → allowed
 # TENANT inheritance satisfies both UPDATE and RELEASE for resource endpoint
