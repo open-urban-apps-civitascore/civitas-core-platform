@@ -1,5 +1,4 @@
 import { Sidebar } from '../ui/sidebar'
-import { currentOrganization, expampleOrganizations } from './appSidebarItems'
 import { AppSidebarContent } from './components/AppSidebarContent'
 import { AppSidebarFooter } from './components/AppSidebarFooter'
 import { AppSidebarHeader } from './components/AppSidebarHeader'
@@ -18,7 +17,7 @@ export const AppSidebar = async (props: AppSidebarProps) => {
   return (
     <nav aria-label="Main navigation">
       <Sidebar collapsible="icon">
-        <AppSidebarHeader currentOrganization={currentOrganization} organizations={expampleOrganizations} />
+        <AppSidebarHeader />
 
         <AppSidebarContent />
 

@@ -37,8 +37,7 @@ import org.junit.jupiter.api.Test;
 
 class RedpandaConnectClientTest {
 
-  private static final byte[] MASTER_KEY = new byte[32];
-  private static final byte[] SALT = new byte[16];
+  private static final byte[] STRETCHED_KEY = new byte[32];
 
   private Client mockClient;
   private Invocation.Builder mockBuilder;
@@ -57,8 +56,7 @@ class RedpandaConnectClientTest {
     when(mockStreamsTarget.path(anyString())).thenReturn(mockIdTarget);
     when(mockIdTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
 
-    redpandaClient =
-        new RedpandaConnectClient("http://localhost:4195", MASTER_KEY, SALT, mockClient);
+    redpandaClient = new RedpandaConnectClient("http://localhost:4195", STRETCHED_KEY, mockClient);
   }
 
   @Nested

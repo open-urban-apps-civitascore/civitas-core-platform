@@ -1,79 +1,60 @@
-import { BookOpen, Building2, GitPullRequestArrow, LucideProps, SquareMenu, SquareTerminal, User } from 'lucide-react'
-import { ForwardRefExoticComponent, ReactNode, RefAttributes } from 'react'
+import { FileQuestion, LucideProps, SquareMenu, UserCog } from 'lucide-react'
+import { ForwardRefExoticComponent, RefAttributes } from 'react'
 
 export interface NavItem {
   title: string
   url: string
-  icon?: ReactNode | ForwardRefExoticComponent<Omit<LucideProps, 'ref'> & RefAttributes<SVGSVGElement>>
+  icon?: ForwardRefExoticComponent<Omit<LucideProps, 'ref'> & RefAttributes<SVGSVGElement>>
   isActive?: boolean
+  external?: boolean
   items?: NavItem[]
 }
 
-export const appSidebarNavItems = [
+export interface NavSection {
+  title: string
+  items: NavItem[]
+}
+
+export const appSidebarNavSections: NavSection[] = [
   {
-    title: 'ourData',
-    url: '/datasets',
-    icon: SquareMenu,
-    isActive: true,
-  },
-  {
-    title: 'tenants',
-    url: '',
-    icon: User,
-    isActive: true,
+    title: 'platform',
     items: [
       {
-        title: 'users',
-        url: '/users',
-      },
-      {
-        title: 'groups',
-        url: '/groups',
-      },
-      {
-        title: 'roles',
-        url: '/roles',
-      },
-      {
-        title: 'permissions',
-        url: '/permissions',
-      },
-      {
-        title: 'dataspaces',
-        url: '/dataspaces',
+        title: 'ourData',
+        url: '/datasets',
+        icon: SquareMenu,
+        items: [
+          { title: 'datasets', url: '/datasets' },
+          { title: 'datasources', url: '/datasources' },
+          { title: 'datastructures', url: '/datastructures' },
+        ],
       },
     ],
   },
   {
-    title: 'data-management',
-    url: '#',
-    icon: GitPullRequestArrow,
+    title: 'admin',
     items: [
       {
-        title: 'datasources',
-        url: '/datasources',
-      },
-      {
-        title: 'datastructures',
-        url: '/datastructures',
+        title: 'tenants',
+        url: '',
+        icon: UserCog,
+        items: [
+          { title: 'users', url: '/users' },
+          { title: 'groups', url: '/groups' },
+          { title: 'roles', url: '/roles' },
+        ],
       },
     ],
   },
   {
-    title: 'documentation',
-    url: '#',
-    icon: BookOpen,
-  },
-  {
-    title: 'uml-modeler',
-    url: '/uml-modeler',
-    icon: SquareTerminal,
+    title: 'help',
+    items: [
+      {
+        title: 'documentation',
+        url: 'https://docs.core.civitasconnect.digital/',
+        icon: FileQuestion,
+        external: true,
+      },
+    ],
   },
 ]
-
-export const expampleOrganizations = [
-  { organizationName: 'Organization 2', tenant: 'Tenant B', icon: Building2 },
-  { organizationName: 'Organization 3', tenant: 'Tenant C', icon: Building2 },
-]
-
-export const currentOrganization = { organizationName: 'Organization 1', tenant: 'Tenant A', icon: Building2 }

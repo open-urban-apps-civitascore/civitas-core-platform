@@ -66,12 +66,12 @@ class RedpandaConnectClient implements AutoCloseable {
   private final PipelineSerializer serializer;
   private final Client client;
 
-  RedpandaConnectClient(String baseUrl, byte[] masterKey, byte[] salt) {
-    this(baseUrl, new PipelineSerializer(masterKey, salt), createDefaultClient());
+  RedpandaConnectClient(String baseUrl, byte[] stretchedKey) {
+    this(baseUrl, new PipelineSerializer(stretchedKey), createDefaultClient());
   }
 
-  RedpandaConnectClient(String baseUrl, byte[] masterKey, byte[] salt, Client client) {
-    this(baseUrl, new PipelineSerializer(masterKey, salt), client);
+  RedpandaConnectClient(String baseUrl, byte[] stretchedKey, Client client) {
+    this(baseUrl, new PipelineSerializer(stretchedKey), client);
   }
 
   private RedpandaConnectClient(String baseUrl, PipelineSerializer serializer, Client client) {
@@ -94,7 +94,7 @@ class RedpandaConnectClient implements AutoCloseable {
   void createPipeline(String pipelineId, Map<String, Object> pipelineData)
       throws FatalAdapterException, RetryableAdapterException {
     validatePipelineId(pipelineId);
-    String yaml = serializer.toYaml(pipelineData);
+    String yaml = serializer.toYaml(pipelineData, pipelineId);
     logger.info("Creating pipeline: {}", Encode.forJava(pipelineId));
 
     try (Response response =
@@ -123,7 +123,7 @@ class RedpandaConnectClient implements AutoCloseable {
   void updatePipeline(String pipelineId, Map<String, Object> pipelineData)
       throws FatalAdapterException, RetryableAdapterException {
     validatePipelineId(pipelineId);
-    String yaml = serializer.toYaml(pipelineData);
+    String yaml = serializer.toYaml(pipelineData, pipelineId);
     logger.info("Updating pipeline: {}", Encode.forJava(pipelineId));
 
     try (Response response =
@@ -169,6 +169,7 @@ class RedpandaConnectClient implements AutoCloseable {
 
   @Override
   public void close() {
+    serializer.close();
     if (client != null) {
       client.close();
     }

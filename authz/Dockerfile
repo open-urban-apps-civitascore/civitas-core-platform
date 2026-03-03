@@ -44,7 +44,7 @@ RUN mkdir /out && \
     printf '{\n  "authz_repository_url": "http://civitas-authz-repository:8091/api/v1/user-context",\n  "authz_cache_duration_seconds": 0\n}\n' > /out/config.json
 
 
-FROM openpolicyagent/opa:1.4.2-static AS opa
+FROM openpolicyagent/opa:1.14.0-static AS opa
 
 COPY --from=fetcher /out/config.json /data/config.json
 COPY --from=fetcher /out/tmp/bundle/policy /policies

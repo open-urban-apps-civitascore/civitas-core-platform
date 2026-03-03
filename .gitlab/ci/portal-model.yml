@@ -12,16 +12,91 @@
       changes:
         - portal-model/**/*
         - portal-backend/**/* # Backend depends on portal-model, so run when backend changes too
+        - authz/**/* # AuthZ repository depends on portal-model
         - .gitlab-ci.yml
         - .gitlab/ci/portal-model.yml
         - .gitlab/ci/backend.yml # Also run when backend changes since it depends on portal-model
+        - .gitlab/ci/authz.yml
+
+# Setup version for portal-model from pom.xml with branch-based suffixes
+# - main/tags: release version (e.g., 1.0.0)
+# - develop: snapshot version (e.g., 1.0.0-SNAPSHOT)
+# - MR: merge request version (e.g., 1.0.0-MR-123)
+setup-version-portal-model:
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: .pre
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: portal-model-maven
+      files:
+        - portal-model/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd portal-model
+    # Extract base version from pom.xml
+    - BASE_VERSION=$(mvn help:evaluate -Dexpression=revision -q -DforceStdout)
+    - echo "Base version from pom.xml - $BASE_VERSION"
+    # Apply branch-based suffix
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ -n "$CI_COMMIT_TAG" ]; then
+        PORTAL_MODEL_VERSION="$BASE_VERSION"
+      elif [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+        PORTAL_MODEL_VERSION="${BASE_VERSION}-SNAPSHOT"
+      elif [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
+        PORTAL_MODEL_VERSION="${BASE_VERSION}-MR-${CI_MERGE_REQUEST_IID}"
+      else
+        PORTAL_MODEL_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
+      fi
+    - echo "PORTAL_MODEL_VERSION=$PORTAL_MODEL_VERSION" > ../portal-model-version.env
+    - echo "Setting PORTAL_MODEL_VERSION=$PORTAL_MODEL_VERSION"
+  artifacts:
+    reports:
+      dotenv: portal-model-version.env
+
+# Generate maven dependency graph JSON for license scanning
+# This must always run (needs: []) to ensure dependency scanning has the graph
+# even when the build job is skipped due to no changes
+generate-graph-portal-model:
+  image: maven:3.9-eclipse-temurin-21-alpine
+  stage: lint
+  needs:
+    - job: setup-version-portal-model
+  rules:
+    # Always run on tags
+    - if: $CI_COMMIT_TAG
+    # Always run on main and develop branch
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    # Always run on MR pipelines
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
+  cache:
+    key:
+      prefix: portal-model-maven
+      files:
+        - portal-model/pom.xml
+    paths:
+      - .m2/repository
+  script:
+    - cd portal-model
+    # Only generate dependency tree, no compilation needed
+    - mvn -B dependency:tree -Drevision=$PORTAL_MODEL_VERSION -DoutputType=json -DoutputFile=maven.graph.json -DappendOutput=false
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - portal-model/maven.graph.json
 
 lint-portal-model:
   extends: .only-portal-model-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: lint
   needs:
-    - job: setup-version
+    - job: setup-version-portal-model
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -33,14 +108,14 @@ lint-portal-model:
       - .m2/repository
   script:
     - cd portal-model
-    - mvn spotless:check -Drevision=$REVISION
+    - mvn spotless:check -Drevision=$PORTAL_MODEL_VERSION
 
 dependency-prune-portal-model:
   extends: .only-portal-model-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: lint
   needs:
-    - job: setup-version
+    - job: setup-version-portal-model
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -52,7 +127,7 @@ dependency-prune-portal-model:
       - .m2/repository
   script:
     - cd portal-model
-    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Drevision=$REVISION -DfailOnWarning=true -DignoreNonCompile=false
+    - mvn $MAVEN_CLI_OPTS -B dependency:analyze -Drevision=$PORTAL_MODEL_VERSION -DfailOnWarning=true -DignoreNonCompile=false
   allow_failure:
     exit_codes:
       - 1
@@ -62,7 +137,7 @@ build-portal-model:
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: build-package
   needs:
-    - job: setup-version
+    - job: setup-version-portal-model
     - job: lint-portal-model
     - job: dependency-prune-portal-model
   variables:
@@ -76,19 +151,22 @@ build-portal-model:
       - .m2/repository
   script:
     - cd portal-model
-    - mvn package -DskipTests -Drevision=$REVISION
+    - mvn package -DskipTests -Drevision=$PORTAL_MODEL_VERSION
   artifacts:
     when: on_success
     paths:
       - portal-model/target/*.jar
     expire_in: 1 month
 
+# Publish portal-model artifacts to GitLab Maven repository
+# This makes the artifacts available to portal-backend and other projects
+# Runs in deploy-package stage so backend tests can use the published artifacts
 publish-portal-model:
   extends: .only-portal-model-changes
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: deploy-package
   needs:
-    - job: setup-version
+    - job: setup-version-portal-model
     - job: build-portal-model
       optional: true
   variables:
@@ -103,7 +181,8 @@ publish-portal-model:
   script:
     - cd portal-model
     # Deploy to GitLab Maven repository
+    # Version suffix (SNAPSHOT, MR-xxx) is already applied by setup-version-portal-model
     - |
-      mvn deploy -DskipTests -Drevision=$REVISION \
+      mvn deploy -DskipTests -Drevision=$PORTAL_MODEL_VERSION \
         -DaltDeploymentRepository=gitlab-maven::default::${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
         -s ci_settings.xml

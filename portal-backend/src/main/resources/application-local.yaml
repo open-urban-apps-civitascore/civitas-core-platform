@@ -6,9 +6,9 @@ logging:
 
 app:
   url: http://localhost:8089
-  encryption:
-    key: ${CIVITAS_MASTER_KEY:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef}
-    salt: ${CIVITAS_MASTER_SALT:00112233445566778899aabbccddeeff}
+
+civitas:
+  master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 spring:
   jpa:
@@ -32,3 +32,8 @@ kafka:
   bootstrap-servers: localhost:9092
   acks: all
   retries: 3
+
+model-atlas:
+  baseUrl: "http://localhost:8086"
+  scope: civitas
+  stage: draft

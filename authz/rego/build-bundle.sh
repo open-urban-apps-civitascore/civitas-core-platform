@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
 # OPA image version (keep in sync with docker-compose.yml and CI)
-OPA_IMAGE="openpolicyagent/opa:1.4.2-static"
+OPA_IMAGE="openpolicyagent/opa:1.14.0-static"
 
 # Determine revision (from argument, git SHA, or timestamp)
 if [ -n "$1" ]; then
