@@ -2,12 +2,12 @@ package de.civitascore.portal.messaging.saga;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.civitascore.configadapter.model.dataset.DataPipeline;
+import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.portal.model.entity.DataSet;
-import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,65 +44,67 @@ public class DataSetSagaPublisher {
   }
 
   public void publishCreateRequested(DataSet dataset) {
-    var trigger = new LinkedHashMap<String, Object>();
-    trigger.put("sagaType", "DATASET_CREATE");
-    trigger.put("datasetId", dataset.getId().toString());
-    trigger.put("datasetName", dataset.getName());
-    trigger.put("description", dataset.getDescription());
-    trigger.put("openDataAccess", dataset.getOpenDataAccess());
-    trigger.put("datasources", buildDatasourcesList(dataset));
-    trigger.put("dataPipelines", buildPipelinesList(dataset.getPipelines(), "ADD"));
-    sendTrigger(dataset.getId().toString(), trigger);
+    var trigger =
+        SagaTrigger.DatasetCreate.of(
+            dataset.getId().toString(),
+            dataset.getName(),
+            dataset.getDescription(),
+            dataset.getOpenDataAccess(),
+            buildDatasources(dataset),
+            buildPipelines(dataset.getPipelines(), "ADD"));
+    sendTrigger(trigger);
   }
 
   public void publishUpdateRequested(DataSet dataset, Set<Pipeline> previousPipelines) {
-    var trigger = new LinkedHashMap<String, Object>();
-    trigger.put("sagaType", "DATASET_UPDATE");
-    trigger.put("datasetId", dataset.getId().toString());
-    trigger.put("datasetName", dataset.getName());
-    trigger.put("description", dataset.getDescription());
-    trigger.put("openDataAccess", dataset.getOpenDataAccess());
-    trigger.put("projectId", dataset.getProjectId());
-    trigger.put("routeId", dataset.getRouteId());
-    trigger.put("serviceId", dataset.getServiceId());
-    trigger.put("pipelineIds", dataset.getPipelineIds());
-    trigger.put("datasources", buildDatasourcesList(dataset));
-    trigger.put("dataPipelines", buildPipelineDiff(previousPipelines, dataset.getPipelines()));
-    sendTrigger(dataset.getId().toString(), trigger);
+    var trigger =
+        SagaTrigger.DatasetUpdate.of(
+            dataset.getId().toString(),
+            dataset.getName(),
+            dataset.getDescription(),
+            dataset.getOpenDataAccess(),
+            dataset.getProjectId(),
+            dataset.getRouteId(),
+            dataset.getServiceId(),
+            dataset.getPipelineIds(),
+            buildDatasources(dataset),
+            buildPipelineDiff(previousPipelines, dataset.getPipelines()));
+    sendTrigger(trigger);
   }
 
   public void publishDeleteRequested(DataSet dataset) {
-    var trigger = new LinkedHashMap<String, Object>();
-    trigger.put("sagaType", "DATASET_DELETE");
-    trigger.put("datasetId", dataset.getId().toString());
-    trigger.put("projectId", dataset.getProjectId());
-    trigger.put("frostBaseUrl", dataset.getFrostBaseUrl());
-    trigger.put("routeId", dataset.getRouteId());
-    trigger.put("serviceId", dataset.getServiceId());
-    trigger.put("pipelineIds", dataset.getPipelineIds());
-    sendTrigger(dataset.getId().toString(), trigger);
+    var trigger =
+        SagaTrigger.DatasetDelete.of(
+            dataset.getId().toString(),
+            dataset.getProjectId(),
+            dataset.getFrostBaseUrl(),
+            dataset.getRouteId(),
+            dataset.getServiceId(),
+            dataset.getPipelineIds());
+    sendTrigger(trigger);
   }
 
-  private List<Map<String, Object>> buildDatasourcesList(DataSet dataset) {
-    Set<UUID> seen = new HashSet<>();
-    List<Map<String, Object>> datasources = new ArrayList<>();
-
+  private List<Datasource> buildDatasources(DataSet dataset) {
     if (dataset.getPipelines() == null) {
-      return datasources;
+      return List.of();
     }
 
-    for (Pipeline pipeline : dataset.getPipelines()) {
+    Set<UUID> seen = new HashSet<>();
+    List<Datasource> datasources = new ArrayList<>();
+
+    for (var pipeline : dataset.getPipelines()) {
       if (pipeline.getDataSources() == null) {
         continue;
       }
-      for (DataSource ds : pipeline.getDataSources()) {
+      for (var ds : pipeline.getDataSources()) {
         if (seen.add(ds.getId())) {
-          var entry = new LinkedHashMap<String, Object>();
-          entry.put("id", ds.getId().toString());
-          entry.put("name", ds.getName());
-          entry.put("type", ds.getConnectorType() != null ? ds.getConnectorType().name() : null);
-          entry.put("configuration", ds.getConfiguration());
-          datasources.add(entry);
+          var datasource = new Datasource();
+          datasource.setId(ds.getId().toString());
+          datasource.setName(ds.getName());
+          datasource.setType(ds.getConnectorType() != null ? ds.getConnectorType().name() : null);
+          if (ds.getConfiguration() != null) {
+            ds.getConfiguration().forEach(datasource::handleUnknownProperty);
+          }
+          datasources.add(datasource);
         }
       }
     }
@@ -110,12 +112,11 @@ public class DataSetSagaPublisher {
     return datasources;
   }
 
-  private List<Map<String, Object>> buildPipelinesList(Set<Pipeline> pipelines, String action) {
-    return pipelines.stream().map(p -> pipelineEntry(p, action)).toList();
+  private List<DataPipeline> buildPipelines(Set<Pipeline> pipelines, String action) {
+    return pipelines.stream().map(p -> toPipelineEntry(p, action)).toList();
   }
 
-  private List<Map<String, Object>> buildPipelineDiff(
-      Set<Pipeline> previous, Set<Pipeline> current) {
+  private List<DataPipeline> buildPipelineDiff(Set<Pipeline> previous, Set<Pipeline> current) {
     Set<UUID> previousIds =
         previous == null
             ? Set.of()
@@ -123,33 +124,24 @@ public class DataSetSagaPublisher {
     Map<UUID, Pipeline> currentMap =
         current.stream().collect(Collectors.toMap(Pipeline::getId, p -> p));
 
-    List<Map<String, Object>> result = new ArrayList<>();
+    List<DataPipeline> result = new ArrayList<>();
 
-    for (Map.Entry<UUID, Pipeline> e : currentMap.entrySet()) {
-      String action = previousIds.contains(e.getKey()) ? "UPDATE" : "ADD";
-      result.add(pipelineEntry(e.getValue(), action));
+    for (var entry : currentMap.entrySet()) {
+      String action = previousIds.contains(entry.getKey()) ? "UPDATE" : "ADD";
+      result.add(toPipelineEntry(entry.getValue(), action));
     }
 
     for (UUID id : previousIds) {
       if (!currentMap.containsKey(id)) {
-        var entry = new LinkedHashMap<String, Object>();
-        entry.put("id", id.toString());
-        entry.put("version", "1");
-        entry.put("action", "DELETE");
-        result.add(entry);
+        result.add(new DataPipeline(id.toString(), "1", "DELETE", null));
       }
     }
 
     return result;
   }
 
-  private Map<String, Object> pipelineEntry(Pipeline p, String action) {
-    var entry = new LinkedHashMap<String, Object>();
-    entry.put("id", p.getId().toString());
-    entry.put("version", "1");
-    entry.put("action", action);
-    entry.put("data", p.getModel());
-    return entry;
+  private DataPipeline toPipelineEntry(Pipeline pipeline, String action) {
+    return new DataPipeline(pipeline.getId().toString(), "1", action, pipeline.getModel());
   }
 
   /**
@@ -160,8 +152,9 @@ public class DataSetSagaPublisher {
    * flight with no corresponding DB state. Eliminating that would require
    * {@code @TransactionalEventListener(AFTER_COMMIT)}, which is a larger structural change.
    */
-  private void sendTrigger(String datasetId, Map<String, Object> trigger) {
-    String sagaType = (String) trigger.get("sagaType");
+  private void sendTrigger(SagaTrigger trigger) {
+    String datasetId = trigger.datasetId();
+    String sagaType = trigger.sagaType().name();
     try {
       String json = objectMapper.writeValueAsString(trigger);
       eventKafkaTemplate
