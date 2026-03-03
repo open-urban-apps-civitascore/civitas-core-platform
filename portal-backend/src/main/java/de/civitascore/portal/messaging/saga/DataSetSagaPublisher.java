@@ -110,8 +110,7 @@ public class DataSetSagaPublisher {
           var entry = new LinkedHashMap<String, Object>();
           entry.put("id", ds.getId().toString());
           entry.put("name", ds.getName());
-          entry.put(
-              "connectorType", ds.getConnectorType() != null ? ds.getConnectorType().name() : null);
+          entry.put("type", ds.getConnectorType() != null ? ds.getConnectorType().name() : null);
           entry.put("configuration", ds.getConfiguration());
           datasources.add(entry);
         }

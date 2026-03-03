@@ -2,6 +2,7 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.github.dockerjava.api.model.ContainerNetwork;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.SagaInfraVerifier;
 import de.civitascore.portal.config.SagaOrchestratorTestHelper;
@@ -143,8 +144,17 @@ class DataSetSagaE2EIntegrationTest extends BaseKeycloakIntegrationTest {
     mosquitto.start();
     redpandaConnect.start();
 
+    // Use the sagaNetwork gateway IP so FROST is reachable from both the host (test process)
+    // and containers on sagaNetwork (Redpanda Connect). localhost would resolve to the
+    // container's own loopback inside Docker, making FROST unreachable from there.
+    String sagaGatewayIp =
+        frost.getContainerInfo().getNetworkSettings().getNetworks().values().stream()
+            .filter(net -> sagaNetwork.getId().equals(net.getNetworkID()))
+            .findFirst()
+            .map(ContainerNetwork::getGateway)
+            .orElse(frost.getHost());
     frostExternalUrl =
-        "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
+        "http://" + sagaGatewayIp + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
     redpandaExternalUrl =
         "http://" + redpandaConnect.getHost() + ":" + redpandaConnect.getMappedPort(4195);
 
@@ -319,7 +329,7 @@ class DataSetSagaE2EIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   private void publishMqttMessage(String topic, String payload) throws Exception {
-    mosquitto.execInContainer("mosquitto_pub", "-h", "localhost", "-t", topic, "-m", payload);
+    mosquitto.execInContainer("mosquitto_pub", "-h", "localhost", "-t", topic, "-r", "-m", payload);
     log.info("Published MQTT message to topic '{}': {}", topic, payload);
   }
 
