@@ -129,7 +129,7 @@ Runs all unit tests via Docker (no local OPA installation required).
 Pre-flight checks:
 1. `opa fmt --diff` - Formatting
 2. `opa check --strict` - Type checking
-3. `opa test` - Unit tests
+3. `opa test policy lib providers test data -v` - Unit tests
 
 Output: `bundle.tar.gz` containing compiled policies and data.
 

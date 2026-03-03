@@ -357,6 +357,8 @@ fi
 echo "------------------------------------------------------"
 echo
 
+DEV_VERSION="1.0.0-dev"
+
 # ---- Phase 3: Infrastructure Startup --------------------------------
 
 echo "Ensuring Docker network exists..."
@@ -431,12 +433,12 @@ fi
 # Build AuthZ Repository JAR (required by its Dockerfile)
 echo "Building AuthZ Repository..."
 cd "$SCRIPT_DIR/../portal-model"
-if ! mvn clean install -DskipTests -q; then
+if ! mvn clean install -DskipTests -Drevision=$DEV_VERSION -q; then
     echo "ERROR: Portal Model build failed"
     exit 1
 fi
 cd "$SCRIPT_DIR/../authz/repository"
-if ! mvn clean package -DskipTests -q; then
+if ! mvn clean package -DskipTests -Dportal-model.version=$DEV_VERSION -q; then
     echo "ERROR: AuthZ Repository build failed"
     exit 1
 fi
@@ -522,8 +524,6 @@ echo
 
 # ---- Phase 4: Application Build & Start -----------------------------
 
-DEV_VERSION="1.0.0-dev"
-
 # Kill any leftover processes from a previous run to avoid port conflicts.
 # Without this, the health check may hit an old backend and falsely report success.
 echo "Checking for leftover application processes..."
@@ -559,7 +559,7 @@ fi
 if [ "$backend_option" = "1" ]; then
     echo "Building Portal Backend (config-adapter version: $DEV_VERSION)..."
     cd "$SCRIPT_DIR/../portal-backend"
-    if ! mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION; then
+    if ! mvn clean package -DskipTests -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION; then
         echo "ERROR: Portal Backend build failed"
         exit 1
     fi

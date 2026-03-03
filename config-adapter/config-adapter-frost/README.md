@@ -9,6 +9,7 @@ The FROST adapter integrates with FROST-Server's OGC SensorThings API to manage 
 **Key Features:**
 - Full CRUD operations for SensorThings entities (Things, Locations, Sensors, ObservedProperties, Datastreams)
 - FROST Projects extension support (project-scoped entity management)
+- Flexible authentication: API key header or HTTP Basic Auth
 - Asynchronous result publishing via CloudEvents
 - Comprehensive error handling with HTTP status-based categorization
 - Production-ready with integration tests
@@ -96,31 +97,50 @@ The adapter subscribes to all SensorThings entity lifecycle events:
 
 ## Configuration
 
-### Required Properties
+### Properties
 
 ```properties
-# FROST-Server URL
+# FROST-Server URL (optional, defaults to http://localhost:8080/v1.1)
 frost.url=http://localhost:8080/FROST-Server/v1.1
 
-# API key for authentication (required)
-frost.api.key=your-frost-api-key
-
-# HTTP header name for the API key (optional, defaults to X-API-Key)
-frost.api.key.header=X-API-Key
-
-# Topics to subscribe to (comma-separated)
+# Topics to subscribe to (comma-separated, required)
 frost.topics=de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
+```
+
+### Authentication
+
+At least one authentication method must be configured. If both are present, Basic Auth takes precedence.
+
+**Option A: API Key** — sends a custom header on every request (default header: `X-API-Key`):
+
+```properties
+frost.api.key=your-frost-api-key
+# optional, defaults to X-API-Key
+frost.api.key.header=X-API-Key
+```
+
+**Option B: HTTP Basic Auth** — sends a standard `Authorization: Basic <base64>` header:
+
+```properties
+frost.basic.auth.username=your-username
+frost.basic.auth.password=your-password
 ```
 
 ### Environment Variables
 
-All properties can be overridden with environment variables:
+All properties can be overridden with environment variables (dots → underscores, uppercase):
 
 ```bash
 FROST_URL=http://frost-server:8080/FROST-Server/v1.1
+FROST_TOPICS=de.civitascore.data.thing.created,de.civitascore.data.thing.updated
+
+# API key auth
 FROST_API_KEY=your-api-key
 FROST_API_KEY_HEADER=X-API-Key
-FROST_TOPICS=de.civitascore.data.thing.created,de.civitascore.data.thing.updated
+
+# Basic auth
+FROST_BASIC_AUTH_USERNAME=your-username
+FROST_BASIC_AUTH_PASSWORD=your-password
 ```
 
 ### Docker Compose Example
@@ -135,8 +155,10 @@ services:
       EVENTHANDLER_NAME: kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       FROST_URL: http://frost-server:8080/FROST-Server/v1.1
-      FROST_API_KEY: ${FROST_API_KEY}
       FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted
+      # Choose one auth method:
+      FROST_API_KEY: ${FROST_API_KEY}
+      # or: FROST_BASIC_AUTH_USERNAME / FROST_BASIC_AUTH_PASSWORD
     depends_on:
       - kafka
       - frost-server
@@ -424,7 +446,9 @@ Network error during FROST entity creation: Connection refused
 FROST client error during entity creation: HTTP 401
 ```
 
-**Solution:** Check `frost.api.key` is correct and the API key header matches FROST-Server configuration.
+**Solution:** Check your authentication configuration:
+- API key: verify `frost.api.key` and `frost.api.key.header` match FROST-Server configuration.
+- Basic auth: verify `frost.basic.auth.username` and `frost.basic.auth.password` are correct.
 
 #### 3. Bad Request (400)
 

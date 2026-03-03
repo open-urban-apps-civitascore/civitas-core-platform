@@ -1,65 +1,52 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { SidebarProvider } from '@/components/ui/sidebar'
 
 import { AppSidebarHeader } from './AppSidebarHeader'
 
 describe('AppSidebarHeader', () => {
-  const currentOrganization = {
-    organizationName: 'Current Org',
-    tenant: 'Current Tenant',
-  }
-
-  const organizations = [
-    { organizationName: 'Organization 2', tenant: 'Tenant B' },
-    { organizationName: 'Organization 3', tenant: 'Tenant C' },
-  ]
-
-  const renderWithProvider = (
-    props: { currentOrganization: typeof currentOrganization; organizations: typeof organizations } = {
-      currentOrganization,
-      organizations,
-    },
-  ) => {
+  const renderWithProvider = () => {
     return render(
       <SidebarProvider>
-        <AppSidebarHeader {...props} />
+        <AppSidebarHeader />
       </SidebarProvider>,
     )
   }
 
-  describe('dropdown trigger', () => {
-    it('renders dropdown trigger button', () => {
-      renderWithProvider()
-
-      const button = screen.getByRole('button')
-      expect(button).toBeInTheDocument()
+  describe('tenant name from environment variable', () => {
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_TENANT_NAME = 'Test-Mandant'
     })
 
-    it('has correct accessibility attributes for dropdown menu', () => {
-      renderWithProvider()
-
-      const button = screen.getByRole('button')
-      expect(button).toHaveAttribute('aria-haspopup', 'menu')
-      expect(button).toHaveAttribute('data-state', 'closed')
+    afterEach(() => {
+      delete process.env.NEXT_PUBLIC_TENANT_NAME
     })
 
-    it('displays organization info in trigger button', () => {
+    it('renders the tenant name from NEXT_PUBLIC_TENANT_NAME', () => {
       renderWithProvider()
 
-      const button = screen.getByRole('button')
-      expect(button).toHaveTextContent('Current Org')
-      expect(button).toHaveTextContent('Current Tenant')
+      expect(screen.getByText('Test-Mandant')).toBeInTheDocument()
     })
   })
 
-  describe('edge cases', () => {
-    it('renders correctly with empty organizations array', () => {
-      renderWithProvider({ currentOrganization, organizations: [] })
+  describe('fallback when env variable is not set', () => {
+    beforeEach(() => {
+      delete process.env.NEXT_PUBLIC_TENANT_NAME
+    })
 
-      expect(screen.getByText('Current Org')).toBeInTheDocument()
-      expect(screen.getByText('Current Tenant')).toBeInTheDocument()
+    it('renders fallback tenant name when env variable is not set', () => {
+      renderWithProvider()
+
+      expect(screen.getByText('Mandanten-Name')).toBeInTheDocument()
+    })
+  })
+
+  describe('static content', () => {
+    it('renders CIVITAS/CORE subtitle', () => {
+      renderWithProvider()
+
+      expect(screen.getByText('CIVITAS/CORE')).toBeInTheDocument()
     })
   })
 })
