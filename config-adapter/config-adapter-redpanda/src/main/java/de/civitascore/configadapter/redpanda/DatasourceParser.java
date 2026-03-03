@@ -33,6 +33,14 @@ final class DatasourceParser {
 
   private static final Logger log = LoggerFactory.getLogger(DatasourceParser.class);
 
+  private static final String CONFIGURATION_KEY = "configuration";
+  private static final int DEFAULT_MQTT_PORT = 1883;
+  private static final int DEFAULT_POSTGRES_PORT = 5432;
+  private static final String DEFAULT_DRIVER = "postgres";
+  private static final String POSTGRES_SCHEME = "postgres://";
+  private static final String SSL_MODE_PARAM = "?sslmode=";
+  private static final String TCP_SCHEME = "tcp://";
+
   private static final Set<String> VALID_SSL_MODES =
       Set.of("disable", "allow", "prefer", "require", "verify-ca", "verify-full");
 
@@ -64,11 +72,11 @@ final class DatasourceParser {
     List<String> urls = DatasourceField.URLS.asList(cfg);
     if (urls.isEmpty()) {
       String host = datasource.getHost();
-      int port = datasource.getPort() != null ? datasource.getPort() : 1883;
+      int port = datasource.getPort() != null ? datasource.getPort() : DEFAULT_MQTT_PORT;
       if (host == null) {
         host = DatasourceField.HOST.asString(cfg).orElse(null);
       }
-      if (host != null) urls = List.of("tcp://" + host + ":" + port);
+      if (host != null) urls = List.of(TCP_SCHEME + host + ":" + port);
     }
 
     if (urls.isEmpty()) {
@@ -84,6 +92,8 @@ final class DatasourceParser {
         DatasourceField.KEEPALIVE.asInt(cfg).orElse(null),
         DatasourceField.CONNECT_TIMEOUT.asString(cfg).orElse(null),
         DatasourceField.USER.asString(cfg).orElse(null),
+        // Password is intentionally passed through as-is (possibly ENC(...) encrypted).
+        // Decryption is handled by the Redpanda Connect runtime, not by the adapter.
         DatasourceField.PASSWORD.asObject(cfg),
         DatasourceField.TLS_ENABLED.asBooleanNested(cfg));
   }
@@ -104,7 +114,7 @@ final class DatasourceParser {
               + datasource.getId()
               + "' has no DSN and cannot build one (missing host, database, or username)");
     }
-    String driver = DatasourceField.DRIVER.asString(cfg).orElse("postgres");
+    String driver = DatasourceField.DRIVER.asString(cfg).orElse(DEFAULT_DRIVER);
     String query = DatasourceField.QUERY.asString(cfg).orElse(null);
 
     return new ConnectorConfig.Sql(driver, dsn, query);
@@ -128,7 +138,7 @@ final class DatasourceParser {
     int port =
         datasource.getPort() != null
             ? datasource.getPort()
-            : DatasourceField.PORT.asInt(cfg).orElse(5432);
+            : DatasourceField.PORT.asInt(cfg).orElse(DEFAULT_POSTGRES_PORT);
     String database = DatasourceField.DATABASE.asString(cfg).orElse(null);
     String username = DatasourceField.USERNAME.asString(cfg).orElse(null);
     Object password = DatasourceField.PASSWORD.asObject(cfg);
@@ -157,7 +167,7 @@ final class DatasourceParser {
     String encDatabase = URLEncoder.encode(database, StandardCharsets.UTF_8);
     // Host is not URL-encoded: RFC 3986 hostnames are restricted to unreserved
     // characters. IPv6 literals must be bracketed per RFC 3986 §3.2.2.
-    return "postgres://"
+    return POSTGRES_SCHEME
         + credentials
         + "@"
         + host
@@ -165,7 +175,7 @@ final class DatasourceParser {
         + port
         + "/"
         + encDatabase
-        + "?sslmode="
+        + SSL_MODE_PARAM
         + sslMode;
   }
 
@@ -182,12 +192,14 @@ final class DatasourceParser {
 
   /**
    * Returns the nested {@code configuration} map from the datasource's additional properties, or
-   * the additional properties map itself if no {@code configuration} sub-key exists.
+   * the additional properties map itself if no {@code configuration} sub-key exists. Returns an
+   * empty map if {@code getAdditionalProperties()} is null.
    */
   @SuppressWarnings("unchecked")
   static Map<String, Object> configuration(Datasource datasource) {
     Map<String, Object> props = datasource.getAdditionalProperties();
-    Object cfg = props.get("configuration");
+    if (props == null) return Map.of();
+    Object cfg = props.get(CONFIGURATION_KEY);
     return cfg instanceof Map<?, ?> m ? (Map<String, Object>) m : props;
   }
 }

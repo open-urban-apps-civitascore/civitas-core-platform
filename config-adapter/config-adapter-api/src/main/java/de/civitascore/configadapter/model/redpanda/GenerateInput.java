@@ -18,6 +18,10 @@ import java.util.Objects;
 /** Generate input configuration for a RedPanda Connect pipeline (synthetic data generation). */
 public final class GenerateInput extends AbstractApiModel {
 
+  private static final String KEY_INTERVAL = "interval";
+  private static final String KEY_COUNT = "count";
+  private static final String KEY_MAPPING = "mapping";
+
   private String interval;
   private Integer count;
   private String mapping;
@@ -51,9 +55,9 @@ public final class GenerateInput extends AbstractApiModel {
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (interval != null) map.put("interval", interval);
-    if (count != null) map.put("count", count);
-    if (mapping != null) map.put("mapping", mapping);
+    if (interval != null) map.put(KEY_INTERVAL, interval);
+    if (count != null) map.put(KEY_COUNT, count);
+    if (mapping != null) map.put(KEY_MAPPING, mapping);
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }

@@ -40,6 +40,14 @@ final class PlaceholderResolver {
 
   private static final Logger log = LoggerFactory.getLogger(PlaceholderResolver.class);
 
+  // Core Datasource field names used in getCoreField switch
+  private static final String FIELD_ID = "id";
+  private static final String FIELD_TYPE = "type";
+  private static final String FIELD_NAME = "name";
+  private static final String FIELD_DESCRIPTION = "description";
+  private static final String FIELD_HOST = "host";
+  private static final String FIELD_PORT = "port";
+
   /**
    * Pattern matching our placeholders while ignoring Bloblang {@code ${!...}} interpolation.
    *
@@ -92,6 +100,7 @@ final class PlaceholderResolver {
   private static Map<String, Object> resolveMap(
       Map<String, Object> map, String targetUrl, List<Datasource> datasources)
       throws FatalAdapterException {
+    if (map == null) return Map.of();
     Map<String, Object> result = new LinkedHashMap<>(map.size());
     for (Map.Entry<String, Object> entry : map.entrySet()) {
       result.put(entry.getKey(), resolveValue(entry.getValue(), targetUrl, datasources));
@@ -101,6 +110,7 @@ final class PlaceholderResolver {
 
   private static List<Object> resolveList(
       List<?> list, String targetUrl, List<Datasource> datasources) throws FatalAdapterException {
+    if (list == null) return List.of();
     List<Object> result = new ArrayList<>(list.size());
     for (Object item : list) {
       result.add(resolveValue(item, targetUrl, datasources));
@@ -174,6 +184,10 @@ final class PlaceholderResolver {
     }
 
     Datasource ds = datasources.get(index);
+    if (ds == null) {
+      throw new FatalAdapterException(
+          AdapterErrorCode.INVALID_PAYLOAD, "Datasource at index " + index + " is null");
+    }
 
     if (property != null) {
       return resolveDatasourceProperty(ds, index, property);
@@ -208,10 +222,16 @@ final class PlaceholderResolver {
       throws FatalAdapterException {
     Object value = getCoreField(ds, property);
     if (value == null) {
-      value = ds.getAdditionalProperties().get(property);
+      Map<String, Object> additionalProps = ds.getAdditionalProperties();
+      if (additionalProps != null) {
+        value = additionalProps.get(property);
+      }
     }
     if (value == null) {
-      value = DatasourceParser.configuration(ds).get(property);
+      Map<String, Object> cfg = DatasourceParser.configuration(ds);
+      if (cfg != null) {
+        value = cfg.get(property);
+      }
     }
     if (value == null) {
       throw new FatalAdapterException(
@@ -234,12 +254,12 @@ final class PlaceholderResolver {
    */
   private static Object getCoreField(Datasource ds, String property) {
     return switch (property) {
-      case "id" -> ds.getId();
-      case "type" -> ds.getType();
-      case "name" -> ds.getName();
-      case "description" -> ds.getDescription();
-      case "host" -> ds.getHost();
-      case "port" -> ds.getPort();
+      case FIELD_ID -> ds.getId();
+      case FIELD_TYPE -> ds.getType();
+      case FIELD_NAME -> ds.getName();
+      case FIELD_DESCRIPTION -> ds.getDescription();
+      case FIELD_HOST -> ds.getHost();
+      case FIELD_PORT -> ds.getPort();
       default -> null;
     };
   }

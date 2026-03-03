@@ -19,6 +19,8 @@ import java.util.Objects;
 /** Switch output configuration for a RedPanda Connect pipeline with conditional routing. */
 public final class SwitchOutput extends AbstractApiModel {
 
+  private static final String KEY_CASES = "cases";
+
   private List<SwitchCase> cases;
 
   public SwitchOutput() {}
@@ -35,7 +37,7 @@ public final class SwitchOutput extends AbstractApiModel {
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
     if (cases != null) {
-      map.put("cases", cases.stream().map(SwitchCase::toApiMap).toList());
+      map.put(KEY_CASES, cases.stream().map(SwitchCase::toApiMap).toList());
     }
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);

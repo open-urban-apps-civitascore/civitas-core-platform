@@ -24,6 +24,11 @@ import java.util.Objects;
  */
 public final class BranchProcessor extends AbstractApiModel {
 
+  private static final String KEY_REQUEST_MAP = "request_map";
+  private static final String KEY_PROCESSORS = "processors";
+  private static final String KEY_RESULT_MAP = "result_map";
+  private static final int TOSTRING_MAX_LENGTH = 50;
+
   @JsonProperty("request_map")
   private String requestMap;
 
@@ -61,11 +66,11 @@ public final class BranchProcessor extends AbstractApiModel {
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (requestMap != null) map.put("request_map", requestMap);
+    if (requestMap != null) map.put(KEY_REQUEST_MAP, requestMap);
     if (processors != null) {
-      map.put("processors", processors.stream().map(ProcessorStep::toApiMap).toList());
+      map.put(KEY_PROCESSORS, processors.stream().map(ProcessorStep::toApiMap).toList());
     }
-    if (resultMap != null) map.put("result_map", resultMap);
+    if (resultMap != null) map.put(KEY_RESULT_MAP, resultMap);
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }
@@ -90,11 +95,11 @@ public final class BranchProcessor extends AbstractApiModel {
   public String toString() {
     return "BranchProcessor["
         + "requestMap="
-        + StringUtils.truncate(requestMap, 50)
+        + StringUtils.truncate(requestMap, TOSTRING_MAX_LENGTH)
         + ", processors="
         + (processors != null ? processors.size() : 0)
         + ", resultMap="
-        + StringUtils.truncate(resultMap, 50)
+        + StringUtils.truncate(resultMap, TOSTRING_MAX_LENGTH)
         + ", additionalProperties="
         + additionalProperties().keySet()
         + ']';

@@ -21,6 +21,11 @@ import java.util.Objects;
  */
 public final class PipelineInput extends AbstractApiModel {
 
+  private static final String KEY_LABEL = "label";
+  private static final String KEY_MQTT = "mqtt";
+  private static final String KEY_SQL_RAW = "sql_raw";
+  private static final String KEY_GENERATE = "generate";
+
   private MqttInput mqtt;
 
   @JsonProperty("sql_raw")
@@ -67,10 +72,10 @@ public final class PipelineInput extends AbstractApiModel {
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (label != null) map.put("label", label);
-    if (mqtt != null) map.put("mqtt", mqtt.toApiMap());
-    if (sqlRaw != null) map.put("sql_raw", sqlRaw.toApiMap());
-    if (generate != null) map.put("generate", generate.toApiMap());
+    if (label != null) map.put(KEY_LABEL, label);
+    if (mqtt != null) map.put(KEY_MQTT, mqtt.toApiMap());
+    if (sqlRaw != null) map.put(KEY_SQL_RAW, sqlRaw.toApiMap());
+    if (generate != null) map.put(KEY_GENERATE, generate.toApiMap());
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }

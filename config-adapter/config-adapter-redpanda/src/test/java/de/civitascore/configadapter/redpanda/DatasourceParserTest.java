@@ -620,6 +620,18 @@ class DatasourceParserTest {
     }
 
     @Test
+    @DisplayName("returns empty map when additionalProperties is null")
+    void configuration_nullAdditionalProperties_returnsEmptyMap() {
+      Datasource ds = new Datasource();
+      // Do not call handleUnknownProperty — additionalProperties may be null
+
+      Map<String, Object> result = DatasourceParser.configuration(ds);
+
+      assertNotNull(result);
+      assertTrue(result.isEmpty());
+    }
+
+    @Test
     @DisplayName("returns additionalProperties when no 'configuration' key")
     void configuration_withoutNestedKey_returnsProps() {
       Datasource ds = new Datasource();

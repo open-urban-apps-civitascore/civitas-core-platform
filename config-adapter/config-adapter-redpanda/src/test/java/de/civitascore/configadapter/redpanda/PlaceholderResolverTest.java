@@ -367,6 +367,38 @@ class PlaceholderResolverTest {
     }
   }
 
+  // ─── Null safety ─────────────────────────────────────────────────────────
+
+  @Nested
+  @DisplayName("Null safety")
+  class NullSafety {
+
+    @Test
+    @DisplayName("throws FatalAdapterException when datasource in list is null")
+    void resolve_nullDatasourceInList_throwsFatalException() {
+      List<Datasource> datasources = new java.util.ArrayList<>();
+      datasources.add(null);
+      Map<String, Object> data = Map.of("dsn", "${DATASOURCE[0]}");
+
+      assertThrows(
+          FatalAdapterException.class, () -> PlaceholderResolver.resolve(data, null, datasources));
+    }
+
+    @Test
+    @DisplayName("throws FatalAdapterException for missing prop when additionalProperties is null")
+    void resolve_datasourceWithNullAdditionalProperties_throwsFatalForMissingProp() {
+      Datasource ds = new Datasource();
+      ds.setId("ds-nullprops");
+      ds.setType("mqtt");
+      // Do not call handleUnknownProperty — additionalProperties may be null
+
+      Map<String, Object> data = Map.of("val", "${DATASOURCE[0].nonexistent}");
+
+      assertThrows(
+          FatalAdapterException.class, () -> PlaceholderResolver.resolve(data, null, List.of(ds)));
+    }
+  }
+
   // ─── Dataset event pattern ────────────────────────────────────────────────
 
   @Nested

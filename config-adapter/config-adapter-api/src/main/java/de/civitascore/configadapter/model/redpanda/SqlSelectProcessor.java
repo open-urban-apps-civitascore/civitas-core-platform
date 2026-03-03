@@ -19,6 +19,12 @@ import java.util.Objects;
 /** SQL select processor configuration for a RedPanda Connect pipeline. */
 public final class SqlSelectProcessor extends AbstractApiModel {
 
+  private static final String KEY_DRIVER = "driver";
+  private static final String KEY_DSN = "dsn";
+  private static final String KEY_TABLE = "table";
+  private static final String KEY_COLUMNS = "columns";
+  private static final String REDACTED = "[PRESENT]";
+
   private String driver;
   private String dsn;
   private String table;
@@ -61,10 +67,10 @@ public final class SqlSelectProcessor extends AbstractApiModel {
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (driver != null) map.put("driver", driver);
-    if (dsn != null) map.put("dsn", dsn);
-    if (table != null) map.put("table", table);
-    if (columns != null) map.put("columns", columns);
+    if (driver != null) map.put(KEY_DRIVER, driver);
+    if (dsn != null) map.put(KEY_DSN, dsn);
+    if (table != null) map.put(KEY_TABLE, table);
+    if (columns != null) map.put(KEY_COLUMNS, columns);
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }
@@ -92,7 +98,7 @@ public final class SqlSelectProcessor extends AbstractApiModel {
         + "driver="
         + driver
         + ", dsn="
-        + (dsn != null ? "[PRESENT]" : "null")
+        + (dsn != null ? REDACTED : "null")
         + ", table="
         + table
         + ", columns="

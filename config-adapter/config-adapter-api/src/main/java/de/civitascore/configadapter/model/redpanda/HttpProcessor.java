@@ -18,6 +18,11 @@ import java.util.Objects;
 /** HTTP processor configuration for a RedPanda Connect pipeline. */
 public final class HttpProcessor extends AbstractApiModel {
 
+  private static final String KEY_URL = "url";
+  private static final String KEY_VERB = "verb";
+  private static final String KEY_HEADERS = "headers";
+  private static final String KEY_TIMEOUT = "timeout";
+
   private String url;
   private String verb;
   private Map<String, String> headers;
@@ -60,10 +65,10 @@ public final class HttpProcessor extends AbstractApiModel {
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (url != null) map.put("url", url);
-    if (verb != null) map.put("verb", verb);
-    if (headers != null) map.put("headers", headers);
-    if (timeout != null) map.put("timeout", timeout);
+    if (url != null) map.put(KEY_URL, url);
+    if (verb != null) map.put(KEY_VERB, verb);
+    if (headers != null) map.put(KEY_HEADERS, headers);
+    if (timeout != null) map.put(KEY_TIMEOUT, timeout);
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }

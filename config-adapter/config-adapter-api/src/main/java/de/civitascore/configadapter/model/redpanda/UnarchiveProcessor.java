@@ -18,6 +18,8 @@ import java.util.Objects;
 /** Unarchive processor configuration for a RedPanda Connect pipeline. */
 public final class UnarchiveProcessor extends AbstractApiModel {
 
+  private static final String KEY_FORMAT = "format";
+
   private String format;
 
   public UnarchiveProcessor() {}
@@ -33,7 +35,7 @@ public final class UnarchiveProcessor extends AbstractApiModel {
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (format != null) map.put("format", format);
+    if (format != null) map.put(KEY_FORMAT, format);
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }

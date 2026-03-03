@@ -269,6 +269,48 @@ class DatasourceInjectorTest {
     }
 
     @Test
+    @DisplayName("rejects placeholder with extra closing brace")
+    void extractPlaceholder_withExtraClosingBrace_returnsEmpty() throws Exception {
+      Map<String, Object> pipelineData = Map.of("input", Map.of("label", "${test}}"));
+
+      Datasource ds = new Datasource();
+      ds.setId("test");
+      ds.setType("mqtt");
+      ds.setHost("broker.local");
+      ds.handleUnknownProperty("configuration", Map.of("topics", List.of("t/#")));
+
+      // ${test}} does not match strict regex — returns unchanged
+      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(ds));
+      assertSame(pipelineData, result);
+    }
+
+    @Test
+    @DisplayName("rejects placeholder with extra opening brace")
+    void extractPlaceholder_withExtraOpeningBrace_returnsEmpty() throws Exception {
+      Map<String, Object> pipelineData = Map.of("input", Map.of("label", "${{test}"));
+
+      Datasource ds = new Datasource();
+      ds.setId("test");
+      ds.setType("mqtt");
+
+      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(ds));
+      assertSame(pipelineData, result);
+    }
+
+    @Test
+    @DisplayName("rejects placeholder with special chars in UUID")
+    void extractPlaceholder_withSpecialCharsInUuid_returnsEmpty() throws Exception {
+      Map<String, Object> pipelineData = Map.of("input", Map.of("label", "${te.st}"));
+
+      Datasource ds = new Datasource();
+      ds.setId("te.st");
+      ds.setType("mqtt");
+
+      Map<String, Object> result = DatasourceInjector.resolve(pipelineData, List.of(ds));
+      assertSame(pipelineData, result);
+    }
+
+    @Test
     @DisplayName("resolves correct datasource from multiple datasources")
     void resolve_multipleDatasources_resolvesCorrectOne() throws Exception {
       String targetId = "target-ds";

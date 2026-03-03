@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.redpanda;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,9 @@ import java.util.Map;
  * PipelineSerializer}.
  */
 sealed interface ConnectorConfig permits ConnectorConfig.Mqtt, ConnectorConfig.Sql {
+
+  /** Shared key for the datasource label in the Redpanda Connect input map. */
+  String KEY_LABEL = "label";
 
   /**
    * Returns the Redpanda Connect {@code input} map with the datasource ID as label:
@@ -44,23 +48,35 @@ sealed interface ConnectorConfig permits ConnectorConfig.Mqtt, ConnectorConfig.S
       boolean tlsEnabled)
       implements ConnectorConfig {
 
+    private static final String KEY_URLS = "urls";
+    private static final String KEY_TOPICS = "topics";
+    private static final String KEY_CLIENT_ID = "client_id";
+    private static final String KEY_QOS = "qos";
+    private static final String KEY_KEEPALIVE = "keepalive";
+    private static final String KEY_CONNECT_TIMEOUT = "connect_timeout";
+    private static final String KEY_USER = "user";
+    private static final String KEY_PASSWORD = "password";
+    private static final String KEY_TLS = "tls";
+    private static final String KEY_ENABLED = "enabled";
+
     @Override
     public Map<String, Object> toInputMap(String label) {
       Map<String, Object> mqtt = new LinkedHashMap<>();
-      if (urls != null && !urls.isEmpty()) mqtt.put("urls", List.copyOf(urls));
-      if (topics != null && !topics.isEmpty()) mqtt.put("topics", List.copyOf(topics));
-      if (clientId != null) mqtt.put("client_id", clientId);
-      if (qos != null) mqtt.put("qos", qos);
-      if (keepalive != null) mqtt.put("keepalive", keepalive);
-      if (connectTimeout != null) mqtt.put("connect_timeout", connectTimeout);
-      if (user != null) mqtt.put("user", user);
-      if (password != null) mqtt.put("password", password);
-      if (tlsEnabled) mqtt.put("tls", Map.of("enabled", true));
+      if (urls != null && !urls.isEmpty()) mqtt.put(KEY_URLS, Collections.unmodifiableList(urls));
+      if (topics != null && !topics.isEmpty())
+        mqtt.put(KEY_TOPICS, Collections.unmodifiableList(topics));
+      if (clientId != null) mqtt.put(KEY_CLIENT_ID, clientId);
+      if (qos != null) mqtt.put(KEY_QOS, qos);
+      if (keepalive != null) mqtt.put(KEY_KEEPALIVE, keepalive);
+      if (connectTimeout != null) mqtt.put(KEY_CONNECT_TIMEOUT, connectTimeout);
+      if (user != null) mqtt.put(KEY_USER, user);
+      if (password != null) mqtt.put(KEY_PASSWORD, password);
+      if (tlsEnabled) mqtt.put(KEY_TLS, Map.of(KEY_ENABLED, true));
 
       Map<String, Object> input = new LinkedHashMap<>();
-      input.put("label", label);
-      input.put(ConnectorType.MQTT.redpandaKey, Map.copyOf(mqtt));
-      return Map.copyOf(input);
+      input.put(KEY_LABEL, label);
+      input.put(ConnectorType.MQTT.redpandaKey, Collections.unmodifiableMap(mqtt));
+      return Collections.unmodifiableMap(input);
     }
   }
 
@@ -69,17 +85,22 @@ sealed interface ConnectorConfig permits ConnectorConfig.Mqtt, ConnectorConfig.S
   /** SQL (sql_raw) input connector. {@code dsn} may be {@code ENC(...)} encrypted. */
   record Sql(String driver, String dsn, String query) implements ConnectorConfig {
 
+    private static final String KEY_DRIVER = "driver";
+    private static final String KEY_DSN = "dsn";
+    private static final String KEY_QUERY = "query";
+    private static final String DEFAULT_DRIVER = "postgres";
+
     @Override
     public Map<String, Object> toInputMap(String label) {
       Map<String, Object> sql = new LinkedHashMap<>();
-      sql.put("driver", driver != null ? driver : "postgres");
-      if (dsn != null) sql.put("dsn", dsn);
-      if (query != null) sql.put("query", query);
+      sql.put(KEY_DRIVER, driver != null ? driver : DEFAULT_DRIVER);
+      if (dsn != null) sql.put(KEY_DSN, dsn);
+      if (query != null) sql.put(KEY_QUERY, query);
 
       Map<String, Object> input = new LinkedHashMap<>();
-      input.put("label", label);
-      input.put(ConnectorType.SQL.redpandaKey, Map.copyOf(sql));
-      return Map.copyOf(input);
+      input.put(KEY_LABEL, label);
+      input.put(ConnectorType.SQL.redpandaKey, Collections.unmodifiableMap(sql));
+      return Collections.unmodifiableMap(input);
     }
   }
 }

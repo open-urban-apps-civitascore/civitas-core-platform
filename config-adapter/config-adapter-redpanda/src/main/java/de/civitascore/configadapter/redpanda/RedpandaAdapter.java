@@ -46,6 +46,7 @@ public class RedpandaAdapter extends AbstractConfigAdapter {
   private static final String URL_PROPERTY = "url";
   private static final String MASTER_KEY_ENV = "CIVITAS_MASTER_KEY";
   private static final String MASTER_SALT_ENV = "CIVITAS_MASTER_SALT";
+  private static final String ERR_EXPECTED_PIPELINE_CONFIG = "Expected PipelineConfigValue";
 
   private RedpandaConnectClient redpandaClient;
 
@@ -141,8 +142,7 @@ public class RedpandaAdapter extends AbstractConfigAdapter {
       }
       return id;
     }
-    throw new FatalAdapterException(
-        AdapterErrorCode.INVALID_PAYLOAD, "Expected PipelineConfigValue");
+    throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, ERR_EXPECTED_PIPELINE_CONFIG);
   }
 
   private Map<String, Object> extractPipelineData(ConfigEvent event) throws FatalAdapterException {
@@ -150,8 +150,7 @@ public class RedpandaAdapter extends AbstractConfigAdapter {
     if (configValue instanceof PipelineConfigValue pipelineConfig) {
       return pipelineConfig.toApiMap();
     }
-    throw new FatalAdapterException(
-        AdapterErrorCode.INVALID_PAYLOAD, "Expected PipelineConfigValue");
+    throw new FatalAdapterException(AdapterErrorCode.INVALID_PAYLOAD, ERR_EXPECTED_PIPELINE_CONFIG);
   }
 
   void setRedpandaClient(RedpandaConnectClient client) {

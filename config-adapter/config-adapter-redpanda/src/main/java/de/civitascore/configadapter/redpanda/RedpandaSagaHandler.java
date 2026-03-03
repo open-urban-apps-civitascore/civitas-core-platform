@@ -46,6 +46,25 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   private static final String MASTER_KEY_ENV = "CIVITAS_MASTER_KEY";
   private static final String MASTER_SALT_ENV = "CIVITAS_MASTER_SALT";
 
+  private static final String OP_DEPLOY = "DEPLOY_PIPELINES";
+  private static final String OP_UPDATE = "UPDATE_PIPELINES";
+  private static final String OP_DELETE = "DELETE_PIPELINES";
+  private static final String OP_RESTORE = "RESTORE_PIPELINES";
+
+  private static final String TYPE_COMPENSATE = "COMPENSATE_STEP";
+
+  private static final String FIELD_DATA_PIPELINES = "dataPipelines";
+  private static final String FIELD_PIPELINE_IDS = "pipelineIds";
+  private static final String FIELD_TARGET_URL = "targetUrl";
+  private static final String FIELD_DATASOURCES = "datasources";
+  private static final String FIELD_ID = "id";
+  private static final String FIELD_ACTION = "action";
+  private static final String FIELD_DATA = "data";
+
+  private static final String ACTION_ADD = "ADD";
+  private static final String ACTION_UPDATE = "UPDATE";
+  private static final String ACTION_DELETE = "DELETE";
+
   private RedpandaConnectClient redpandaClient;
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
@@ -88,31 +107,31 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   @Override
   protected SagaCommandResult doHandle(SagaCommandMessage command) {
     return switch (command.operation()) {
-      case "DEPLOY_PIPELINES" -> handleDeployPipelines(command);
-      case "UPDATE_PIPELINES" -> handleUpdatePipelines(command);
-      case "DELETE_PIPELINES" -> handleDeletePipelines(command);
-      case "RESTORE_PIPELINES" -> handleRestorePipelines(command);
+      case OP_DEPLOY -> handleDeployPipelines(command);
+      case OP_UPDATE -> handleUpdatePipelines(command);
+      case OP_DELETE -> handleDeletePipelines(command);
+      case OP_RESTORE -> handleRestorePipelines(command);
       default -> unknownOperation(command);
     };
   }
 
   private SagaCommandResult handleDeployPipelines(SagaCommandMessage command) {
-    List<Map<String, Object>> dataPipelines = extractPipelineList(command, "dataPipelines");
+    List<Map<String, Object>> dataPipelines = extractPipelineList(command, FIELD_DATA_PIPELINES);
     String targetUrl = extractTargetUrl(command);
     List<String> deployedIds = new ArrayList<>();
 
     try {
       List<Datasource> datasources = extractDatasources(command);
       for (Map<String, Object> pipeline : dataPipelines) {
-        String id = requirePipelineField(pipeline, "id");
+        String id = requirePipelineField(pipeline, FIELD_ID);
         Map<String, Object> data = resolvePipelineData(pipeline, datasources, targetUrl);
 
         redpandaClient.createPipeline(id, data);
         deployedIds.add(id);
       }
 
-      Map<String, Object> resultData = Map.of("pipelineIds", List.copyOf(deployedIds));
-      Map<String, Object> compensationData = Map.of("pipelineIds", List.copyOf(deployedIds));
+      Map<String, Object> resultData = Map.of(FIELD_PIPELINE_IDS, List.copyOf(deployedIds));
+      Map<String, Object> compensationData = Map.of(FIELD_PIPELINE_IDS, List.copyOf(deployedIds));
 
       log.info(
           "Deployed {} pipelines for saga {}",
@@ -123,27 +142,27 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
           command.sagaId(), command.stepId(), resultData, compensationData);
 
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      return pipelineError(command, "DEPLOY_PIPELINES", false, e);
+      return pipelineError(command, OP_DEPLOY, false, e);
     }
   }
 
   private SagaCommandResult handleUpdatePipelines(SagaCommandMessage command) {
-    List<Map<String, Object>> dataPipelines = extractPipelineList(command, "dataPipelines");
+    List<Map<String, Object>> dataPipelines = extractPipelineList(command, FIELD_DATA_PIPELINES);
     String targetUrl = extractTargetUrl(command);
     List<String> processedIds = new ArrayList<>();
-    boolean isCompensation = "COMPENSATE_STEP".equals(command.type());
+    boolean isCompensation = TYPE_COMPENSATE.equals(command.type());
 
     try {
       List<Datasource> datasources = extractDatasources(command);
       for (Map<String, Object> pipeline : dataPipelines) {
-        String id = requirePipelineField(pipeline, "id");
-        String action = requirePipelineField(pipeline, "action");
+        String id = requirePipelineField(pipeline, FIELD_ID);
+        String action = requirePipelineField(pipeline, FIELD_ACTION);
         Map<String, Object> data = resolvePipelineData(pipeline, datasources, targetUrl);
 
         switch (action) {
-          case "ADD" -> redpandaClient.createPipeline(id, data);
-          case "UPDATE" -> redpandaClient.updatePipeline(id, data);
-          case "DELETE" -> redpandaClient.deletePipeline(id);
+          case ACTION_ADD -> redpandaClient.createPipeline(id, data);
+          case ACTION_UPDATE -> redpandaClient.updatePipeline(id, data);
+          case ACTION_DELETE -> redpandaClient.deletePipeline(id);
           default ->
               throw new IllegalArgumentException(
                   "Unknown pipeline action: " + action + " for pipeline: " + id);
@@ -151,8 +170,8 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
         processedIds.add(id);
       }
 
-      Map<String, Object> resultData = Map.of("pipelineIds", List.copyOf(processedIds));
-      Map<String, Object> compensationData = Map.of("pipelineIds", List.copyOf(processedIds));
+      Map<String, Object> resultData = Map.of(FIELD_PIPELINE_IDS, List.copyOf(processedIds));
+      Map<String, Object> compensationData = Map.of(FIELD_PIPELINE_IDS, List.copyOf(processedIds));
 
       log.info(
           "Updated {} pipelines for saga {}",
@@ -163,13 +182,13 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
           command.sagaId(), command.stepId(), resultData, compensationData);
 
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      return pipelineError(command, "UPDATE_PIPELINES", isCompensation, e);
+      return pipelineError(command, OP_UPDATE, isCompensation, e);
     }
   }
 
   private SagaCommandResult handleDeletePipelines(SagaCommandMessage command) {
-    List<String> pipelineIds = extractStringList(command, "pipelineIds");
-    boolean isCompensation = "COMPENSATE_STEP".equals(command.type());
+    List<String> pipelineIds = extractStringList(command, FIELD_PIPELINE_IDS);
+    boolean isCompensation = TYPE_COMPENSATE.equals(command.type());
 
     try {
       for (String id : pipelineIds) {
@@ -185,18 +204,18 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
       return SagaCommandResult.success(command.sagaId(), command.stepId(), Map.of(), Map.of());
 
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      return pipelineError(command, "DELETE_PIPELINES", isCompensation, e);
+      return pipelineError(command, OP_DELETE, isCompensation, e);
     }
   }
 
   private SagaCommandResult handleRestorePipelines(SagaCommandMessage command) {
-    List<Map<String, Object>> dataPipelines = extractPipelineList(command, "dataPipelines");
+    List<Map<String, Object>> dataPipelines = extractPipelineList(command, FIELD_DATA_PIPELINES);
     String targetUrl = extractTargetUrl(command);
 
     try {
       List<Datasource> datasources = extractDatasources(command);
       for (Map<String, Object> pipeline : dataPipelines) {
-        String id = requirePipelineField(pipeline, "id");
+        String id = requirePipelineField(pipeline, FIELD_ID);
         Map<String, Object> data = resolvePipelineData(pipeline, datasources, targetUrl);
         redpandaClient.updatePipeline(id, data);
       }
@@ -209,7 +228,7 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
       return SagaCommandResult.compensationSuccess(command.sagaId(), command.stepId());
 
     } catch (FatalAdapterException | RetryableAdapterException e) {
-      return pipelineError(command, "RESTORE_PIPELINES", true, e);
+      return pipelineError(command, OP_RESTORE, true, e);
     }
   }
 
@@ -218,7 +237,7 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   private Map<String, Object> resolvePipelineData(
       Map<String, Object> pipeline, List<Datasource> datasources, String targetUrl)
       throws FatalAdapterException {
-    Map<String, Object> data = optionalPipelineMapField(pipeline, "data");
+    Map<String, Object> data = optionalPipelineMapField(pipeline, FIELD_DATA);
     data = DatasourceInjector.resolve(data, datasources);
     return PlaceholderResolver.resolve(data, targetUrl, datasources);
   }
@@ -240,7 +259,7 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
 
   private static List<Datasource> extractDatasources(SagaCommandMessage command)
       throws FatalAdapterException {
-    Object value = command.payload().getOrDefault("datasources", List.of());
+    Object value = command.payload().getOrDefault(FIELD_DATASOURCES, List.of());
     if (!(value instanceof List<?> list) || list.isEmpty()) {
       return List.of();
     }
@@ -259,7 +278,7 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   }
 
   private static String extractTargetUrl(SagaCommandMessage command) {
-    Object value = command.payload().get("targetUrl");
+    Object value = command.payload().get(FIELD_TARGET_URL);
     return value instanceof String s ? s : null;
   }
 

@@ -22,6 +22,9 @@ import java.util.Objects;
  */
 public final class PipelineOutput extends AbstractApiModel {
 
+  private static final String KEY_HTTP_CLIENT = "http_client";
+  private static final String KEY_SWITCH = "switch";
+
   @JsonProperty("http_client")
   private HttpClientOutput httpClient;
 
@@ -49,8 +52,8 @@ public final class PipelineOutput extends AbstractApiModel {
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (httpClient != null) map.put("http_client", httpClient.toApiMap());
-    if (switchOutput != null) map.put("switch", switchOutput.toApiMap());
+    if (httpClient != null) map.put(KEY_HTTP_CLIENT, httpClient.toApiMap());
+    if (switchOutput != null) map.put(KEY_SWITCH, switchOutput.toApiMap());
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }

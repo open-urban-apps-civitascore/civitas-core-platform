@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +40,10 @@ class DatasourceInjector {
 
   private static final Logger log = LoggerFactory.getLogger(DatasourceInjector.class);
   private static final String LABEL_KEY = "label";
+  private static final String KEY_INPUT = "input";
+
+  /** Strict pattern: exactly {@code ${<word-or-hyphen chars>}}. Rejects malformed variants. */
+  private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("^\\$\\{[\\w-]+\\}$");
 
   private DatasourceInjector() {}
 
@@ -59,7 +64,7 @@ class DatasourceInjector {
       return pipelineData;
     }
 
-    Object inputObj = pipelineData.get("input");
+    Object inputObj = pipelineData.get(KEY_INPUT);
     if (!(inputObj instanceof Map<?, ?> inputMap)) {
       return pipelineData;
     }
@@ -82,7 +87,7 @@ class DatasourceInjector {
     if (!(labelObj instanceof String label)) return Optional.empty();
 
     String trimmed = label.trim();
-    if (!trimmed.startsWith("${") || !trimmed.endsWith("}")) return Optional.empty();
+    if (!PLACEHOLDER_PATTERN.matcher(trimmed).matches()) return Optional.empty();
 
     String uuid = trimmed.substring(2, trimmed.length() - 1).trim();
     if (uuid.isEmpty()) return Optional.empty();
@@ -123,7 +128,7 @@ class DatasourceInjector {
         config.getClass().getSimpleName());
 
     Map<String, Object> resolved = new LinkedHashMap<>(pipelineData);
-    resolved.put("input", config.toInputMap(placeholder.datasourceId()));
+    resolved.put(KEY_INPUT, config.toInputMap(placeholder.datasourceId()));
     return resolved;
   }
 

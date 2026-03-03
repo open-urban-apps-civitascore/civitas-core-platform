@@ -23,6 +23,13 @@ import java.util.Objects;
  */
 public final class ProcessorStep extends AbstractApiModel {
 
+  private static final String KEY_MAPPING = "mapping";
+  private static final String KEY_BRANCH = "branch";
+  private static final String KEY_UNARCHIVE = "unarchive";
+  private static final String KEY_SQL_SELECT = "sql_select";
+  private static final String KEY_HTTP = "http";
+  private static final int TOSTRING_MAX_LENGTH = 50;
+
   private String mapping;
   private BranchProcessor branch;
   private UnarchiveProcessor unarchive;
@@ -77,11 +84,11 @@ public final class ProcessorStep extends AbstractApiModel {
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (mapping != null) map.put("mapping", mapping);
-    if (branch != null) map.put("branch", branch.toApiMap());
-    if (unarchive != null) map.put("unarchive", unarchive.toApiMap());
-    if (sqlSelect != null) map.put("sql_select", sqlSelect.toApiMap());
-    if (http != null) map.put("http", http.toApiMap());
+    if (mapping != null) map.put(KEY_MAPPING, mapping);
+    if (branch != null) map.put(KEY_BRANCH, branch.toApiMap());
+    if (unarchive != null) map.put(KEY_UNARCHIVE, unarchive.toApiMap());
+    if (sqlSelect != null) map.put(KEY_SQL_SELECT, sqlSelect.toApiMap());
+    if (http != null) map.put(KEY_HTTP, http.toApiMap());
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }
@@ -108,7 +115,7 @@ public final class ProcessorStep extends AbstractApiModel {
   public String toString() {
     return "ProcessorStep["
         + "mapping="
-        + StringUtils.truncate(mapping, 50)
+        + StringUtils.truncate(mapping, TOSTRING_MAX_LENGTH)
         + ", branch="
         + branch
         + ", unarchive="

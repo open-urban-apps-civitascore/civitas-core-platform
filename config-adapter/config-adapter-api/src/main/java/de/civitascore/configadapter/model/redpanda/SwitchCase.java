@@ -19,6 +19,10 @@ import java.util.Objects;
 /** A single case within a switch output, with a condition and a recursive output definition. */
 public final class SwitchCase extends AbstractApiModel {
 
+  private static final String KEY_CHECK = "check";
+  private static final String KEY_OUTPUT = "output";
+  private static final int TOSTRING_MAX_LENGTH = 50;
+
   private String check;
   private PipelineOutput output;
 
@@ -43,8 +47,8 @@ public final class SwitchCase extends AbstractApiModel {
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (check != null) map.put("check", check);
-    if (output != null) map.put("output", output.toApiMap());
+    if (check != null) map.put(KEY_CHECK, check);
+    if (output != null) map.put(KEY_OUTPUT, output.toApiMap());
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }
@@ -66,6 +70,11 @@ public final class SwitchCase extends AbstractApiModel {
 
   @Override
   public String toString() {
-    return "SwitchCase[" + "check=" + StringUtils.truncate(check, 50) + ", output=" + output + ']';
+    return "SwitchCase["
+        + "check="
+        + StringUtils.truncate(check, TOSTRING_MAX_LENGTH)
+        + ", output="
+        + output
+        + ']';
   }
 }
