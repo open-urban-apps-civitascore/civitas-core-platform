@@ -44,8 +44,6 @@ public class SagaTestDataFactory {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  // ─── DataSet ─────────────────────────────────────────────────────────────────
-
   public DataSet createDataSet(String name) {
     DataSet ds = new DataSet();
     ds.setName(name + " " + System.nanoTime());
@@ -54,8 +52,6 @@ public class SagaTestDataFactory {
     ds.setDataSetStatus(DataSetStatus.DRAFT);
     return dataSetRepository.save(ds);
   }
-
-  // ─── DataSource ──────────────────────────────────────────────────────────────
 
   public DataSource createMqttDataSource() {
     DataSource ds = new DataSource();
@@ -92,8 +88,6 @@ public class SagaTestDataFactory {
             "query", "SELECT sensor_name, sensor_description FROM sensors"));
     return dataSourceRepository.save(ds);
   }
-
-  // ─── Pipeline ────────────────────────────────────────────────────────────────
 
   /**
    * Creates a pipeline with a synthetic {@code generate} input — no real datasource container
@@ -181,8 +175,6 @@ public class SagaTestDataFactory {
     return saved;
   }
 
-  // ─── Group + Role + Assignment ───────────────────────────────────────────────
-
   /** Creates a Group, Role (DATA type), and Assignment scoped to the given DataSet. */
   public void seedGroupAndAssignment(DataSet dataSet) {
     Group group = new Group();
@@ -204,8 +196,6 @@ public class SagaTestDataFactory {
     assignmentRepository.save(assignment);
   }
 
-  // ─── Cleanup ─────────────────────────────────────────────────────────────────
-
   /** Deletes all test entities in the correct order (respecting FK constraints). */
   public void cleanAll() {
     assignmentRepository.deleteAll();
@@ -215,8 +205,6 @@ public class SagaTestDataFactory {
     groupRepository.deleteAll();
     roleRepository.deleteAll();
   }
-
-  // ─── Private Helpers ─────────────────────────────────────────────────────────
 
   /**
    * Loads a pipeline configuration from a JSON file in the classpath.
