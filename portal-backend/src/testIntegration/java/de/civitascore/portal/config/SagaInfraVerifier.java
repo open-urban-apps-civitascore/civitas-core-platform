@@ -32,8 +32,6 @@ public class SagaInfraVerifier {
     this.redpandaExternalUrl = redpandaExternalUrl;
   }
 
-  // ─── Saga Awaiting ─────────────────────────────────────────────────────────
-
   /** Waits for a CREATE saga to complete: pendingSagaType=null and projectId set. */
   public DataSet awaitSagaCompletion(UUID dataSetId) {
     await()
@@ -74,8 +72,6 @@ public class SagaInfraVerifier {
     return dataSetRepository.findById(dataSetId).orElseThrow();
   }
 
-  // ─── FROST Verification ────────────────────────────────────────────────────
-
   public void verifyFrostProjectExists(String projectId) throws Exception {
     HttpResponse<String> response = httpGet(frostExternalUrl + "/Projects(" + projectId + ")");
     assertThat(response.statusCode())
@@ -106,8 +102,6 @@ public class SagaInfraVerifier {
             });
   }
 
-  // ─── Redpanda Verification ─────────────────────────────────────────────────
-
   public void verifyRedpandaPipelineExists(UUID pipelineId) throws Exception {
     HttpResponse<String> response = httpGet(redpandaExternalUrl + "/streams/" + pipelineId);
     assertThat(response.statusCode())
@@ -129,8 +123,6 @@ public class SagaInfraVerifier {
             });
   }
 
-  // ─── APISIX Verification ───────────────────────────────────────────────────
-
   public void verifyApisixReceivedRequests(
       SagaOrchestratorTestHelper sagaHelper, UUID dataSetId, String expectedMethod) {
     assertThat(sagaHelper.getApisixRequests())
@@ -151,8 +143,6 @@ public class SagaInfraVerifier {
           .anyMatch(r -> "PUT".equals(r.method()) && r.path().contains(upstreamSuffix));
     }
   }
-
-  // ─── Private HTTP Helper ───────────────────────────────────────────────────
 
   private static HttpResponse<String> httpGet(String url) throws Exception {
     HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
