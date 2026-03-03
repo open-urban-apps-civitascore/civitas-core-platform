@@ -100,18 +100,6 @@ public class DataSourceController
     return super.getAll(spec, pageable);
   }
 
-  @Override
-  public ResponseEntity<DataSourceOutputDTO> patch(
-      @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
-    DataSource entity = getService().findByIdOrThrow(id);
-    DataSourceInputDTO currentDto = dataSourceAssembler.toInput(entity);
-    DataSourceInputDTO patchedDto = objectMapper.readerForUpdating(currentDto).readValue(updates);
-    getService().mergeConfigurationForPatch(patchedDto, entity, updates);
-    DataSource updated = getService().update(id, patchedDto);
-    DataSourceOutputDTO output = getAssembler().toOutput(updated);
-    return ResponseEntity.ok(output);
-  }
-
   @PostMapping("/{id}/publish")
   @Operation(
       summary = "Publish a data source",
@@ -144,5 +132,13 @@ public class DataSourceController
     DataSource updated = getService().updatePublishedMeta(id, input);
     DataSourceOutputDTO output = dataSourceAssembler.toOutput(updated);
     return ResponseEntity.ok(output);
+  }
+
+  @Override
+  protected DataSourceInputDTO patchInput(
+      DataSourceInputDTO currentDto, DataSource entity, JsonNode updates) throws IOException {
+    DataSourceInputDTO patchedDto = objectMapper.readerForUpdating(currentDto).readValue(updates);
+    getService().mergeConfigurationForPatch(patchedDto, entity, updates);
+    return patchedDto;
   }
 }

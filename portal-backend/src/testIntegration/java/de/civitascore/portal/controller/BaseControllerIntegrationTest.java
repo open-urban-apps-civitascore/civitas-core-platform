@@ -1,5 +1,8 @@
 package de.civitascore.portal.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.model.input.BaseInputDTO;
@@ -11,6 +14,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -152,5 +157,19 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
     HttpHeaders headers = createAuthHeaders();
     customizer.accept(headers);
     return headers;
+  }
+
+  @Test
+  @DisplayName("Should return BAD_REQUEST when PATCH produces an invalid entity")
+  void shouldRejectPatchThatResultsInInvalidEntity() {
+    UUID id = createTestEntity();
+    Map<String, Object> patchBody =
+        objectMapper.convertValue(createInvalidInput(), new TypeReference<>() {});
+
+    ResponseEntity<O> response = performPatch(id, patchBody);
+
+    assertThat(response.getStatusCode())
+        .as("PATCH producing an invalid entity should return BAD_REQUEST")
+        .isEqualTo(HttpStatus.BAD_REQUEST);
   }
 }
