@@ -1,98 +1,39 @@
-'use client'
+import { getTranslations } from 'next-intl/server'
 
-import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
-import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
-
-import { useGetGroups } from '@/app/services/api/groups/clientRequests'
+import { getGroups } from '@/app/services/api/groups/serverRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
-import { Button } from '@/components/ui/button'
-import { useQueryParams } from '@/hooks/use-query-params'
-import { Group } from '@/types/groups'
+import { Item } from '@/types/common'
+import { ApiRequestParams, getApiRequestParams } from '@/utils/requestParams'
 
-import { GroupsTable } from './components/groups-list/GroupsTable'
+import GroupsList from './components/groups-list/GroupList'
 
-export const getSortParam = (sorting: SortingState) => {
-  if (sorting.length > 0) {
-    const sortingId = sorting[0]?.id
-    const sortParam = `&_sort=${sortingId}`
-    const orderParam = sorting[0]?.desc ? `&_order=desc` : `&_order=asc`
-    return `${sortParam}${orderParam}`
-  }
-  return ''
+export type UserAuthority = Item & {
+  department: Item
 }
 
-const GroupsPage = () => {
-  const t = useTranslations('groups')
-  const router = useRouter()
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+type Props = {
+  searchParams: Promise<ApiRequestParams>
+}
 
-  const {
-    setSortingParams,
-    setPaginationParams,
-    setSearchParam,
-    getApiRequestParamsByUrl,
-    setTotalPages,
-    pageIndex,
-    pageSize,
-    sorting,
-    search,
-    totalPages,
-  } = useQueryParams()
+const GroupsPage = async ({ searchParams }: Props) => {
+  const t = await getTranslations('groups')
+  const params = await searchParams
 
-  const { data: groupsData, isFetching } = useGetGroups({ params: getApiRequestParamsByUrl() })
+  const { apiParams } = getApiRequestParams(params)
 
-  const rowCount = groupsData?.totalElements || 0
-  useEffect(() => {
-    setTotalPages(Math.ceil(rowCount / pageSize))
-  }, [rowCount, pageSize, setTotalPages])
+  const { data: groupsData, totalElements } = await getGroups(apiParams)
 
-  const handleRowClick = (row: Row<Group>) => {
-    const params = getApiRequestParamsByUrl()
-    router.push(`groups/${row.id}?${params}`)
-  }
-
-  const CustomElement = () => {
-    const params = getApiRequestParamsByUrl()
-    return (
-      <Button onClick={() => router.push(`groups/create?${params}`)}>
-        <Plus />
-        {t('newGroup')}
-      </Button>
-    )
-  }
+  const totalCount = Number(totalElements) || 0
 
   return (
-    <PageContainer headerType="onlyTitle">
-      <PageHeader title={t('title')} />
+    <PageContainer headerType="withSubTabsOrSubtitle" testId="usersPage">
+      <PageHeader title={t('title')} subtitle={t('subtitle')} />
       <PageBackground>
-        <SearchHeader
-          customElement={<CustomElement />}
-          onChangeSearchString={setSearchParam}
-          searchString={search}
-          placeholder={t('search')}
-        />
         <TableContainer>
-          <GroupsTable
-            groups={groupsData?.data && !isFetching ? groupsData?.data : []}
-            rowCount={rowCount}
-            pageIndex={pageIndex}
-            pageSize={pageSize}
-            sorting={sorting}
-            totalPages={totalPages}
-            rowSelection={rowSelection}
-            setRowSelection={setRowSelection}
-            onRowClick={handleRowClick}
-            onSortingChange={setSortingParams}
-            onPaginationChange={setPaginationParams}
-            isLoading={isFetching}
-          />
+          <GroupsList groupsData={groupsData} totalCount={totalCount} />
         </TableContainer>
       </PageBackground>
     </PageContainer>

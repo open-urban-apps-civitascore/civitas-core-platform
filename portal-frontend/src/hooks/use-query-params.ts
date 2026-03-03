@@ -4,16 +4,22 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { QUERY_PARAMS } from '@/const/searchParams'
 
-const getSortingState = (searchParams: ReadonlyURLSearchParams) => {
-  const sorting = searchParams.get(QUERY_PARAMS.sortingId)
-    ? [
-        {
-          id: searchParams.get(QUERY_PARAMS.sortingId) as string,
-          desc: searchParams.get(QUERY_PARAMS.order) === 'desc' ? true : false,
-        },
-      ]
-    : []
-  return sorting
+const getSortingState = (searchParams: ReadonlyURLSearchParams): SortingState => {
+  const sorts = searchParams.getAll('sort')
+
+  if (!sorts.length) return []
+
+  return searchParams.getAll('sort').flatMap<SortingState[number]>(sort => {
+    const [id, order] = sort.split(',')
+    return !id
+      ? []
+      : [
+          {
+            id,
+            desc: order?.toUpperCase() === 'DESC',
+          },
+        ]
+  })
 }
 
 export const useQueryParams = () => {
@@ -41,14 +47,24 @@ export const useQueryParams = () => {
   }, [totalPages, pageIndex, pageSize])
 
   const setSortingParams = (newSorting: SortingState) => {
-    const params = new URLSearchParams(searchParams)
-    const sortingId = newSorting[0]?.id
-    const order = newSorting[0]?.desc ? `desc` : `asc`
-    if (sortingId && order) {
-      params.set(QUERY_PARAMS.sortingId, String(sortingId))
-      params.set(QUERY_PARAMS.order, String(order))
-    }
-    router.push(`${pathname}?${params.toString()}`)
+    const params = new URLSearchParams(window.location.search)
+
+    const existingSorts = params.getAll('sort')
+    params.delete('sort')
+
+    newSorting.forEach(sort => {
+      const newSortStr = `${sort.id},${sort.desc ? 'DESC' : 'ASC'}`
+      const existingIndex = existingSorts.findIndex(existingSort => existingSort.startsWith(`${sort.id}`))
+
+      if (existingIndex >= 0) {
+        // if sort for this id already exists, replace it
+        existingSorts[existingIndex] = newSortStr
+      } else {
+        existingSorts.push(newSortStr)
+      }
+    })
+    existingSorts.forEach(existingSort => params.append('sort', existingSort))
+    router.push(`?${params.toString()}`)
   }
 
   const setSearchParam = (newSearch: string) => {
@@ -100,17 +116,23 @@ export const useQueryParams = () => {
     sorting?: SortingState
   }
 
-  const getApiRequestParams = useCallback((params: ApiRequestParams) => {
+  const getApiRequestParams = useCallback((params: ApiRequestParams): URLSearchParams => {
     const apiParams = new URLSearchParams()
+
     apiParams.set(QUERY_PARAMS.pageIndex, String(params.pageIndex + 1))
     apiParams.set(QUERY_PARAMS.pageSize, String(params.pageSize))
-    if (params.sorting?.[0]) {
-      apiParams.set(QUERY_PARAMS.sortingId, params.sorting[0].id)
-      apiParams.set(QUERY_PARAMS.order, params.sorting[0].desc ? 'desc' : 'asc')
+
+    if (params.sorting && params.sorting.length > 0) {
+      params.sorting.forEach(sort => {
+        const sortValue = `${sort.id},${sort.desc ? 'DESC' : 'ASC'}`
+        apiParams.append('sort', sortValue)
+      })
     }
-    if (params.search) {
-      apiParams.set(QUERY_PARAMS.search, params.search)
+
+    if (params.search && params.search.trim().length > 0) {
+      apiParams.set(QUERY_PARAMS.search, params.search.trim())
     }
+
     return apiParams
   }, [])
 
