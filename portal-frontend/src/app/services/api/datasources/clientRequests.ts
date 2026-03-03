@@ -11,6 +11,7 @@ export const useGetDatasources = ({ params, isEnabled }: GetListInput = {}) =>
     key,
     params,
     isEnabled,
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while loading datasources.',
   })
 
@@ -26,6 +27,7 @@ export const useGetDatasource = ({ id, isEnabled }: GetItemInput) =>
 export const useCreateDatasource = () =>
   useCreateMutation<Datasource, DatasourceCreateData>({
     key,
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while creating datasource',
   })
 
@@ -33,5 +35,6 @@ export const useUpdateDatasource = () =>
   useUpdateMutation<Datasource, DatasourceUpdateData>({
     method: 'PATCH',
     key,
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating datasource',
   })

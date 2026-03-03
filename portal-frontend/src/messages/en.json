@@ -429,8 +429,8 @@
       "action": "Action"
     },
     "status": {
-      "draft": "Draft",
-      "available": "Available"
+      "DRAFT": "Draft",
+      "AVAILABLE": "Available"
     },
     "connection": {
       "active": "active",

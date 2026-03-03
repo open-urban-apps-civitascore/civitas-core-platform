@@ -7,14 +7,13 @@ import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { CONNECTOR_TYPE_KEYS } from '@/const/connectors'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
 import { STATUS_TYPES } from '@/types/common'
 import { Datasource } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
-interface DatasourcesTableProps extends TableProps<Datasource> {
+export interface DatasourcesTableProps extends TableProps<Datasource> {
   datasources: Datasource[]
   onDelete?: (id: string) => void
 }
@@ -47,7 +46,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
       cell: info =>
-        info.getValue() ? <LinkCell href={`datasources/${info.row.id}`}>{info.getValue()}</LinkCell> : '-',
+        info.getValue() ? <LinkCell href={`datasources/${info.row.original.id}`}>{info.getValue()}</LinkCell> : '-',
 
       meta: {
         style: {
@@ -68,12 +67,9 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('connector', {
+    columnHelper.accessor('connectorType', {
       header: t('tableHeaders.connector'),
-      cell: info => {
-        const connectorType = info.getValue()?.type
-        return connectorType ? CONNECTOR_TYPE_KEYS[connectorType] : '-'
-      },
+      cell: info => info.getValue() ?? '-',
       meta: {
         style: {
           width: '15%',
@@ -81,10 +77,12 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('lastActive', {
+    columnHelper.accessor('modifiedAt', {
       header: t('tableHeaders.lastActive'),
       cell: info => {
-        const interval = formatDistanceStrict(new Date(), new Date(info.getValue()), { locale: DATE_LOCALES[locale] })
+        const value = info.getValue()
+        if (!value) return '-'
+        const interval = formatDistanceStrict(new Date(), new Date(value), { locale: DATE_LOCALES[locale] })
         return interval
       },
       meta: {
@@ -94,7 +92,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('status', {
+    columnHelper.accessor('dataSourceStatus', {
       header: t('tableHeaders.status'),
       cell: info => {
         const status = info.getValue()
