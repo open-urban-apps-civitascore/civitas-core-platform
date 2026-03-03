@@ -192,6 +192,15 @@
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Explicit JUnit Jupiter aggregate: pins all junit-platform-* artifacts to a
+             single consistent version (managed by Spring Boot BOM).  Prevents the
+             "TestEngine with ID 'junit-jupiter' failed to discover tests" engine-crash
+             that occurs in CI when transitive JUnit pulls disagree on platform version. -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
 
         <dependency>
             <groupId>org.testcontainers</groupId>
@@ -589,6 +598,10 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-failsafe-plugin</artifactId>
                         <configuration combine.self="override">
+                            <!-- Explicitly point Failsafe at the integration test source
+                                 directory so the include pattern resolves to classes
+                                 compiled from src/testIntegration/java, not src/test/java. -->
+                            <testSourceDirectory>${project.basedir}/src/testIntegration/java</testSourceDirectory>
                             <includes>
                                 <include>**/*IntegrationTest.java</include>
                             </includes>
