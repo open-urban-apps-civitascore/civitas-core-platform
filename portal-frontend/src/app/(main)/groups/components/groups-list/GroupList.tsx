@@ -14,8 +14,8 @@ import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
-
 import { GroupsTable } from './GroupsTable'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {
@@ -37,6 +37,8 @@ const GroupsList = (props: GroupsListProps) => {
   const t = useTranslations('groups')
   const router = useRouter()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [isWarningModalOpen, setIsWarningmodalOpen] = useState(false)
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false)
 
   const {
     setSortingParams,
@@ -59,6 +61,18 @@ const GroupsList = (props: GroupsListProps) => {
   const handleRowClick = (row: Row<Group>) => {
     const params = getApiRequestParamsByUrl()
     router.push(`groups/${row.id}?${params}`)
+  }
+
+  const handleDeleteGroup = () => {
+    
+  }
+
+  const handleDeleteGroupClick = (groupId: string) => {
+    const group = groupsData.find(group => group.id === groupId)
+    if (!group?.members) return
+    if (group?.members.length > 0) {
+      setIsInfoModalOpen(true)
+    } else setIsWarningmodalOpen(true)
   }
 
   const CustomElement = () => {
@@ -94,9 +108,11 @@ const GroupsList = (props: GroupsListProps) => {
             onRowClick={handleRowClick}
             onSortingChange={setSortingParams}
             onPaginationChange={setPaginationParams}
+            onDeleteGroupClick={() => {}}
           />
         </TableContainer>
       </PageBackground>
+      <WarningModal title={t('WarningModal.title')} description={t('WarningModal.description')} />
     </PageContainer>
   )
 }

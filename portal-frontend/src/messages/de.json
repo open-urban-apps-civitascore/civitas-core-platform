@@ -284,6 +284,10 @@
     "errors": {
       "createError": "Beim Anlegen der Gruppe ist ein Fehler aufgetreten",
       "updateError": "Beim Aktualisieren der Gruppe ist ein Fehler aufgetreten"
+    },
+    "warningModal": {
+      "title": "Gruppe wirklich löschen?",
+      "description": "Diese Aktion kann nicht rückgngig gemacht werden."
     }
   },
   "pagination": {
