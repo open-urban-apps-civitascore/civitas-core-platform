@@ -374,6 +374,7 @@ echo "  - Keycloak"
 echo "  - APISIX + etcd"
 echo "  - OPA + AuthZ Repository"
 echo "  - FROST Server"
+echo "  - Model Atlas + Apicurio Registry"
 echo
 
 cd "$SCRIPT_DIR/postgres"
@@ -466,6 +467,10 @@ else
     echo "           Portal development works fine without it."
 fi
 
+cd "$SCRIPT_DIR/modelatlas"
+$DOCKER_COMPOSE up -d
+echo "  Model Atlas + Apicurio Registry started"
+
 cd "$SCRIPT_DIR"
 
 echo
@@ -513,6 +518,19 @@ wait_for_service "Keycloak" "http://localhost:8080/realms/master" 60
 wait_for_service "Kafka UI" "http://localhost:8090" 30
 wait_for_service "OPA" "http://localhost:8181/health" 30
 wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 60
+# Model Atlas has no health endpoint — check that it responds (any HTTP status)
+MA_READY=false
+for i in $(seq 1 30); do
+    if curl -s -o /dev/null "http://localhost:8086/" 2>/dev/null; then
+        echo "  Model Atlas is ready"
+        MA_READY=true
+        break
+    fi
+    sleep 2
+done
+if [ "$MA_READY" = false ]; then
+    echo "  WARNING: Model Atlas may not be ready yet (timeout)"
+fi
 
 # macOS: disable Keycloak https requirement on master realm on macos
 if [ "$OS_TYPE" = "Darwin" ]; then
@@ -648,6 +666,7 @@ if [ "$backend_option" = "1" ]; then
     cat > /tmp/start-portal-backend.sh << SCRIPT_EOF
 #!/bin/bash
 cd "$BACKEND_DIR"
+export MODEL_ATLAS_BASE_URL=http://localhost:8086
 mvn clean spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION
 exec bash
 SCRIPT_EOF
@@ -669,6 +688,9 @@ else
     echo "  Project: portal-backend"
     echo "  Main class: de.civitascore.portal.PortalBackendApplication"
     echo "  Profiles: local,local-init,postgres"
+    echo
+    echo "Environment variables to set in IDE:"
+    echo "  MODEL_ATLAS_BASE_URL=http://localhost:8086"
     echo
 fi
 
@@ -844,6 +866,8 @@ echo "  FROST Server:     http://localhost:1883"
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  OPA:              http://localhost:8181"
 echo "  AuthZ Repository: http://localhost:8091"
+echo "  Model Atlas:      http://localhost:8086"
+echo "  Apicurio Registry UI: http://localhost:8888"
 echo
 echo "======================================================"
 echo "Default Development User"
@@ -874,5 +898,6 @@ echo "  cd dev-environment/postgres && docker compose down"
 echo "  cd dev-environment/kafka && docker compose down"
 echo "  cd dev-environment/keycloak && docker compose down"
 echo "  cd dev-environment/apisix && docker compose down"
+echo "  cd dev-environment/modelatlas && docker compose down"
 echo "  cd dev-environment/frost && docker compose down"
 echo
