@@ -1,6 +1,5 @@
 package de.civitascore.portal.controller;
 
-import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.input.DataSetInputDTO;
@@ -150,18 +149,15 @@ public class DataSetController
     return ResponseEntity.accepted().body(output);
   }
 
+  @Override
   @DeleteMapping("/{id}")
   @Operation(
       summary = "Delete a dataset",
       description =
           "Deletes a DRAFT dataset immediately (204 No Content). "
-              + "For AVAILABLE datasets, triggers async infrastructure teardown via saga and returns 202 Accepted. "
-              + "READY datasets cannot be deleted — unpublish first.")
+              + "READY datasets cannot be deleted — unpublish first. "
+              + "AVAILABLE datasets cannot be deleted directly — unrelease first (POST /{id}/unrelease) to tear down infrastructure, then delete.")
   public void delete(@PathVariable UUID id) {
-    DataSet dataSet = dataSetService.findByIdOrThrow(id);
-    if (dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE) {
-      dataSetService.triggerDeleteSaga(id);
-    }
     dataSetService.deleteById(id);
   }
 }

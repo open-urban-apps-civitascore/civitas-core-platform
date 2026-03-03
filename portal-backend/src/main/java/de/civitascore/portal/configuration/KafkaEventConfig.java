@@ -32,9 +32,6 @@ public class KafkaEventConfig {
   @Value("${spring.kafka.producer.buffer-memory:33554432}")
   private long bufferMemory;
 
-  @Value("${spring.kafka.consumer.group-id:civitas-portal-backend}")
-  private String consumerGroupId;
-
   @Bean
   public KafkaTemplate<String, String> eventKafkaTemplate() {
     Map<String, Object> props = new HashMap<>();
@@ -75,7 +72,6 @@ public class KafkaEventConfig {
 
     Map<String, Object> consumerProps = new HashMap<>();
     consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-    consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId + "-saga");
     consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
     consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
