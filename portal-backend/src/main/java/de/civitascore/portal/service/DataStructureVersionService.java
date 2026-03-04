@@ -159,7 +159,7 @@ public class DataStructureVersionService
         .ifPresent(
             existing -> {
               throw new UniqueConstraintViolationException(
-                  DataStructure.class.getSimpleName(),
+                  DataStructureVersion.class.getSimpleName(),
                   "version",
                   "Version must be unique within the same DataStructure. Another version with the same version already exists: "
                       + existing.getId());
