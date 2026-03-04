@@ -3,22 +3,29 @@ package de.civitascore.portal.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.model.embedded.ConnectorType;
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
+import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
+import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -39,6 +46,8 @@ class DataSourceControllerIntegrationTest
   @Autowired private DataSourceRepository dataSourceRepository;
   @Autowired private DataStructureRepository dataStructureRepository;
   @Autowired private DataStructureVersionRepository dataStructureVersionRepository;
+  @Autowired private DataSetRepository dataSetRepository;
+  @Autowired private PipelineRepository pipelineRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -47,6 +56,8 @@ class DataSourceControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
+    pipelineRepository.deleteAll();
+    dataSetRepository.deleteAll();
     dataSourceRepository.deleteAll();
     dataStructureVersionRepository.deleteAll();
     dataStructureRepository.deleteAll();
@@ -128,6 +139,37 @@ class DataSourceControllerIntegrationTest
   private ResponseEntity<DataSourceOutputDTO> performPublish(UUID id) {
     String url = DATASOURCES_ENDPOINT + "/" + id + "/publish";
     return exchange(url, HttpMethod.POST, createAuthHeaders(), null, getOutputTypeReference());
+  }
+
+  private ResponseEntity<DataSourceOutputDTO> performUnpublish(UUID id) {
+    String url = DATASOURCES_ENDPOINT + "/" + id + "/unpublish";
+    return exchange(url, HttpMethod.POST, createAuthHeaders(), null, getOutputTypeReference());
+  }
+
+  private ResponseEntity<String> performUnpublishExpectingError(UUID id) {
+    String url = DATASOURCES_ENDPOINT + "/" + id + "/unpublish";
+    return restTemplate.exchange(
+        url, HttpMethod.POST, new HttpEntity<>(createAuthHeaders()), String.class);
+  }
+
+  private DataSource createAvailableDataSource() {
+    UUID id = createPublishableTestEntity();
+    performPublish(id);
+    return dataSourceRepository.findById(id).orElseThrow();
+  }
+
+  private void linkDataSourceToDataSetViaStatus(DataSource dataSource, DataSetStatus status) {
+    DataSet dataSet = new DataSet();
+    dataSet.setName("ds_for_inuse_" + UUID.randomUUID().toString().substring(0, 8));
+    dataSet.setDataSetStatus(status);
+    dataSet.setOpenDataAccess(false);
+    dataSet = dataSetRepository.save(dataSet);
+
+    Pipeline pipeline = new Pipeline();
+    pipeline.setName("pipeline_" + UUID.randomUUID().toString().substring(0, 8));
+    pipeline.setDataSet(dataSet);
+    pipeline.setDataSources(Set.of(dataSource));
+    pipelineRepository.save(pipeline);
   }
 
   private ResponseEntity<String> performPublishExpectingError(UUID id) {
@@ -867,6 +909,110 @@ class DataSourceControllerIntegrationTest
       assertThat(config.get("topics")).isEqualTo(List.of("sensor/data"));
       assertThat(config.get("user")).isEqualTo("mqttuser");
       assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
+    }
+  }
+
+  @Nested
+  @DisplayName("inUse Flag Tests")
+  class InUseFlagTests {
+
+    @Test
+    @DisplayName("Should return inUse=false when DataSource is not referenced by any DataSet")
+    void shouldReturnInUseFalseWhenNotReferenced() {
+      UUID id = createPublishableTestEntity();
+      performPublish(id);
+
+      ResponseEntity<DataSourceOutputDTO> response = performGetById(id);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().isInUse()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should return inUse=false when DataSource is only referenced by a DRAFT DataSet")
+    void shouldReturnInUseFalseWhenOnlyDraftDataSetReferences() {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
+
+      ResponseEntity<DataSourceOutputDTO> response = performGetById(dataSource.getId());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().isInUse()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should return inUse=true when DataSource is referenced by a READY DataSet")
+    void shouldReturnInUseTrueWhenReadyDataSetReferences() {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.READY);
+
+      ResponseEntity<DataSourceOutputDTO> response = performGetById(dataSource.getId());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().isInUse()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should return inUse=true when DataSource is referenced by an AVAILABLE DataSet")
+    void shouldReturnInUseTrueWhenAvailableDataSetReferences() {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
+
+      ResponseEntity<DataSourceOutputDTO> response = performGetById(dataSource.getId());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().isInUse()).isTrue();
+    }
+  }
+
+  @Nested
+  @DisplayName("Unpublish DataSource Tests")
+  class UnpublishTests {
+
+    @Test
+    @DisplayName("Should unpublish DataSource when not in use")
+    void shouldUnpublishWhenNotInUse() {
+      UUID id = createPublishableTestEntity();
+      performPublish(id);
+
+      ResponseEntity<DataSourceOutputDTO> response = performUnpublish(id);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when unpublishing a DataSource in use by a READY DataSet")
+    void shouldReturn409WhenInUseByReadyDataSet() {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.READY);
+
+      ResponseEntity<String> response = performUnpublishExpectingError(dataSource.getId());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Should return 409 when unpublishing a DataSource in use by an AVAILABLE DataSet")
+    void shouldReturn409WhenInUseByAvailableDataSet() {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
+
+      ResponseEntity<String> response = performUnpublishExpectingError(dataSource.getId());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("Should allow unpublish when DataSource is only referenced by a DRAFT DataSet")
+    void shouldAllowUnpublishWhenOnlyDraftDataSetReferences() {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.DRAFT);
+
+      ResponseEntity<DataSourceOutputDTO> response = performUnpublish(dataSource.getId());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
     }
   }
 }
