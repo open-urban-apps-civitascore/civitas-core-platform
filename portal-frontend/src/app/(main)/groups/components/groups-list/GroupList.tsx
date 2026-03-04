@@ -1,11 +1,15 @@
 'use client'
 
-import { Row, RowSelectionState, SortingState } from '@tanstack/react-table'
+import { Row, RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
+import { useDeleteGroup } from '@/app/services/api/groups/clientRequests'
+import { InfoModal } from '@/components/modals/info-modal/InfoModal'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -14,21 +18,8 @@ import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
-import { GroupsTable } from './GroupsTable'
-import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
-import { useDeleteGroup } from '@/app/services/api/groups/clientRequests'
-import { toast } from 'sonner'
-import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 
-export const getSortParam = (sorting: SortingState) => {
-  if (sorting.length > 0) {
-    const sortingId = sorting[0]?.id
-    const sortParam = `&_sort=${sortingId}`
-    const orderParam = sorting[0]?.desc ? `&_order=desc` : `&_order=asc`
-    return `${sortParam}${orderParam}`
-  }
-  return ''
-}
+import { GroupsTable } from './GroupsTable'
 
 interface GroupsListProps {
   groupsData: Group[]

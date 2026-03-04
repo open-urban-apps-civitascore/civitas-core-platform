@@ -256,8 +256,8 @@
     },
     "details": {
       "baseInfo": "Basisinformationen",
-      "name": "Name der Gruppe",
-      "description": "Beschreibung der Gruppe",
+      "name": "Name",
+      "description": "Beschreibung",
       "contact": { "label": "Ansprechpartner", "placeholder": "Nach Name oder Email suchen" }
     },
     "roles": {

@@ -258,9 +258,9 @@
     },
     "details": {
       "baseInfo": "Base Information",
-      "name": "Name of the Group",
-      "description": "Group Description",
-      "contact": { "label": "Contact", "placeholder": "Search by name or email" }
+      "name": "Name",
+      "description": "Description",
+      "contact": { "label": "Contact Person", "placeholder": "Search by name or email" }
     },
     "roles": {
       "groupInfo": "Group Information",

@@ -18,7 +18,7 @@ import { Item2 } from '@/types/common'
 import { Group, GroupBaseFormData } from '@/types/groups'
 import { Contact } from '@/types/users'
 
-const MIN_LENGTH = 2
+const MIN_LENGTH = 3
 
 const getContactListItems = (contacts: Contact[]) =>
   contacts.map(contact => ({

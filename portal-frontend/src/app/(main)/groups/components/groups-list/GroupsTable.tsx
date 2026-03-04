@@ -4,7 +4,7 @@ import {
   getExpandedRowModel,
   getSortedRowModel,
   Row,
-  useReactTable
+  useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 
