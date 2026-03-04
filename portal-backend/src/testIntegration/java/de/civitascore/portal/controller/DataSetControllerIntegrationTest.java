@@ -313,8 +313,8 @@ class DataSetControllerIntegrationTest
       DataSetOutputDTO output = response.getBody();
       assertThat(output.getCreatedBy()).as("createdBy should be populated").isNotNull();
       assertThat(output.getCreatedBy().getId())
-          .as("createdBy.id should be the creator's database UUID")
-          .isNotNull();
+          .as("createdBy.id should match the creator's database UUID")
+          .isEqualTo(creator.getId());
       assertThat(output.getCreatedBy().getName())
           .as("createdBy.name should be first + last name")
           .isEqualTo("Test User");

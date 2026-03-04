@@ -19,13 +19,17 @@ public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO
 
   @Override
   public DataSetOutputDTO mapToBaseDto(DataSet entity) {
-    DataSetOutputDTO output = dataSetMapper.toOutput(entity);
+    return dataSetMapper.toOutput(entity);
+  }
+
+  @Override
+  public DataSetOutputDTO enrichDto(DataSetOutputDTO dto, DataSet entity) {
     if (entity.getCreatedBy() != null) {
       userRepository
           .findByExternalId(entity.getCreatedBy().toString())
-          .ifPresent(user -> output.setCreatedBy(userMapper.toSummary(user)));
+          .ifPresent(user -> dto.setCreatedBy(userMapper.toSummary(user)));
     }
-    return output;
+    return dto;
   }
 
   @Override
