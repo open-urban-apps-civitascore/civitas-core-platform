@@ -22,7 +22,7 @@ interface VersionInfoTabProps {
 
 export const VersionInfoTab = (props: VersionInfoTabProps) => {
   const { form, isReadOnly = false, versionAlreadyExistsError } = props
-  const t = useTranslations('datastructureVersion')
+  const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
 
   return (

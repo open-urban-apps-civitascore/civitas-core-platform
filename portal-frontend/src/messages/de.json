@@ -532,7 +532,7 @@
       "updateSuccess": "Datenstruktur wurde erfolgreich aktualisiert."
     }
   },
-  "datastructureVersion": {
+  "datastructureVersions": {
     "newVersion": "Neue Version",
     "tabs": {
       "structure": "Strukturdefinition",
@@ -550,7 +550,8 @@
     },
     "messages": {
       "createSuccess": "Die Version der Datenstruktur wurde erfolgreich angelegt.",
-      "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert."
+      "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert.",
+      "versionInUse": "Das Datenmodell kann nicht bearbeitet werden, da es bereits verwendet wird."
     },
     "errors": {
       "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur."

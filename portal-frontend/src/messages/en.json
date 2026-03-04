@@ -561,7 +561,8 @@
     },
     "messages": {
       "createSuccess": "The version of the data structure has been successfully created.",
-      "updateSuccess": "The version of the data has been successfully updated."
+      "updateSuccess": "The version of the data has been successfully updated.",
+      "versionInUse": "The data model can not be edited since it is already in use."
     },
     "errors": {
       "versionAlreadyExists": "A version with the same version number already exists in this data structure."

@@ -29,7 +29,7 @@ export const VersionsTable = (props: VersionsTableProps) => {
     onSortingChange,
   } = props
   const t = useTranslations('datastructures')
-  const tVersion = useTranslations('datastructureVersion')
+  const tVersion = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
   const columnHelper = createColumnHelper<DatastructureVersionsListData>()
 

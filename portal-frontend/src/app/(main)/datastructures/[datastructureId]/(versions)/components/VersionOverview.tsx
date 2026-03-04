@@ -64,11 +64,11 @@ const mapApiToFormData = (version: DatastructureVersion) => ({ ...version, descr
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
     value: 'structure',
-    label: 'datastructureVersion.tabs.structure',
+    label: 'datastructureVersions.tabs.structure',
   },
   {
     value: 'versionInfo',
-    label: 'datastructureVersion.tabs.versionInfo',
+    label: 'datastructureVersions.tabs.versionInfo',
   },
 ]
 
@@ -87,7 +87,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const { title, datastructureId, version, isCreateMode, testId, existingVersions } = props
   const params = useSearchParams()
   const mode = params.get('mode')
-  const t = useTranslations('datastructureVersion')
+  const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const initialFormValues = useRef<DatastructureVersionFormData>(version ? mapApiToFormData(version) : defaultFormData)
@@ -141,17 +141,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
    *  Also, set all model form values to null after closing the session
    */
   useEffect(() => {
-    console.trace('activesession', activeSession)
-    if (
-      activeSession?.isDirty ||
-      activeSession?.created !== initialSession?.created
-    )
-      setIsDiagramDirty(true)
-    if (
-      !activeSession?.isDirty &&
-      activeSession?.created !== initialSession?.created
-    ) {
-      console.log('setFormValues')
+    if (activeSession?.isDirty || activeSession?.created !== initialSession?.created) setIsDiagramDirty(true)
+    if (!activeSession?.isDirty && activeSession?.created !== initialSession?.created) {
       form.setValue('model', null, { shouldDirty: true })
       form.setValue('modelAtlasUri', null, { shouldDirty: true })
       form.setValue('modelName', null, { shouldDirty: true })
@@ -219,7 +210,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }, [canSetAvailable, statusWatch])
 
   const completedTabs = useMemo((): DatastructureVersionTab[] => {
-    console.log('dirty form fields', form.formState.dirtyFields)
     const completed: DatastructureVersionTab[] = []
     if (versionWatch.length > 0 && descriptionWatch.length > 0 && sourceWatch) completed.push('versionInfo')
     if (modelWatch && modelUriWatch && modelNameWatch && stylesWatch) completed.push('structure')
@@ -240,7 +230,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
       form.setValue('modelName', diagramUpdateData.name, { shouldDirty: true })
     }
     if (hasModelChanges && diagram && diagramUpdateData?.model) {
-      console.log('set form values')
       form.setValue('model', diagramUpdateData.model, { shouldDirty: true })
       form.setValue('styles', diagram, { shouldDirty: true })
       form.setValue('modelAtlasUri', modelUri, {
@@ -263,7 +252,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     mutationFn: UseMutationResult<ApiServiceResponse<DatastructureVersion>, unknown, WithId, unknown>,
     versionId: string,
   ) => {
-    console.log('handleStatusUpdate')
     try {
       await mutationFn.mutateAsync({ id: versionId })
       toast.success(tCommon('info.statusChangeSuccess'))
@@ -302,8 +290,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const resetValues = () => {
     const currentValues = form.getValues()
     form.reset(currentValues)
-    if(activeSessionId)
-    modelSessionManager.markSessionClean(activeSessionId)
+    if (activeSessionId) modelSessionManager.markSessionClean(activeSessionId)
   }
 
   const handleUpdateValues = async (values: DatastructureVersionFormData) => {
@@ -322,21 +309,15 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     try {
       const dirtyFields = form.formState.dirtyFields
 
-      console.log('dirtyFields', dirtyFields)
-
       const shouldPublish =
         !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
       const shouldUnpublish =
         !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
-      console.log('shouldPublish', shouldPublish)
-      console.log('shouldUnpublish', shouldUnpublish)
-
       const fieldsToUpdate = pickDirtyValues(parsedValues, dirtyFields)
       const shouldUpdateValues = (Object.keys(fieldsToUpdate) as (keyof DatastructureVersionFormData)[]).some(
         key => key !== 'dataStructureVersionStatus',
       )
-      console.log('shouldUpdateValues', shouldUpdateValues)
       if (shouldUpdateValues) await handleUpdateValues(parsedValues)
 
       if (shouldPublish) {
@@ -436,7 +417,13 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         )
       case 'structure':
       default:
-        return <StructureDefinitionTab isReadOnly={isReadOnly} modelSessionManager={modelSessionManager} />
+        return (
+          <StructureDefinitionTab
+            isReadOnly={isReadOnly}
+            modelSessionManager={modelSessionManager}
+            isInUse={version?.inUse || false}
+          />
+        )
     }
   }
 
