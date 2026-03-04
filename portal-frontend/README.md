@@ -1,3 +1,9 @@
+## Deployment
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for all environment variables and deployment configuration.
+
+---
+
 ## Getting Started
 
 ### Prerequisites
