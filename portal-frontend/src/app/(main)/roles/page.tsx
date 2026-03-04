@@ -4,7 +4,7 @@ import { Row, RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -49,11 +49,19 @@ const RolesPage = () => {
 
   const [selectedRoleType, setSelectedRoleType] = useState<string>(tabValue || DEFAULT_TAB)
 
-  const requestParams = new URLSearchParams(`type=${selectedRoleType}&${getApiRequestParamsByUrl()}`)
+  // TODO: Fetch all roles without type filter — backend RoleSpec does not support roleType filtering.
+  // Backend filter will be implemented in a later stage
+  const requestParams = new URLSearchParams(getApiRequestParamsByUrl())
 
   const { data: rolesData, isFetching } = useGetRoles({ params: requestParams })
 
-  const rowCount = rolesData?.totalElements || 0
+  // Filter roles client-side by the selected tab's roleType
+  const filteredRoles = useMemo<Role[]>(() => {
+    if (!rolesData?.data) return []
+    return rolesData.data.filter(role => role.roleType === selectedRoleType)
+  }, [rolesData?.data, selectedRoleType])
+
+  const rowCount = filteredRoles.length
   useEffect(() => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, setTotalPages, pageSize])
@@ -87,7 +95,7 @@ const RolesPage = () => {
         />
         <TableContainer>
           <RolesTable
-            roles={rolesData?.data && !isFetching ? rolesData?.data : []}
+            roles={isFetching ? [] : filteredRoles}
             isLoading={isFetching}
             rowCount={rowCount}
             pageIndex={pageIndex}

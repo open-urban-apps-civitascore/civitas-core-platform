@@ -6,13 +6,18 @@ import { useTranslations } from 'next-intl'
 import { JSX, useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
+import {
+  useCreateAssignment,
+  useDeleteAssignment,
+  useGetAssignments,
+} from '@/app/services/api/assignments/clientRequests'
 import { useCreateRole, useDeleteRole, useGetRole, useUpdateRole } from '@/app/services/api/roles/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { FormRole, Role, ROLE_ORIGINS, roleSchema, RoleTab } from '@/types/roles'
+import { FormRole, Role, roleSchema, RoleTab } from '@/types/roles'
 
 import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
@@ -37,15 +42,14 @@ const subTabValues: Record<RoleTab, Tab<RoleTab>> = {
 const defaultRole: Role = {
   id: '',
   name: '',
-  type: DEFAULT_TAB,
-  tenant: '',
-  users: [],
+  roleType: DEFAULT_TAB,
   permissions: [],
-  groups: [],
-  createdAt: new Date().toISOString(), // Placeholder createdAt, later set by backend
-  lastUpdated: null,
-  updatedBy: null,
-  roleOrigin: ROLE_ORIGINS.CUSTOM,
+  readonly: false,
+  modifiedBy: null,
+  modifiedAt: null,
+  createdAt: new Date().toISOString(),
+  groupCount: 0,
+  userCount: 0,
 }
 
 interface RoleDetailsProps {
@@ -62,6 +66,19 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const { data: roleData, isFetching: isLoadingRole } = useGetRole({ id: roleId || '', isEnabled: !!roleId })
 
+  // Fetch existing assignments for this role so we can get assignment IDs for deletion
+  const assignmentsParams = new URLSearchParams(`roleId=${roleId}`)
+  const { data: assignmentsData, refetch: refetchAssignments } = useGetAssignments({
+    params: assignmentsParams,
+    isEnabled: !!roleId && isEditMode,
+  })
+
+  // Derive assigned group IDs directly from assignments (group.roles is not populated by backend)
+  const assignedGroupIds = (assignmentsData?.data ?? []).map(a => a.group.id)
+
+  const createAssignment = useCreateAssignment()
+  const deleteAssignment = useDeleteAssignment()
+
   const initialRole = roleData?.data || defaultRole
 
   const createRole = useCreateRole()
@@ -75,6 +92,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     defaultValues: {
       name: initialRole.name,
       description: initialRole.description,
+      readonly: initialRole.readonly,
     },
   })
 
@@ -82,6 +100,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     if (initialRole) {
       form.setValue('name', initialRole.name)
       form.setValue('description', initialRole.description || '')
+      form.setValue('readonly', initialRole.readonly)
     }
   }, [initialRole, form])
 
@@ -94,7 +113,14 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const onSubmit = (values: FormRole): void => {
     if (roleId && initialRole) {
       updateRole.mutate(
-        { ...initialRole, ...values },
+        {
+          id: roleId,
+          name: values.name,
+          description: values.description,
+          roleType: initialRole.roleType,
+          permissionIds: (initialRole.permissions ?? []).map(p => p.id),
+          readonly: values.readonly,
+        },
         {
           onSuccess: () => {
             setHasPermissionsTabBeenSaved(true)
@@ -102,13 +128,19 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         },
       )
     } else {
-      // eslint-disable-next-line unused-imports/no-unused-vars
-      const { id, ...creadteRoleData } = { ...initialRole, ...values }
-      createRole.mutate(creadteRoleData, {
-        onSuccess: ({ data }) => {
-          router.push(`/roles/${data.id}?_tab=${tabValue}`)
+      createRole.mutate(
+        {
+          name: values.name,
+          description: values.description,
+          roleType: (tabValue as Role['roleType']) || DEFAULT_TAB,
+          readonly: values.readonly,
         },
-      })
+        {
+          onSuccess: ({ data }) => {
+            router.push(`/roles/${data.id}?_tab=${tabValue}`)
+          },
+        },
+      )
     }
   }
 
@@ -116,7 +148,14 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     if (!initialRole || !roleId) return
 
     updateRole.mutate(
-      { ...initialRole, permissions: permissionIds },
+      {
+        id: roleId,
+        name: initialRole.name,
+        description: initialRole.description,
+        roleType: initialRole.roleType,
+        permissionIds,
+        readonly: initialRole.readonly,
+      },
       {
         onSuccess: () => {
           setHasPermissionsTabBeenSaved(true)
@@ -125,17 +164,23 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     )
   }
 
-  const handleGroupAssigmentUpdate = (newGroupIds: string[]): void => {
-    if (!initialRole || !roleId) return
+  const handleGroupAssigmentUpdate = async (newGroupIds: string[]): Promise<void> => {
+    if (!roleId) return
 
-    updateRole.mutate(
-      { ...initialRole, groups: newGroupIds },
-      {
-        onSuccess: () => {
-          setHasPermissionsTabBeenSaved(true)
-        },
-      },
-    )
+    const existingAssignments = assignmentsData?.data ?? []
+    const currentGroupIds = existingAssignments.map(a => a.group.id)
+
+    const groupIdsToAdd = newGroupIds.filter(id => !currentGroupIds.includes(id))
+    const assignmentsToRemove = existingAssignments.filter(a => !newGroupIds.includes(a.group.id))
+
+    // Create new assignments
+    await Promise.all(groupIdsToAdd.map(groupId => createAssignment.mutateAsync({ groupId, roleId })))
+
+    // Delete removed assignments
+    await Promise.all(assignmentsToRemove.map(a => deleteAssignment(a.id)))
+
+    // Refresh assignments so the tab reflects the new state
+    await refetchAssignments()
   }
 
   const disabledTabs = !isEditMode ? ['permissions', 'groupAssignment'] : undefined
@@ -146,7 +191,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     subTabValues.groupAssignment,
   ]
   const defaultSubTab = subTabValues.basicInformation.value
-  const isDefaultRole = initialRole?.roleOrigin === ROLE_ORIGINS.DEFAULT
+  const isDefaultRole = initialRole?.readonly === true
 
   useEffect(() => {
     if (!subTabValue) {
@@ -154,8 +199,8 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     }
   }, [subTabValue, setSubTabValueParam, defaultSubTab])
 
-  const roleType = initialRole?.type || tabValue
-  const badgeTitle = roleType ? tRoles(`${roleType}Roles`).slice(0, -1) : undefined
+  const roleType = initialRole?.roleType || tabValue
+  const badgeTitle = roleType ? tRoles(`${roleType.toLowerCase()}Roles`).slice(0, -1) : undefined
 
   return (
     <PageContainer headerType="withSubTabsOrSubtitle">
@@ -186,7 +231,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         {subTabValue === subTabValues.permissions.value && (
           <PermissionsTab
             onPermissionUpdate={handlePermissionUpdate}
-            currentSelectedPermissionIds={initialRole?.permissions || []}
+            currentSelectedPermissionIds={initialRole?.permissions?.map(p => p.id) ?? []}
             roleType={tabValue}
             hasPermissionsTabBeenSaved={hasPermissionsTabBeenSaved}
             setHasPermissionsTabBeenSaved={setHasPermissionsTabBeenSaved}
@@ -196,7 +241,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
         {subTabValue === subTabValues.groupAssignment.value && (
           <GroupAssignmentTab
-            assignedGroupIds={initialRole?.groups || []}
+            assignedGroupIds={assignedGroupIds}
             onGroupAssignmentUpdate={handleGroupAssigmentUpdate}
             roleName={initialRole?.name || ''}
           />

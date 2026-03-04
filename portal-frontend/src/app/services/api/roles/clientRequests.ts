@@ -8,20 +8,37 @@ import { CreateRoleData, Role, UpdateRoleData } from '@/types/roles'
 const key = 'roles'
 
 export const useGetRoles = ({ params, isEnabled }: GetListInput = {}) =>
-  useDataQuery<Role[]>({ key, params, isEnabled, errorMessage: 'An error occurred while loading roles.' })
+  useDataQuery<Role[]>({
+    key,
+    params,
+    isEnabled,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while loading roles.',
+  })
 
 export const useGetRole = ({ id, isEnabled }: GetItemInput) =>
-  useDataQuery<Role>({ id, key, isEnabled, errorMessage: 'An error occurred while loading role.' })
+  useDataQuery<Role>({
+    id,
+    key,
+    isEnabled,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while loading role.',
+  })
 
 export const useCreateRole = () =>
-  useCreateMutation<Role, CreateRoleData>({ key, errorMessage: 'An error occurred while creating the role.' })
+  useCreateMutation<Role, CreateRoleData>({
+    key,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while creating the role.',
+  })
 
 export const useUpdateRole = () =>
   useUpdateMutation<Role, UpdateRoleData>({
     key,
     method: 'PUT',
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating the role.',
   })
 
 export const useDeleteRole = (id: string) =>
-  useDeleteMutation({ id, key, errorMessage: 'An error occurred while creating the role.' })
+  useDeleteMutation({ id, key, errorMessage: 'An error occurred while deleting the role.' })

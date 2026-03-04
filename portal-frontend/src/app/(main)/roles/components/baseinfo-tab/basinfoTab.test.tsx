@@ -33,7 +33,7 @@ const { result } = renderHook(
       defaultValues: {
         name: '',
         description: '',
-        roleOrigin: 'custom',
+        readonly: false,
       },
     }),
   { wrapper },
@@ -60,18 +60,18 @@ describe('BaseInfoTab Component Custom Roles', () => {
 
     const nameInput = screen.getByRole('textbox', { name: 'form.inputs.name' })
     const descriptionInput = screen.getByRole('textbox', { name: 'form.inputs.description' })
-    const roleOriginSelect = screen.getByRole('combobox', { name: 'form.inputs.roleOrigin' })
+    const roleOriginInput = screen.getByRole('textbox', { name: 'form.inputs.roleOrigin' })
     const editButton = screen.getByRole('button', { name: 'actions.edit' })
 
     expect(nameInput).toBeDefined()
     expect(descriptionInput).toBeDefined()
-    expect(roleOriginSelect).toBeDefined()
+    expect(roleOriginInput).toBeDefined()
 
     expect(editButton).toBeDefined()
 
     expect(nameInput).toBeDisabled()
     expect(descriptionInput).toBeDisabled()
-    expect(roleOriginSelect).toBeDisabled()
+    expect(roleOriginInput).toBeDisabled()
 
     const cancelButton = screen.queryByRole('button', { name: 'actions.cancel' })
     expect(cancelButton).toBeNull()
@@ -110,8 +110,8 @@ describe('BaseInfoTab Component Custom Roles', () => {
       'New Role Description',
     )
 
-    expect(screen.getByRole('combobox', { name: 'form.inputs.roleOrigin' })).toBeDefined()
-    expect(screen.getByRole('combobox', { name: 'form.inputs.roleOrigin' })).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: 'form.inputs.roleOrigin' })).toBeDefined()
+    expect(screen.getByRole('textbox', { name: 'form.inputs.roleOrigin' })).toBeDisabled()
   })
 
   it('calls deleteRole when delete button is clicked', () => {
@@ -162,18 +162,18 @@ describe('BaseInfoTab Component Default Roles', () => {
 
     const nameInput = screen.getByRole('textbox', { name: 'form.inputs.name' })
     const descriptionInput = screen.getByRole('textbox', { name: 'form.inputs.description' })
-    const roleOriginSelect = screen.getByRole('combobox', { name: 'form.inputs.roleOrigin' })
+    const roleOriginInput = screen.getByRole('textbox', { name: 'form.inputs.roleOrigin' })
     const editButton = screen.queryByRole('button', { name: 'actions.edit' })
 
     expect(nameInput).toBeDefined()
     expect(descriptionInput).toBeDefined()
-    expect(roleOriginSelect).toBeDefined()
+    expect(roleOriginInput).toBeDefined()
 
     expect(editButton).toBeNull()
 
     expect(nameInput).toBeDisabled()
     expect(descriptionInput).toBeDisabled()
-    expect(roleOriginSelect).toBeDisabled()
+    expect(roleOriginInput).toBeDisabled()
 
     const cancelButton = screen.queryByRole('button', { name: 'actions.cancel' })
     expect(cancelButton).toBeNull()

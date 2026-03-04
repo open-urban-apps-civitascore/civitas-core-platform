@@ -14,7 +14,7 @@ export const mapRolesData = (roles: BaseRole[], groupData: Group[]) => {
         name: currentRole.name,
         inherited: false,
         group: group?.name || null,
-        type: currentRole.type,
+        type: currentRole.roleType,
         roleId: currentRole.id,
       }
     })

@@ -39,7 +39,11 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const [groupSelection, setGroupSelection] = useState<RowSelectionState>(getGroupSelection(assignedGroupIds))
   const originalGroupSelection = getGroupSelection(assignedGroupIds)
 
-  const requestParams = new URLSearchParams(`_limit=${pageSize}&_page=${pageIndex + 1}`)
+  useEffect(() => {
+    setGroupSelection(getGroupSelection(assignedGroupIds))
+  }, [assignedGroupIds])
+
+  const requestParams = new URLSearchParams(`size=${pageSize}&page=${pageIndex}`)
   const { data: groupsData, isFetching } = useGetGroups({ params: requestParams })
 
   const groups = useMemo(() => {

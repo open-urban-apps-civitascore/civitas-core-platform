@@ -7,15 +7,15 @@ import { ROLE_TYPES } from '@/types/roles'
 import { mapRolesData } from './mappers'
 
 const roles = [
-  { id: 'r1', name: 'Admin', type: ROLE_TYPES.SYSTEM },
-  { id: 'r2', name: 'Editor', type: ROLE_TYPES.DATA },
-  { id: 'r3', name: 'Support', type: ROLE_TYPES.GOVERNANCE },
-]
-
-const groupRoles = [
   { id: 'r1', name: 'Admin', roleType: ROLE_TYPES.SYSTEM },
   { id: 'r2', name: 'Editor', roleType: ROLE_TYPES.DATA },
   { id: 'r3', name: 'Support', roleType: ROLE_TYPES.GOVERNANCE },
+]
+
+const groupRoles = [
+  { id: 'r1', name: 'Admin', roleType: 'SYSTEM' as const },
+  { id: 'r2', name: 'Editor', roleType: 'DATA' as const },
+  { id: 'r3', name: 'Support', roleType: 'GOVERNANCE' as const },
 ]
 
 const groups: Group[] = [

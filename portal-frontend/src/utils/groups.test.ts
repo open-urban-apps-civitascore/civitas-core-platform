@@ -12,7 +12,7 @@ const baseGroup: Group = {
     {
       id: 'r1',
       name: 'Admin',
-      roleType: 'system',
+      roleType: 'SYSTEM',
     },
   ],
   members: [
