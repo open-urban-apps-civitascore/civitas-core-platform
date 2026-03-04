@@ -1,10 +1,10 @@
 import z from 'zod'
 
+import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { enumFromConst } from '@/utils/common'
 
 import { AssignmentSchema } from './assignments'
 import { ItemSchema, STATUS_TYPES, WithId } from './common'
-import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 
 export const DATASTRUCTURE_STATUS_TYPES = {
   DRAFT: 'DRAFT',

@@ -681,5 +681,11 @@
       "notConfigured": "Not configured"
     },
     "lines": "{count, plural, one {# line} other {# lines}}"
+  },
+    "umlModeler": {
+    "closeTabModal": {
+      "title": "Discard model?",
+      "description": "This action deletes the model. It can not be undone."
+    }
   }
 }

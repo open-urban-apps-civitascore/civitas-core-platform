@@ -25,7 +25,8 @@ interface MultiSessionLayoutProps {
 
 export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
   const { className, externalSessionManager, isMultiSessionMode, canExportXmi, canImportXmi } = props
-  const t = useTranslations('common')
+  const t = useTranslations('umlModeler')
+  const tCommon = useTranslations('common')
   const { isReadOnly } = useReadOnly()
   const sessionManager = useMultiSessionManager({ sessionManager: externalSessionManager })
   const isControlledExternally = !!externalSessionManager
@@ -37,15 +38,9 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     sessionManager.createSession('Untitled Diagram')
   }, [sessionManager])
 
-  const handleCloseSession = useCallback(
-    (sessionId: string) => {
-      const session = sessionManager.sessions.find(s => s.id === sessionId)
-
-      if (session?.isDirty) setIsWarningModalOpen(true)
-      else sessionManager.closeSession(sessionId)
-    },
-    [sessionManager],
-  )
+  const handleCloseSession = () => {
+    setIsWarningModalOpen(true)
+  }
 
   const handleConfirmCloseSession = () => {
     setIsWarningModalOpen(false)
@@ -138,7 +133,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
       <WarningModal
         title={t('closeTabModal.title')}
         description={t('closeTabModal.description')}
-        confirmButtonTitle={t('actions.close')}
+        confirmButtonTitle={tCommon('actions.close')}
         open={isWarningModalOpen}
         onOpenChange={() => setIsWarningModalOpen(false)}
         onDiscard={handleDiscardCloseSession}

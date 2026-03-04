@@ -81,10 +81,6 @@
       "title": "Vor dem Beenden speichern?",
       "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
       "discard": "Verwerfen"
-    },
-    "closeTabModal": {
-      "title": "Ungespeicherte Änderungen",
-      "description": "Sie haben ungespeicherte Änderungen. Wollen Sie den Tab wirklich schließen?"
     }
   },
   "languages": {
@@ -674,5 +670,11 @@
       "notConfigured": "Nicht konfiguriert"
     },
     "lines": "{count, plural, one {# Zeile} other {# Zeilen}}"
+  },
+  "umlModeler": {
+    "closeTabModal": {
+      "title": "Modell wirklich verwerfen?",
+      "description": "Diese Aktion löscht das Modell. Sie kann nicht rückgängig gemacht werden."
+    }
   }
 }

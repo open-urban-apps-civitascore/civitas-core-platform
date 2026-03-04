@@ -27,8 +27,8 @@ import { Button } from '@/components/ui/button'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
-import { importFromXmi } from '@/components/uml-modeler/services/xmiImportService'
 import { DirtyField } from '@/components/uml-modeler/types/session'
+import { QUERY_PARAMS } from '@/const/searchParams'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { STATUS_TYPES, WithId } from '@/types/common'
 import {
@@ -46,7 +46,6 @@ import { pickDirtyValues } from '@/utils/form'
 
 import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
-import { QUERY_PARAMS } from '@/const/searchParams'
 
 export const defaultFormData: DatastructureVersionFormData = {
   id: '',
@@ -97,8 +96,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     const diagram = initialFormValues.current.styles
     const modelName = initialFormValues.current.modelName
 
-    if (!diagram && !modelName) return undefined
-    if (!diagram) return createEmptySession(modelName as string)
+    if (!diagram) return createEmptySession(modelName || undefined)
     return {
       id: diagram.id,
       name: modelName || 'Untitled Diagram',
@@ -110,8 +108,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     }
   }, [initialFormValues])
 
-
   const modelSessionManager = useMultiSessionManager({ initialSession })
+  const [isDiagramDirty, setIsDiagramDirty] = useState(false)
 
   const router = useRouter()
 
@@ -133,6 +131,30 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     defaultValues: initialFormValues.current,
   })
 
+  /**
+   * Set setIsDiagramDirty when active session chenges:
+   * after closing the diagram, a new session gets created. This session is clean.
+   * Therefore, it has to be checked if it is still the same session, based on the creation date
+   *
+   *  Also, set all model form values to null after closing the session
+   */
+  useEffect(() => {
+    if (
+      modelSessionManager.activeSession?.isDirty ||
+      modelSessionManager.activeSession?.created !== initialSession?.created
+    )
+      setIsDiagramDirty(true)
+    if (
+      !modelSessionManager.activeSession?.isDirty &&
+      modelSessionManager.activeSession?.created !== initialSession?.created
+    ) {
+      form.setValue('model', null, { shouldDirty: true })
+      form.setValue('modelAtlasUri', null, { shouldDirty: true })
+      form.setValue('modelName', null, { shouldDirty: true })
+      form.setValue('styles', null, { shouldDirty: true })
+    }
+  }, [modelSessionManager.activeSession, initialSession, form])
+
   const dirtyModelFields = modelSessionManager.activeSession?.dirtyFields
 
   const formValues = useWatch({ control: form.control })
@@ -143,8 +165,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const sourceWatch = form.watch('dataStructureVersionSource')
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
-
-  const isDiagramDirty = modelSessionManager.activeSession?.isDirty
 
   const modelAtlasUri = `http://civitas.org/model/${datastructureId}/${versionWatch}`
 
@@ -331,14 +351,13 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const handleExit = () => {
     if (modelSessionManager.activeSessionId) {
-      modelSessionManager.closeSession(
-        modelSessionManager.activeSessionId,
-        initialFormValues.current.modelName || undefined,
-      )
+      modelSessionManager.setSession(modelSessionManager.activeSessionId, initialSession)
     }
+    setIsDiagramDirty(false)
     form.reset(initialFormValues.current)
     setIsReadOnly(true)
     setIsExitModalOpen(false)
+    router.refresh()
   }
 
   const handleExitButtonClick = () => {
@@ -347,11 +366,14 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }
 
   const isConfirmButtonDisabled = useMemo(
-    () =>
-      (!form.formState.isDirty && !isDiagramDirty) ||
-      !!form.formState.errors.version ||
-      !!versionAlreadyExistsError ||
-      isLoading,
+    () => {
+      return (
+        (!form.formState.isDirty && !isDiagramDirty) ||
+        !!form.formState.errors.version ||
+        !!versionAlreadyExistsError ||
+        isLoading
+      )
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isLoading, statusWatch, formValues, isDiagramDirty],
   )

@@ -68,6 +68,13 @@ export const sessionReducer = (state: MultiSessionState, action: SessionAction):
       }
     }
 
+    case 'SET_SESSION': {
+      const { sessionId, session } = action.payload
+      const newSessions = state.sessions.map(s => (s.id === sessionId ? session : s))
+
+      return { ...state, sessions: [...newSessions] }
+    }
+
     case 'SWITCH_SESSION': {
       const { sessionId } = action.payload
 

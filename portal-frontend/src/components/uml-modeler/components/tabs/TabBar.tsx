@@ -10,14 +10,13 @@ interface TabProps {
   session: DiagramSession
   isActive: boolean
   isModelerReadOnly: boolean
-  isMultiSessionMode: boolean
   onSelect: (sessionId: string) => void
   onClose: (sessionId: string) => void
   onRename: (sessionId: string, newName: string) => void
 }
 
 const Tab: React.FC<TabProps> = props => {
-  const { session, isActive, isMultiSessionMode, onSelect, onClose, onRename, isModelerReadOnly } = props
+  const { session, isActive, onSelect, onClose, onRename, isModelerReadOnly } = props
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(session.name)
 
@@ -87,7 +86,7 @@ const Tab: React.FC<TabProps> = props => {
       </div>
 
       {/* Close Button */}
-      {!isModelerReadOnly && isMultiSessionMode && (
+      {!isModelerReadOnly && (
         <button
           onClick={handleClose}
           className="flex-shrink-0 p-1 rounded hover:bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -135,7 +134,6 @@ export const TabBar: React.FC<TabBarProps> = props => {
             onClose={onCloseSession}
             onRename={onRenameSession}
             isModelerReadOnly={isModelerReadOnly}
-            isMultiSessionMode={isMultiSessionMode}
           />
         ))}
       </div>

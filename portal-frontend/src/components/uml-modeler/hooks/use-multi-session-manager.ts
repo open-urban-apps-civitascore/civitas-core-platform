@@ -44,6 +44,16 @@ export const useMultiSessionManager = ({
     [dispatch],
   )
 
+  const setSession = useCallback(
+    (sessionId: string, session: DiagramSession): void => {
+      dispatch({
+        type: 'SET_SESSION',
+        payload: { sessionId, session },
+      })
+    },
+    [dispatch],
+  )
+
   const switchToSession = useCallback(
     (sessionId: string): void => {
       dispatch({
@@ -111,6 +121,7 @@ export const useMultiSessionManager = ({
       activeSession,
       createSession,
       closeSession,
+      setSession,
       switchToSession,
       updateSessionName,
       updateSessionDiagram,
