@@ -94,7 +94,7 @@ const defaultValues: DatasourceFormDraft = {
   },
 }
 
-const renderConnectorTab = (values?: Partial<DatasourceFormDraft>) => {
+const renderConnectorTab = (values?: Partial<DatasourceFormDraft>, isReadOnly = false) => {
   const merged = { ...defaultValues, ...values }
   const Wrapper = () => {
     const form = useForm<DatasourceFormDraft>({
@@ -104,7 +104,7 @@ const renderConnectorTab = (values?: Partial<DatasourceFormDraft>) => {
 
     return (
       <Form {...form}>
-        <ConnectorTab form={form} readyConnectorType={merged.connectorType} />
+        <ConnectorTab form={form} readyConnectorType={merged.connectorType} isReadOnly={isReadOnly} />
       </Form>
     )
   }
@@ -153,8 +153,27 @@ describe('ConnectorTab (integration)', () => {
   })
 
   it('works in draft mode', () => {
-    renderConnectorTab(true)
+    renderConnectorTab()
 
     expect(screen.getByLabelText(/URLs/)).toBeInTheDocument()
+  })
+
+  describe('Read-only mode', () => {
+    it('disables connector type select when isReadOnly is true', () => {
+      renderConnectorTab(undefined, true)
+      expect(screen.getByTestId('connectorTypeSelectTrigger')).toBeDisabled()
+    })
+
+    it('disables dynamic form fields when isReadOnly is true', () => {
+      renderConnectorTab(undefined, true)
+      expect(screen.getByLabelText(/URLs/)).toBeDisabled()
+      expect(screen.getByRole('checkbox')).toBeDisabled()
+    })
+
+    it('fields are enabled when isReadOnly is false', () => {
+      renderConnectorTab(undefined, false)
+      expect(screen.getByTestId('connectorTypeSelectTrigger')).not.toBeDisabled()
+      expect(screen.getByLabelText(/URLs/)).not.toBeDisabled()
+    })
   })
 })
