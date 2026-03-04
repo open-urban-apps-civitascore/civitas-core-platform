@@ -4,6 +4,10 @@ import { getToken } from 'next-auth/jwt'
 import { GetRequestLogContext, logger } from '@/lib/logger'
 
 const JSON_SERVER_URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERVER_PORT}`
+
+// APISIX Gateway URL - requests go through the gateway for JWT validation
+// The gateway validates the Bearer token and forwards to the backend
+// See .env.local.template for configuration
 const API_URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
 
 // Log configured endpoints on module initialization
@@ -61,8 +65,9 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
     // Attach authorization token
     headers.set('Authorization', `Bearer ${token.access_token}`)
 
-    // Remove host header to avoid conflicts with backend
+    // Remove headers that shouldn't be forwarded to the backend
     headers.delete('host')
+    headers.delete('cookie') // Session cookies are only for NextAuth, not the backend
 
     const fetchOptions: RequestInit = { method, headers }
 

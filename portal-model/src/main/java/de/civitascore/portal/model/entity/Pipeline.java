@@ -19,13 +19,10 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-
 @Entity
 @Table(
     name = "pipelines",
-    indexes = {
-      @Index(name = "idx_pipeline_dataset", columnList = "dataset_id")
-    })
+    indexes = {@Index(name = "idx_pipeline_dataset", columnList = "dataset_id")})
 @Getter
 @Setter
 public class Pipeline extends NamedEntity {
@@ -34,16 +31,12 @@ public class Pipeline extends NamedEntity {
   @JoinColumn(name = "dataset_id", nullable = false)
   private DataSet dataSet;
 
-  /**
-   * React Flow visual layout stored as JSON (nodes/edges/viewport).
-   */
+  /** React Flow visual layout stored as JSON (nodes/edges/viewport). */
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "styles", columnDefinition = "jsonb")
   private Map<String, Object> styles;
 
-  /**
-   * Data sources associated with this pipeline.
-   */
+  /** Data sources associated with this pipeline. */
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "pipeline_data_sources",
@@ -51,24 +44,16 @@ public class Pipeline extends NamedEntity {
       inverseJoinColumns = @JoinColumn(name = "data_source_id"))
   private Set<DataSource> dataSources = new HashSet<>();
 
-  /**
-   * Array of API paths (e.g., ["/api/v1/traffic"]).
-   * Used to auto-generate Distribution entries.
-   */
+  /** Array of API paths (e.g., ["/api/v1/traffic"]). Used to auto-generate Distribution entries. */
   @Column(name = "apis", columnDefinition = "text[]")
   private List<String> apis;
 
-  /**
-   * Array of persistence IDs. Must only contain the Master ID (persistenceId from DataSet).
-   */
+  /** Array of persistence IDs. Must only contain the Master ID (persistenceId from DataSet). */
   @Column(name = "persistences", columnDefinition = "bigint[]")
   private List<Long> persistences;
 
-  /**
-   * Executable RedpandaConnect configuration in JSON/YAML format.
-   */
+  /** Executable RedpandaConnect configuration in JSON/YAML format. */
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "model", columnDefinition = "jsonb")
   private Map<String, Object> model;
 }
-

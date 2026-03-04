@@ -408,6 +408,57 @@
         }
       ],
       "realmRoles": ["default-roles-civitas-core"]
+    },
+    {
+      "id": "e2e00000-0000-0000-0000-000000000001",
+      "username": "authz.admin@e2e.civitas.dev",
+      "email": "authz.admin@e2e.civitas.dev",
+      "firstName": "Authz",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["default-roles-civitas-core"]
+    },
+    {
+      "id": "e2e00000-0000-0000-0000-000000000002",
+      "username": "authz.reader@e2e.civitas.dev",
+      "email": "authz.reader@e2e.civitas.dev",
+      "firstName": "Authz",
+      "lastName": "Reader",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["default-roles-civitas-core"]
+    },
+    {
+      "id": "e2e00000-0000-0000-0000-000000000003",
+      "username": "authz.none@e2e.civitas.dev",
+      "email": "authz.none@e2e.civitas.dev",
+      "firstName": "Authz",
+      "lastName": "NoPerms",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["default-roles-civitas-core"]
     }
   ],
   "defaultRole": {
@@ -611,7 +662,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "**********",
+      "secret": "dev-only-portal-frontend-secret",
       "redirectUris": ["http://localhost:3000/api/auth/callback/keycloak"],
       "webOrigins": ["http://localhost:3000"],
       "notBefore": 0,

@@ -16,7 +16,9 @@
     "test": "vitest",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
+    "postinstall": "[ -f json-server/db.json ] || [ ! -f json-server/db.seed.json ] || cp json-server/db.seed.json json-server/db.json",
     "json-server": "source .env.local && npx json-server json-server/db.json -p $JSON_SERVER_PORT",
+    "json-server:reset": "cp json-server/db.seed.json json-server/db.json",
     "fetch-design-tokens": "npx shadcn@latest add https://rdhlrr8yducbb6dq.public.blob.vercel-storage.com/figma-to-shadcn/v4-variables-874296775744998506-9vlyIlh2ztIwRvlO8zaz1JlkduI51J.json",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
@@ -110,5 +112,14 @@
     "typescript": "5.9.3",
     "vite-tsconfig-paths": "5.1.4",
     "vitest": "3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "@swc/core",
+      "esbuild",
+      "sharp",
+      "unrs-resolver"
+    ]
   }
 }

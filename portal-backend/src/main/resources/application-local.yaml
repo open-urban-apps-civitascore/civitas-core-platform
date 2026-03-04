@@ -7,6 +7,9 @@ logging:
 app:
   url: http://localhost:8089
 
+civitas:
+  master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
 spring:
   jpa:
     hibernate:
@@ -17,10 +20,6 @@ spring:
   # Kafka local deployment settings
   kafka:
     bootstrap-servers: localhost:9092
-    producer:
-      bootstrap-servers: localhost:9092
-    consumer:
-      bootstrap-servers: localhost:9092
 
 keycloak:
   realm: "civitas-core"
@@ -33,4 +32,3 @@ kafka:
   bootstrap-servers: localhost:9092
   acks: all
   retries: 3
-  async-publish: true  # true = async (callback), false = sync (blocking)

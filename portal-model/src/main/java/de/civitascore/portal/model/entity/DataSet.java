@@ -1,7 +1,7 @@
 package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
-import de.civitascore.portal.model.entity.base.NamedEntity;
+import de.civitascore.portal.model.entity.base.BaseDataEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -16,14 +16,11 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -41,24 +38,22 @@ import lombok.Setter;
     })
 @Getter
 @Setter
-public class DataSet extends NamedEntity {
+public class DataSet extends BaseDataEntity {
 
-  /**
-   * Status of the dataset in its lifecycle.
-   * Default is DRAFT.
-   */
+  /** Status of the dataset in its lifecycle. Default is DRAFT. */
   @Enumerated(EnumType.STRING)
   @Column(name = "status", nullable = false, length = 20)
   private DataSetStatus dataSetStatus = DataSetStatus.DRAFT;
 
-  /**
-   * Master persistence ID (FROST ID).
-   * Required for publishing the dataset.
-   */
+  /** Master persistence ID (FROST ID). Required for publishing the dataset. */
   @Column(name = "persistence_id")
   private Long persistenceId;
 
-  @OneToMany(mappedBy = "dataSet", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
   private Set<Pipeline> pipelines = new HashSet<>();
 
   @Column(name = "identifier")
@@ -97,7 +92,11 @@ public class DataSet extends NamedEntity {
       })
   private Set<Agent> agents = new HashSet<>();
 
-  @OneToMany(mappedBy = "dataSet", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+  @OneToMany(
+      mappedBy = "dataSet",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
   private Set<Distribution> distributions = new HashSet<>();
 
   @ManyToMany(mappedBy = "dataSets", fetch = FetchType.LAZY)
@@ -112,8 +111,18 @@ public class DataSet extends NamedEntity {
   @Column(name = "open_data_access", nullable = false)
   private Boolean openDataAccess = false;
 
-  @OneToMany(mappedBy = "dataset", fetch = FetchType.LAZY)
+  @OneToMany(
+      mappedBy = "dataset",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
   private Set<Assignment> assignments = new HashSet<>();
+
+  @Override
+  protected void linkAssignment(Assignment assignment) {
+    assignment.setScope(this);
+  }
 
   public void setDistributions(Collection<Distribution> newDistributions) {
     this.distributions.clear();

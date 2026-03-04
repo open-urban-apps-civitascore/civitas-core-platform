@@ -1,0 +1,10 @@
+{
+  "_comment": "FROST Server (OGC SensorThings API) - Stub",
+  "_version": "1.0.0",
+  "_backend_id": "frost-server",
+  "endpoints": {
+    "/api/v1/{id}/sta": {
+      "GET": "DATASET_READ"
+    }
+  }
+}

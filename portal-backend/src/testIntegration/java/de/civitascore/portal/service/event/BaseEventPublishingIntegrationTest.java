@@ -8,6 +8,7 @@ import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.UserService;
 import java.util.List;
+import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,10 +24,10 @@ import org.springframework.test.context.TestPropertySource;
     partitions = 1,
     brokerProperties = {"listeners=PLAINTEXT://localhost:0", "port=0"},
     topics = {
-      "core.civitas.idm.user.created",
-      "core.civitas.idm.user.updated",
-      "core.civitas.idm.user.deleted",
-      "core.civitas.config.results"
+      "de.civitascore.idm.user.created",
+      "de.civitascore.idm.user.updated",
+      "de.civitascore.idm.user.deleted",
+      "de.civitascore.config.results"
     })
 @TestPropertySource(properties = {"kafka.enabled=true"})
 @Slf4j
@@ -124,7 +125,7 @@ public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakInt
     UserInputDTO input = new UserInputDTO();
     input.setFirstName("Integration");
     input.setLastName("Test" + System.currentTimeMillis());
-    input.setEmail("test." + System.currentTimeMillis() + "@example.com");
+    input.setEmail("test." + UUID.randomUUID().toString().substring(0, 8) + "@example.com");
     input.setPhone("+49123456789");
     input.setActive(true);
     return input;

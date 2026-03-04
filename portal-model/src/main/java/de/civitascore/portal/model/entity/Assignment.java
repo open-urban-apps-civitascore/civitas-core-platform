@@ -3,6 +3,7 @@ package de.civitascore.portal.model.entity;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.base.BaseEntity;
+import de.civitascore.portal.model.entity.base.NamedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -14,7 +15,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import de.civitascore.portal.model.entity.base.NamedEntity;
 import java.util.Objects;
 import java.util.stream.Stream;
 import lombok.Getter;
@@ -136,5 +136,33 @@ public class Assignment extends BaseEntity {
     if (scopeType != null && role.getRoleType() == RoleType.SYSTEM) {
       throw new IllegalStateException("SYSTEM roles cannot have scope");
     }
+  }
+
+  // Convenience setters used by BaseDataEntity.linkAssignment implementations.
+  // Each overload sets both the FK reference and the scopeType atomically.
+
+  public void setScope(DataStructure scope) {
+    this.dataStructure = scope;
+    this.scopeType = ScopeType.DATASTRUCTURE;
+  }
+
+  public void setScope(DataSet scope) {
+    this.dataset = scope;
+    this.scopeType = ScopeType.DATASET;
+  }
+
+  public void setScope(DataSource scope) {
+    this.dataSource = scope;
+    this.scopeType = ScopeType.DATASOURCE;
+  }
+
+  public void setScope(DataSpace scope) {
+    this.dataSpace = scope;
+    this.scopeType = ScopeType.DATASPACE;
+  }
+
+  public void setScope(Catalog scope) {
+    this.catalog = scope;
+    this.scopeType = ScopeType.CATALOG;
   }
 }

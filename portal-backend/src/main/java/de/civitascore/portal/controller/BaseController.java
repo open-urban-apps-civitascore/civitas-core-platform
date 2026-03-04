@@ -6,7 +6,10 @@ import de.civitascore.portal.model.entity.base.BaseEntity;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
 import de.civitascore.portal.model.output.assembler.BaseAssembler;
+import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
 import de.civitascore.portal.repository.specification.base.BaseSpec;
+import de.civitascore.portal.security.AllowedScopes;
+import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.service.BaseService;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -20,13 +23,16 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.experimental.FieldDefaults;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,6 +59,7 @@ public abstract class BaseController<
   protected abstract BaseAssembler<E, O, UUID> getAssembler();
 
   @Autowired protected ObjectMapper objectMapper;
+  @Autowired protected ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   @Parameters({
     @Parameter(
@@ -88,6 +95,10 @@ public abstract class BaseController<
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
+    return getAll((Specification<E>) spec, pageable);
+  }
+
+  protected ResponseEntity<Page<O>> getAll(Specification<E> spec, Pageable pageable) {
     Page<E> entities = getService().findAll(spec, pageable);
     Page<O> outputs = getAssembler().toOutput(entities);
     return ResponseEntity.ok(outputs);
@@ -166,5 +177,25 @@ public abstract class BaseController<
    */
   protected I preProcessInput(I input) {
     return input;
+  }
+
+  /**
+   * Apply scope-based filtering to a specification (M5.5).
+   *
+   * <p>Throws {@link AccessDeniedException} if the {@code X-Allowed-Scope-Ids} header is missing.
+   * If wildcard, returns the spec unchanged. Otherwise combines the spec with the provided scope
+   * filter.
+   */
+  protected Specification<E> applyScopeFilter(S spec) {
+    AllowedScopes scopes = allowedScopesProvider.getObject();
+    if (!scopes.isHeaderPresent()) {
+      throw new AccessDeniedException(
+          "Missing required " + AllowedScopesFilter.HEADER_NAME + " header");
+    }
+    if (scopes.isWildcard()) {
+      return spec;
+    }
+    Specification<E> scopeFilter = ScopeFilteringSpecification.baseEntityById(scopes.getScopeIds());
+    return spec == null ? scopeFilter : spec.and(scopeFilter);
   }
 }

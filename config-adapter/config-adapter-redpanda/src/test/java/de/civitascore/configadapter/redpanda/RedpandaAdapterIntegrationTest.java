@@ -59,7 +59,7 @@ class RedpandaAdapterIntegrationTest {
 
   @Container
   static final GenericContainer<?> redpandaConnect =
-      new GenericContainer<>(DockerImageName.parse("docker.redpanda.com/redpandadata/connect"))
+      new GenericContainer<>(DockerImageName.parse("redpandadata/connect"))
           .withCommand("streams")
           .withExposedPorts(CONNECT_PORT)
           .waitingFor(Wait.forHttp("/ready").forPort(CONNECT_PORT).forStatusCode(200));

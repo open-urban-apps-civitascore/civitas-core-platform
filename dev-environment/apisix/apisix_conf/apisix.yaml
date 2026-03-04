@@ -1,0 +1,105 @@
+# APISIX Routes with OPA Authorization
+# M5: Full AuthZ integration - APISIX -> OPA -> AuthZ Repository
+#
+# Architecture:
+#   - Plugin Config: Reusable auth+authz plugin bundle (openid-connect + opa)
+#   - Services: Backend definitions with upstream config (portal-backend)
+#   - Routes: Map URIs to services, reference plugin config for protection
+#
+# Request flow (protected routes):
+#   1. openid-connect: Validates JWT, sets X-Userinfo header (base64 claims)
+#   2. opa: Calls OPA for authorization decision (with_service=true sends service
+#      metadata to OPA, so OPA knows which backend's permission mappings to use)
+#   3. Request forwarded to backend if allowed (403 if denied)
+#
+# =============================================================================
+# JWT VALIDATION NOTES
+# =============================================================================
+# APISIX discovers Keycloak via Docker DNS (civitas-keycloak:8080). Keycloak is
+# configured with KC_HOSTNAME=localhost + KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true,
+# so the discovery response reports issuer=localhost (matching browser tokens)
+# but jwks_uri=civitas-keycloak (reachable from Docker). No /etc/hosts needed.
+
+# =============================================================================
+# SERVICES - Backend upstream definitions
+# =============================================================================
+# Each service represents a backend. The service name is the canonical backend
+# identifier used by OPA for permission mapping dispatch.
+#
+# Convention: service name matches the permission mappings directory name
+# (with dashes, OPA converts to underscores for data file lookup).
+#   portal-backend -> data.backends.portal_backend.endpoints
+
+services:
+  - id: svc-portal-backend
+    name: portal-backend
+    desc: "Portal Backend API Service"
+    upstream:
+      type: roundrobin
+      nodes:
+        "portal-backend:8089": 1
+      timeout:
+        connect: 6
+        send: 6
+        read: 6
+
+# =============================================================================
+# PLUGIN CONFIGS - Reusable plugin bundles
+# =============================================================================
+# Attach plugin_config_id to protected routes. Public routes omit it.
+
+plugin_configs:
+  - id: 1
+    desc: "Standard auth + authz (openid-connect + OPA)"
+    plugins:
+      # 1. JWT validation - validates token and sets X-Userinfo header
+      openid-connect:
+        client_id: "apisix-validator"
+        client_secret: "unused-for-jwks-validation"
+        discovery: "http://civitas-keycloak:8080/realms/civitas-core/.well-known/openid-configuration"
+        bearer_only: true
+        use_jwks: true
+        # DEV-ONLY: ssl_verify disabled for local HTTP Keycloak.
+        # PRODUCTION MUST use ssl_verify: true (see TEAM3-AUTHZ-DEPLOYMENT.md).
+        ssl_verify: false
+        # Pass decoded JWT claims to OPA via X-Userinfo header
+        set_userinfo_header: true
+
+      # 2. OPA authorization - calls OPA for permission decision
+      # M5.5: send_headers_upstream passes OPA response headers to backend.
+      # OPA returns X-Allowed-Scope-Ids for collection filtering.
+      opa:
+        host: "http://civitas-opa:8181"
+        policy: "civitas/authz/decision"
+        with_route: true
+        with_service: true
+        with_consumer: false
+        send_headers_upstream:
+          - "X-Allowed-Scope-Ids"
+
+      # 3. Strip client-supplied scope headers before OPA sets them.
+      # APISIX forwards all client headers by default — without this, a
+      # malicious client could send X-Allowed-Scope-Ids: * and bypass
+      # collection-level authorization filtering in the backend.
+      proxy-rewrite:
+        headers:
+          remove:
+            - "X-Allowed-Scope-Ids"
+
+      # 4. Request ID for tracing
+      request-id:
+        include_in_response: true
+
+# =============================================================================
+# ROUTES
+# =============================================================================
+
+routes:
+  # Protected API routes - require valid JWT and OPA authorization
+  - id: portal-backend-api
+    name: "Portal Backend API (AuthZ)"
+    uri: /v2/*
+    service_id: svc-portal-backend
+    plugin_config_id: 1
+
+#END

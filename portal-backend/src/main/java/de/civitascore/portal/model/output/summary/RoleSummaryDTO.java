@@ -6,6 +6,6 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class RoleSummaryDTO extends BaseSummaryDTO {
+public class RoleSummaryDTO extends BaseSummaryNamedDTO {
   private RoleType roleType;
 }

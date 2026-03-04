@@ -4,7 +4,8 @@ export const mapDatasetToFormData = (dataset: Dataset) => {
   return {
     id: dataset.id,
     name: dataset.name,
-    dataspace: dataset.dataspace?.id || '',
     description: dataset.description,
+    openDataAccess: dataset.openDataAccess,
+    dataSetStatus: dataset.dataSetStatus,
   }
 }

@@ -13,11 +13,12 @@ import de.civitascore.configadapter.adapter.AbstractSagaCommandHandler;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import de.civitascore.configadapter.crypto.CredentialDecryptor;
+import de.civitascore.configadapter.crypto.CryptoKeyLoader;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
 import jakarta.ws.rs.client.Client;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.owasp.encoder.Encode;
@@ -41,7 +42,6 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   private static final String ADAPTER_NAME = "redpanda";
   private static final String DEFAULT_URL = "http://localhost:4195";
   private static final String MASTER_KEY_ENV = "CIVITAS_MASTER_KEY";
-  private static final String MASTER_SALT_ENV = "CIVITAS_MASTER_SALT";
 
   private RedpandaConnectClient redpandaClient;
 
@@ -53,23 +53,20 @@ public class RedpandaSagaHandler extends AbstractSagaCommandHandler {
   @Override
   protected void doInitialize(AdapterConfig config) {
     String baseUrl = getProperty("url", DEFAULT_URL);
-    byte[] masterKey = CredentialDecryptor.loadKeyFromEnv(MASTER_KEY_ENV);
-    byte[] salt = CredentialDecryptor.loadKeyFromEnv(MASTER_SALT_ENV);
+    byte[] stretchedKey = CryptoKeyLoader.loadAndStretchKeyFromEnv(MASTER_KEY_ENV);
 
-    if (masterKey.length == 0 || salt.length == 0) {
-      log.warn(
-          "{} or {} not set — encrypted credentials cannot be decrypted",
-          MASTER_KEY_ENV,
-          MASTER_SALT_ENV);
+    if (stretchedKey.length == 0) {
+      log.warn("{} not set — encrypted credentials cannot be decrypted", MASTER_KEY_ENV);
     }
 
     if (this.redpandaClient == null) {
-      jakarta.ws.rs.client.Client jaxrsClient = client();
+      Client jaxrsClient = client();
       this.redpandaClient =
           jaxrsClient != null
-              ? new RedpandaConnectClient(baseUrl, masterKey, salt, jaxrsClient)
-              : new RedpandaConnectClient(baseUrl, masterKey, salt);
+              ? new RedpandaConnectClient(baseUrl, stretchedKey, jaxrsClient)
+              : new RedpandaConnectClient(baseUrl, stretchedKey);
     }
+    Arrays.fill(stretchedKey, (byte) 0);
 
     log.info("RedpandaSagaHandler initialized for: {}", Encode.forJava(baseUrl));
   }

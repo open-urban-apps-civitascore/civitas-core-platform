@@ -66,7 +66,7 @@ class RoleControllerIntegrationTest
   @Override
   protected RoleInputDTO createValidInput() {
     RoleInputDTO input = new RoleInputDTO();
-    input.setName("test_role_" + System.currentTimeMillis());
+    input.setName("test_role_" + UUID.randomUUID().toString().substring(0, 8));
     input.setDescription("A test role for integration testing");
     input.setRoleType(RoleType.GOVERNANCE);
     return input;
@@ -158,7 +158,11 @@ class RoleControllerIntegrationTest
     void shouldCreateRoleWithDifferentRoleTypes() {
       for (RoleType type : RoleType.values()) {
         RoleInputDTO input = createValidInput();
-        input.setName("role_" + type.name().toLowerCase() + "_" + System.currentTimeMillis());
+        input.setName(
+            "role_"
+                + type.name().toLowerCase()
+                + "_"
+                + UUID.randomUUID().toString().substring(0, 8));
         input.setName("Role " + type.name());
         input.setRoleType(type);
 

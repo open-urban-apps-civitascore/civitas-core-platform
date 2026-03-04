@@ -1,9 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import type {
-  PipelineOutputDTO,
-  PipelinePayload,
-} from '@/app/(main)/datasets/[datasetId]/data/pipeline-editor/_types/pipeline'
+import { PipelinePayload } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types'
+import { PipelineOutputDTO } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
 import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 
 const API_REQUEST_HEADER = 'x-api-request'

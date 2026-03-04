@@ -1,0 +1,10 @@
+*/target/
+!*/target/*.jar
+*/*.log
+*/*.iml
+*/.idea/
+*/.git/
+*/.gitignore
+*/README.md
+Dockerfile
+.dockerignore

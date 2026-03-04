@@ -14,11 +14,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
-@ActiveProfiles({"test-integration", "local-init"})
+@ActiveProfiles({"test-integration", "local-init", "local-init-test"})
 @DisplayName("LocalUserInitializer Integration Tests")
 class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest {
 
@@ -37,8 +35,6 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   }
 
   @Test
-  @Transactional
-  @Rollback
   @DisplayName("Should create group with Tenant Admin assignment")
   void shouldCreateGroupWithRoleAssignment() {
     localUserInitializer.initialize();
@@ -54,8 +50,6 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   }
 
   @Test
-  @Transactional
-  @Rollback
   @DisplayName("Should create user and assign to group in database")
   void shouldCreateUserAssignedToGroup() {
     localUserInitializer.initialize();
@@ -66,7 +60,12 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
     assertThat(user.get().getLastName()).isEqualTo("TestUser");
     assertThat(user.get().getActive()).isTrue();
     assertThat(user.get().getExternalId()).isEqualTo(TEST_EXTERNAL_ID);
-    assertThat(user.get().getGroups()).extracting("name").containsExactly(TEST_GROUP_NAME);
+
+    Group group = groupRepository.findByName(TEST_GROUP_NAME).orElseThrow();
+    List<Group> groupsWithMembers = groupRepository.findAllByIdWithMembers(List.of(group.getId()));
+    assertThat(groupsWithMembers.get(0).getMembers())
+        .extracting("email")
+        .containsExactly(TEST_EMAIL);
   }
 
   @Test

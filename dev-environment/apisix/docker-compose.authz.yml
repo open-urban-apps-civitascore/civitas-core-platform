@@ -1,0 +1,79 @@
+# AuthZ Services — OPA + AuthZ Repository + Seed
+#
+# Split from docker-compose.yml so that the APISIX gateway can run
+# independently. Included by backend/docker-compose.yml for full-Docker
+# mode and started by start-portal-dev.sh for dev mode.
+#
+# Environment variables (set by start script):
+#   OPA_DATA_DIR  — path to backends data (default: real permissions)
+#                   Set to backends-allowall for allow-all mode.
+
+services:
+  # AuthZ Repository - serves user context to OPA
+  # Requires PostgreSQL (postgres-portal) to be running — started by infra compose.
+  authz-repository:
+    build:
+      context: ../../authz/repository
+      dockerfile: Dockerfile
+    container_name: civitas-authz-repository
+    restart: always
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
+      DATABASE_USERNAME: ${POSTGRES_USER:-admin}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      SERVER_PORT: 8091
+    ports:
+      - "8091:8091"
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # OPA - Policy Decision Point
+  opa:
+    image: openpolicyagent/opa:1.14.0-static
+    container_name: civitas-opa
+    restart: always
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=info"
+      - "--log-format=json"
+      - "--set=decision_logs.console=true"
+      - "/policies"
+      - "/lib"
+      - "/providers"
+      - "/data"
+    volumes:
+      - ../../authz/rego/policy:/policies:ro
+      - ../../authz/rego/lib:/lib:ro
+      - ../../authz/rego/providers:/providers:ro
+      - ${OPA_DATA_DIR:-../../authz/rego/data/backends}:/data/backends:ro
+      - ./opa-config:/data/config:ro
+    ports:
+      - "8181:8181"
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "-f", "pretty", "true"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      authz-repository:
+        condition: service_healthy
+
+  # Dev admin seeding moved to start-portal-dev.sh (runs AFTER backend starts,
+  # so PermissionRoleInitializer has created permissions before we link them).
+  # For full-Docker mode (backend/docker-compose.yml), see that file's seed setup.
+
+networks:
+  civitas-network:
+    name: civitas-network
+    external: true

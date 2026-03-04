@@ -1,7 +1,7 @@
 // mapDatasetToFormData.test.ts
 import { describe, expect, it } from 'vitest'
 
-import { type Dataset, DATASET_STATUS } from '@/types/datasets'
+import { type Dataset, DATASET_STATUS_TYPES } from '@/types/datasets'
 
 import { mapDatasetToFormData } from './mappers'
 
@@ -9,12 +9,12 @@ const dataset: Dataset = {
   id: 'd1',
   name: 'Dataset 1',
   description: 'Test description',
-  contact: null,
-  issued: '2024-01-01',
-  lastUpdated: '2024-01-02',
-  access: true,
-  status: DATASET_STATUS.DRAFT,
-  dataspace: { id: 'ds1', name: 'dataspace1' },
+  createdAt: '2024-01-01T00:00:00Z',
+  modifiedAt: '2024-01-02T00:00:00Z',
+  openDataAccess: true,
+  dataSetStatus: DATASET_STATUS_TYPES.DRAFT,
+  distributions: [],
+  pipelines: [],
 }
 
 describe('mapDatasetToFormData', () => {
@@ -24,14 +24,15 @@ describe('mapDatasetToFormData', () => {
     expect(result).toEqual({
       id: 'd1',
       name: 'Dataset 1',
-      dataspace: 'ds1',
       description: 'Test description',
+      openDataAccess: true,
+      dataSetStatus: DATASET_STATUS_TYPES.DRAFT,
     })
   })
 
-  it('maps empty dataspace id when dataspace is null', () => {
-    const result = mapDatasetToFormData({ ...dataset, dataspace: null })
+  it('handles empty descriptions', () => {
+    const result = mapDatasetToFormData({ ...dataset, description: '' })
 
-    expect(result.dataspace).toBe('')
+    expect(result.description).toBe('')
   })
 })

@@ -1,0 +1,37 @@
+logging:
+  level:
+    root: INFO
+    org.hibernate: WARN
+    org.flywaydb: INFO
+
+app:
+  url: http://localhost:8089
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.format_sql: true
+
+  # Kafka - use Docker service names
+  kafka:
+    bootstrap-servers: kafka:9092
+    producer:
+      bootstrap-servers: kafka:9092
+    consumer:
+      bootstrap-servers: kafka:9092
+
+# Backend running in DOCKER alongside Keycloak
+keycloak:
+  realm: "civitas-core"
+  auth-server-url: http://keycloak:8080
+  issuer-uri: http://localhost:8080
+  target-realm: "civitas-core"
+
+kafka:
+  enabled: true
+  bootstrap-servers: kafka:9092
+  acks: all
+  retries: 3
+  async-publish: true  # true = async (callback), false = sync (blocking)

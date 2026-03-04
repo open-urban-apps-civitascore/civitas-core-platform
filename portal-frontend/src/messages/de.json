@@ -1,4 +1,9 @@
 {
+  "welcome": {
+    "title": "Willkommen in CIVITAS/CORE 2.0",
+    "subtitle": "Neu hier?",
+    "docsButton": "Dokumentation"
+  },
   "common": {
     "type-to-search": "Zum Suchen tippen",
     "search": "Durchsuchen",
@@ -61,7 +66,8 @@
     },
     "status": {
       "DRAFT": "Entwurf",
-      "AVAILABLE": "Verfügbar"
+      "AVAILABLE": "Verfügbar",
+      "READY": "Fertig"
     },
     "exitModal": {
       "title": "Vor dem Beenden speichern?",
@@ -82,23 +88,27 @@
     "all-datasets": "Alle Datensätze",
     "documentation": "Dokumentation",
     "logout": "Abmelden",
+    "platform": "Plattform",
+    "admin": "Admin",
+    "help": "Hilfe",
     "ourData": "Unsere Daten",
-    "datasets": "Unsere Daten",
+    "datasets": "Datensätze",
     "permissions": "Berechtigungen",
     "roles": "Rollen",
     "create": "erstellen",
     "edit": "bearbeiten",
-    "users": "User Management",
+    "users": "User",
     "groups": "Gruppen",
     "dataspaces": "Datenräume",
     "tenants": "Mandanten-Management",
     "uml-modeler": "UML Modeler",
-    "data": "Daten",
+    "data-flow": "Datenfluss",
     "table-editor": "Table Editor",
     "pipeline-editor": "Pipeline Editor",
     "data-management": "Daten-Management",
     "datasources": "Datenquellen",
-    "datastructures": "Datenstrukturen"
+    "datastructures": "Datenstrukturen",
+    "access-management": "Zugriffsmanagement"
   },
   "datasets": {
     "title": "Datensätze",
@@ -107,56 +117,52 @@
     "newDataset": "Neuer Datensatz",
     "tableHeaders": {
       "name": "Name",
-      "dataSpace": "Datenraum",
-      "department": "Fachbereich",
-      "contact": "Ansprechperson",
-      "lastUpdated": "Zuletzt aktualisiert",
-      "access": "Zugriff",
-      "status": "Status"
+      "createdBy": "Erstellt von",
+      "lastUpdated": "Aktualisiert",
+      "status": "Status",
+      "action": "Aktion"
     },
     "tableValues": {
-      "status": {
-        "open": "offen",
-        "closed": "geschlossen"
+      "draft": "Entwurf",
+      "available": "Verfügbar",
+      "ready": "Fertig",
+      "yesterday": "Gestern"
+    },
+    "create": {
+      "title": "Neuer Datensatz",
+      "subtitle": "Neue Datensätze sind nur intern sichtbar.",
+      "form": {
+        "title": "Basisinformationen",
+        "subtitle": "Der Name kann später angepasst werden.",
+        "name": "Name"
       }
     },
     "overview": {
-      "title": "Erstellen: Neuer Datensatz",
-      "subtitle": "Gib die Basisinformationen ein.",
       "info": {
         "title": "Basisinformationen",
-        "dataspace": "Datenraum",
-        "selectDataspace": "Datenraum wählen...",
-        "name": "Name des Datensatzes",
-        "description": "Beschreibung"
+        "name": "Name",
+        "description": "Beschreibung",
+        "descriptionHint": "max. 150 Zeichen"
       },
       "completion": {
         "title": "Erstellungsfortschritt",
-        "metadata": {
-          "title": "Metadaten",
-          "button": "Metadaten eintragen",
-          "requirementsMet": "Mindestanforderungen erfüllt"
-        },
-        "accessPermissions": {
+        "accessManagement": {
           "title": "Zugriffsberechtigungen",
-          "button": "Rollen und Usergruppen hinzufügen",
-          "userGroups": "Usergruppen"
+          "button": "Gruppen und Rollen bearbeiten",
+          "assignments": "Gruppen und Rollen",
+          "noAssignments": "Keine Gruppen oder Rollen vorhanden",
+          "groups": "Gruppen",
+          "roles": "Rollen",
+          "openDataAccess": "Open Data",
+          "openDataAccessHint": "Zugriff auf Nutzdaten dieses Datensatzes ohne Authentifizierung ermöglichen."
         },
-        "data": {
-          "title": "Daten",
-          "button": "Daten einspielen und mappen",
-          "datasources": "Datenquellen",
-          "persistence": "Persistenz"
-        },
-        "distribution": {
-          "title": "Distribution",
-          "button1": "APIs anbinden",
-          "button2": "Dateien bereitstellen",
-          "api": "API"
-        },
-        "usagePermissions": { "title": "Nutzungsberechtigungen", "button": "Rate Limiting einstellen" },
-        "applications": { "title": "Applikationen", "button": "Applikationen anbinden" },
-        "publication": { "title": "Freigabe", "button": "Freigabe gestalten" }
+        "dataFlow": {
+          "title": "Datenfluss",
+          "button": "Daten laden und bereitstellen",
+          "pipelines": "Pipeline",
+          "distributionAccessURLs": "SensorThings API",
+          "noDataFlow": "Es sind noch keine Daten vorhanden."
+        }
       }
     },
     "dataMode": {
@@ -165,6 +171,10 @@
       "pipelineEditor": "Pipeline Editor",
       "tableDescription": "Eine Oberfläche, die sich an Excel-Workflows orientiert. Für Datensätze mit einem übersichtlichen Datenfluss – basierend auf Datei-Importe, wenigen Datenquellen, wenigen Transformationen, …",
       "pipelineDescription": "Eine Oberfläche, die sich an node based programming orientiert. Für Datensätze mit einem komplexen Datenfluss – basierend auf vielen Datenquellen, vielen Transformationen, …"
+    },
+    "messages": {
+      "createSuccess": "Datensatz wurde erfolgreich angelegt.",
+      "updateSuccess": "Datensatz wurde erfolgreich aktualisiert."
     }
   },
   "users": {
