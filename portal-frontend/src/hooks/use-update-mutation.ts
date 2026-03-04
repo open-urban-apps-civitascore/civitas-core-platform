@@ -10,12 +10,12 @@ export const useUpdateMutation = <TResponse, TData extends WithId<string>>({
   endpoint,
   errorMessage,
   headers,
-}: UpdateMutationInput) => {
+}: UpdateMutationInput<TData>) => {
   const queryClient = useQueryClient()
 
   return useMutation<ApiServiceResponse<TResponse>, unknown, MutationData<TData>>({
     mutationFn: (data: MutationData<TData>) => {
-      const url = isFn(endpoint) ? getRequestEndpoint(endpoint, data.id) : endpoint
+      const url = isFn(endpoint) ? getRequestEndpoint(endpoint, data) : endpoint
 
       return apiRequest<TResponse>({
         method: method,

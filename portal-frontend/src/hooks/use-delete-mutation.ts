@@ -3,9 +3,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { DeleteMutationInput } from '@/types/common'
 
-type DeleteMutationOptions = Omit<DeleteMutationInput, 'id'>
+type DeleteMutationOptions<TData> = Omit<DeleteMutationInput<TData>, 'id'>
 
-export const useDeleteMutation = <TResponse>({ key: mutationKey, errorMessage, headers }: DeleteMutationOptions) => {
+export const useDeleteMutation = <TResponse, TData>({
+  key: mutationKey,
+  errorMessage,
+  headers,
+}: DeleteMutationOptions<TData>) => {
   const queryClient = useQueryClient()
 
   return useMutation<ApiServiceResponse<TResponse>, Error, string>({

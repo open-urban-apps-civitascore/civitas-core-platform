@@ -61,19 +61,19 @@ export type UpdateInput = {
   method: UpdateMutationMethod
 }
 
-export type BaseMutationInput = {
+export type BaseMutationInput<TData> = {
   key: string
-  endpoint?: string | ((id: string) => string)
+  endpoint?: string | ((value: TData) => string)
   errorMessage: string
   headers?: AxiosRequestConfig['headers']
 }
 
-export type CreateMutationInput = BaseMutationInput
+export type CreateMutationInput<TData> = BaseMutationInput<TData>
 
-export type UpdateMutationInput = BaseMutationInput & {
+export type UpdateMutationInput<TData> = BaseMutationInput<TData> & {
   method: UpdateMutationMethod
 }
 
-export type DeleteMutationInput = BaseMutationInput & {
+export type DeleteMutationInput<TData> = BaseMutationInput<TData> & {
   id: string
 }

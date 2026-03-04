@@ -59,6 +59,8 @@ export const defaultFormData: DatastructureVersionFormData = {
   styles: null,
 }
 
+const mapApiToFormData = (version: DatastructureVersion) => ({ ...version, description: version?.description || '' })
+
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
     value: 'structure',
@@ -89,7 +91,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const tCommon = useTranslations('common')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const initialFormValues = useRef<DatastructureVersionFormData>(
-    version ? { ...version, description: version?.description || '' } : defaultFormData,
+    version ? mapApiToFormData(version) : defaultFormData,
   )
 
   const initialSession = useMemo(() => {
@@ -162,6 +164,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const statusWatch = form.watch('dataStructureVersionStatus')
   const versionWatch = form.watch('version')
   const modelWatch = form.watch('model')
+  const modelUriWatch = form.watch('modelAtlasUri')
+  const modelNameWatch = form.watch('modelName')
+  const stylesWatch = form.watch('styles')
   const sourceWatch = form.watch('dataStructureVersionSource')
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
@@ -213,9 +218,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const completedTabs = useMemo((): DatastructureVersionTab[] => {
     const completed: DatastructureVersionTab[] = []
-    if (versionWatch.length > 0 && descriptionWatch.length > 0 && sourceWatch) {
-      completed.push('versionInfo')
-    }
+    if (versionWatch.length > 0 && descriptionWatch.length > 0 && sourceWatch) completed.push('versionInfo')
+    if (modelWatch && modelAtlasUri && modelNameWatch && stylesWatch) completed.push('structure')
     return completed
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
@@ -255,8 +259,10 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     mutationFn: UseMutationResult<ApiServiceResponse<DatastructureVersion>, unknown, WithId, unknown>,
     versionId: string,
   ) => {
+    console.log('handleStatusUpdate')
     try {
-      mutationFn.mutateAsync({ id: versionId })
+      const response = await mutationFn.mutateAsync({ id: versionId })
+      form.reset(mapApiToFormData(response.data))
       toast.success(tCommon('info.statusChangeSuccess'))
     } catch (error) {
       toast.error(tCommon('errors.statusChangeError'))
@@ -306,15 +312,21 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     try {
       const dirtyFields = form.formState.dirtyFields
 
+      console.log('dirtyFields', dirtyFields)
+
       const shouldPublish =
         !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
       const shouldUnpublish =
         !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
+      console.log('shouldPublish', shouldPublish)
+      console.log('shouldUnpublish', shouldUnpublish)
+
       const fieldsToUpdate = pickDirtyValues(parsedValues, dirtyFields)
       const shouldUpdateValues = (Object.keys(fieldsToUpdate) as (keyof DatastructureVersionFormData)[]).some(
         key => key !== 'dataStructureVersionStatus',
       )
+      console.log('shouldUpdateValues', shouldUpdateValues)
       if (shouldUpdateValues) await handleUpdateValues(parsedValues)
 
       if (shouldPublish) {

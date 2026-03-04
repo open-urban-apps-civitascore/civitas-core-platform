@@ -13,10 +13,10 @@ export const setFocus = (id: string) => {
 export const isFn = <TData>(x: string | ((data: TData) => string) | undefined): x is (data: TData) => string =>
   typeof x === 'function'
 
-export const getRequestEndpoint = (endpointFn: (id: string) => string, id?: string) => {
-  if (!id) {
-    throw new Error('Error building request enpoint: Missing id.')
+export const getRequestEndpoint = <TValue>(endpointFn: (value: TValue) => string, value?: TValue) => {
+  if (!value) {
+    throw new Error('Error building request enpoint: Missing value.')
   }
 
-  return endpointFn(id)
+  return endpointFn(value)
 }
