@@ -86,7 +86,11 @@ export const GroupOverview = (props: GroupDetailsProps) => {
         toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
         router.push(`/groups/${data.id}?mode=edit`)
       },
-      onError: () => toast.error(t('errors.createError')),
+      onError: (error: unknown) => {
+        if (((error as Error).message as string).includes('Request failed with status code 409')) {
+          form.setError('name', { type: 'manual', message: t('errors.groupNameExists') })
+        } else toast.error(t('errors.createError'))
+      },
     })
   }
 

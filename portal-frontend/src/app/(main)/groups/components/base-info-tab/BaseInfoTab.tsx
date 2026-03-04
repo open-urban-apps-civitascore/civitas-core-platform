@@ -118,7 +118,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
       <DetailsFieldContainer>
         <FormTextArea
-          className="max-w-lg my-12"
+          className="max-w-lg"
           form={form}
           label={t('details.description')}
           name="description"

@@ -4,6 +4,7 @@ import React, { HTMLAttributes } from 'react'
 import { cn } from '@/lib/utils'
 
 import { Button } from '../ui/button'
+import { ContentCard } from '../content-card/ContentCard'
 
 interface NoDataPageProps extends HTMLAttributes<HTMLDivElement> {
   title: string
@@ -14,15 +15,15 @@ interface NoDataPageProps extends HTMLAttributes<HTMLDivElement> {
 export const NoDataPage = (props: NoDataPageProps) => {
   const { title, subTitle, buttonText, onButtonClick, ...divProps } = props
   return (
-    <div className={cn('h-full flex flex-col justify-center items-center', divProps.className)}>
+    <ContentCard className={cn('flex flex-col justify-center items-center', divProps.className)}>
       <p className="text-xl font-semibold mb-2">{title}</p>
       {subTitle && <p className="text-[muted-foreground] mb-12">{subTitle}</p>}
       {buttonText && (
-        <Button onClick={onButtonClick}>
+        <Button type="button" onClick={onButtonClick}>
           <Plus />
           {buttonText}
         </Button>
       )}
-    </div>
+    </ContentCard>
   )
 }

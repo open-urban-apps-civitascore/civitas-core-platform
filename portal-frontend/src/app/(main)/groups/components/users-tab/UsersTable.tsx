@@ -7,6 +7,7 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { TableProps } from '@/types/table'
 import { ListUser } from '@/types/users'
 import { resolveUpdater } from '@/utils/table'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 
 interface UsersTableProps extends TableProps<ListUser> {
   users: ListUser[]
@@ -43,7 +44,7 @@ export const UsersTable = (props: UsersTableProps) => {
     }),
     columnHelper.accessor('fullName', {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.displayName')} />,
-      cell: info => info.getValue(),
+      cell: ({ row }) => <LinkCell href={`/users/${row.id}`}>{row.original.fullName}</LinkCell>,
       meta: {
         style: {
           width: '22.22%',

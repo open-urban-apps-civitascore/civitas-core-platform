@@ -299,7 +299,8 @@
     "errors": {
       "createError": "An error occurred while creating the group",
       "updateError": "An error occurred while updating the group",
-      "deleteError": "An error occurred while deleting the group"
+      "deleteError": "An error occurred while deleting the group",
+      "groupNameExists": "The group name is already in use. Please, chose another name."
     },
     "warningModal": {
       "title": "Delete the group?",
