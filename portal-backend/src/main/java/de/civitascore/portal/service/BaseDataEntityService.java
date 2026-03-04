@@ -20,6 +20,10 @@ public abstract class BaseDataEntityService<
               .distinct()
               .map(dto -> getAssignmentBuilderService().build(dto))
               .collect(Collectors.toSet());
+      // Clear and flush DELETEs before INSERTs to avoid unique constraint violation
+      // when re-inserting the same group+role+scope combination.
+      entity.getAssignments().clear();
+      getRepository().flush();
       entity.setAssignments(assignments);
     }
     return super.postConvertToEntity(entity, input);
