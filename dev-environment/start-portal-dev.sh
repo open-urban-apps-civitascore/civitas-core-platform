@@ -670,7 +670,7 @@ if [ "$backend_option" = "1" ]; then
 #!/bin/bash
 cd "$BACKEND_DIR"
 export MODEL_ATLAS_BASE_URL=http://localhost:8086
-mvn clean spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION
+mvn clean spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION
 exec bash
 SCRIPT_EOF
     chmod +x /tmp/start-portal-backend.sh
