@@ -90,9 +90,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const t = useTranslations('datastructureVersion')
   const tCommon = useTranslations('common')
   const { setSubTabValueParam, subTabValue } = useQueryParams()
-  const initialFormValues = useRef<DatastructureVersionFormData>(
-    version ? mapApiToFormData(version) : defaultFormData,
-  )
+  const initialFormValues = useRef<DatastructureVersionFormData>(version ? mapApiToFormData(version) : defaultFormData)
 
   const initialSession = useMemo(() => {
     const diagram = initialFormValues.current.styles
@@ -111,6 +109,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }, [initialFormValues])
 
   const modelSessionManager = useMultiSessionManager({ initialSession })
+  const activeSession = modelSessionManager.activeSession
+  const activeSessionId = modelSessionManager.activeSessionId
   const [isDiagramDirty, setIsDiagramDirty] = useState(false)
 
   const router = useRouter()
@@ -141,23 +141,25 @@ export const VersionOverview = (props: VersionOverviewProps) => {
    *  Also, set all model form values to null after closing the session
    */
   useEffect(() => {
+    console.trace('activesession', activeSession)
     if (
-      modelSessionManager.activeSession?.isDirty ||
-      modelSessionManager.activeSession?.created !== initialSession?.created
+      activeSession?.isDirty ||
+      activeSession?.created !== initialSession?.created
     )
       setIsDiagramDirty(true)
     if (
-      !modelSessionManager.activeSession?.isDirty &&
-      modelSessionManager.activeSession?.created !== initialSession?.created
+      !activeSession?.isDirty &&
+      activeSession?.created !== initialSession?.created
     ) {
+      console.log('setFormValues')
       form.setValue('model', null, { shouldDirty: true })
       form.setValue('modelAtlasUri', null, { shouldDirty: true })
       form.setValue('modelName', null, { shouldDirty: true })
       form.setValue('styles', null, { shouldDirty: true })
     }
-  }, [modelSessionManager.activeSession, initialSession, form])
+  }, [activeSession, initialSession, form])
 
-  const dirtyModelFields = modelSessionManager.activeSession?.dirtyFields
+  const dirtyModelFields = activeSession?.dirtyFields
 
   const formValues = useWatch({ control: form.control })
   const descriptionWatch = form.watch('description')
@@ -171,7 +173,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
-  const modelAtlasUri = `http://civitas.org/model/${datastructureId}/${versionWatch}`
+  const modelUri = `http://civitas.org/model/${datastructureId}/${versionWatch}`
 
   const versionAlreadyExistsError = useMemo(() => {
     const versionExists = existingVersions.find(
@@ -217,9 +219,10 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }, [canSetAvailable, statusWatch])
 
   const completedTabs = useMemo((): DatastructureVersionTab[] => {
+    console.log('dirty form fields', form.formState.dirtyFields)
     const completed: DatastructureVersionTab[] = []
     if (versionWatch.length > 0 && descriptionWatch.length > 0 && sourceWatch) completed.push('versionInfo')
-    if (modelWatch && modelAtlasUri && modelNameWatch && stylesWatch) completed.push('structure')
+    if (modelWatch && modelUriWatch && modelNameWatch && stylesWatch) completed.push('structure')
     return completed
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
@@ -232,14 +235,15 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     const diagram = modelSessionManager.activeSession?.diagram
     const hasNameChanges = dirtyModelFields?.has('modelName')
     const hasModelChanges = dirtyModelFields?.has('model')
-    const diagramUpdateData = diagram ? buildUMLModelPayload(diagram, modelAtlasUri) : null
+    const diagramUpdateData = diagram ? buildUMLModelPayload(diagram, modelUri) : null
     if (hasNameChanges && diagramUpdateData) {
       form.setValue('modelName', diagramUpdateData.name, { shouldDirty: true })
     }
     if (hasModelChanges && diagram && diagramUpdateData?.model) {
+      console.log('set form values')
       form.setValue('model', diagramUpdateData.model, { shouldDirty: true })
       form.setValue('styles', diagram, { shouldDirty: true })
-      form.setValue('modelAtlasUri', modelAtlasUri, {
+      form.setValue('modelAtlasUri', modelUri, {
         shouldDirty: true,
       })
     }
@@ -248,7 +252,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   useEffect(() => {
     if (versionWatch && modelWatch) {
-      form.setValue('modelAtlasUri', modelAtlasUri, {
+      form.setValue('modelAtlasUri', modelUri, {
         shouldDirty: true,
       })
     }
@@ -261,8 +265,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   ) => {
     console.log('handleStatusUpdate')
     try {
-      const response = await mutationFn.mutateAsync({ id: versionId })
-      form.reset(mapApiToFormData(response.data))
+      await mutationFn.mutateAsync({ id: versionId })
       toast.success(tCommon('info.statusChangeSuccess'))
     } catch (error) {
       toast.error(tCommon('errors.statusChangeError'))
@@ -294,6 +297,13 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         setIsExitModalOpen(false)
       },
     })
+  }
+
+  const resetValues = () => {
+    const currentValues = form.getValues()
+    form.reset(currentValues)
+    if(activeSessionId)
+    modelSessionManager.markSessionClean(activeSessionId)
   }
 
   const handleUpdateValues = async (values: DatastructureVersionFormData) => {
@@ -335,6 +345,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
       if (shouldUnpublish) {
         await handleStatusUpdate(unpublishVersion, parsedValues.id)
       }
+      resetValues()
       router.refresh()
     } catch (error) {
       console.error('An error occurred while submitting datastructure version data.', error)
@@ -362,8 +373,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }
 
   const handleExit = () => {
-    if (modelSessionManager.activeSessionId) {
-      modelSessionManager.setSession(modelSessionManager.activeSessionId, initialSession)
+    if (activeSessionId) {
+      modelSessionManager.setSession(activeSessionId, initialSession)
     }
     setIsDiagramDirty(false)
     form.reset(initialFormValues.current)
