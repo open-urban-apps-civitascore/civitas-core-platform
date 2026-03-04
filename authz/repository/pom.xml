@@ -20,7 +20,7 @@
         <java.version>21</java.version>
         <testcontainers.version>1.21.0</testcontainers.version>
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
-        <portal-model.version>1.0.0-MR-234</portal-model.version>
+        <portal-model.version>1.0.0-SNAPSHOT</portal-model.version>
     </properties>
 
     <dependencyManagement>
