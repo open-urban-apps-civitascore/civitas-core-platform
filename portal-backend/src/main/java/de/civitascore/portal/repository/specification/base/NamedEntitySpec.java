@@ -2,6 +2,7 @@ package de.civitascore.portal.repository.specification.base;
 
 import de.civitascore.portal.model.entity.base.NamedEntity;
 import net.kaczmarzyk.spring.data.jpa.domain.LikeIgnoreCase;
+import net.kaczmarzyk.spring.data.jpa.web.annotation.Or;
 import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 
 /**
@@ -21,14 +22,11 @@ interface NamedEntityNameSpec<T> extends BaseSpec<T> {}
 @Spec(path = "description", params = "description", spec = LikeIgnoreCase.class)
 interface NamedEntityDescriptionSpec<T> extends BaseSpec<T> {}
 
-@Spec(path = "name", params = "q", spec = LikeIgnoreCase.class)
-interface NamedEntityNameSearchSpec<T> extends BaseSpec<T> {}
-
-@Spec(path = "description", params = "q", spec = LikeIgnoreCase.class)
-interface NamedEntityDescriptionSearchSpec<T> extends BaseSpec<T> {}
+@Or({
+  @Spec(path = "name", params = "q", spec = LikeIgnoreCase.class),
+  @Spec(path = "description", params = "q", spec = LikeIgnoreCase.class)
+})
+interface NamedEntityQuickSearchSpec<T> extends BaseSpec<T> {}
 
 public interface NamedEntitySpec<T extends NamedEntity>
-    extends NamedEntityNameSpec<T>,
-        NamedEntityDescriptionSpec<T>,
-        NamedEntityNameSearchSpec<T>,
-        NamedEntityDescriptionSearchSpec<T> {}
+    extends NamedEntityNameSpec<T>, NamedEntityDescriptionSpec<T>, NamedEntityQuickSearchSpec<T> {}

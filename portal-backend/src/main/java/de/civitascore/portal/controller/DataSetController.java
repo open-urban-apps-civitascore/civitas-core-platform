@@ -63,7 +63,7 @@ public class DataSetController
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return super.getAll(applyScopeFilter(spec), pageable);
+    return super.getAll(spec, pageable);
   }
 
   @Override

@@ -41,6 +41,7 @@ usage() {
     echo
     echo "Examples:"
     echo "  $0 --authz=allowall --config-adapter=auto --backend=auto --frontend=skip"
+    echo "  $0 --config-adapter=ide --backend=auto --frontend=skip"
     echo "  $0 --backend=auto --keycloak-secret=abc123"
     exit 0
 }
@@ -374,6 +375,7 @@ echo "  - Keycloak"
 echo "  - APISIX + etcd"
 echo "  - OPA + AuthZ Repository"
 echo "  - FROST Server"
+echo "  - Model Atlas + Apicurio Registry"
 echo
 
 cd "$SCRIPT_DIR/postgres"
@@ -423,6 +425,7 @@ echo "  Keycloak started"
 # Apply AuthZ mode configuration
 if [ "$authz_option" = "2" ]; then
     echo "  Configuring ALLOW-ALL mode (wildcard scope, null-permission data)"
+    bash "$SCRIPT_DIR/../authz/rego/generate-allowall.sh"
     export OPA_DATA_DIR="../../authz/rego/data/backends-allowall"
     export APISIX_CONFIG="./apisix_conf/apisix-allowall.yaml"
 else
@@ -464,6 +467,10 @@ else
     echo "  WARNING: FROST Server failed to start (may not support this architecture)"
     echo "           Portal development works fine without it."
 fi
+
+cd "$SCRIPT_DIR/modelatlas"
+$DOCKER_COMPOSE up -d
+echo "  Model Atlas + Apicurio Registry started"
 
 cd "$SCRIPT_DIR"
 
@@ -512,6 +519,19 @@ wait_for_service "Keycloak" "http://localhost:8080/realms/master" 60
 wait_for_service "Kafka UI" "http://localhost:8090" 30
 wait_for_service "OPA" "http://localhost:8181/health" 30
 wait_for_service "AuthZ Repository" "http://localhost:8091/actuator/health" 60
+# Model Atlas has no health endpoint — check that it responds (any HTTP status)
+MA_READY=false
+for i in $(seq 1 30); do
+    if curl -s -o /dev/null "http://localhost:8086/" 2>/dev/null; then
+        echo "  Model Atlas is ready"
+        MA_READY=true
+        break
+    fi
+    sleep 2
+done
+if [ "$MA_READY" = false ]; then
+    echo "  WARNING: Model Atlas may not be ready yet (timeout)"
+fi
 
 # macOS: disable Keycloak https requirement on master realm on macos
 if [ "$OS_TYPE" = "Darwin" ]; then
@@ -541,6 +561,8 @@ for port in 8088 8089 3000; do
     fi
 done
 echo
+
+# ---- Build Phase ---------------------------------------------------
 
 # Build config-adapter if command line option selected
 if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
@@ -647,6 +669,7 @@ if [ "$backend_option" = "1" ]; then
     cat > /tmp/start-portal-backend.sh << SCRIPT_EOF
 #!/bin/bash
 cd "$BACKEND_DIR"
+export MODEL_ATLAS_BASE_URL=http://localhost:8086
 mvn clean spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION
 exec bash
 SCRIPT_EOF
@@ -668,6 +691,9 @@ else
     echo "  Project: portal-backend"
     echo "  Main class: de.civitascore.portal.PortalBackendApplication"
     echo "  Profiles: local,local-init,postgres"
+    echo
+    echo "Environment variables to set in IDE:"
+    echo "  MODEL_ATLAS_BASE_URL=http://localhost:8086"
     echo
 fi
 
@@ -708,6 +734,29 @@ if [ "$authz_option" = "1" ]; then
         echo "  Dev admin seeding complete"
     else
         echo "  WARNING: seed-dev-admin.sql not found"
+    fi
+    echo
+fi
+# Check if Keycloak client secret needs to be configured
+if [ -f "$FRONTEND_DIR/.env.local" ]; then
+    CURRENT_SECRET=$(grep '^KEYCLOAK_CLIENT_SECRET=' "$FRONTEND_DIR/.env.local" | cut -d'=' -f2)
+    if [ "$CURRENT_SECRET" = "XXXXXXXXXXXXXXXXXXX" ] || [ -z "$CURRENT_SECRET" ]; then
+        if [ -n "$keycloak_secret_arg" ]; then
+            keycloak_secret="$keycloak_secret_arg"
+        else
+            echo
+            echo "The Keycloak client secret is not configured in .env.local."
+            echo "You can find it in Keycloak Admin (http://localhost:8080):"
+            echo "  Realm: civitas-core > Clients > portal-frontend > Credentials"
+            echo
+            read -p "Enter Keycloak client secret (or press Enter to skip): " keycloak_secret
+        fi
+        if [ -n "$keycloak_secret" ]; then
+            perl -i -pe "s|^KEYCLOAK_CLIENT_SECRET=.*|KEYCLOAK_CLIENT_SECRET=$keycloak_secret|" "$FRONTEND_DIR/.env.local"
+            echo "  Keycloak client secret updated in .env.local"
+        else
+            echo "  Skipped. Update KEYCLOAK_CLIENT_SECRET in portal-frontend/.env.local before using the frontend."
+        fi
     fi
     echo
 fi
@@ -843,6 +892,8 @@ echo "  FROST Server:     http://localhost:1883"
 echo "  APISIX Gateway:   http://localhost:9080"
 echo "  OPA:              http://localhost:8181"
 echo "  AuthZ Repository: http://localhost:8091"
+echo "  Model Atlas:      http://localhost:8086"
+echo "  Apicurio Registry UI: http://localhost:8888"
 echo
 echo "======================================================"
 echo "Default Development User"
@@ -873,5 +924,6 @@ echo "  cd dev-environment/postgres && docker compose down"
 echo "  cd dev-environment/kafka && docker compose down"
 echo "  cd dev-environment/keycloak && docker compose down"
 echo "  cd dev-environment/apisix && docker compose down"
+echo "  cd dev-environment/modelatlas && docker compose down"
 echo "  cd dev-environment/frost && docker compose down"
 echo

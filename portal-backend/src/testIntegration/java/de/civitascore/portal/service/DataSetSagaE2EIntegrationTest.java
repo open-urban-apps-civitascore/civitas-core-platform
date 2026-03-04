@@ -2,7 +2,6 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.github.dockerjava.api.model.ContainerNetwork;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.SagaInfraVerifier;
 import de.civitascore.portal.config.SagaOrchestratorTestHelper;
@@ -144,17 +143,11 @@ class DataSetSagaE2EIntegrationTest extends BaseKeycloakIntegrationTest {
     mosquitto.start();
     redpandaConnect.start();
 
-    // Use the sagaNetwork gateway IP so FROST is reachable from both the host (test process)
-    // and containers on sagaNetwork (Redpanda Connect). localhost would resolve to the
-    // container's own loopback inside Docker, making FROST unreachable from there.
-    String sagaGatewayIp =
-        frost.getContainerInfo().getNetworkSettings().getNetworks().values().stream()
-            .filter(net -> sagaNetwork.getId().equals(net.getNetworkID()))
-            .findFirst()
-            .map(ContainerNetwork::getGateway)
-            .orElse(frost.getHost());
+    // FrostSagaHandler and SagaInfraVerifier run in the JVM, so they use localhost:mappedPort.
+    // The FROST "public URL" for pipeline output uses the Docker network alias (frost-server:8080)
+    // which is reachable from the Redpanda Connect container. See SagaOrchestratorTestHelper.
     frostExternalUrl =
-        "http://" + sagaGatewayIp + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
+        "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
     redpandaExternalUrl =
         "http://" + redpandaConnect.getHost() + ":" + redpandaConnect.getMappedPort(4195);
 
@@ -179,9 +172,13 @@ class DataSetSagaE2EIntegrationTest extends BaseKeycloakIntegrationTest {
   @BeforeAll
   static void seedAndWireSaga() throws Exception {
     seedDatasourceDb();
+    // frostExternalUrl uses localhost:mappedPort (JVM-reachable) for the FrostSagaHandler's
+    // HTTP calls. The public URL uses the Docker network alias so pipeline output URLs resolve
+    // correctly from inside the Redpanda Connect container.
+    String frostPublicUrl = "http://frost-server:8080/FROST-Server/v1.1";
     sagaHelper =
         new SagaOrchestratorTestHelper(
-            kafka.getBootstrapServers(), frostExternalUrl, redpandaExternalUrl);
+            kafka.getBootstrapServers(), frostExternalUrl, frostPublicUrl, redpandaExternalUrl);
   }
 
   @DynamicPropertySource

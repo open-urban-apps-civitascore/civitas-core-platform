@@ -1,6 +1,8 @@
 package de.civitascore.portal.repository;
 
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -21,6 +23,9 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
   @EntityGraph(attributePaths = {"owner", "pipelines", "distributions"})
   @Query("SELECT d FROM DataSet d WHERE d.id = :id")
   Optional<DataSet> findByIdWithRelations(@Param("id") UUID id);
+
+  boolean existsByPipelinesDataSourcesIdAndDataSetStatusIn(
+      UUID dataSourceId, Collection<DataSetStatus> statuses);
 
   @EntityGraph(attributePaths = {"owner", "pipelines", "pipelines.dataSources", "distributions"})
   @Query("SELECT d FROM DataSet d WHERE d.id = :id")

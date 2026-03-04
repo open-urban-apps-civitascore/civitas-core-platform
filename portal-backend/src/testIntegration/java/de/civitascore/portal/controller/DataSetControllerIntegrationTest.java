@@ -300,6 +300,46 @@ class DataSetControllerIntegrationTest
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
       assertThat(response.getBody()).isNotNull();
     }
+
+    @Test
+    @DisplayName("Should populate createdBy with user name when creator exists in database")
+    void shouldPopulateCreatedByWhenCreatorExistsInDatabase() {
+      String keycloakId = getUsersResource().search("testuser", true).get(0).getId();
+
+      User creator = new User();
+      creator.setFirstName("Test");
+      creator.setLastName("User");
+      creator.setEmail("testuser.creator." + System.currentTimeMillis() + "@example.com");
+      creator.setExternalId(keycloakId);
+      creator.setActive(true);
+      userRepository.save(creator);
+
+      ResponseEntity<DataSetOutputDTO> response = performCreate(createValidInput());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+
+      DataSetOutputDTO output = response.getBody();
+      assertThat(output.getCreatedBy()).as("createdBy should be populated").isNotNull();
+      assertThat(output.getCreatedBy().getId())
+          .as("createdBy.id should match the creator's database UUID")
+          .isEqualTo(creator.getId());
+      assertThat(output.getCreatedBy().getName())
+          .as("createdBy.name should be first + last name")
+          .isEqualTo("Test User");
+    }
+
+    @Test
+    @DisplayName("Should return null createdBy when creator is not found in database")
+    void shouldReturnNullCreatedByWhenCreatorNotInDatabase() {
+      ResponseEntity<DataSetOutputDTO> response = performCreate(createValidInput());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getCreatedBy())
+          .as("createdBy should be null when no matching User exists")
+          .isNull();
+    }
   }
 
   @Nested

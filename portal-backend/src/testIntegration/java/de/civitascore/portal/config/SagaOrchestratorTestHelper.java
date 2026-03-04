@@ -77,7 +77,7 @@ public class SagaOrchestratorTestHelper implements AutoCloseable {
   @Getter private final List<RecordedApisixRequest> apisixRequests;
 
   public SagaOrchestratorTestHelper(
-      String kafkaBrokers, String frostBaseUrl, String redpandaConnectUrl) {
+      String kafkaBrokers, String frostBaseUrl, String frostPublicUrl, String redpandaConnectUrl) {
 
     log.info("Initializing SagaOrchestratorTestHelper");
 
@@ -99,9 +99,14 @@ public class SagaOrchestratorTestHelper implements AutoCloseable {
     frostHandler.initialize(
         mapConfig(
             Map.of(
-                "frost.url", frostBaseUrl,
-                "frost.api.key", "test-api-key",
-                "frost.api.key.header", "X-API-Key")));
+                "frost.url",
+                frostBaseUrl,
+                "frost.public.url",
+                frostPublicUrl,
+                "frost.api.key",
+                "test-api-key",
+                "frost.api.key.header",
+                "X-API-Key")));
 
     ApisixSagaHandler apisixHandler = new ApisixSagaHandler();
     apisixHandler.initialize(
