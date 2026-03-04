@@ -25,7 +25,8 @@ export type SessionAction =
   | { type: 'UPDATE_SESSION_NAME'; payload: { sessionId: string; name: string } }
   | { type: 'UPDATE_SESSION_DIAGRAM'; payload: { sessionId: string; diagram: UMLDiagram } }
   | { type: 'MARK_SESSION_DIRTY'; payload: { sessionId: string; dirtyField: DirtyField } }
-  | { type: 'MARK_SESSION_CLEAN'; payload: { sessionId: string; dirtyField: DirtyField } }
+  | { type: 'MARK_SESSION_CLEAN'; payload: { sessionId: string } }
+  | { type: 'MARK_FIELD_CLEAN'; payload: { sessionId: string; dirtyField: DirtyField } }
   | { type: 'LOAD_SESSIONS'; payload: { sessions: DiagramSession[]; activeSessionId: string | null } }
 
 // Hook interface with actions as functions (for ease of use)
@@ -37,7 +38,8 @@ export interface MultiSessionActions {
   updateSessionName: (sessionId: string, name: string) => void
   updateSessionDiagram: (sessionId: string, diagram: UMLDiagram) => void
   markSessionDirty: (sessionId: string, dirtyField: DirtyField) => void
-  markSessionClean: (sessionId: string, dirtyField: DirtyField) => void
+  markSessionClean: (sessionId: string) => void
+  markFieldClean: (sessionId: string, dirtyField: DirtyField) => void
   getActiveSession: () => DiagramSession | null
   getAllSessions: () => DiagramSession[]
 }

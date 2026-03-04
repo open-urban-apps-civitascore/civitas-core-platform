@@ -95,9 +95,19 @@ export const useMultiSessionManager = ({
   )
 
   const markSessionClean = useCallback(
-    (sessionId: string, dirtyField: DirtyField): void => {
+    (sessionId: string): void => {
       dispatch({
         type: 'MARK_SESSION_CLEAN',
+        payload: { sessionId },
+      })
+    },
+    [dispatch],
+  )
+
+  const markFieldClean = useCallback(
+    (sessionId: string, dirtyField: DirtyField): void => {
+      dispatch({
+        type: 'MARK_FIELD_CLEAN',
         payload: { sessionId, dirtyField },
       })
     },
@@ -127,6 +137,7 @@ export const useMultiSessionManager = ({
       updateSessionDiagram,
       markSessionDirty,
       markSessionClean,
+      markFieldClean,
       getActiveSession,
       getAllSessions,
     }

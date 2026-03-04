@@ -22,6 +22,17 @@ interface ActiveDiagramProviderComponentProps {
   sessionManager: UseMultiSessionReturn
 }
 
+const isSemanticDiagramChange = (action: DiagramAction): boolean => {
+  if (action.type === 'MARK_CLEAN') return false
+  if (action.type === 'NODE_CHANGES') {
+    return action.payload.some(change => change.type !== 'select' && change.type !== 'dimensions')
+  }
+  if (action.type === 'EDGE_CHANGES') {
+    return action.payload.some(change => change.type !== 'select')
+  }
+  return true
+}
+
 export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderComponentProps> = ({
   children,
   sessionManager,
@@ -42,7 +53,10 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
       if (!activeSession) return
       const updatedDiagram = updater(activeSession.diagram)
       sessionManager.updateSessionDiagram(activeSession.id, updatedDiagram)
-      sessionManager.markSessionDirty(activeSession.id, 'model')
+      // Selection/viewport updates should not create model dirtiness.
+      if (!activeSession.dirtyFields.has('model')) {
+        sessionManager.markFieldClean(activeSession.id, 'model')
+      }
     },
     [activeSession, sessionManager],
   )
@@ -56,11 +70,10 @@ export const ActiveDiagramProviderComponent: React.FC<ActiveDiagramProviderCompo
       const updatedDiagram = diagramReducer(activeSession.diagram, action)
       sessionManager.updateSessionDiagram(activeSession.id, updatedDiagram)
 
-      // Mark as dirty for most actions
-      if (action.type !== 'MARK_CLEAN') {
+      if (isSemanticDiagramChange(action)) {
         sessionManager.markSessionDirty(activeSession.id, 'model')
-      } else {
-        sessionManager.markSessionClean(activeSession.id, 'model')
+      } else if (!activeSession.dirtyFields.has('model')) {
+        sessionManager.markFieldClean(activeSession.id, 'model')
       }
     },
     [activeSession, sessionManager],

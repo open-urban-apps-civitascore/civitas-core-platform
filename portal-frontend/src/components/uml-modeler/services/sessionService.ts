@@ -1,4 +1,4 @@
-import type { DiagramSession, MultiSessionState, SessionAction } from '../types/session'
+import { DirtyField, type DiagramSession, type MultiSessionState, type SessionAction } from '../types/session'
 import { createEmptyDiagram } from './diagramService'
 
 // Initial session state factory
@@ -137,7 +137,7 @@ export const sessionReducer = (state: MultiSessionState, action: SessionAction):
     }
 
     case 'MARK_SESSION_CLEAN': {
-      const { sessionId, dirtyField } = action.payload
+      const { sessionId } = action.payload
 
       return {
         ...state,
@@ -146,10 +146,27 @@ export const sessionReducer = (state: MultiSessionState, action: SessionAction):
             ? {
                 ...session,
                 isDirty: false,
-                dirtyFields: new Set([...session.dirtyFields].filter(field => field !== dirtyField)),
+                dirtyFields: new Set<DirtyField>(),
               }
             : session,
         ),
+      }
+    }
+
+    case 'MARK_FIELD_CLEAN': {
+      const { sessionId, dirtyField } = action.payload
+      return {
+        ...state,
+        sessions: state.sessions.map(session => {
+          const dirtyFields = new Set([...session.dirtyFields].filter(field => field !== dirtyField))
+          return session.id === sessionId
+            ? {
+                ...session,
+                isDirty: dirtyFields.size > 0,
+                dirtyFields: new Set([...session.dirtyFields].filter(field => field !== dirtyField)),
+              }
+            : session
+        }),
       }
     }
 

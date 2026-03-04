@@ -1,7 +1,13 @@
-import { addEdge, applyEdgeChanges, applyNodeChanges, type Connection } from '@xyflow/react'
+import { addEdge, applyEdgeChanges, applyNodeChanges, type Connection, type EdgeChange, type NodeChange } from '@xyflow/react'
 
 import type { DiagramAction, UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
 import type { UMLRelationship } from '../types/uml'
+
+const hasSemanticNodeChanges = (changes: NodeChange[]) =>
+  changes.some(change => change.type !== 'select' && change.type !== 'dimensions')
+
+const hasSemanticEdgeChanges = (changes: EdgeChange[]) =>
+  changes.some(change => change.type !== 'select')
 
 // Initial empty diagram state
 export const createEmptyDiagram = (name = 'Untitled Diagram'): UMLDiagram => ({
@@ -32,21 +38,25 @@ export const diagramReducer = (state: UMLDiagram, action: DiagramAction): UMLDia
         isDirty: true,
       }
 
-    case 'NODE_CHANGES':
+    case 'NODE_CHANGES': {
+      const areNodeChangesDirty = hasSemanticNodeChanges(action.payload)
       return {
         ...state,
         nodes: applyNodeChanges(action.payload, state.nodes) as UMLNode[],
-        lastModified: new Date(),
-        isDirty: true,
+        lastModified: areNodeChangesDirty ? new Date() : state.lastModified,
+        isDirty: areNodeChangesDirty ? true : state.isDirty,
       }
+    }
 
-    case 'EDGE_CHANGES':
+    case 'EDGE_CHANGES': {
+      const areEdgeChangesDirty = hasSemanticEdgeChanges(action.payload)
       return {
         ...state,
         edges: applyEdgeChanges(action.payload, state.edges) as UMLEdge[],
-        lastModified: new Date(),
-        isDirty: true,
+        lastModified: areEdgeChangesDirty ? new Date() : state.lastModified,
+        isDirty: areEdgeChangesDirty ? true : state.isDirty,
       }
+    }
 
     case 'ADD_EDGE':
       return {
