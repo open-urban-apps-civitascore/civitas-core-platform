@@ -44,11 +44,12 @@ export type GroupApiData = z.infer<typeof GroupApiDataSchema>
 
 export const GroupBaseFormDataSchema = z.object({
   id: z.string(),
-  name: z.string().min(2, {
+  name: z.string().trim().min(2, {
     message: 'common.errors.atLeast2',
   }),
-  description: z.string(),
+  description: z.string().trim(),
   contactUserId: z.string(),
+  members: z.array(z.string()),
 })
 
 export type GroupBaseFormData = z.infer<typeof GroupBaseFormDataSchema>

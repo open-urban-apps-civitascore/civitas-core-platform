@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { FieldErrors, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useCreateGroup, useUpdateGroup } from '@/app/services/api/groups/clientRequests'
@@ -16,9 +16,10 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
+import { Form } from '@/components/ui/form'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Group, GroupBaseFormData, GroupBaseFormDataSchema, GroupTab } from '@/types/groups'
-import { mapGroupApiToFormData } from '@/utils/groups'
+import { mapGroupApiToFormData, mapGroupFormToApiata } from '@/utils/groups'
 
 import { BaseInfoTab } from './base-info-tab/BaseInfoTab'
 import { RolesTab } from './roles-tab/RolesTab'
@@ -68,7 +69,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
 
   useEffect(() => {
     setInitialGroupData(initialGroupData)
-  }, [initialGroupData])
+  }, [groupData])
 
   const form = useForm<GroupBaseFormData>({
     resolver: zodResolver(GroupBaseFormDataSchema),
@@ -94,7 +95,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   }
 
   const handleUpdateGroup = (formData: GroupBaseFormData) => {
-    updateGroup.mutate(formData, {
+    updateGroup.mutate(mapGroupFormToApiata(formData), {
       onSuccess: ({ data }) => {
         toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.group') }))
         setInitialGroupData(data)
@@ -111,29 +112,37 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     setIsExitModalOpen(false)
   }
 
+  const handleExitAndSafe = () => {
+    form.handleSubmit(handleSave)()
+    setIsReadOnly(false)
+  }
+
   const handleExitButtonClick = () => {
     if (isFormDirty) setIsExitModalOpen(true)
     else handleExit()
   }
 
-  const handleSubmit = isCreateMode ? handleCreateGroup : handleUpdateGroup
+  const handleSave = isCreateMode ? handleCreateGroup : handleUpdateGroup
+
+  const handleValidationErrors = (errors: FieldErrors<GroupBaseFormData>) =>
+    console.error('Validation errors: ', errors)
 
   const renderTabContent = () => {
     switch (subTabValue) {
       case tabValues.roles.value:
         return <RolesTab groupData={groupData} />
       case tabValues.users.value:
-        return <UsersTab groupData={groupData} />
-      case tabValues.info.value:
-      default:
         return (
-          <BaseInfoTab
+          <UsersTab
             form={form}
-            initialContactUser={initialGroupData.contactUser}
-            onSubmit={handleSubmit}
+            originalUsers={groupData.members?.map(member => member.id) || []}
             isReadOnly={isReadOnly}
+            isUpdatingGroup={updateGroup.isPending}
           />
         )
+      case tabValues.info.value:
+      default:
+        return <BaseInfoTab form={form} initialContactUser={initialGroupData.contactUser} isReadOnly={isReadOnly} />
     }
   }
 
@@ -170,14 +179,21 @@ export const GroupOverview = (props: GroupDetailsProps) => {
         customElement={isReadOnly ? EditButton : SaveAndExitButtons}
       />
       <PageBackground className="flex flex-col" hasBackground={!isReadOnly}>
-        {' '}
-        {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
+        <Form {...form}>
+          <form
+            id="groupEditForm"
+            onSubmit={form.handleSubmit(handleSave, handleValidationErrors)}
+            className="flex flex-col justify-between h-full"
+          >
+            {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
+          </form>
+        </Form>
       </PageBackground>
       <ExitWarningModal
         open={isExitModalOpen}
         onOpenChange={() => setIsExitModalOpen(false)}
         onDiscard={handleExit}
-        onConfirm={form.handleSubmit(handleSubmit)}
+        onConfirm={handleExitAndSafe}
         isLoading={isLoading}
       />
     </PageContainer>

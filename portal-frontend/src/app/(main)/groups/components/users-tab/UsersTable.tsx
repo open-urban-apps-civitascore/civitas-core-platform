@@ -1,7 +1,7 @@
-import { createColumnHelper, getCoreRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table'
+import { createColumnHelper, getCoreRowModel, getSortedRowModel, Row, useReactTable } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 
-import { StatusLabel } from '@/components/status-label/StatusLabel'
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { TableProps } from '@/types/table'
@@ -10,6 +10,8 @@ import { resolveUpdater } from '@/utils/table'
 
 interface UsersTableProps extends TableProps<ListUser> {
   users: ListUser[]
+  onRemoveUserClick: (userId: string) => void
+  isReadOnly: boolean
 }
 
 export const UsersTable = (props: UsersTableProps) => {
@@ -24,9 +26,13 @@ export const UsersTable = (props: UsersTableProps) => {
     onRowClick,
     onPaginationChange,
     onSortingChange,
+    onRemoveUserClick,
     isLoading,
+    isReadOnly,
   } = props
   const tUsers = useTranslations('users')
+  const tCommon = useTranslations('common')
+
   const columnHelper = createColumnHelper<ListUser>()
 
   const columns = [
@@ -49,10 +55,28 @@ export const UsersTable = (props: UsersTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.email')} />,
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor('active', {
-      header: tUsers('info.status.active'),
-      cell: info => <StatusLabel isChecked={info.getValue()} />,
-    }),
+    ...(!isReadOnly
+      ? [
+          {
+            id: 'actions',
+            cell: ({ row }: { row: Row<ListUser> }) => (
+              <TableDropdownMenu
+                menuItems={[
+                  {
+                    label: tCommon('actions.removeItem', { item: tCommon('items.user') }),
+                    onClick: () => onRemoveUserClick(row.id),
+                  },
+                ]}
+              />
+            ),
+            meta: {
+              style: {
+                width: '50px',
+              },
+            },
+          },
+        ]
+      : []),
   ]
 
   const table = useReactTable({

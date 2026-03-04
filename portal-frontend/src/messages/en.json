@@ -278,7 +278,7 @@
       "noUsersSub": "No users assigned to this group",
       "removeUserModal": {
         "title": "Remove User from Group?",
-        "description": "This action removes the association between the user, the group, and their role assignment."
+        "description": "This action can not be undone."
       }
     },
     "messages": {
@@ -291,7 +291,7 @@
       "deleteError": "An error occurred while deleting the group"
     },
     "warningModal": {
-      "title": "Are you sure you want to delete the group?",
+      "title": "Delete the group?",
       "description": "This action can not be undone."
     },
     "infoModal": {

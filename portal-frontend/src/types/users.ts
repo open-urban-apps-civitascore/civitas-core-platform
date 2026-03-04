@@ -56,7 +56,6 @@ export type ListUser = {
   id: string
   fullName: string
   email: string
-  active: boolean
 }
 
 export const UserFormSchema = UserApiSchema.omit({

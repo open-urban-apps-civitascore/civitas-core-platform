@@ -33,7 +33,7 @@ const GroupsList = (props: GroupsListProps) => {
   const router = useRouter()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null)
-  const [isWarningModalOpen, setIsWarningmodalOpen] = useState(false)
+  const [isDeleteGroupWarningModalOpen, setIsDeleteGroupWarningmodalOpen] = useState(false)
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false)
 
   const deleteGroup = useDeleteGroup()
@@ -65,12 +65,12 @@ const GroupsList = (props: GroupsListProps) => {
     deleteGroup.mutate(groupId, {
       onSuccess: () => {
         toast.success(tCommon('messages.deleteSuccess', { item: tCommon('items.group') }))
-        setIsWarningmodalOpen(false)
+        setIsDeleteGroupWarningmodalOpen(false)
         router.refresh()
       },
       onError: () => {
         toast.error(t('errors.deleteError'))
-        setIsWarningmodalOpen(false)
+        setIsDeleteGroupWarningmodalOpen(false)
       },
     })
   }
@@ -89,7 +89,7 @@ const GroupsList = (props: GroupsListProps) => {
       setIsInfoModalOpen(true)
     else {
       setGroupToDelete(groupId)
-      setIsWarningmodalOpen(true)
+      setIsDeleteGroupWarningmodalOpen(true)
     }
   }
 
@@ -137,11 +137,11 @@ const GroupsList = (props: GroupsListProps) => {
         onClose={() => setIsInfoModalOpen(false)}
       />
       <WarningModal
-        open={isWarningModalOpen}
+        open={isDeleteGroupWarningModalOpen}
         title={t('warningModal.title')}
         description={t('warningModal.description')}
         onConfirm={handleConfirmDeletion}
-        onDiscard={() => setIsWarningmodalOpen(false)}
+        onDiscard={() => setIsDeleteGroupWarningmodalOpen(false)}
         isLoading={deleteGroup.isPending}
         confirmButtonTitle={tCommon('actions.delete')}
       />

@@ -275,8 +275,8 @@
       "noUsers": "Keine User",
       "noUsersSub": "Keine User in dieser Gruppe enthalten",
       "removeUserModal": {
-        "title": "User aus Gruppe entfernen?",
-        "description": "Diese Aktion löst die Zuordnung zwischen dem User, der Gruppe und ihre Rollen-Zuordnung auf."
+        "title": "User wirklich aus Gruppe entfernen?",
+        "description": "Diese Aktion kann nicht rückgängig gemacht werden."
       }
     },
     "errors": {

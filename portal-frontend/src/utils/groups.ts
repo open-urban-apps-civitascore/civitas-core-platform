@@ -1,4 +1,4 @@
-import { Group, GroupBaseFormData, UserGroupsListData } from '@/types/groups'
+import { Group, GroupApiData, GroupBaseFormData, UserGroupsListData } from '@/types/groups'
 
 export const mapGroupDetailsData = (groupResponse: Group | null): Group | null =>
   groupResponse
@@ -14,6 +14,14 @@ export const mapGroupApiToFormData = (groupData: Group): GroupBaseFormData => ({
   name: groupData.name,
   description: groupData.description || '',
   contactUserId: groupData.contactUser?.id || '',
+  members: groupData.members?.map(member => member.id) || [],
+})
+export const mapGroupFormToApiata = (groupData: GroupBaseFormData): GroupApiData => ({
+  id: groupData.id,
+  name: groupData.name,
+  description: groupData.description || '',
+  contactUserId: groupData.contactUserId,
+  memberIds: groupData.members,
 })
 
 export const mapGroupsApiToListData = (groups: Group[]): UserGroupsListData[] =>
