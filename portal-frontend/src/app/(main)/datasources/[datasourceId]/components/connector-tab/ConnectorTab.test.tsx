@@ -129,7 +129,7 @@ describe('ConnectorTab (integration)', () => {
   })
 
   it('does not render config when no connector type selected', async () => {
-    renderConnectorTab(true, { connectorType: undefined, configuration: undefined })
+    renderConnectorTab({ connectorType: undefined, configuration: undefined })
 
     expect(screen.getByLabelText('type')).toBeInTheDocument()
     expect(screen.queryByText('MQTT')).not.toBeInTheDocument()

@@ -11,6 +11,7 @@ import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { Button } from '@/components/ui/button'
 import { useTableSearchParams } from '@/hooks/use-table-search-params'
+import { STATUS_TYPES } from '@/types/common'
 import { Datasource } from '@/types/datasources'
 
 import { DatasourcesTable } from './DatasourcesTable'
@@ -72,10 +73,10 @@ export const DatasourcesList = ({
         onPaginationChange={handlePaginationChange}
         onDelete={setDatasourceToDelete}
       />
-      {datasourceToDelete?.inUse ? (
+      {datasourceToDelete?.dataSourceStatus === STATUS_TYPES.AVAILABLE ? (
         <WarningModal
-          title={t('inUseModal.title')}
-          description={t('inUseModal.description')}
+          title={t('availableModal.title')}
+          description={t('availableModal.description')}
           open={!!datasourceToDelete}
           onOpenChange={() => setDatasourceToDelete(null)}
           onDiscard={() => setDatasourceToDelete(null)}
