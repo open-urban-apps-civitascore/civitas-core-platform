@@ -7,7 +7,7 @@ import { TextField } from '@/components/form/fields/TextField'
 import { InputPropsWithoutForm, SelectOption } from '@/types/common'
 
 export interface DynamicFormFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
-  id?: string
+  id: string
   type: 'textArea' | 'input' | 'select' | 'checkbox'
   form: UseFormReturn<T>
   label: string
@@ -19,7 +19,7 @@ export interface DynamicFormFieldProps<T extends FieldValues> extends InputProps
 }
 export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldProps<T>) => {
   const {
-    id = '',
+    id,
     type,
     form,
     label,
