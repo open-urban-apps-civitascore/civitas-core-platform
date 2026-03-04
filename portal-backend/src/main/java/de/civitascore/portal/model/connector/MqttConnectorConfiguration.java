@@ -54,6 +54,10 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
       example = "secret")
   private String password;
 
+  public void setPassword(String password) {
+    this.password = (password != null && password.isBlank()) ? null : password;
+  }
+
   // Validates URLs with java.net.URI and strips any embedded credentials (discarding them)
   public void setUrls(List<String> urls) {
     if (urls == null || urls.isEmpty()) {
@@ -65,6 +69,10 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
     for (String url : urls) {
       try {
         URI uri = new URI(url);
+        if (uri.getScheme() == null || uri.getHost() == null) {
+          throw new IllegalArgumentException(
+              "Invalid URL: missing scheme or host in '" + url + "'");
+        }
         if (uri.getUserInfo() != null) {
           uri =
               new URI(

@@ -77,6 +77,26 @@ class MqttConnectorConfigurationTest {
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("Invalid URL");
     }
+
+    @Test
+    @DisplayName("Should throw on URL without scheme")
+    void shouldThrowOnUrlWithoutScheme() {
+      MqttConnectorConfiguration config = new MqttConnectorConfiguration();
+
+      assertThatThrownBy(() -> config.setUrls(List.of("broker:1883")))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("missing scheme or host");
+    }
+
+    @Test
+    @DisplayName("Should throw on URL without host")
+    void shouldThrowOnUrlWithoutHost() {
+      MqttConnectorConfiguration config = new MqttConnectorConfiguration();
+
+      assertThatThrownBy(() -> config.setUrls(List.of("tcp:///path/only")))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessageContaining("missing scheme or host");
+    }
   }
 
   @Nested
@@ -94,6 +114,25 @@ class MqttConnectorConfigurationTest {
       assertThat(config.getUser()).isEqualTo("admin");
       assertThat(config.getPassword()).isEqualTo("secret");
       assertThat(config.getUrls()).containsExactly("tcp://broker:1883");
+    }
+
+    @Test
+    @DisplayName("Should normalize blank password to null")
+    void shouldNormalizeBlankPasswordToNull() {
+      MqttConnectorConfiguration config = new MqttConnectorConfiguration();
+      config.setPassword("");
+      assertThat(config.getPassword()).isNull();
+
+      config.setPassword("   ");
+      assertThat(config.getPassword()).isNull();
+    }
+
+    @Test
+    @DisplayName("Should preserve null password")
+    void shouldPreserveNullPassword() {
+      MqttConnectorConfiguration config = new MqttConnectorConfiguration();
+      config.setPassword(null);
+      assertThat(config.getPassword()).isNull();
     }
   }
 
