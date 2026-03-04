@@ -5,6 +5,8 @@ import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.output.GroupOutputDTO;
+import de.civitascore.portal.model.output.summary.RoleSummaryDTO;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -38,10 +40,16 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
           entity.getMembers().stream().map(userMapper::toSummary).collect(Collectors.toList()));
     }
 
-    // Map roles
-    if (entity.getRoles() != null && !entity.getRoles().isEmpty()) {
-      output.setRoles(
-          entity.getRoles().stream().map(roleMapper::toSummary).collect(Collectors.toList()));
+    // Map SYSTEM roles from assignments (scopeType == null)
+    if (entity.getAssignments() != null && !entity.getAssignments().isEmpty()) {
+      List<RoleSummaryDTO> systemRoles =
+          entity.getAssignments().stream()
+              .filter(a -> a.getScopeType() == null)
+              .map(a -> roleMapper.toSummary(a.getRole()))
+              .collect(Collectors.toList());
+      if (!systemRoles.isEmpty()) {
+        output.setRoles(systemRoles);
+      }
     }
 
     // Map childGroups
