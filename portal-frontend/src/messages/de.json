@@ -26,7 +26,8 @@
       "saveAndContinue": "Erstellen und weiter",
       "exit": "Beenden",
       "assignItem": "{item} hinzufügen",
-      "assignTo": "zu {item}"
+      "assignTo": "zu {item}",
+      "back": "Zurück"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",

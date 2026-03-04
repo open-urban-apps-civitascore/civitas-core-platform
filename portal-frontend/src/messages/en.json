@@ -26,7 +26,8 @@
       "saveAndContinue": "Save and continue",
       "exit": "Exit",
       "assignItem": "Assign {item}",
-      "assignTo": "to {item}"
+      "assignTo": "to {item}",
+      "back": "Back"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
