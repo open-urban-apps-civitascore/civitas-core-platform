@@ -76,6 +76,4 @@ export type UpdateMutationInput = BaseMutationInput & {
   method: UpdateMutationMethod
 }
 
-export type DeleteMutationInput = BaseMutationInput & {
-  id: string
-}
+export type DeleteMutationInput = BaseMutationInput

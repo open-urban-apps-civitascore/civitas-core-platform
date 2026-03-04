@@ -26,7 +26,8 @@
       "saveAndContinue": "Save and continue",
       "exit": "Exit",
       "assignItem": "Assign {item}",
-      "assignTo": "to {item}"
+      "assignTo": "to {item}",
+      "close": "Close"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
@@ -62,7 +63,8 @@
     },
     "messages": {
       "updateSuccess": "{item} has been successfully updated",
-      "createSuccess": "{item} has been successfully created"
+      "createSuccess": "{item} has been successfully created",
+      "deleteSuccess": "{item} has been successfully deleted"
     },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
@@ -285,7 +287,16 @@
     },
     "errors": {
       "createError": "An error occurred while creating the group",
-      "updateError": "An error occurred while updating the group"
+      "updateError": "An error occurred while updating the group",
+      "deleteError": "An error occurred while deleting the group"
+    },
+    "warningModal": {
+      "title": "Are you sure you want to delete the group?",
+      "description": "This action can not be undone."
+    },
+    "infoModal": {
+      "title": "Group can not be deleted",
+      "description": "First, all assignments to users, roles and scopes have to be removed."
     }
   },
   "pagination": {

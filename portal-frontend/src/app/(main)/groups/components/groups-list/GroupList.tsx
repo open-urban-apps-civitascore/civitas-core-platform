@@ -16,6 +16,9 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { Group } from '@/types/groups'
 import { GroupsTable } from './GroupsTable'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
+import { useDeleteGroup } from '@/app/services/api/groups/clientRequests'
+import { toast } from 'sonner'
+import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 
 export const getSortParam = (sorting: SortingState) => {
   if (sorting.length > 0) {
@@ -35,10 +38,14 @@ interface GroupsListProps {
 const GroupsList = (props: GroupsListProps) => {
   const { groupsData, totalCount } = props
   const t = useTranslations('groups')
+  const tCommon = useTranslations('common')
   const router = useRouter()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [groupToDelete, setGroupToDelete] = useState<string | null>(null)
   const [isWarningModalOpen, setIsWarningmodalOpen] = useState(false)
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false)
+
+  const deleteGroup = useDeleteGroup()
 
   const {
     setSortingParams,
@@ -63,16 +70,36 @@ const GroupsList = (props: GroupsListProps) => {
     router.push(`groups/${row.id}?${params}`)
   }
 
-  const handleDeleteGroup = () => {
-    
+  const handleDeleteGroup = (groupId: string) => {
+    deleteGroup.mutate(groupId, {
+      onSuccess: () => {
+        toast.success(tCommon('messages.deleteSuccess', { item: tCommon('items.group') }))
+        setIsWarningmodalOpen(false)
+        router.refresh()
+      },
+      onError: () => {
+        toast.error(t('errors.deleteError'))
+        setIsWarningmodalOpen(false)
+      },
+    })
+  }
+
+  const handleConfirmDeletion = () => {
+    if (groupToDelete) {
+      handleDeleteGroup(groupToDelete)
+    }
+    setGroupToDelete(null)
   }
 
   const handleDeleteGroupClick = (groupId: string) => {
     const group = groupsData.find(group => group.id === groupId)
-    if (!group?.members) return
-    if (group?.members.length > 0) {
+    if (!group) return
+    if ((group?.members?.length && group?.members?.length > 0) || (group?.roles?.length && group?.roles?.length > 0))
       setIsInfoModalOpen(true)
-    } else setIsWarningmodalOpen(true)
+    else {
+      setGroupToDelete(groupId)
+      setIsWarningmodalOpen(true)
+    }
   }
 
   const CustomElement = () => {
@@ -108,11 +135,25 @@ const GroupsList = (props: GroupsListProps) => {
             onRowClick={handleRowClick}
             onSortingChange={setSortingParams}
             onPaginationChange={setPaginationParams}
-            onDeleteGroupClick={() => {}}
+            onDeleteGroupClick={handleDeleteGroupClick}
           />
         </TableContainer>
       </PageBackground>
-      <WarningModal title={t('WarningModal.title')} description={t('WarningModal.description')} />
+      <InfoModal
+        open={isInfoModalOpen}
+        title={t('infoModal.title')}
+        description={t('infoModal.description')}
+        onClose={() => setIsInfoModalOpen(false)}
+      />
+      <WarningModal
+        open={isWarningModalOpen}
+        title={t('warningModal.title')}
+        description={t('warningModal.description')}
+        onConfirm={handleConfirmDeletion}
+        onDiscard={() => setIsWarningmodalOpen(false)}
+        isLoading={deleteGroup.isPending}
+        confirmButtonTitle={tCommon('actions.delete')}
+      />
     </PageContainer>
   )
 }

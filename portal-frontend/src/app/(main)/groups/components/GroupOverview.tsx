@@ -169,7 +169,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
         }}
         customElement={isReadOnly ? EditButton : SaveAndExitButtons}
       />
-      <PageBackground className="flex flex-col">
+      <PageBackground className="flex flex-col" hasBackground={!isReadOnly}>
         {' '}
         {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
       </PageBackground>

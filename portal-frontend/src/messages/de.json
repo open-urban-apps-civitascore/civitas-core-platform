@@ -26,7 +26,8 @@
       "saveAndContinue": "Erstellen und weiter",
       "exit": "Beenden",
       "assignItem": "{item} hinzufügen",
-      "assignTo": "zu {item}"
+      "assignTo": "zu {item}",
+      "close": "Schließen"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -61,7 +62,8 @@
     },
     "messages": {
       "updateSuccess": "{item} wurde erfolgreich aktualisiert",
-      "createSuccess": "{item} wurde erfolgreich angelegt"
+      "createSuccess": "{item} wurde erfolgreich angelegt",
+      "deleteSuccess": "{item} wurde erfolgreich gelöscht"
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
@@ -277,17 +279,18 @@
         "description": "Diese Aktion löst die Zuordnung zwischen dem User, der Gruppe und ihre Rollen-Zuordnung auf."
       }
     },
-    "messages": {
-      "createSuccess": "Gruppe wurde erfolgreich angelegt.",
-      "updateSuccess": "Gruppe wurde erfolgreich aktualisiert."
-    },
     "errors": {
       "createError": "Beim Anlegen der Gruppe ist ein Fehler aufgetreten",
-      "updateError": "Beim Aktualisieren der Gruppe ist ein Fehler aufgetreten"
+      "updateError": "Beim Aktualisieren der Gruppe ist ein Fehler aufgetreten",
+      "deleteError": "Beim Löschen der Gruppe ist ein Fehler aufgetreten"
     },
     "warningModal": {
       "title": "Gruppe wirklich löschen?",
-      "description": "Diese Aktion kann nicht rückgngig gemacht werden."
+      "description": "Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "infoModal": {
+      "title": "Gruppe kann nicht gelöscht werden",
+      "description": "Zuerst müssen alle Zuordnungen zu Usern, Rollen und Geltungsbereichen entfernt werden."
     }
   },
   "pagination": {
