@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Group } from '@/types/groups'
 
-import { mapGroupApiToFormData, mapGroupDetailsData, mapGroupsApiToListData } from './groups'
+import { mapGroupApiToFormData, mapGroupDetailsData, mapGroupFormToApiata, mapGroupsApiToListData } from './groups'
 
 const baseGroup: Group = {
   id: '1',
@@ -58,12 +58,14 @@ describe('mapGroupApiToFormData', () => {
       name: 'Test Group',
       description: 'Description',
       contactUserId: 'u1',
+      members: ['m1', 'm2'],
     })
   })
 
   it('uses fallback values for nullable fields', () => {
     const group: Group = {
       ...baseGroup,
+      members: null,
       description: '',
       contactUser: null,
     }
@@ -75,6 +77,7 @@ describe('mapGroupApiToFormData', () => {
       name: 'Test Group',
       description: '',
       contactUserId: '',
+      members: [],
     })
   })
 })
@@ -107,6 +110,42 @@ describe('mapGroupsApiToListData', () => {
 
   it('returns empty array for empty input', () => {
     expect(mapGroupsApiToListData([])).toEqual([])
+  })
+})
+
+describe('mapGroupFormToApiata', () => {
+  it('maps form data to API data correctly', () => {
+    const formData = {
+      id: baseGroup.id,
+      name: baseGroup.name,
+      description: baseGroup.description,
+      contactUserId: 'm1',
+      members: ['m1', 'm2'],
+    }
+
+    const result = mapGroupFormToApiata(formData)
+
+    expect(result).toEqual({
+      id: '1',
+      name: 'Test Group',
+      description: 'Description',
+      contactUserId: 'm1',
+      memberIds: ['m1', 'm2'],
+    })
+  })
+
+  it('maps empty members array correctly', () => {
+    const formData = {
+      id: baseGroup.id,
+      name: baseGroup.name,
+      description: baseGroup.description,
+      contactUserId: 'm1',
+      members: [],
+    }
+
+    const result = mapGroupFormToApiata(formData)
+
+    expect(result.memberIds).toEqual([])
   })
 })
 

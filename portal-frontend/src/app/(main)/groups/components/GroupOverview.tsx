@@ -67,10 +67,6 @@ export const GroupOverview = (props: GroupDetailsProps) => {
 
   const isLoading = createGroup.isPending || updateGroup.isPending
 
-  useEffect(() => {
-    setInitialGroupData(initialGroupData)
-  }, [groupData])
-
   const form = useForm<GroupBaseFormData>({
     resolver: zodResolver(GroupBaseFormDataSchema),
     defaultValues: mapGroupApiToFormData(initialGroupData),

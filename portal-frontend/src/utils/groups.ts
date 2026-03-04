@@ -16,6 +16,7 @@ export const mapGroupApiToFormData = (groupData: Group): GroupBaseFormData => ({
   contactUserId: groupData.contactUser?.id || '',
   members: groupData.members?.map(member => member.id) || [],
 })
+
 export const mapGroupFormToApiata = (groupData: GroupBaseFormData): GroupApiData => ({
   id: groupData.id,
   name: groupData.name,
