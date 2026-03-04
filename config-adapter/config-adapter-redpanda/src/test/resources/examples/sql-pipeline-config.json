@@ -1,0 +1,22 @@
+{
+  "input": {
+    "label": "${PLACEHOLDER}"
+  },
+  "pipeline": {
+    "processors": [
+      {
+        "mapping": "root.name = this.sensor_name\nroot.description = this.sensor_description"
+      }
+    ]
+  },
+  "output": {
+    "http_client": {
+      "url": "${FROST_BASE}/Things",
+      "verb": "POST",
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  }
+}
+

@@ -16,13 +16,24 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/** Input container for a RedPanda Connect pipeline. Supports MQTT and SQL raw sources. */
+/**
+ * Input container for a RedPanda Connect pipeline. Supports MQTT, SQL raw, and generate sources.
+ */
 public final class PipelineInput extends AbstractApiModel {
+
+  private static final String KEY_LABEL = "label";
+  private static final String KEY_MQTT = "mqtt";
+  private static final String KEY_SQL_RAW = "sql_raw";
+  private static final String KEY_GENERATE = "generate";
 
   private MqttInput mqtt;
 
   @JsonProperty("sql_raw")
   private SqlRawInput sqlRaw;
+
+  private GenerateInput generate;
+
+  private String label;
 
   public PipelineInput() {}
 
@@ -42,11 +53,29 @@ public final class PipelineInput extends AbstractApiModel {
     this.sqlRaw = sqlRaw;
   }
 
+  public GenerateInput getGenerate() {
+    return generate;
+  }
+
+  public void setGenerate(GenerateInput generate) {
+    this.generate = generate;
+  }
+
+  public String getLabel() {
+    return label;
+  }
+
+  public void setLabel(String label) {
+    this.label = label;
+  }
+
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (mqtt != null) map.put("mqtt", mqtt.toApiMap());
-    if (sqlRaw != null) map.put("sql_raw", sqlRaw.toApiMap());
+    if (label != null) map.put(KEY_LABEL, label);
+    if (mqtt != null) map.put(KEY_MQTT, mqtt.toApiMap());
+    if (sqlRaw != null) map.put(KEY_SQL_RAW, sqlRaw.toApiMap());
+    if (generate != null) map.put(KEY_GENERATE, generate.toApiMap());
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }
@@ -58,12 +87,14 @@ public final class PipelineInput extends AbstractApiModel {
     var that = (PipelineInput) obj;
     return Objects.equals(this.mqtt, that.mqtt)
         && Objects.equals(this.sqlRaw, that.sqlRaw)
+        && Objects.equals(this.generate, that.generate)
+        && Objects.equals(this.label, that.label)
         && Objects.equals(this.additionalProperties(), that.additionalProperties());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(mqtt, sqlRaw, additionalProperties());
+    return Objects.hash(mqtt, sqlRaw, generate, label, additionalProperties());
   }
 
   @Override
@@ -73,6 +104,10 @@ public final class PipelineInput extends AbstractApiModel {
         + mqtt
         + ", sqlRaw="
         + sqlRaw
+        + ", generate="
+        + generate
+        + ", label="
+        + label
         + ", additionalProperties="
         + additionalProperties().keySet()
         + ']';
