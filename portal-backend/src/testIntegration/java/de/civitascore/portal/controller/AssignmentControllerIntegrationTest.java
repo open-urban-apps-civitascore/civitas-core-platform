@@ -2,6 +2,7 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Catalog;
@@ -482,5 +483,20 @@ class AssignmentControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
+  }
+
+  @Override
+  @Test
+  @DisplayName("Should return INTERNAL_SERVER_ERROR when PATCH due to unsupported operation")
+  void shouldRejectPatchThatResultsInInvalidEntity() {
+    UUID id = createTestEntity();
+    Map<String, Object> patchBody =
+        objectMapper.convertValue(createInvalidInput(), new TypeReference<>() {});
+
+    ResponseEntity<AssignmentOutputDTO> response = performPatch(id, patchBody);
+
+    assertThat(response.getStatusCode())
+        .as("PATCH producing an invalid entity should return INTERNAL_SERVER_ERROR")
+        .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
   }
 }

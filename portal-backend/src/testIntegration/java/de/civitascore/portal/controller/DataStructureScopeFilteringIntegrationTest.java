@@ -50,6 +50,7 @@ class DataStructureScopeFilteringIntegrationTest
     DataStructureInputDTO input = new DataStructureInputDTO();
     input.setName("scope_test_datastructure_" + System.currentTimeMillis());
     input.setDescription("DataStructure for scope filtering test");
+    input.setCreatedFromDataSource(false);
     return input;
   }
 
@@ -121,7 +122,7 @@ class DataStructureScopeFilteringIntegrationTest
       RestPage<DataStructureOutputDTO> page = getAllDataStructures(ds1.toString());
 
       assertThat(page.getContent()).hasSize(1);
-      assertThat(page.getContent().get(0).getId()).isEqualTo(ds1);
+      assertThat(page.getContent().getFirst().getId()).isEqualTo(ds1);
     }
 
     @Test
