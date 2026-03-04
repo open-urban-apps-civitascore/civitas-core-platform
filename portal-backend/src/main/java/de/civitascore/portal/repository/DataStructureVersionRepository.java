@@ -2,6 +2,7 @@ package de.civitascore.portal.repository;
 
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
@@ -21,4 +22,6 @@ public interface DataStructureVersionRepository extends BaseRepository<DataStruc
   @EntityGraph(attributePaths = {"dataStructure"})
   @Query("SELECT dsv FROM DataStructureVersion dsv WHERE dsv.id = :id")
   Optional<DataStructureVersion> findByIdWithRelations(@Param("id") UUID id);
+
+  Set<DataStructureVersion> findAllByDataStructureIdAndVersion(UUID id, String version);
 }

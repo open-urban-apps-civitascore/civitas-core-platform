@@ -41,6 +41,7 @@ public class ModelRestClientRequestService {
           .post()
           .uri(getUploadEndpoint(nsUri))
           .contentType(MediaType.parseMediaType("application/uml"))
+          .accept(MediaType.APPLICATION_JSON)
           .body(modelFile.getResource())
           .retrieve()
           .body(String.class);
@@ -66,6 +67,7 @@ public class ModelRestClientRequestService {
           .post()
           .uri(getUploadEndpoint(nsUri))
           .contentType(MediaType.parseMediaType("application/uml"))
+          .accept(MediaType.APPLICATION_JSON)
           .body(modelContent)
           .retrieve()
           .body(String.class);

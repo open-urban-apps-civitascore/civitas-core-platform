@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.portal.mapper.DataSourceMapper;
 import de.civitascore.portal.model.connector.OnPublish;
 import de.civitascore.portal.model.embedded.ConnectorType;
+import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -12,10 +13,12 @@ import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
+import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import jakarta.validation.groups.Default;
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +39,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final ConnectorHandlerRegistry connectorHandlerRegistry;
   private final ScopedAssignmentBuilderService assignmentBuilderService;
   private final DataStructureVersionService dataStructureVersionService;
+  private final DataSetRepository dataSetRepository;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -233,8 +237,20 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
           getEntityName(), id, "Only data sources in AVAILABLE status can be unpublished");
     }
 
+    validateNotInUse(id);
+
     entity.setDataSourceStatus(DataSourceStatus.DRAFT);
     return save(entity);
+  }
+
+  private void validateNotInUse(UUID id) {
+    if (dataSetRepository.existsByPipelinesDataSourcesIdAndDataSetStatusIn(
+        id, List.of(DataSetStatus.READY, DataSetStatus.AVAILABLE))) {
+      throw new ResourceInUseException(
+          getEntityName(),
+          id,
+          "Cannot unpublish DataSource because it is referenced by a READY or AVAILABLE DataSet.");
+    }
   }
 
   @Transactional

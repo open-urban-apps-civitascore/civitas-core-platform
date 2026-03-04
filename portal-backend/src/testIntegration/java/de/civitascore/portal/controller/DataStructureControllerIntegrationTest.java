@@ -26,6 +26,7 @@ import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.RoleRepository;
+import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
 import java.util.List;
@@ -181,6 +182,7 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
     headers.setBearerAuth(getValidAccessToken());
     headers.setContentType(MediaType.APPLICATION_JSON);
     headers.setAccept(MediaType.parseMediaTypes("application/json"));
+    headers.set(AllowedScopesFilter.HEADER_NAME, "*");
     return headers;
   }
 

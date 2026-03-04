@@ -76,6 +76,28 @@ user_with_scoped_permissions(perms, scope_type, scope_id) := {
 	}],
 }
 
+# User with multiple groups, one assignment per group.
+# Each entry: {"perms": [...], "scope_type": "...", "scope_id": "..."}
+user_with_grouped_permissions(assignment_list) := {
+	"userId": "test-user-123",
+	"externalId": "test-user-123",
+	"groups": [group |
+		some i, a in assignment_list
+		group := {
+			"id": sprintf("group-%d", [i + 1]),
+			"name": sprintf("Group %d", [i + 1]),
+			"assignments": [{
+				"roleId": sprintf("role-%d", [i + 1]),
+				"roleName": sprintf("Role %d", [i + 1]),
+				"roleType": "DATA",
+				"scopeType": a.scope_type,
+				"scopeId": a.scope_id,
+				"permissions": a.perms,
+			}],
+		}
+	],
+}
+
 # User with no permissions (empty groups)
 user_no_permissions := {
 	"userId": "test-user-no-perms",

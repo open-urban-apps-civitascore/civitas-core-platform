@@ -428,6 +428,28 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .isEqualTo(dataStructureId)
           .isNotEqualTo(otherDataStructureId);
     }
+
+    @Test
+    @DisplayName(
+        "Should return 409 when creating a version whose version string already exists for the same DataStructure")
+    void shouldReturn409WhenCreatingDuplicateVersion() {
+      // "1.0.0" is already saved in initTestData for dataStructureId
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setVersion("1.0.0");
+      input.setDescription("Duplicate of existing version 1.0.0");
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint(),
+              HttpMethod.POST,
+              new HttpEntity<>(input, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return CONFLICT for duplicate version string within the same DataStructure")
+          .isEqualTo(HttpStatus.CONFLICT);
+    }
   }
 
   @Nested
@@ -767,6 +789,36 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(output.getDataStructure().getId())
           .as("DataStructure ID should remain unchanged")
           .isEqualTo(dataStructureId);
+    }
+
+    @Test
+    @DisplayName(
+        "Should return 409 when updating a version to a version string that already exists for the same DataStructure")
+    void shouldReturn400WhenUpdatingToDuplicateVersion() {
+      // versionId1 has "1.0.0"; "2.0.0" is already used by another version in the same
+      // DataStructure
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setVersion("2.0.0");
+      input.setDescription("Trying to use a version string already taken by another version");
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.PUT,
+              new HttpEntity<>(input, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as(
+              "Should return CONFLICT when updating to a version string already used by another version in the same DataStructure")
+          .isEqualTo(HttpStatus.CONFLICT);
+
+      DataStructureVersion unchanged =
+          dataStructureVersionRepository.findById(versionId1).orElseThrow();
+      assertThat(unchanged.getVersion())
+          .as("Version string of versionId1 must not have changed")
+          .isEqualTo("1.0.0");
     }
   }
 

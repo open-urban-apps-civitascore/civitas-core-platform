@@ -9,9 +9,11 @@
  */
 package de.civitascore.configadapter.redpanda;
 
+import static de.civitascore.configadapter.redpanda.RedpandaTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
@@ -366,6 +368,275 @@ class RedpandaSagaHandlerTest {
   }
 
   @Nested
+  @DisplayName("Placeholder resolution")
+  class PlaceholderResolution {
+
+    @Test
+    @DisplayName("deploys pipeline with ${FROST_BASE} resolved from targetUrl")
+    void handle_deployWithFrostBasePlaceholder_resolvesTargetUrl() throws Exception {
+      RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
+      doNothing().when(mockClient).createPipeline(any(), anyMap());
+
+      try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
+        Map<String, Object> pipelineData =
+            Map.of(
+                "output",
+                Map.of("http_client", Map.of("url", "${FROST_BASE}/Things", "verb", "POST")));
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "DEPLOY_PIPELINES",
+                Map.of(
+                    "datasetId",
+                    "ds-1",
+                    "targetUrl",
+                    "https://frost.example.com/FROST-Server/v1.1",
+                    "dataPipelines",
+                    List.of(Map.of("id", "pipeline-frost", "data", pipelineData))));
+
+        SagaCommandResult result = handler.handle(command);
+        assertEquals("STEP_COMPLETED", result.type());
+
+        org.mockito.ArgumentCaptor<Map<String, Object>> captor =
+            org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(mockClient).createPipeline(eq("pipeline-frost"), captor.capture());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> deployedOutput =
+            (Map<String, Object>)
+                ((Map<String, Object>) captor.getValue().get("output")).get("http_client");
+        assertEquals(
+            "https://frost.example.com/FROST-Server/v1.1/Things", deployedOutput.get("url"));
+      }
+    }
+
+    @Test
+    @DisplayName(
+        "deploys pipeline with both DatasourceInjector label and PlaceholderResolver placeholders"
+            + " resolved")
+    void handle_deployWithLabelAndPlaceholders_resolvesBoth() throws Exception {
+      RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
+      doNothing().when(mockClient).createPipeline(any(), anyMap());
+
+      try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
+        String datasourceId = "mqtt-ds-123";
+
+        // Pipeline with:
+        //  - input label (resolved by DatasourceInjector → injects MQTT config)
+        //  - output ${FROST_BASE} (resolved by PlaceholderResolver)
+        //  - processors ${DATASOURCE[0]} DSN (resolved by PlaceholderResolver)
+        Map<String, Object> pipelineData = new HashMap<>();
+        pipelineData.put("input", Map.of("label", "${" + datasourceId + "}"));
+        pipelineData.put(
+            "output", Map.of("http_client", Map.of("url", "${FROST_BASE}/Things", "verb", "POST")));
+        pipelineData.put(
+            "pipeline", Map.of("processors", List.of(Map.of("dsn", "${DATASOURCE[0]}"))));
+
+        // MQTT datasource for DatasourceInjector
+        Map<String, Object> mqttDsMap = new HashMap<>();
+        mqttDsMap.put("id", datasourceId);
+        mqttDsMap.put("type", "mqtt");
+        mqttDsMap.put("host", "broker.local");
+        mqttDsMap.put("port", 1883);
+        mqttDsMap.put("configuration", Map.of("topics", List.of("sensor/#")));
+
+        // Postgres datasource for ${DATASOURCE[0]} placeholder
+        Map<String, Object> pgDsMap = new HashMap<>();
+        pgDsMap.put("id", "pg-ds-1");
+        pgDsMap.put("type", "postgresql");
+        pgDsMap.put("host", "db.local");
+        pgDsMap.put("port", 5432);
+        pgDsMap.put("database", "testdb");
+        pgDsMap.put("username", "admin");
+        pgDsMap.put("password", "s3cret");
+        pgDsMap.put("ssl_mode", "disable");
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "DEPLOY_PIPELINES",
+                Map.of(
+                    "datasetId",
+                    "ds-1",
+                    "targetUrl",
+                    "https://frost.example.com/FROST-Server/v1.1",
+                    "datasources",
+                    List.of(pgDsMap, mqttDsMap),
+                    "dataPipelines",
+                    List.of(Map.of("id", "pipeline-combined", "data", pipelineData))));
+
+        SagaCommandResult result = handler.handle(command);
+        assertEquals("STEP_COMPLETED", result.type());
+
+        org.mockito.ArgumentCaptor<Map<String, Object>> captor =
+            org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(mockClient).createPipeline(eq("pipeline-combined"), captor.capture());
+
+        Map<String, Object> deployed = captor.getValue();
+
+        // Verify DatasourceInjector resolved the input label → MQTT config
+        @SuppressWarnings("unchecked")
+        Map<String, Object> input = (Map<String, Object>) deployed.get("input");
+        assertNotNull(input.get("mqtt"), "input should contain mqtt block after label resolution");
+
+        // Verify PlaceholderResolver resolved ${FROST_BASE} in output
+        @SuppressWarnings("unchecked")
+        Map<String, Object> httpClient =
+            (Map<String, Object>) ((Map<String, Object>) deployed.get("output")).get("http_client");
+        assertEquals("https://frost.example.com/FROST-Server/v1.1/Things", httpClient.get("url"));
+
+        // Verify PlaceholderResolver resolved ${DATASOURCE[0]} in processors
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> processors =
+            (List<Map<String, Object>>)
+                ((Map<String, Object>) deployed.get("pipeline")).get("processors");
+        String dsn = (String) processors.get(0).get("dsn");
+        assertTrue(dsn.startsWith("postgres://admin"));
+        assertTrue(dsn.contains("db.local:5432"));
+        assertTrue(dsn.contains("testdb"));
+      }
+    }
+
+    @Test
+    @DisplayName("updates pipeline with ${FROST_BASE} resolved from targetUrl")
+    void handle_updateWithFrostBasePlaceholder_resolvesTargetUrl() throws Exception {
+      RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
+      doNothing().when(mockClient).updatePipeline(any(), anyMap());
+
+      try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
+        Map<String, Object> pipelineData =
+            Map.of(
+                "output",
+                Map.of("http_client", Map.of("url", "${FROST_BASE}/Things", "verb", "POST")));
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_PIPELINES",
+                Map.of(
+                    "datasetId",
+                    "ds-1",
+                    "targetUrl",
+                    "https://frost.example.com/FROST-Server/v1.1",
+                    "dataPipelines",
+                    List.of(
+                        Map.of("id", "pipeline-frost", "action", "UPDATE", "data", pipelineData))));
+
+        SagaCommandResult result = handler.handle(command);
+        assertEquals("STEP_COMPLETED", result.type());
+
+        org.mockito.ArgumentCaptor<Map<String, Object>> captor =
+            org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(mockClient).updatePipeline(eq("pipeline-frost"), captor.capture());
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> deployedOutput =
+            (Map<String, Object>)
+                ((Map<String, Object>) captor.getValue().get("output")).get("http_client");
+        assertEquals(
+            "https://frost.example.com/FROST-Server/v1.1/Things", deployedOutput.get("url"));
+      }
+    }
+
+    @Test
+    @DisplayName("restores pipeline with ${DATASOURCE[0]} resolved to DSN")
+    void handle_restoreWithDatasourcePlaceholder_resolvesDsn() throws Exception {
+      RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
+      doNothing().when(mockClient).updatePipeline(any(), anyMap());
+
+      try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
+        Map<String, Object> pipelineData =
+            Map.of("pipeline", Map.of("processors", List.of(Map.of("dsn", "${DATASOURCE[0]}"))));
+
+        Map<String, Object> datasource = new HashMap<>();
+        datasource.put("id", "pg-ds-1");
+        datasource.put("type", "postgresql");
+        datasource.put("host", "db.local");
+        datasource.put("port", 5432);
+        datasource.put("database", "testdb");
+        datasource.put("username", "admin");
+        datasource.put("password", "s3cret");
+        datasource.put("ssl_mode", "disable");
+
+        SagaCommandMessage command =
+            createCommand(
+                "COMPENSATE_STEP",
+                "RESTORE_PIPELINES",
+                Map.of(
+                    "datasetId",
+                    "ds-1",
+                    "datasources",
+                    List.of(datasource),
+                    "dataPipelines",
+                    List.of(Map.of("id", "pipeline-dsn", "data", pipelineData))));
+
+        SagaCommandResult result = handler.handle(command);
+        assertEquals("COMPENSATION_COMPLETED", result.type());
+
+        org.mockito.ArgumentCaptor<Map<String, Object>> captor =
+            org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(mockClient).updatePipeline(eq("pipeline-dsn"), captor.capture());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> processors =
+            (List<Map<String, Object>>)
+                ((Map<String, Object>) captor.getValue().get("pipeline")).get("processors");
+        String dsn = (String) processors.get(0).get("dsn");
+        assertTrue(dsn.startsWith("postgres://admin:s3cret@db.local:5432/testdb"));
+      }
+    }
+
+    @Test
+    @DisplayName("deploys pipeline with ${DATASOURCE[0]} resolved to DSN")
+    void handle_deployWithDatasourcePlaceholder_resolvesDsn() throws Exception {
+      RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
+      doNothing().when(mockClient).createPipeline(any(), anyMap());
+
+      try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
+        Map<String, Object> pipelineData =
+            Map.of("pipeline", Map.of("processors", List.of(Map.of("dsn", "${DATASOURCE[0]}"))));
+
+        Map<String, Object> datasource = new HashMap<>();
+        datasource.put("id", "pg-ds-1");
+        datasource.put("type", "postgresql");
+        datasource.put("host", "db.local");
+        datasource.put("port", 5432);
+        datasource.put("database", "testdb");
+        datasource.put("username", "admin");
+        datasource.put("password", "s3cret");
+        datasource.put("ssl_mode", "disable");
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "DEPLOY_PIPELINES",
+                Map.of(
+                    "datasetId",
+                    "ds-1",
+                    "datasources",
+                    List.of(datasource),
+                    "dataPipelines",
+                    List.of(Map.of("id", "pipeline-dsn", "data", pipelineData))));
+
+        SagaCommandResult result = handler.handle(command);
+        assertEquals("STEP_COMPLETED", result.type());
+
+        org.mockito.ArgumentCaptor<Map<String, Object>> captor =
+            org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(mockClient).createPipeline(eq("pipeline-dsn"), captor.capture());
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> processors =
+            (List<Map<String, Object>>)
+                ((Map<String, Object>) captor.getValue().get("pipeline")).get("processors");
+        String dsn = (String) processors.get(0).get("dsn");
+        assertTrue(dsn.startsWith("postgres://admin:s3cret@db.local:5432/testdb"));
+      }
+    }
+  }
+
+  @Nested
   @DisplayName("Unknown operation")
   class UnknownOperation {
 
@@ -509,6 +780,63 @@ class RedpandaSagaHandlerTest {
     }
 
     @Test
+    @DisplayName("DEPLOY_PIPELINES with malformed datasource entry returns STEP_FAILED")
+    void deployPipelines_malformedDatasourceEntry_shouldReturnStepFailed() throws Exception {
+      RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
+
+      try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "DEPLOY_PIPELINES",
+                Map.of(
+                    "datasetId",
+                    "ds-1",
+                    "datasources",
+                    List.of("not-a-datasource-map"),
+                    "dataPipelines",
+                    List.of(Map.of("id", "pipeline-1", "data", Map.of()))));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        verify(mockClient, never()).createPipeline(any(), anyMap());
+      }
+    }
+
+    @Test
+    @DisplayName("DEPLOY_PIPELINES with valid then invalid datasource returns STEP_FAILED")
+    void deployPipelines_validThenInvalidDatasource_shouldReturnStepFailed() throws Exception {
+      RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
+
+      try (RedpandaSagaHandler handler = createHandlerWithClient(mockClient)) {
+        Map<String, Object> validDs = new HashMap<>();
+        validDs.put("id", "ds-ok");
+        validDs.put("type", "mqtt");
+        validDs.put("host", "broker.local");
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "DEPLOY_PIPELINES",
+                Map.of(
+                    "datasetId",
+                    "ds-1",
+                    "datasources",
+                    List.of(validDs, "not-a-map"),
+                    "dataPipelines",
+                    List.of(Map.of("id", "pipeline-1", "data", Map.of()))));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+        verify(mockClient, never()).createPipeline(any(), anyMap());
+      }
+    }
+
+    @Test
     @DisplayName("DELETE_PIPELINES with list of integers returns STEP_FAILED")
     void deletePipelines_listOfIntegers_shouldReturnStepFailed() {
       RedpandaConnectClient mockClient = mock(RedpandaConnectClient.class);
@@ -542,11 +870,5 @@ class RedpandaSagaHandlerTest {
     handler.setTestRedpandaClient(mockClient);
     handler.initialize(mockConfig);
     return handler;
-  }
-
-  private SagaCommandMessage createCommand(
-      String type, String operation, Map<String, Object> payload) {
-    return new SagaCommandMessage(
-        type, "msg-001", "saga-001", "deploy-pipelines", "redpanda", operation, payload);
   }
 }

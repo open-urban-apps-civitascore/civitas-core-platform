@@ -50,6 +50,10 @@ class RedpandaConnectClient implements AutoCloseable {
   private static final int READ_TIMEOUT_SECONDS = 30;
   private static final int HTTP_CLIENT_ERROR_MIN = 400;
   private static final int HTTP_SERVER_ERROR_MIN = 500;
+  private static final String YAML_CONTENT_TYPE = "application/x-yaml";
+  private static final int HTTP_SUCCESS_MIN = 200;
+  private static final int HTTP_SUCCESS_MAX = 300;
+  private static final int HTTP_NOT_FOUND = 404;
 
   /**
    * Allowed characters for pipeline IDs: alphanumeric start, then alphanumeric, dots, dashes,
@@ -71,6 +75,9 @@ class RedpandaConnectClient implements AutoCloseable {
   }
 
   private RedpandaConnectClient(String baseUrl, PipelineSerializer serializer, Client client) {
+    if (baseUrl == null) {
+      throw new IllegalArgumentException("baseUrl must not be null");
+    }
     this.baseUrl = baseUrl.replaceAll("/$", "");
     this.serializer = serializer;
     this.client = client;
@@ -96,7 +103,7 @@ class RedpandaConnectClient implements AutoCloseable {
             .path(STREAMS_PATH)
             .path(pipelineId)
             .request(MediaType.APPLICATION_JSON)
-            .post(Entity.entity(yaml, "application/x-yaml"))) {
+            .post(Entity.entity(yaml, YAML_CONTENT_TYPE))) {
       handleResponse(response, AdapterOperation.PIPELINE_CREATE, pipelineId);
     } catch (FatalAdapterException | RetryableAdapterException e) {
       throw e;
@@ -125,7 +132,7 @@ class RedpandaConnectClient implements AutoCloseable {
             .path(STREAMS_PATH)
             .path(pipelineId)
             .request(MediaType.APPLICATION_JSON)
-            .put(Entity.entity(yaml, "application/x-yaml"))) {
+            .put(Entity.entity(yaml, YAML_CONTENT_TYPE))) {
       handleResponse(response, AdapterOperation.PIPELINE_UPDATE, pipelineId);
     } catch (FatalAdapterException | RetryableAdapterException e) {
       throw e;
@@ -179,9 +186,18 @@ class RedpandaConnectClient implements AutoCloseable {
       throws FatalAdapterException, RetryableAdapterException {
     int status = response.getStatus();
 
-    if (status >= 200 && status < 300) {
+    if (status >= HTTP_SUCCESS_MIN && status < HTTP_SUCCESS_MAX) {
       logger.info(
           "Pipeline {} succeeded for: {}", operation.getDescription(), Encode.forJava(pipelineId));
+      return;
+    }
+
+    // DELETE idempotency: treat 404 as success (pipeline already gone)
+    if (status == HTTP_NOT_FOUND && operation == AdapterOperation.PIPELINE_DELETE) {
+      logger.info(
+          "Pipeline {} already absent (HTTP 404), treating {} as success",
+          Encode.forJava(pipelineId),
+          operation.getDescription());
       return;
     }
 

@@ -259,18 +259,63 @@ class PipelineInputTest {
   }
 
   @Test
-  void jsonDeserialization_withUnknownProperties_shouldCaptureAdditionalProperties()
-      throws Exception {
+  void jsonDeserialization_withGenerateInput_shouldMapToTypedField() throws Exception {
     String json =
         """
                 {
-                  "generate": {"mapping": "root = {}"}
+                  "generate": {"mapping": "root = {}", "interval": "1s"}
                 }
                 """;
 
     PipelineInput input = objectMapper.readValue(json, PipelineInput.class);
     assertNull(input.getMqtt());
     assertNull(input.getSqlRaw());
-    assertNotNull(input.getAdditionalProperties().get("generate"));
+    assertNotNull(input.getGenerate());
+    assertEquals("root = {}", input.getGenerate().getMapping());
+    assertEquals("1s", input.getGenerate().getInterval());
+  }
+
+  @Test
+  void jsonDeserialization_withUnknownProperties_shouldCaptureAdditionalProperties()
+      throws Exception {
+    String json =
+        """
+                {
+                  "stdin": {"codec": "lines"}
+                }
+                """;
+
+    PipelineInput input = objectMapper.readValue(json, PipelineInput.class);
+    assertNull(input.getMqtt());
+    assertNull(input.getSqlRaw());
+    assertNull(input.getGenerate());
+    assertNotNull(input.getAdditionalProperties().get("stdin"));
+  }
+
+  @Test
+  void toApiMap_whenGenerateSet_shouldContainGenerateNestedMap() {
+    GenerateInput generate = new GenerateInput();
+    generate.setInterval("1s");
+    generate.setCount(1);
+    generate.setMapping("root = {}");
+    PipelineInput input = new PipelineInput();
+    input.setGenerate(generate);
+
+    Map<String, Object> map = input.toApiMap();
+    @SuppressWarnings("unchecked")
+    Map<String, Object> genMap = (Map<String, Object>) map.get("generate");
+    assertNotNull(genMap);
+    assertEquals("1s", genMap.get("interval"));
+    assertEquals(1, genMap.get("count"));
+    assertEquals("root = {}", genMap.get("mapping"));
+  }
+
+  @Test
+  void toApiMap_whenLabelSet_shouldContainLabel() {
+    PipelineInput input = new PipelineInput();
+    input.setLabel("${some-uuid}");
+
+    Map<String, Object> map = input.toApiMap();
+    assertEquals("${some-uuid}", map.get("label"));
   }
 }

@@ -3,6 +3,7 @@ package de.civitascore.portal.model.output;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.output.summary.DistributionSummaryDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
+import de.civitascore.portal.model.output.summary.UserSummaryDTO;
 import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -22,4 +23,6 @@ public class DataSetOutputDTO extends BaseOutputDTO {
   private List<DistributionSummaryDTO> distributions;
 
   private Boolean openDataAccess;
+
+  private UserSummaryDTO createdBy;
 }
