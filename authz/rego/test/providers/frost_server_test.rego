@@ -52,20 +52,6 @@ test_path_pattern_odata_not_mapped if {
 }
 
 # =============================================================================
-# REQUEST ACCESSOR TESTS
-# =============================================================================
-
-test_request_method if {
-	result := frost_server.request_method with input as frost_request("GET", "/api/v1/abc-123/sta")
-	result == "GET"
-}
-
-test_request_path_valid if {
-	result := frost_server.request_path with input as frost_request("GET", "/api/v1/abc-123/sta")
-	result == "/api/v1/abc-123/sta"
-}
-
-# =============================================================================
 # SCOPE ENFORCEMENT TESTS
 # =============================================================================
 
@@ -102,10 +88,5 @@ test_not_collection_endpoint if {
 
 test_path_traversal_rejected if {
 	result := frost_server.path_pattern with input as frost_request("GET", "/api/v1/../admin/sta")
-	result == ""
-}
-
-test_invalid_path_empty_request_path if {
-	result := frost_server.request_path with input as frost_request("GET", "/api/v1/../admin/sta")
 	result == ""
 }

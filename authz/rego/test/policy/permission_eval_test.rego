@@ -32,99 +32,29 @@ portal_request_no_auth(method, path) := {
 	"service": {"name": "portal-backend"},
 }
 
-user_with_permissions(perms) := {
-	"userId": "user-1",
-	"externalId": "ext-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Test Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Test Role",
-			"roleType": "DATA",
-			"scopeType": "DATASET",
-			"scopeId": "dataset-1",
-			"permissions": perms,
-		}],
-	}],
-}
+# Helper: user with permissions scoped to dataset-1 (used throughout this file)
+dataset_user(perms) := mock_http.user_with_scoped_permissions(perms, "DATASET", "dataset-1")
 
-# Mock http.send functions
-mock_send_user_with_perms(perms) := func if {
-	func := {"status_code": 200, "body": user_with_permissions(perms)}
-}
-
-mock_send_read_dataset(_) := {"status_code": 200, "body": user_with_permissions(["DATASET_READ", "DATASET_CREATE"])}
-mock_send_read_only(_) := {"status_code": 200, "body": user_with_permissions(["DATASET_READ"])}
-mock_send_no_perms(_) := {"status_code": 200, "body": user_with_permissions([])}
-mock_send_no_groups(_) := {"status_code": 200, "body": {"userId": "user-1", "externalId": "ext-1", "groups": []}}
+mock_send_read_dataset(_) := {"status_code": 200, "body": dataset_user(["DATASET_READ", "DATASET_CREATE"])}
+mock_send_read_only(_) := {"status_code": 200, "body": dataset_user(["DATASET_READ"])}
+mock_send_no_perms(_) := {"status_code": 200, "body": dataset_user([])}
+mock_send_no_groups(_) := {"status_code": 200, "body": mock_http.user_no_permissions}
 mock_send_user_id_only(_) := {"status_code": 200, "body": {"userId": "123"}}
 mock_send_external_id_only(_) := {"status_code": 200, "body": {"externalId": "ext-123"}}
 mock_send_empty(_) := {"status_code": 200, "body": {}}
+mock_send_multiple_groups(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["DATASET_READ"], "scope_type": "DATASET", "scope_id": "dataset-1"},
+	{"perms": ["DATASET_CREATE"], "scope_type": "DATASET", "scope_id": "dataset-2"},
+])}
 
-# Mock for multiple groups test
-mock_send_multiple_groups(_) := {"status_code": 200, "body": {
-	"userId": "user-1",
-	"externalId": "ext-1",
-	"groups": [
-		{
-			"id": "group-1",
-			"name": "Group 1",
-			"assignments": [{
-				"roleId": "role-1",
-				"roleName": "Reader",
-				"roleType": "DATA",
-				"scopeType": "DATASET",
-				"scopeId": "dataset-1",
-				"permissions": ["DATASET_READ"],
-			}],
-		},
-		{
-			"id": "group-2",
-			"name": "Group 2",
-			"assignments": [{
-				"roleId": "role-2",
-				"roleName": "Creator",
-				"roleType": "DATA",
-				"scopeType": "DATASET",
-				"scopeId": "dataset-2",
-				"permissions": ["DATASET_CREATE"],
-			}],
-		},
-	],
-}}
-
-# Mock for all_user_permissions test
-mock_send_multi_role(_) := {"status_code": 200, "body": {
-	"userId": "user-1",
-	"externalId": "ext-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Test",
-		"assignments": [
-			{
-				"roleId": "role-1",
-				"roleName": "Role1",
-				"roleType": "DATA",
-				"scopeType": "TENANT",
-				"scopeId": "t-1",
-				"permissions": ["USER_READ", "USER_CREATE"],
-			},
-			{
-				"roleId": "role-2",
-				"roleName": "Role2",
-				"roleType": "DATA",
-				"scopeType": "DATASPACE",
-				"scopeId": "ds-1",
-				"permissions": ["DATASET_READ"],
-			},
-		],
-	}],
-}}
+mock_send_multi_role(_) := {"status_code": 200, "body": mock_http.user_with_grouped_permissions([
+	{"perms": ["USER_READ", "USER_CREATE"], "scope_type": "TENANT", "scope_id": "t-1"},
+	{"perms": ["DATASET_READ"], "scope_type": "DATASPACE", "scope_id": "ds-1"},
+])}
 
 # Mock for AND-permission tests
-mock_send_and_both(_) := {"status_code": 200, "body": user_with_permissions(["DATASET_UPDATE", "DATASET_RELEASE"])}
-mock_send_and_missing_one(_) := {"status_code": 200, "body": user_with_permissions(["DATASET_UPDATE"])}
+mock_send_and_both(_) := {"status_code": 200, "body": dataset_user(["DATASET_UPDATE", "DATASET_RELEASE"])}
+mock_send_and_missing_one(_) := {"status_code": 200, "body": dataset_user(["DATASET_UPDATE"])}
 
 # =============================================================================
 # PERMISSION LOOKUP TESTS
@@ -324,23 +254,7 @@ test_is_not_authenticated_empty_context if {
 # SCOPE INHERITANCE TESTS
 # =============================================================================
 
-# Mock: User with DATASET_READ at TENANT scope
-mock_send_tenant_dataset_read(_) := {"status_code": 200, "body": {
-	"userId": "user-1",
-	"externalId": "ext-1",
-	"groups": [{
-		"id": "group-1",
-		"name": "Admin Group",
-		"assignments": [{
-			"roleId": "role-1",
-			"roleName": "Admin",
-			"roleType": "SYSTEM",
-			"scopeType": "TENANT",
-			"scopeId": "tenant-1",
-			"permissions": ["DATASET_READ"],
-		}],
-	}],
-}}
+mock_send_tenant_dataset_read(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_READ"], "TENANT", "tenant-1")}
 
 # Test: TENANT scope cascades to DATASET resource endpoint (direct unit test of inheritance rule)
 test_user_has_permission_tenant_cascades_to_dataset if {

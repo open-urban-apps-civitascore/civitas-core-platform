@@ -59,6 +59,15 @@ public class DataStructureVersionController
   }
 
   @Override
+  public ResponseEntity<DataStructureVersionOutputDTO> create(
+      @Valid @RequestBody DataStructureVersionInputDTO input) {
+    ResponseEntity<DataStructureVersionOutputDTO> response = super.create(input);
+    DataStructureVersion created = getService().findByIdOrThrow(response.getBody().getId());
+    getService().findModelForDataStructureVersion(created).ifPresent(response.getBody()::setModel);
+    return response;
+  }
+
+  @Override
   @GetMapping("/{id}")
   public ResponseEntity<DataStructureVersionOutputDTO> getById(@PathVariable UUID id) {
     DataStructureVersion entity = getService().findByIdOrThrow(id);

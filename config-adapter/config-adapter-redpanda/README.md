@@ -339,6 +339,45 @@ The pipeline definition follows the RedPanda Connect configuration structure:
 
 All model classes extend `AbstractApiModel` and support `toApiMap()` for recursive Map conversion to YAML.
 
+## Datasource Injection & Placeholder Resolution
+
+In the saga path, pipeline templates can reference datasource properties via placeholders. These are resolved before deployment so that a single pipeline template can be reused across datasets with different datasource configurations.
+
+### DatasourceInjector
+
+When a pipeline's `input.label` matches the pattern `${datasource-id}`, the `DatasourceInjector` replaces the entire input section with a concrete MQTT or SQL input configuration parsed from the matching datasource.
+
+For example, an input label of `${sensor-mqtt-1}` is resolved against the dataset's datasource list. The matching datasource is parsed into a `ConnectorConfig` (MQTT or SQL), and the template's input section is replaced with the fully configured input block.
+
+### PlaceholderResolver
+
+String values anywhere in the pipeline configuration can contain placeholders that are resolved against the dataset context. Three placeholder types are supported:
+
+| Placeholder | Resolves to | Example |
+|---|---|---|
+| `${FROST_BASE}` | The dataset's `targetUrl` | `https://frost.example.com/FROST-Server/v1.1` |
+| `${DATASOURCE[n]}` | Full DSN string from the n-th datasource | `postgres://user:pass@host:5432/db?sslmode=disable` |
+| `${DATASOURCE[n].property}` | A single property from the n-th datasource | `${DATASOURCE[0].host}` → `db.example.com` |
+
+#### DSN Construction
+
+When `${DATASOURCE[n]}` is used (without a property suffix), a PostgreSQL DSN is built from the datasource's components:
+
+```
+postgres://user:pass@host:port/database?sslmode=<mode>
+```
+
+- **Credentials and database** are URL-encoded (RFC 3986)
+- **Host** is not URL-encoded (restricted to unreserved characters per RFC 3986)
+- **Port** defaults to `5432` if not specified
+- **`ssl_mode`** must be one of: `disable`, `allow`, `prefer`, `require`, `verify-ca`, `verify-full`
+  - Defaults to `disable` if not specified
+  - Invalid values produce a `FatalAdapterException` (routed to DLQ)
+
+#### Bloblang Preservation
+
+Bloblang interpolation expressions (`${!...}`) are preserved and **not** resolved by the adapter. This allows pipeline processors to use Bloblang's native variable interpolation alongside adapter-level placeholders.
+
 ## Error Handling
 
 ### HTTP Status Code Mapping

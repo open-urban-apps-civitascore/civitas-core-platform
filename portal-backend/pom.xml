@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.7</version>
+        <version>3.5.11</version>
         <relativePath/>
     </parent>
 
@@ -43,28 +43,25 @@
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
         <build-helper-maven-plugin.version>3.6.1</build-helper-maven-plugin.version>
         <tomcat.version>11.0.14</tomcat.version>
-        <commons-compress.version>1.27.1</commons-compress.version>
+        <lz4-java.version>1.8.1</lz4-java.version>
+        <commons-io.version>2.18.0</commons-io.version>
+        <!-- Override Spring Boot 3.5.11 default (3.17.0) to fix CVE-2025-48924 -->
+        <commons-lang3.version>3.18.0</commons-lang3.version>
         <spring-kafka.version>3.3.13</spring-kafka.version>
         <owasp.encoder.version>1.4.0</owasp.encoder.version>
         <apache-jena.version>5.6.0</apache-jena.version>
         <cyclonedx-maven-plugin.version>2.9.0</cyclonedx-maven-plugin.version>
         <config-adapter.version>1.0.2-MR-236</config-adapter.version>
-        <portal-model.version>1.0.0-SNAPSHOT</portal-model.version>
+        <portal-model.version>1.0.0</portal-model.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
-            <!-- Override transitive dependency to fix CVE -->
+            <!-- Override lz4-java to fix CVE-2025-12183 / CVE-2025-66566 -->
             <dependency>
-                <groupId>org.apache.commons</groupId>
-                <artifactId>commons-compress</artifactId>
-                <version>${commons-compress.version}</version>
-            </dependency>
-            <!-- Required by commons-compress for Testcontainers -->
-            <dependency>
-                <groupId>commons-io</groupId>
-                <artifactId>commons-io</artifactId>
-                <version>2.18.0</version>
+                <groupId>org.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>${lz4-java.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -185,6 +182,7 @@
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
+            <version>${commons-io.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>

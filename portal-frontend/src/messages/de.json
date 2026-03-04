@@ -35,6 +35,7 @@
       "invalidNumber": "Bitte geben Sie eine gültige Zahl ein",
       "required": "Dieses Feld ist erforderlich",
       "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
+      "atLeast3": "Die Eingabe muss mindestens 3 Zeichen lang sein.",
       "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
       "atLeast1Value": "Mindestens ein Wert ist erforderlich.",
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
@@ -94,13 +95,16 @@
     "all-datasets": "Alle Datensätze",
     "documentation": "Dokumentation",
     "logout": "Abmelden",
+    "platform": "Plattform",
+    "admin": "Admin",
+    "help": "Hilfe",
     "ourData": "Unsere Daten",
-    "datasets": "Unsere Daten",
+    "datasets": "Datensätze",
     "permissions": "Berechtigungen",
     "roles": "Rollen",
     "create": "erstellen",
     "edit": "bearbeiten",
-    "users": "User Management",
+    "users": "User",
     "groups": "Gruppen",
     "dataspaces": "Datenräume",
     "tenants": "Mandanten-Management",
@@ -177,7 +181,14 @@
     },
     "messages": {
       "createSuccess": "Datensatz wurde erfolgreich angelegt.",
-      "updateSuccess": "Datensatz wurde erfolgreich aktualisiert."
+      "updateSuccess": "Datensatz wurde erfolgreich aktualisiert.",
+      "deleteSuccess": "Datensatz wurde erfolgreich gelöscht.",
+      "deleteError": "Fehler beim Löschen des Datensatzes. Bitte versuche es erneut."
+    },
+    "warningModal": {
+      "title": "Datensatz löschen?",
+      "description": "Diese Aktion kann nicht rückgängig gemacht werden. Dies wird den Datensatz und alle zugehörigen Daten dauerhaft löschen.",
+      "confirm": "Löschen"
     }
   },
   "users": {
@@ -644,7 +655,12 @@
         "validateBeforeSave": "Klicke auf Validieren vor dem Speichern",
         "validate": "Validieren",
         "save": "Speichern",
-        "saving": "Speichert..."
+        "saving": "Speichert...",
+        "loading": "Pipelines werden geladen...",
+        "pipelineSettings": "Pipeline-Einstellungen",
+        "deletePipeline": "Pipeline löschen",
+        "deleteConfirmTitle": "Pipeline löschen?",
+        "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
       },
       "tabs": {
         "closeTab": "Tab schließen",

@@ -55,12 +55,12 @@ describe('AppSidebar', () => {
       expect(screen.getByTestId('sidebar-content')).toBeInTheDocument()
     })
 
-    it('renders AppSidebarHeader with organization info', async () => {
+    it('renders AppSidebarHeader with tenant name and CIVITAS/CORE', async () => {
       await renderWithProviders(mockUser)
 
-      // Organization 1 comes from the mock data (currentOrganization)
-      expect(screen.getByText('Organization 1')).toBeInTheDocument()
-      expect(screen.getByText('Tenant A')).toBeInTheDocument()
+      // Tenant name comes from NEXT_PUBLIC_TENANT_NAME env var (falls back to 'Mandanten-Name')
+      expect(screen.getByText('Mandanten-Name')).toBeInTheDocument()
+      expect(screen.getByText('CIVITAS/CORE')).toBeInTheDocument()
     })
 
     it('renders AppSidebarFooter with user info', async () => {

@@ -16,6 +16,9 @@ gl-dependency-scanning.json
 errorlogs.txt
 .vscode
 
+# Generated allowall data (derived from backends/ at dev startup)
+authz/rego/data/backends-allowall/
+
 # Claude Code state (symlinked to private archive repo)
 /CLAUDE.md
 /.claude

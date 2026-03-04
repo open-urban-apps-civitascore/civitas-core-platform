@@ -112,7 +112,7 @@ class FrostAdapterTest {
   }
 
   @Test
-  void initializationWithoutApiKeyThrowsException() {
+  void initializationWithoutAnyAuthThrowsException() {
     when(mockConfig.getProperty("frost.topics")).thenReturn("de.civitascore.data.thing.created");
     when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
         .thenReturn("http://localhost:8080/v1.1");
@@ -121,11 +121,14 @@ class FrostAdapterTest {
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> adapter.initialize(mockConfig));
 
-    assertEquals("The FROST API key cannot be null or blank.", exception.getMessage());
+    assertEquals(
+        "The FROST adapter requires authentication: configure frost.api.key or "
+            + "frost.basic.auth.username with frost.basic.auth.password.",
+        exception.getMessage());
   }
 
   @Test
-  void initializationWithBlankApiKeyThrowsException() {
+  void initializationWithBlankApiKeyAndNoBasicAuthThrowsException() {
     when(mockConfig.getProperty("frost.api.key")).thenReturn("   ");
     when(mockConfig.getProperty("frost.topics")).thenReturn("de.civitascore.data.thing.created");
     when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
@@ -135,7 +138,24 @@ class FrostAdapterTest {
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> adapter.initialize(mockConfig));
 
-    assertEquals("The FROST API key cannot be null or blank.", exception.getMessage());
+    assertEquals(
+        "The FROST adapter requires authentication: configure frost.api.key or "
+            + "frost.basic.auth.username with frost.basic.auth.password.",
+        exception.getMessage());
+  }
+
+  @Test
+  void initializationWithBasicAuthAndNoApiKeySucceeds() {
+    when(mockConfig.getProperty("frost.topics")).thenReturn("de.civitascore.data.thing.created");
+    when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
+        .thenReturn("http://localhost:8080/v1.1");
+    when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
+    when(mockConfig.getProperty("frost.basic.auth.username")).thenReturn("admin");
+    when(mockConfig.getProperty("frost.basic.auth.password")).thenReturn("secret");
+
+    adapter.initialize(mockConfig);
+
+    assertNotNull(adapter.getSubscribedTopics());
   }
 
   @Test
@@ -327,6 +347,50 @@ class FrostAdapterTest {
               () -> adapter.processConfigEvent("de.civitascore.data.thing.created", event));
 
       assertEquals(AdapterErrorCode.INVALID_RESOURCE_TYPE, exception.getErrorCode());
+    }
+
+    @Test
+    void createThingWithBasicAuthSendsAuthorizationHeader()
+        throws FatalAdapterException, RetryableAdapterException {
+      AdapterConfig basicAuthConfig = mock(AdapterConfig.class);
+      when(basicAuthConfig.getProperty("frost.topics"))
+          .thenReturn("de.civitascore.data.thing.created");
+      when(basicAuthConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
+          .thenReturn("http://localhost:8080/v1.1");
+      when(basicAuthConfig.getProperty("frost.api.key.header", "X-API-Key"))
+          .thenReturn("X-API-Key");
+      when(basicAuthConfig.getProperty("frost.basic.auth.username")).thenReturn("admin");
+      when(basicAuthConfig.getProperty("frost.basic.auth.password")).thenReturn("secret");
+
+      Invocation.Builder basicAuthBuilder = mock(Invocation.Builder.class);
+      Response basicAuthResponse = mock(Response.class);
+      Client basicAuthClient = mock(Client.class);
+      WebTarget basicAuthTarget = mock(WebTarget.class);
+      WebTarget basicAuthPathTarget = mock(WebTarget.class);
+
+      when(basicAuthClient.target(any(String.class))).thenReturn(basicAuthTarget);
+      when(basicAuthTarget.path(any(String.class))).thenReturn(basicAuthPathTarget);
+      when(basicAuthPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(basicAuthBuilder);
+      when(basicAuthBuilder.header(any(String.class), any())).thenReturn(basicAuthBuilder);
+      when(basicAuthResponse.getStatus()).thenReturn(201);
+      when(basicAuthResponse.getHeaderString("Location"))
+          .thenReturn("http://localhost:8080/v1.1/Things(42)");
+      when(basicAuthBuilder.post(any(Entity.class))).thenReturn(basicAuthResponse);
+
+      try (FrostAdapter basicAuthAdapter = new FrostAdapter()) {
+        basicAuthAdapter.setClient(basicAuthClient);
+        basicAuthAdapter.initialize(basicAuthConfig);
+        basicAuthAdapter.setEventPublisher(mockPublisher);
+
+        ConfigEvent event = createConfigEvent(Operation.CREATE, "Things", Map.of("name", "Test"));
+        basicAuthAdapter.processConfigEvent("de.civitascore.data.thing.created", event);
+
+        ArgumentCaptor<String> headerNameCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object> headerValueCaptor = ArgumentCaptor.forClass(Object.class);
+        verify(basicAuthBuilder).header(headerNameCaptor.capture(), headerValueCaptor.capture());
+        assertEquals("Authorization", headerNameCaptor.getValue());
+        assertTrue(headerValueCaptor.getValue().toString().startsWith("Basic "));
+      }
     }
   }
 

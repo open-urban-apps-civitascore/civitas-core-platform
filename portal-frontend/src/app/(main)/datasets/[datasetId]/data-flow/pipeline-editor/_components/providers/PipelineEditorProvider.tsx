@@ -5,15 +5,20 @@
  *
  * Main context provider for the pipeline editor.
  * Manages session state and provides pipeline operations to child components.
- * Adapted from UML modeler's ActiveDiagramProvider.
+ * Integrates with the backend API for CRUD operations on pipelines.
  *
  */
 
 import type { Connection } from '@xyflow/react'
 import { useParams } from 'next/navigation'
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { useCreatePipeline } from '@/app/services/api/pipelines/clientRequests'
+import {
+  useCreatePipeline,
+  useDeletePipeline,
+  useGetPipelines,
+  useUpdatePipeline,
+} from '@/app/services/api/pipelines/clientRequests'
 
 import { ActivePipelineProvider } from '../../_hooks/use-active-pipeline'
 import { buildPipelinePayload } from '../../_services/payloadBuilderService'
@@ -26,6 +31,7 @@ import {
   pipelineReducerWithReactFlow,
   validateConnection,
 } from '../../_services/pipelineService'
+import { createSessionFromBackendDTO } from '../../_services/sessionService'
 import {
   getNodeValidationSeverity as getNodeValidationSeverityFn,
   validatePipelineWithNodeStatus,
@@ -53,10 +59,7 @@ interface PipelineEditorProviderComponentProps {
 /**
  * Provider component that wraps the pipeline editor.
  * Combines session management with pipeline operations.
- *
- * IMPORTANT: sessionManager is passed as prop (not called as hook)
- * to ensure single source of truth for session state.
- * This follows the same pattern as UML modeler's ActiveDiagramProvider.
+ * Fetches pipelines from backend on mount and provides CRUD operations.
  *
  */
 export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderComponentProps> = ({
@@ -64,8 +67,39 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   sessionManager,
 }) => {
   const params = useParams<{ datasetId: string }>()
+  const datasetId = params.datasetId
   const activeSession = sessionManager.getActiveSession()
   const pipeline = activeSession?.pipeline || createEmptyPipeline()
+
+  // ===== Track whether initial load has been done =====
+  const hasLoadedRef = useRef(false)
+
+  // ===== Backend API Hooks =====
+  const pipelinesQuery = useGetPipelines(datasetId)
+  const createPipelineMutation = useCreatePipeline(datasetId)
+  const updatePipelineMutation = useUpdatePipeline(datasetId)
+  const deletePipelineMutation = useDeletePipeline(datasetId)
+
+  // ===== Load pipelines from backend on mount =====
+  useEffect(() => {
+    if (hasLoadedRef.current) return
+    if (!pipelinesQuery.data?.data) return
+
+    hasLoadedRef.current = true
+    const pipelineDTOs = pipelinesQuery.data.data
+
+    if (pipelineDTOs.length === 0) {
+      // No pipelines in backend — keep the default empty session
+      return
+    }
+
+    // Convert backend DTOs to sessions
+    const sessions = pipelineDTOs.map(dto => createSessionFromBackendDTO(dto))
+    const activeSessionId = sessions[0]?.id || null
+
+    // Load all sessions into the session manager
+    sessionManager.loadSessions(sessions, activeSessionId)
+  }, [pipelinesQuery.data, sessionManager])
 
   // ===== Validation State =====
   const [validationResult, setValidationResult] = useState<ValidationResultWithNodeStatus | null>(null)
@@ -131,7 +165,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // ===== Node Operations =====
   const addNode = useCallback(
     (context: NodeCreationContext) => {
-      const nodeData = createDefaultNodeData(context.nodeType, params.datasetId)
+      const nodeData = createDefaultNodeData(context.nodeType, datasetId)
       const newNode: PipelineNode = {
         id: crypto.randomUUID(),
         type: context.nodeType as PipelineNodeType,
@@ -140,7 +174,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       }
       dispatch({ type: 'ADD_NODE', payload: newNode })
     },
-    [dispatch, params.datasetId],
+    [dispatch, datasetId],
   )
 
   const updateNode = useCallback(
@@ -274,26 +308,81 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     setShouldShowValidationPanel(false)
   }, [])
 
-  // ===== Pipeline Operations =====
-  const createPipeline = useCreatePipeline()
-
+  // ===== Pipeline Operations: Save (Create or Update) =====
   const savePipeline = useCallback(() => {
     if (!activeSession || !pipeline) return
 
     const payload = buildPipelinePayload(pipeline)
+    const pipelineId = pipeline.id
 
-    createPipeline.mutate(payload, {
-      onSuccess: () => {
-        sessionManager.markSessionClean(activeSession.id)
-        console.log('Pipeline saved successfully')
-      },
-      onError: error => {
-        console.error('Failed to save pipeline:', error)
-      },
-    })
-  }, [activeSession, pipeline, sessionManager, createPipeline])
+    if (pipelineId) {
+      // Existing pipeline → PUT update
+      updatePipelineMutation.mutate(
+        { pipelineId, data: payload },
+        {
+          onSuccess: () => {
+            sessionManager.markSessionClean(activeSession.id)
+            console.log('Pipeline updated successfully')
+          },
+          onError: error => {
+            console.error('Failed to update pipeline:', error)
+          },
+        },
+      )
+    } else {
+      // New pipeline → POST create
+      createPipelineMutation.mutate(payload, {
+        onSuccess: response => {
+          // Set the id from the response on the pipeline
+          const updatedPipeline: Pipeline = {
+            ...activeSession.pipeline,
+            id: response.data.id,
+            isDirty: false,
+          }
+          sessionManager.updateSessionPipeline(activeSession.id, updatedPipeline)
+          sessionManager.markSessionClean(activeSession.id)
+          console.log('Pipeline created successfully with id:', response.data.id)
+        },
+        onError: error => {
+          console.error('Failed to create pipeline:', error)
+        },
+      })
+    }
+  }, [activeSession, pipeline, sessionManager, createPipelineMutation, updatePipelineMutation])
 
-  const isSaving = createPipeline.isPending
+  const isSaving = createPipelineMutation.isPending || updatePipelineMutation.isPending
+
+  // ===== Pipeline Operations: Delete =====
+  const deletePipeline = useCallback(() => {
+    if (!activeSession) return
+
+    const pipelineId = activeSession.pipeline.id
+
+    const removeSession = () => {
+      sessionManager.closeSession(activeSession.id)
+    }
+
+    if (pipelineId) {
+      // Existing pipeline → DELETE from backend, then remove session
+      deletePipelineMutation.mutate(pipelineId, {
+        onSuccess: () => {
+          removeSession()
+          console.log('Pipeline deleted successfully')
+        },
+        onError: error => {
+          console.error('Failed to delete pipeline:', error)
+        },
+      })
+    } else {
+      // Never-saved pipeline → just remove the session
+      removeSession()
+    }
+  }, [activeSession, sessionManager, deletePipelineMutation])
+
+  const isDeleting = deletePipelineMutation.isPending
+
+  // ===== Loading State =====
+  const isLoadingPipelines = pipelinesQuery.isLoading
 
   // ===== Context Value =====
   const contextValue: ActivePipelineContextValue = useMemo(
@@ -341,6 +430,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       // Pipeline operations
       savePipeline,
       isSaving,
+      deletePipeline,
+      isDeleting,
+      isLoadingPipelines,
 
       // Session info
       activeSessionId: activeSession?.id || null,
@@ -374,6 +466,9 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       hideValidationPanel,
       savePipeline,
       isSaving,
+      deletePipeline,
+      isDeleting,
+      isLoadingPipelines,
     ],
   )
 

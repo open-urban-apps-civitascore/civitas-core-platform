@@ -9,8 +9,8 @@
 #   3. Reader creates dataset -> 403 (lacks DATASET_CREATE)
 #   4. NoPerms user reads datasets -> 403 (no permissions)
 #   5. No token -> 401 (unauthenticated)
-#   6. /users/me (null-permission) -> 200 for any authenticated user
-#   7. Dataspaces/catalogs (null-permission) -> 200 for any authenticated user
+#   6. Datasources/datastructures -> 200 for admin/reader with permissions
+#   7. Dataspaces/catalogs -> 403 (removed from v2.0, OPA denies as unknown_endpoint)
 #
 # Prerequisites:
 #   - Full authz stack running (start-portal-dev.sh --authz=full)
@@ -206,21 +206,19 @@ test_endpoint "GET /v2/datasets (no token - 401)" "GET" "/v2/datasets" "" "401"
 test_endpoint "GET /v2/users/me (no token - 401)" "GET" "/v2/users/me" "" "401"
 echo ""
 
-echo "=== Test 6: New Resource Endpoints (Datasources/Datastructures) ==="
-# Backend may not have these controllers yet (404), but OPA should NOT block (403).
-# Tests verify authorization passes — backend 404 is expected until controllers are implemented.
-test_endpoint "GET /v2/datasources (DATASOURCE_READ - backend 404)" "GET" "/v2/datasources" "$ADMIN_TOKEN" "404"
-test_endpoint "GET /v2/datastructures (DATASTRUCTURE_READ - backend 404)" "GET" "/v2/datastructures" "$ADMIN_TOKEN" "404"
-test_endpoint "GET /v2/datasources (DATASOURCE_READ reader - backend 404)" "GET" "/v2/datasources" "$READER_TOKEN" "404"
+echo "=== Test 6: Resource Endpoints (Datasources/Datastructures) ==="
+# Backend has controllers for these resources. OPA enforces permissions.
+test_endpoint "GET /v2/datasources (DATASOURCE_READ - admin)" "GET" "/v2/datasources" "$ADMIN_TOKEN" "200"
+test_endpoint "GET /v2/datastructures (DATASTRUCTURE_READ - admin)" "GET" "/v2/datastructures" "$ADMIN_TOKEN" "200"
+test_endpoint "GET /v2/datasources (DATASOURCE_READ - reader)" "GET" "/v2/datasources" "$READER_TOKEN" "200"
 test_endpoint "POST /v2/datasources (DATASOURCE_CREATE - reader denied)" "POST" "/v2/datasources" "$READER_TOKEN" "403"
 echo ""
 
-echo "=== Test 7: Null-Permission Endpoints (Dataspaces/Catalogs) ==="
-# Dataspaces and catalogs are null-permission endpoints (GET only, any authenticated user).
-# Backend still has these controllers (scheduled for removal in #989).
-# OPA allows (null-permission), backend returns 200.
-test_endpoint "GET /v2/dataspaces (null-permission - 200)" "GET" "/v2/dataspaces" "$ADMIN_TOKEN" "200"
-test_endpoint "GET /v2/catalogs (null-permission - 200)" "GET" "/v2/catalogs" "$ADMIN_TOKEN" "200"
+echo "=== Test 7: Removed Endpoints (Dataspaces/Catalogs) ==="
+# Dataspaces and catalogs are not implemented in v2.0 (see #989).
+# Removed from OPA data.json — OPA denies as unknown_endpoint (403).
+test_endpoint "GET /v2/dataspaces (removed - 403)" "GET" "/v2/dataspaces" "$ADMIN_TOKEN" "403"
+test_endpoint "GET /v2/catalogs (removed - 403)" "GET" "/v2/catalogs" "$ADMIN_TOKEN" "403"
 echo ""
 
 # =============================================================================

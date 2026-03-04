@@ -121,16 +121,6 @@ backend_endpoints := frost_server.endpoints if {
 }
 
 # =============================================================================
-# RESERVED SEGMENTS (delegated to library)
-# =============================================================================
-
-# Special path segments that are NOT resource IDs.
-# Delegated to restmapper library for consistency.
-is_special_segment(segment) if {
-	restmapper.is_reserved_segment(segment)
-}
-
-# =============================================================================
 # SCOPE ENFORCEMENT (M5.1 - dispatched to providers)
 # =============================================================================
 # Each provider exposes scope information for resource endpoints.

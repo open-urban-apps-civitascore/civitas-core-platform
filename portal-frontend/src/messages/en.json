@@ -35,6 +35,7 @@
       "invalidNumber": "Enter a valid number",
       "required": "This field is required",
       "atLeast2": "The input must be at least 2 characters.",
+      "atLeast3": "The input must be at least 3 characters.",
       "atLeast10": "The input must be at least 10 characters.",
       "atLeast1Value": "At least 1 value is required.",
       "minChar": "The input has to be at least {amount} characters.",
@@ -95,13 +96,16 @@
     "all-datasets": "All Datasets",
     "documentation": "Documentation",
     "logout": "Log out",
+    "platform": "Platform",
+    "admin": "Admin",
+    "help": "Help",
     "ourData": "Our Data",
-    "datasets": "Our Data",
+    "datasets": "Datasets",
     "permissions": "Permissions",
-    "roles": "Role Management",
+    "roles": "Roles",
     "create": "create",
     "edit": "edit",
-    "users": "User Management",
+    "users": "User",
     "groups": "Groups",
     "dataspaces": "Data Spaces",
     "tenants": "Tenant Management",
@@ -178,7 +182,14 @@
     },
     "messages": {
       "createSuccess": "Dataset has been successfully created.",
-      "updateSuccess": "Dataset has been successfully updated."
+      "updateSuccess": "Dataset has been successfully updated.",
+      "deleteSuccess": "Dataset has been successfully deleted.",
+      "deleteError": "An error occurred while deleting the dataset. Please try again."
+    },
+    "warningModal": {
+      "title": "Delete dataset?",
+      "description": "This action cannot be undone. This will permanently delete the dataset and all associated data.",
+      "confirm": "Delete"
     }
   },
   "users": {
@@ -654,7 +665,12 @@
         "validateBeforeSave": "Click Validate before saving",
         "validate": "Validate",
         "save": "Save",
-        "saving": "Saving..."
+        "saving": "Saving...",
+        "loading": "Loading pipelines...",
+        "pipelineSettings": "Pipeline settings",
+        "deletePipeline": "Delete Pipeline",
+        "deleteConfirmTitle": "Delete Pipeline?",
+        "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone."
       },
       "tabs": {
         "closeTab": "Close tab",

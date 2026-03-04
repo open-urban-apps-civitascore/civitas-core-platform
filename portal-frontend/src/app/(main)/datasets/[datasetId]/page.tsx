@@ -1,4 +1,4 @@
-import { getDataset } from '@/app/services/api/datasets/serverRequests'
+import { getDataset, getDatasetAssignments } from '@/app/services/api/datasets/serverRequests'
 
 import { DatasetOverview } from './overview/components/DatasetOverview'
 
@@ -12,27 +12,18 @@ const DatasetPage = async (props: DatasetPageProps) => {
 
   const { data: dataset } = await getDataset(datasetId)
 
-  // needs to be changed to real assignments when access management is implemented, currently only for testing purposes
-  const mockAssignements = [
-    {
-      id: '1',
-      group: { id: '1', name: 'Testgruppe' },
-      role: { id: '1', name: 'TestRolle' },
-      createdAt: '2024-01-01T00:00:00Z',
-      modifiedAt: '2024-01-01T00:00:00Z',
-      scopeType: 'DATASET',
-      scope: { id: datasetId, name: dataset.name },
-    },
-  ]
+  const { data: datasetAssignments } = await getDatasetAssignments(datasetId)
 
-  return (
-    <DatasetOverview
-      testId="datasetPage"
-      dataset={dataset}
-      groupCount={mockAssignements.filter(a => a.group).length}
-      roleCount={mockAssignements.filter(a => a.role).length}
-    />
-  )
+  const getUniqueValuesCount = (entity: 'group' | 'role') => {
+    const uniqueGroups = new Set(datasetAssignments.map(a => a[entity]?.id))
+
+    return uniqueGroups.size
+  }
+
+  const roleCount = getUniqueValuesCount('role')
+  const groupCount = getUniqueValuesCount('group')
+
+  return <DatasetOverview testId="datasetPage" dataset={dataset} groupCount={groupCount} roleCount={roleCount} />
 }
 
 export default DatasetPage

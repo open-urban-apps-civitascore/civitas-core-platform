@@ -17,7 +17,7 @@ import {
   sessionReducer,
 } from '../_services/sessionService'
 import type { Pipeline } from '../_types/pipeline'
-import type { PipelineSession, UsePipelineSessionReturn } from '../_types/session'
+import type { PipelineSession, PipelineSessionAction, UsePipelineSessionReturn } from '../_types/session'
 
 /**
  * Hook for managing multiple pipeline sessions (tabs).
@@ -109,6 +109,16 @@ export const usePipelineSession = (initialSession?: PipelineSession): UsePipelin
     return getAllSessionsFromState(state)
   }, [state])
 
+  const loadSessions = useCallback(
+    (sessions: PipelineSession[], activeSessionId: string | null): void => {
+      dispatch({
+        type: 'LOAD_SESSIONS',
+        payload: { sessions, activeSessionId },
+      } as PipelineSessionAction)
+    },
+    [dispatch],
+  )
+
   const activeSession = getActiveSession()
 
   return {
@@ -124,5 +134,6 @@ export const usePipelineSession = (initialSession?: PipelineSession): UsePipelin
     markSessionClean,
     getActiveSession,
     getAllSessions,
+    loadSessions,
   }
 }

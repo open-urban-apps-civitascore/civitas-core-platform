@@ -58,30 +58,6 @@ test_path_pattern_unknown if {
 }
 
 # =============================================================================
-# REQUEST ACCESSOR TESTS
-# =============================================================================
-
-test_request_method if {
-	result := portal_backend.request_method with input as portal_request("POST", "/v2/users")
-	result == "POST"
-}
-
-test_request_path_valid if {
-	result := portal_backend.request_path with input as portal_request("GET", "/v2/users/123")
-	result == "/v2/users/123"
-}
-
-test_request_path_invalid if {
-	result := portal_backend.request_path with input as portal_request("GET", "/v2/users/../admin")
-	result == ""
-}
-
-test_path_parts if {
-	result := portal_backend.path_parts with input as portal_request("GET", "/v2/datasets/abc")
-	result == ["v2", "datasets", "abc"]
-}
-
-# =============================================================================
 # SUB-RESOURCE PATH PATTERN TESTS
 # =============================================================================
 
@@ -164,23 +140,24 @@ test_endpoints_contains_datastructures_id if {
 }
 
 # =============================================================================
-# DATASPACES AND CATALOGS TESTS (null-permission endpoints)
+# DATASPACES AND CATALOGS — removed from v2.0 (see #989)
+# OPA should deny these as unknown_endpoint.
 # =============================================================================
 
-test_endpoints_contains_dataspaces if {
-	portal_backend.endpoints["/v2/dataspaces"]
+test_endpoints_does_not_contain_dataspaces if {
+	not portal_backend.endpoints["/v2/dataspaces"]
 }
 
-test_endpoints_contains_dataspaces_id if {
-	portal_backend.endpoints["/v2/dataspaces/{id}"]
+test_endpoints_does_not_contain_dataspaces_id if {
+	not portal_backend.endpoints["/v2/dataspaces/{id}"]
 }
 
-test_endpoints_contains_catalogs if {
-	portal_backend.endpoints["/v2/catalogs"]
+test_endpoints_does_not_contain_catalogs if {
+	not portal_backend.endpoints["/v2/catalogs"]
 }
 
-test_endpoints_contains_catalogs_id if {
-	portal_backend.endpoints["/v2/catalogs/{id}"]
+test_endpoints_does_not_contain_catalogs_id if {
+	not portal_backend.endpoints["/v2/catalogs/{id}"]
 }
 
 # =============================================================================

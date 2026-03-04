@@ -16,11 +16,20 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/** Output container for a RedPanda Connect pipeline. Supports HTTP client output. */
+/**
+ * Output container for a RedPanda Connect pipeline. Supports HTTP client output and switch
+ * (conditional routing) output.
+ */
 public final class PipelineOutput extends AbstractApiModel {
+
+  private static final String KEY_HTTP_CLIENT = "http_client";
+  private static final String KEY_SWITCH = "switch";
 
   @JsonProperty("http_client")
   private HttpClientOutput httpClient;
+
+  @JsonProperty("switch")
+  private SwitchOutput switchOutput;
 
   public PipelineOutput() {}
 
@@ -32,10 +41,19 @@ public final class PipelineOutput extends AbstractApiModel {
     this.httpClient = httpClient;
   }
 
+  public SwitchOutput getSwitchOutput() {
+    return switchOutput;
+  }
+
+  public void setSwitchOutput(SwitchOutput switchOutput) {
+    this.switchOutput = switchOutput;
+  }
+
   @Override
   public Map<String, Object> toApiMap() {
     Map<String, Object> map = new LinkedHashMap<>();
-    if (httpClient != null) map.put("http_client", httpClient.toApiMap());
+    if (httpClient != null) map.put(KEY_HTTP_CLIENT, httpClient.toApiMap());
+    if (switchOutput != null) map.put(KEY_SWITCH, switchOutput.toApiMap());
     additionalProperties().forEach(map::putIfAbsent);
     return Collections.unmodifiableMap(map);
   }
@@ -46,12 +64,13 @@ public final class PipelineOutput extends AbstractApiModel {
     if (obj == null || obj.getClass() != this.getClass()) return false;
     var that = (PipelineOutput) obj;
     return Objects.equals(this.httpClient, that.httpClient)
+        && Objects.equals(this.switchOutput, that.switchOutput)
         && Objects.equals(this.additionalProperties(), that.additionalProperties());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(httpClient, additionalProperties());
+    return Objects.hash(httpClient, switchOutput, additionalProperties());
   }
 
   @Override
@@ -59,6 +78,8 @@ public final class PipelineOutput extends AbstractApiModel {
     return "PipelineOutput["
         + "httpClient="
         + httpClient
+        + ", switch="
+        + switchOutput
         + ", additionalProperties="
         + additionalProperties().keySet()
         + ']';

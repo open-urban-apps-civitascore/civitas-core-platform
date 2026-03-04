@@ -189,7 +189,10 @@ test-authz:
   needs:
     - job: setup-version
       artifacts: true
+    - job: setup-version-portal-model
+      artifacts: true
     - job: publish-portal-model
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -202,7 +205,7 @@ test-authz:
   script:
     - cd authz/repository
     # Run tests using published portal-model from GitLab Maven repository
-    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report -s ci_settings.xml -Dportal-model.version=$REVISION
+    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
     # To print coverage, picked up by coverage regex
     - cat target/site/jacoco/index.html| grep -o '<tfoot>.*</tfoot>'
   coverage: '/Total.*?([0-9]{1,3})%/'
@@ -225,10 +228,13 @@ build-authz:
   needs:
     - job: setup-version
       artifacts: true
+    - job: setup-version-portal-model
+      artifacts: true
     - lint-authz
     - dependency-prune-authz
     - test-authz
-    # - job: publish-portal-model
+    - job: publish-portal-model
+      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -242,7 +248,7 @@ build-authz:
     - cd authz/repository
     # Use GitLab Maven repository for config-adapter and portal-model dependencies
     - |
-      mvn package -DskipTests -s ci_settings.xml -Dportal-model.version=$REVISION
+      mvn package -DskipTests -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
   artifacts:
     when: on_success
     paths:
@@ -402,6 +408,10 @@ deploy-opa:
     - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/opa:${REVISION}-scan
     - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/opa:$REVISION
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/opa:$REVISION --tag $CI_REGISTRY_IMAGE/opa:$CI_COMMIT_BRANCH
+      fi
 
 deploy-authz:
   extends: .only-authz-changes
@@ -423,6 +433,10 @@ deploy-authz:
     - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/authz-repo-service:${REVISION}-scan
     - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/authz-repo-service:$REVISION
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "staging" ] || [ "$CI_COMMIT_BRANCH" = "develop" ]; then
+        docker buildx imagetools create $CI_REGISTRY_IMAGE/authz-repo-service:$REVISION --tag $CI_REGISTRY_IMAGE/authz-repo-service:$CI_COMMIT_BRANCH
+      fi
 
 sbom-opa-image:
   extends: .only-authz-changes

@@ -173,6 +173,16 @@ class RedpandaConnectClientTest {
     }
 
     @Test
+    @DisplayName("succeeds on HTTP 404 (idempotent delete)")
+    void deletePipeline_http404_succeeds() {
+      Response mockResponse = mock(Response.class);
+      when(mockResponse.getStatus()).thenReturn(404);
+      when(mockBuilder.delete()).thenReturn(mockResponse);
+
+      assertDoesNotThrow(() -> redpandaClient.deletePipeline("test-pipeline"));
+    }
+
+    @Test
     @DisplayName("throws FatalAdapterException on HTTP 400")
     void deletePipeline_http400_throwsFatalAdapterException() {
       Response mockResponse = mock(Response.class);

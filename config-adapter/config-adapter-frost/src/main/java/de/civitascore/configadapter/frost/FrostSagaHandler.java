@@ -15,8 +15,11 @@ import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
+import jakarta.ws.rs.client.Invocation;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import org.owasp.encoder.Encode;
@@ -44,6 +47,8 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   private String serverUrl;
   private String apiKey;
   private String apiKeyHeader;
+  private String basicAuthUsername;
+  private String basicAuthPassword;
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
   public FrostSagaHandler() {
@@ -55,9 +60,15 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     this.serverUrl = getProperty("url", DEFAULT_SERVER_URL).replaceAll("/$", "");
     this.apiKey = getProperty("api.key");
     this.apiKeyHeader = getProperty("api.key.header", "X-API-Key");
+    this.basicAuthUsername = getProperty("basic.auth.username");
+    this.basicAuthPassword = getProperty("basic.auth.password");
 
-    if (apiKey == null || apiKey.isBlank()) {
-      throw new IllegalArgumentException("The FROST API key cannot be null or blank.");
+    boolean hasApiKey = apiKey != null && !apiKey.isBlank();
+    boolean hasBasicAuth = basicAuthUsername != null && !basicAuthUsername.isBlank();
+    if (!hasApiKey && !hasBasicAuth) {
+      throw new IllegalArgumentException(
+          "The FROST adapter requires authentication: configure frost.api.key or "
+              + "frost.basic.auth.username with frost.basic.auth.password.");
     }
 
     log.info("FrostSagaHandler initialized for: {}", Encode.forJava(serverUrl));
@@ -65,6 +76,18 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
   void setTestClient(Client client) {
     super.setClient(client);
+  }
+
+  private Invocation.Builder withAuth(Invocation.Builder builder) {
+    if (basicAuthUsername != null && !basicAuthUsername.isBlank()) {
+      String password = basicAuthPassword != null ? basicAuthPassword : "";
+      String credentials =
+          Base64.getEncoder()
+              .encodeToString(
+                  (basicAuthUsername + ":" + password).getBytes(StandardCharsets.UTF_8));
+      return builder.header("Authorization", "Basic " + credentials);
+    }
+    return builder.header(apiKeyHeader, apiKey);
   }
 
   @Override
@@ -87,11 +110,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     body.put("description", description);
 
     try (Response response =
-        client()
-            .target(serverUrl)
-            .path("Projects")
-            .request(MediaType.APPLICATION_JSON)
-            .header(apiKeyHeader, apiKey)
+        withAuth(client().target(serverUrl).path("Projects").request(MediaType.APPLICATION_JSON))
             .post(Entity.json(body))) {
 
       checkResponse(response, "CREATE_PROJECT");
@@ -121,11 +140,11 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String previousName;
     String previousDescription;
     try (Response getResponse =
-        client()
-            .target(serverUrl)
-            .path("Projects(" + projectId + ")")
-            .request(MediaType.APPLICATION_JSON)
-            .header(apiKeyHeader, apiKey)
+        withAuth(
+                client()
+                    .target(serverUrl)
+                    .path("Projects(" + projectId + ")")
+                    .request(MediaType.APPLICATION_JSON))
             .get()) {
       checkResponse(getResponse, "GET project for UPDATE_PROJECT");
       @SuppressWarnings("unchecked")
@@ -139,11 +158,11 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     body.put("description", description);
 
     try (Response response =
-        client()
-            .target(serverUrl)
-            .path("Projects(" + projectId + ")")
-            .request(MediaType.APPLICATION_JSON)
-            .header(apiKeyHeader, apiKey)
+        withAuth(
+                client()
+                    .target(serverUrl)
+                    .path("Projects(" + projectId + ")")
+                    .request(MediaType.APPLICATION_JSON))
             .method("PATCH", Entity.json(body))) {
 
       checkResponse(response, "UPDATE_PROJECT");
@@ -170,11 +189,11 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     String projectId = requireString(command, "projectId");
 
     try (Response response =
-        client()
-            .target(serverUrl)
-            .path("Projects(" + projectId + ")")
-            .request(MediaType.APPLICATION_JSON)
-            .header(apiKeyHeader, apiKey)
+        withAuth(
+                client()
+                    .target(serverUrl)
+                    .path("Projects(" + projectId + ")")
+                    .request(MediaType.APPLICATION_JSON))
             .delete()) {
 
       checkResponse(response, "DELETE_PROJECT");
@@ -200,11 +219,11 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
     body.put("description", previousDescription);
 
     try (Response response =
-        client()
-            .target(serverUrl)
-            .path("Projects(" + projectId + ")")
-            .request(MediaType.APPLICATION_JSON)
-            .header(apiKeyHeader, apiKey)
+        withAuth(
+                client()
+                    .target(serverUrl)
+                    .path("Projects(" + projectId + ")")
+                    .request(MediaType.APPLICATION_JSON))
             .method("PATCH", Entity.json(body))) {
 
       checkResponse(response, "RESTORE_PROJECT");

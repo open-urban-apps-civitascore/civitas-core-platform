@@ -6,24 +6,24 @@ import de.civitascore.portal.model.entity.base.BaseEntity;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
 import de.civitascore.portal.model.output.assembler.BaseAssembler;
-import de.civitascore.portal.repository.specification.ScopeFilteringSpecification;
 import de.civitascore.portal.repository.specification.base.BaseSpec;
-import de.civitascore.portal.security.AllowedScopes;
-import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.service.BaseService;
+import de.civitascore.portal.util.InvalidInputException;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Valid;
+import jakarta.validation.Validator;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import lombok.experimental.FieldDefaults;
 import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,7 +32,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -59,7 +58,7 @@ public abstract class BaseController<
   protected abstract BaseAssembler<E, O, UUID> getAssembler();
 
   @Autowired protected ObjectMapper objectMapper;
-  @Autowired protected ObjectProvider<AllowedScopes> allowedScopesProvider;
+  @Autowired protected Validator validator;
 
   @Parameters({
     @Parameter(
@@ -139,8 +138,18 @@ public abstract class BaseController<
       throws IOException {
     E current = getService().findByIdOrThrow(id);
     I currentDto = getAssembler().toInput(current);
-    I patchedDto = objectMapper.readerForUpdating(currentDto).readValue(updates);
+    I patchedDto = patchInput(currentDto, current, updates);
     patchedDto = preProcessInput(patchedDto);
+
+    Set<ConstraintViolation<I>> violations = validator.validate(patchedDto);
+    if (!violations.isEmpty()) {
+      String message =
+          violations.stream()
+              .map(ConstraintViolation::getMessage)
+              .reduce((a, b) -> a + ";\n" + b)
+              .orElse("");
+      throw new InvalidInputException(patchedDto.getClass().getSimpleName(), id, message);
+    }
     E updated = getService().update(id, patchedDto);
     O output = getAssembler().toOutput(updated);
     return ResponseEntity.ok(output);
@@ -168,6 +177,22 @@ public abstract class BaseController<
   }
 
   /**
+   * Helper method to apply JSON Patch updates to an existing DTO. By default, it uses Jackson's
+   * ObjectMapper to read the updates into the current DTO. Subclasses can override this method to
+   * implement custom patching logic if needed.
+   *
+   * @param currentDto the current state of the DTO before applying updates
+   * @param current the current state of the entity before applying updates (in case it's needed for
+   *     patching logic)
+   * @param updates the JSON node containing the updates to be applied
+   * @return the patched DTO after applying the updates
+   * @throws IOException if there is an error during JSON processing
+   */
+  protected I patchInput(I currentDto, E current, JsonNode updates) throws IOException {
+    return objectMapper.readerForUpdating(currentDto).readValue(updates);
+  }
+
+  /**
    * Pre-process the input DTO before creating/updating an entity. This method can be overridden by
    * subclasses to implement custom logic, e.g. when URL parameters need to be set on the input DTO
    * before conversion to entity.
@@ -177,25 +202,5 @@ public abstract class BaseController<
    */
   protected I preProcessInput(I input) {
     return input;
-  }
-
-  /**
-   * Apply scope-based filtering to a specification (M5.5).
-   *
-   * <p>Throws {@link AccessDeniedException} if the {@code X-Allowed-Scope-Ids} header is missing.
-   * If wildcard, returns the spec unchanged. Otherwise combines the spec with the provided scope
-   * filter.
-   */
-  protected Specification<E> applyScopeFilter(S spec) {
-    AllowedScopes scopes = allowedScopesProvider.getObject();
-    if (!scopes.isHeaderPresent()) {
-      throw new AccessDeniedException(
-          "Missing required " + AllowedScopesFilter.HEADER_NAME + " header");
-    }
-    if (scopes.isWildcard()) {
-      return spec;
-    }
-    Specification<E> scopeFilter = ScopeFilteringSpecification.baseEntityById(scopes.getScopeIds());
-    return spec == null ? scopeFilter : spec.and(scopeFilter);
   }
 }
