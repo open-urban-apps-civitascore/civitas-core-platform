@@ -20,7 +20,8 @@ const defaultFormValues: DatasourceBaseFormData = {
   id: '1',
   name: '',
   description: '',
-  dataSourceStatus: 'DRAFT',
+  dataStructureVersionId: '',
+  assignments: [],
 }
 
 interface WrapperProps {
@@ -131,22 +132,19 @@ describe('BasicInfoTab', () => {
     })
   })
 
-  describe('Draft Mode', () => {
-    test('name and description required asterisk is visible in draft mode', () => {
-      setup({ isDraftMode: true })
+  describe('Required Indicators', () => {
+    test('name required asterisk is visible', () => {
+      setup()
       const nameLabel = screen.getByText('form.name')
-      const descriptionLabel = screen.getByText('form.description')
       const nameAsterisk = nameLabel.parentElement?.querySelector('.text-red-500')
-      const descriptionAsterisk = descriptionLabel.parentElement?.querySelector('.text-red-500')
       expect(nameAsterisk).toBeInTheDocument()
-      expect(descriptionAsterisk).toBeInTheDocument()
     })
 
-    test('name and description required asterisk is visible when not in draft mode', () => {
-      setup({ isDraftMode: false })
+    test('description does not have required asterisk', () => {
+      setup()
       const descriptionLabel = screen.getByText('form.description')
       const asterisk = descriptionLabel.parentElement?.querySelector('.text-red-500')
-      expect(asterisk).toBeInTheDocument()
+      expect(asterisk).not.toBeInTheDocument()
     })
   })
 
