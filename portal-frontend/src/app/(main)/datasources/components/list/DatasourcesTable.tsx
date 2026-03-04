@@ -15,7 +15,7 @@ import { resolveUpdater } from '@/utils/table'
 
 export interface DatasourcesTableProps extends TableProps<Datasource> {
   datasources: Datasource[]
-  onDelete?: (id: string) => void
+  onDelete?: (datasource: Datasource) => void
 }
 
 export const DatasourcesTable = (props: DatasourcesTableProps) => {
@@ -118,7 +118,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
       id: 'actions',
       cell: ({ row }: { row: Row<Datasource> }) => (
         <TableDropdownMenu
-          menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDelete?.(row.original.id) }]}
+          menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDelete?.(row.original) }]}
         />
       ),
     },

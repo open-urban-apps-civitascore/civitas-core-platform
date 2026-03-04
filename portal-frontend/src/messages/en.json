@@ -436,6 +436,10 @@
       "title": "Really delete data source?",
       "description": "This action will permanently delete the data source. This action cannot be undone."
     },
+    "inUseModal": {
+      "title": "Data source cannot be deleted",
+      "description": "This data source is currently in use and cannot be deleted. All connections to this data source must be removed first."
+    },
     "connection": {
       "active": "active",
       "inactive": "inactive",

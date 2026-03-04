@@ -41,6 +41,7 @@ export const DatasourceApiResponseSchema = z.object({
   connectorType: ConnectorTypeSchema.nullable(),
   configuration: z.record(z.string(), z.unknown()).nullable(),
   dataStructureVersion: DatastructureVersionSummaryApiResponseSchema.nullable(),
+  inUse: z.boolean(),
 })
 
 export type Datasource = z.infer<typeof DatasourceApiResponseSchema>

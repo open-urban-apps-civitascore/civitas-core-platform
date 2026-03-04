@@ -11,6 +11,7 @@ export const mockDatasources: Datasource[] = [
     connectorType: 'MQTT',
     configuration: null,
     dataStructureVersion: null,
+    inUse: false,
   },
   {
     id: '00000000-0000-0000-0000-000000000002',
@@ -22,6 +23,7 @@ export const mockDatasources: Datasource[] = [
     connectorType: 'SQL',
     configuration: null,
     dataStructureVersion: null,
+    inUse: false,
   },
   {
     id: '00000000-0000-0000-0000-000000000003',
@@ -33,5 +35,6 @@ export const mockDatasources: Datasource[] = [
     connectorType: null,
     configuration: null,
     dataStructureVersion: null,
+    inUse: false,
   },
 ]

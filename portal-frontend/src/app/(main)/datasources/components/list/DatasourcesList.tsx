@@ -38,14 +38,13 @@ export const DatasourcesList = ({
   const tCommon = useTranslations('common')
   const router = useRouter()
 
-  const [datasourceToDelete, setDatasourceToDelete] = useState<string | null>(null)
-  const isWarningModalOpen = datasourceToDelete !== null
+  const [datasourceToDelete, setDatasourceToDelete] = useState<Datasource | null>(null)
   const deleteDatasource = useDeleteDatasource()
   const { handleSortingChange, handlePaginationChange, handleSearchChange } = useTableSearchParams()
 
   const handleDeleteConfirm = () => {
     if (datasourceToDelete) {
-      deleteDatasource.mutate(datasourceToDelete, {
+      deleteDatasource.mutate(datasourceToDelete.id, {
         onSuccess: () => router.refresh(),
       })
     }
@@ -73,15 +72,25 @@ export const DatasourcesList = ({
         onPaginationChange={handlePaginationChange}
         onDelete={setDatasourceToDelete}
       />
-      <WarningModal
-        title={t('deleteModal.title')}
-        description={t('deleteModal.description')}
-        open={isWarningModalOpen}
-        confirmButtonTitle={tCommon('actions.delete')}
-        onOpenChange={() => setDatasourceToDelete(null)}
-        onDiscard={() => setDatasourceToDelete(null)}
-        onConfirm={handleDeleteConfirm}
-      />
+      {datasourceToDelete?.inUse ? (
+        <WarningModal
+          title={t('inUseModal.title')}
+          description={t('inUseModal.description')}
+          open={!!datasourceToDelete}
+          onOpenChange={() => setDatasourceToDelete(null)}
+          onDiscard={() => setDatasourceToDelete(null)}
+        />
+      ) : (
+        <WarningModal
+          title={t('deleteModal.title')}
+          description={t('deleteModal.description')}
+          open={!!datasourceToDelete}
+          confirmButtonTitle={tCommon('actions.delete')}
+          onOpenChange={() => setDatasourceToDelete(null)}
+          onDiscard={() => setDatasourceToDelete(null)}
+          onConfirm={handleDeleteConfirm}
+        />
+      )}
     </>
   )
 }

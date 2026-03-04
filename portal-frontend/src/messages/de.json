@@ -435,6 +435,10 @@
       "title": "Datenquelle wirklich löschen?",
       "description": "Diese Aktion löscht die Datenquelle endgültig. Diese Aktion kann nicht rückgängig gemacht werden."
     },
+    "inUseModal": {
+      "title": "Datenquellen kann nicht gelöscht werden",
+      "description": "Diese Datenquelle wird derzeit verwendet und kann daher nicht gelöscht werden. Zum Löschen müssen alle Verbindungen zu dieser Datenquelle getrennt werden."
+    },
     "connection": {
       "active": "aktiv",
       "inactive": "inaktiv",
