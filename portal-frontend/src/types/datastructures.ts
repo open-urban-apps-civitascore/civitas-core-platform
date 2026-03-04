@@ -4,6 +4,7 @@ import { enumFromConst } from '@/utils/common'
 
 import { AssignmentSchema } from './assignments'
 import { ItemSchema, STATUS_TYPES, WithId } from './common'
+import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 
 export const DATASTRUCTURE_STATUS_TYPES = {
   DRAFT: 'DRAFT',
@@ -43,7 +44,7 @@ export const DatastructureVersionApiResponseSchema = z.object({
   modelAtlasUri: z.string().nullable(),
   modelName: z.string().nullable(),
   model: z.string().nullable(),
-  styles: UMLModelStylesPayloadSchema.nullable(),
+  styles: z.custom<UMLDiagram>().nullable(),
   inUse: z.boolean().optional(),
   dataStructure: ItemSchema,
   createdAt: z.string(),
@@ -69,7 +70,7 @@ export const DatastructureVersionFormDraftSchema = z.object({
   modelAtlasUri: z.string().trim().nullable(),
   modelName: z.string().trim().nullable(),
   model: z.string().trim().nullable(),
-  styles: UMLModelStylesPayloadSchema.nullable(),
+  styles: z.custom<UMLDiagram>().nullable(),
 })
 
 export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormDraftSchema.extend({
@@ -77,7 +78,7 @@ export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormD
   modelAtlasUri: z.string().trim().min(1, 'common.errors.required'),
   modelName: z.string().trim().min(1, 'common.errors.required'),
   model: z.string().trim().min(1, 'common.errors.required'),
-  styles: UMLModelStylesPayloadSchema,
+  styles: z.custom<UMLDiagram>(),
 })
 
 export const DatastructureVersionCreateSchema = DatastructureVersionFormDraftSchema.omit({ id: true })

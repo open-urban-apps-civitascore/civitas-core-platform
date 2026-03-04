@@ -92,22 +92,24 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const initialFormValues = useRef<DatastructureVersionFormData>(
     version ? { ...version, description: version?.description || '' } : defaultFormData,
   )
+
   const initialSession = useMemo(() => {
-    const values = initialFormValues.current
-    const importResult = importFromXmi(values?.model || '')
-    const diagram = importResult.diagram
-    if (!diagram && !values?.modelName) return undefined
-    if (!diagram) return createEmptySession(values.modelName as string)
+    const diagram = initialFormValues.current.styles
+    const modelName = initialFormValues.current.modelName
+
+    if (!diagram && !modelName) return undefined
+    if (!diagram) return createEmptySession(modelName as string)
     return {
       id: diagram.id,
-      name: values?.modelName || 'Untitled Diagram',
-      diagram: diagram,
+      name: modelName || 'Untitled Diagram',
+      diagram,
       isDirty: false,
       dirtyFields: new Set<DirtyField>(),
       lastModified: diagram.lastModified,
       created: diagram.lastModified,
     }
   }, [initialFormValues])
+
 
   const modelSessionManager = useMultiSessionManager({ initialSession })
 
@@ -143,6 +145,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
   const isDiagramDirty = modelSessionManager.activeSession?.isDirty
+
+  const modelAtlasUri = `http://civitas.org/model/${datastructureId}/${versionWatch}`
 
   const versionAlreadyExistsError = useMemo(() => {
     const versionExists = existingVersions.find(
@@ -204,14 +208,14 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     const diagram = modelSessionManager.activeSession?.diagram
     const hasNameChanges = dirtyModelFields?.has('modelName')
     const hasModelChanges = dirtyModelFields?.has('model')
-    const diagramUpdateData = diagram ? buildUMLModelPayload(diagram) : null
+    const diagramUpdateData = diagram ? buildUMLModelPayload(diagram, modelAtlasUri) : null
     if (hasNameChanges && diagramUpdateData) {
       form.setValue('modelName', diagramUpdateData.name, { shouldDirty: true })
     }
-    if (hasModelChanges && diagramUpdateData) {
+    if (hasModelChanges && diagram && diagramUpdateData?.model) {
       form.setValue('model', diagramUpdateData.model, { shouldDirty: true })
-      form.setValue('styles', diagramUpdateData.styles, { shouldDirty: true })
-      form.setValue('modelAtlasUri', `http://civitas.org/model/${datastructureId}+${versionWatch}`, {
+      form.setValue('styles', diagram, { shouldDirty: true })
+      form.setValue('modelAtlasUri', modelAtlasUri, {
         shouldDirty: true,
       })
     }
@@ -220,7 +224,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   useEffect(() => {
     if (versionWatch && modelWatch) {
-      form.setValue('modelAtlasUri', `http://civitas.org/model/${datastructureId}/${versionWatch}`, {
+      form.setValue('modelAtlasUri', modelAtlasUri, {
         shouldDirty: true,
       })
     }
