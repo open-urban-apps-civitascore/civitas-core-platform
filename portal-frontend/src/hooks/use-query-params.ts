@@ -4,22 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { QUERY_PARAMS } from '@/const/searchParams'
 
-const getSortingState = (searchParams: ReadonlyURLSearchParams): SortingState => {
-  const sorts = searchParams.getAll('sort')
-
-  if (!sorts.length) return []
-
-  return searchParams.getAll('sort').flatMap<SortingState[number]>(sort => {
-    const [id, order] = sort.split(',')
-    return !id
-      ? []
-      : [
-          {
-            id,
-            desc: order?.toUpperCase() === 'DESC',
-          },
-        ]
-  })
+const getSortingState = (searchParams: ReadonlyURLSearchParams) => {
+  const sort = searchParams.get(QUERY_PARAMS.sort)
+  if (!sort) return []
+  const [id, direction] = sort.split(',')
+  return id ? [{ id, desc: direction === 'desc' }] : []
 }
 
 export const useQueryParams = () => {
@@ -28,10 +17,7 @@ export const useQueryParams = () => {
   const searchParams = useSearchParams()
 
   const pageSize = useMemo(() => Number(searchParams.get(QUERY_PARAMS.pageSize) ?? 10), [searchParams])
-  const pageIndex = useMemo(
-    () => (Number(searchParams.get(QUERY_PARAMS.pageIndex)) ? Number(searchParams.get(QUERY_PARAMS.pageIndex)) : 0),
-    [searchParams],
-  )
+  const pageIndex = useMemo(() => Number(searchParams.get(QUERY_PARAMS.pageIndex) ?? 0), [searchParams])
   const sorting: SortingState = useMemo(() => getSortingState(searchParams), [searchParams])
   const search = useMemo(() => searchParams.get(QUERY_PARAMS.search) ?? '', [searchParams])
   const tabValue = useMemo(() => searchParams.get(QUERY_PARAMS.tabValue) ?? '', [searchParams])
@@ -47,24 +33,15 @@ export const useQueryParams = () => {
   }, [totalPages, pageIndex, pageSize])
 
   const setSortingParams = (newSorting: SortingState) => {
-    const params = new URLSearchParams(window.location.search)
-
-    const existingSorts = params.getAll('sort')
-    params.delete('sort')
-
-    newSorting.forEach(sort => {
-      const newSortStr = `${sort.id},${sort.desc ? 'DESC' : 'ASC'}`
-      const existingIndex = existingSorts.findIndex(existingSort => existingSort.startsWith(`${sort.id}`))
-
-      if (existingIndex >= 0) {
-        // if sort for this id already exists, replace it
-        existingSorts[existingIndex] = newSortStr
-      } else {
-        existingSorts.push(newSortStr)
-      }
-    })
-    existingSorts.forEach(existingSort => params.append('sort', existingSort))
-    router.push(`?${params.toString()}`)
+    const params = new URLSearchParams(searchParams)
+    const sortingId = newSorting[0]?.id
+    const direction = newSorting[0]?.desc ? 'desc' : 'asc'
+    if (sortingId) {
+      params.set(QUERY_PARAMS.sort, `${sortingId},${direction}`)
+    } else {
+      params.delete(QUERY_PARAMS.sort)
+    }
+    router.push(`${pathname}?${params.toString()}`)
   }
 
   const setSearchParam = (newSearch: string) => {
@@ -118,15 +95,10 @@ export const useQueryParams = () => {
 
   const getApiRequestParams = useCallback((params: ApiRequestParams): URLSearchParams => {
     const apiParams = new URLSearchParams()
-
     apiParams.set(QUERY_PARAMS.pageIndex, String(params.pageIndex))
     apiParams.set(QUERY_PARAMS.pageSize, String(params.pageSize))
-
-    if (params.sorting && params.sorting.length > 0) {
-      params.sorting.forEach(sort => {
-        const sortValue = `${sort.id},${sort.desc ? 'DESC' : 'ASC'}`
-        apiParams.append('sort', sortValue)
-      })
+    if (params.sorting?.[0]) {
+      apiParams.set(QUERY_PARAMS.sort, `${params.sorting[0].id},${params.sorting[0].desc ? 'desc' : 'asc'}`)
     }
 
     if (params.search && params.search.trim().length > 0) {

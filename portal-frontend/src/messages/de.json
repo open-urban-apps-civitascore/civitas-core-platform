@@ -447,6 +447,18 @@
       "DRAFT": "Entwurf",
       "AVAILABLE": "Verfügbar"
     },
+    "deleteModal": {
+      "title": "Datenquelle wirklich löschen?",
+      "description": "Diese Aktion löscht die Datenquelle endgültig. Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "availableModal": {
+      "title": "Datenquelle kann nicht gelöscht werden",
+      "description": "Diese Datenquelle hat den Status \"Verfügbar\" und kann nicht gelöscht werden. Bitte setzen Sie den Status zuerst auf \"Entwurf\"."
+    },
+    "errors": {
+      "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
+      "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)"
+    },
     "connection": {
       "active": "aktiv",
       "inactive": "inaktiv",

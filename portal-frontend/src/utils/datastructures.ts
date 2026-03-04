@@ -16,6 +16,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
     }, null)
     return {
       id: datastructure.id,
+      dataStructureId: datastructure.id,
       name: datastructure.name,
       description: datastructure.description,
       status: datastructure.status,
@@ -36,6 +37,7 @@ export const mapdatastructureFormToApiData = (
   datastructure: DatastructureCreateFormData,
 ): DatastructureCreateJsonServerData => ({
   name: datastructure.name,
+  dataStructureId: '',
   description: '',
   source: 'OWN',
   status: 'DRAFT',

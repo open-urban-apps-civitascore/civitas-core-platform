@@ -54,7 +54,6 @@ export const BasicInfoTab = (props: BasicInfoTabProps) => {
             maxLength={150}
             hasCharacterCount
             disabled={isReadOnly}
-            required
             className="min-h-[100px] resize-none"
           />
         </DetailsFieldContainer>
