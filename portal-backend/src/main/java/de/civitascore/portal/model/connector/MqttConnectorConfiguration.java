@@ -41,9 +41,14 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
   @Schema(description = "Keepalive interval.", example = "30s")
   private String keepalive;
 
-  @JsonProperty("tls.enabled")
-  @Schema(description = "Whether to enable TLS.", example = "false")
-  private boolean tlsEnabled;
+  @Schema(description = "TLS configuration.")
+  private Tls tls = new Tls();
+
+  @Data
+  public static class Tls {
+    @Schema(description = "Whether to enable TLS.", example = "false")
+    private boolean enabled;
+  }
 
   @Schema(description = "Broker username.", example = "mqttuser")
   private String user;
