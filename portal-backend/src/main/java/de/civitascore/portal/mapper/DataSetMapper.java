@@ -30,6 +30,7 @@ public interface DataSetMapper extends DtoMapper<DataSetInputDTO, DataSetOutputD
   @Override
   DataSet toEntity(DataSetInputDTO input);
 
+  @Mapping(target = "createdBy", ignore = true)
   @Override
   DataSetOutputDTO toOutput(DataSet entity);
 
