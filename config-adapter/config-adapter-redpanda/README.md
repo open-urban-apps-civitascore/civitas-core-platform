@@ -356,7 +356,7 @@ String values anywhere in the pipeline configuration can contain placeholders th
 | Placeholder | Resolves to | Example |
 |---|---|---|
 | `${FROST_BASE}` | The dataset's `targetUrl` | `https://frost.example.com/FROST-Server/v1.1` |
-| `${DATASOURCE[n]}` | Full DSN string from the n-th datasource | `postgres://user:pass@host:5432/db?sslmode=disable` |
+| `${DATASOURCE[n]}` | Full DSN string from the n-th datasource | `postgres://user@host:5432/db?sslmode=disable` |
 | `${DATASOURCE[n].property}` | A single property from the n-th datasource | `${DATASOURCE[0].host}` → `db.example.com` |
 
 #### DSN Construction
@@ -364,7 +364,7 @@ String values anywhere in the pipeline configuration can contain placeholders th
 When `${DATASOURCE[n]}` is used (without a property suffix), a PostgreSQL DSN is built from the datasource's components:
 
 ```
-postgres://user:pass@host:port/database?sslmode=<mode>
+postgres://user@host:port/database?sslmode=<mode>
 ```
 
 - **Credentials and database** are URL-encoded (RFC 3986)
