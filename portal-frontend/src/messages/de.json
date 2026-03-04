@@ -34,6 +34,7 @@
       "invalidNumber": "Bitte geben Sie eine gültige Zahl ein",
       "required": "Dieses Feld ist erforderlich",
       "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
+      "atLeast3": "Die Eingabe muss mindestens 3 Zeichen lang sein.",
       "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
       "atLeast1Value": "Mindestens ein Wert ist erforderlich.",
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
@@ -174,7 +175,14 @@
     },
     "messages": {
       "createSuccess": "Datensatz wurde erfolgreich angelegt.",
-      "updateSuccess": "Datensatz wurde erfolgreich aktualisiert."
+      "updateSuccess": "Datensatz wurde erfolgreich aktualisiert.",
+      "deleteSuccess": "Datensatz wurde erfolgreich gelöscht.",
+      "deleteError": "Fehler beim Löschen des Datensatzes. Bitte versuche es erneut."
+    },
+    "warningModal": {
+      "title": "Datensatz löschen?",
+      "description": "Diese Aktion kann nicht rückgängig gemacht werden. Dies wird den Datensatz und alle zugehörigen Daten dauerhaft löschen.",
+      "confirm": "Löschen"
     }
   },
   "users": {
