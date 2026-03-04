@@ -150,7 +150,7 @@ class MqttConnectorConfigurationTest {
       map.put("qos", 2);
       map.put("connect_timeout", "5s");
       map.put("keepalive", "30s");
-      map.put("tls.enabled", true);
+      map.put("tls", Map.of("enabled", true));
       map.put("user", "admin");
       map.put("password", "secret");
 
@@ -163,7 +163,7 @@ class MqttConnectorConfigurationTest {
       assertThat(config.getQos()).isEqualTo(2);
       assertThat(config.getConnectTimeout()).isEqualTo("5s");
       assertThat(config.getKeepalive()).isEqualTo("30s");
-      assertThat(config.isTlsEnabled()).isTrue();
+      assertThat(config.getTls().isEnabled()).isTrue();
       assertThat(config.getUser()).isEqualTo("admin");
       assertThat(config.getPassword()).isEqualTo("secret");
     }
@@ -213,7 +213,7 @@ class MqttConnectorConfigurationTest {
       config.setQos(2);
       config.setConnectTimeout("5s");
       config.setKeepalive("30s");
-      config.setTlsEnabled(true);
+      config.getTls().setEnabled(true);
       config.setUser("admin");
       config.setPassword("secret");
 
@@ -225,7 +225,7 @@ class MqttConnectorConfigurationTest {
       assertThat(map.get("qos")).isEqualTo(2);
       assertThat(map.get("connect_timeout")).isEqualTo("5s");
       assertThat(map.get("keepalive")).isEqualTo("30s");
-      assertThat(map.get("tls.enabled")).isEqualTo(true);
+      assertThat(map.get("tls")).isEqualTo(Map.of("enabled", true));
       assertThat(map.get("user")).isEqualTo("admin");
       assertThat(map.get("password")).isEqualTo("secret");
     }

@@ -15,10 +15,8 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
-import { CONNECTION_TYPES } from '@/const/connectors'
 import { cn } from '@/lib/utils'
-import { STATUS_TYPES } from '@/types/common'
-import { DatasourceCreateFormData, DatasourceCreateFormSchema } from '@/types/datasources'
+import { DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
 
 export const DatasourceCreateForm = () => {
   const t = useTranslations('datasources')
@@ -30,23 +28,16 @@ export const DatasourceCreateForm = () => {
   const createDatasource = useCreateDatasource()
   const isLoading = createDatasource.isPending
 
-  const form = useForm<DatasourceCreateFormData>({
-    resolver: zodResolver(DatasourceCreateFormSchema),
+  const form = useForm<DatasourceFormDraft>({
+    resolver: zodResolver(DatasourceFormDraftSchema),
     defaultValues: {
       name: '',
     },
   })
 
-  const handleCreateDatasource = async (formData: DatasourceCreateFormData) => {
+  const handleCreateDatasource = async (formData: DatasourceFormDraft) => {
     createDatasource.mutate(
-      {
-        name: formData.name,
-        description: '',
-        status: STATUS_TYPES.DRAFT,
-        connector: null,
-        connection: CONNECTION_TYPES.INACTIVE,
-        lastActive: new Date().toISOString(),
-      },
+      { name: formData.name! },
       {
         onSuccess: ({ data }) => {
           router.push(`/datasources/${data.id}`)

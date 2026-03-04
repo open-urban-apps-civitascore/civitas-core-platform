@@ -429,8 +429,20 @@
       "action": "Action"
     },
     "status": {
-      "draft": "Draft",
-      "available": "Available"
+      "DRAFT": "Draft",
+      "AVAILABLE": "Available"
+    },
+    "deleteModal": {
+      "title": "Really delete data source?",
+      "description": "This action will permanently delete the data source. This action cannot be undone."
+    },
+    "availableModal": {
+      "title": "Data source cannot be deleted",
+      "description": "This data source has the status \"Available\" and cannot be deleted. Please set it to \"Draft\" first."
+    },
+    "errors": {
+      "invalidDsn": "Enter a valid URI (e.g. postgres://host:5432/db)",
+      "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)"
     },
     "connection": {
       "active": "active",

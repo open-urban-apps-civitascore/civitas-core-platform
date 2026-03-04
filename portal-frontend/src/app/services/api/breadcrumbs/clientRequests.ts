@@ -16,6 +16,7 @@ export const useGetBredcrumbs = (breadcrumbs: Breadcrumb[]) =>
         apiRequest<BreadcrumbApiResponse>({
           endpoint: crumb.href,
           method: 'GET',
+          headers: { 'x-api-request': 'true' },
           errorMessage: 'An error occurred while fetching breadcrumbs data.',
         }),
     })),
