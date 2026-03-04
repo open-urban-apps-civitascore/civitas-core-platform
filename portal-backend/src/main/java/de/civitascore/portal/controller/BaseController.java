@@ -143,8 +143,12 @@ public abstract class BaseController<
 
     Set<ConstraintViolation<I>> violations = validator.validate(patchedDto);
     if (!violations.isEmpty()) {
-      throw new InvalidInputException(
-          patchedDto.getClass().getSimpleName(), id, violations.iterator().next().getMessage());
+      String message =
+          violations.stream()
+              .map(ConstraintViolation::getMessage)
+              .reduce((a, b) -> a + ";\n" + b)
+              .orElse("");
+      throw new InvalidInputException(patchedDto.getClass().getSimpleName(), id, message);
     }
     E updated = getService().update(id, patchedDto);
     O output = getAssembler().toOutput(updated);
