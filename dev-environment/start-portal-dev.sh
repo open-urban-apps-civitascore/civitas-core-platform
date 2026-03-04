@@ -669,6 +669,8 @@ if [ "$backend_option" = "1" ]; then
     cat > /tmp/start-portal-backend.sh << SCRIPT_EOF
 #!/bin/bash
 cd "$BACKEND_DIR"
+export SPRING_DATASOURCE_USERNAME=admin
+export SPRING_DATASOURCE_PASSWORD=admin
 export MODEL_ATLAS_BASE_URL=http://localhost:8086
 mvn clean spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION
 exec bash
@@ -693,6 +695,8 @@ else
     echo "  Profiles: local,local-init,postgres"
     echo
     echo "Environment variables to set in IDE:"
+    echo "  SPRING_DATASOURCE_USERNAME=admin"
+    echo "  SPRING_DATASOURCE_PASSWORD=admin"
     echo "  MODEL_ATLAS_BASE_URL=http://localhost:8086"
     echo
 fi
