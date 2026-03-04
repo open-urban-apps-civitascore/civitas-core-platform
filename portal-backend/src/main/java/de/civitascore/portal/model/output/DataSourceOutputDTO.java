@@ -24,4 +24,5 @@ public class DataSourceOutputDTO extends BaseOutputDTO {
   private Map<String, Object> configuration;
 
   private DataStructureVersionSummaryDTO dataStructureVersion;
+  private boolean inUse;
 }

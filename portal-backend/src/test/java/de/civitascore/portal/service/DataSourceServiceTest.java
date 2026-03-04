@@ -15,10 +15,12 @@ import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
+import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.service.connector.ConnectorHandlerRegistry;
 import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Collections;
 import java.util.List;
@@ -45,6 +47,7 @@ class DataSourceServiceTest {
   @Mock private ConnectorHandler sqlHandler;
   @Mock private AssignmentService assignmentService;
   @Mock private DataStructureVersionService dataStructureVersionService;
+  @Mock private DataSetRepository dataSetRepository;
 
   @InjectMocks private DataSourceService dataSourceService;
 
@@ -273,10 +276,29 @@ class DataSourceServiceTest {
 
       when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
       when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+      when(dataSetRepository.existsByPipelinesDataSourcesIdAndDataSetStatusIn(any(), any()))
+          .thenReturn(false);
 
       DataSource result = dataSourceService.unpublish(id);
 
       assertThat(result.getDataSourceStatus()).isEqualTo(DataSourceStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName(
+        "Should block unpublish when DataSource is referenced by a READY or AVAILABLE DataSet")
+    void shouldBlockUnpublishWhenInUse() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(dataSetRepository.existsByPipelinesDataSourcesIdAndDataSetStatusIn(any(), any()))
+          .thenReturn(true);
+
+      assertThatThrownBy(() -> dataSourceService.unpublish(id))
+          .isInstanceOf(ResourceInUseException.class);
     }
 
     @Test
