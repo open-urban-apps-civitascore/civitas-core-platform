@@ -30,7 +30,7 @@ export interface UMLModelPayload {
  * @param diagram - The UML diagram with nodes, edges, and viewport
  * @returns The payload ready to be sent to `POST /models`
  */
-export const buildUMLModelPayload = (diagram: UMLDiagram): UMLModelPayload => {
+export const buildUMLModelPayload = (diagram: UMLDiagram, modelUri?: string): UMLModelPayload => {
   // 1. Extract styles (viewport + node positions for reload)
   const styles: UMLModelStylesPayload = {
     viewport: diagram.viewport,
@@ -38,7 +38,7 @@ export const buildUMLModelPayload = (diagram: UMLDiagram): UMLModelPayload => {
   }
 
   // 2. Build XMI model (without layout info - styles are stored separately)
-  const model = exportToXmi(diagram)
+  const model = exportToXmi(diagram, modelUri)
 
   // 3. Assemble payload
   return {

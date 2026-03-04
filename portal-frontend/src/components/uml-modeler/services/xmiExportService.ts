@@ -456,7 +456,7 @@ export const sanitizeName = (name: string): string => {
 /**
  * Main export function - converts a UMLDiagram to XMI format (Eclipse UML2 5.0.0 compatible)
  */
-export const exportToXmi = (diagram: UMLDiagram): string => {
+export const exportToXmi = (diagram: UMLDiagram, modelUri?: string): string => {
   const lines: string[] = []
 
   // Generate dynamic package name and URI from diagram name
@@ -470,7 +470,7 @@ export const exportToXmi = (diagram: UMLDiagram): string => {
   // UML Model as root element with namespaces (Eclipse UML2 format)
   const modelId = `${diagram.id}_model`
   lines.push(
-    `<uml:Model xmi:version="${XMI_VERSION}" xmlns:xmi="${XMI_NAMESPACE}" xmlns:uml="${UML_NAMESPACE}" xmi:id="${modelId}" name="${escapeXml(diagram.name)}">`,
+    `<uml:Model xmi:version="${XMI_VERSION}" xmlns:xmi="${XMI_NAMESPACE}" xmlns:uml="${UML_NAMESPACE}" xmi:id="${modelId}" name="${escapeXml(diagram.name)}" ${modelUri && `URI="${modelUri}"`}>`,
   )
 
   // Package wrapper for all elements
