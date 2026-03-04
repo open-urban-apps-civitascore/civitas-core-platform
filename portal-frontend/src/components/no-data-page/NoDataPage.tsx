@@ -3,8 +3,8 @@ import React, { HTMLAttributes } from 'react'
 
 import { cn } from '@/lib/utils'
 
-import { Button } from '../ui/button'
 import { ContentCard } from '../content-card/ContentCard'
+import { Button } from '../ui/button'
 
 interface NoDataPageProps extends HTMLAttributes<HTMLDivElement> {
   title: string
