@@ -1,4 +1,5 @@
 import { serverFetch } from '@/lib/serverFetch'
+import { Assignment } from '@/types/assignments'
 import { Dataset } from '@/types/datasets'
 
 /**
@@ -16,6 +17,7 @@ export const getDatasets = async (params?: URLSearchParams) => {
       endpoint: '/datasets',
       method: 'GET',
       params,
+      isApiBackend: true, // Use real API backend instead of JSON Server
     })
   } catch (error) {
     console.error('An error occurred while fetching datasets.', error)
@@ -28,9 +30,23 @@ export const getDataset = async (id: string) => {
     return await serverFetch<Dataset>({
       endpoint: `/datasets/${id}`,
       method: 'GET',
+      isApiBackend: true, // Use real API backend instead of JSON Server
     })
   } catch (error) {
     console.error(`An error occurred while fetching dataset ${id}.`, error)
     throw new Error('An error occurred while fetching dataset.')
+  }
+}
+
+export const getDatasetAssignments = async (datasetId: string) => {
+  try {
+    return await serverFetch<Assignment[]>({
+      endpoint: `/datasets/${datasetId}/assignments`,
+      method: 'GET',
+      isApiBackend: true, // Use real API backend instead of JSON Server
+    })
+  } catch (error) {
+    console.error(`An error occurred while fetching assignments for dataset ${datasetId}.`, error)
+    throw new Error('An error occurred while fetching dataset assignments.')
   }
 }

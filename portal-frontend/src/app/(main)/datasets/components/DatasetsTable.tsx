@@ -14,6 +14,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface DatasetsTableProps extends TableProps<DatasetTableData> {
   datasets: DatasetTableData[]
+  onDeleteClick: (datasetId: string | null) => void
 }
 
 export const DatasetsTable = (props: DatasetsTableProps) => {
@@ -28,10 +29,12 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
     onSortingChange,
     onRowClick,
     isLoading,
+    onDeleteClick,
   } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
   const locale = useLocale()
+
   const columnHelper = createColumnHelper<DatasetTableData>()
 
   const statusCell = ({ value }: { value: string }) => {
@@ -119,7 +122,11 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
     {
       id: 'actions',
       header: t('tableHeaders.action'),
-      cell: () => <TableDropdownMenu menuItems={[{ label: tCommon('actions.delete') }]} />,
+      cell: (info: { row: { id: string | null } }) => (
+        <TableDropdownMenu
+          menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDeleteClick(info.row.id) }]}
+        />
+      ),
       meta: {
         style: {
           width: '8%',
