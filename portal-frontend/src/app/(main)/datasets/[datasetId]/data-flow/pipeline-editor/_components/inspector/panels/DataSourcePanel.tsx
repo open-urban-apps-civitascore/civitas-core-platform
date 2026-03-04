@@ -72,10 +72,9 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
           <EntityMetadata
             title={t('dataSourcePanel.details')}
             items={[
-              { label: t('dataSourcePanel.connector'), value: selectedEntity.connector?.type },
-              { label: t('dataSourcePanel.connection'), value: selectedEntity.connection },
-              { label: t('dataSourcePanel.status'), value: selectedEntity.status },
-              { label: t('dataSourcePanel.description'), value: selectedEntity.description },
+              { label: t('dataSourcePanel.connector'), value: selectedEntity.connectorType ?? undefined },
+              { label: t('dataSourcePanel.status'), value: selectedEntity.dataSourceStatus },
+              { label: t('dataSourcePanel.description'), value: selectedEntity.description ?? undefined },
             ]}
           />
           <button

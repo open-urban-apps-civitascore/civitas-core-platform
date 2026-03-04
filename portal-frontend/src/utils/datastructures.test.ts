@@ -6,8 +6,9 @@ import { mapDatastructuresApiToListData } from './datastructures'
 
 type Version = DatastructuresResponse['versions'][number]
 
-const createVersion = (versionNumber: string): Version => ({
+const createVersion = (versionNumber: string, dataStructureId = 'ds1'): Version => ({
   id: versionNumber,
+  dataStructureId,
   description: `Test Description ${versionNumber}`,
   status: 'DRAFT',
   versionNumber,
@@ -16,12 +17,13 @@ const createVersion = (versionNumber: string): Version => ({
 
 const createDatastructure = (versions: string[], datastructureId = 'ds1'): DatastructuresResponse => ({
   id: datastructureId,
+  dataStructureId: datastructureId,
   name: `Datastructure ${datastructureId}`,
   description: 'Datastructure Description',
   createdFromDataSource: 'OWN',
   status: 'DRAFT',
   inUse: false,
-  versions: versions.map(version => createVersion(version)),
+  versions: versions.map(version => createVersion(version, datastructureId)),
 })
 
 describe('mapDatastructuresApiToListData', () => {

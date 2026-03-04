@@ -1,70 +1,87 @@
-import { ChevronDown } from 'lucide-react'
+'use client'
+
+import { ChevronRight } from 'lucide-react'
 import Link from 'next/link'
-import { getTranslations } from 'next-intl/server'
+import { usePathname } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible'
 import {
   SidebarContent,
   SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '../../ui/sidebar'
-import { appSidebarNavItems } from '../appSidebarItems'
+import { appSidebarNavSections } from '../appSidebarItems'
 
-export const AppSidebarContent = async () => {
-  const tNav = await getTranslations('sidebar')
-
-  const getMenuItemTitle = (item: { title: string; url: string }) => {
-    const [name, number] = item.title.split(' ')
-    const title = tNav(name)
-    return `${title} ${number ?? ''}`
-  }
+export const AppSidebarContent = () => {
+  const tNav = useTranslations('sidebar')
+  const pathname = usePathname()
 
   return (
     <SidebarContent>
-      <SidebarGroup>
-        {appSidebarNavItems.map(item =>
-          item.items ? (
-            <Collapsible key={item.title} defaultOpen={item.isActive} className="group/collapsible">
-              <CollapsibleTrigger asChild>
-                <SidebarMenuButton className="cursor-pointer">
-                  <item.icon />
-                  <span>{getMenuItemTitle(item)}</span>
-                  <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180 " />
-                </SidebarMenuButton>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <SidebarMenuSub>
-                  {item.items?.map(subItem => (
-                    <SidebarMenuSubItem
-                      key={getMenuItemTitle(subItem)}
-                      data-testid={`sidebarMenuItem-${subItem.title}`}
-                    >
-                      <SidebarMenuSubButton asChild>
-                        <Link href={subItem.url}>
-                          <span>{getMenuItemTitle(subItem)}</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  ))}
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </Collapsible>
-          ) : (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild>
-                <Link href={item.url}>
-                  <item.icon />
-                  <span>{getMenuItemTitle(item)}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ),
-        )}
-      </SidebarGroup>
+      {appSidebarNavSections.map(section => (
+        <SidebarGroup key={section.title}>
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden text-base-sidebar-foreground text-sm font-medium font-['IBM_Plex_Sans'] leading-5 line-clamp-1">
+            {tNav(section.title)}
+          </SidebarGroupLabel>
+          <SidebarMenu>
+            {section.items.map(item =>
+              item.items ? (
+                <Collapsible key={item.title} asChild defaultOpen={item.isActive} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        tooltip={tNav(item.title)}
+                        className="cursor-pointer"
+                        isActive={item.items.some(subItem => pathname === subItem.url)}
+                      >
+                        {item.icon && <item.icon />}
+                        <span>{tNav(item.title)}</span>
+                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {item.items.map(subItem => (
+                          <SidebarMenuSubItem key={subItem.title} data-testid={`sidebarMenuItem-${subItem.title}`}>
+                            <SidebarMenuSubButton asChild isActive={pathname === subItem.url}>
+                              <Link href={subItem.url}>
+                                <span>{tNav(subItem.title)}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              ) : (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild tooltip={tNav(item.title)} isActive={pathname === item.url}>
+                    {item.external ? (
+                      <a href={item.url} target="_blank" rel="noopener noreferrer">
+                        {item.icon && <item.icon />}
+                        <span>{tNav(item.title)}</span>
+                      </a>
+                    ) : (
+                      <Link href={item.url}>
+                        {item.icon && <item.icon />}
+                        <span>{tNav(item.title)}</span>
+                      </Link>
+                    )}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ),
+            )}
+          </SidebarMenu>
+        </SidebarGroup>
+      ))}
     </SidebarContent>
   )
 }

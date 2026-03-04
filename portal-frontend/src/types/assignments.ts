@@ -29,3 +29,8 @@ export type Assignment = z.infer<typeof AssignmentApiResponseSchema>
 export type CreateAssignmentData = { groupId: string; roleId: string }
 
 export type UpdateAssignmentData = CreateAssignmentData & { id: string }
+
+export const AssignmentScopedInputSchema = z.object({
+  groupId: z.string().trim().min(1, 'common.errors.required'),
+  roleId: z.string().trim().min(1, 'common.errors.required'),
+})

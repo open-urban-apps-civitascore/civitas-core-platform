@@ -3,15 +3,18 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { DeleteMutationInput } from '@/types/common'
 
-export const useDeleteMutation = <TResponse>({ id, key: mutationKey, errorMessage }: DeleteMutationInput) => {
+type DeleteMutationOptions = Omit<DeleteMutationInput, 'id'>
+
+export const useDeleteMutation = <TResponse>({ key: mutationKey, errorMessage, headers }: DeleteMutationOptions) => {
   const queryClient = useQueryClient()
 
-  return useMutation<ApiServiceResponse<TResponse>>({
-    mutationFn: () =>
+  return useMutation<ApiServiceResponse<TResponse>, Error, string>({
+    mutationFn: (id: string) =>
       apiRequest<TResponse>({
         method: 'DELETE',
         endpoint: `/${mutationKey}/${id}`,
         errorMessage: errorMessage,
+        headers,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({

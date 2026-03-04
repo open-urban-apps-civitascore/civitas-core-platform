@@ -98,12 +98,7 @@ springdoc:
     enabled: true
 
 
-app:
-  encryption:
-    key: ${CIVITAS_MASTER_KEY}
-    salt: ${CIVITAS_MASTER_SALT}
-
 model-atlas:
   baseUrl: "http://model-atlas:8080"
-  scope: default
+  scope: civitas
   stage: draft

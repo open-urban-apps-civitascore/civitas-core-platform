@@ -16,12 +16,14 @@
  *
  */
 
+import { Loader2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback } from 'react'
 
 import { cn } from '@/lib/utils'
 
 import { LAYOUT_DIMENSIONS } from '../../_constants/pipelineStyles'
+import { useActivePipeline } from '../../_hooks/use-active-pipeline'
 import { usePipelineSession } from '../../_hooks/use-pipeline-session'
 import type { UsePipelineSessionReturn } from '../../_types/session'
 import { PipelineCanvas } from '../canvas/PipelineCanvas'
@@ -54,19 +56,12 @@ interface PipelineEditorLayoutInnerProps {
  */
 const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ className = '', sessionManager }) => {
   const t = useTranslations('pipelineEditor')
+  const { isLoadingPipelines } = useActivePipeline()
 
   // ===== Tab management handlers =====
   const handleCreateSession = useCallback(() => {
     sessionManager.createSession(t('tabs.untitledPipeline'))
   }, [sessionManager, t])
-
-  const handleCloseSession = useCallback(
-    (sessionId: string) => {
-      // Note: Dirty state warning deferred to Phase 5
-      sessionManager.closeSession(sessionId)
-    },
-    [sessionManager],
-  )
 
   const handleSelectSession = useCallback(
     (sessionId: string) => {
@@ -90,31 +85,37 @@ const PipelineEditorLayoutInner: React.FC<PipelineEditorLayoutInnerProps> = ({ c
           sessions={sessionManager.sessions}
           activeSessionId={sessionManager.activeSessionId}
           onSelectSession={handleSelectSession}
-          onCloseSession={handleCloseSession}
           onRenameSession={handleRenameSession}
           onCreateSession={handleCreateSession}
         />
       </div>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left Panel - Palette */}
-        <PipelinePalette />
-
-        {/* Center Panel - Canvas + Toolbar */}
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {/* Toolbar */}
-          <PipelineToolbar />
-
-          {/* Canvas */}
-          <div className="relative flex-1 overflow-hidden">
-            <PipelineCanvas />
-          </div>
+      {isLoadingPipelines ? (
+        <div className="flex flex-1 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <span className="ml-2 text-sm text-muted-foreground">{t('toolbar.loading')}</span>
         </div>
+      ) : (
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left Panel - Palette */}
+          <PipelinePalette />
 
-        {/* Right Panel - Inspector */}
-        <PipelineInspector />
-      </div>
+          {/* Center Panel - Canvas + Toolbar */}
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+            {/* Toolbar */}
+            <PipelineToolbar />
+
+            {/* Canvas */}
+            <div className="relative flex-1 overflow-hidden">
+              <PipelineCanvas />
+            </div>
+          </div>
+
+          {/* Right Panel - Inspector */}
+          <PipelineInspector />
+        </div>
+      )}
     </div>
   )
 }

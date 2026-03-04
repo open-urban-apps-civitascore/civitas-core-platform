@@ -66,7 +66,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const createRole = useCreateRole()
   const updateRole = useUpdateRole()
-  const deleteRole = useDeleteRole(roleId || '')
+  const deleteRole = useDeleteRole()
 
   const isLoading = isLoadingRole || createRole.isPending || updateRole.isPending || deleteRole.isPending
 
@@ -86,7 +86,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   }, [initialRole, form])
 
   const handleDeleteRole = () => {
-    deleteRole.mutate(undefined, {
+    deleteRole.mutate(roleId || '', {
       onSuccess: () => router.push('/roles'),
     })
   }

@@ -14,6 +14,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
       }, null)
     return {
       id: datastructure.id,
+      dataStructureId: datastructure.id,
       name: datastructure.name,
       description: datastructure.description || '-',
       status: datastructure.dataStructureStatus,

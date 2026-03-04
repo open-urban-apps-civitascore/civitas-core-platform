@@ -25,7 +25,7 @@ const EditDataSpacePage = () => {
   const router = useRouter()
 
   const updateDataspace = useUpdateDataspace()
-  const deleteDataspace = useDeleteDataSpace(dataspaceId)
+  const deleteDataspace = useDeleteDataSpace()
 
   const { data: dataspace } = useGetDataspace({ id: dataspaceId })
 
@@ -40,7 +40,8 @@ const EditDataSpacePage = () => {
     }
   }, [dataspace?.data, form])
 
-  const handleDeleteDataspace = () => deleteDataspace.mutate(undefined, { onSuccess: () => router.push('/dataspaces') })
+  const handleDeleteDataspace = () =>
+    deleteDataspace.mutate(dataspaceId, { onSuccess: () => router.push('/dataspaces') })
 
   const onSubmit = async (values: DataSpaceFormData) => {
     if (!dataspace?.data) return

@@ -5,6 +5,7 @@
  *
  */
 
+import type { Pipeline, PipelineOutputDTO, PipelineStylesPayload } from '../_types/pipeline'
 import type { PipelineSession, PipelineSessionAction, PipelineSessionState } from '../_types/session'
 import { createEmptyPipeline } from './pipelineService'
 
@@ -37,6 +38,44 @@ export const createInitialSessionState = (initialSession?: PipelineSession): Pip
   return {
     sessions: [firstSession],
     activeSessionId: firstSession.id,
+  }
+}
+
+/**
+ * Creates a PipelineSession from a backend PipelineOutputDTO.
+ * Parses the `styles` JSON string to restore nodes, edges, and viewport.
+ */
+export const createSessionFromBackendDTO = (dto: PipelineOutputDTO): PipelineSession => {
+  const now = new Date()
+  let parsedStyles: PipelineStylesPayload | null = null
+
+  try {
+    if (dto.styles) {
+      parsedStyles = dto.styles as PipelineStylesPayload
+    }
+  } catch {
+    console.error(`Failed to parse styles for pipeline ${dto.id}:`, dto.styles)
+  }
+
+  const pipeline: Pipeline = {
+    id: dto.id,
+    name: dto.name,
+    description: dto.description || '',
+    nodes: parsedStyles?.nodes ?? [],
+    edges: parsedStyles?.edges ?? [],
+    viewport: parsedStyles?.viewport ?? { x: 0, y: 0, zoom: 1 },
+    createdAt: dto.createdAt ? new Date(dto.createdAt) : now,
+    updatedAt: dto.modifiedAt ? new Date(dto.modifiedAt) : now,
+    isDirty: false,
+  }
+
+  return {
+    id: crypto.randomUUID(),
+    name: dto.name,
+    pipeline,
+    isDirty: false,
+    created: pipeline.createdAt,
+    lastModified: pipeline.updatedAt,
   }
 }
 

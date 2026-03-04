@@ -39,29 +39,13 @@ endpoints := {} if {
 path_pattern := restmapper.match_pattern(input.request.path, endpoints)
 
 # =============================================================================
-# REQUEST ACCESSORS
-# =============================================================================
-
-# HTTP method from request
-request_method := input.request.method
-
-# Request path (validated)
-request_path := input.request.path if {
-	restmapper.is_valid_path(input.request.path)
-}
-
-request_path := "" if {
-	not restmapper.is_valid_path(input.request.path)
-}
-
-# Path parts for debugging/logging
-path_parts := restmapper.parse_path(input.request.path)
-
-# =============================================================================
 # SCOPE ENFORCEMENT
 # =============================================================================
 # FROST paths are /api/v1/{dataset_id}/sta — the {id} is always a dataset ID.
 # Scope type is always DATASET since all FROST access is dataset-scoped.
+
+# Path parts for internal use (resource ID extraction)
+path_parts := restmapper.parse_path(input.request.path)
 
 # Extract dataset ID from path (third segment: /api/v1/{id}/sta)
 resource_id := path_parts[2] if {
@@ -70,9 +54,9 @@ resource_id := path_parts[2] if {
 	not restmapper.is_reserved_segment(path_parts[2])
 }
 
-# All FROST resources are dataset-scoped
+# All FROST endpoints are dataset-scoped
 expected_scope_type := "DATASET" if {
-	resource_id
+	path_pattern != ""
 }
 
 # FROST endpoints are always resource endpoints (dataset-specific)
@@ -80,4 +64,7 @@ is_resource_endpoint if {
 	resource_id
 }
 
-# No collection endpoints — FROST is always accessed via dataset ID
+# Collection endpoint if marked in data (currently none — FROST is always dataset-scoped).
+is_collection_endpoint if {
+	restmapper.is_collection_pattern(path_pattern, endpoints)
+}

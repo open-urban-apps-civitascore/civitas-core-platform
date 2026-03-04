@@ -1,25 +1,18 @@
 import z from 'zod'
 
-import { CONNECTION_TYPES, CONNECTOR_TYPES } from '@/const/connectors'
+import { CONNECTOR_TYPES } from '@/const/connectors'
 
-import { WithId } from './common'
-import {
-  ConnectorApiResponseSchema,
-  ConnectorFormToApiSchema,
-  ConnectorLooseSchema,
-  ConnectorStrictSchema,
-} from './connectors'
+import { AssignmentScopedInputSchema } from './assignments'
+import { STATUS_TYPES, WithId } from './common'
+import { ConnectorApiToFormSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
+import { DatastructureVersionSummaryApiResponseSchema } from './datastructures'
 
 export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'accessPermissions'
-
-export type DatasourceTabKeys = 'basicInfo' | 'connector' | 'dataStructure' | 'accessPermissions'
-
-export type ConnectionType = (typeof CONNECTION_TYPES)[keyof typeof CONNECTION_TYPES]
 
 export const DATASOURCE_STATUS_TYPES = {
   DRAFT: 'DRAFT',
   AVAILABLE: 'AVAILABLE',
-} as const
+} as const satisfies Partial<typeof STATUS_TYPES>
 
 export type DatasourceStatusType = (typeof DATASOURCE_STATUS_TYPES)[keyof typeof DATASOURCE_STATUS_TYPES]
 
@@ -27,7 +20,6 @@ const enumFromConst = <T extends Record<string, string>>(obj: T) =>
   z.enum(Object.values(obj) as [T[keyof T], ...T[keyof T][]])
 
 export const ConnectorTypeSchema = enumFromConst(CONNECTOR_TYPES)
-export const ConnectionTypeSchema = enumFromConst(CONNECTION_TYPES)
 export const DatasourceStatusSchema = enumFromConst(DATASOURCE_STATUS_TYPES)
 
 export type FormFieldType = 'input' | 'textArea' | 'select' | 'checkbox'
@@ -39,51 +31,84 @@ export type ConnectorField = {
   options?: string[]
   defaultValue?: unknown
   required?: boolean
-  placeholder: string
+  placeholder?: string
+  rows?: number
+  expert?: boolean
 }
 
 export const DatasourceApiResponseSchema = z.object({
   id: z.string(),
-  name: z.string().trim().min(1, 'common.errors.descriptionRequired'),
-  description: z.string().trim(),
-  connection: ConnectionTypeSchema,
-  lastActive: z.string(),
-  status: DatasourceStatusSchema,
-  connector: ConnectorApiResponseSchema.nullable(),
+  createdAt: z.string(),
+  modifiedAt: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  dataSourceStatus: DatasourceStatusSchema,
+  connectorType: ConnectorTypeSchema.nullable(),
+  configuration: z.record(z.string(), z.unknown()).nullable(),
+  dataStructureVersion: DatastructureVersionSummaryApiResponseSchema.nullable(),
+  inUse: z.boolean(),
 })
 
 export type Datasource = z.infer<typeof DatasourceApiResponseSchema>
 
 /* Form schemas for edit */
-export const DatasourceBaseFormSchema = DatasourceApiResponseSchema.pick({
-  id: true,
-  name: true,
-  description: true,
-  status: true,
+export const DatasourceBaseFormSchema = z.object({
+  id: z.string(),
+  name: z.string().trim().min(1, 'common.errors.nameRequired'),
+  description: z.string().trim().max(150, 'common.errors.descriptionMaxLength'),
+  dataStructureVersionId: z.string().trim().min(1, 'datasources.errors.required'),
+  assignments: AssignmentScopedInputSchema.array(),
 })
 
 export type DatasourceBaseFormData = z.infer<typeof DatasourceBaseFormSchema>
 
-export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.extend({ connector: ConnectorLooseSchema.nullable() })
-export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
-  name: z.string().trim().min(1, 'common.errors.descriptionRequired'),
-  description: z
-    .string()
-    .trim()
-    .min(1, 'common.errors.descriptionRequired')
-    .max(150, 'common.errors.descriptionMaxLength'),
-  connector: ConnectorStrictSchema,
-})
-export const DatasourceFormToApiSchema = DatasourceBaseFormSchema.partial().extend({
-  connector: ConnectorFormToApiSchema.nullable().optional(),
-})
+export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.partial()
+  .extend({
+    connectorType: ConnectorTypeSchema.optional(),
+    configuration: z.record(z.string(), z.unknown()).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.connectorType || !data.configuration) return
+    const result = ConnectorLooseSchema.safeParse(data)
+    if (!result.success) {
+      result.error.issues.forEach(issue => ctx.addIssue({ ...issue }))
+    }
+  })
 
-export type DatasourceFormToApiData = z.infer<typeof DatasourceFormToApiSchema>
+export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.partial()
+  .required({
+    name: true,
+    dataStructureVersionId: true,
+  })
+  .extend({
+    connectorType: ConnectorTypeSchema,
+    configuration: z.record(z.string(), z.unknown()),
+  })
+  .superRefine((data, ctx) => {
+    const result = ConnectorStrictSchema.safeParse(data)
+    if (!result.success) {
+      result.error.issues.forEach(issue => ctx.addIssue({ ...issue }))
+    }
+  })
 
 export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>
 
-export const DatasourceCreateFormSchema = DatasourceApiResponseSchema.pick({ name: true })
-export type DatasourceCreateFormData = z.infer<typeof DatasourceCreateFormSchema>
-export type DatasourceCreateData = Omit<Datasource, 'id'>
+export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
+  ({ id, name, description, dataStructureVersion, connectorType, configuration }) => {
+    const connectorParsed =
+      connectorType && configuration ? ConnectorApiToFormSchema.safeParse({ connectorType, configuration }) : null
+    if (connectorParsed && !connectorParsed.success) {
+      console.error('ConnectorApiToFormSchema parse failed:', connectorParsed.error.issues)
+    }
+    return {
+      id,
+      name: name ?? '',
+      description: description ?? '',
+      dataStructureVersionId: dataStructureVersion?.id,
+      ...(connectorParsed?.success ? connectorParsed.data : {}),
+    } as DatasourceFormDraft
+  },
+)
 
-export type DatasourceUpdateData = Partial<z.infer<typeof DatasourceFormToApiSchema>> & WithId
+export type DatasourceCreateData = { name: string }
+export type DatasourceUpdateData = DatasourceFormDraft & WithId

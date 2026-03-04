@@ -1,11 +1,11 @@
 -- Test seed data for AuthZ Adapter integration tests
 
 -- Create test permissions (using portal-model PermissionType enum: SYSTEM, DATA, GOVERNANCE)
-INSERT INTO permissions (id, name, description, permission_type, created_at)
+INSERT INTO permissions (id, name, description, permission_type, category, source, created_at)
 VALUES
-  ('a1111111-1111-1111-1111-111111111111', 'dataset:read', 'Read datasets', 'DATA', NOW()),
-  ('a2222222-2222-2222-2222-222222222222', 'dataset:write', 'Write datasets', 'DATA', NOW()),
-  ('a3333333-3333-3333-3333-333333333333', 'tenant:manage', 'Manage tenant', 'SYSTEM', NOW());
+  ('a1111111-1111-1111-1111-111111111111', 'dataset:read', 'Read datasets', 'DATA', 'DATA', 'INTERNAL', NOW()),
+  ('a2222222-2222-2222-2222-222222222222', 'dataset:write', 'Write datasets', 'DATA', 'DATA', 'INTERNAL', NOW()),
+  ('a3333333-3333-3333-3333-333333333333', 'tenant:manage', 'Manage tenant', 'SYSTEM', 'TENANT_ADMINISTRATION', 'INTERNAL', NOW());
 
 -- Create test roles (using portal-model RoleType enum: SYSTEM, DATA, GOVERNANCE)
 INSERT INTO roles (id, name, description, role_type, created_at)
@@ -92,18 +92,18 @@ VALUES
   ('e4444444-4444-4444-4444-444444444444', 'c4444444-4444-4444-4444-444444444444', 'b4444444-4444-4444-4444-444444444444', 'TENANT', NOW());
 
 -- User with many permissions (10+) for sorting test
-INSERT INTO permissions (id, name, description, permission_type, created_at)
+INSERT INTO permissions (id, name, description, permission_type, category, source, created_at)
 VALUES
-  ('a4444444-4444-4444-4444-444444444444', 'zebra:read', 'Zebra read', 'DATA', NOW()),
-  ('a5555555-5555-5555-5555-555555555555', 'alpha:write', 'Alpha write', 'DATA', NOW()),
-  ('a6666666-6666-6666-6666-666666666666', 'beta:delete', 'Beta delete', 'DATA', NOW()),
-  ('a7777777-7777-7777-7777-777777777777', 'gamma:create', 'Gamma create', 'DATA', NOW()),
-  ('a8888888-8888-8888-8888-888888888888', 'delta:update', 'Delta update', 'DATA', NOW()),
-  ('a9999999-9999-9999-9999-999999999999', 'epsilon:list', 'Epsilon list', 'DATA', NOW()),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'theta:export', 'Theta export', 'DATA', NOW()),
-  ('abbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'iota:import', 'Iota import', 'DATA', NOW()),
-  ('accccccc-cccc-cccc-cccc-cccccccccccc', 'kappa:admin', 'Kappa admin', 'SYSTEM', NOW()),
-  ('addddddd-dddd-dddd-dddd-dddddddddddd', 'lambda:view', 'Lambda view', 'DATA', NOW());
+  ('a4444444-4444-4444-4444-444444444444', 'zebra:read', 'Zebra read', 'DATA', 'DATA', 'INTERNAL', NOW()),
+  ('a5555555-5555-5555-5555-555555555555', 'alpha:write', 'Alpha write', 'DATA', 'DATA', 'INTERNAL', NOW()),
+  ('a6666666-6666-6666-6666-666666666666', 'beta:delete', 'Beta delete', 'DATA', 'DATA', 'INTERNAL', NOW()),
+  ('a7777777-7777-7777-7777-777777777777', 'gamma:create', 'Gamma create', 'DATA', 'DATA', 'INTERNAL', NOW()),
+  ('a8888888-8888-8888-8888-888888888888', 'delta:update', 'Delta update', 'DATA', 'DATA', 'INTERNAL', NOW()),
+  ('a9999999-9999-9999-9999-999999999999', 'epsilon:list', 'Epsilon list', 'DATA', 'DATA', 'INTERNAL', NOW()),
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'theta:export', 'Theta export', 'DATA', 'DATA', 'INTERNAL', NOW()),
+  ('abbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'iota:import', 'Iota import', 'DATA', 'DATA', 'INTERNAL', NOW()),
+  ('accccccc-cccc-cccc-cccc-cccccccccccc', 'kappa:admin', 'Kappa admin', 'SYSTEM', 'TENANT_ADMINISTRATION', 'INTERNAL', NOW()),
+  ('addddddd-dddd-dddd-dddd-dddddddddddd', 'lambda:view', 'Lambda view', 'DATA', 'DATA', 'INTERNAL', NOW());
 
 INSERT INTO roles (id, name, description, role_type, created_at)
 VALUES

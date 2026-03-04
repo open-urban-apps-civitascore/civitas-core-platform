@@ -54,8 +54,11 @@ export const apiRequest = async <TResponse, TBody = unknown>({
   data,
 }: FetchConfig<TBody>): Promise<ApiServiceResponse<TResponse>> => {
   try {
+    const paramsString = params?.toString()
+    const url = paramsString ? `/api${endpoint}?${paramsString}` : `/api${endpoint}`
+
     const response = await axiosClient.request<ApiResponse<TResponse>>({
-      url: `/api${endpoint}?${params?.toString() || ''}`,
+      url,
       headers: {
         ...requestHeaders,
 

@@ -35,6 +35,68 @@ Supported platforms: **Linux**, **macOS** (including Apple Silicon / ARM), and *
 
 ### Option A: Full Docker (CI, demos)
 
+```bash
+cd dev-environment
+./start-portal-dev.sh
+```
+
+This script:
+1. Starts all infrastructure services (Kafka, PostgreSQL, Keycloak, APISIX, FROST)
+2. Asks how you want to start each backend service:
+   - **auto**: builds and starts the service in a new terminal window
+   - **ide**: prints IDE setup instructions for debugging in Eclipse/IntelliJ
+3. Optionally starts the portal frontend
+
+On Linux, new terminal windows are opened via `gnome-terminal` or `xterm`.
+On macOS, new terminal windows are opened via `Terminal.app`.
+
+### Command-line Options
+
+All interactive prompts can be bypassed with command-line flags, which is useful for scripting or quick restarts:
+
+```
+Usage: start-portal-dev.sh [OPTIONS]
+
+Options:
+  --config-adapter=auto|ide    Config Adapter startup (default: prompt)
+  --backend=auto|ide           Portal Backend startup (default: prompt)
+  --frontend=auto|manual|skip  Portal Frontend startup (default: prompt)
+  --keycloak-secret=SECRET     Keycloak client secret for portal-frontend
+  -h, --help                   Show this help message
+```
+
+**Examples:**
+
+```bash
+# Fully non-interactive: start everything automatically
+./start-portal-dev.sh --config-adapter=auto --backend=auto --frontend=auto
+
+# Run backend in IDE, skip frontend
+./start-portal-dev.sh --config-adapter=ide --backend=ide --frontend=skip
+
+# Provide the Keycloak client secret directly
+./start-portal-dev.sh --backend=auto --keycloak-secret=<secret>
+```
+
+### Keycloak Client Secret
+
+The portal frontend requires a Keycloak client secret. If not yet configured in
+`portal-frontend/.env.local`, the script will prompt for it (or accept it via
+`--keycloak-secret`). The secret can be found in the Keycloak Admin UI:
+
+> Realm: `civitas-core` → Clients → `portal-frontend` → Credentials
+
+### Stopping All Services
+
+```bash
+cd dev-environment
+./stop-portal-dev.sh
+```
+
+---
+
+## Full Stack Mode (All in Docker)
+
 All services run in Docker containers. No hot-reload for backend changes.
 
 ```bash

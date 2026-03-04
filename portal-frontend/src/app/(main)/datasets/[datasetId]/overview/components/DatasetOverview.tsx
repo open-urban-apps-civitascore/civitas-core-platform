@@ -31,6 +31,7 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
+import { pickDirtyValues } from '@/utils/form'
 
 import { mapDatasetToFormData } from '../../../utils/mappers'
 import { BaseInfoForm } from '../../components/BaseInfoForm'
@@ -78,8 +79,10 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const formValues = useWatch({ control: form.control })
 
   const canSetAvailable = useMemo(() => {
-    return DatasetFormAvailableSchema.safeParse(formValues).success
-  }, [formValues])
+    const hasDistribution = !!dataset.pipelines?.length || !!dataset.distributions?.length
+    const hasAssignments = groupCount > 0 && roleCount > 0
+    return DatasetFormAvailableSchema.safeParse(formValues).success && hasDistribution && hasAssignments
+  }, [formValues, dataset.pipelines, dataset.distributions, groupCount, roleCount])
 
   // Auto-revert status to draft when required fields become invalid
   const revalidateDraftMode = () => {
@@ -106,12 +109,17 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   }, [canSetAvailable, dataSetStatus])
 
   const handleUpdateDataset = async (formData: DatasetFormDraft) => {
-    const values = {
+    const { dirtyFields } = form.formState
+
+    // Validation with all form data
+    const valuesForValidation = {
       ...formData,
       id: dataset.id,
     }
 
-    const parsed = isDraftMode ? DatasetUpdateApiSchema.safeParse(values) : DatasetFormAvailableSchema.safeParse(values)
+    const parsed = isDraftMode
+      ? DatasetUpdateApiSchema.safeParse(valuesForValidation)
+      : DatasetFormAvailableSchema.safeParse(valuesForValidation)
 
     if (!parsed.success) {
       console.error(parsed.error)
@@ -119,9 +127,12 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       return
     }
 
+    const fieldsToUpdate = pickDirtyValues(parsed.data, dirtyFields)
+
     const updateData: DatasetUpdateApiData = {
-      ...parsed.data,
       id: dataset.id,
+      name: formData.name,
+      ...fieldsToUpdate,
     }
 
     updateDataset.mutate(updateData, {
@@ -158,14 +169,16 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const handleDiscardAndExit = () => {
     setIsExitModalOpen(false)
-    router.push(`/datasets?${searchParams.toString()}`)
+    form.reset(mapDatasetToFormData(dataset))
+    setDataSetStatus(dataset.dataSetStatus)
+    setIsReadOnly(true)
   }
 
   const handleSaveAndExit = () => {
     void form.handleSubmit(data => {
       handleUpdateDataset(data as DatasetFormDraft)
       setIsExitModalOpen(false)
-      router.push(`/datasets?${searchParams.toString()}`)
+      setIsReadOnly(true)
     })()
   }
 

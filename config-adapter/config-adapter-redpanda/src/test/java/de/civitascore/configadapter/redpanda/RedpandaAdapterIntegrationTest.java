@@ -11,35 +11,22 @@ package de.civitascore.configadapter.redpanda;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import de.civitascore.configadapter.configuration.AdapterConfig;
-import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.model.Config;
 import de.civitascore.configadapter.model.ConfigEvent;
 import de.civitascore.configadapter.model.Metadata;
 import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.Payload;
 import de.civitascore.configadapter.model.redpanda.PipelineConfigValue;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
-import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.time.OffsetDateTime;
-import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Integration test for {@link RedpandaAdapter} against a real RedPanda Connect instance. Requires
@@ -50,41 +37,12 @@ import org.testcontainers.utility.DockerImageName;
  * starting a fresh container per test adds ~10 s each. Guard methods like {@code
  * ensurePipelineExists()} ensure each test can also run in isolation.
  */
-@Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-class RedpandaAdapterIntegrationTest {
+class RedpandaAdapterIntegrationTest extends AbstractRedpandaIntegrationTest {
 
-  private static final int CONNECT_PORT = 4195;
   private static final String PIPELINE_ID = "integration-test-pipeline";
 
-  @Container
-  static final GenericContainer<?> redpandaConnect =
-      new GenericContainer<>(DockerImageName.parse("redpandadata/connect"))
-          .withCommand("streams")
-          .withExposedPorts(CONNECT_PORT)
-          .waitingFor(Wait.forHttp("/ready").forPort(CONNECT_PORT).forStatusCode(200));
-
-  private static String baseUrl;
-  private static Client httpClient;
   private RedpandaAdapter adapter;
-
-  @BeforeAll
-  static void setUpContainer() {
-    baseUrl =
-        "http://" + redpandaConnect.getHost() + ":" + redpandaConnect.getMappedPort(CONNECT_PORT);
-    httpClient =
-        ClientBuilder.newBuilder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build();
-  }
-
-  @AfterAll
-  static void tearDown() {
-    if (httpClient != null) {
-      httpClient.close();
-    }
-  }
 
   @BeforeEach
   void setUp() {
@@ -143,12 +101,11 @@ class RedpandaAdapterIntegrationTest {
 
   @Test
   @Order(4)
-  @DisplayName("DELETE non-existent pipeline throws FatalAdapterException")
-  void processConfigEvent_deleteNonExistent_throwsFatalAdapterException() {
+  @DisplayName("DELETE non-existent pipeline succeeds (idempotent)")
+  void processConfigEvent_deleteNonExistent_succeedsIdempotent() {
     ConfigEvent event = createEvent(Operation.DELETE, "non-existent-pipeline");
 
-    assertThrows(
-        FatalAdapterException.class,
+    assertDoesNotThrow(
         () -> adapter.processConfigEvent("de.civitascore.data.pipeline.deleted", event));
   }
 
@@ -167,15 +124,6 @@ class RedpandaAdapterIntegrationTest {
             "1.0",
             "de.civitascore.data.pipeline.processing.result");
     return new ConfigEvent(metadata, payload);
-  }
-
-  private Response getPipeline(String pipelineId) {
-    return httpClient
-        .target(baseUrl)
-        .path("streams")
-        .path(pipelineId)
-        .request(MediaType.APPLICATION_JSON)
-        .get();
   }
 
   private void ensurePipelineExists(String pipelineId) {

@@ -73,6 +73,10 @@ public class SqlConnectorConfiguration implements ConnectorConfiguration {
       example = "secret")
   private String password;
 
+  public void setPassword(String password) {
+    this.password = (password != null && password.isBlank()) ? null : password;
+  }
+
   // Validates DSN with java.net.URI and strips any embedded credentials (discarding them).
   // Strips "jdbc:" prefix if present since Redpanda Connect (Go) doesn't use it.
   public void setDsn(String dsn) {

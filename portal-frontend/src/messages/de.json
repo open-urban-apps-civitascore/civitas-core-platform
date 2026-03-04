@@ -35,6 +35,7 @@
       "invalidNumber": "Bitte geben Sie eine gültige Zahl ein",
       "required": "Dieses Feld ist erforderlich",
       "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
+      "atLeast3": "Die Eingabe muss mindestens 3 Zeichen lang sein.",
       "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
       "atLeast1Value": "Mindestens ein Wert ist erforderlich.",
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
@@ -96,14 +97,17 @@
     "all-datasets": "Alle Datensätze",
     "documentation": "Dokumentation",
     "logout": "Abmelden",
+    "platform": "Plattform",
+    "admin": "Admin",
+    "help": "Hilfe",
     "ourData": "Unsere Daten",
-    "datasets": "Unsere Daten",
+    "datasets": "Datensätze",
     "permissions": "Berechtigungen",
     "roles": "Rollen",
     "create": "erstellen",
     "createVersion": "Neue Version",
     "edit": "bearbeiten",
-    "users": "User Management",
+    "users": "User",
     "groups": "Gruppen",
     "dataspaces": "Datenräume",
     "tenants": "Mandanten-Management",
@@ -180,7 +184,14 @@
     },
     "messages": {
       "createSuccess": "Datensatz wurde erfolgreich angelegt.",
-      "updateSuccess": "Datensatz wurde erfolgreich aktualisiert."
+      "updateSuccess": "Datensatz wurde erfolgreich aktualisiert.",
+      "deleteSuccess": "Datensatz wurde erfolgreich gelöscht.",
+      "deleteError": "Fehler beim Löschen des Datensatzes. Bitte versuche es erneut."
+    },
+    "warningModal": {
+      "title": "Datensatz löschen?",
+      "description": "Diese Aktion kann nicht rückgängig gemacht werden. Dies wird den Datensatz und alle zugehörigen Daten dauerhaft löschen.",
+      "confirm": "Löschen"
     }
   },
   "users": {
@@ -428,6 +439,18 @@
     "status": {
       "DRAFT": "Entwurf",
       "AVAILABLE": "Verfügbar"
+    },
+    "deleteModal": {
+      "title": "Datenquelle wirklich löschen?",
+      "description": "Diese Aktion löscht die Datenquelle endgültig. Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "availableModal": {
+      "title": "Datenquelle kann nicht gelöscht werden",
+      "description": "Diese Datenquelle hat den Status \"Verfügbar\" und kann nicht gelöscht werden. Bitte setzen Sie den Status zuerst auf \"Entwurf\"."
+    },
+    "errors": {
+      "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
+      "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)"
     },
     "connection": {
       "active": "aktiv",

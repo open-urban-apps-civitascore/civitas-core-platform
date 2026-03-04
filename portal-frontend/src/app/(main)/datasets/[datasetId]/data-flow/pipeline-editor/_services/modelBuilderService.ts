@@ -56,7 +56,7 @@ const buildDataSourceInput = (node: PipelineNode): object | null => {
 
   return {
     [connectorType]: {
-      label: `datasource_${entityId}`,
+      label: '${' + `datasource_${entityId}` + '}',
     },
   }
 }

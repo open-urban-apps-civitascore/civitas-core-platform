@@ -35,25 +35,6 @@ endpoints := {} if {
 path_pattern := restmapper.match_pattern(input.request.path, endpoints)
 
 # =============================================================================
-# REQUEST ACCESSORS
-# =============================================================================
-
-# HTTP method from request
-request_method := input.request.method
-
-# Request path (validated)
-request_path := input.request.path if {
-	restmapper.is_valid_path(input.request.path)
-}
-
-request_path := "" if {
-	not restmapper.is_valid_path(input.request.path)
-}
-
-# Path parts for debugging/logging
-path_parts := restmapper.parse_path(input.request.path)
-
-# =============================================================================
 # SCOPE ENFORCEMENT (M5.1)
 # =============================================================================
 # Maps resources to their expected scope types and extracts resource IDs
@@ -81,23 +62,19 @@ resource_scope_type := {
 	"datastructures": "DATASTRUCTURE",
 }
 
+# Path parts for internal use (scope extraction, collection detection)
+path_parts := restmapper.parse_path(input.request.path)
+
 # Extract resource name from path (second segment: /v2/{resource}/...)
 resource_name := path_parts[1] if {
 	count(path_parts) >= 2
 }
 
 # Extract resource ID from path (third segment: /v2/resource/{id})
+# Covers both direct resources (/v2/users/{id}) and sub-resources (/v2/datasets/{id}/publish)
 # Only defined for resource endpoints, not collection endpoints
 resource_id := path_parts[2] if {
-	count(path_parts) == 3
-	path_parts[2] != ""
-	not restmapper.is_reserved_segment(path_parts[2])
-}
-
-# Sub-resource paths (4 or 5 segments): parent resource ID is parts[2]
-# e.g., /v2/datasets/{id}/release or /v2/datasets/{id}/assignments/{id}
-resource_id := path_parts[2] if {
-	count(path_parts) >= 4
+	count(path_parts) >= 3
 	path_parts[2] != ""
 	not restmapper.is_reserved_segment(path_parts[2])
 }
@@ -112,12 +89,9 @@ is_resource_endpoint if {
 	resource_id
 }
 
-# Is this a collection endpoint (no ID)?
+# Is this a collection endpoint?
+# Data-driven: reads _collection flag from endpoint data.json instead of
+# counting path segments.
 is_collection_endpoint if {
-	count(path_parts) == 2
-}
-
-is_collection_endpoint if {
-	count(path_parts) == 3
-	restmapper.is_reserved_segment(path_parts[2])
+	restmapper.is_collection_pattern(path_pattern, endpoints)
 }

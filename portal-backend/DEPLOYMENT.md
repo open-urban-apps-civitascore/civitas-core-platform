@@ -8,14 +8,14 @@
    - [Database (PostgreSQL)](#11-database-postgresql)
    - [Keycloak / Security](#12-keycloak--security)
    - [Kafka](#13-kafka)
+   - [Model Atlas](#14-model-atlas)
 2. [Optional / Tuning](#2-optional--tuning)
    - [Server](#21-server)
    - [Event Publishing & Config-Adapter](#22-event-publishing--config-adapter)
    - [Kafka Producer Tuning](#23-kafka-producer-tuning)
    - [Kafka Consumer](#24-kafka-consumer)
-   - [Model Atlas](#25-model-atlas)
-   - [Logging](#26-logging)
-   - [OpenAPI / Swagger UI](#27-openapi--swagger-ui)
+   - [Logging](#25-logging)
+   - [OpenAPI / Swagger UI](#26-openapi--swagger-ui)
 3. [Local Development Only](#3-local-development-only)
    - [Local Defaults](#31-local-defaults)
    - [Seed Data Profile (local-init)](#32-seed-data-profile-local-init)
@@ -33,11 +33,10 @@
 | `SPRING_DATASOURCE_URL` | `jdbc:postgresql://postgres:5432/portal_backend` | JDBC connection URL |
 | `SPRING_DATASOURCE_USERNAME` | `admin` | Database username |
 | `SPRING_DATASOURCE_PASSWORD` | `secret` | Database password |
-| `CIVITAS_MASTER_KEY` | `0000...0000` (64 hex chars) | 256-bit master key for credential encryption, hex-encoded. Shared with config-adapter. |
-| `CIVITAS_MASTER_SALT` | `0000...0000` (32+ hex chars) | Salt for PBKDF2 key derivation, hex-encoded (min 16 bytes, NIST SP 800-132). Shared with config-adapter. |
+| `CIVITAS_MASTER_KEY` | `0000...0000` (64 hex chars) | 256-bit master key for credential encryption, hex-encoded. Shared with config-adapter. Stretched via PBKDF2 at startup; per-credential keys derived via HKDF-Expand. |
 
 > `application-postgres.yaml` defaults to `localhost:5432 / admin / admin` — always override in production.
-> `application-local.yaml` sets fallback values for `CIVITAS_MASTER_KEY` and `CIVITAS_MASTER_SALT` — never use these in production.
+> `application-local.yaml` sets a fallback value for `CIVITAS_MASTER_KEY` — never use it in production.
 
 ---
 
@@ -59,6 +58,16 @@
 | `KAFKA_BOOTSTRAP_SERVERS` | *(required)* | Sets both `spring.kafka.bootstrap-servers` and `kafka.bootstrap-servers` — only one env var needed |
 | `kafka.enabled` | `false` | **Must be `true`.** Enables the Kafka CloudEvent publisher. Without it, events are only logged, never sent. |
 | `kafka.result-topic` | `de.civitascore.config.results` | Topic on which config-adapter publishes processing results |
+
+---
+
+### 1.4 Model Atlas
+
+| Property / Env Var | Default | Description |
+|---|---|---|
+| `model-atlas.baseUrl` | `http://model-atlas:8080` | Model Atlas base URL |
+| `model-atlas.scope` | `default` | Scope for requests |
+| `model-atlas.stage` | `draft` | Stage for requests |
 
 ---
 
@@ -111,17 +120,7 @@ Defaults are tuned for production. Only adjust for specific throughput/latency r
 
 ---
 
-### 2.5 Model Atlas
-
-| Property | Default | Description |
-|---|---|---|
-| `model-atlas.baseUrl` | `http://model-atlas:8080` | Model Atlas base URL |
-| `model-atlas.scope` | `default` | Scope for requests |
-| `model-atlas.stage` | `draft` | Stage for requests |
-
----
-
-### 2.6 Logging
+### 2.5 Logging
 
 | Property | Default | Description |
 |---|---|---|
@@ -133,7 +132,7 @@ Defaults are tuned for production. Only adjust for specific throughput/latency r
 
 ---
 
-### 2.7 OpenAPI / Swagger UI
+### 2.6 OpenAPI / Swagger UI
 
 | Property | Default | Description |
 |---|---|---|
@@ -218,7 +217,6 @@ environment:
 
   # Credential Encryption (shared with config-adapter)
   CIVITAS_MASTER_KEY: <hex-encoded 256-bit key>
-  CIVITAS_MASTER_SALT: <hex-encoded 16+ byte salt>
 
   # Keycloak
   KEYCLOAK_AUTH_SERVER_URL: https://keycloak.example.com
@@ -228,7 +226,12 @@ environment:
 
   # Kafka
   KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-  kafka.enabled: "true"
+  KAFKA_ENABLED: "true"
+
+  # Model Atlas
+  MODEL_ATLAS_BASE_URL: http://model-atlas:8080
+  MODEL_ATLAS_SCOPE: default
+  MODEL_ATLAS_STAGE: draft
 
   # Optional
   APP_URL: https://api.example.com
