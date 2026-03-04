@@ -440,6 +440,10 @@
       "title": "Data source cannot be deleted",
       "description": "This data source is currently in use and cannot be deleted. All connections to this data source must be removed first."
     },
+    "errors": {
+      "invalidDsn": "Enter a valid URI (e.g. postgres://host:5432/db)",
+      "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)"
+    },
     "connection": {
       "active": "active",
       "inactive": "inactive",

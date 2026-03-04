@@ -94,7 +94,7 @@ const defaultValues: DatasourceFormDraft = {
   },
 }
 
-const renderConnectorTab = (isDraftMode = false, values?: Partial<DatasourceFormDraft>) => {
+const renderConnectorTab = (values?: Partial<DatasourceFormDraft>) => {
   const merged = { ...defaultValues, ...values }
   const Wrapper = () => {
     const form = useForm<DatasourceFormDraft>({
@@ -104,7 +104,7 @@ const renderConnectorTab = (isDraftMode = false, values?: Partial<DatasourceForm
 
     return (
       <Form {...form}>
-        <ConnectorTab form={form} isDraftMode={isDraftMode} readyConnectorType={merged.connectorType} />
+        <ConnectorTab form={form} readyConnectorType={merged.connectorType} />
       </Form>
     )
   }

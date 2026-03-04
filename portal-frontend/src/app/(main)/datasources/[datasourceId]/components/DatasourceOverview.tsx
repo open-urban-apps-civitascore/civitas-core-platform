@@ -44,7 +44,6 @@ export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
     readyConnectorType,
     dataSourceStatus,
     handleStatusChange,
-    isDraftMode,
     canSetAvailable,
     completedTabs,
     submitDatasource,
@@ -84,7 +83,7 @@ export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
       case 'basicInfo':
         return <BasicInfoTab form={form} />
       case 'connector':
-        return <ConnectorTab form={form} isDraftMode={isDraftMode} readyConnectorType={readyConnectorType} />
+        return <ConnectorTab form={form} readyConnectorType={readyConnectorType} />
       case 'dataStructure':
       case 'accessPermissions':
       default:

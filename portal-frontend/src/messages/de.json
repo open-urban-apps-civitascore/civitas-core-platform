@@ -439,6 +439,10 @@
       "title": "Datenquellen kann nicht gelöscht werden",
       "description": "Diese Datenquelle wird derzeit verwendet und kann daher nicht gelöscht werden. Zum Löschen müssen alle Verbindungen zu dieser Datenquelle getrennt werden."
     },
+    "errors": {
+      "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
+      "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)"
+    },
     "connection": {
       "active": "aktiv",
       "inactive": "inaktiv",

@@ -60,15 +60,37 @@ const MqttBaseSchema = z.object({
   password: z.string().trim(),
 })
 
+const isValidUri = (v: string) => {
+  try {
+    new URL(v)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const uriSchema = (message: string) =>
+  z.string().refine(v => {
+    if (!v) return true
+    return isValidUri(v)
+  }, message)
+
+const URISchema = uriSchema('datasources.errors.invalidDsn')
+
+const brokerUrlArray = (inner: z.ZodTypeAny) =>
+  z
+    .preprocess(parseStringArray, inner)
+    .refine(urls => !urls || (urls as string[]).every(isValidUri), 'datasources.errors.invalidBrokerUrl')
+
 export const MqttLooseSchema = MqttBaseSchema.partial().extend({
-  urls: z.preprocess(parseStringArray, z.array(z.string()).optional()),
+  urls: brokerUrlArray(z.array(z.string()).optional()),
   topics: z.preprocess(parseStringArray, z.array(z.string()).optional()),
 })
 
 export const MqttStrictSchema = MqttBaseSchema.partial()
   .required({ qos: true })
   .extend({
-    urls: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'common.errors.required')),
+    urls: brokerUrlArray(z.array(z.string()).min(1, 'common.errors.required')),
     topics: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'common.errors.required')),
   })
 
@@ -121,14 +143,29 @@ const SqlBaseSchema = z.object({
   init_statement: z.string().trim(),
   conn_max_idle_time: z.string().trim(),
   conn_max_life_time: z.string().trim(),
-  conn_max_idle: z.number().int().nonnegative(),
-  conn_max_open: z.number().int().nonnegative(),
+  conn_max_idle: z.preprocess(
+    v => (v === '' || v === undefined ? undefined : Number(v)),
+    z.number().int().nonnegative(),
+  ),
+  conn_max_open: z.preprocess(
+    v => (v === '' || v === undefined ? undefined : Number(v)),
+    z.number().int().nonnegative(),
+  ),
   user: z.string().trim(),
   password: z.string().trim(),
 })
 
 export const SqlLooseSchema = SqlBaseSchema.partial().extend({
+  dsn: URISchema.optional(),
   columns: z.preprocess(parseStringArray, z.array(z.string()).optional()),
+  conn_max_idle: z.preprocess(
+    v => (v === '' || v === undefined ? undefined : Number(v)),
+    z.number().int().nonnegative().optional(),
+  ),
+  conn_max_open: z.preprocess(
+    v => (v === '' || v === undefined ? undefined : Number(v)),
+    z.number().int().nonnegative().optional(),
+  ),
 })
 
 export const SqlStrictSchema = SqlBaseSchema.partial()
@@ -139,9 +176,17 @@ export const SqlStrictSchema = SqlBaseSchema.partial()
     columns: true,
   })
   .extend({
-    dsn: z.string().trim().min(1, 'common.errors.descriptionRequired'),
+    dsn: z.string().min(1, 'common.errors.required').pipe(URISchema),
     table: z.string().trim().min(1, 'common.errors.descriptionRequired'),
     columns: z.preprocess(parseStringArray, z.array(z.string()).min(1, 'required')),
+    conn_max_idle: z.preprocess(
+      v => (v === '' || v === undefined ? undefined : Number(v)),
+      z.number().int().nonnegative().optional(),
+    ),
+    conn_max_open: z.preprocess(
+      v => (v === '' || v === undefined ? undefined : Number(v)),
+      z.number().int().nonnegative().optional(),
+    ),
   })
 
 export const SqlApiToFormSchema = SqlApiResponseSchema.transform(({ columns, ...rest }) => ({

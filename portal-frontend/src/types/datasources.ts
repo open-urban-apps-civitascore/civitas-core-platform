@@ -90,8 +90,9 @@ export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>
 
 export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
   ({ id, name, description, dataStructureVersion, connectorType, configuration }) => {
-    const connectorParsed = ConnectorApiToFormSchema.safeParse({ connectorType, configuration })
-    if (!connectorParsed.success) {
+    const connectorParsed =
+      connectorType && configuration ? ConnectorApiToFormSchema.safeParse({ connectorType, configuration }) : null
+    if (connectorParsed && !connectorParsed.success) {
       console.error('ConnectorApiToFormSchema parse failed:', connectorParsed.error.issues)
     }
     return {
@@ -99,7 +100,7 @@ export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
       name: name ?? '',
       description: description ?? '',
       dataStructureVersionId: dataStructureVersion?.id,
-      ...(connectorParsed.success ? connectorParsed.data : {}),
+      ...(connectorParsed?.success ? connectorParsed.data : {}),
     } as DatasourceFormDraft
   },
 )
