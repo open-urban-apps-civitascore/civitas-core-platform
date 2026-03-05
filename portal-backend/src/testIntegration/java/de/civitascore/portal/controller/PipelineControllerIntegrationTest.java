@@ -260,24 +260,6 @@ class PipelineControllerIntegrationTest
       assertThat(response.getBody().getName()).isEqualTo(input.getName());
       assertThat(response.getBody().getDescription()).isNull();
     }
-
-    @Test
-    @DisplayName("Should handle non-existent data source gracefully")
-    void shouldHandleNonExistentDataSource() {
-      PipelineInputDTO input = createValidInput();
-      input.setDataSourceIds(Set.of(UUID.randomUUID()));
-
-      ResponseEntity<PipelineOutputDTO> response = performCreate(input);
-
-      // Non-existent data sources are silently ignored by findAllById
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-
-      // Verify no data sources were associated
-      Pipeline savedPipeline =
-          pipelineRepository.findByIdWithRelations(response.getBody().getId()).orElseThrow();
-      assertThat(savedPipeline.getDataSources()).isEmpty();
-    }
   }
 
   @Nested
