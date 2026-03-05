@@ -1,20 +1,19 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
-import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
+import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
-import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Form } from '@/components/ui/form'
 import { STATUS_TYPES } from '@/types/common'
-import { Datasource, DatasourceTab } from '@/types/datasources'
+import { Datasource, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
@@ -38,6 +37,27 @@ export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
   const tCommon = useTranslations('common')
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
+
+  useEffect(() => {
+    setIsReadOnly(searchParams.get('mode') !== 'edit')
+  }, [searchParams])
+
+  const updateMode = useCallback(
+    (isEditing: boolean) => {
+      setIsReadOnly(!isEditing)
+      const params = new URLSearchParams(searchParams.toString())
+      if (isEditing) {
+        params.set('mode', 'edit')
+      } else {
+        params.delete('mode')
+      }
+      const query = params.toString()
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    },
+    [pathname, searchParams, router],
+  )
 
   const {
     form,
@@ -52,8 +72,6 @@ export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-  const listUrl = `/datasources?${searchParams.toString()}`
-
   const handleSave = () => {
     submitDatasource(() => router.refresh())
   }
@@ -62,60 +80,36 @@ export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
     if (form.formState.isDirty) {
       setIsExitModalOpen(true)
     } else {
-      router.push(listUrl)
+      form.reset()
+      updateMode(false)
     }
   }
 
   const handleDiscardAndExit = () => {
     setIsExitModalOpen(false)
-    router.push(listUrl)
+    form.reset()
+    updateMode(false)
   }
 
   const handleSaveAndExit = () => {
     submitDatasource(() => {
       setIsExitModalOpen(false)
-      router.push(listUrl)
+      updateMode(false)
     })
   }
 
   const renderTabContent = () => {
     switch (selectedTab) {
       case 'basicInfo':
-        return <BasicInfoTab form={form} />
+        return <BasicInfoTab form={form} isReadOnly={isReadOnly} />
       case 'connector':
-        return <ConnectorTab form={form} readyConnectorType={readyConnectorType} />
+        return <ConnectorTab form={form} readyConnectorType={readyConnectorType} isReadOnly={isReadOnly} />
       case 'dataStructure':
       case 'accessPermissions':
       default:
         return null
     }
   }
-
-  const ActionButtonsAndStatusSwitch = (
-    <div className="flex gap-6">
-      <StatusDropdown
-        statusOptions={Object.values(STATUS_TYPES)}
-        status={dataSourceStatus}
-        onStatusChange={handleStatusChange}
-        canSetAvailable={canSetAvailable}
-      />
-      <ActionButtons
-        confirmButtonType="button"
-        onCancelClick={handleExit}
-        onConfirmClick={handleSave}
-        isConfirmButtonDisabled={
-          !form.formState.isDirty ||
-          !!form.formState.errors.name ||
-          (dataSourceStatus !== STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
-          isLoading
-        }
-        isCancelButtonDisabled={isLoading}
-        cancelButtonTitle={tCommon('actions.exit')}
-        hasCard={false}
-        wrapperClassname="w-auto"
-      />
-    </div>
-  )
 
   return (
     <PageContainer testId="datasourceOverviewPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">
@@ -129,9 +123,31 @@ export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
           disabledTabs,
           hasCompletionStatus: true,
         }}
-        customElement={ActionButtonsAndStatusSwitch}
+        customElement={
+          <PageEditControls<DatasourceStatusType>
+            status={dataSourceStatus}
+            onStatusChange={handleStatusChange}
+            statusOptions={Object.values(STATUS_TYPES)}
+            canSetAvailable={canSetAvailable}
+            confirmButtonType="button"
+            onConfirmClick={handleSave}
+            isConfirmButtonDisabled={
+              !form.formState.isDirty ||
+              !!form.formState.errors.name ||
+              (dataSourceStatus !== STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
+              isLoading
+            }
+            isCancelButtonDisabled={isLoading}
+            onCancelClick={handleExit}
+            hasCard={false}
+            isReadOnly={isReadOnly}
+            onEditClick={() => updateMode(true)}
+            cancelButtonTitle={tCommon('actions.exit')}
+            wrapperClassname="w-auto"
+          />
+        }
       />
-      <PageBackground className="overflow-y-auto">
+      <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
         <Form {...form}>
           <form
             data-testid="datasourceEditForm"
