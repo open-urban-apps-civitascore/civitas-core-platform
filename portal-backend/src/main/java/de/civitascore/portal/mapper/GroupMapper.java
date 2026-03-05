@@ -25,7 +25,7 @@ public interface GroupMapper extends DtoMapper<GroupInputDTO, GroupOutputDTO, Gr
   Group toEntity(GroupInputDTO input);
 
   @Mapping(target = "members", ignore = true) // Assembler enriches
-  @Mapping(target = "roles", ignore = true)
+  @Mapping(target = "assignments", ignore = true)
   @Mapping(target = "contactUser", ignore = true)
   @Mapping(target = "parentGroup", ignore = true)
   @Mapping(target = "childGroups", ignore = true)

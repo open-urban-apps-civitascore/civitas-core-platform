@@ -1,11 +1,10 @@
 package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.GroupMapper;
-import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.GroupOutputDTO;
-import de.civitascore.portal.model.output.summary.RoleSummaryDTO;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -18,7 +17,7 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
 
   private final GroupMapper groupMapper;
   private final UserMapper userMapper;
-  private final RoleMapper roleMapper;
+  private final AssignmentAssembler assignmentAssembler;
 
   @Override
   public GroupOutputDTO mapToBaseDto(Group entity) {
@@ -40,16 +39,13 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
           entity.getMembers().stream().map(userMapper::toSummary).collect(Collectors.toList()));
     }
 
-    // Map SYSTEM roles from assignments (scopeType == null)
+    // Map assignments
     if (entity.getAssignments() != null && !entity.getAssignments().isEmpty()) {
-      List<RoleSummaryDTO> systemRoles =
+      List<AssignmentOutputDTO> assignments =
           entity.getAssignments().stream()
-              .filter(a -> a.getScopeType() == null)
-              .map(a -> roleMapper.toSummary(a.getRole()))
+              .map(assignmentAssembler::mapToBaseDto)
               .collect(Collectors.toList());
-      if (!systemRoles.isEmpty()) {
-        output.setRoles(systemRoles);
-      }
+      output.setAssignments(assignments);
     }
 
     // Map childGroups
