@@ -64,7 +64,7 @@ describe('apiRequest', () => {
     expect(mockedRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         method: 'POST',
-        url: '/api/users/123?',
+        url: '/api/users/123',
         data: body,
       }),
     )
@@ -93,7 +93,7 @@ describe('apiRequest', () => {
     expect(mockedRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         method: 'DELETE',
-        url: '/api/users/123?',
+        url: '/api/users/123',
       }),
     )
 

@@ -7,7 +7,7 @@ import { TextField } from '@/components/form/fields/TextField'
 import { InputPropsWithoutForm, SelectOption } from '@/types/common'
 
 export interface DynamicFormFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
-  id?: string
+  id: string
   type: 'textArea' | 'input' | 'select' | 'checkbox'
   form: UseFormReturn<T>
   label: string
@@ -19,7 +19,7 @@ export interface DynamicFormFieldProps<T extends FieldValues> extends InputProps
 }
 export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldProps<T>) => {
   const {
-    id = '',
+    id,
     type,
     form,
     label,
@@ -29,6 +29,7 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
     options = [],
     shouldShowErrors,
     className,
+    disabled,
   } = props
   switch (type) {
     case 'textArea':
@@ -41,10 +42,20 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
           required={required}
           shouldShowErrors={shouldShowErrors}
           formItemProps={{ className }}
+          disabled={disabled}
         />
       )
     case 'checkbox':
-      return <FormCheckbox form={form} name={name} label={label} required={required} formItemProps={{ className }} />
+      return (
+        <FormCheckbox
+          form={form}
+          name={name}
+          label={label}
+          required={required}
+          formItemProps={{ className }}
+          disabled={disabled}
+        />
+      )
     case 'select':
       return (
         <FormSelect
@@ -56,6 +67,7 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
           options={options}
           required={required}
           formItemProps={{ className }}
+          disabled={disabled}
         />
       )
     case 'input':
@@ -69,6 +81,7 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
           required={required}
           shouldShowErrors={shouldShowErrors}
           formItemProps={{ className }}
+          disabled={disabled}
         />
       )
   }

@@ -8,7 +8,7 @@
  *
  */
 
-import { Plus, X } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useState } from 'react'
 
@@ -22,12 +22,10 @@ interface TabProps {
   session: PipelineSession
   isActive: boolean
   onSelect: (sessionId: string) => void
-  onClose: (sessionId: string) => void
   onRename: (sessionId: string, newName: string) => void
-  closeTabTitle: string
 }
 
-const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onClose, onRename, closeTabTitle }) => {
+const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onRename }) => {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(session.name)
 
@@ -54,14 +52,6 @@ const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onClose, onRenam
     setIsEditing(false)
   }, [session.id, session.name, editName, onRename])
 
-  const handleClose = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation()
-      onClose(session.id)
-    },
-    [session.id, onClose],
-  )
-
   return (
     <div
       className={`
@@ -77,7 +67,7 @@ const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onClose, onRenam
       onDoubleClick={handleDoubleClick}
     >
       {/* Tab Content */}
-      <div className="mr-2 min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
         {isEditing ? (
           <input
             type="text"
@@ -95,15 +85,6 @@ const Tab: React.FC<TabProps> = ({ session, isActive, onSelect, onClose, onRenam
           </span>
         )}
       </div>
-
-      {/* Close Button */}
-      <button
-        onClick={handleClose}
-        className="flex-shrink-0 rounded p-1 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
-        title={closeTabTitle}
-      >
-        <X className="h-3 w-3" />
-      </button>
     </div>
   )
 }
@@ -116,7 +97,6 @@ interface PipelineTabBarProps {
   sessions: PipelineSession[]
   activeSessionId: string | null
   onSelectSession: (sessionId: string) => void
-  onCloseSession: (sessionId: string) => void
   onRenameSession: (sessionId: string, newName: string) => void
   onCreateSession: () => void
 }
@@ -129,7 +109,6 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
   sessions,
   activeSessionId,
   onSelectSession,
-  onCloseSession,
   onRenameSession,
   onCreateSession,
 }) => {
@@ -145,9 +124,7 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
             session={session}
             isActive={session.id === activeSessionId}
             onSelect={onSelectSession}
-            onClose={onCloseSession}
             onRename={onRenameSession}
-            closeTabTitle={t('tabs.closeTab')}
           />
         ))}
       </div>

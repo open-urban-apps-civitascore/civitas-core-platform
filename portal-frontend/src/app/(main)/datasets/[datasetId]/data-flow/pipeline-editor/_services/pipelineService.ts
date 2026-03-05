@@ -23,7 +23,7 @@ import type { Pipeline, PipelineAction, PipelineEdge, PipelineNode } from '../_t
 export const createEmptyPipeline = (name?: string): Pipeline => {
   const now = new Date()
   return {
-    id: crypto.randomUUID(),
+    id: undefined,
     name: name || 'Untitled Pipeline',
     description: '',
     nodes: [],

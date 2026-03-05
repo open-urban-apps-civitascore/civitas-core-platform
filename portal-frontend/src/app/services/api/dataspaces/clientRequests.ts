@@ -43,5 +43,5 @@ export const usePatchDataspace = () =>
     errorMessage: 'An error occurred while updating the data space.',
   })
 
-export const useDeleteDataSpace = (id: string) =>
-  useDeleteMutation({ id, key, errorMessage: 'An error occurred while deleting the data space.' })
+export const useDeleteDataSpace = () =>
+  useDeleteMutation({ key, errorMessage: 'An error occurred while deleting the data space.' })

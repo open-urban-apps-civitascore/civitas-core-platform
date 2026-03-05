@@ -3,8 +3,11 @@
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
+import { useDeleteDataset } from '@/app/services/api/datasets/clientRequests'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -39,6 +42,34 @@ const DatasetsList = (props: DatasetsListProps) => {
     totalPages,
   } = useQueryParams()
 
+  const [datasetToDelete, setDatasetToDelete] = useState<string | null>(null)
+  const [isWarningOpen, setIsWarningOpen] = useState(false)
+
+  const { mutate: deleteDataset } = useDeleteDataset()
+
+  const handleDeleteClick = (datasetId: string) => {
+    setIsWarningOpen(true)
+    setDatasetToDelete(datasetId)
+  }
+
+  const handleConfirmDelete = () => {
+    if (!datasetToDelete) return
+
+    deleteDataset(datasetToDelete, {
+      onSuccess: () => {
+        setDatasetToDelete(null)
+        setIsWarningOpen(false)
+        toast.success(t('messages.deleteSuccess'))
+        router.refresh()
+      },
+      onError: () => {
+        setDatasetToDelete(null)
+        setIsWarningOpen(false)
+        toast.error(t('messages.deleteError'))
+      },
+    })
+  }
+
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
   const CustomElement = (
@@ -49,29 +80,41 @@ const DatasetsList = (props: DatasetsListProps) => {
   )
 
   return (
-    <PageContainer testId="datasetsPage" headerType="onlyTitle">
-      <PageHeader title={t('title')} />
-      <PageBackground>
-        <SearchHeader
-          searchString={search}
-          onChangeSearchString={setSearchParam}
-          aria-label={t('searchDatasets')}
-          customElement={CustomElement}
-        />
-        <TableContainer>
-          <DatasetsTable
-            datasets={datasets}
-            rowCount={rowCount}
-            pageIndex={pageIndex}
-            pageSize={pageSize}
-            sorting={sorting}
-            totalPages={totalPages}
-            onPaginationChange={setPaginationParams}
-            onSortingChange={setSortingParams}
+    <>
+      <PageContainer testId="datasetsPage" headerType="onlyTitle">
+        <PageHeader title={t('title')} />
+        <PageBackground>
+          <SearchHeader
+            searchString={search}
+            onChangeSearchString={setSearchParam}
+            aria-label={t('searchDatasets')}
+            customElement={CustomElement}
           />
-        </TableContainer>
-      </PageBackground>
-    </PageContainer>
+          <TableContainer>
+            <DatasetsTable
+              datasets={datasets}
+              rowCount={rowCount}
+              pageIndex={pageIndex}
+              pageSize={pageSize}
+              sorting={sorting}
+              totalPages={totalPages}
+              onPaginationChange={setPaginationParams}
+              onSortingChange={setSortingParams}
+              onDeleteClick={id => handleDeleteClick(id as string)}
+            />
+          </TableContainer>
+        </PageBackground>
+      </PageContainer>
+
+      <WarningModal
+        title={t('warningModal.title')}
+        description={t('warningModal.description')}
+        open={isWarningOpen}
+        onDiscard={() => setIsWarningOpen(false)}
+        onConfirm={handleConfirmDelete}
+        confirmButtonTitle={t('warningModal.confirm')}
+      />
+    </>
   )
 }
 

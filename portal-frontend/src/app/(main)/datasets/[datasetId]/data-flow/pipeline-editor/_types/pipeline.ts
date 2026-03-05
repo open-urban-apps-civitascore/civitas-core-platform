@@ -75,7 +75,8 @@ export interface PipelineEdge extends Edge<PipelineEdgeData> {
  *
  */
 export interface Pipeline {
-  id: string
+  /** Backend UUID. Undefined for new (unsaved) pipelines, set after first save. */
+  id?: string
   name: string
   description: string
   nodes: PipelineNode[]
@@ -97,6 +98,10 @@ export interface Pipeline {
 export interface PipelineStylesPayload {
   viewport?: Viewport
   nodePositions: Record<string, { x: number; y: number }>
+  /** Full React Flow nodes for round-tripping (Option A) */
+  nodes: PipelineNode[]
+  /** Full React Flow edges for round-tripping (Option A) */
+  edges: PipelineEdge[]
 }
 
 /**
@@ -107,11 +112,33 @@ export interface PipelineStylesPayload {
 export interface PipelinePayload {
   name: string
   description: string
+  /** JSON-stringified PipelineStylesPayload — backend stores as opaque string */
   styles: PipelineStylesPayload
-  dataSources: number[] // IDs extracted from DataSource nodes (real API)
-  apis: string[] // IDs extracted from ApiRequest/ApiResponse nodes (mock)
-  persistences: string[] // IDs extracted from Frost nodes (mock)
-  model: string // Pipeline graph serialized in RedPandaConnect syntax
+  dataSources: number[] // IDs extracted from DataSource nodes
+  apis: string[] // endpoint paths from ApiRequest/ApiResponse nodes
+  persistences: number[] // persistence config IDs (Long[] in backend)
+  model: object // Pipeline graph serialized in RedPandaConnect syntax
+}
+
+// ============================================================================
+// Pipeline Backend DTOs
+// ============================================================================
+
+/**
+ * Backend response DTO for a pipeline.
+ * Returned by GET/POST/PUT /datasets/{datasetId}/pipelines[/{id}]
+ */
+export interface PipelineOutputDTO {
+  id: string
+  createdAt: string
+  modifiedAt: string
+  name: string
+  description: string
+  styles: PipelineStylesPayload
+  dataSources: number[]
+  apis: string[]
+  persistences: number[]
+  model: object
 }
 
 // ============================================================================

@@ -10,6 +10,12 @@ app:
 civitas:
   master-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
+server:
+  error:
+    include-message: always
+    include-exception: true
+    include-stacktrace: on_param
+
 spring:
   jpa:
     hibernate:

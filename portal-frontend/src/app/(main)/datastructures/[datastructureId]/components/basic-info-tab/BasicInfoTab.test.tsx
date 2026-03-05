@@ -20,7 +20,7 @@ const defaultFormValues: DatasourceBaseFormData = {
   id: '1',
   name: '',
   description: '',
-  status: 'draft',
+  dataSourceStatus: 'DRAFT',
 }
 
 interface WrapperProps {

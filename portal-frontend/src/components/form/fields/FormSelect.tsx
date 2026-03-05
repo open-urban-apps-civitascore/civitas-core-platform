@@ -57,7 +57,7 @@ export const FormSelect = <T extends FieldValues>(props: AccessibleSelectProps<T
               formItemProps?.className,
             )}
           >
-            <FormLabel htmlFor={id} className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            <FormLabel htmlFor={id}>
               {label}
               {required && <span className="text-red-500 ml-1">*</span>}
             </FormLabel>

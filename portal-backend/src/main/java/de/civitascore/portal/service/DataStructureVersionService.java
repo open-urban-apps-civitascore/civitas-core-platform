@@ -10,6 +10,7 @@ import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,12 +24,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class DataStructureVersionService
     extends BaseService<DataStructureVersion, DataStructureVersionInputDTO> {
 
+  private final DataSourceRepository dataSourceRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
-  private final DataStructureVersionMapper dataStructureVersionMapper;
 
   private final DataStructureService dataStructureService;
   private final ModelService modelService;
-  private final DataSourceRepository dataSourceRepository;
+
+  private final DataStructureVersionMapper dataStructureVersionMapper;
 
   @Override
   protected DataStructureVersionRepository getRepository() {
@@ -126,6 +128,12 @@ public class DataStructureVersionService
   }
 
   @Override
+  protected DataStructureVersion preSave(DataStructureVersion entity) {
+    validateUniqueVersion(entity);
+    return super.preSave(entity);
+  }
+
+  @Override
   protected DataStructureVersion postSave(
       DataStructureVersion entity, DataStructureVersionInputDTO input) {
     if (StringUtils.isNotBlank(input.getModel())
@@ -140,6 +148,22 @@ public class DataStructureVersionService
     }
 
     return super.postSave(entity, input);
+  }
+
+  private void validateUniqueVersion(DataStructureVersion entity) {
+    dataStructureVersionRepository
+        .findAllByDataStructureIdAndVersion(entity.getDataStructure().getId(), entity.getVersion())
+        .stream()
+        .filter(existing -> !existing.getId().equals(entity.getId()))
+        .findAny()
+        .ifPresent(
+            existing -> {
+              throw new UniqueConstraintViolationException(
+                  DataStructureVersion.class.getSimpleName(),
+                  "version",
+                  "Version must be unique within the same DataStructure. Another version with the same version already exists: "
+                      + existing.getId());
+            });
   }
 
   private void validateModelAndAtlasUri(DataStructureVersionInputDTO input) {
