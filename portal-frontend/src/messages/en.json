@@ -562,7 +562,9 @@
     "messages": {
       "createSuccess": "The version of the data structure has been successfully created.",
       "updateSuccess": "The version of the data has been successfully updated.",
-      "versionInUse": "The data model can not be edited since it is already in use."
+      "versionInUseModelHint": "The data model can not be edited since it is already in use.",
+      "versionInUseStatusHint": "Can not be set to draft since this version is already in use.",
+      "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available datastructure. Set the datastructure to draft first."
     },
     "errors": {
       "versionAlreadyExists": "A version with the same version number already exists in this data structure."

@@ -1,6 +1,10 @@
 import { getDatastructure } from '@/app/services/api/datastructures/serverRequests'
 import { getDatastructureVersion } from '@/app/services/api/datastructures/versions/serverRequests'
-import { DatastructureApiResponseSchema, DatastructureVersionApiResponseSchema } from '@/types/datastructures'
+import {
+  DATASTRUCTURE_STATUS_TYPES,
+  DatastructureApiResponseSchema,
+  DatastructureVersionApiResponseSchema,
+} from '@/types/datastructures'
 
 import { VersionOverview } from '../components/VersionOverview'
 
@@ -22,14 +26,23 @@ const EditDatastructureVersionPage = async ({ params }: EditDatastructureVersion
     console.error('Error while parsing datastrcuture version API response.')
     throw new Error()
   }
+
+  const otherExistingVersions = parsedDatastructure.data.dataStructureVersions?.flatMap(version =>
+    version.id !== versionId
+      ? {
+          id: version.id,
+          version: version.version,
+          dataStructureVersionStatus: version.dataStructureVersionStatus,
+        }
+      : [],
+  )
+
   return (
     <VersionOverview
       title={`Version ${parsedVersion.data.version}`}
       datastructureId={datastructureId}
-      existingVersions={parsedDatastructure.data.dataStructureVersions?.map(version => ({
-        id: version.id,
-        version: version.version,
-      }))}
+      isDatastructureAvailable={parsedDatastructure.data.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE}
+      otherVersions={otherExistingVersions}
       version={parsedVersion.data}
       isCreateMode={false}
       testId="editDatastructureVersionOverview"

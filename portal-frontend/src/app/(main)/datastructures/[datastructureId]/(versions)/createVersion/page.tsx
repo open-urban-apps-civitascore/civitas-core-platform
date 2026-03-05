@@ -23,7 +23,7 @@ const CreateDatastructureVersionPage = async ({ params }: CreateDatastructureVer
 
   return (
     <VersionOverview
-      existingVersions={parsedDatastructure.data.dataStructureVersions?.map(version => ({
+      otherVersions={parsedDatastructure.data.dataStructureVersions?.map(version => ({
         id: version.id,
         version: version.version,
       }))}

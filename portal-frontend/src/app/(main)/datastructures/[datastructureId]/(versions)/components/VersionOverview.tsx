@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { UseMutationResult } from '@tanstack/react-query'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -80,11 +80,12 @@ interface VersionOverviewProps {
   version: DatastructureVersion | null
   isCreateMode: boolean
   testId: string
-  existingVersions: { id: string; version: string }[]
+  otherVersions: { id: string; version: string; dataStructureVersionStatus: DatastructureStatusTypes }[]
+  isDatastructureAvailable: boolean
 }
 
 export const VersionOverview = (props: VersionOverviewProps) => {
-  const { title, datastructureId, version, isCreateMode, testId, existingVersions } = props
+  const { title, datastructureId, version, isCreateMode, testId, otherVersions, isDatastructureAvailable } = props
   const params = useSearchParams()
   const mode = params.get('mode')
   const t = useTranslations('datastructureVersions')
@@ -167,15 +168,21 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const modelUri = `http://civitas.org/model/${datastructureId}/${versionWatch}`
 
   const versionAlreadyExistsError = useMemo(() => {
-    const versionExists = existingVersions.find(
-      version => version.version === versionWatch.trim() && version.id !== initialFormValues.current.id,
-    )
+    const versionExists = otherVersions.find(version => version.version === versionWatch.trim())
     if (versionExists) {
       return t('errors.versionAlreadyExists')
     } else {
       return undefined
     }
-  }, [existingVersions, versionWatch, t])
+  }, [otherVersions, versionWatch, t])
+
+  // A version that is in use can not be set back to draft
+  const isInUse = version?.inUse
+  const isLastAvailableVersionInAvailableDatastructure =
+    isDatastructureAvailable &&
+    !otherVersions.some(version => version.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE)
+
+  const canSetDraft = !isInUse && !isLastAvailableVersionInAvailableDatastructure
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
@@ -382,6 +389,11 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     [isLoading, statusWatch, formValues, isDiagramDirty],
   )
 
+  const statusHint = useMemo(() => {
+    if (isInUse) return t('messages.versionInUseStatusHint')
+    else if (isLastAvailableVersionInAvailableDatastructure) return t('messages.isLastAvailableVersion')
+  }, [isInUse, isLastAvailableVersionInAvailableDatastructure, t])
+
   const ActionButtonsAndStatusSwitch = (
     <div className="flex gap-6">
       <StatusDropdown
@@ -389,6 +401,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         status={statusWatch}
         onStatusChange={handleStatusChange}
         canSetAvailable={canSetAvailable}
+        canSetDraft={canSetDraft}
+        statusHint={statusHint}
       />
       <ActionButtons
         confirmButtonType="button"

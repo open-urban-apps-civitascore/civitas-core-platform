@@ -14,7 +14,7 @@ export const StructureDefinitionTab = (props: StructureDefinitionTabProps) => {
   const { isReadOnly, isInUse, modelSessionManager } = props
   const t = useTranslations('datastructureVersions')
   useEffect(() => {
-    if (isInUse && !isReadOnly) toast.info(t('messages.versionInUse'))
+    if (isInUse && !isReadOnly) toast.info(t('messages.versionInUseModelHint'))
   }, [isReadOnly, isInUse])
 
   return isReadOnly || isInUse ? (
