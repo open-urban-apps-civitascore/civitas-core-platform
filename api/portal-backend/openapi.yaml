@@ -2613,11 +2613,6 @@ components:
           items:
             type: string
             format: uuid
-        roleIds:
-          type: array
-          items:
-            type: string
-            format: uuid
       required:
       - name
     GroupOutputDTO:
@@ -2648,10 +2643,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/UserSummaryDTO'
-        roles:
+        assignments:
           type: array
           items:
-            $ref: '#/components/schemas/RoleSummaryDTO'
+            $ref: '#/components/schemas/AssignmentOutputDTO'
     RoleSummaryDTO:
       type: object
       properties:
@@ -2660,12 +2655,16 @@ components:
           format: uuid
         name:
           type: string
+        description:
+          type: string
         roleType:
           type: string
           enum:
           - SYSTEM
           - DATA
           - GOVERNANCE
+        readonly:
+          type: boolean
     AssignmentScopedInputDTO:
       type: object
       properties:
