@@ -1,7 +1,7 @@
 'use client'
 
 import { signOut, useSession } from 'next-auth/react'
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 
 const ACTIVITY_DEBOUNCE_MS = 2 * 60 * 1000
 // Must be shorter than Keycloak ssoSessionIdleTimeout (3600s / 60min in production).
@@ -16,16 +16,17 @@ export const useActivityRefresh = () => {
   const { data: session, update } = useSession()
   const lastActivityRef = useRef<number>(Date.now())
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  const resetInactivityTimer = useCallback(() => {
-    clearTimeout(inactivityTimerRef.current)
-    inactivityTimerRef.current = setTimeout(() => {
-      signOut({ redirectTo: '/login' })
-    }, INACTIVITY_TIMEOUT_MS)
-  }, [])
+  const hasSession = !!session
 
   useEffect(() => {
-    if (!session) return
+    if (!hasSession) return
+
+    const resetInactivityTimer = () => {
+      clearTimeout(inactivityTimerRef.current)
+      inactivityTimerRef.current = setTimeout(() => {
+        signOut({ redirectTo: '/login' })
+      }, INACTIVITY_TIMEOUT_MS)
+    }
 
     resetInactivityTimer()
 
@@ -34,8 +35,8 @@ export const useActivityRefresh = () => {
       if (now - lastActivityRef.current > ACTIVITY_DEBOUNCE_MS) {
         lastActivityRef.current = now
         update()
+        resetInactivityTimer()
       }
-      resetInactivityTimer()
     }
 
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart']
@@ -50,5 +51,5 @@ export const useActivityRefresh = () => {
         document.removeEventListener(event, handleActivity)
       })
     }
-  }, [session, update, resetInactivityTimer])
+  }, [hasSession, update])
 }
