@@ -381,6 +381,21 @@
       "selectedPersmissions": "{count} ausgewählt",
       "roleTemplate": {
         "placeholder": "Rolle als Vorlage auswählen"
+      },
+      "categories": {
+        "TENANT_ADMINISTRATION": "Mandantenverwaltung",
+        "DATA": "Datenverwaltung"
+      },
+      "dataPermissions": {
+        "dataset": "Datensatz",
+        "datasetPayload": "Datensatz-Payload",
+        "datasource": "Datenquelle",
+        "datastructure": "Datenstruktur",
+        "read": "Lesen",
+        "create": "Erstellen",
+        "update": "Aktualisieren",
+        "delete": "Löschen",
+        "release": "Freigeben"
       }
     },
     "groupAssignmentTab": {

@@ -27,7 +27,7 @@ describe('CategoryList', () => {
         permissionList={permissionList}
         checkedItems={checkedItems}
         setCheckedItems={setCheckedItems}
-        isDefaultRole={false}
+        isReadOnly={false}
       />,
     )
 
@@ -48,7 +48,7 @@ describe('CategoryList', () => {
         permissionList={permissionList}
         checkedItems={checkedItems}
         setCheckedItems={setCheckedItems}
-        isDefaultRole={false}
+        isReadOnly={false}
       />,
     )
 
@@ -67,7 +67,7 @@ describe('CategoryList', () => {
         permissionList={permissionList}
         checkedItems={checkedItems}
         setCheckedItems={setCheckedItems}
-        isDefaultRole={false}
+        isReadOnly={false}
       />,
     )
 
@@ -77,13 +77,13 @@ describe('CategoryList', () => {
     expect(setCheckedItems).toHaveBeenCalledWith(permissionList)
   })
 
-  it('renders disabled checkboxes when isDefaultRole is true', () => {
+  it('renders disabled checkboxes when isReadOnly is true', () => {
     render(
       <CategoryList
         permissionList={permissionList}
         checkedItems={checkedItems}
         setCheckedItems={setCheckedItems}
-        isDefaultRole={true}
+        isReadOnly={true}
       />,
     )
 

@@ -14,6 +14,7 @@ import { Permission, PermissionItem } from '@/types/permissions'
 import { ROLE_TYPES } from '@/types/roles'
 
 import { CategoryList } from './CategoryList'
+import { DataPermissionsGrid } from './DataPermissionsGrid'
 import { RoleTemplateSelect } from './RoleTemplateSelect'
 
 interface PermissionsTabProps {
@@ -23,6 +24,7 @@ interface PermissionsTabProps {
   hasPermissionsTabBeenSaved: boolean
   setHasPermissionsTabBeenSaved: (value: boolean) => void
   isDefaultRole: boolean
+  isEditMode: boolean
 }
 
 const mapPermissions = (permissionsInput: Permission[]): PermissionItem[] => {
@@ -41,7 +43,9 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     hasPermissionsTabBeenSaved,
     setHasPermissionsTabBeenSaved,
     isDefaultRole,
+    isEditMode,
   } = props
+  const isReadOnly = isDefaultRole || !isEditMode
   const router = useRouter()
   const t = useTranslations('common')
   const tRoles = useTranslations('roles')
@@ -129,7 +133,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
         searchString={searchInput}
         onChangeSearchString={setSearchInput}
         customElement={
-          isDefaultRole ? null : <RoleTemplateSelect allRoles={allRoles} setRoleTemplate={setRoleTemplate} />
+          isReadOnly ? null : <RoleTemplateSelect allRoles={allRoles} setRoleTemplate={setRoleTemplate} />
         }
         placeholder={tRoles('permissionsTab.searchPermissions')}
       />
@@ -138,18 +142,27 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
         <div className="flex items-center justify-center text-sm mt-3.5">{t('noResults')}</div>
       ) : (
         <>
-          {categories.map(category => (
-            <div key={category}>
-              <CategoryList
-                permissionList={permissions.filter(permission => permission.category.id === category)}
-                checkedItems={checkedPermissionItems}
-                setCheckedItems={setCheckedPermissionItems}
-                isDefaultRole={isDefaultRole}
-              />
-            </div>
-          ))}
+          {tabValue?.toUpperCase() === ROLE_TYPES.DATA ? (
+            <DataPermissionsGrid
+              permissions={permissions}
+              checkedItems={checkedPermissionItems}
+              setCheckedItems={setCheckedPermissionItems}
+              isReadOnly={isReadOnly}
+            />
+          ) : (
+            categories.map(category => (
+              <div key={category}>
+                <CategoryList
+                  permissionList={permissions.filter(permission => permission.category.id === category)}
+                  checkedItems={checkedPermissionItems}
+                  setCheckedItems={setCheckedPermissionItems}
+                  isReadOnly={isReadOnly}
+                />
+              </div>
+            ))
+          )}
 
-          {!isDefaultRole && (
+          {!isReadOnly && (
             <ActionButtons
               confirmButtonType="button"
               onConfirmClick={() => onPermissionUpdate(checkedPermissionItems.map(item => item.value))}

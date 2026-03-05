@@ -236,6 +236,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
             hasPermissionsTabBeenSaved={hasPermissionsTabBeenSaved}
             setHasPermissionsTabBeenSaved={setHasPermissionsTabBeenSaved}
             isDefaultRole={isDefaultRole}
+            isEditMode={isEditMode}
           />
         )}
 
