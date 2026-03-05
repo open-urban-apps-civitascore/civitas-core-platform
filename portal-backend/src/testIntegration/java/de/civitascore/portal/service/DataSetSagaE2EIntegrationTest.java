@@ -2,7 +2,6 @@ package de.civitascore.portal.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.SagaInfraVerifier;
 import de.civitascore.portal.config.SagaOrchestratorTestHelper;
 import de.civitascore.portal.config.SagaTestDataFactory;
@@ -13,8 +12,6 @@ import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.repository.DataSetRepository;
-import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
@@ -31,9 +28,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.kafka.KafkaContainer;
-import org.testcontainers.utility.MountableFile;
 
 /**
  * End-to-end integration test for the full Dataset Saga workflow.
@@ -58,78 +53,27 @@ import org.testcontainers.utility.MountableFile;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Slf4j
 @Import(SagaTestDataFactory.class)
-class DataSetSagaE2EIntegrationTest extends BaseKeycloakIntegrationTest {
+class DataSetSagaE2EIntegrationTest extends AbstractSagaIntegrationTest {
 
   static final Network sagaNetwork = Network.newNetwork();
 
-  @SuppressWarnings("resource")
-  static final GenericContainer<?> postgis =
-      new GenericContainer<>("postgis/postgis:16-3.4-alpine")
-          .withNetwork(sagaNetwork)
-          .withNetworkAliases("database")
-          .withEnv("POSTGRES_DB", "sensorthings")
-          .withEnv("POSTGRES_USER", "sensorthings")
-          .withEnv("POSTGRES_PASSWORD", "ChangeMe")
-          .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*", 2));
-
-  @SuppressWarnings("resource")
-  static final GenericContainer<?> frost =
-      new GenericContainer<>("hylkevds/frost-http-projects:latest")
-          .withNetwork(sagaNetwork)
-          .withNetworkAliases("frost-server")
-          .withExposedPorts(8080)
-          .dependsOn(postgis)
-          .withEnv("serviceRootUrl", "http://localhost:8080/FROST-Server/")
-          .withEnv("plugins_modelLoader_enable", "true")
-          .withEnv("plugins_multiDatastream_enable", "false")
-          .withEnv("plugins_actuation_enable", "false")
-          .withEnv("persistence_db_driver", "org.postgresql.Driver")
-          .withEnv("persistence_db_url", "jdbc:postgresql://database:5432/sensorthings")
-          .withEnv("persistence_db_username", "sensorthings")
-          .withEnv("persistence_db_password", "ChangeMe")
-          .withEnv("persistence_autoUpdateDatabase", "true")
-          .withEnv("plugins_modelLoader_securityPath", "")
-          .withEnv("plugins_modelLoader_securityFiles", "")
-          .waitingFor(
-              Wait.forHttp("/FROST-Server/v1.1/Projects")
-                  .forStatusCode(200)
-                  .withStartupTimeout(Duration.ofMinutes(3)));
-
-  static final KafkaContainer kafka = new KafkaContainer("apache/kafka:3.8.0");
-
-  @SuppressWarnings("resource")
-  static final GenericContainer<?> redpandaConnect =
-      new GenericContainer<>("redpandadata/connect:4")
-          .withNetwork(sagaNetwork)
-          .withNetworkAliases("redpanda-connect")
-          .withExposedPorts(4195)
-          .withCommand("streams")
-          .withEnv("FROST_BASE", "http://frost-server:8080/FROST-Server/v1.1")
-          .waitingFor(
-              Wait.forHttp("/ready").forPort(4195).withStartupTimeout(Duration.ofSeconds(60)));
+  static final GenericContainer<?> postgis = createPostgis(sagaNetwork);
+  static final GenericContainer<?> frost = createFrost(sagaNetwork, postgis);
+  static final KafkaContainer kafka = createKafka();
+  static final GenericContainer<?> redpandaConnect = createRedpandaConnect(sagaNetwork);
+  static final GenericContainer<?> mosquitto = createMosquitto(sagaNetwork);
 
   @SuppressWarnings("resource")
   static final GenericContainer<?> datasourcePg =
-      new GenericContainer<>("postgres:15")
+      new GenericContainer<>("postgres:15-alpine")
           .withNetwork(sagaNetwork)
           .withNetworkAliases("datasource-db")
           .withEnv("POSTGRES_DB", "testdb")
           .withEnv("POSTGRES_USER", "testuser")
           .withEnv("POSTGRES_PASSWORD", "testpass")
-          .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*", 2));
-
-  @SuppressWarnings("resource")
-  static final GenericContainer<?> mosquitto =
-      new GenericContainer<>("eclipse-mosquitto:2")
-          .withNetwork(sagaNetwork)
-          .withNetworkAliases("mqtt-broker")
-          .withExposedPorts(1883)
-          .withCopyFileToContainer(
-              MountableFile.forHostPath(
-                  Paths.get("src/testIntegration/resources/mosquitto/mosquitto.conf")
-                      .toAbsolutePath()),
-              "/mosquitto/config/mosquitto.conf")
-          .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(30)));
+          .waitingFor(
+              org.testcontainers.containers.wait.strategy.Wait.forLogMessage(
+                  ".*database system is ready to accept connections.*", 2));
 
   private static SagaOrchestratorTestHelper sagaHelper;
   private static String frostExternalUrl;
@@ -143,9 +87,6 @@ class DataSetSagaE2EIntegrationTest extends BaseKeycloakIntegrationTest {
     mosquitto.start();
     redpandaConnect.start();
 
-    // FrostSagaHandler and SagaInfraVerifier run in the JVM, so they use localhost:mappedPort.
-    // The FROST "public URL" for pipeline output uses the Docker network alias (frost-server:8080)
-    // which is reachable from the Redpanda Connect container. See SagaOrchestratorTestHelper.
     frostExternalUrl =
         "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
     redpandaExternalUrl =
@@ -172,9 +113,6 @@ class DataSetSagaE2EIntegrationTest extends BaseKeycloakIntegrationTest {
   @BeforeAll
   static void seedAndWireSaga() throws Exception {
     seedDatasourceDb();
-    // frostExternalUrl uses localhost:mappedPort (JVM-reachable) for the FrostSagaHandler's
-    // HTTP calls. The public URL uses the Docker network alias so pipeline output URLs resolve
-    // correctly from inside the Redpanda Connect container.
     String frostPublicUrl = "http://frost-server:8080/FROST-Server/v1.1";
     sagaHelper =
         new SagaOrchestratorTestHelper(

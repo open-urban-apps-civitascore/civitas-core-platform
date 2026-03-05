@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
+import de.civitascore.portal.model.embedded.PipelineAction;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Pipeline;
 import java.util.ArrayList;
@@ -51,7 +52,7 @@ public class DataSetSagaPublisher {
             dataset.getDescription(),
             dataset.getOpenDataAccess(),
             buildDatasources(dataset),
-            buildPipelines(dataset.getPipelines(), "ADD"));
+            buildPipelines(dataset.getPipelines(), PipelineAction.ADD));
     sendTrigger(trigger);
   }
 
@@ -89,30 +90,26 @@ public class DataSetSagaPublisher {
     }
 
     Set<UUID> seen = new HashSet<>();
-    List<Datasource> datasources = new ArrayList<>();
-
-    for (var pipeline : dataset.getPipelines()) {
-      if (pipeline.getDataSources() == null) {
-        continue;
-      }
-      for (var ds : pipeline.getDataSources()) {
-        if (seen.add(ds.getId())) {
-          var datasource = new Datasource();
-          datasource.setId(ds.getId().toString());
-          datasource.setName(ds.getName());
-          datasource.setType(ds.getConnectorType() != null ? ds.getConnectorType().name() : null);
-          if (ds.getConfiguration() != null) {
-            ds.getConfiguration().forEach(datasource::handleUnknownProperty);
-          }
-          datasources.add(datasource);
-        }
-      }
-    }
-
-    return datasources;
+    return dataset.getPipelines().stream()
+        .filter(p -> p.getDataSources() != null)
+        .flatMap(p -> p.getDataSources().stream())
+        .filter(ds -> seen.add(ds.getId()))
+        .map(
+            ds -> {
+              var datasource = new Datasource();
+              datasource.setId(ds.getId().toString());
+              datasource.setName(ds.getName());
+              datasource.setType(
+                  ds.getConnectorType() != null ? ds.getConnectorType().name() : null);
+              if (ds.getConfiguration() != null) {
+                ds.getConfiguration().forEach(datasource::handleUnknownProperty);
+              }
+              return datasource;
+            })
+        .toList();
   }
 
-  private List<DataPipeline> buildPipelines(Set<Pipeline> pipelines, String action) {
+  private List<DataPipeline> buildPipelines(Set<Pipeline> pipelines, PipelineAction action) {
     return pipelines.stream().map(p -> toPipelineEntry(p, action)).toList();
   }
 
@@ -127,21 +124,26 @@ public class DataSetSagaPublisher {
     List<DataPipeline> result = new ArrayList<>();
 
     for (var entry : currentMap.entrySet()) {
-      String action = previousIds.contains(entry.getKey()) ? "UPDATE" : "ADD";
+      PipelineAction action =
+          previousIds.contains(entry.getKey()) ? PipelineAction.UPDATE : PipelineAction.ADD;
       result.add(toPipelineEntry(entry.getValue(), action));
     }
 
     for (UUID id : previousIds) {
       if (!currentMap.containsKey(id)) {
-        result.add(new DataPipeline(id.toString(), "1", "DELETE", null));
+        result.add(new DataPipeline(id.toString(), "0", PipelineAction.DELETE.name(), null));
       }
     }
 
     return result;
   }
 
-  private DataPipeline toPipelineEntry(Pipeline pipeline, String action) {
-    return new DataPipeline(pipeline.getId().toString(), "1", action, pipeline.getModel());
+  private DataPipeline toPipelineEntry(Pipeline pipeline, PipelineAction action) {
+    return new DataPipeline(
+        pipeline.getId().toString(),
+        String.valueOf(pipeline.getVersion()),
+        action.name(),
+        pipeline.getModel());
   }
 
   /**
@@ -162,9 +164,9 @@ public class DataSetSagaPublisher {
           .get(publishTimeoutSeconds, TimeUnit.SECONDS);
       log.info(
           "Published saga trigger: sagaType={}, datasetId={}, topic={}",
-          sagaType,
-          datasetId,
-          triggerTopic);
+          Encode.forJava(sagaType),
+          Encode.forJava(datasetId),
+          Encode.forJava(triggerTopic));
     } catch (JsonProcessingException e) {
       log.error(
           "Failed to serialize saga trigger for dataset {}: {}",
@@ -175,8 +177,8 @@ public class DataSetSagaPublisher {
     } catch (ExecutionException e) {
       log.error(
           "Kafka broker rejected saga trigger for dataset {}, sagaType={}: {}",
-          datasetId,
-          sagaType,
+          Encode.forJava(datasetId),
+          Encode.forJava(sagaType),
           e.getCause() != null ? e.getCause().getMessage() : e.getMessage(),
           e);
       throw new IllegalStateException("Failed to send saga trigger to Kafka", e);
@@ -184,16 +186,16 @@ public class DataSetSagaPublisher {
       log.error(
           "Timed out after {}s waiting for Kafka ack for saga trigger: sagaType={}, datasetId={}",
           publishTimeoutSeconds,
-          sagaType,
-          datasetId,
+          Encode.forJava(sagaType),
+          Encode.forJava(datasetId),
           e);
       throw new IllegalStateException("Timeout sending saga trigger to Kafka", e);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       log.error(
           "Interrupted while waiting for Kafka ack for saga trigger: sagaType={}, datasetId={}",
-          sagaType,
-          datasetId,
+          Encode.forJava(sagaType),
+          Encode.forJava(datasetId),
           e);
       throw new RuntimeException(e);
     }

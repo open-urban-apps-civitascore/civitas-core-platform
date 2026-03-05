@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
+import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -15,14 +16,11 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,20 +35,21 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   private final DistributionService distributionService;
   private final ObjectMapper objectMapper;
 
-  @Autowired(required = false)
-  private DataSetSagaPublisher sagaPublisher;
+  private final DataSetSagaPublisher sagaPublisher;
 
   public DataSetService(
       DataSetRepository dataSetRepository,
       DataSetMapper dataSetMapper,
       ScopedAssignmentBuilderService assignmentBuilderService,
       DistributionService distributionService,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      Optional<DataSetSagaPublisher> sagaPublisher) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
     this.assignmentBuilderService = assignmentBuilderService;
     this.distributionService = distributionService;
     this.objectMapper = objectMapper;
+    this.sagaPublisher = sagaPublisher.orElse(null);
   }
 
   @Override
@@ -151,7 +150,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @param id the dataset ID
    * @param input the update input
    * @return the updated dataset
-   * @throws InvalidInputException if trying to update a DRAFT dataset
+   * @throws InvalidInputException if trying to update a DRAFT dataset or saga infrastructure is
+   *     unavailable
    */
   @Transactional
   public DataSet updatePublishedMeta(UUID id, DataSetInputDTO input) {
@@ -170,15 +170,14 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
         && updated.getProjectId() != null
         && updated.getPendingSagaType() == null) {
       if (sagaPublisher == null) {
-        log.warn(
-            "Saga infrastructure not available — skipping UPDATE saga for dataset {}. "
-                + "Infrastructure changes will not be propagated.",
-            id);
-      } else {
-        updated.setPendingSagaType(PendingSagaType.UPDATE);
-        updated = dataSetRepository.save(updated);
-        sagaPublisher.publishUpdateRequested(updated, previousPipelines);
+        throw new InvalidInputException(
+            "dataSetStatus",
+            id,
+            "Saga infrastructure not available — cannot update AVAILABLE dataset");
       }
+      updated.setPendingSagaType(PendingSagaType.UPDATE);
+      updated = dataSetRepository.save(updated);
+      sagaPublisher.publishUpdateRequested(updated, previousPipelines);
     }
 
     return updated;
@@ -342,8 +341,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * the saga type that was pending.
    */
   @Transactional
-  @SuppressWarnings("unchecked")
-  public void handleSagaCompleted(UUID datasetId, Map<String, Object> result) {
+  public void handleSagaCompleted(UUID datasetId, SagaResultPayload result) {
     DataSet dataSet = findByIdOrThrow(datasetId);
     PendingSagaType pendingType = dataSet.getPendingSagaType();
 
@@ -434,28 +432,30 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
         "Cannot delete an AVAILABLE dataset. Unrelease it first (POST /datasets/{id}/unrelease) to tear down infrastructure");
   }
 
-  @SuppressWarnings("unchecked")
-  private void applyInfrastructureResult(DataSet dataSet, Map<String, Object> result) {
-    if (result.containsKey("projectId")) {
-      dataSet.setProjectId((String) result.get("projectId"));
+  /**
+   * Applies infrastructure fields from the saga result payload to the dataset entity. Uses
+   * PATCH-style semantics: only non-null fields in the result are applied. This is intentional
+   * because partial saga results (e.g., UPDATE saga that only touches APISIX) should not null out
+   * fields set by earlier steps.
+   */
+  private void applyInfrastructureResult(DataSet dataSet, SagaResultPayload result) {
+    if (result.projectId() != null) {
+      dataSet.setProjectId(result.projectId());
     }
-    if (result.containsKey("baseUrl")) {
-      dataSet.setFrostBaseUrl((String) result.get("baseUrl"));
+    if (result.baseUrl() != null) {
+      dataSet.setFrostBaseUrl(result.baseUrl());
     }
-    if (result.containsKey("routeId")) {
-      dataSet.setRouteId((String) result.get("routeId"));
+    if (result.routeId() != null) {
+      dataSet.setRouteId(result.routeId());
     }
-    if (result.containsKey("serviceId")) {
-      dataSet.setServiceId((String) result.get("serviceId"));
+    if (result.serviceId() != null) {
+      dataSet.setServiceId(result.serviceId());
     }
-    if (result.containsKey("publicUrl")) {
-      dataSet.setPublicUrl((String) result.get("publicUrl"));
+    if (result.publicUrl() != null) {
+      dataSet.setPublicUrl(result.publicUrl());
     }
-    if (result.containsKey("pipelineIds")) {
-      Object pipelineIds = result.get("pipelineIds");
-      if (pipelineIds instanceof List<?> list) {
-        dataSet.setPipelineIds(list.stream().map(Object::toString).toList());
-      }
+    if (result.pipelineIds() != null) {
+      dataSet.setPipelineIds(result.pipelineIds());
     }
   }
 
@@ -463,11 +463,12 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (dataSet.getPublicUrl() == null) {
       return;
     }
+    String baseUrl = StringUtils.stripEnd(dataSet.getPublicUrl(), "/");
     for (Distribution dist : dataSet.getDistributions()) {
       if (Boolean.TRUE.equals(dist.getAutoGenerated())
           && dist.getAccessUrl() != null
           && !dist.getAccessUrl().startsWith(dataSet.getPublicUrl())) {
-        dist.setAccessUrl(dataSet.getPublicUrl() + dist.getAccessUrl());
+        dist.setAccessUrl(baseUrl + dist.getAccessUrl());
       }
     }
   }

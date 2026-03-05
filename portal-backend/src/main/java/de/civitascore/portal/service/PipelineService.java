@@ -100,6 +100,9 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
   @Override
   protected Pipeline preSave(Pipeline entity) {
     validateUniqueName(entity);
+    if (entity.getId() != null) {
+      entity.setVersion(entity.getVersion() + 1);
+    }
     return super.preSave(entity);
   }
 

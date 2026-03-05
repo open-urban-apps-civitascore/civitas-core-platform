@@ -1,5 +1,6 @@
 package de.civitascore.portal.messaging.saga;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.Datasource;
 import de.civitascore.configadapter.model.saga.SagaType;
@@ -12,7 +13,12 @@ import java.util.List;
  *
  * <p>The three permitted subtypes map 1:1 to {@link SagaType} variants and are constructed via
  * their static factory methods, which fix the correct {@code sagaType} value automatically.
+ *
+ * <p>{@code NON_NULL} is required because the orchestrator's {@code SagaPayloadBuilder}
+ * deserializes the JSON into {@code Map<String, Object>} and calls {@code Map.copyOf()}, which
+ * rejects null values. Omitting null fields from the JSON prevents null map entries.
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public sealed interface SagaTrigger
     permits SagaTrigger.DatasetCreate, SagaTrigger.DatasetUpdate, SagaTrigger.DatasetDelete {
 
@@ -26,6 +32,7 @@ public sealed interface SagaTrigger
    * Trigger for {@link SagaType#DATASET_CREATE}: provisions FROST project → APISIX route → Redpanda
    * pipeline (conditional).
    */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   record DatasetCreate(
       SagaType sagaType,
       String datasetId,
@@ -59,6 +66,7 @@ public sealed interface SagaTrigger
    * pipeline diff (conditional). Carries existing infrastructure IDs so the orchestrator can issue
    * targeted update commands without re-querying.
    */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   record DatasetUpdate(
       SagaType sagaType,
       String datasetId,
@@ -104,6 +112,7 @@ public sealed interface SagaTrigger
    * FROST project (reverse order, best-effort). Only infrastructure IDs are needed — no dataset
    * content.
    */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   record DatasetDelete(
       SagaType sagaType,
       String datasetId,

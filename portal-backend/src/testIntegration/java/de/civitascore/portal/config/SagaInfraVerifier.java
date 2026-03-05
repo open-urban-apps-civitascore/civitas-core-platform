@@ -51,6 +51,27 @@ public class SagaInfraVerifier {
     return dataSetRepository.findById(dataSetId).orElseThrow();
   }
 
+  /** Waits for an UPDATE saga to complete: pendingSagaType=null and status still AVAILABLE. */
+  public DataSet awaitSagaUpdate(UUID dataSetId) {
+    await()
+        .atMost(120, SECONDS)
+        .pollInterval(2, SECONDS)
+        .untilAsserted(
+            () -> {
+              DataSet ds =
+                  dataSetRepository
+                      .findById(dataSetId)
+                      .orElseThrow(() -> new AssertionError("DataSet not found"));
+              assertThat(ds.getPendingSagaType())
+                  .as("pendingSagaType should be null after UPDATE saga completion")
+                  .isNull();
+              assertThat(ds.getDataSetStatus())
+                  .as("Status should remain AVAILABLE after UPDATE saga")
+                  .isEqualTo(DataSetStatus.AVAILABLE);
+            });
+    return dataSetRepository.findById(dataSetId).orElseThrow();
+  }
+
   /** Waits for a DELETE saga to complete: pendingSagaType=null and status=READY. */
   public DataSet awaitSagaDeletion(UUID dataSetId) {
     await()

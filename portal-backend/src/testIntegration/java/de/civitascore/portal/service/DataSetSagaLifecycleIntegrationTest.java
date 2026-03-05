@@ -3,7 +3,6 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.SagaInfraVerifier;
 import de.civitascore.portal.config.SagaOrchestratorTestHelper;
 import de.civitascore.portal.config.SagaTestDataFactory;
@@ -13,12 +12,11 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Distribution;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DistributionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.util.InvalidInputException;
-import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -38,9 +36,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
-import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.kafka.KafkaContainer;
-import org.testcontainers.utility.MountableFile;
 
 /**
  * Extended lifecycle integration tests for the Dataset Saga workflow.
@@ -64,68 +60,15 @@ import org.testcontainers.utility.MountableFile;
     properties = {"kafka.enabled=true", "spring.kafka.listener.missing-topics-fatal=false"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Slf4j
-class DataSetSagaLifecycleIntegrationTest extends BaseKeycloakIntegrationTest {
+class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
 
   static final Network sagaNetwork = Network.newNetwork();
 
-  @SuppressWarnings("resource")
-  static final GenericContainer<?> postgis =
-      new GenericContainer<>("postgis/postgis:16-3.4-alpine")
-          .withNetwork(sagaNetwork)
-          .withNetworkAliases("database")
-          .withEnv("POSTGRES_DB", "sensorthings")
-          .withEnv("POSTGRES_USER", "sensorthings")
-          .withEnv("POSTGRES_PASSWORD", "ChangeMe")
-          .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*", 2));
-
-  @SuppressWarnings("resource")
-  static final GenericContainer<?> frost =
-      new GenericContainer<>("hylkevds/frost-http-projects:latest")
-          .withNetwork(sagaNetwork)
-          .withNetworkAliases("frost-server")
-          .withExposedPorts(8080)
-          .dependsOn(postgis)
-          .withEnv("serviceRootUrl", "http://localhost:8080/FROST-Server/")
-          .withEnv("plugins_modelLoader_enable", "true")
-          .withEnv("plugins_multiDatastream_enable", "false")
-          .withEnv("plugins_actuation_enable", "false")
-          .withEnv("persistence_db_driver", "org.postgresql.Driver")
-          .withEnv("persistence_db_url", "jdbc:postgresql://database:5432/sensorthings")
-          .withEnv("persistence_db_username", "sensorthings")
-          .withEnv("persistence_db_password", "ChangeMe")
-          .withEnv("persistence_autoUpdateDatabase", "true")
-          .withEnv("plugins_modelLoader_securityPath", "")
-          .withEnv("plugins_modelLoader_securityFiles", "")
-          .waitingFor(
-              Wait.forHttp("/FROST-Server/v1.1/Projects")
-                  .forStatusCode(200)
-                  .withStartupTimeout(Duration.ofMinutes(3)));
-
-  static final KafkaContainer kafka = new KafkaContainer("apache/kafka:3.8.0");
-
-  @SuppressWarnings("resource")
-  static final GenericContainer<?> redpandaConnect =
-      new GenericContainer<>("redpandadata/connect:4")
-          .withNetwork(sagaNetwork)
-          .withNetworkAliases("redpanda-connect")
-          .withExposedPorts(4195)
-          .withCommand("streams")
-          .withEnv("FROST_BASE", "http://frost-server:8080/FROST-Server/v1.1")
-          .waitingFor(
-              Wait.forHttp("/ready").forPort(4195).withStartupTimeout(Duration.ofSeconds(60)));
-
-  @SuppressWarnings("resource")
-  static final GenericContainer<?> mosquitto =
-      new GenericContainer<>("eclipse-mosquitto:2")
-          .withNetwork(sagaNetwork)
-          .withNetworkAliases("mqtt-broker")
-          .withExposedPorts(1883)
-          .withCopyFileToContainer(
-              MountableFile.forHostPath(
-                  Paths.get("src/testIntegration/resources/mosquitto/mosquitto.conf")
-                      .toAbsolutePath()),
-              "/mosquitto/config/mosquitto.conf")
-          .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(30)));
+  static final GenericContainer<?> postgis = createPostgis(sagaNetwork);
+  static final GenericContainer<?> frost = createFrost(sagaNetwork, postgis);
+  static final KafkaContainer kafka = createKafka();
+  static final GenericContainer<?> redpandaConnect = createRedpandaConnect(sagaNetwork);
+  static final GenericContainer<?> mosquitto = createMosquitto(sagaNetwork);
 
   private static SagaOrchestratorTestHelper sagaHelper;
   private static String frostExternalUrl;
@@ -138,9 +81,6 @@ class DataSetSagaLifecycleIntegrationTest extends BaseKeycloakIntegrationTest {
     mosquitto.start();
     redpandaConnect.start();
 
-    // Use the sagaNetwork gateway IP so FROST is reachable from both the host (test process)
-    // and containers on sagaNetwork (Redpanda Connect). localhost would resolve to the
-    // container's own loopback inside Docker, making FROST unreachable from there.
     frostExternalUrl =
         "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
     redpandaExternalUrl =
@@ -479,5 +419,135 @@ class DataSetSagaLifecycleIntegrationTest extends BaseKeycloakIntegrationTest {
         "Multi-pipeline saga completed: pipelineIds={}, distributionCount={}",
         completed.getPipelineIds(),
         distUrls.size());
+  }
+
+  @Nested
+  @DisplayName("UPDATE saga (updatePublishedMeta)")
+  class UpdateSaga {
+
+    @Test
+    @DisplayName(
+        "updatePublishedMeta on AVAILABLE dataset triggers UPDATE saga and preserves infra")
+    void updatePublishedMeta_triggersUpdateSaga() throws Exception {
+      DataSource dataSource = data.createMqttDataSource();
+      DataSet dataSet = data.createDataSet("Update Saga Dataset");
+      Pipeline pipeline = data.createGeneratePipeline(dataSet, dataSource);
+      data.seedGroupAndAssignment(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      // DRAFT → READY → AVAILABLE (CREATE saga completes first)
+      dataSetService.publish(dataSetId);
+      dataSetService.release(dataSetId);
+      DataSet created = verifier.awaitSagaCompletion(dataSetId);
+      String originalProjectId = created.getProjectId();
+      String originalRouteId = created.getRouteId();
+
+      assertThat(originalProjectId).isNotNull();
+      assertThat(originalRouteId).isNotNull();
+
+      // Update metadata on AVAILABLE dataset → triggers UPDATE saga
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Updated Name " + System.nanoTime());
+      updateInput.setDescription("Updated description");
+      DataSet updated = dataSetService.updatePublishedMeta(dataSetId, updateInput);
+
+      assertThat(updated.getPendingSagaType())
+          .as("UPDATE saga should be pending")
+          .isEqualTo(PendingSagaType.UPDATE);
+      assertThat(updated.getDataSetStatus())
+          .as("Status should remain AVAILABLE during UPDATE")
+          .isEqualTo(DataSetStatus.AVAILABLE);
+
+      DataSet completed = verifier.awaitSagaUpdate(dataSetId);
+
+      assertThat(completed.getProjectId())
+          .as("projectId should be preserved after UPDATE")
+          .isEqualTo(originalProjectId);
+      assertThat(completed.getRouteId())
+          .as("routeId should be preserved after UPDATE")
+          .isEqualTo(originalRouteId);
+      assertThat(completed.getPendingSagaType()).as("pendingSagaType should be cleared").isNull();
+      assertThat(completed.getPipelineIds())
+          .as("pipelineIds should still contain the pipeline")
+          .contains(pipeline.getId().toString());
+
+      log.info(
+          "UPDATE saga completed: projectId={}, name={}",
+          completed.getProjectId(),
+          completed.getName());
+    }
+
+    @Test
+    @DisplayName("updatePublishedMeta skips saga for READY dataset (no infra yet)")
+    void updatePublishedMeta_readyDataset_noSagaTriggered() {
+      DataSource dataSource = data.createMqttDataSource();
+      DataSet dataSet = data.createDataSet("Ready Update Dataset");
+      data.createGeneratePipeline(dataSet, dataSource);
+      data.seedGroupAndAssignment(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      // DRAFT → READY only (no release, no infra)
+      dataSetService.publish(dataSetId);
+
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Updated Ready Name " + System.nanoTime());
+      updateInput.setDescription("Updated ready description");
+      DataSet updated = dataSetService.updatePublishedMeta(dataSetId, updateInput);
+
+      assertThat(updated.getPendingSagaType())
+          .as("No saga should be triggered for READY dataset")
+          .isNull();
+      assertThat(updated.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+      assertThat(updated.getName()).contains("Updated Ready Name");
+
+      log.info("READY dataset updated without saga trigger");
+    }
+
+    @Test
+    @DisplayName("updatePublishedMeta rejects DRAFT dataset")
+    void updatePublishedMeta_draftDataset_rejected() {
+      DataSet dataSet = data.createDataSet("Draft Meta Update Dataset");
+
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Attempted update " + System.nanoTime());
+
+      assertThatThrownBy(() -> dataSetService.updatePublishedMeta(dataSet.getId(), updateInput))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DRAFT");
+    }
+
+    @Test
+    @DisplayName(
+        "Full cycle: CREATE → UPDATE (metadata change) → DELETE preserves correct transitions")
+    void createThenUpdateThenDelete_fullCycle() throws Exception {
+      DataSource dataSource = data.createMqttDataSource();
+      DataSet dataSet = data.createDataSet("Full Cycle Update Dataset");
+      Pipeline pipeline = data.createGeneratePipeline(dataSet, dataSource);
+      data.seedGroupAndAssignment(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      // Phase 1: CREATE
+      dataSetService.publish(dataSetId);
+      dataSetService.release(dataSetId);
+      DataSet created = verifier.awaitSagaCompletion(dataSetId);
+      assertThat(created.getProjectId()).isNotNull();
+
+      // Phase 2: UPDATE metadata
+      DataSetInputDTO updateInput = new DataSetInputDTO();
+      updateInput.setName("Renamed Dataset " + System.nanoTime());
+      dataSetService.updatePublishedMeta(dataSetId, updateInput);
+      DataSet afterUpdate = verifier.awaitSagaUpdate(dataSetId);
+      assertThat(afterUpdate.getProjectId())
+          .as("projectId preserved through UPDATE")
+          .isEqualTo(created.getProjectId());
+
+      // Phase 3: DELETE (unrelease)
+      dataSetService.unrelease(dataSetId);
+      DataSet afterDelete = verifier.awaitSagaDeletion(dataSetId);
+      assertThat(afterDelete.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+      assertThat(afterDelete.getProjectId()).isNull();
+
+      log.info("Full CREATE → UPDATE → DELETE cycle completed successfully");
+    }
   }
 }
