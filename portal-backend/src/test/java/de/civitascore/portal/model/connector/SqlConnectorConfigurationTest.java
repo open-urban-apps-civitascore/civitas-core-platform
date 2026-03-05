@@ -127,6 +127,25 @@ class SqlConnectorConfigurationTest {
       assertThat(config.getPassword()).isEqualTo("secret");
       assertThat(config.getDsn()).isEqualTo("postgres://localhost:5432/mydb");
     }
+
+    @Test
+    @DisplayName("Should normalize blank password to null")
+    void shouldNormalizeBlankPasswordToNull() {
+      SqlConnectorConfiguration config = new SqlConnectorConfiguration();
+      config.setPassword("");
+      assertThat(config.getPassword()).isNull();
+
+      config.setPassword("   ");
+      assertThat(config.getPassword()).isNull();
+    }
+
+    @Test
+    @DisplayName("Should preserve null password")
+    void shouldPreserveNullPassword() {
+      SqlConnectorConfiguration config = new SqlConnectorConfiguration();
+      config.setPassword(null);
+      assertThat(config.getPassword()).isNull();
+    }
   }
 
   @Nested

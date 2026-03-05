@@ -19,7 +19,7 @@ interface WarningModalProps extends DialogProps {
   isLoading?: boolean
   confirmButtonTitle?: string
   onDiscard: () => void
-  onConfirm: () => void
+  onConfirm?: () => void
 }
 
 export const WarningModal = (props: WarningModalProps) => {
@@ -37,15 +37,17 @@ export const WarningModal = (props: WarningModalProps) => {
           <Button data-testid="discardButton" type="button" variant="outline" onClick={onDiscard} disabled={isLoading}>
             {t('cancel')}
           </Button>
-          <Button
-            data-testid="saveButton"
-            type="button"
-            onClick={onConfirm}
-            disabled={isLoading}
-            className="text-white bg-destructive  border-destructive hover:bg-destructive/70"
-          >
-            {confirmButtonTitle || t('submit')}
-          </Button>
+          {onConfirm && (
+            <Button
+              data-testid="saveButton"
+              type="button"
+              onClick={onConfirm}
+              disabled={isLoading}
+              className="text-white bg-destructive  border-destructive hover:bg-destructive/70"
+            >
+              {confirmButtonTitle || t('submit')}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

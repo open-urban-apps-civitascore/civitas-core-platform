@@ -16,6 +16,7 @@ export type Source = (typeof SOURCE)[keyof typeof SOURCE]
 
 export const DatastructureVersionApiResponseSchema = z.object({
   id: z.string(),
+  dataStructureId: z.string(),
   versionNumber: z.string(),
   description: z.string(),
   source: SourceEnum,

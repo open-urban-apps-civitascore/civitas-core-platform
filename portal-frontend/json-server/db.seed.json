@@ -187,6 +187,28 @@
           "description": "Automatische Verarbeitung des Datensatzes"
         }
       ]
+    },
+    {
+      "id": "d8d1d79c-fffa-4afa-9da2-28ffcdfa80ef",
+      "name": "Test Pipeline Sensorerfassung",
+      "description": "Erfasste Verkehrsunfälle basierend auf Sensordaten im Stadtgebiet.",
+      "createdAt": "2023-09-04T00:00:00Z",
+      "modifiedAt": "2023-09-26T00:00:00Z",
+      "dataSetStatus": "READY",
+      "openDataAccess": true,
+      "distributions": [
+        {
+          "id": "10",
+          "accessURL": "https://sensors.example/10"
+        }
+      ],
+      "pipelines": [
+        {
+          "id": "pipeline-10",
+          "name": "Standard Pipeline",
+          "description": "Automatische Verarbeitung des Datensatzes"
+        }
+      ]
     }
   ],
   "users": [

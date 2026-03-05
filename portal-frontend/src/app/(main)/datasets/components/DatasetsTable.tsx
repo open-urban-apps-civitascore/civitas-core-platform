@@ -14,6 +14,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface DatasetsTableProps extends TableProps<DatasetTableData> {
   datasets: DatasetTableData[]
+  onDeleteClick: (datasetId: string | null) => void
 }
 
 export const DatasetsTable = (props: DatasetsTableProps) => {
@@ -28,10 +29,12 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
     onSortingChange,
     onRowClick,
     isLoading,
+    onDeleteClick,
   } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
   const locale = useLocale()
+
   const columnHelper = createColumnHelper<DatasetTableData>()
 
   const statusCell = ({ value }: { value: string }) => {
@@ -97,8 +100,15 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
     columnHelper.accessor('modifiedAt', {
       header: t('tableHeaders.lastUpdated'),
       cell: info => {
-        const yesterday = new Date().getDate() - 1
-        const isModifiedAtYesterday = new Date(info.getValue()).getDate() === yesterday
+        const now = new Date()
+        const yesterday = new Date(now)
+        yesterday.setDate(yesterday.getDate() - 1)
+        yesterday.setHours(0, 0, 0, 0)
+
+        const modifiedDate = new Date(info.getValue())
+        modifiedDate.setHours(0, 0, 0, 0)
+
+        const isModifiedAtYesterday = modifiedDate.getTime() === yesterday.getTime()
         return isModifiedAtYesterday ? t('tableValues.yesterday') : formatDate(info.getValue(), locale)
       },
       meta: {
@@ -119,7 +129,11 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
     {
       id: 'actions',
       header: t('tableHeaders.action'),
-      cell: () => <TableDropdownMenu menuItems={[{ label: tCommon('actions.delete') }]} />,
+      cell: (info: { row: { id: string | null } }) => (
+        <TableDropdownMenu
+          menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDeleteClick(info.row.id) }]}
+        />
+      ),
       meta: {
         style: {
           width: '8%',

@@ -41,9 +41,14 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
   @Schema(description = "Keepalive interval.", example = "30s")
   private String keepalive;
 
-  @JsonProperty("tls.enabled")
-  @Schema(description = "Whether to enable TLS.", example = "false")
-  private boolean tlsEnabled;
+  @Schema(description = "TLS configuration.")
+  private Tls tls = new Tls();
+
+  @Data
+  public static class Tls {
+    @Schema(description = "Whether to enable TLS.", example = "false")
+    private boolean enabled;
+  }
 
   @Schema(description = "Broker username.", example = "mqttuser")
   private String user;
@@ -53,6 +58,10 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
       accessMode = Schema.AccessMode.WRITE_ONLY,
       example = "secret")
   private String password;
+
+  public void setPassword(String password) {
+    this.password = (password != null && password.isBlank()) ? null : password;
+  }
 
   // Validates URLs with java.net.URI and strips any embedded credentials (discarding them)
   public void setUrls(List<String> urls) {
@@ -65,6 +74,10 @@ public class MqttConnectorConfiguration implements ConnectorConfiguration {
     for (String url : urls) {
       try {
         URI uri = new URI(url);
+        if (uri.getScheme() == null || uri.getHost() == null) {
+          throw new IllegalArgumentException(
+              "Invalid URL: missing scheme or host in '" + url + "'");
+        }
         if (uri.getUserInfo() != null) {
           uri =
               new URI(

@@ -47,12 +47,12 @@ RUN mkdir /out && \
 FROM openpolicyagent/opa:1.14.0-static AS opa
 
 COPY --from=fetcher /out/config.json /data/config.json
-COPY --from=fetcher /out/tmp/bundle/policy /policies
-COPY --from=fetcher /out/tmp/bundle/lib /lib
-COPY --from=fetcher /out/tmp/bundle/providers /providers
+COPY --from=fetcher /out/bundle/policy /policies
+COPY --from=fetcher /out/bundle/lib /helpers
+COPY --from=fetcher /out/bundle/providers /providers
 COPY --from=fetcher /out/data.json /data/data.json
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=5s \
     CMD /opa eval -f pretty true || exit 1
 
-CMD [ "run", "--server", "--addr=0.0.0.0:8181", "--log-level=info", "--log-format=json", "--set=decision_logs.console=true", "/policies", "/lib", "/providers", "/data" ]
+CMD [ "run", "--server", "--addr=0.0.0.0:8181", "--log-level=info", "--log-format=json", "--set=decision_logs.console=true", "/policies", "/helpers", "/providers", "/data" ]

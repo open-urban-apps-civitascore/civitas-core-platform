@@ -40,7 +40,6 @@ export const DatasetCreateForm = () => {
     createDataset.mutate(
       {
         name: formData.name,
-        dataSetStatus: 'DRAFT', // Is neccessary for JSON server usage. Needs to be removed, when backend API is implemented.
       },
       {
         onSuccess: ({ data }) => {

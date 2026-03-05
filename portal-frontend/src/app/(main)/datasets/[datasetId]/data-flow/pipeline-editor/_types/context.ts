@@ -104,6 +104,12 @@ export interface ActivePipelineContextValue {
   savePipeline: () => void
   /** Whether a save operation is currently in progress */
   isSaving: boolean
+  /** Delete the active pipeline from backend and remove its tab */
+  deletePipeline: () => void
+  /** Whether a delete operation is currently in progress */
+  isDeleting: boolean
+  /** Whether pipelines are being loaded from the backend */
+  isLoadingPipelines: boolean
 
   // ===== Session Info =====
   /** ID of the active session */

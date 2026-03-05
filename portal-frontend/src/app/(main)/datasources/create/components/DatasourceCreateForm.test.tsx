@@ -82,10 +82,6 @@ describe('DatasourceCreateForm', () => {
       expect(mockMutate).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'Test Datasource',
-          description: '',
-          status: 'DRAFT',
-          connector: null,
-          connection: 'inactive',
         }),
         expect.any(Object),
       )

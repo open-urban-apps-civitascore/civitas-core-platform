@@ -16,6 +16,7 @@ export const getDatasources = async (params?: URLSearchParams) => {
       endpoint: '/datasources',
       method: 'GET',
       params,
+      isApiBackend: true,
     })
   } catch (error) {
     console.error('An error occurred while fetching datasources.', error)
@@ -28,6 +29,7 @@ export const getDatasource = async (id: string) => {
     return await serverFetch<Datasource>({
       endpoint: `/datasources/${id}`,
       method: 'GET',
+      isApiBackend: true,
     })
   } catch (error) {
     console.error(`An error occurred while fetching datasource ${id}.`, error)
