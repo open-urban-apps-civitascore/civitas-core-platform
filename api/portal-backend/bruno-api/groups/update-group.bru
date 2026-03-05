@@ -28,3 +28,9 @@ body:json {
 auth:bearer {
   token: {{accessToken}}
 }
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('groupId', res.body.id);
+  }
+}
