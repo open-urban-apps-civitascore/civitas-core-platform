@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "name": "Portal Backend Test Flows",
+  "type": "collection",
+  "ignore": ["node_modules"]
+}

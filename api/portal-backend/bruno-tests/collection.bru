@@ -1,0 +1,21 @@
+script:pre-request {
+  const tokenUrl = `${bru.getEnvVar('keycloakUrl')}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`;
+
+  const existingToken = bru.getVar('accessToken');
+  if (existingToken) {
+    return;
+  }
+
+  const res = await bru.http({
+    method: 'POST',
+    url: tokenUrl,
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: bru.getEnvVar('clientId'),
+      client_secret: bru.getEnvVar('clientSecret')
+    }).toString()
+  });
+
+  bru.setVar('accessToken', res.data.access_token);
+}
