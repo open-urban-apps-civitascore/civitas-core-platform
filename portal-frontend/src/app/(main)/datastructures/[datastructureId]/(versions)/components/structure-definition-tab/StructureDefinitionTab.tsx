@@ -1,9 +1,10 @@
-import { PageBackground } from '@/components/page-background/PageBackground'
-import { UseMultiSessionReturn } from '@/components/uml-modeler/types/session'
-import { UmlModeler } from '@/components/uml-modeler/UmlModeler'
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 import { toast } from 'sonner'
+
+import { PageBackground } from '@/components/page-background/PageBackground'
+import { UseMultiSessionReturn } from '@/components/uml-modeler/types/session'
+import { UmlModeler } from '@/components/uml-modeler/UmlModeler'
 
 interface StructureDefinitionTabProps {
   isReadOnly: boolean

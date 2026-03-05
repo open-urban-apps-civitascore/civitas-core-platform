@@ -1,4 +1,4 @@
-import { DirtyField, type DiagramSession, type MultiSessionState, type SessionAction } from '../types/session'
+import { type DiagramSession, DirtyField, type MultiSessionState, type SessionAction } from '../types/session'
 import { createEmptyDiagram } from './diagramService'
 
 // Initial session state factory

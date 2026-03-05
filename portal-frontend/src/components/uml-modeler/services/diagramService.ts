@@ -1,4 +1,11 @@
-import { addEdge, applyEdgeChanges, applyNodeChanges, type Connection, type EdgeChange, type NodeChange } from '@xyflow/react'
+import {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  type Connection,
+  type EdgeChange,
+  type NodeChange,
+} from '@xyflow/react'
 
 import type { DiagramAction, UMLDiagram, UMLEdge, UMLNode } from '../types/diagram'
 import type { UMLRelationship } from '../types/uml'
@@ -6,8 +13,7 @@ import type { UMLRelationship } from '../types/uml'
 const hasSemanticNodeChanges = (changes: NodeChange[]) =>
   changes.some(change => change.type !== 'select' && change.type !== 'dimensions')
 
-const hasSemanticEdgeChanges = (changes: EdgeChange[]) =>
-  changes.some(change => change.type !== 'select')
+const hasSemanticEdgeChanges = (changes: EdgeChange[]) => changes.some(change => change.type !== 'select')
 
 // Initial empty diagram state
 export const createEmptyDiagram = (name = 'Untitled Diagram'): UMLDiagram => ({

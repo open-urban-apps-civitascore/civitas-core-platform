@@ -1,6 +1,6 @@
 import z from 'zod'
 
-import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
+import { UMLDiagram, UMLEdge, UMLNode } from '@/components/uml-modeler/types/diagram'
 import { enumFromConst } from '@/utils/common'
 
 import { AssignmentSchema } from './assignments'
@@ -69,24 +69,29 @@ export const DatastructureVersionFormDraftSchema = z.object({
   dataStructureVersionStatus: DatastructureStatusEnum,
   modelAtlasUri: z.string().trim().nullable(),
   modelName: z.string().trim().nullable(),
-  model: z.string().trim().nullable(),
-  styles: z.custom<UMLDiagram>().nullable(),
+  nodes: z.array(z.custom<UMLNode>()),
+  edges: z.array(z.custom<UMLEdge>()),
 })
 
 export const DatastructureVersionFormAvailableSchema = DatastructureVersionFormDraftSchema.extend({
   description: z.string().trim().min(1, 'common.errors.required'),
   modelAtlasUri: z.string().trim().min(1, 'common.errors.required'),
   modelName: z.string().trim().min(1, 'common.errors.required'),
-  model: z.string().trim().min(1, 'common.errors.required'),
-  styles: z.custom<UMLDiagram>(),
+  // Available datastructure models must have at least one node
+  nodes: z.array(z.custom<UMLNode>()).min(1),
+  edges: z.array(z.custom<UMLEdge>()),
 })
 
-export const DatastructureVersionCreateSchema = DatastructureVersionFormDraftSchema.omit({ id: true })
-  .partial()
-  .extend({
-    version: z.string().trim().min(1, 'common.errors.required'),
-    dataStructureVersionSource: DatastructureVersionSourceEnum,
-  })
+export const DatastructureVersionCreateSchema = z.object({
+  version: z.string().trim().min(1, 'common.errors.required'),
+  description: z.string().trim().optional(),
+  dataStructureVersionSource: DatastructureVersionSourceEnum,
+  dataStructureVersionStatus: DatastructureStatusEnum.optional(),
+  modelAtlasUri: z.string().trim().nullable().optional(),
+  modelName: z.string().trim().nullable().optional(),
+  model: z.string().trim().nullable().optional(),
+  styles: z.custom<UMLDiagram>().nullable().optional(),
+})
 
 export type DatastructureVersion = z.infer<typeof DatastructureVersionApiResponseSchema>
 export type DatastructureVersionSummary = z.infer<typeof DatastructureVersionSummaryApiResponseSchema>
