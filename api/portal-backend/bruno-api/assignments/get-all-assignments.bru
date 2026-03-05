@@ -7,7 +7,7 @@ meta {
 get {
   url: {{baseUrl}}/assignments
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:query {
@@ -18,8 +18,4 @@ params:query {
   ~userId: user-456
   ~groupId: group-789
   ~scopeId: scope-101112
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

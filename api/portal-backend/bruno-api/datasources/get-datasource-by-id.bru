@@ -7,13 +7,9 @@ meta {
 get {
   url: {{baseUrl}}/datasources/:id
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
   id: {{dataSourceId}}
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

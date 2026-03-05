@@ -7,7 +7,7 @@ meta {
 post {
   url: {{baseUrl}}/datasets/:dataSetId/pipelines
   body: json
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
@@ -24,10 +24,6 @@ body:json {
     "apis": [],
     "persistences": []
   }
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 script:post-response {

@@ -7,7 +7,7 @@ meta {
 post {
   url: {{baseUrl}}/users
   body: json
-  auth: bearer
+  auth: inherit
 }
 
 body:json {
@@ -21,10 +21,6 @@ body:json {
     "active": true,
     "groupIds": []
   }
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 script:post-response {

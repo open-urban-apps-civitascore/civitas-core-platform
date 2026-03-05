@@ -7,7 +7,7 @@ meta {
 get {
   url: {{baseUrl}}/datastructures
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:query {
@@ -17,8 +17,4 @@ params:query {
   ~name: My Data Structure
   ~description: Data structure description
   ~q: structure
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

@@ -7,7 +7,7 @@ meta {
 post {
   url: {{baseUrl}}/datasets
   body: json
-  auth: bearer
+  auth: inherit
 }
 
 body:json {
@@ -17,10 +17,6 @@ body:json {
     "openDataAccess": false,
     "assignments": []
   }
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 script:post-response {

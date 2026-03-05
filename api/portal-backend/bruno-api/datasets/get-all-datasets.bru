@@ -7,7 +7,7 @@ meta {
 get {
   url: {{baseUrl}}/datasets
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:query {
@@ -17,8 +17,4 @@ params:query {
   ~name: sensor-data
   ~description: Temperature sensor readings
   ~q: sensor
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

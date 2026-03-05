@@ -7,13 +7,9 @@ meta {
 get {
   url: {{baseUrl}}/datasets/:id/assignments
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
   id: {{dataSetId}}
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

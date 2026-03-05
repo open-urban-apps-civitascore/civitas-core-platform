@@ -7,14 +7,10 @@ meta {
 delete {
   url: {{baseUrl}}/datastructures/:dataStructureId/versions/:id
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
   dataStructureId: {{dataStructureId}}
   id: {{dataStructureVersionId}}
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

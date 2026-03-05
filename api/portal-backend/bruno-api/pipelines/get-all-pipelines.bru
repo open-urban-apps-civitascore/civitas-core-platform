@@ -7,7 +7,7 @@ meta {
 get {
   url: {{baseUrl}}/datasets/:dataSetId/pipelines
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
@@ -21,8 +21,4 @@ params:query {
   ~name: traffic-pipeline
   ~description: Processing traffic data
   ~q: traffic
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

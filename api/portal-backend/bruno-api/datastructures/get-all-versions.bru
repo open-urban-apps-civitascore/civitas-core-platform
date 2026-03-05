@@ -7,7 +7,7 @@ meta {
 get {
   url: {{baseUrl}}/datastructures/:dataStructureId/versions
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
@@ -18,8 +18,4 @@ params:query {
   ~page: 0
   ~size: 20
   ~sort: createdAt,DESC
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

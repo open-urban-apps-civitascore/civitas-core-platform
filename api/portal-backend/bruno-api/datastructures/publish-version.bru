@@ -7,14 +7,10 @@ meta {
 post {
   url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/publish
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
   dataStructureId: {{dataStructureId}}
   versionId: {{dataStructureVersionId}}
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

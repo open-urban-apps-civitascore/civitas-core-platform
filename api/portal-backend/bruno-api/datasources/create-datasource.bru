@@ -7,7 +7,7 @@ meta {
 post {
   url: {{baseUrl}}/datasources
   body: json
-  auth: bearer
+  auth: inherit
 }
 
 body:json {
@@ -31,10 +31,6 @@ body:json {
     "dataStructureVersionId": null,
     "assignments": []
   }
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 script:post-response {

@@ -7,7 +7,7 @@ meta {
 put {
   url: {{baseUrl}}/roles/:id
   body: json
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
@@ -22,10 +22,6 @@ body:json {
     "permissionIds": [],
     "readonly": false
   }
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 script:post-response {

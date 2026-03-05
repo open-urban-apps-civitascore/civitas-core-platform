@@ -7,7 +7,7 @@ meta {
 get {
   url: {{baseUrl}}/datasources
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:query {
@@ -19,8 +19,4 @@ params:query {
   ~q: sensor
   ~dataSourceStatus: DRAFT
   ~connectorType: MQTT
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

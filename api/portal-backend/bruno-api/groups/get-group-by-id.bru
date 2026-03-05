@@ -7,13 +7,9 @@ meta {
 get {
   url: {{baseUrl}}/groups/:id
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
   id: {{groupId}}
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

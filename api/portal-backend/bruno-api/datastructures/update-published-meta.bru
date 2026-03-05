@@ -7,7 +7,7 @@ meta {
 put {
   url: {{baseUrl}}/datastructures/:dataStructureId/published/meta
   body: json
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
@@ -19,8 +19,4 @@ body:json {
     "name": "Updated Name",
     "description": "Updated description for published data structure"
   }
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

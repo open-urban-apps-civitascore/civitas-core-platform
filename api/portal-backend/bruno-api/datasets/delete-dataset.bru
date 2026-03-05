@@ -7,13 +7,9 @@ meta {
 delete {
   url: {{baseUrl}}/datasets/:id
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
   id: {{dataSetId}}
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

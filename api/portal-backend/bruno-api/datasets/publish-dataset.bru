@@ -7,13 +7,9 @@ meta {
 post {
   url: {{baseUrl}}/datasets/:id/publish
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
   id: {{dataSetId}}
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

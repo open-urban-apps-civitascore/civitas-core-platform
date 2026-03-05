@@ -7,14 +7,10 @@ meta {
 get {
   url: {{baseUrl}}/authorities
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:query {
   ~page: 0
   ~size: 20
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

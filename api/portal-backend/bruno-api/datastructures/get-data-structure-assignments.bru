@@ -7,13 +7,9 @@ meta {
 get {
   url: {{baseUrl}}/datastructures/:id/assignments
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
   id: {{dataStructureId}}
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

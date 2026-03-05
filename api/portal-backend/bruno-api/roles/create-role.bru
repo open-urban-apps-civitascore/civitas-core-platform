@@ -7,7 +7,7 @@ meta {
 post {
   url: {{baseUrl}}/roles
   body: json
-  auth: bearer
+  auth: inherit
 }
 
 body:json {
@@ -18,10 +18,6 @@ body:json {
     "permissionIds": [],
     "readonly": false
   }
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 script:post-response {

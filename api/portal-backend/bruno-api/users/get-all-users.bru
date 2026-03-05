@@ -7,7 +7,7 @@ meta {
 get {
   url: {{baseUrl}}/users
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:query {
@@ -20,8 +20,4 @@ params:query {
   ~active: true
   ~externalId: ext-123
   ~q: john
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

@@ -7,7 +7,7 @@ meta {
 put {
   url: {{baseUrl}}/datasources/:id/published/meta
   body: json
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
@@ -20,8 +20,4 @@ body:json {
     "description": "Updated description for published data source",
     "assignments": []
   }
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

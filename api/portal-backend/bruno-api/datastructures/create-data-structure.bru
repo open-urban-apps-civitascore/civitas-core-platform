@@ -7,7 +7,7 @@ meta {
 post {
   url: {{baseUrl}}/datastructures
   body: json
-  auth: bearer
+  auth: inherit
 }
 
 body:json {
@@ -18,10 +18,6 @@ body:json {
     "dataStructureVersionIds": [],
     "assignments": []
   }
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 script:post-response {

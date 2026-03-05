@@ -7,7 +7,7 @@ meta {
 patch {
   url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
   body: json
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
@@ -19,10 +19,6 @@ body:json {
   {
     "description": "Patched pipeline description"
   }
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 script:post-response {

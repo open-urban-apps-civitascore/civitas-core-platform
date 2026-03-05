@@ -7,7 +7,7 @@ meta {
 post {
   url: {{baseUrl}}/assignments
   body: json
-  auth: bearer
+  auth: inherit
 }
 
 body:json {
@@ -17,10 +17,6 @@ body:json {
     "scopeType": "TENANT",
     "scopeId": null
   }
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
 
 script:post-response {

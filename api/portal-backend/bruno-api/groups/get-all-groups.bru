@@ -7,7 +7,7 @@ meta {
 get {
   url: {{baseUrl}}/groups
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:query {
@@ -19,8 +19,4 @@ params:query {
   ~contactUserId: user-123
   ~parentGroupId: group-456
   ~q: team
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

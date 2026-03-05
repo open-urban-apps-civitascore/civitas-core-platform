@@ -7,14 +7,10 @@ meta {
 delete {
   url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
   dataSetId: {{dataSetId}}
   id: {{pipelineId}}
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

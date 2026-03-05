@@ -7,13 +7,9 @@ meta {
 delete {
   url: {{baseUrl}}/users/:id
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
   id: {{userId}}
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }

@@ -7,13 +7,9 @@ meta {
 get {
   url: {{baseUrl}}/permissions/:id
   body: none
-  auth: bearer
+  auth: inherit
 }
 
 params:path {
   id: {{permissionId}}
-}
-
-auth:bearer {
-  token: {{accessToken}}
 }
