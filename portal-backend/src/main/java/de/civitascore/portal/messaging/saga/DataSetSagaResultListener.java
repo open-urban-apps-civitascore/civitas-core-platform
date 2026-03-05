@@ -8,14 +8,12 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@ConditionalOnProperty(name = "kafka.enabled", havingValue = "true")
 public class DataSetSagaResultListener {
 
   private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};

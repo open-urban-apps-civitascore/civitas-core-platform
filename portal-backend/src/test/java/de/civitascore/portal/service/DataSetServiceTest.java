@@ -41,24 +41,14 @@ class DataSetServiceTest {
   @Mock private ObjectMapper objectMapper;
   @Mock private DataSetSagaPublisher sagaPublisher;
 
-  private DataSetService serviceWithPublisher() {
+  private DataSetService createService() {
     return new DataSetService(
         dataSetRepository,
         dataSetMapper,
         assignmentBuilderService,
         distributionService,
         objectMapper,
-        Optional.of(sagaPublisher));
-  }
-
-  private DataSetService serviceWithoutPublisher() {
-    return new DataSetService(
-        dataSetRepository,
-        dataSetMapper,
-        assignmentBuilderService,
-        distributionService,
-        objectMapper,
-        Optional.empty());
+        sagaPublisher);
   }
 
   private DataSet readyDataSet(UUID id) {
@@ -86,21 +76,12 @@ class DataSetServiceTest {
   class ReleaseTests {
 
     @Test
-    @DisplayName("throws when saga publisher absent")
-    void throwsWhenPublisherAbsent() {
-      UUID id = UUID.randomUUID();
-      assertThatThrownBy(() -> serviceWithoutPublisher().release(id))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("Saga infrastructure not available");
-    }
-
-    @Test
     @DisplayName("throws when dataset not found")
     void throwsWhenDatasetNotFound() {
       UUID id = UUID.randomUUID();
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.empty());
 
-      assertThatThrownBy(() -> serviceWithPublisher().release(id))
+      assertThatThrownBy(() -> createService().release(id))
           .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -111,7 +92,7 @@ class DataSetServiceTest {
       DataSet ds = availableDataSet(id);
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
 
-      assertThatThrownBy(() -> serviceWithPublisher().release(id))
+      assertThatThrownBy(() -> createService().release(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("READY");
     }
@@ -124,7 +105,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      DataSetService service = serviceWithPublisher();
+      DataSetService service = createService();
       DataSet result = service.release(id);
 
       assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
@@ -138,22 +119,13 @@ class DataSetServiceTest {
   class UnreleaseTests {
 
     @Test
-    @DisplayName("throws when saga publisher absent")
-    void throwsWhenPublisherAbsent() {
-      UUID id = UUID.randomUUID();
-      assertThatThrownBy(() -> serviceWithoutPublisher().unrelease(id))
-          .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("Saga infrastructure not available");
-    }
-
-    @Test
     @DisplayName("throws when dataset not in AVAILABLE status")
     void throwsWhenNotAvailable() {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
       when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
 
-      assertThatThrownBy(() -> serviceWithPublisher().unrelease(id))
+      assertThatThrownBy(() -> createService().unrelease(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("AVAILABLE");
     }
@@ -166,7 +138,7 @@ class DataSetServiceTest {
       ds.setPendingSagaType(PendingSagaType.CREATE);
       when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
 
-      assertThatThrownBy(() -> serviceWithPublisher().unrelease(id))
+      assertThatThrownBy(() -> createService().unrelease(id))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("saga is in-flight");
     }
@@ -179,7 +151,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      DataSetService service = serviceWithPublisher();
+      DataSetService service = createService();
       DataSet result = service.unrelease(id);
 
       assertThat(result.getPendingSagaType()).isEqualTo(PendingSagaType.DELETE);
@@ -211,7 +183,7 @@ class DataSetServiceTest {
               "https://public.example.com",
               List.of("pipe-1"));
 
-      serviceWithPublisher().handleSagaCompleted(id, result);
+      createService().handleSagaCompleted(id, result);
 
       ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
       verify(dataSetRepository).save(saved.capture());
@@ -237,7 +209,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      serviceWithPublisher()
+      createService()
           .handleSagaCompleted(
               id, new SagaResultPayload(id.toString(), null, null, null, null, null, null));
 
@@ -257,7 +229,7 @@ class DataSetServiceTest {
       ds.setPendingSagaType(null);
       when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
 
-      serviceWithPublisher()
+      createService()
           .handleSagaCompleted(
               id, new SagaResultPayload(id.toString(), null, null, null, null, null, null));
 
@@ -278,7 +250,7 @@ class DataSetServiceTest {
       when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-      serviceWithPublisher().handleSagaFailed(id, "FROST", "timeout", true);
+      createService().handleSagaFailed(id, "FROST", "timeout", true);
 
       ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
       verify(dataSetRepository).save(saved.capture());
@@ -317,7 +289,7 @@ class DataSetServiceTest {
               "https://public.example.com/",
               List.of());
 
-      serviceWithPublisher().handleSagaCompleted(id, result);
+      createService().handleSagaCompleted(id, result);
 
       ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
       verify(dataSetRepository).save(saved.capture());

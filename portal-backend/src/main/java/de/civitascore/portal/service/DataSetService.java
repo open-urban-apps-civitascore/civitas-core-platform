@@ -43,13 +43,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       ScopedAssignmentBuilderService assignmentBuilderService,
       DistributionService distributionService,
       ObjectMapper objectMapper,
-      Optional<DataSetSagaPublisher> sagaPublisher) {
+      DataSetSagaPublisher sagaPublisher) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
     this.assignmentBuilderService = assignmentBuilderService;
     this.distributionService = distributionService;
     this.objectMapper = objectMapper;
-    this.sagaPublisher = sagaPublisher.orElse(null);
+    this.sagaPublisher = sagaPublisher;
   }
 
   @Override
@@ -150,8 +150,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    * @param id the dataset ID
    * @param input the update input
    * @return the updated dataset
-   * @throws InvalidInputException if trying to update a DRAFT dataset or saga infrastructure is
-   *     unavailable
+   * @throws InvalidInputException if trying to update a DRAFT dataset
    */
   @Transactional
   public DataSet updatePublishedMeta(UUID id, DataSetInputDTO input) {
@@ -169,12 +168,6 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
     if (updated.getDataSetStatus() == DataSetStatus.AVAILABLE
         && updated.getProjectId() != null
         && updated.getPendingSagaType() == null) {
-      if (sagaPublisher == null) {
-        throw new InvalidInputException(
-            "dataSetStatus",
-            id,
-            "Saga infrastructure not available — cannot update AVAILABLE dataset");
-      }
       updated.setPendingSagaType(PendingSagaType.UPDATE);
       updated = dataSetRepository.save(updated);
       sagaPublisher.publishUpdateRequested(updated, previousPipelines);
@@ -269,16 +262,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    *
    * @param id the dataset ID
    * @return the released dataset
-   * @throws InvalidInputException if dataset is not in READY status or saga infrastructure is
-   *     unavailable
+   * @throws InvalidInputException if dataset is not in READY status
    */
   @Transactional
   public DataSet release(UUID id) {
-    if (sagaPublisher == null) {
-      throw new InvalidInputException(
-          "dataSetStatus", id, "Saga infrastructure not available — cannot release dataset");
-    }
-
     DataSet dataSet =
         dataSetRepository
             .findByIdWithPipelineDataSources(id)
@@ -304,16 +291,10 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
    *
    * @param id the dataset ID
    * @return the dataset with pending DELETE saga
-   * @throws InvalidInputException if dataset is not AVAILABLE, has a saga in-flight, or saga
-   *     infrastructure is unavailable
+   * @throws InvalidInputException if dataset is not AVAILABLE or has a saga in-flight
    */
   @Transactional
   public DataSet unrelease(UUID id) {
-    if (sagaPublisher == null) {
-      throw new InvalidInputException(
-          "dataSetStatus", id, "Saga infrastructure not available — cannot unrelease dataset");
-    }
-
     DataSet dataSet = findByIdOrThrow(id);
 
     if (dataSet.getDataSetStatus() != DataSetStatus.AVAILABLE) {
