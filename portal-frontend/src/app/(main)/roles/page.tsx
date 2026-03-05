@@ -28,9 +28,8 @@ const RolesPage = () => {
   const tabsValues = {
     systemRoles: { value: ROLE_TYPES.SYSTEM, label: t('systemRoles') },
     dataRoles: { value: ROLE_TYPES.DATA, label: t('dataRoles') },
-    governanceRoles: { value: ROLE_TYPES.GOVERNANCE, label: t('governanceRoles') },
   }
-  const tabs = [tabsValues.systemRoles, tabsValues.dataRoles, tabsValues.governanceRoles]
+  const tabs = [tabsValues.systemRoles, tabsValues.dataRoles]
 
   const {
     setSortingParams,

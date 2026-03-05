@@ -4,7 +4,7 @@ import { ItemScheme, WithId } from './common'
 
 export type GroupTab = 'info' | 'roles' | 'users' | 'subgroups'
 
-export const GroupRoleTypes = z.enum(['SYSTEM', 'DATA', 'GOVERNANCE'])
+export const GroupRoleTypes = z.enum(['SYSTEM', 'DATA'])
 
 export const GroupRoleScheme = ItemScheme.extend({
   roleType: GroupRoleTypes,

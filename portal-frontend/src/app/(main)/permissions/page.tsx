@@ -19,7 +19,6 @@ import { PermissionsTable } from './components/PermissionsTable'
 const tabsValues = {
   systemPermissions: { value: ROLE_TYPES.SYSTEM, label: 'permissions.systemPermissions' },
   dataPermissions: { value: ROLE_TYPES.DATA, label: 'permissions.dataPermissions' },
-  governancePermissions: { value: ROLE_TYPES.GOVERNANCE, label: 'permissions.governancePermissions' },
 }
 
 export const DEFAULT_TAB = ROLE_TYPES.SYSTEM
@@ -27,7 +26,7 @@ export const DEFAULT_TAB = ROLE_TYPES.SYSTEM
 const PermissionsPage = () => {
   const t = useTranslations()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const tabs = [tabsValues.systemPermissions, tabsValues.dataPermissions, tabsValues.governancePermissions]
+  const tabs = [tabsValues.systemPermissions, tabsValues.dataPermissions]
 
   const {
     setSortingParams,

@@ -9,13 +9,11 @@ import { mapRolesData } from './mappers'
 const roles = [
   { id: 'r1', name: 'Admin', roleType: ROLE_TYPES.SYSTEM },
   { id: 'r2', name: 'Editor', roleType: ROLE_TYPES.DATA },
-  { id: 'r3', name: 'Support', roleType: ROLE_TYPES.GOVERNANCE },
 ]
 
 const groupRoles = [
   { id: 'r1', name: 'Admin', roleType: 'SYSTEM' as const },
   { id: 'r2', name: 'Editor', roleType: 'DATA' as const },
-  { id: 'r3', name: 'Support', roleType: 'GOVERNANCE' as const },
 ]
 
 const groups: Group[] = [
@@ -33,7 +31,7 @@ const groups: Group[] = [
     id: 'g2',
     name: 'Group 02',
     description: '',
-    roles: [groupRoles[0], groupRoles[2]],
+    roles: [groupRoles[0]],
     members: [],
     contactUser: null,
     createdAt: '',
@@ -69,14 +67,6 @@ describe('mapRolesData', () => {
         group: 'Group 02',
         type: ROLE_TYPES.SYSTEM,
         roleId: 'r1',
-      },
-      {
-        id: 'g2-r3',
-        name: 'Support',
-        inherited: false,
-        group: 'Group 02',
-        type: ROLE_TYPES.GOVERNANCE,
-        roleId: 'r3',
       },
     ])
   })

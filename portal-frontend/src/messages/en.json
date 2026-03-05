@@ -318,7 +318,6 @@
     "title": "Permissions",
     "systemPermissions": "System Permissions",
     "dataPermissions": "Daten Permissions",
-    "governancePermissions": "Governance Permissions",
     "tableHeaders": {
       "title": "Name",
       "category": "Category"
@@ -330,7 +329,6 @@
     "overView": "Overview:",
     "systemRoles": "System Roles",
     "dataRoles": "Data Roles",
-    "governanceRoles": "Governance Roles",
     "roles": "Individual Roles",
     "roleSets": "Role Sets",
     "tableHeaders": {

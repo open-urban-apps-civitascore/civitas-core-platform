@@ -7,7 +7,6 @@ export type RoleTab = 'basicInformation' | 'permissions' | 'groupAssignment'
 export const ROLE_TYPES = {
   SYSTEM: 'SYSTEM',
   DATA: 'DATA',
-  GOVERNANCE: 'GOVERNANCE',
 } as const
 
 export type RoleType = (typeof ROLE_TYPES)[keyof typeof ROLE_TYPES]

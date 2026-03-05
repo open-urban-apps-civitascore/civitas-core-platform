@@ -316,7 +316,6 @@
     "title": "Berechtigungen",
     "systemPermissions": "Systemberechtigungen",
     "dataPermissions": "Datenberechtigungen",
-    "governancePermissions": "Governanceberechtigungen",
     "tableHeaders": {
       "title": "Name",
       "category": "Kategorie"
@@ -328,7 +327,6 @@
     "overView": "Übersicht:",
     "systemRoles": " Systemrollen",
     "dataRoles": "Datenrollen",
-    "governanceRoles": "Governancerollen",
     "roles": "Einzelrollen",
     "roleSets": "Rollensets",
     "tableHeaders": {
@@ -346,7 +344,7 @@
     "tabLabels": {
       "basicInformation": "Informationen",
       "permissions": "Berechtigungen",
-      "groupAssignment": "Mitgliedschaft"
+      "groupAssignment": "Gruppen Zuweisungen"
     },
     "baseInfoTab": {
       "heading": "Basisinformationen",
@@ -386,7 +384,7 @@
       }
     },
     "groupAssignmentTab": {
-      "heading": "Mitgliedschaften",
+      "heading": "Gruppen Zuweisungen",
       "addGroup": "Gruppen hinzufügen",
       "tableHeaders": {
         "name": "Name",
