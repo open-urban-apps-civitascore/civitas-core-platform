@@ -25,17 +25,21 @@ Install Redocly CLI:
 
 ```bash
 cd api/portal-backend
-npm install
+pnpm install
 ```
 
 ### View API docs
 
-Open `docs.html` in a browser — renders the OpenAPI spec via Scalar (CDN-loaded, no server needed).
+```bash
+pnpm api-docs
+```
+
+Opens the Scalar API reference at `http://localhost:8095/docs.html`. The page loads the OpenAPI spec via Scalar (CDN).
 
 ### Live preview while editing
 
 ```bash
-npm run preview
+pnpm run preview
 ```
 
 Opens a live-reloading preview at `http://localhost:8080`. Edit `openapi.yaml` in your editor, see changes instantly.
@@ -43,7 +47,7 @@ Opens a live-reloading preview at `http://localhost:8080`. Edit `openapi.yaml` i
 ### Lint the spec
 
 ```bash
-npm run lint
+pnpm run lint
 ```
 
 ### Use Bruno collections
@@ -51,7 +55,7 @@ npm run lint
 1. Open Bruno
 2. Open Collection > select `api/portal-backend/bruno-api/` or `api/portal-backend/bruno-tests/`
 3. Select the "local" environment
-4. Set `KEYCLOAK_CLIENT_SECRET` environment variable or update the environment in Bruno
+4. Dev credentials are pre-configured — ready to use out of the box
 
 **bruno-api** — one request per endpoint, organized by resource. Use for manual testing during development.
 
@@ -66,5 +70,5 @@ Recommended IDE extensions for autocomplete and validation:
 
 Workflow:
 1. Edit `openapi.yaml` in your IDE
-2. Run `npm run preview` for live browser preview (optional)
-3. Run `npm run lint` before committing
+2. Run `pnpm run preview` for live browser preview (optional)
+3. Run `pnpm run lint` before committing
