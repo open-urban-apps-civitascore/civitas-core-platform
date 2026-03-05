@@ -39,9 +39,9 @@ export const PermissionsTable = (props: PermissionsTableProps) => {
       cell: info => info.getValue(),
       enableHiding: true,
     }),
-    columnHelper.accessor('title', {
+    columnHelper.accessor('name', {
       header: ({ column }) => {
-        return <SortableTableHeader column={column} title={t('tableHeaders.title')} />
+        return <SortableTableHeader column={column} title={t('tableHeaders.name')} />
       },
       cell: info => info.getValue(),
       meta: {
@@ -52,7 +52,7 @@ export const PermissionsTable = (props: PermissionsTableProps) => {
     }),
     columnHelper.accessor('category', {
       header: () => t('tableHeaders.category'),
-      cell: info => info.getValue().title,
+      cell: info => info.getValue(),
     }),
     {
       id: 'action',
