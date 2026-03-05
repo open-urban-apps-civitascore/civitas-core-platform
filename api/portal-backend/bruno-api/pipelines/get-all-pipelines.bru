@@ -1,0 +1,28 @@
+meta {
+  name: Get All Pipelines
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: none
+  auth: bearer
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+  ~name: traffic-pipeline
+  ~description: Processing traffic data
+  ~q: traffic
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

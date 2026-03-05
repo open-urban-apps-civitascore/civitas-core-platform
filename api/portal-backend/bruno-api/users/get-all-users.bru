@@ -1,0 +1,27 @@
+meta {
+  name: Get All Users
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/users
+  body: none
+  auth: bearer
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+  ~firstName: John
+  ~lastName: Doe
+  ~email: john.doe@example.com
+  ~active: true
+  ~externalId: ext-123
+  ~q: john
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

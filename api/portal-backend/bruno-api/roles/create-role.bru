@@ -1,0 +1,25 @@
+meta {
+  name: Create Role
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/roles
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Data Manager",
+    "description": "Can manage data resources",
+    "roleType": "DATA",
+    "permissionIds": [],
+    "readonly": false
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

@@ -1,0 +1,38 @@
+meta {
+  name: Create Data Source
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "MQTT Sensor Source",
+    "description": "Temperature sensor data source",
+    "connectorType": "MQTT",
+    "configuration": {
+      "urls": ["tcp://broker:1883"],
+      "topics": ["sensor/#"],
+      "qos": 1,
+      "keepalive": "30s",
+      "user": "mqttuser",
+      "password": "secret",
+      "client_id": "civitas-client-1",
+      "connect_timeout": "5s",
+      "tls": {
+        "enabled": false
+      }
+    },
+    "dataStructureVersionId": null,
+    "assignments": []
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

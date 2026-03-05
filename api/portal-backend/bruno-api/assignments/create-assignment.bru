@@ -1,0 +1,24 @@
+meta {
+  name: Create Assignment
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/assignments
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "groupId": "{{groupId}}",
+    "roleId": "{{roleId}}",
+    "scopeType": "TENANT",
+    "scopeId": null
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

@@ -1,0 +1,29 @@
+meta {
+  name: Update Data Structure
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/datastructures/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: {{dataStructureId}}
+}
+
+body:json {
+  {
+    "name": "Sensor Data Structure",
+    "description": "Updated data structure for sensor readings",
+    "createdFromDataSource": false,
+    "dataStructureVersionIds": [],
+    "assignments": []
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

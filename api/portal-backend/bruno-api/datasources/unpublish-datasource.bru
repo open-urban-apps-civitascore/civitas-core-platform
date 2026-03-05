@@ -1,0 +1,19 @@
+meta {
+  name: Unpublish Data Source
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/unpublish
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

@@ -1,0 +1,20 @@
+meta {
+  name: Delete Data Structure Version
+  type: http
+  seq: 16
+}
+
+delete {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:id
+  body: none
+  auth: bearer
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  id: {{dataStructureVersionId}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

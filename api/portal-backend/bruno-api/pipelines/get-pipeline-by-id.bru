@@ -1,0 +1,20 @@
+meta {
+  name: Get Pipeline by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
+  body: none
+  auth: bearer
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{pipelineId}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

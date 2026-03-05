@@ -1,0 +1,32 @@
+meta {
+  name: Update User
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/users/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: {{userId}}
+}
+
+body:json {
+  {
+    "title": "MR",
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@example.com",
+    "phone": "+1234567890",
+    "externalId": "ext-123",
+    "active": true,
+    "groupIds": []
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

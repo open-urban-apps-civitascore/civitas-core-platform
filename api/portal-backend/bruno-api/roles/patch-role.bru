@@ -1,0 +1,25 @@
+meta {
+  name: Patch Role
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/roles/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: {{roleId}}
+}
+
+body:json {
+  {
+    "description": "Patched description"
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

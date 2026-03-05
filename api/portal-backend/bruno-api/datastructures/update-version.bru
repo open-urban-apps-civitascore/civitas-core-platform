@@ -1,0 +1,32 @@
+meta {
+  name: Update Data Structure Version
+  type: http
+  seq: 14
+}
+
+put {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  id: {{dataStructureVersionId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "1.1.0",
+    "description": "Updated version",
+    "modelAtlasUri": null,
+    "modelName": "SensorModel",
+    "model": null,
+    "styles": {}
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

@@ -1,0 +1,29 @@
+meta {
+  name: Update Role
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/roles/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: {{roleId}}
+}
+
+body:json {
+  {
+    "name": "Data Manager",
+    "description": "Updated description",
+    "roleType": "DATA",
+    "permissionIds": [],
+    "readonly": false
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

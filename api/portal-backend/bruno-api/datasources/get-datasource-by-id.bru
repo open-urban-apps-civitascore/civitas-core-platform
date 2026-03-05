@@ -1,0 +1,19 @@
+meta {
+  name: Get Data Source by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/datasources/:id
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

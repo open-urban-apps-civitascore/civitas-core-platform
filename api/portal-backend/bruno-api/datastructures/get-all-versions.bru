@@ -1,0 +1,25 @@
+meta {
+  name: Get All Data Structure Versions
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: none
+  auth: bearer
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

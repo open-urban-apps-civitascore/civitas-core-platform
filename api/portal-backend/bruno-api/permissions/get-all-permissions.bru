@@ -1,0 +1,24 @@
+meta {
+  name: Get All Permissions
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/permissions
+  body: none
+  auth: bearer
+}
+
+params:query {
+  ~name: read
+  ~description: Allows read access
+  ~q: read
+  ~permissionType: SYSTEM
+  ~category: TENANT_ADMINISTRATION
+  ~source: INTERNAL
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

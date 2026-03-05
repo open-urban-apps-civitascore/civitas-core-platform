@@ -1,0 +1,26 @@
+meta {
+  name: Patch Pipeline
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{pipelineId}}
+}
+
+body:json {
+  {
+    "description": "Patched pipeline description"
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

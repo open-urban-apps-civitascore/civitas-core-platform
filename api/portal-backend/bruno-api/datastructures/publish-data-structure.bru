@@ -1,0 +1,19 @@
+meta {
+  name: Publish Data Structure
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/publish
+  body: none
+  auth: bearer
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

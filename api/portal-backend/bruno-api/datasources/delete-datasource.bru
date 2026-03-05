@@ -1,0 +1,19 @@
+meta {
+  name: Delete Data Source
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/datasources/:id
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

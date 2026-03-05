@@ -1,0 +1,25 @@
+meta {
+  name: Patch Data Structure
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/datastructures/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: {{dataStructureId}}
+}
+
+body:json {
+  {
+    "description": "Patched description"
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

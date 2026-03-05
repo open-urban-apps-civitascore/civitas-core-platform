@@ -1,0 +1,19 @@
+meta {
+  name: Get Role by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/roles/:id
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{roleId}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

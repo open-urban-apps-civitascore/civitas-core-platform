@@ -1,0 +1,25 @@
+meta {
+  name: Patch Data Source
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/datasources/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+body:json {
+  {
+    "description": "Patched description"
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

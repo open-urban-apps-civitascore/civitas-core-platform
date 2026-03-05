@@ -1,0 +1,24 @@
+meta {
+  name: Get All Data Structures
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/datastructures
+  body: none
+  auth: bearer
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+  ~name: My Data Structure
+  ~description: Data structure description
+  ~q: structure
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

@@ -1,0 +1,20 @@
+meta {
+  name: Get All Authorities
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/authorities
+  body: none
+  auth: bearer
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

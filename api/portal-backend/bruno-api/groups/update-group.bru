@@ -1,0 +1,30 @@
+meta {
+  name: Update Group
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/groups/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: {{groupId}}
+}
+
+body:json {
+  {
+    "name": "Engineering",
+    "description": "Updated engineering team",
+    "contactUserId": null,
+    "parentGroupId": null,
+    "memberIds": [],
+    "roleIds": []
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

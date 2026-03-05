@@ -1,0 +1,26 @@
+meta {
+  name: Create Group
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/groups
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Engineering",
+    "description": "Engineering team",
+    "contactUserId": null,
+    "parentGroupId": null,
+    "memberIds": [],
+    "roleIds": []
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

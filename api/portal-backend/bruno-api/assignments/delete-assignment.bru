@@ -1,0 +1,19 @@
+meta {
+  name: Delete Assignment
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/assignments/:id
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{assignmentId}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

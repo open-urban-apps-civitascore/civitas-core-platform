@@ -1,0 +1,31 @@
+meta {
+  name: Create Data Structure Version
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: json
+  auth: bearer
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "1.0.0",
+    "description": "Initial version",
+    "modelAtlasUri": null,
+    "modelName": "SensorModel",
+    "model": null,
+    "styles": {}
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

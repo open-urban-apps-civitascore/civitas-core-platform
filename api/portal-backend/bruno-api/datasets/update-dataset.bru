@@ -1,0 +1,28 @@
+meta {
+  name: Update Dataset
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/datasets/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "Sensor Readings Dataset",
+    "description": "Updated dataset description",
+    "openDataAccess": false,
+    "assignments": []
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

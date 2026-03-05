@@ -1,0 +1,27 @@
+meta {
+  name: Update Published Data Source Meta
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/datasources/:id/published/meta
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+body:json {
+  {
+    "name": "Updated Source Name",
+    "description": "Updated description for published data source",
+    "assignments": []
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

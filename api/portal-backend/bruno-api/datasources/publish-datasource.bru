@@ -1,0 +1,19 @@
+meta {
+  name: Publish Data Source
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/publish
+  body: none
+  auth: bearer
+}
+
+params:path {
+  id: {{dataSourceId}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

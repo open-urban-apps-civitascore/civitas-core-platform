@@ -1,0 +1,32 @@
+meta {
+  name: Update Pipeline
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
+  body: json
+  auth: bearer
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{pipelineId}}
+}
+
+body:json {
+  {
+    "name": "Traffic Data Pipeline",
+    "description": "Updated pipeline description",
+    "styles": {},
+    "model": {},
+    "dataSourceIds": [],
+    "apis": [],
+    "persistences": []
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

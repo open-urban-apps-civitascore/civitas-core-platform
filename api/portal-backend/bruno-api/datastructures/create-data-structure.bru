@@ -1,0 +1,25 @@
+meta {
+  name: Create Data Structure
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/datastructures
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Sensor Data Structure",
+    "description": "Data structure for sensor readings",
+    "createdFromDataSource": false,
+    "dataStructureVersionIds": [],
+    "assignments": []
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}

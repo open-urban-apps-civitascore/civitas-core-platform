@@ -1,0 +1,31 @@
+meta {
+  name: Create Pipeline
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: json
+  auth: bearer
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "Traffic Data Pipeline",
+    "description": "Processes traffic sensor data",
+    "styles": {},
+    "model": {},
+    "dataSourceIds": [],
+    "apis": [],
+    "persistences": []
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
