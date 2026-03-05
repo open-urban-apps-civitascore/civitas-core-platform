@@ -1,22 +1,23 @@
 script:pre-request {
-  const tokenUrl = `${bru.getEnvVar('keycloakUrl')}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`;
+  const axios = require('axios');
 
   const existingToken = bru.getVar('accessToken');
   if (existingToken) {
     return;
   }
 
-  const res = await bru.http({
-    method: 'POST',
-    url: tokenUrl,
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'password',
-      client_id: bru.getEnvVar('clientId'),
-      client_secret: bru.getEnvVar('clientSecret'),
-      username: bru.getEnvVar('username'),
-      password: bru.getEnvVar('password')
-    }).toString()
+  const tokenUrl = `${bru.getEnvVar('keycloakUrl')}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`;
+
+  const body = [
+    `grant_type=password`,
+    `client_id=${bru.getEnvVar('clientId')}`,
+    `client_secret=${bru.getEnvVar('clientSecret')}`,
+    `username=${bru.getEnvVar('username')}`,
+    `password=${bru.getEnvVar('password')}`
+  ].join('&');
+
+  const res = await axios.post(tokenUrl, body, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
   });
 
   bru.setVar('accessToken', res.data.access_token);
