@@ -62,8 +62,11 @@ public class DataStructureVersionController
   public ResponseEntity<DataStructureVersionOutputDTO> create(
       @Valid @RequestBody DataStructureVersionInputDTO input) {
     ResponseEntity<DataStructureVersionOutputDTO> response = super.create(input);
-    DataStructureVersion created = getService().findByIdOrThrow(response.getBody().getId());
-    getService().findModelForDataStructureVersion(created).ifPresent(response.getBody()::setModel);
+    DataStructureVersionOutputDTO output = response.getBody();
+    if (output != null) {
+      DataStructureVersion created = getService().findByIdOrThrow(output.getId());
+      getService().findModelForDataStructureVersion(created).ifPresent(output::setModel);
+    }
     return response;
   }
 
@@ -78,7 +81,7 @@ public class DataStructureVersionController
 
   @Override
   protected DataStructureVersionInputDTO preProcessInput(DataStructureVersionInputDTO input) {
-    Optional.of(extractPathVariables().get("dataStructureId"))
+    Optional.ofNullable(extractPathVariables().get("dataStructureId"))
         .map(UUID::fromString)
         .ifPresentOrElse(
             input::setDataStructureId,

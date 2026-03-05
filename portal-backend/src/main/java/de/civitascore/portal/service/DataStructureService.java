@@ -13,6 +13,7 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -66,11 +67,18 @@ public class DataStructureService
 
   @Override
   protected DataStructure postConvertToEntity(DataStructure entity, DataStructureInputDTO input) {
-    // Set dataStructureVersions
-    Optional.ofNullable(input.getDataStructureVersionIds())
-        .map(dataStructureVersionRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setDataStructureVersions);
+    if (input.getDataStructureVersionIds() != null
+        && !input.getDataStructureVersionIds().isEmpty()) {
+      List<DataStructureVersion> versions =
+          dataStructureVersionRepository.findAllById(input.getDataStructureVersionIds());
+      if (versions.size() != input.getDataStructureVersionIds().size()) {
+        throw new InvalidInputException(
+            "DataStructure",
+            "dataStructureVersionIds",
+            "One or more DataStructureVersion IDs not found");
+      }
+      entity.setDataStructureVersions(new HashSet<>(versions));
+    }
 
     return super.postConvertToEntity(entity, input); // base handles assignments
   }

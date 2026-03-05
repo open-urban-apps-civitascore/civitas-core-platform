@@ -1,6 +1,7 @@
 package de.civitascore.portal.controller.exception;
 
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import jakarta.persistence.PersistenceException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +26,27 @@ public class DataIntegrityExceptionHandler {
       log.warn("Unique constraint violation: {}", mapped.getMessage());
       return ResponseEntity.status(HttpStatus.CONFLICT).build();
     }
+    if (message != null
+        && (message.contains("foreign key") || message.contains("is still referenced"))) {
+      log.warn("Foreign key constraint violation: {}", message);
+      return ResponseEntity.status(HttpStatus.CONFLICT).build();
+    }
+    if (message != null && message.contains("not-null")) {
+      log.warn("Not-null constraint violation: {}", message);
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+    }
     log.error("Data integrity violation: {}", message);
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+  }
+
+  @ExceptionHandler(PersistenceException.class)
+  public ResponseEntity<Object> handlePersistenceException(PersistenceException ex) {
+    Throwable cause = ex.getCause();
+    if (cause instanceof IllegalStateException) {
+      log.warn("Entity validation failed: {}", cause.getMessage());
+      return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+    }
+    log.error("Persistence error: {}", ex.getMessage());
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
   }
 

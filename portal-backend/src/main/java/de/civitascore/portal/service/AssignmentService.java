@@ -41,6 +41,29 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
   }
 
   @Override
+  protected AssignmentInputDTO preProcessCreateInput(AssignmentInputDTO input) {
+    if (input.getScopeType() != null
+        && input.getScopeType() != ScopeType.TENANT
+        && input.getScopeId() == null) {
+      throw new InvalidInputException(
+          "Assignment", "scopeId", "scopeId is required for scope type " + input.getScopeType());
+    }
+    return super.preProcessCreateInput(input);
+  }
+
+  @Override
+  protected AssignmentInputDTO preProcessUpdateInput(
+      AssignmentInputDTO input, Assignment existingEntity) {
+    if (input.getScopeType() != null
+        && input.getScopeType() != ScopeType.TENANT
+        && input.getScopeId() == null) {
+      throw new InvalidInputException(
+          "Assignment", "scopeId", "scopeId is required for scope type " + input.getScopeType());
+    }
+    return super.preProcessUpdateInput(input, existingEntity);
+  }
+
+  @Override
   protected Assignment postConvertToEntity(Assignment entity, AssignmentInputDTO input) {
 
     if (input.getGroupId() != null) {

@@ -139,7 +139,6 @@ public abstract class BaseController<
     E current = getService().findByIdOrThrow(id);
     I currentDto = getAssembler().toInput(current);
     I patchedDto = patchInput(currentDto, current, updates);
-    patchedDto = preProcessInput(patchedDto);
 
     Set<ConstraintViolation<I>> violations = validator.validate(patchedDto);
     if (!violations.isEmpty()) {
@@ -150,6 +149,8 @@ public abstract class BaseController<
               .orElse("");
       throw new InvalidInputException(patchedDto.getClass().getSimpleName(), id, message);
     }
+
+    patchedDto = preProcessInput(patchedDto);
     E updated = getService().update(id, patchedDto);
     O output = getAssembler().toOutput(updated);
     return ResponseEntity.ok(output);
@@ -189,6 +190,15 @@ public abstract class BaseController<
    * @throws IOException if there is an error during JSON processing
    */
   protected I patchInput(I currentDto, E current, JsonNode updates) throws IOException {
+    if (updates.isObject()) {
+      com.fasterxml.jackson.databind.node.ObjectNode objectNode =
+          (com.fasterxml.jackson.databind.node.ObjectNode) updates;
+      objectNode.remove("id");
+      objectNode.remove("createdAt");
+      objectNode.remove("createdBy");
+      objectNode.remove("modifiedAt");
+      objectNode.remove("modifiedBy");
+    }
     return objectMapper.readerForUpdating(currentDto).readValue(updates);
   }
 
