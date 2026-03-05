@@ -1,0 +1,14 @@
+{
+  "name": "@civitas/portal-backend-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Portal Backend API collection — OpenAPI spec, docs, and Bruno collections",
+  "scripts": {
+    "lint": "redocly lint openapi.yaml",
+    "preview": "redocly preview openapi.yaml",
+    "lint:fix": "redocly lint openapi.yaml --format stylish"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^1"
+  }
+}

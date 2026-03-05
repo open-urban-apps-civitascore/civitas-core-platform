@@ -19,6 +19,9 @@ errorlogs.txt
 # Generated allowall data (derived from backends/ at dev startup)
 authz/rego/data/backends-allowall/
 
+# API collection tooling
+api/**/node_modules/
+
 # Claude Code state (symlinked to private archive repo)
 /CLAUDE.md
 /.claude

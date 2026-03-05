@@ -1,0 +1,9 @@
+extends:
+  - recommended
+
+rules:
+  info-description: warn
+  operation-operationId: error
+  operation-summary: warn
+  tag-description: warn
+  no-unused-components: warn
