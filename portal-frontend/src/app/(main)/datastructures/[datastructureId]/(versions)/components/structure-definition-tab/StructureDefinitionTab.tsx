@@ -13,9 +13,10 @@ interface StructureDefinitionTabProps {
 export const StructureDefinitionTab = (props: StructureDefinitionTabProps) => {
   const { isReadOnly, isInUse, modelSessionManager } = props
   const t = useTranslations('datastructureVersions')
+
   useEffect(() => {
-    if (isInUse && !isReadOnly) toast.info(t('messages.versionInUseModelHint'))
-  }, [isReadOnly, isInUse])
+    if (isInUse && !isReadOnly) toast.info(t('messages.isInUseModelHint'))
+  }, [isReadOnly, isInUse, t])
 
   return isReadOnly || isInUse ? (
     <UmlModeler

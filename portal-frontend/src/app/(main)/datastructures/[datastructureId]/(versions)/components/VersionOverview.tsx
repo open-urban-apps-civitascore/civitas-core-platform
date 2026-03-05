@@ -390,7 +390,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   )
 
   const statusHint = useMemo(() => {
-    if (isInUse) return t('messages.versionInUseStatusHint')
+    if (isInUse) return t('messages.isInUseStatusHint')
     else if (isLastAvailableVersionInAvailableDatastructure) return t('messages.isLastAvailableVersion')
   }, [isInUse, isLastAvailableVersionInAvailableDatastructure, t])
 

@@ -107,6 +107,9 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const descriptionWatch = form.watch('description')
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
+  const isInUse = datastructure.inUse
+
+  const canSetDraft = !isInUse
 
   // Allow "Available" only when the form would be valid in AVAILABLE mode
   const canSetAvailable = useMemo(() => {
@@ -255,6 +258,8 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
         status={statusWatch}
         onStatusChange={handleStatusChange}
         canSetAvailable={canSetAvailable}
+        canSetDraft={canSetDraft}
+        statusHint={!canSetDraft ? t('messages.isInUseStatusHint') : undefined}
       />
       <ActionButtons
         confirmButtonType="button"
