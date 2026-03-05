@@ -1,10 +1,11 @@
 package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.GroupMapper;
-import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.GroupOutputDTO;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +17,7 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
 
   private final GroupMapper groupMapper;
   private final UserMapper userMapper;
-  private final RoleMapper roleMapper;
+  private final AssignmentAssembler assignmentAssembler;
 
   @Override
   public GroupOutputDTO mapToBaseDto(Group entity) {
@@ -38,10 +39,13 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
           entity.getMembers().stream().map(userMapper::toSummary).collect(Collectors.toList()));
     }
 
-    // Map roles
-    if (entity.getRoles() != null && !entity.getRoles().isEmpty()) {
-      output.setRoles(
-          entity.getRoles().stream().map(roleMapper::toSummary).collect(Collectors.toList()));
+    // Map assignments
+    if (entity.getAssignments() != null && !entity.getAssignments().isEmpty()) {
+      List<AssignmentOutputDTO> assignments =
+          entity.getAssignments().stream()
+              .map(assignmentAssembler::mapToBaseDto)
+              .collect(Collectors.toList());
+      output.setAssignments(assignments);
     }
 
     // Map childGroups

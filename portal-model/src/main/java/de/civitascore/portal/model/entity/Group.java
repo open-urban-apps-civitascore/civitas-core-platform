@@ -38,13 +38,6 @@ public class Group extends NamedEntity {
       inverseJoinColumns = @JoinColumn(name = "user_id"))
   private Set<User> members = new HashSet<>();
 
-  @ManyToMany(fetch = FetchType.LAZY)
-  @JoinTable(
-      name = "group_roles",
-      joinColumns = @JoinColumn(name = "group_id"),
-      inverseJoinColumns = @JoinColumn(name = "role_id"))
-  private Set<Role> roles = new HashSet<>();
-
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "contact_user_id")
   private User contactUser;

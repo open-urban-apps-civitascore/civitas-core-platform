@@ -16,5 +16,4 @@ public class GroupInputDTO extends BaseInputDTO {
   private UUID contactUserId;
   private UUID parentGroupId;
   private List<UUID> memberIds;
-  private List<UUID> roleIds;
 }
