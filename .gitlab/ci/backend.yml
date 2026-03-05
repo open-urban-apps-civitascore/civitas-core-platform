@@ -197,8 +197,6 @@ saga-e2e-test-backend:
         - config-adapter/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
-      when: manual
-      allow_failure: true
   services:
     - name: docker:27-dind
       command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
