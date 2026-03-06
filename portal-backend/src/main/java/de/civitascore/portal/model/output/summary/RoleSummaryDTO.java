@@ -8,4 +8,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class RoleSummaryDTO extends BaseSummaryNamedDTO {
   private RoleType roleType;
+  private String description;
+  private boolean readonly;
 }

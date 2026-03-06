@@ -17,9 +17,10 @@ import { DynamicFormField } from './DynamicFormField'
 interface ConnectorTabProps {
   form: UseFormReturn<DatasourceFormDraft>
   readyConnectorType?: ConnectorType
+  isReadOnly?: boolean
 }
 export const ConnectorTab = (props: ConnectorTabProps) => {
-  const { form, readyConnectorType } = props
+  const { form, readyConnectorType, isReadOnly = false } = props
   const t = useTranslations('datasources.connectorTab')
   const tCommon = useTranslations('common')
   const connectorTypeOptions: SelectOption[] = Object.keys(CONNECTOR_INPUTS).map(type => ({
@@ -50,6 +51,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
           options={connectorTypeOptions}
           formItemProps={{ className: 'py-6' }}
           required
+          disabled={isReadOnly}
         />
       </ContentCard>
 
@@ -69,6 +71,7 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
               shouldShowErrors
               required={property.required}
               className="py-3"
+              disabled={isReadOnly}
             />
           ))}
         </ContentCard>

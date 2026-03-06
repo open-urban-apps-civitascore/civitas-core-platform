@@ -28,6 +28,7 @@
       "assignItem": "{item} hinzufügen",
       "assignTo": "zu {item}",
       "close": "Schließen"
+      "back": "Zurück"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",

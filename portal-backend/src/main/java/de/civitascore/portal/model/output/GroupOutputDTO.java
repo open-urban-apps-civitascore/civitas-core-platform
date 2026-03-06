@@ -1,7 +1,6 @@
 package de.civitascore.portal.model.output;
 
 import de.civitascore.portal.model.output.summary.GroupSummaryDTO;
-import de.civitascore.portal.model.output.summary.RoleSummaryDTO;
 import de.civitascore.portal.model.output.summary.UserSummaryDTO;
 import java.util.List;
 import lombok.Data;
@@ -17,5 +16,5 @@ public class GroupOutputDTO extends BaseOutputDTO {
   private GroupSummaryDTO parentGroup;
   private List<GroupSummaryDTO> childGroups;
   private List<UserSummaryDTO> members;
-  private List<RoleSummaryDTO> roles;
+  private List<AssignmentOutputDTO> assignments;
 }

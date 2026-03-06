@@ -17,7 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.ActiveProfiles;
 
+@ActiveProfiles({"test-integration", "preview"})
 @DisplayName("DataSpace Controller Integration Tests")
 class DataSpaceControllerIntegrationTest
     extends BaseControllerIntegrationTest<DataSpaceInputDTO, DataSpaceOutputDTO> {

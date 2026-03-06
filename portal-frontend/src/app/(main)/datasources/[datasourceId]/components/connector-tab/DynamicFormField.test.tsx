@@ -103,4 +103,58 @@ describe('DynamicFormField (integration)', () => {
 
     expect(screen.getByLabelText('Select')).toBeInTheDocument()
   })
+
+  describe('Disabled state', () => {
+    it('renders disabled input for type=input', () => {
+      renderWithForm({
+        type: 'input',
+        name: 'name',
+        label: 'Input',
+        placeholder: 'Max Mustermann',
+        shouldShowErrors: false,
+        disabled: true,
+      })
+      expect(screen.getByLabelText('Input')).toBeDisabled()
+    })
+
+    it('renders disabled textarea for type=textArea', () => {
+      renderWithForm({
+        type: 'textArea',
+        name: 'description',
+        label: 'Textarea',
+        placeholder: 'text',
+        shouldShowErrors: false,
+        disabled: true,
+      })
+      expect(screen.getByLabelText('Textarea')).toBeDisabled()
+    })
+
+    it('renders disabled checkbox for type=checkbox', () => {
+      renderWithForm({
+        type: 'checkbox',
+        name: 'isActive',
+        label: 'Checkbox',
+        placeholder: 'text',
+        shouldShowErrors: false,
+        disabled: true,
+      })
+      expect(screen.getByRole('checkbox')).toBeDisabled()
+    })
+
+    it('renders disabled select for type=select', () => {
+      renderWithForm({
+        type: 'select',
+        name: 'category',
+        label: 'Select',
+        placeholder: 'select',
+        shouldShowErrors: false,
+        disabled: true,
+        options: [
+          { label: 'A', value: 'a' },
+          { label: 'B', value: 'b' },
+        ],
+      })
+      expect(screen.getByTestId('categorySelectTrigger')).toBeDisabled()
+    })
+  })
 })

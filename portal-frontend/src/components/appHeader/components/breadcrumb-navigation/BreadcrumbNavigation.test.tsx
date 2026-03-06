@@ -6,9 +6,11 @@ import { apiRequest } from '@/app/services/api/request/apiRequest'
 
 import { BreadcrumbNavigation } from './BreadcrumbNavigation'
 
+const mockPush = vi.fn()
 vi.mock('next/navigation', async () => ({
   usePathname: vi.fn().mockReturnValue('/admin/users/123'),
   useParams: vi.fn().mockReturnValue({ id: '123' }),
+  useRouter: () => ({ push: mockPush }),
 }))
 
 vi.mock('next-intl', () => ({

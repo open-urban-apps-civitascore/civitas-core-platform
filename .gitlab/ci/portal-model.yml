@@ -168,7 +168,6 @@ publish-portal-model:
   needs:
     - job: setup-version-portal-model
     - job: build-portal-model
-      optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
