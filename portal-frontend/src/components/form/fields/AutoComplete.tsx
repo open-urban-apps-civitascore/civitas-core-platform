@@ -32,6 +32,8 @@ interface AutoCompleteProps<T extends FieldValues> {
   onSelectItem: (newSelection: SelectItem) => void
   onBlur?: () => void
   isLoading?: boolean
+  // eslint-disable-next-line react/boolean-prop-naming
+  disabled?: boolean
 }
 export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>) => {
   const {
@@ -52,6 +54,7 @@ export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>)
     onBlur,
     popoverContentProps,
     isLoading,
+    disabled = false,
   } = props
   const t = useTranslations('common')
   const error =
@@ -82,6 +85,7 @@ export const AutoComplete = <T extends FieldValues>(props: AutoCompleteProps<T>)
                     className: cn('border rounded-md', form.formState.errors[name] && 'border-destructive'),
                   }}
                   value={inputValue}
+                  disabled={disabled}
                 />
               </PopoverTrigger>
               <FormMessage className="mt-2" />

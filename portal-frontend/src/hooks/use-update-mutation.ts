@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { MutationData, UpdateMutationInput, WithId } from '@/types/common'
@@ -26,7 +27,7 @@ export const useUpdateMutation = <TResponse, TData extends WithId<string | numbe
       })
     },
     onError: error => {
-      console.error(errorMessage, error)
+      console.error(errorMessage, (error as AxiosError).message)
     },
   })
 }

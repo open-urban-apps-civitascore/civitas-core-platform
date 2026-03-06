@@ -1,5 +1,6 @@
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
+import { useDeleteMutation } from '@/hooks/use-delete-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
 import { GetItemInput, GetListInput } from '@/types/common'
 import { CreateGroupData, Group, UpdateGroupData } from '@/types/groups'
@@ -46,4 +47,11 @@ export const usePatchGroup = () =>
     method: 'PATCH',
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating the group.',
+  })
+
+export const useDeleteGroup = () =>
+  useDeleteMutation({
+    key,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while deleting the group.',
   })

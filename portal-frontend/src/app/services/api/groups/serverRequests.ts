@@ -13,6 +13,7 @@ export const getGroups = async (params?: URLSearchParams) => {
       endpoint: '/groups',
       method: 'GET',
       params,
+      isApiBackend: true,
     })
   } catch (error) {
     console.error('An error occurred while fetching groups data.', error)
@@ -25,6 +26,7 @@ export const getGroup = async (id: string) => {
     return await serverFetch<Group>({
       endpoint: `/groups/${id}`,
       method: 'GET',
+      isApiBackend: true,
     })
   } catch (error) {
     console.error('An error occurred while fetching group data.', error)
