@@ -31,13 +31,13 @@ const tabValues: Record<GroupTab, Tab<GroupTab>> = {
     value: 'info',
     label: 'groups.detailsTabs.info',
   },
-  roles: {
-    value: 'roles',
-    label: 'groups.detailsTabs.roles',
-  },
   users: {
     value: 'users',
     label: 'groups.detailsTabs.users',
+  },
+  roles: {
+    value: 'roles',
+    label: 'groups.detailsTabs.roles',
   },
 }
 
