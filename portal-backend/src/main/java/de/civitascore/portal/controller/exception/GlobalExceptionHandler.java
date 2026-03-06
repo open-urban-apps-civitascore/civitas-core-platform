@@ -146,7 +146,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         .body(createErrorMap("EXTERNAL_SYSTEM_TIMEOUT", ex.getMessage()));
   }
 
-
   @Override
   protected ResponseEntity<Object> handleMethodArgumentNotValid(
       MethodArgumentNotValidException ex,
@@ -184,7 +183,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity.badRequest()
         .body(createErrorMap("MALFORMED_REQUEST", "Request body is missing or malformed"));
   }
-
 
   private Map<String, Object> createErrorMap(String error, String message) {
     return Map.of(
