@@ -98,6 +98,8 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
             "Pipeline", "dataSourceIds", "One or more DataSource IDs not found");
       }
       entity.setDataSources(new HashSet<>(dataSources));
+    } else {
+      entity.setDataSources(null);
     }
 
     return super.postConvertToEntity(entity, input);
