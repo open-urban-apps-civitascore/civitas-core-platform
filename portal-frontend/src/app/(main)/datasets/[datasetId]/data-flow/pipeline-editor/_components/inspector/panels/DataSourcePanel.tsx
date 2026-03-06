@@ -52,7 +52,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
   }
 
   const selectableEntities = entities
-    .filter(entity => entity.status === DATASOURCE_STATUS_TYPES.AVAILABLE)
+    .filter(entity => entity.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE)
     .map(datasourceToSelectable)
 
   return (

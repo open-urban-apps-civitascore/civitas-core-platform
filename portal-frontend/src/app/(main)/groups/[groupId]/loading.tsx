@@ -2,10 +2,10 @@ import { getTranslations } from 'next-intl/server'
 
 import LoadingPage from '@/components/loading-page/LoadingPage'
 
-const UsersErrorPage = async () => {
+const GroupLoadingPage = async () => {
   const t = await getTranslations('common')
 
-  return <LoadingPage testId="editUserLoadingPage" title={t('loadingItems', { item: t('items.group') })} />
+  return <LoadingPage testId="editGroupsLoadingPage" title={t('loadingItems', { item: t('items.group') })} />
 }
 
-export default UsersErrorPage
+export default GroupLoadingPage

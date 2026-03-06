@@ -74,6 +74,4 @@ export type UpdateMutationInput<TData> = BaseMutationInput<TData> & {
   method: UpdateMutationMethod
 }
 
-export type DeleteMutationInput<TData> = BaseMutationInput<TData> & {
-  id: string
-}
+export type DeleteMutationInput<TData> = BaseMutationInput<TData>

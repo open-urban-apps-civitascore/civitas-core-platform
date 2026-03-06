@@ -1,4 +1,3 @@
-import { ContentCard } from '@/components/content-card/ContentCard'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -14,9 +13,7 @@ const LoadingPage = (props: LoadingPageProps) => {
     <PageContainer headerType="onlyTitle" testId={testId}>
       <PageHeader title={title} />
       <PageBackground>
-        <ContentCard className="p-10">
-          <LoadingSpinner />
-        </ContentCard>
+        <LoadingSpinner className="h-full" />
       </PageBackground>
     </PageContainer>
   )

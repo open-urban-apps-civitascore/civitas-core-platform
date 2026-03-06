@@ -27,7 +27,9 @@
       "saveAndContinue": "Erstellen und weiter",
       "exit": "Beenden",
       "assignItem": "{item} hinzufügen",
-      "assignTo": "zu {item}"
+      "assignTo": "zu {item}",
+      "close": "Schließen",
+      "back": "Zurück"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -46,7 +48,7 @@
       "nameRequired": "Name ist erforderlich",
       "descriptionRequired": "Beschreibung ist erforderlich",
       "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
-      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden",
+      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden. Überprüfen Sie Ihre Eingaben.",
       "statusChangeError": "Beim Ändern des Verfügbarkeitsstatus ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten."
     },
@@ -65,6 +67,11 @@
       "datastructures": "Datenstrukturen",
       "datastructure": "Datenstruktur",
       "datastructureVersion": "Version"
+    },
+    "messages": {
+      "updateSuccess": "{item} wurde erfolgreich aktualisiert",
+      "createSuccess": "{item} wurde erfolgreich angelegt",
+      "deleteSuccess": "{item} wurde erfolgreich gelöscht"
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
@@ -277,8 +284,8 @@
     },
     "details": {
       "baseInfo": "Basisinformationen",
-      "name": "Name der Gruppe",
-      "description": "Beschreibung der Gruppe",
+      "name": "Name",
+      "description": "Beschreibung",
       "contact": { "label": "Ansprechpartner", "placeholder": "Nach Name oder Email suchen" }
     },
     "roles": {
@@ -296,13 +303,23 @@
       "noUsers": "Keine User",
       "noUsersSub": "Keine User in dieser Gruppe enthalten",
       "removeUserModal": {
-        "title": "User aus Gruppe entfernen?",
-        "description": "Diese Aktion löst die Zuordnung zwischen dem User, der Gruppe und ihre Rollen-Zuordnung auf."
+        "title": "User wirklich aus Gruppe entfernen?",
+        "description": "Diese Aktion kann nicht rückgängig gemacht werden."
       }
     },
-    "messages": {
-      "createSuccess": "Gruppe wurde erfolgreich angelegt.",
-      "updateSuccess": "Gruppe wurde erfolgreich aktualisiert."
+    "errors": {
+      "createError": "Beim Anlegen der Gruppe ist ein Fehler aufgetreten",
+      "updateError": "Beim Aktualisieren der Gruppe ist ein Fehler aufgetreten",
+      "deleteError": "Beim Löschen der Gruppe ist ein Fehler aufgetreten",
+      "groupNameExists": "Der Gruppenname ist bereits vergeben. Bitte wählen sie einen anderen Namen."
+    },
+    "warningModal": {
+      "title": "Gruppe wirklich löschen?",
+      "description": "Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "infoModal": {
+      "title": "Gruppe kann nicht gelöscht werden",
+      "description": "Zuerst müssen alle Zuordnungen zu Usern, Rollen und Geltungsbereichen entfernt werden."
     }
   },
   "pagination": {

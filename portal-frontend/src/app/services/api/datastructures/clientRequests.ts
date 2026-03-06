@@ -52,9 +52,8 @@ export const useUnpublishDatastructure = () =>
   })
 
 export const useDeleteDatastructure = () =>
-  useDeleteMutation<Datastructure, WithId>({
+  useDeleteMutation({
     key,
-    endpoint: ({ id }) => `datastructures/${id}`,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while deleting datastructure',
   })

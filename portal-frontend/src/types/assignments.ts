@@ -3,6 +3,7 @@ import z from 'zod'
 import { enumFromConst } from '@/utils/common'
 
 import { ItemSchema } from './common'
+import { RoleTypeEnum } from './roles'
 
 export const ASSIGNMENT_SCOPE_TYPES = {
   DATASTRUCTURE: 'DATASTRUCTURE',
@@ -10,12 +11,24 @@ export const ASSIGNMENT_SCOPE_TYPES = {
 
 export const AssignmentScopeEnum = enumFromConst(ASSIGNMENT_SCOPE_TYPES)
 
+export type AssignmentScope = (typeof ASSIGNMENT_SCOPE_TYPES)[keyof typeof ASSIGNMENT_SCOPE_TYPES]
+
+export const AssignmentRoleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  roleType: RoleTypeEnum,
+  description: z.string(),
+  readonly: z.boolean(),
+})
+
+export type AssignmentRole = z.infer<typeof AssignmentRoleSchema>
+
 export const AssignmentApiResponseSchema = z.object({
   id: z.string(),
   createdAt: z.string(),
   modifiedAt: z.string(),
   group: ItemSchema,
-  role: ItemSchema,
+  role: AssignmentRoleSchema,
   scopeType: AssignmentScopeEnum,
   scope: ItemSchema,
 })

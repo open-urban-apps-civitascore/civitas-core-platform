@@ -29,6 +29,7 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
     options = [],
     shouldShowErrors,
     className,
+    disabled,
   } = props
   switch (type) {
     case 'textArea':
@@ -41,10 +42,20 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
           required={required}
           shouldShowErrors={shouldShowErrors}
           formItemProps={{ className }}
+          disabled={disabled}
         />
       )
     case 'checkbox':
-      return <FormCheckbox form={form} name={name} label={label} required={required} formItemProps={{ className }} />
+      return (
+        <FormCheckbox
+          form={form}
+          name={name}
+          label={label}
+          required={required}
+          formItemProps={{ className }}
+          disabled={disabled}
+        />
+      )
     case 'select':
       return (
         <FormSelect
@@ -56,6 +67,7 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
           options={options}
           required={required}
           formItemProps={{ className }}
+          disabled={disabled}
         />
       )
     case 'input':
@@ -69,6 +81,7 @@ export const DynamicFormField = <T extends FieldValues>(props: DynamicFormFieldP
           required={required}
           shouldShowErrors={shouldShowErrors}
           formItemProps={{ className }}
+          disabled={disabled}
         />
       )
   }

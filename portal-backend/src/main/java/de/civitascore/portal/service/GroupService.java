@@ -23,7 +23,6 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
   private final GroupRepository groupRepository;
   private final GroupMapper groupMapper;
   private final UserService userService;
-  private final RoleService roleService;
   private final ObjectMapper objectMapper;
 
   @Override
@@ -65,14 +64,6 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
       if (!input.getMemberIds().isEmpty()) {
         entity.setMembers(
             new HashSet<>(userService.getRepository().findAllById(input.getMemberIds())));
-      }
-    }
-
-    // Set system roles
-    if (Objects.nonNull(input.getRoleIds())) {
-      entity.setRoles(new HashSet<>());
-      if (!input.getRoleIds().isEmpty()) {
-        entity.setRoles(new HashSet<>(roleService.getRepository().findAllById(input.getRoleIds())));
       }
     }
 

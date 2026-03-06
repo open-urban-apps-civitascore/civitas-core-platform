@@ -2,9 +2,17 @@ package de.civitascore.portal.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.embedded.RoleType;
+import de.civitascore.portal.model.embedded.ScopeType;
+import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.input.AssignmentInputDTO;
 import de.civitascore.portal.model.input.GroupInputDTO;
+import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.GroupOutputDTO;
+import de.civitascore.portal.model.output.summary.RoleSummaryDTO;
+import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.GroupRepository;
+import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.Collections;
 import java.util.HashMap;
@@ -15,6 +23,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -25,6 +34,8 @@ class GroupControllerIntegrationTest
   private final String GROUPS_ENDPOINT = "/groups";
 
   @Autowired private GroupRepository groupRepository;
+  @Autowired private RoleRepository roleRepository;
+  @Autowired private AssignmentRepository assignmentRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -33,7 +44,9 @@ class GroupControllerIntegrationTest
 
   @Override
   protected void performAdditionalCleanup() {
+    assignmentRepository.deleteAll();
     groupRepository.deleteAll();
+    roleRepository.deleteAll();
   }
 
   @Override
@@ -582,6 +595,53 @@ class GroupControllerIntegrationTest
 
       ResponseEntity<GroupOutputDTO> response = performGetById(group1Id);
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    @DisplayName("Should return assignments with role description and readonly in group response")
+    void shouldReturnAssignmentsWithRoleDetails() {
+      // Create group
+      UUID groupId = createTestEntity();
+
+      // Create role with description and readonly
+      Role role = new Role();
+      role.setName("Test Role " + UUID.randomUUID().toString().substring(0, 8));
+      role.setDescription("Role for testing assignments");
+      role.setRoleType(RoleType.DATA);
+      role = roleRepository.save(role);
+
+      // Create assignment via API
+      AssignmentInputDTO assignmentInput = new AssignmentInputDTO();
+      assignmentInput.setGroupId(groupId);
+      assignmentInput.setRoleId(role.getId());
+      assignmentInput.setScopeType(ScopeType.TENANT);
+
+      ResponseEntity<AssignmentOutputDTO> assignmentResponse =
+          exchange(
+              "/assignments",
+              HttpMethod.POST,
+              createAuthHeaders(),
+              assignmentInput,
+              new ParameterizedTypeReference<AssignmentOutputDTO>() {});
+      assertThat(assignmentResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+      // Fetch group and verify assignments
+      ResponseEntity<GroupOutputDTO> groupResponse = performGetById(groupId);
+      assertThat(groupResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+
+      GroupOutputDTO output = groupResponse.getBody();
+      assertThat(output).isNotNull();
+      assertThat(output.getAssignments()).as("Assignments should not be empty").isNotEmpty();
+
+      AssignmentOutputDTO assignment = output.getAssignments().get(0);
+      assertThat(assignment.getRole()).as("Role should be present").isNotNull();
+
+      RoleSummaryDTO roleSummary = assignment.getRole();
+      assertThat(roleSummary.getName()).isEqualTo(role.getName());
+      assertThat(roleSummary.getDescription())
+          .as("Role description should be mapped")
+          .isEqualTo("Role for testing assignments");
+      assertThat(roleSummary.isReadonly()).as("Role readonly should be mapped").isFalse();
     }
 
     @Test

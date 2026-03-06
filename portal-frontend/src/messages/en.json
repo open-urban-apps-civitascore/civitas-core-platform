@@ -27,7 +27,8 @@
       "saveAndContinue": "Save and continue",
       "exit": "Exit",
       "assignItem": "Assign {item}",
-      "assignTo": "to {item}"
+      "assignTo": "to {item}",
+      "back": "Back"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
@@ -47,7 +48,7 @@
       "nameRequired": "Name is required",
       "descriptionRequired": "Description is required",
       "descriptionMaxLength": "Description must be 150 characters or less",
-      "formInvalid": "All required information must be provided correctly.",
+      "formInvalid": "All required information must be provided correctly. Please, verify your input.",
       "statusChangeError": "An error occurred while changing the availability status.",
       "updateError": "An error occurred while updating the {item}."
     },
@@ -66,6 +67,11 @@
       "datastructures": "Datastructures",
       "datastructure": "Datastructure",
       "datastructureVersion": "Version"
+    },
+    "messages": {
+      "updateSuccess": "{item} has been successfully updated",
+      "createSuccess": "{item} has been successfully created",
+      "deleteSuccess": "{item} has been successfully deleted"
     },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
@@ -279,9 +285,9 @@
     },
     "details": {
       "baseInfo": "Base Information",
-      "name": "Name of the Group",
-      "description": "Group Description",
-      "contact": { "label": "Contact", "placeholder": "Search by name or email" }
+      "name": "Name",
+      "description": "Description",
+      "contact": { "label": "Contact Person", "placeholder": "Search by name or email" }
     },
     "roles": {
       "groupInfo": "Group Information",
@@ -299,12 +305,26 @@
       "noUsersSub": "No users assigned to this group",
       "removeUserModal": {
         "title": "Remove User from Group?",
-        "description": "This action removes the association between the user, the group, and their role assignment."
+        "description": "This action can not be undone."
       }
     },
     "messages": {
       "createSuccess": "Group has been successfully created.",
       "updateSuccess": "Group has been successfully updated."
+    },
+    "errors": {
+      "createError": "An error occurred while creating the group",
+      "updateError": "An error occurred while updating the group",
+      "deleteError": "An error occurred while deleting the group",
+      "groupNameExists": "The group name is already in use. Please, chose another name."
+    },
+    "warningModal": {
+      "title": "Delete the group?",
+      "description": "This action can not be undone."
+    },
+    "infoModal": {
+      "title": "Group can not be deleted",
+      "description": "First, all assignments to users, roles and scopes have to be removed."
     }
   },
   "pagination": {

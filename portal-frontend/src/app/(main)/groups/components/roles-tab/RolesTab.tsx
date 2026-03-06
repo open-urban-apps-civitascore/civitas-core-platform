@@ -25,7 +25,10 @@ export const RolesTab = (props: RolesTabProps) => {
   const tRoles = useTranslations('roles')
   const router = useRouter()
   const updateGroup = usePatchGroup()
-  const originalRoleIds = useMemo<string[]>(() => groupData.roles?.map(role => role.id) ?? [], [groupData.roles])
+  const originalRoleIds = useMemo<string[]>(
+    () => groupData.assignments?.map(assignment => assignment.role.id) ?? [],
+    [groupData.assignments],
+  )
   const [roles, setRoles] = useState<string[]>(originalRoleIds)
 
   const { data: rolesdata, isLoading: isLoadingRoles } = useGetRoles()

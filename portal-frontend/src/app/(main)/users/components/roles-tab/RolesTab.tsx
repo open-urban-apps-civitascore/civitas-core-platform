@@ -30,7 +30,10 @@ export const RolesTab = (props: RolesTabProps) => {
     error: groupsError,
   } = useGetGroups({ params: groupsRequestParams, isEnabled: groupIds.length > 0 })
 
-  const roleIds = useMemo(() => new Set(groupsData?.data.flatMap(group => group.roles)), [groupsData])
+  const roleIds = useMemo(
+    () => new Set(groupsData?.data.flatMap(group => group.assignments?.map(assignment => assignment.role.id))),
+    [groupsData],
+  )
   const rolesRequestparams = new URLSearchParams([...roleIds].map(role => `id=${role}`).join('&'))
   const {
     data: rolesData,

@@ -1,24 +1,23 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { DeleteMutationInput } from '@/types/common'
-
-type DeleteMutationOptions<TData> = Omit<DeleteMutationInput<TData>, 'id'>
 
 export const useDeleteMutation = <TResponse, TData>({
   key: mutationKey,
   errorMessage,
   headers,
-}: DeleteMutationOptions<TData>) => {
+}: DeleteMutationInput<TData>) => {
   const queryClient = useQueryClient()
 
   return useMutation<ApiServiceResponse<TResponse>, Error, string>({
     mutationFn: (id: string) =>
       apiRequest<TResponse>({
         method: 'DELETE',
+        headers,
         endpoint: `/${mutationKey}/${id}`,
         errorMessage: errorMessage,
-        headers,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -26,7 +25,7 @@ export const useDeleteMutation = <TResponse, TData>({
       })
     },
     onError: error => {
-      console.error(errorMessage, error)
+      console.error(errorMessage, (error as AxiosError).message)
     },
   })
 }

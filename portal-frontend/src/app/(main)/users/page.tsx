@@ -5,21 +5,16 @@ import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { TableContainer } from '@/components/table-container/TableContainer'
-import { Item } from '@/types/common'
 import { ApiRequestParams, getApiRequestParams } from '@/utils/requestParams'
 import { mapListUsers } from '@/utils/users'
 
 import { UsersListContent } from './components/users-list/UsersListContent'
 
-export type UserAuthority = Item & {
-  department: Item
-}
-
-type Props = {
+interface UsersPageProps {
   searchParams: Promise<ApiRequestParams>
 }
 
-const UsersPage = async ({ searchParams }: Props) => {
+const UsersPage = async ({ searchParams }: UsersPageProps) => {
   const t = await getTranslations('users')
   const params = await searchParams
 
