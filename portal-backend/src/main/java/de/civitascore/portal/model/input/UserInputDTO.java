@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.input;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import de.civitascore.portal.model.embedded.UserTitleType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -21,7 +22,14 @@ public class UserInputDTO extends BaseInputDTO {
   @NotBlank(message = "Email is required") @Email(regexp = ".+@.+\\..+", message = "Invalid email format") private String email;
 
   private String phone;
+
+  /**
+   * Read-only — set exclusively by the config-adapter via Kafka result events. Not accepted as API
+   * input.
+   */
+  @JsonProperty(access = JsonProperty.Access.READ_ONLY)
   private String externalId;
+
   private Boolean active;
   private List<UUID> groupIds;
 }

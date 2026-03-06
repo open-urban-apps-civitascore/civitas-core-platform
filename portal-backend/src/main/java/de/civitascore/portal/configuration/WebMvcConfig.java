@@ -12,9 +12,16 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @RequiredArgsConstructor
 public class WebMvcConfig implements WebMvcConfigurer {
 
+  /** Maximum allowed page size. */
+  private static final int MAX_PAGE_SIZE = 200;
+
   @Override
   public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
     resolvers.add(new SpecificationArgumentResolver());
-    resolvers.add(new PageableHandlerMethodArgumentResolver());
+
+    PageableHandlerMethodArgumentResolver pageableResolver =
+        new PageableHandlerMethodArgumentResolver();
+    pageableResolver.setMaxPageSize(MAX_PAGE_SIZE);
+    resolvers.add(pageableResolver);
   }
 }

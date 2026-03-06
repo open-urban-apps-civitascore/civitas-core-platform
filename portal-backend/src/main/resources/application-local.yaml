@@ -17,6 +17,8 @@ server:
     include-stacktrace: on_param
 
 spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable
   jpa:
     hibernate:
       ddl-auto: validate

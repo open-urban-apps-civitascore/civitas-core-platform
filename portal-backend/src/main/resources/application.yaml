@@ -23,6 +23,12 @@ spring:
           # Token issuer validation
           issuer-uri: "${keycloak.issuer-uri}/realms/${keycloak.realm}"
 
+  # F-07: Explicit upload size limits to prevent DoS via oversized payloads
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
   # Kafka Configuration
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}

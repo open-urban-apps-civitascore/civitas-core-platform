@@ -1,5 +1,7 @@
 package de.civitascore.portal.configuration;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -14,15 +16,25 @@ import org.springframework.validation.annotation.Validated;
 @Setter
 @NoArgsConstructor
 public class ModelAtlasConfig {
-  /** Base URL of the Model Atlas service */
+
+  /** Base URL of the Model Atlas service. Must be an http or https URL. */
+  @NotBlank @Pattern(
+      regexp = "^https?://[^\\s/$.?#].[^\\s]*$",
+      message = "model-atlas.baseUrl must be a valid http or https URL")
   private String baseUrl;
 
   /** Scope of the model atlas to be used for requests */
-  private String scope;
+  @NotBlank private String scope;
 
   /**
    * Stage of the model atlas to be used for requests. For now, only a single stage is supported,
    * this may change in the future with transitions between stages.
    */
-  private String stage;
+  @NotBlank private String stage;
+
+  /** HTTP connect timeout in milliseconds for Model Atlas requests (default: 5 s). */
+  private int connectTimeoutMs = 5000;
+
+  /** HTTP read timeout in milliseconds for Model Atlas requests (default: 30 s). */
+  private int readTimeoutMs = 30000;
 }

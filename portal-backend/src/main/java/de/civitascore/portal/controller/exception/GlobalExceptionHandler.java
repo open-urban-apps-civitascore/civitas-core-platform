@@ -131,7 +131,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       ExternalSystemRejectionException ex) {
     log.error("External system rejected request: {}", ex.getMessage());
     return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-        .body(createErrorMap("EXTERNAL_SYSTEM_ERROR", ex.getMessage()));
+        .body(
+            createErrorMap(
+                "EXTERNAL_SYSTEM_ERROR", "The request was rejected by an external system"));
   }
 
   @ExceptionHandler(ExternalSystemTimeoutException.class)
@@ -139,7 +141,9 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       ExternalSystemTimeoutException ex) {
     log.error("External system timed out: {}", ex.getMessage());
     return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
-        .body(createErrorMap("EXTERNAL_SYSTEM_TIMEOUT", ex.getMessage()));
+        .body(
+            createErrorMap(
+                "EXTERNAL_SYSTEM_TIMEOUT", "An external system did not respond in time"));
   }
 
   @Override
