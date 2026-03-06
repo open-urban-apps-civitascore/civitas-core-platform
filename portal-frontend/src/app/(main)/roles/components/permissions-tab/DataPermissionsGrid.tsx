@@ -62,9 +62,7 @@ export const DataPermissionsGrid = (props: DataPermissionsGridProps): JSX.Elemen
       {/* Data rows */}
       {DATA_PERMISSION_ROWS.map(row => (
         <div key={row.key} className="grid grid-cols-6 border-b border-[#E5E5E5] last:border-b-0 bg-white">
-          <div className="p-3 font-medium text-sm flex items-center">
-            {tRoles(`dataPermissions.${row.key}`)}
-          </div>
+          <div className="p-3 font-medium text-sm flex items-center">{tRoles(`dataPermissions.${row.key}`)}</div>
           {DATA_PERMISSION_COLUMNS.map(col => {
             const permission = findPermission(row.prefix, col)
             // If no permission exists for this combination (e.g., DATASET_PAYLOAD_RELEASE), show disabled

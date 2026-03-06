@@ -78,7 +78,8 @@ export const CategoryList = (props: CategoryListProps) => {
               />
             </div>
             <h2 className="text-xl">
-              {tRoles(`permissionsTab.categories.${permissionList[0]?.category.id}` as any) || permissionList[0]?.category.title}
+              {tRoles(`permissionsTab.categories.${permissionList[0]?.category.id}`) ||
+                permissionList[0]?.category.title}
             </h2>
           </div>
           <span className="font-semibold text-xs text-primary">

@@ -1,14 +1,22 @@
 import { createColumnHelper, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 
+import { AssignmentScopeType } from '@/app/services/api/assignments/clientRequests'
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Group } from '@/types/groups'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
-interface GroupTableProps extends TableProps<Group> {
-  groups: Group[]
+export interface GroupTableRow extends Group {
+  scopeType?: AssignmentScopeType
+}
+
+interface GroupTableProps extends TableProps<GroupTableRow> {
+  groups: GroupTableRow[]
+  isEditMode?: boolean
+  onRemoveGroup?: (group: GroupTableRow) => void
 }
 
 export const GroupTable = (props: GroupTableProps) => {
@@ -24,10 +32,12 @@ export const GroupTable = (props: GroupTableProps) => {
     onRowClick,
     onPaginationChange,
     onSortingChange,
+    isEditMode,
+    onRemoveGroup,
   } = props
   const t = useTranslations('roles.groupAssignmentTab')
 
-  const columnHelper = createColumnHelper<Group>()
+  const columnHelper = createColumnHelper<GroupTableRow>()
 
   const columns = [
     columnHelper.accessor('id', {
@@ -51,7 +61,7 @@ export const GroupTable = (props: GroupTableProps) => {
       cell: info => info.getValue()?.length || 0,
       meta: {
         style: {
-          width: '15%',
+          width: '10%',
         },
       },
     }),
@@ -60,7 +70,7 @@ export const GroupTable = (props: GroupTableProps) => {
       cell: info => info.getValue()?.name ?? '',
       meta: {
         style: {
-          width: '20%',
+          width: '15%',
         },
       },
     }),
@@ -69,11 +79,46 @@ export const GroupTable = (props: GroupTableProps) => {
       cell: info => info.getValue(),
       meta: {
         style: {
-          width: '40%',
+          width: '30%',
           minWidth: '200px',
         },
       },
     }),
+    columnHelper.accessor('scopeType', {
+      header: () => t('tableHeaders.scope'),
+      cell: info => {
+        const scopeType = info.getValue()
+        return scopeType ? t(`scopeLabels.${scopeType}`) : ''
+      },
+      meta: {
+        style: {
+          width: '15%',
+        },
+      },
+    }),
+    ...(isEditMode && onRemoveGroup
+      ? [
+          columnHelper.display({
+            id: 'actions',
+            header: () => null,
+            cell: ({ row }) => (
+              <TableDropdownMenu
+                menuItems={[
+                  {
+                    label: t('removeAssignment'),
+                    onClick: () => onRemoveGroup(row.original),
+                  },
+                ]}
+              />
+            ),
+            meta: {
+              style: {
+                width: '60px',
+              },
+            },
+          }),
+        ]
+      : []),
   ]
 
   const table = useReactTable({
@@ -103,7 +148,6 @@ export const GroupTable = (props: GroupTableProps) => {
       totalPages={totalPages}
       isLoading={isLoading}
       onRowClick={onRowClick}
-      // isRowClickable={row => !row.original.parent}
     />
   )
 }

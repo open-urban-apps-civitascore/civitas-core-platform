@@ -406,9 +406,32 @@
         "name": "Name",
         "usersCount": "Amount of Users",
         "contact": "Contact Person",
-        "description": "Description"
+        "description": "Description",
+        "scope": "Scope"
       },
       "noGroupsAssigned": "No groups assigned yet.",
+      "removeAssignment": "Remove assignment",
+      "removeModal": {
+        "title": "Remove Group Assignment",
+        "description": "Are you sure you want to remove the group \"{groupName}\" from this role? This action cannot be undone.",
+        "confirm": "Remove"
+      },
+      "scopeTabs": {
+        "platformWide": "Platform-wide",
+        "dataset": "Dataset",
+        "datasource": "Data Source",
+        "datastructure": "Data Structure"
+      },
+      "scopeLabels": {
+        "TENANT": "Platform-wide",
+        "DATASET": "Dataset",
+        "DATASOURCE": "Data Source",
+        "DATASTRUCTURE": "Data Structure"
+      },
+      "infoBox": "Groups that are assigned here, get the type 'platform-wide' (permissions to all data objects inside the platform)",
+      "scopeReadOnlyMessageDATASET": "Dataset-related assignments happen at the corresponding dataset",
+      "scopeReadOnlyMessageDATASOURCE": "Datasource-related assignments happen at the corresponding datasource",
+      "scopeReadOnlyMessageDATASTRUCTURE": "Datastructure-related assignments happen at the corresponding datastructure",
       "modal": {
         "title": "Add Group",
         "description": "to Role {roleName}",

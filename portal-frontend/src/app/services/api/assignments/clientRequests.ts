@@ -5,10 +5,14 @@ import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
 import { GetListInput } from '@/types/common'
 
+export type AssignmentScopeType = 'TENANT' | 'DATASET' | 'DATASOURCE' | 'DATASTRUCTURE'
+
 export type AssignmentSummary = {
   id: string
   group: { id: string; name: string }
   role: { id: string; name: string; roleType: string }
+  scopeType: AssignmentScopeType
+  scope: { id: string; name: string } | null
 }
 
 export type CreateAssignmentData = {

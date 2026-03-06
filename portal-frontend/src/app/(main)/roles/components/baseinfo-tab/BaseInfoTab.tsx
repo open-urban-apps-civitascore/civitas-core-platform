@@ -1,10 +1,7 @@
-import { SquarePen } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { UseFormReturn } from 'react-hook-form'
 
-import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
@@ -13,38 +10,20 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { FormRole, ROLE_TYPES } from '@/types/roles'
+import { FormRole } from '@/types/roles'
 
 interface BaseInfoTabProps {
   form: UseFormReturn<FormRole>
-  onSubmit: (values: FormRole) => void
-  isLoading: boolean
   isDefaultRole: boolean
-  isEditMode: boolean
+  isReadOnly: boolean
   deleteRole: () => void
-  roleType: string
 }
 
 export const BaseInfoTab = (props: BaseInfoTabProps) => {
-  const { form, onSubmit, isLoading, roleType, isDefaultRole, isEditMode, deleteRole } = props
-  const router = useRouter()
-  const tCommon = useTranslations('common')
+  const { form, isDefaultRole, isReadOnly, deleteRole } = props
   const tRolesBaseInfo = useTranslations('roles.baseInfoTab')
   const tRoles = useTranslations('roles')
   const isMobile = useIsMobile()
-  const [isReadOnly, setIsReadOnly] = useState(isEditMode)
-
-  const EditButton = (
-    <Button variant="outline" type="button" onClick={() => setIsReadOnly(false)}>
-      <SquarePen />
-      {tCommon('actions.edit')}
-    </Button>
-  )
-
-  const onSubmitHandler = (values: FormRole) => {
-    onSubmit(values)
-    setIsReadOnly(true)
-  }
 
   const isReadonly = useMemo(() => isDefaultRole, [isDefaultRole])
 
@@ -54,10 +33,10 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmitHandler)} className="flex flex-col gap-5 h-full">
+      <form onSubmit={e => e.preventDefault()} className="flex flex-col gap-5 h-full">
         <ContentCard>
           <DetailsFieldContainer className="pt-0 pb-3 text-xl">
-            <SubHeader title={tRolesBaseInfo('heading')} customElement={!isDefaultRole && isEditMode && EditButton} />
+            <SubHeader title={tRolesBaseInfo('heading')} />
           </DetailsFieldContainer>
 
           <DetailsFieldContainer>
@@ -70,7 +49,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
                 className: isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]',
               }}
               required={!isDefaultRole && !isReadOnly}
-              disabled={isReadOnly || isDefaultRole}
+              disabled={isReadOnly}
             />
           </DetailsFieldContainer>
 
@@ -84,7 +63,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               formItemProps={{
                 className: isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]',
               }}
-              disabled={isReadOnly || isDefaultRole}
+              disabled={isReadOnly}
             />
           </DetailsFieldContainer>
 
@@ -102,7 +81,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           </DetailsFieldContainer>
         </ContentCard>
 
-        {!isDefaultRole && isEditMode && (
+        {!isDefaultRole && !isReadOnly && (
           <ContentCard className="mt-0">
             <DetailsFieldContainer className="pt-0 pb-3 text-xl border-none">
               <SubHeader title={tRolesBaseInfo('securityArea.heading')} className="border-b pb-2" />
@@ -122,15 +101,6 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
               </div>
             </DetailsFieldContainer>
           </ContentCard>
-        )}
-
-        {!isDefaultRole && !isReadOnly && (
-          <ActionButtons
-            onCancelClick={() => router.push(`/roles?_tab=${roleType || ROLE_TYPES.SYSTEM}`)}
-            confirmButtonType="submit"
-            isConfirmButtonDisabled={!form.formState.isDirty || isLoading || isReadOnly}
-            isCancelButtonDisabled={isLoading}
-          />
         )}
       </form>
     </Form>
