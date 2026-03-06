@@ -72,6 +72,7 @@ const GroupsList = (props: GroupsListProps) => {
         toast.error(t('errors.deleteError'))
         setIsDeleteGroupWarningmodalOpen(false)
       },
+      onSettled: () => setGroupToDelete(null),
     })
   }
 
@@ -79,7 +80,6 @@ const GroupsList = (props: GroupsListProps) => {
     if (groupToDelete) {
       handleDeleteGroup(groupToDelete)
     }
-    setGroupToDelete(null)
   }
 
   const handleDeleteGroupClick = (groupId: string) => {

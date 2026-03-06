@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { DeleteMutationInput } from '@/types/common'
@@ -20,7 +21,7 @@ export const useDeleteMutation = <TResponse>({ key: mutationKey, errorMessage, h
       })
     },
     onError: error => {
-      console.error(errorMessage, error)
+      console.error(errorMessage, (error as AxiosError).message)
     },
   })
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
@@ -50,6 +51,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   const params = useSearchParams()
   const mode = params.get('mode')
   const [initialGroupData, setInitialGroupData] = useState(groupData)
+  const [isNavigating, setIsNavigating] = useState(false)
 
   const { subTabValue, setSubTabValueParam } = useQueryParams()
 
@@ -65,7 +67,11 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   const createGroup = useCreateGroup()
   const updateGroup = useUpdateGroup()
 
-  const isLoading = createGroup.isPending || updateGroup.isPending
+  const isLoading = createGroup.isPending || updateGroup.isPending || isNavigating
+
+  useEffect(() => {
+    setInitialGroupData(groupData)
+  }, [groupData])
 
   const form = useForm<GroupBaseFormData>({
     resolver: zodResolver(GroupBaseFormDataSchema),
@@ -78,31 +84,34 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     form.reset(mapGroupApiToFormData(initialGroupData))
   }, [initialGroupData, form])
 
+  const handleGroupRequestError = (error: unknown, message: string) => {
+    if ((error as AxiosError).response?.status == 409) {
+      form.setError('name', { type: 'manual', message: 'groups.errors.groupNameExists' })
+    }
+    toast.error(t(message))
+  }
+
   const handleCreateGroup = (formData: GroupBaseFormData) => {
     // eslint-disable-next-line unused-imports/no-unused-vars
-    const { id, ...createGroupData } = formData
+    const { id, ...createGroupData } = mapGroupFormToApiata(formData)
     createGroup.mutate(createGroupData, {
       onSuccess: ({ data }) => {
         toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
+        setIsNavigating(true)
         router.push(`/groups/${data.id}?mode=edit`)
       },
-      onError: (error: unknown) => {
-        if (((error as Error).message as string).includes('Request failed with status code 409')) {
-          form.setError('name', { type: 'manual', message: t('errors.groupNameExists') })
-        } else toast.error(t('errors.createError'))
-      },
+      onError: (error: unknown) => handleGroupRequestError(error, 'errors.createError'),
     })
   }
 
   const handleUpdateGroup = (formData: GroupBaseFormData) => {
     updateGroup.mutate(mapGroupFormToApiata(formData), {
-      onSuccess: ({ data }) => {
+      onSuccess: () => {
         toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.group') }))
-        setInitialGroupData(data)
         router.refresh()
         setIsExitModalOpen(false)
       },
-      onError: () => toast.error(t('errors.updateError')),
+      onError: (error: unknown) => handleGroupRequestError(error, 'errors.updateError'),
     })
   }
 
@@ -130,12 +139,12 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   const renderTabContent = () => {
     switch (subTabValue) {
       case tabValues.roles.value:
-        return <RolesTab groupData={groupData} />
+        return <RolesTab groupData={initialGroupData} />
       case tabValues.users.value:
         return (
           <UsersTab
             form={form}
-            originalUsers={groupData.members?.map(member => member.id) || []}
+            originalUsers={initialGroupData.members?.map(member => member.id) || []}
             isReadOnly={isReadOnly}
             isUpdatingGroup={updateGroup.isPending}
           />
