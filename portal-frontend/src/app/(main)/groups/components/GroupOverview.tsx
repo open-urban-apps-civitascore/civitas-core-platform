@@ -86,10 +86,10 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   }
 
   const handleGroupRequestError = (error: unknown, message: string) => {
-    if ((error as AxiosError).response?.status == 409) {
+    if ((error as AxiosError).response?.status === 409) {
       form.setError('name', { type: 'manual', message: 'groups.errors.groupNameExists' })
-    }
-    toast.error(t(message))
+      toast.error(tCommon('errors.formInvalid'))
+    } else toast.error(t(message))
   }
 
   const handleCreateGroup = (formData: GroupBaseFormData) => {

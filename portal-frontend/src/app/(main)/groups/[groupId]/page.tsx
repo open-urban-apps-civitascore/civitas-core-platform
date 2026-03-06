@@ -2,11 +2,11 @@ import { getGroup } from '@/app/services/api/groups/serverRequests'
 
 import { GroupOverview } from '../components/GroupOverview'
 
-interface PageProps {
+interface EditGroupPageProps {
   params: Promise<{ groupId: string }>
 }
 
-const EditGroupPage = async (props: PageProps) => {
+const EditGroupPage = async (props: EditGroupPageProps) => {
   const { params } = props
   const { groupId } = await params
 

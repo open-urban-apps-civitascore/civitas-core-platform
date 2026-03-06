@@ -3,11 +3,11 @@ import { ApiRequestParams, getApiRequestParams } from '@/utils/requestParams'
 
 import GroupsList from './components/groups-list/GroupList'
 
-type Props = {
+interface GroupsPageProps {
   searchParams: Promise<ApiRequestParams>
 }
 
-const GroupsPage = async ({ searchParams }: Props) => {
+const GroupsPage = async ({ searchParams }: GroupsPageProps) => {
   const params = await searchParams
   const { apiParams } = getApiRequestParams(params)
 
