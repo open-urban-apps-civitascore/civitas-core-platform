@@ -119,6 +119,11 @@ test_path_pattern_6_segment_versions_unpublish if {
 	result == "/v2/datastructures/{id}/versions/{id}/unpublish"
 }
 
+test_path_pattern_7_segment_versions_published_meta if {
+	result := portal_backend.path_pattern with input as portal_request("PUT", "/v2/datastructures/dstr-123/versions/v-456/published/meta")
+	result == "/v2/datastructures/{id}/versions/{id}/published/meta"
+}
+
 # =============================================================================
 # NEW RESOURCE ENDPOINT TESTS
 # =============================================================================
