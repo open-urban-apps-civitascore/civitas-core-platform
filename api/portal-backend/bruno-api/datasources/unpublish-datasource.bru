@@ -1,0 +1,15 @@
+meta {
+  name: Unpublish Data Source
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/datasources/:id/unpublish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSourceId}}
+}

@@ -1,0 +1,21 @@
+meta {
+  name: Get All Data Structure Versions
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+  ~sort: createdAt,DESC
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Patch Role
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/roles/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{roleId}}
+}
+
+body:json {
+  {
+    "description": "Patched description"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('roleId', res.body.id);
+  }
+}

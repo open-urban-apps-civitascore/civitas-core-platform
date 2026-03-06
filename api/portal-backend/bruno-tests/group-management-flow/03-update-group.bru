@@ -1,0 +1,29 @@
+meta {
+  name: Update Group
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/groups/{{createdGroupId}}
+  body: json
+  auth: bearer
+}
+
+body:json {
+  {
+    "name": "Updated Test Flow Group",
+    "description": "Updated by test flow"
+  }
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("should update group", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.name).to.equal("Updated Test Flow Group");
+  });
+}

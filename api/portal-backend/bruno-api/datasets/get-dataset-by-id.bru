@@ -1,0 +1,15 @@
+meta {
+  name: Get Dataset by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Patch Dataset
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/datasets/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+body:json {
+  {
+    "description": "Patched description"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSetId', res.body.id);
+  }
+}

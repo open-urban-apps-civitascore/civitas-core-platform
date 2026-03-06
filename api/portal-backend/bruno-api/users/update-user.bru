@@ -1,0 +1,34 @@
+meta {
+  name: Update User
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/users/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{userId}}
+}
+
+body:json {
+  {
+    "title": "MR",
+    "firstName": "John",
+    "lastName": "Doe",
+    "email": "john.doe@example.com",
+    "phone": "+1234567890",
+    "externalId": "ext-123",
+    "active": true,
+    "groupIds": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('userId', res.body.id);
+  }
+}
