@@ -1,27 +1,117 @@
 package de.civitascore.portal.controller.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
+import de.civitascore.portal.util.ForbiddenException;
+import de.civitascore.portal.util.InvalidInputException;
+import de.civitascore.portal.util.ResourceInUseException;
+import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.context.request.WebRequest;
 
-@DisplayName("DataIntegrityExceptionHandler Unit Tests")
-class DataIntegrityExceptionHandlerTest {
+@DisplayName("GlobalExceptionHandler Unit Tests")
+class GlobalExceptionHandlerTest {
 
-  private final DataIntegrityExceptionHandler handler = new DataIntegrityExceptionHandler();
+  private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
 
   private static ConstraintViolationException constraintViolation(
       String sqlState, String message, String constraintName) {
     SQLException sqlException = new SQLException(message, sqlState);
     return new ConstraintViolationException(message, sqlException, constraintName);
+  }
+
+  @Nested
+  @DisplayName("Domain exception handling")
+  class DomainExceptionTests {
+
+    @Test
+    @DisplayName("Should return 404 for ResourceNotFoundException")
+    void shouldReturn404ForNotFound() {
+      UUID id = UUID.randomUUID();
+      ResourceNotFoundException ex = new ResourceNotFoundException("DataSet", id);
+
+      ResponseEntity<Map<String, Object>> response = handler.handleNotFound(ex);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().get("error")).isEqualTo("NOT_FOUND");
+      assertThat((String) response.getBody().get("message")).contains(id.toString());
+    }
+
+    @Test
+    @DisplayName("Should return 400 for InvalidInputException")
+    void shouldReturn400ForInvalidInput() {
+      InvalidInputException ex =
+          new InvalidInputException("Pipeline", UUID.randomUUID(), "Name is required");
+
+      ResponseEntity<Map<String, Object>> response = handler.handleInvalidInput(ex);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().get("error")).isEqualTo("INVALID_INPUT");
+      assertThat(response.getBody().get("message")).isEqualTo("Name is required");
+    }
+
+    @Test
+    @DisplayName("Should return 409 for UniqueConstraintViolationException")
+    void shouldReturn409ForUniqueConstraint() {
+      UniqueConstraintViolationException ex =
+          new UniqueConstraintViolationException("Pipeline", "name", "test-pipeline");
+
+      ResponseEntity<Map<String, Object>> response = handler.handleUniqueConstraint(ex);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().get("error")).isEqualTo("UNIQUE_CONSTRAINT_VIOLATION");
+    }
+
+    @Test
+    @DisplayName("Should return 409 for ResourceInUseException")
+    void shouldReturn409ForResourceInUse() {
+      UUID id = UUID.randomUUID();
+      ResourceInUseException ex =
+          new ResourceInUseException("DataStructureVersion", id, "Referenced by DataSource");
+
+      ResponseEntity<Map<String, Object>> response = handler.handleResourceInUse(ex);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().get("error")).isEqualTo("RESOURCE_IN_USE");
+      assertThat(response.getBody().get("message")).isEqualTo("Referenced by DataSource");
+    }
+
+    @Test
+    @DisplayName("Should return 403 for ForbiddenException")
+    void shouldReturn403ForForbidden() {
+      ForbiddenException ex =
+          new ForbiddenException("Role", UUID.randomUUID(), "Cannot delete system role");
+
+      ResponseEntity<Map<String, Object>> response = handler.handleForbidden(ex);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().get("error")).isEqualTo("FORBIDDEN");
+      assertThat(response.getBody().get("message")).isEqualTo("Cannot delete system role");
+    }
   }
 
   @Nested
@@ -153,6 +243,59 @@ class DataIntegrityExceptionHandlerTest {
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().get("error")).isEqualTo("PERSISTENCE_ERROR");
+    }
+  }
+
+  @Nested
+  @DisplayName("Spring MVC exception handling")
+  class SpringMvcExceptionTests {
+
+    @Test
+    @DisplayName("Should return 400 with field errors for MethodArgumentNotValidException")
+    @SuppressWarnings("unchecked")
+    void shouldReturn400WithFieldErrors() {
+      BeanPropertyBindingResult bindingResult =
+          new BeanPropertyBindingResult(new Object(), "input");
+      bindingResult.addError(new FieldError("input", "name", "Name is required"));
+      bindingResult.addError(
+          new FieldError("input", "description", "Description must not be blank"));
+
+      MethodArgumentNotValidException ex = new MethodArgumentNotValidException(null, bindingResult);
+
+      ResponseEntity<Object> response =
+          handler.handleMethodArgumentNotValid(
+              ex, new HttpHeaders(), HttpStatus.BAD_REQUEST, mock(WebRequest.class));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+
+      Map<String, Object> body = (Map<String, Object>) response.getBody();
+      assertThat(body.get("error")).isEqualTo("VALIDATION_FAILED");
+
+      List<Map<String, String>> fieldErrors = (List<Map<String, String>>) body.get("fieldErrors");
+      assertThat(fieldErrors).hasSize(2);
+      assertThat(fieldErrors)
+          .extracting(fe -> fe.get("field"))
+          .containsExactlyInAnyOrder("name", "description");
+    }
+
+    @Test
+    @DisplayName("Should return 400 for HttpMessageNotReadableException")
+    void shouldReturn400ForMalformedJson() {
+      HttpMessageNotReadableException ex =
+          new HttpMessageNotReadableException(
+              "JSON parse error", new MockHttpInputMessage(new byte[0]));
+
+      ResponseEntity<Object> response =
+          handler.handleHttpMessageNotReadable(
+              ex, new HttpHeaders(), HttpStatus.BAD_REQUEST, mock(WebRequest.class));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody()).isNotNull();
+
+      @SuppressWarnings("unchecked")
+      Map<String, Object> body = (Map<String, Object>) response.getBody();
+      assertThat(body.get("error")).isEqualTo("MALFORMED_REQUEST");
     }
   }
 }
