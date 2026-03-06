@@ -1,20 +1,32 @@
 import { describe, expect, it } from 'vitest'
 
+import { Assignment, ASSIGNMENT_SCOPE_TYPES, AssignmentRole } from '@/types/assignments'
 import type { Group } from '@/types/groups'
+import { ROLE_TYPES } from '@/types/roles'
 
 import { mapGroupApiToFormData, mapGroupDetailsData, mapGroupFormToApiData, mapGroupsApiToListData } from './groups'
+
+const groupRoles: AssignmentRole[] = [
+  { id: 'r1', name: 'Admin', roleType: ROLE_TYPES.SYSTEM, description: '', readonly: false },
+  { id: 'r2', name: 'Editor', roleType: ROLE_TYPES.DATA, description: '', readonly: false },
+  { id: 'r3', name: 'Support', roleType: ROLE_TYPES.GOVERNANCE, description: '', readonly: false },
+]
+
+const baseAssignment: Assignment = {
+  id: 'a1',
+  createdAt: new Date().toISOString(),
+  modifiedAt: new Date().toISOString(),
+  group: { id: 'g1', name: 'Group 01' },
+  role: groupRoles[0],
+  scopeType: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+  scope: { id: 's1', name: 'scope 01' },
+}
 
 const baseGroup: Group = {
   id: '1',
   name: 'Test Group',
   description: 'Description',
-  roles: [
-    {
-      id: 'r1',
-      name: 'Admin',
-      roleType: 'system',
-    },
-  ],
+  assignments: [baseAssignment],
   members: [
     { id: 'm1', name: 'User 1' },
     { id: 'm2', name: 'User 2' },
@@ -35,17 +47,17 @@ describe('mapGroupDetailsData', () => {
     expect(result).toEqual(baseGroup)
   })
 
-  it('adds fallback contactUser and roles if null', () => {
+  it('adds fallback contactUser and assignemnts if null', () => {
     const group: Group = {
       ...baseGroup,
       contactUser: null,
-      roles: null,
+      assignments: null,
     }
 
     const result = mapGroupDetailsData(group)
 
     expect(result?.contactUser).toEqual({ id: '', name: '' })
-    expect(result?.roles).toEqual([])
+    expect(result?.assignments).toEqual([])
   })
 })
 
