@@ -1,5 +1,7 @@
 package de.civitascore.portal.controller.exception;
 
+import de.civitascore.portal.util.ExternalSystemRejectionException;
+import de.civitascore.portal.util.ExternalSystemTimeoutException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
 import java.time.LocalDateTime;
@@ -75,6 +77,22 @@ public class DataIntegrityExceptionHandler {
     log.error("Persistence error: {}", ex.getMessage(), ex);
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .body(createErrorMap("PERSISTENCE_ERROR", "A persistence error occurred"));
+  }
+
+  @ExceptionHandler(ExternalSystemRejectionException.class)
+  public ResponseEntity<Map<String, Object>> handleExternalSystemRejection(
+      ExternalSystemRejectionException ex) {
+    log.error("External system rejected request: {}", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+        .body(createErrorMap("EXTERNAL_SYSTEM_ERROR", ex.getMessage()));
+  }
+
+  @ExceptionHandler(ExternalSystemTimeoutException.class)
+  public ResponseEntity<Map<String, Object>> handleExternalSystemTimeout(
+      ExternalSystemTimeoutException ex) {
+    log.error("External system timed out: {}", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
+        .body(createErrorMap("EXTERNAL_SYSTEM_TIMEOUT", ex.getMessage()));
   }
 
   private Map<String, Object> createErrorMap(String error, String message) {
