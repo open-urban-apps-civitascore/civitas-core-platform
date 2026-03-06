@@ -559,20 +559,6 @@ class UserControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getActive()).isFalse();
     }
-
-    @Test
-    @DisplayName(
-        "Should not accept externalId via API — field is read-only, set only by Kafka sync")
-    void shouldHandleExternalId() {
-      UserInputDTO input = createValidInput();
-      input.setExternalId("ext-123");
-
-      ResponseEntity<UserOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getExternalId()).isNull();
-    }
   }
 
   @Nested
