@@ -5,7 +5,7 @@
   "description": "Portal Backend API collection — OpenAPI spec, docs, and Bruno collections",
   "scripts": {
     "lint": "redocly lint openapi.yaml",
-    "preview": "redocly preview openapi.yaml",
+    "preview": "redocly preview-docs openapi.yaml",
     "lint:fix": "redocly lint openapi.yaml --format stylish",
     "api-docs": "pnpm dlx http-server . -p 8095 -o /docs.html -c-1"
   },
