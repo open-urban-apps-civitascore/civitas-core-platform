@@ -3,13 +3,16 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.configuration.ModelAtlasConfig;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -51,7 +54,7 @@ public class ModelRestClientRequestService {
    */
   public String uploadModelFile(MultipartFile modelFile, String nsUri) {
     try {
-      RestClient restClient = restClientBuilder.baseUrl(getBaseUrl()).build();
+      RestClient restClient = createRestClient();
 
       return restClient
           .post()
@@ -79,7 +82,7 @@ public class ModelRestClientRequestService {
    */
   public String uploadModelString(String modelContent, String nsUri) {
     try {
-      RestClient restClient = restClientBuilder.baseUrl(getBaseUrl()).build();
+      RestClient restClient = createRestClient();
 
       return restClient
           .post()
@@ -96,6 +99,17 @@ public class ModelRestClientRequestService {
       log.error("Failed to upload model string to Model Atlas: nsUri={}", nsUri, e);
       throw new ExternalSystemRejectionException("Failed to upload model string to Model Atlas", e);
     }
+  }
+
+  private RestClient createRestClient() {
+    RestTemplate restTemplate = new RestTemplate();
+    restTemplate
+        .getMessageConverters()
+        .add(0, new StringHttpMessageConverter(StandardCharsets.UTF_8));
+    return restClientBuilder
+        .baseUrl(getBaseUrl())
+        .messageConverters(restTemplate.getMessageConverters())
+        .build();
   }
 
   /**
