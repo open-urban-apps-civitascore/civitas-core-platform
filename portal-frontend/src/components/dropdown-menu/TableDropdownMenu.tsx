@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { cn } from '@/lib/utils'
 
 type DropDownMenuItem = {
   label: string
@@ -18,9 +19,10 @@ type DropDownMenuItem = {
 
 interface TableDropdownMenuProps {
   menuItems: DropDownMenuItem[]
+  menuContentClassName?: string
 }
 export const TableDropdownMenu = (props: TableDropdownMenuProps) => {
-  const { menuItems } = props
+  const { menuItems, menuContentClassName } = props
 
   return (
     <DropdownMenu modal={false}>
@@ -29,7 +31,7 @@ export const TableDropdownMenu = (props: TableDropdownMenuProps) => {
           <MoreVerticalIcon />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-40" align="end">
+      <DropdownMenuContent className={cn('w-40', menuContentClassName)} align="end">
         <DropdownMenuGroup>
           {menuItems.map(item => (
             <DropdownMenuItem key={item.label} onSelect={item.onClick} className="hover:cursor-pointer">

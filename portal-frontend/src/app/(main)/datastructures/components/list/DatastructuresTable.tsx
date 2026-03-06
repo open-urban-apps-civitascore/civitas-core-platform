@@ -4,6 +4,7 @@ import {
   getCoreRowModel,
   getExpandedRowModel,
   getSortedRowModel,
+  Row,
   useReactTable,
 } from '@tanstack/react-table'
 import { CircleCheckBig, CircleDashed } from 'lucide-react'
@@ -16,10 +17,12 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { DATASTRUCTURE_STATUS_TYPES, DatastructuresListData } from '@/types/datastructures'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 
 interface DatastructuresTableProps extends TableProps<DatastructuresListData> {
   datastructures: DatastructuresListData[]
   onDelete?: (id: string) => void
+  onDeleteDatastructureClick: (id: string) => void
 }
 
 export const DatastructuresTable = (props: DatastructuresTableProps) => {
@@ -33,6 +36,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     rowSelection,
     onPaginationChange,
     onSortingChange,
+    onDeleteDatastructureClick,
   } = props
   const t = useTranslations('datastructures')
   const tVersion = useTranslations('datastructureVersions')
@@ -62,7 +66,6 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       ),
       meta: {
         style: {
-          width: '20%',
           minWidth: '200px',
           color: 'var(--foreground)',
           fontWeight: '500',
@@ -74,7 +77,6 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       cell: info => info.getValue(),
       meta: {
         style: {
-          width: '25%',
           minWidth: '200px',
         },
       },
@@ -94,7 +96,6 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       cell: info => info.getValue() || '-',
       meta: {
         style: {
-          width: '10%',
           minWidth: '100px',
         },
       },
@@ -116,11 +117,29 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       },
       meta: {
         style: {
-          width: '10%',
           minWidth: '120px',
         },
       },
     }),
+    {
+      id: 'actions',
+      cell: ({ row }: { row: Row<DatastructuresListData> }) => (
+        <TableDropdownMenu
+          menuContentClassName="w-50"
+          menuItems={[
+            {
+              label: tCommon('actions.removeItem', { item: tCommon('items.datastructure') }),
+              onClick: () => onDeleteDatastructureClick(row.original.id),
+            },
+          ]}
+        />
+      ),
+      meta: {
+        style: {
+          width: '50px',
+        },
+      },
+    },
   ]
 
   const table = useReactTable({

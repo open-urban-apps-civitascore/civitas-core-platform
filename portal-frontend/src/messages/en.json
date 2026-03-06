@@ -71,8 +71,11 @@
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "commaSeparated": "comma-separated",
       "requiredInAvailable": "This field is required in the available mode.",
-      "descriptionHint": "max. 150 characters",
-      "statusChangeSuccess": "The availability status has been successfully updated."
+      "descriptionHint": "max. 150 characters"
+    },
+    "success": {
+      "statusChangeSuccess": "The availability status has been successfully updated.",
+      "deletionSuccess": "{item} has successfully been deleted."
     },
     "status": {
       "DRAFT": "Draft",
@@ -84,9 +87,9 @@
       "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
       "discard": "Verwerfen"
     },
-    "closeTabModal": {
-      "title": "Unsaved changes",
-      "description": "You have unsaved changes. Do you really want to close the tab?"
+    "deletionWarningModal": {
+      "title": "Delete {item}?",
+      "description": "This action can not be undone."
     }
   },
   "languages": {
@@ -542,6 +545,13 @@
       "createSuccess": "Data structure has been successfully created.",
       "updateSuccess": "Data structure  has been successfully updated.",
       "isInUseStatusHint": "Can not be set to draft since this datastructure is already in use."
+    },
+    "errors": {
+      "deletionError": "An error occurred while deleting the datastructure."
+    },
+    "infoModal": {
+      "title": "Datenstructure can not be deleted",
+      "description": "This Datenstructure is in use and can therefore not be deleted."
     }
   },
   "datastructureVersion": {

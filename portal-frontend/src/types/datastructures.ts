@@ -177,4 +177,5 @@ export type DatastructuresListData = {
   source: DatastructureVersionSource | null
   versionNumber: string | null
   versions: DatastructuresListData[]
+  inUse?: boolean
 }

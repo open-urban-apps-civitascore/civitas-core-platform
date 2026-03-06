@@ -70,8 +70,11 @@
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
       "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
-      "descriptionHint": "max. 150 Zeichen",
-      "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert."
+      "descriptionHint": "max. 150 Zeichen"
+    },
+    "success": {
+      "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert.",
+      "deletionSuccess": "{item} wurde erfolgreich gelöscht."
     },
     "status": {
       "DRAFT": "Entwurf",
@@ -82,6 +85,10 @@
       "title": "Vor dem Beenden speichern?",
       "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
       "discard": "Verwerfen"
+    },
+    "deletionWarningModal": {
+      "title": "{item} wirklich löschen?",
+      "description": "Diese Aktion kann nicht rückgängig gemacht werden."
     }
   },
   "languages": {
@@ -531,6 +538,13 @@
       "createSuccess": "Datenstruktur wurde erfolgreich angelegt.",
       "updateSuccess": "Datenstruktur wurde erfolgreich aktualisiert.",
       "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Datenstruktur bereits verwendet wird."
+    },
+    "errors": {
+      "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten."
+    },
+    "infoModal": {
+      "title": "Datenstruktur kann nicht gelöscht werden",
+      "description": "Diese Datenstruktur ist in Verwendung und kann daher nicht gelöscht werden."
     }
   },
   "datastructureVersions": {
