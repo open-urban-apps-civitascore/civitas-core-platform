@@ -74,8 +74,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         .body(createErrorMap("FORBIDDEN", ex.getMessage()));
   }
 
-  // --- Database / persistence exceptions ---
-
   @ExceptionHandler(DataIntegrityViolationException.class)
   public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(
       DataIntegrityViolationException ex) {
@@ -127,8 +125,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .body(createErrorMap("PERSISTENCE_ERROR", "A persistence error occurred"));
   }
-
-  // --- External system exceptions ---
 
   @ExceptionHandler(ExternalSystemRejectionException.class)
   public ResponseEntity<Map<String, Object>> handleExternalSystemRejection(
