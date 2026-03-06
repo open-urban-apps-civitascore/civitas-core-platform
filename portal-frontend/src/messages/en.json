@@ -27,7 +27,7 @@
       "exit": "Exit",
       "assignItem": "Assign {item}",
       "assignTo": "to {item}",
-      "close": "Close"
+      "close": "Close",
       "back": "Back"
     },
     "errors": {

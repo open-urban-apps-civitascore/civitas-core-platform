@@ -27,7 +27,7 @@
       "exit": "Beenden",
       "assignItem": "{item} hinzufügen",
       "assignTo": "zu {item}",
-      "close": "Schließen"
+      "close": "Schließen",
       "back": "Zurück"
     },
     "errors": {
