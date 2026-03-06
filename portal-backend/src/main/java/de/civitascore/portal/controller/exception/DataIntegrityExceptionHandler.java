@@ -2,6 +2,8 @@ package de.civitascore.portal.controller.exception;
 
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
+import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +26,7 @@ public class DataIntegrityExceptionHandler {
   private static final String NOT_NULL_VIOLATION = "23502";
 
   @ExceptionHandler(DataIntegrityViolationException.class)
-  public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
+  public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(
       DataIntegrityViolationException ex) {
 
     if (ex.getCause() instanceof ConstraintViolationException cve) {
@@ -35,11 +37,7 @@ public class DataIntegrityExceptionHandler {
         UniqueConstraintViolationException mapped = extractUniqueViolationException(dbMessage);
         log.warn("Unique constraint violation: {}", mapped.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(
-                ErrorResponse.of(
-                    HttpStatus.CONFLICT.value(),
-                    "UNIQUE_CONSTRAINT_VIOLATION",
-                    mapped.getMessage()));
+            .body(createErrorMap("UNIQUE_CONSTRAINT_VIOLATION", mapped.getMessage()));
       }
 
       if (FOREIGN_KEY_VIOLATION.equals(sqlState)) {
@@ -49,8 +47,7 @@ public class DataIntegrityExceptionHandler {
             cve.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
             .body(
-                ErrorResponse.of(
-                    HttpStatus.CONFLICT.value(),
+                createErrorMap(
                     "FOREIGN_KEY_VIOLATION",
                     "Referenced entity does not exist or is still in use"));
       }
@@ -59,39 +56,32 @@ public class DataIntegrityExceptionHandler {
         log.warn(
             "Not-null violation on constraint '{}': {}", cve.getConstraintName(), cve.getMessage());
         return ResponseEntity.badRequest()
-            .body(
-                ErrorResponse.of(
-                    HttpStatus.BAD_REQUEST.value(),
-                    "NOT_NULL_VIOLATION",
-                    "A required field is missing"));
+            .body(createErrorMap("NOT_NULL_VIOLATION", "A required field is missing"));
       }
     }
 
     log.error("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .body(
-            ErrorResponse.of(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "DATA_INTEGRITY_ERROR",
-                "A data integrity error occurred"));
+        .body(createErrorMap("DATA_INTEGRITY_ERROR", "A data integrity error occurred"));
   }
 
   @ExceptionHandler(PersistenceException.class)
-  public ResponseEntity<ErrorResponse> handlePersistenceException(PersistenceException ex) {
+  public ResponseEntity<Map<String, Object>> handlePersistenceException(PersistenceException ex) {
     if (ex.getCause() instanceof IllegalStateException ise) {
       log.warn("Entity validation failed: {}", ise.getMessage());
       return ResponseEntity.badRequest()
-          .body(
-              ErrorResponse.of(
-                  HttpStatus.BAD_REQUEST.value(), "ENTITY_VALIDATION_FAILED", ise.getMessage()));
+          .body(createErrorMap("ENTITY_VALIDATION_FAILED", ise.getMessage()));
     }
     log.error("Persistence error: {}", ex.getMessage(), ex);
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .body(
-            ErrorResponse.of(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "PERSISTENCE_ERROR",
-                "A persistence error occurred"));
+        .body(createErrorMap("PERSISTENCE_ERROR", "A persistence error occurred"));
+  }
+
+  private Map<String, Object> createErrorMap(String error, String message) {
+    return Map.of(
+        "error", error,
+        "message", message,
+        "timestamp", LocalDateTime.now().toString());
   }
 
   private UniqueConstraintViolationException extractUniqueViolationException(String dbMessage) {
