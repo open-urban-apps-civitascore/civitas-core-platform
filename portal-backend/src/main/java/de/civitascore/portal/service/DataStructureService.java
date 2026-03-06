@@ -67,17 +67,20 @@ public class DataStructureService
 
   @Override
   protected DataStructure postConvertToEntity(DataStructure entity, DataStructureInputDTO input) {
-    if (input.getDataStructureVersionIds() != null
-        && !input.getDataStructureVersionIds().isEmpty()) {
-      List<DataStructureVersion> versions =
-          dataStructureVersionRepository.findAllById(input.getDataStructureVersionIds());
-      if (versions.size() != input.getDataStructureVersionIds().size()) {
-        throw new InvalidInputException(
-            "DataStructure",
-            "dataStructureVersionIds",
-            "One or more DataStructureVersion IDs not found");
+    if (input.getDataStructureVersionIds() != null) {
+      if (input.getDataStructureVersionIds().isEmpty()) {
+        entity.setDataStructureVersions(new HashSet<>());
+      } else {
+        List<DataStructureVersion> versions =
+            dataStructureVersionRepository.findAllById(input.getDataStructureVersionIds());
+        if (versions.size() != input.getDataStructureVersionIds().size()) {
+          throw new InvalidInputException(
+              "DataStructure",
+              "dataStructureVersionIds",
+              "One or more DataStructureVersion IDs not found");
+        }
+        entity.setDataStructureVersions(new HashSet<>(versions));
       }
-      entity.setDataStructureVersions(new HashSet<>(versions));
     }
 
     return super.postConvertToEntity(entity, input); // base handles assignments

@@ -2,7 +2,6 @@ package de.civitascore.portal.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import de.civitascore.portal.model.entity.base.BaseEntity;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.model.output.BaseOutputDTO;
@@ -191,14 +190,6 @@ public abstract class BaseController<
    * @throws IOException if there is an error during JSON processing
    */
   protected I patchInput(I currentDto, E current, JsonNode updates) throws IOException {
-    if (updates.isObject()) {
-      ObjectNode objectNode = (ObjectNode) updates;
-      objectNode.remove("id");
-      objectNode.remove("createdAt");
-      objectNode.remove("createdBy");
-      objectNode.remove("modifiedAt");
-      objectNode.remove("modifiedBy");
-    }
     return objectMapper.readerForUpdating(currentDto).readValue(updates);
   }
 

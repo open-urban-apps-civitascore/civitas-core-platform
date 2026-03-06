@@ -5,6 +5,7 @@ import jakarta.persistence.PersistenceException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,36 +19,79 @@ public class DataIntegrityExceptionHandler {
   private static final Pattern UNIQUE_DETAIL_PATTERN =
       Pattern.compile("Key \\((.+?)\\)=\\((.+?)\\) already exists");
 
+  private static final String UNIQUE_VIOLATION = "23505";
+  private static final String FOREIGN_KEY_VIOLATION = "23503";
+  private static final String NOT_NULL_VIOLATION = "23502";
+
   @ExceptionHandler(DataIntegrityViolationException.class)
-  public ResponseEntity<Object> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
-    String message = ex.getMostSpecificCause().getMessage();
-    if (message != null && message.contains("unique constraint")) {
-      UniqueConstraintViolationException mapped = extractUniqueViolationException(message);
-      log.warn("Unique constraint violation: {}", mapped.getMessage());
-      return ResponseEntity.status(HttpStatus.CONFLICT).build();
+  public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
+      DataIntegrityViolationException ex) {
+
+    if (ex.getCause() instanceof ConstraintViolationException cve) {
+      String sqlState = cve.getSQLState();
+
+      if (UNIQUE_VIOLATION.equals(sqlState)) {
+        String dbMessage = ex.getMostSpecificCause().getMessage();
+        UniqueConstraintViolationException mapped = extractUniqueViolationException(dbMessage);
+        log.warn("Unique constraint violation: {}", mapped.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(
+                ErrorResponse.of(
+                    HttpStatus.CONFLICT.value(),
+                    "UNIQUE_CONSTRAINT_VIOLATION",
+                    mapped.getMessage()));
+      }
+
+      if (FOREIGN_KEY_VIOLATION.equals(sqlState)) {
+        log.warn(
+            "Foreign key violation on constraint '{}': {}",
+            cve.getConstraintName(),
+            cve.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(
+                ErrorResponse.of(
+                    HttpStatus.CONFLICT.value(),
+                    "FOREIGN_KEY_VIOLATION",
+                    "Referenced entity does not exist or is still in use"));
+      }
+
+      if (NOT_NULL_VIOLATION.equals(sqlState)) {
+        log.warn(
+            "Not-null violation on constraint '{}': {}", cve.getConstraintName(), cve.getMessage());
+        return ResponseEntity.badRequest()
+            .body(
+                ErrorResponse.of(
+                    HttpStatus.BAD_REQUEST.value(),
+                    "NOT_NULL_VIOLATION",
+                    "A required field is missing"));
+      }
     }
-    if (message != null
-        && (message.contains("foreign key") || message.contains("is still referenced"))) {
-      log.warn("Foreign key constraint violation: {}", message);
-      return ResponseEntity.status(HttpStatus.CONFLICT).build();
-    }
-    if (message != null && message.contains("not-null")) {
-      log.warn("Not-null constraint violation: {}", message);
-      return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-    }
-    log.error("Data integrity violation: {}", message);
-    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+
+    log.error("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .body(
+            ErrorResponse.of(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "DATA_INTEGRITY_ERROR",
+                "A data integrity error occurred"));
   }
 
   @ExceptionHandler(PersistenceException.class)
-  public ResponseEntity<Object> handlePersistenceException(PersistenceException ex) {
-    Throwable cause = ex.getCause();
-    if (cause instanceof IllegalStateException) {
-      log.warn("Entity validation failed: {}", cause.getMessage());
-      return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+  public ResponseEntity<ErrorResponse> handlePersistenceException(PersistenceException ex) {
+    if (ex.getCause() instanceof IllegalStateException ise) {
+      log.warn("Entity validation failed: {}", ise.getMessage());
+      return ResponseEntity.badRequest()
+          .body(
+              ErrorResponse.of(
+                  HttpStatus.BAD_REQUEST.value(), "ENTITY_VALIDATION_FAILED", ise.getMessage()));
     }
-    log.error("Persistence error: {}", ex.getMessage());
-    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+    log.error("Persistence error: {}", ex.getMessage(), ex);
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .body(
+            ErrorResponse.of(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "PERSISTENCE_ERROR",
+                "A persistence error occurred"));
   }
 
   private UniqueConstraintViolationException extractUniqueViolationException(String dbMessage) {
