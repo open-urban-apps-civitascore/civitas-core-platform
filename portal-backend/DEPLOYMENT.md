@@ -30,12 +30,12 @@
 
 | Property / Env Var | Example Value | Description |
 |---|---|---|
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://postgres:5432/portal_backend` | JDBC connection URL |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://postgres:5432/portal_backend?sslmode=require` | JDBC connection URL |
 | `SPRING_DATASOURCE_USERNAME` | `admin` | Database username |
 | `SPRING_DATASOURCE_PASSWORD` | `secret` | Database password |
 | `CIVITAS_MASTER_KEY` | `0000...0000` (64 hex chars) | 256-bit master key for credential encryption, hex-encoded. Shared with config-adapter. Stretched via PBKDF2 at startup; per-credential keys derived via HKDF-Expand. |
 
-> `application-postgres.yaml` defaults to `localhost:5432 / admin / admin` — always override in production.
+> `application-postgres.yaml` defaults to `localhost:5432 / admin / admin` with `sslmode=require` — always override `SPRING_DATASOURCE_URL` in production with your actual host and credentials.
 > `application-local.yaml` sets a fallback value for `CIVITAS_MASTER_KEY` — never use it in production.
 
 ---
@@ -211,7 +211,7 @@ environment:
   SPRING_PROFILES_ACTIVE: postgres
 
   # Database
-  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/portal_backend
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/portal_backend?sslmode=require
   SPRING_DATASOURCE_USERNAME: portal_user
   SPRING_DATASOURCE_PASSWORD: <secret>
 
