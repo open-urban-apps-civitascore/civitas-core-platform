@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { UseFormReturn } from 'react-hook-form'
 
 import { useGetUsers } from '@/app/services/api/users/clientRequests'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
@@ -18,7 +19,6 @@ import { mapGroupListUsers } from '@/utils/users'
 
 import { AssignUsersModal } from './AssignUsersModal'
 import { UsersTable } from './UsersTable'
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 
 interface UsersTabProps {
   form: UseFormReturn<GroupBaseFormData>

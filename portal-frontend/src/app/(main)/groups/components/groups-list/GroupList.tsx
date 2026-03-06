@@ -85,7 +85,10 @@ const GroupsList = (props: GroupsListProps) => {
   const handleDeleteGroupClick = (groupId: string) => {
     const group = groupsData.find(group => group.id === groupId)
     if (!group) return
-    if ((group?.members?.length && group?.members?.length > 0) || (group?.roles?.length && group?.roles?.length > 0))
+    if (
+      (group?.members?.length && group?.members?.length > 0) ||
+      (group?.assignments?.length && group?.assignments?.length > 0)
+    )
       setIsInfoModalOpen(true)
     else {
       setGroupToDelete(groupId)

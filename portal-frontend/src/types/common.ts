@@ -9,12 +9,12 @@ export type Item = {
   title: string
 }
 
-export const ItemScheme = z.object({
+export const ItemSchema = z.object({
   id: z.string(),
   name: z.string(),
 })
 
-export type Item2 = z.infer<typeof ItemScheme>
+export type ItemType = z.infer<typeof ItemSchema>
 
 export type SelectOption = {
   value: string

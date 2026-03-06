@@ -1,12 +1,13 @@
 import { z } from 'zod'
 
-import { ItemScheme, WithId } from './common'
+import { AssignmentApiResponseSchema } from './assignments'
+import { ItemSchema, WithId } from './common'
 
 export type GroupTab = 'info' | 'roles' | 'users'
 
 export const GroupRoleTypes = z.enum(['system', 'data', 'governance'])
 
-export const GroupRoleScheme = ItemScheme.extend({
+export const GroupRoleScheme = ItemSchema.extend({
   roleType: GroupRoleTypes,
 })
 
@@ -16,9 +17,9 @@ export const GroupApiResponseSchema = z.object({
     message: 'common.errors.atLeast2',
   }),
   description: z.string(),
-  roles: z.array(GroupRoleScheme).nullable(),
-  members: z.array(ItemScheme).nullable(),
-  contactUser: ItemScheme.nullable(),
+  members: z.array(ItemSchema).nullable(),
+  assignments: z.array(AssignmentApiResponseSchema).nullable(),
+  contactUser: ItemSchema.nullable(),
   createdAt: z.string(),
   modifiedAt: z.string(),
 })

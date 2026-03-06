@@ -13,7 +13,7 @@ import { TextField } from '@/components/form/fields/TextField'
 import { useDebounce } from '@/hooks/use-debounce'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
-import { Item2 } from '@/types/common'
+import { ItemType } from '@/types/common'
 import { GroupBaseFormData } from '@/types/groups'
 import { Contact } from '@/types/users'
 
@@ -32,7 +32,7 @@ const getContactListItems = (contacts: Contact[]) =>
 interface BaseInfoTabProps {
   form: UseFormReturn<GroupBaseFormData>
   isReadOnly: boolean
-  initialContactUser: Item2 | null
+  initialContactUser: ItemType | null
 }
 
 export const BaseInfoTab = (props: BaseInfoTabProps) => {

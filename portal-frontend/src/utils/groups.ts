@@ -5,7 +5,7 @@ export const mapGroupDetailsData = (groupResponse: Group | null): Group | null =
     ? {
         ...groupResponse,
         contactUser: groupResponse.contactUser || { id: '', name: '' },
-        roles: groupResponse.roles || [],
+        assignments: groupResponse.assignments || [],
       }
     : null
 

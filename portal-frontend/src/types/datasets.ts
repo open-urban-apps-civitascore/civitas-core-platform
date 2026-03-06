@@ -2,7 +2,7 @@ import { CheckedState } from '@radix-ui/react-checkbox'
 import { JSX } from 'react'
 import { z } from 'zod'
 
-import { Item2, STATUS_TYPES, WithId } from './common'
+import { ItemType, STATUS_TYPES, WithId } from './common'
 
 export const DATASET_STATUS_TYPES = {
   [STATUS_TYPES.DRAFT]: 'DRAFT',
@@ -108,7 +108,7 @@ export type DatasetTableData = {
   id: string
   name: string
   modifiedAt: string
-  createdBy: Item2
+  createdBy: ItemType
   dataSetStatus: DatasetStatusTypes
 }
 
