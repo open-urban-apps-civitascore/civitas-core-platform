@@ -18,6 +18,7 @@ import { mapGroupListUsers } from '@/utils/users'
 
 import { AssignUsersModal } from './AssignUsersModal'
 import { UsersTable } from './UsersTable'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 
 interface UsersTabProps {
   form: UseFormReturn<GroupBaseFormData>
@@ -71,11 +72,11 @@ export const UsersTab = (props: UsersTabProps) => {
   }, [rowCount, setTotalPages, pageSize])
 
   const users = useMemo(
-    () => (isLoading ? [] : mapGroupListUsers(shouldLoadUsers && usersData?.data ? usersData?.data : [])),
-    [usersData?.data, isLoading, shouldLoadUsers],
+    () => mapGroupListUsers(shouldLoadUsers && usersData?.data ? usersData?.data : []),
+    [usersData?.data, shouldLoadUsers],
   )
 
-  const handleAssignsers = (userSelection: RowSelectionState) => {
+  const handleAssignUsers = (userSelection: RowSelectionState) => {
     const selectedUserIds = Object.keys(userSelection).filter(key => userSelection[key])
     const newUsers = Array.from(new Set([...usersWatch, ...selectedUserIds]))
     form.setValue('members', newUsers, { shouldDirty: true })
@@ -102,6 +103,7 @@ export const UsersTab = (props: UsersTabProps) => {
 
   return (
     <div className="h-full">
+      {isLoading && users.length === 0 && <LoadingSpinner className="h-full" />}
       {!isLoading && users.length === 0 && originalUsers.length === 0 ? (
         <NoDataPage
           title={t('users.noUsers')}
@@ -147,7 +149,7 @@ export const UsersTab = (props: UsersTabProps) => {
         groupTitle={nameWatch}
         open={isAssignUsersOpen}
         onOpenChange={setIsAssignUsersOpen}
-        onAssignUsers={handleAssignsers}
+        onAssignUsers={handleAssignUsers}
       />
     </div>
   )

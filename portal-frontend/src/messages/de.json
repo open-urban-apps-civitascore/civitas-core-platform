@@ -46,7 +46,7 @@
       "nameRequired": "Name ist erforderlich",
       "descriptionRequired": "Beschreibung ist erforderlich",
       "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
-      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden"
+      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden. Überprüfen Sie Ihre Eingaben."
     },
     "items": {
       "users": "Users",

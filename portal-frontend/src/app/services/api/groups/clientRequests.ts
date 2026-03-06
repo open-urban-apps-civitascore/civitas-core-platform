@@ -53,5 +53,5 @@ export const useDeleteGroup = () =>
   useDeleteMutation({
     key,
     headers: { 'x-api-request': 'true' },
-    errorMessage: 'An error occurred while updating the group.',
+    errorMessage: 'An error occurred while deleting the group.',
   })

@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Group, GroupBaseFormData, GroupBaseFormDataSchema, GroupTab } from '@/types/groups'
-import { mapGroupApiToFormData, mapGroupFormToApiata } from '@/utils/groups'
+import { mapGroupApiToFormData, mapGroupFormToApiData } from '@/utils/groups'
 
 import { BaseInfoTab } from './base-info-tab/BaseInfoTab'
 import { RolesTab } from './roles-tab/RolesTab'
@@ -80,6 +80,11 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     form.reset(mapGroupApiToFormData(initialGroupData))
   }, [initialGroupData, form])
 
+  const handleValidationErrors = (errors: FieldErrors<GroupBaseFormData>) => {
+    console.error('Validation errors: ', errors)
+    toast.error(tCommon('errors.formInvalid'))
+  }
+
   const handleGroupRequestError = (error: unknown, message: string) => {
     if ((error as AxiosError).response?.status == 409) {
       form.setError('name', { type: 'manual', message: 'groups.errors.groupNameExists' })
@@ -89,7 +94,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
 
   const handleCreateGroup = (formData: GroupBaseFormData) => {
     // eslint-disable-next-line unused-imports/no-unused-vars
-    const { id, ...createGroupData } = mapGroupFormToApiata(formData)
+    const { id, ...createGroupData } = mapGroupFormToApiData(formData)
     createGroup.mutate(createGroupData, {
       onSuccess: ({ data }) => {
         toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
@@ -101,7 +106,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   }
 
   const handleUpdateGroup = (formData: GroupBaseFormData) => {
-    updateGroup.mutate(mapGroupFormToApiata(formData), {
+    updateGroup.mutate(mapGroupFormToApiData(formData), {
       onSuccess: ({ data }) => {
         toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.group') }))
         setInitialGroupData(data)
@@ -128,9 +133,6 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   }
 
   const handleSave = isCreateMode ? handleCreateGroup : handleUpdateGroup
-
-  const handleValidationErrors = (errors: FieldErrors<GroupBaseFormData>) =>
-    console.error('Validation errors: ', errors)
 
   const renderTabContent = () => {
     switch (subTabValue) {

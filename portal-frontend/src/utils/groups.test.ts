@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Group } from '@/types/groups'
 
-import { mapGroupApiToFormData, mapGroupDetailsData, mapGroupFormToApiata, mapGroupsApiToListData } from './groups'
+import { mapGroupApiToFormData, mapGroupDetailsData, mapGroupFormToApiData, mapGroupsApiToListData } from './groups'
 
 const baseGroup: Group = {
   id: '1',
@@ -123,7 +123,7 @@ describe('mapGroupFormToApiata', () => {
       members: ['m1', 'm2'],
     }
 
-    const result = mapGroupFormToApiata(formData)
+    const result = mapGroupFormToApiData(formData)
 
     expect(result).toEqual({
       id: '1',
@@ -143,7 +143,7 @@ describe('mapGroupFormToApiata', () => {
       members: [],
     }
 
-    const result = mapGroupFormToApiata(formData)
+    const result = mapGroupFormToApiData(formData)
 
     expect(result.memberIds).toEqual([])
   })

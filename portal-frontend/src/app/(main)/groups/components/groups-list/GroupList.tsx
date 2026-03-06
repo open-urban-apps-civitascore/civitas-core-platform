@@ -93,15 +93,12 @@ const GroupsList = (props: GroupsListProps) => {
     }
   }
 
-  const CustomElement = () => {
-    const params = getApiRequestParamsByUrl()
-    return (
-      <Button onClick={() => router.push(`groups/create?${params}`)}>
-        <Plus />
-        {t('newGroup')}
-      </Button>
-    )
-  }
+  const CustomElement = () => (
+    <Button onClick={() => router.push(`groups/create?${getApiRequestParamsByUrl()}`)}>
+      <Plus />
+      {t('newGroup')}
+    </Button>
+  )
 
   return (
     <PageContainer headerType="onlyTitle">
