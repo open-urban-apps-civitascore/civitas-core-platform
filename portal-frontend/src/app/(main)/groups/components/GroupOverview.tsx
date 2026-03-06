@@ -69,10 +69,6 @@ export const GroupOverview = (props: GroupDetailsProps) => {
 
   const isLoading = createGroup.isPending || updateGroup.isPending || isNavigating
 
-  useEffect(() => {
-    setInitialGroupData(groupData)
-  }, [groupData])
-
   const form = useForm<GroupBaseFormData>({
     resolver: zodResolver(GroupBaseFormDataSchema),
     defaultValues: mapGroupApiToFormData(initialGroupData),
@@ -106,9 +102,9 @@ export const GroupOverview = (props: GroupDetailsProps) => {
 
   const handleUpdateGroup = (formData: GroupBaseFormData) => {
     updateGroup.mutate(mapGroupFormToApiata(formData), {
-      onSuccess: () => {
+      onSuccess: ({ data }) => {
         toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.group') }))
-        router.refresh()
+        setInitialGroupData(data)
         setIsExitModalOpen(false)
       },
       onError: (error: unknown) => handleGroupRequestError(error, 'errors.updateError'),
