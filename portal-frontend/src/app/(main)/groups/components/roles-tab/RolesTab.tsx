@@ -1,93 +1,353 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { createColumnHelper, getCoreRowModel, getSortedRowModel, Row, useReactTable } from '@tanstack/react-table'
+import { Info, Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
+import { UseFormReturn } from 'react-hook-form'
 
-import { usePatchGroup } from '@/app/services/api/groups/clientRequests'
-import { useGetRoles } from '@/app/services/api/roles/clientRequests'
-import { ActionButtons } from '@/components/action-buttons/ActionButtons'
-import { ContentCard } from '@/components/content-card/ContentCard'
-import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
-import { Group } from '@/types/groups'
-import { ROLE_TYPES } from '@/types/roles'
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
+import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { SearchHeader } from '@/components/search-area/SearchArea'
+import { DataTable } from '@/components/table/DataTable'
+import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { TableContainer } from '@/components/table-container/TableContainer'
+import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Assignment } from '@/types/assignments'
+import { AssignmentFormData, Group, GroupBaseFormData } from '@/types/groups'
+import { Role, ROLE_TYPES } from '@/types/roles'
 
-import { RoleCategory } from './RoleCategory'
+import { AssignRoleModal } from './AssignRoleModal'
+
+type ScopeTab = 'platform' | 'datasets' | 'datasources' | 'datastructures'
+
+const SCOPE_TAB_CONFIG: Record<ScopeTab, { scopeType: string | null }> = {
+  platform: { scopeType: null },
+  datasets: { scopeType: 'DATASET' },
+  datasources: { scopeType: 'DATASOURCE' },
+  datastructures: { scopeType: 'DATASTRUCTURE' },
+}
 
 interface RolesTabProps {
+  form: UseFormReturn<GroupBaseFormData>
   groupData: Group
+  isReadOnly: boolean
+  pendingRoles: Role[]
+  setPendingRoles: React.Dispatch<React.SetStateAction<Role[]>>
 }
 
 export const RolesTab = (props: RolesTabProps) => {
-  const { groupData } = props
+  const { form, groupData, isReadOnly, pendingRoles, setPendingRoles } = props
   const t = useTranslations('groups')
-  const tRoles = useTranslations('roles')
-  const router = useRouter()
-  const updateGroup = usePatchGroup()
-  const originalRoleIds = useMemo<string[]>(
-    () => groupData.assignments?.map(assignment => assignment.role.id) ?? [],
-    [groupData.assignments],
+  const tCommon = useTranslations('common')
+
+  const [activeScopeTab, setActiveScopeTab] = useState<ScopeTab>('platform')
+  const [searchString, setSearchString] = useState('')
+  const [assignmentToRemove, setAssignmentToRemove] = useState<string | null>(null)
+  const [isRemoveWarningOpen, setIsRemoveWarningOpen] = useState(false)
+  const [assignModalRoleType, setAssignModalRoleType] = useState<
+    typeof ROLE_TYPES.SYSTEM | typeof ROLE_TYPES.DATA | null
+  >(null)
+
+  const isPlatformTab = activeScopeTab === 'platform'
+
+  const formAssignments = form.watch('assignments')
+
+  const existingAssignments: Assignment[] = useMemo(() => {
+    return (groupData.assignments as Assignment[]) ?? []
+  }, [groupData.assignments])
+
+  const displayAssignments: Assignment[] = useMemo(() => {
+    // Keep existing assignments that are still in formAssignments
+    const kept = existingAssignments.filter(ea =>
+      formAssignments.some(fa => fa.roleId === ea.role.id && (fa.scopeType ?? null) === (ea.scopeType ?? null)),
+    )
+
+    // Add newly added assignments (in formAssignments but not in existingAssignments)
+    const added: Assignment[] = formAssignments
+      .filter(
+        fa =>
+          !existingAssignments.some(
+            ea => ea.role.id === fa.roleId && (fa.scopeType ?? null) === (ea.scopeType ?? null),
+          ),
+      )
+      .map(fa => {
+        const role = pendingRoles.find(r => r.id === fa.roleId)
+        return {
+          id: `pending-${fa.roleId}`,
+          createdAt: new Date().toISOString(),
+          modifiedAt: new Date().toISOString(),
+          group: { id: fa.groupId, name: groupData.name },
+          role: {
+            id: fa.roleId,
+            name: role?.name ?? '',
+            roleType: role?.type ?? 'SYSTEM',
+            description: role?.description ?? '',
+            readonly: role?.roleOrigin === 'default',
+          },
+          scopeType: fa.scopeType ?? null,
+          scope: fa.scopeId ? { id: fa.scopeId, name: '' } : null,
+        }
+      })
+
+    return [...kept, ...added]
+  }, [existingAssignments, formAssignments, pendingRoles, groupData.name])
+
+  const filteredAssignments = useMemo(() => {
+    let filtered = displayAssignments.filter(a => {
+      if (isPlatformTab) {
+        return a.scopeType === null || a.scopeType === 'TENANT'
+      }
+      return a.scopeType === SCOPE_TAB_CONFIG[activeScopeTab].scopeType
+    })
+
+    if (searchString.trim()) {
+      const search = searchString.toLowerCase()
+      filtered = filtered.filter(a => a.role.name.toLowerCase().includes(search))
+    }
+
+    return filtered
+  }, [displayAssignments, activeScopeTab, isPlatformTab, searchString])
+
+  const assignedRoleIds = useMemo(() => {
+    return formAssignments
+      .filter(a => a.scopeType === null || a.scopeType === 'TENANT' || a.scopeType === undefined)
+      .map(a => a.roleId)
+  }, [formAssignments])
+
+  const handleRemoveClick = (assignmentId: string) => {
+    setAssignmentToRemove(assignmentId)
+    setIsRemoveWarningOpen(true)
+  }
+
+  const handleConfirmRemove = () => {
+    if (!assignmentToRemove) return
+    const current = form.getValues('assignments')
+    const toRemove = displayAssignments.find(a => a.id === assignmentToRemove)
+    if (!toRemove) return
+    form.setValue(
+      'assignments',
+      current.filter(a => !(a.roleId === toRemove.role.id && (a.scopeType ?? null) === (toRemove.scopeType ?? null))),
+      { shouldDirty: true },
+    )
+    setPendingRoles(prev => prev.filter(r => r.id !== toRemove.role.id))
+    setIsRemoveWarningOpen(false)
+    setAssignmentToRemove(null)
+  }
+
+  const handleAssignRoles = (selectedRoles: Role[]) => {
+    const current = form.getValues('assignments')
+    const isDataRole = assignModalRoleType === ROLE_TYPES.DATA
+    const newAssignments: AssignmentFormData[] = selectedRoles.map(role => ({
+      groupId: groupData.id,
+      roleId: role.id,
+      scopeType: isDataRole ? ('TENANT' as const) : null,
+      scopeId: null,
+    }))
+    form.setValue('assignments', [...current, ...newAssignments], { shouldDirty: true })
+    setPendingRoles(prev => [...prev, ...selectedRoles])
+    setAssignModalRoleType(null)
+  }
+
+  const columnHelper = createColumnHelper<Assignment>()
+
+  const columns = [
+    columnHelper.accessor('role.name', {
+      id: 'name',
+      header: ({ column }) => <SortableTableHeader column={column} title={t('roles.columns.name')} />,
+      cell: info => info.getValue(),
+      meta: {
+        style: {
+          width: '20%',
+          minWidth: '150px',
+        },
+      },
+    }),
+    columnHelper.accessor('role.description', {
+      id: 'description',
+      header: t('roles.columns.description'),
+      cell: info => info.getValue() ?? '',
+      enableSorting: false,
+    }),
+    columnHelper.display({
+      id: 'object',
+      header: t('roles.columns.object'),
+      cell: ({ row }) => {
+        const roleType = row.original.role.roleType
+        if (roleType === ROLE_TYPES.SYSTEM) return t('roles.objectLabels.SYSTEM')
+        if (roleType === ROLE_TYPES.DATA) return t('roles.objectLabels.DATA')
+        if (roleType === ROLE_TYPES.GOVERNANCE) return t('roles.objectLabels.GOVERNANCE')
+        return roleType ?? ''
+      },
+      enableSorting: false,
+    }),
+    columnHelper.display({
+      id: 'type',
+      header: t('roles.columns.type'),
+      cell: ({ row }) => {
+        return row.original.role.readonly ? t('roles.originLabels.default') : t('roles.originLabels.custom')
+      },
+      enableSorting: false,
+    }),
+    columnHelper.display({
+      id: 'scope',
+      header: t('roles.columns.scope'),
+      cell: ({ row }) => {
+        if (isPlatformTab) return t('roles.scopePlatform')
+        return row.original.scope?.name ?? ''
+      },
+      enableSorting: false,
+    }),
+    ...(!isReadOnly && isPlatformTab
+      ? [
+          {
+            id: 'actions',
+            cell: ({ row }: { row: Row<Assignment> }) => (
+              <TableDropdownMenu
+                menuItems={[
+                  {
+                    label: tCommon('actions.removeItem', { item: tCommon('items.role') }),
+                    onClick: () => handleRemoveClick(row.original.id),
+                  },
+                ]}
+              />
+            ),
+            meta: {
+              style: {
+                width: '50px',
+              },
+            },
+          },
+        ]
+      : []),
+  ]
+
+  const table = useReactTable({
+    getRowId: row => row.id,
+    columns,
+    data: filteredAssignments,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    manualPagination: false,
+    manualSorting: false,
+  })
+
+  const scopeTabs: { key: ScopeTab; label: string }[] = [
+    { key: 'platform', label: t('roles.scopeTabs.platform') },
+    { key: 'datasets', label: t('roles.scopeTabs.datasets') },
+    { key: 'datasources', label: t('roles.scopeTabs.datasources') },
+    { key: 'datastructures', label: t('roles.scopeTabs.datastructures') },
+  ]
+
+  const getScopedInfoBannerText = (): string | null => {
+    if (activeScopeTab === 'datasets') return t('roles.scopedInfoBanner.DATASET')
+    if (activeScopeTab === 'datasources') return t('roles.scopedInfoBanner.DATASOURCE')
+    if (activeScopeTab === 'datastructures') return t('roles.scopedInfoBanner.DATASTRUCTURE')
+    return null
+  }
+
+  const infoBannerText = getScopedInfoBannerText()
+
+  const AddRoleDropdown = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button">
+          <Plus />
+          {t('roles.addRole')}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => setAssignModalRoleType(ROLE_TYPES.SYSTEM)} className="hover:cursor-pointer">
+          {t('roles.systemRole')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setAssignModalRoleType(ROLE_TYPES.DATA)} className="hover:cursor-pointer">
+          {t('roles.dataRole')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
-  const [roles, setRoles] = useState<string[]>(originalRoleIds)
 
-  const { data: rolesdata, isLoading: isLoadingRoles } = useGetRoles()
-
-  const hasChanges = useMemo(() => {
-    const sortedRoles = [...roles].sort()
-    const sortedOriginal = [...originalRoleIds].sort()
-    return JSON.stringify(sortedRoles) !== JSON.stringify(sortedOriginal)
-  }, [roles, originalRoleIds])
-
-  const handleAddRole = (roleId: string) => {
-    const updatedRoles = [...roles, roleId]
-    setRoles(updatedRoles)
-  }
-
-  const handleRemoveRole = (roleId: string) => {
-    const updatedRoles = roles.filter(id => id !== roleId)
-    setRoles(updatedRoles)
-  }
-
-  const handleUpdateGroup = async () => {
-    updateGroup.mutate({ roleIds: roles, id: groupData.id }, { onSuccess: () => router.refresh() })
-  }
-
-  if (isLoadingRoles || updateGroup.isPending) {
-    return <LoadingSpinner className="h-full" />
-  }
+  const isEmpty = filteredAssignments.length === 0 && !searchString.trim()
 
   return (
-    <div className="flex flex-col justify-between h-full">
-      <ContentCard>
-        <DetailsFieldContainer isTitleField>
-          <h2>{t('roles.groupInfo')}</h2>
-        </DetailsFieldContainer>
-        <RoleCategory
-          title={tRoles('systemRoles')}
-          category={ROLE_TYPES.SYSTEM}
-          onAddRole={handleAddRole}
-          onRemoveRole={handleRemoveRole}
-          groupRoles={roles}
-          allRoles={rolesdata?.data || []}
-        />
+    <div className="h-full">
+      <div className="flex gap-2 mb-4">
+        {scopeTabs.map(tab => (
+          <Button
+            key={tab.key}
+            type="button"
+            variant={activeScopeTab === tab.key ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setActiveScopeTab(tab.key)
+              setSearchString('')
+            }}
+          >
+            {tab.label}
+          </Button>
+        ))}
+      </div>
 
-        <RoleCategory
-          title={tRoles('dataRoles')}
-          category={ROLE_TYPES.DATA}
-          onAddRole={handleAddRole}
-          onRemoveRole={handleRemoveRole}
-          groupRoles={roles}
-          allRoles={rolesdata?.data || []}
-          className="border-0"
+      {infoBannerText && (
+        <div className="flex items-center gap-2 p-3 mb-4 rounded-md bg-muted text-muted-foreground text-sm">
+          <Info className="h-4 w-4 shrink-0" />
+          <span>{infoBannerText}</span>
+        </div>
+      )}
+
+      {isEmpty ? (
+        <NoDataPage
+          title={t('roles.noRoles')}
+          subTitle={t('roles.noRolesDescription')}
+          customElement={!isReadOnly && isPlatformTab ? AddRoleDropdown : undefined}
         />
-      </ContentCard>
-      <ActionButtons
-        onCancelClick={() => router.push('/groups')}
-        confirmButtonType="button"
-        isConfirmButtonDisabled={!hasChanges}
-        onConfirmClick={handleUpdateGroup}
+      ) : (
+        <>
+          <SearchHeader
+            searchString={searchString}
+            onChangeSearchString={setSearchString}
+            customElement={!isReadOnly && isPlatformTab ? AddRoleDropdown : undefined}
+          />
+          <TableContainer className="pb-4">
+            <DataTable
+              table={table}
+              pageIndex={0}
+              pageSize={filteredAssignments.length || 10}
+              totalPages={1}
+              isLoading={false}
+              isPaginationHidden
+            />
+          </TableContainer>
+        </>
+      )}
+
+      <WarningModal
+        open={isRemoveWarningOpen}
+        title={t('roles.removeRole')}
+        description={t('roles.removeRoleDescription')}
+        onConfirm={handleConfirmRemove}
+        onDiscard={() => {
+          setIsRemoveWarningOpen(false)
+          setAssignmentToRemove(null)
+        }}
+        confirmButtonTitle={tCommon('actions.remove')}
+        isLoading={false}
       />
+
+      {assignModalRoleType && (
+        <AssignRoleModal
+          open={!!assignModalRoleType}
+          onOpenChange={open => {
+            if (!open) setAssignModalRoleType(null)
+          }}
+          groupName={groupData.name}
+          roleType={assignModalRoleType}
+          assignedRoleIds={assignedRoleIds}
+          onAssignRoles={handleAssignRoles}
+        />
+      )}
     </div>
   )
 }
