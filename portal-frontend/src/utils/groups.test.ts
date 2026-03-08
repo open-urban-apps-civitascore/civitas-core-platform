@@ -78,6 +78,14 @@ describe('mapGroupApiToFormData', () => {
       description: 'Description',
       contactUserId: 'u1',
       members: ['m1', 'm2'],
+      assignments: [
+        {
+          groupId: 'g1',
+          roleId: 'r1',
+          scopeType: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+          scopeId: 's1',
+        },
+      ],
     })
   })
 
@@ -97,6 +105,14 @@ describe('mapGroupApiToFormData', () => {
       description: '',
       contactUserId: '',
       members: [],
+      assignments: [
+        {
+          groupId: 'g1',
+          roleId: 'r1',
+          scopeType: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+          scopeId: 's1',
+        },
+      ],
     })
   })
 })
@@ -140,6 +156,9 @@ describe('mapGroupFormToApiata', () => {
       description: baseGroup.description,
       contactUserId: 'm1',
       members: ['m1', 'm2'],
+      assignments: [
+        { groupId: 'g1', roleId: 'r1', scopeType: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE as const, scopeId: 's1' },
+      ],
     }
 
     const result = mapGroupFormToApiData(formData)
@@ -160,6 +179,7 @@ describe('mapGroupFormToApiata', () => {
       description: baseGroup.description,
       contactUserId: 'm1',
       members: [],
+      assignments: [],
     }
 
     const result = mapGroupFormToApiData(formData)
