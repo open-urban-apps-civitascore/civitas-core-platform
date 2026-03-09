@@ -11,7 +11,8 @@ import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
-import { Form } from '@/components/ui/form'
+import { Form, FormItem, FormLabel } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { FormRole, ROLE_TYPES } from '@/types/roles'
 
@@ -89,16 +90,14 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           </DetailsFieldContainer>
 
           <DetailsFieldContainer className="border-0">
-            <TextField
-              form={form}
-              label={tRolesBaseInfo('form.inputs.roleOrigin')}
-              name="readonly"
-              placeholder={isDefaultRole ? tRoles('defaultRole') : tRoles('customRole')}
-              formItemProps={{
-                className: isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]',
-              }}
-              disabled={true}
-            />
+            <FormItem className={isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]'}>
+              <FormLabel>{tRolesBaseInfo('form.inputs.roleOrigin')}</FormLabel>
+              <Input
+                value={isDefaultRole ? tRoles('defaultRole') : tRoles('customRole')}
+                disabled={true}
+                className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
+              />
+            </FormItem>
           </DetailsFieldContainer>
         </ContentCard>
 

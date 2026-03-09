@@ -385,6 +385,16 @@
         "description": "Rolle löschen",
         "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
         "deleteButton": "Rolle löschen"
+      },
+      "deleteConfirmModal": {
+        "title": "Delete role?",
+        "description": "This action cannot be undone.",
+        "confirm": "Delete"
+      },
+      "deleteErrorModal": {
+        "title": "Role cannot be deleted",
+        "description": "All assignments to groups and scopes must be removed first.",
+        "close": "Close"
       }
     },
     "permissionsTab": {

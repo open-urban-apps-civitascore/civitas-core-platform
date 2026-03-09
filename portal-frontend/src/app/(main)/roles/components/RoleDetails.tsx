@@ -12,10 +12,20 @@ import {
   useGetAssignments,
 } from '@/app/services/api/assignments/clientRequests'
 import { useCreateRole, useDeleteRole, useGetRole, useUpdateRole } from '@/app/services/api/roles/clientRequests'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { FormRole, Role, roleSchema, RoleTab } from '@/types/roles'
 
@@ -60,11 +70,17 @@ interface RoleDetailsProps {
 export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const { roleId, isEditMode = false } = props
   const tRoles = useTranslations('roles')
+  const tBaseInfo = useTranslations('roles.baseInfoTab')
   const router = useRouter()
   const { setSubTabValueParam, subTabValue, tabValue } = useQueryParams()
   const [hasPermissionsTabBeenSaved, setHasPermissionsTabBeenSaved] = useState<boolean>(false)
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [isDeleteErrorOpen, setIsDeleteErrorOpen] = useState(false)
 
-  const { data: roleData, isFetching: isLoadingRole } = useGetRole({ id: roleId || '', isEnabled: !!roleId })
+  const deleteRole = useDeleteRole()
+  const isRoleQueryEnabled = !!roleId && !deleteRole.isPending && !deleteRole.isSuccess
+
+  const { data: roleData, isFetching: isLoadingRole } = useGetRole({ id: roleId || '', isEnabled: isRoleQueryEnabled })
 
   // Fetch existing assignments for this role so we can get assignment IDs for deletion
   const assignmentsParams = new URLSearchParams(`roleId=${roleId}`)
@@ -83,7 +99,6 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const createRole = useCreateRole()
   const updateRole = useUpdateRole()
-  const deleteRole = useDeleteRole()
 
   const isLoading = isLoadingRole || createRole.isPending || updateRole.isPending || deleteRole.isPending
 
@@ -105,8 +120,12 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   }, [initialRole, form])
 
   const handleDeleteRole = () => {
+    setIsDeleteConfirmOpen(false)
     deleteRole.mutate(roleId || '', {
       onSuccess: () => router.push('/roles'),
+      onError: () => {
+        setIsDeleteErrorOpen(true)
+      },
     })
   }
 
@@ -224,7 +243,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
             roleType={tabValue}
             isDefaultRole={isDefaultRole}
             isEditMode={isEditMode}
-            deleteRole={() => roleId && handleDeleteRole()}
+            deleteRole={() => roleId && setIsDeleteConfirmOpen(true)}
           />
         )}
 
@@ -247,6 +266,31 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
           />
         )}
       </PageBackground>
+
+      <WarningModal
+        title={tBaseInfo('deleteConfirmModal.title')}
+        description={tBaseInfo('deleteConfirmModal.description')}
+        open={isDeleteConfirmOpen}
+        onOpenChange={setIsDeleteConfirmOpen}
+        onDiscard={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={handleDeleteRole}
+        confirmButtonTitle={tBaseInfo('deleteConfirmModal.confirm')}
+        isLoading={deleteRole.isPending}
+      />
+
+      <Dialog open={isDeleteErrorOpen} onOpenChange={setIsDeleteErrorOpen}>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>{tBaseInfo('deleteErrorModal.title')}</DialogTitle>
+            <DialogDescription>{tBaseInfo('deleteErrorModal.description')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex sm:justify-end">
+            <Button type="button" onClick={() => setIsDeleteErrorOpen(false)}>
+              {tBaseInfo('deleteErrorModal.close')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   )
 }

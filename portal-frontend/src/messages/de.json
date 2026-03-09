@@ -384,6 +384,16 @@
         "description": "Rolle löschen",
         "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
         "deleteButton": "Rolle löschen"
+      },
+      "deleteConfirmModal": {
+        "title": "Rolle wirklich löschen?",
+        "description": "Diese Aktion kann nicht rückgängig gemacht werden.",
+        "confirm": "Löschen"
+      },
+      "deleteErrorModal": {
+        "title": "Rolle kann nicht gelöscht werden",
+        "description": "Zuerst müssen alle Zuordnungen zu Gruppen und Geltungsbereichen entfernt werden.",
+        "close": "Schliessen"
       }
     },
     "permissionsTab": {
