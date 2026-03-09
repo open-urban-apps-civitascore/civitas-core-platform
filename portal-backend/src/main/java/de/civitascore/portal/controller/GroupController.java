@@ -7,6 +7,7 @@ import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.model.output.assembler.GroupAssembler;
 import de.civitascore.portal.repository.specification.GroupSpec;
 import de.civitascore.portal.service.GroupService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -85,6 +86,9 @@ public class GroupController
   }
 
   @PutMapping("/{groupId}/assignments")
+  @Operation(
+      summary = "Replace group assignments",
+      description = "Replaces all role assignments for a group using diff-based semantics.")
   public ResponseEntity<GroupOutputDTO> replaceAssignments(
       @PathVariable UUID groupId, @Valid @RequestBody Set<AssignmentGroupInputDTO> assignments) {
     Group updated = groupService.replaceAssignments(groupId, assignments);

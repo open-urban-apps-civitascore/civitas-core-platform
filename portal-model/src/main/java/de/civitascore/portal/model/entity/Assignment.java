@@ -15,14 +15,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.Setter;
@@ -171,48 +164,5 @@ public class Assignment extends BaseEntity {
   public void setScope(Catalog scope) {
     this.catalog = scope;
     this.scopeType = ScopeType.CATALOG;
-  }
-
-  /** Logical identity of an assignment: group + role + scope type + scope entity ID. */
-  public record LogicalKey(UUID groupId, UUID roleId, ScopeType scopeType, UUID scopeId) {
-    public static LogicalKey of(Assignment a) {
-      NamedEntity scope = a.getScope();
-      return new LogicalKey(
-          a.getGroup().getId(),
-          a.getRole().getId(),
-          a.getScopeType(),
-          scope != null ? scope.getId() : null);
-    }
-  }
-
-  /**
-   * Diff-based replacement of an assignment collection. Matching assignments (same logical key) are
-   * kept to preserve audit fields. Stale ones are removed, new ones are added. The linker is called
-   * on each incoming assignment to set the owning relationship before keying.
-   *
-   * @param existing the managed Hibernate collection (must not be replaced, only mutated)
-   * @param incoming the desired assignments (may be null or empty to clear)
-   * @param linker called on each incoming assignment to set the owner (e.g. group or scope entity)
-   */
-  public static void replaceAll(
-      Set<Assignment> existing, Collection<Assignment> incoming, Consumer<Assignment> linker) {
-    if (incoming == null || incoming.isEmpty()) {
-      existing.clear();
-      return;
-    }
-
-    Map<LogicalKey, Assignment> existingByKey =
-        existing.stream().collect(Collectors.toMap(LogicalKey::of, a -> a));
-
-    Set<Assignment> desired = new HashSet<>();
-    for (Assignment a : incoming) {
-      linker.accept(a);
-      LogicalKey key = LogicalKey.of(a);
-      Assignment match = existingByKey.get(key);
-      desired.add(match != null ? match : a);
-    }
-
-    existing.retainAll(desired);
-    existing.addAll(desired);
   }
 }

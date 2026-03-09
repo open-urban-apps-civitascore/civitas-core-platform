@@ -1,6 +1,6 @@
 package de.civitascore.portal.model.entity;
 
-import de.civitascore.portal.model.entity.base.NamedEntity;
+import de.civitascore.portal.model.entity.base.AssignableEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -29,7 +29,7 @@ import lombok.Setter;
     indexes = {@Index(name = "idx_group_contact", columnList = "contact_user_id")})
 @Getter
 @Setter
-public class Group extends NamedEntity {
+public class Group extends AssignableEntity {
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
@@ -62,8 +62,9 @@ public class Group extends NamedEntity {
   @Setter(AccessLevel.NONE)
   private Set<Assignment> assignments = new HashSet<>();
 
-  public void setAssignments(Collection<Assignment> assignments) {
-    Assignment.replaceAll(getAssignments(), assignments, a -> a.setGroup(this));
+  @Override
+  protected void linkAssignment(Assignment assignment) {
+    assignment.setGroup(this);
   }
 
   /**
