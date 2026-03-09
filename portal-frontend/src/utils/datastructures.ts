@@ -1,6 +1,8 @@
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import {
   Datastructure,
+  DATASTRUCTURE_STATUS_TYPES,
+  DatastructureFormDraft,
   DatastructuresListData,
   DatastructureVersion,
   DatastructureVersionFormAvailableSchema,
@@ -10,6 +12,15 @@ import {
   DatastructureVersionsListData,
   DatastructureVersionSummary,
 } from '@/types/datastructures'
+
+export const mapDatastructureApiToFormData = (datastructure: Datastructure): DatastructureFormDraft => ({
+  id: datastructure.id,
+  name: datastructure.name ?? '',
+  description: datastructure.description ?? '',
+  dataStructureStatus: datastructure.dataStructureStatus ?? DATASTRUCTURE_STATUS_TYPES.DRAFT,
+  dataStructureVersionIds: datastructure.dataStructureVersions.map(version => version.id),
+  assignments: datastructure.assignments || [],
+})
 
 export const mapDatastructuresApiToListData = (datastructures: Datastructure[]): DatastructuresListData[] => {
   return datastructures.map(datastructure => {
@@ -95,3 +106,10 @@ export const parseDatastructureVersionFormData = (
   }
   return parsed.data
 }
+
+type FormFields = DatastructureFormDraft | DatastructureVersionFormData
+
+export const containsNonStatusField = <TData extends FormFields>(fieldsToUpdate: Partial<TData>) =>
+  (Object.keys(fieldsToUpdate) as (keyof TData)[]).some(
+    key => key !== 'dataStructureStatus' && key !== 'dataStructureVersionStatus',
+  )

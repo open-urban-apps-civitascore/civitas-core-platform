@@ -1,21 +1,8 @@
 'use client'
 
-import { zodResolver } from '@hookform/resolvers/zod'
-import { UseMutationResult } from '@tanstack/react-query'
-import { AxiosError } from 'axios'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
-import { toast } from 'sonner'
+import { useState } from 'react'
 
-import {
-  usePublishDatastructure,
-  useUnpublishDatastructure,
-  useUpdateDatastructure,
-  useUpdateDatastructurePublished,
-} from '@/app/services/api/datastructures/clientRequests'
-import { ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -26,23 +13,14 @@ import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
-import { STATUS_TYPES, WithId } from '@/types/common'
-import {
-  Datastructure,
-  DATASTRUCTURE_STATUS_TYPES,
-  DatastructureFormAvailableSchema,
-  DatastructureFormDraft,
-  DatastructureFormDraftSchema,
-  DatastructureStatusTypes,
-  DatastructureTab,
-} from '@/types/datastructures'
+import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureTab } from '@/types/datastructures'
 import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
-import { pickDirtyValues } from '@/utils/form'
 
+import { useDatastructure } from '../hooks/useDatastructure'
 import { BasicInfoTab } from './basic-info-tab/BasicInfoTab'
 import { VersionsTab } from './versions-tab/VersionsTab'
 
-const tabs: Tab<DatastructureTab>[] = [
+export const tabs: Tab<DatastructureTab>[] = [
   {
     value: 'basicInfo',
     label: 'datastructures.tabs.basicInfo',
@@ -65,185 +43,36 @@ interface DatastructureOverviewProps {
 
 export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const { datastructure } = props
-  const params = useSearchParams()
-  const mode = params.get('mode')
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
 
-  const defaultValues: DatastructureFormDraft = {
-    id: datastructure.id,
-    name: datastructure.name ?? '',
-    description: datastructure.description ?? '',
-    dataStructureStatus: datastructure.dataStructureStatus ?? DATASTRUCTURE_STATUS_TYPES.DRAFT,
-    dataStructureVersionIds: datastructure.dataStructureVersions.map(version => version.id) || [],
-    assignments: datastructure.assignments || [],
-  }
-
-  const router = useRouter()
-
-  const [selectedTab, setSelectedTab] = useState<DatastructureTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-  const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
+  const [isReadOnly, setIsReadOnly] = useState(true)
+  const {
+    canSetAvailable,
+    canSetDraft,
+    completedTabs,
+    form,
+    handleStatusChange,
+    isConfirmButtonDisabled,
+    isLoading,
+    resetToInitialState,
+    saveDatastructure,
+    selectedTab,
+    setSelectedTab,
+    statusHint,
+    statusWatch,
+  } = useDatastructure({ datastructure })
 
-  const updateDatastructure = useUpdateDatastructure()
-  const updatePublishedDatastructure = useUpdateDatastructurePublished()
-  const publishDatastructure = usePublishDatastructure()
-  const unpublishDatastructure = useUnpublishDatastructure()
-  const isLoading =
-    updateDatastructure.isPending ||
-    updatePublishedDatastructure.isPending ||
-    publishDatastructure.isPending ||
-    unpublishDatastructure.isPending
-
-  const form = useForm<DatastructureFormDraft>({
-    resolver: zodResolver(DatastructureFormDraftSchema),
-    mode: 'onChange',
-    defaultValues,
-  })
-
-  useEffect(() => {
-    form.reset(defaultValues)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datastructure])
-
-  const formValues = useWatch({ control: form.control })
-  const statusWatch = form.watch('dataStructureStatus')
-  const nameWatch = form.watch('name')
-  const descriptionWatch = form.watch('description')
-
-  const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
-  const isInUse = datastructure.inUse
-
-  const canSetDraft = !isInUse
-
-  // Allow "Available" only when the form would be valid in AVAILABLE mode
-  const canSetAvailable = useMemo(() => {
-    return (
-      DatastructureFormAvailableSchema.safeParse(formValues).success &&
-      !!datastructure.dataStructureVersions.find(
-        version => version.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
-      )
-    )
-  }, [formValues, datastructure.dataStructureVersions])
-
-  const revalidateForm = () => {
-    if (!isDraftMode) {
-      void form.trigger()
+  const handleSave = async () => {
+    const isSaved = await saveDatastructure()
+    if (isSaved) {
+      setIsExitModalOpen(false)
     }
-  }
-  // Auto-revert status to draft when required fields become empty
-  const revalidateDraftMode = () => {
-    if (statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
-      form.setValue('dataStructureStatus', DATASTRUCTURE_STATUS_TYPES.DRAFT, { shouldDirty: true })
-      toast.info(tCommon('info.switchMode'))
-    }
-  }
-
-  useEffect(() => {
-    if (isDraftMode) {
-      form.clearErrors()
-    } else {
-      revalidateForm()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDraftMode])
-
-  useEffect(() => {
-    revalidateDraftMode()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSetAvailable, statusWatch])
-
-  const completedTabs = useMemo((): DatastructureTab[] => {
-    const completed: DatastructureTab[] = []
-    if (nameWatch.length > 0 && descriptionWatch.length > 0) {
-      completed.push('basicInfo')
-    }
-    if (
-      datastructure.dataStructureVersions.find(
-        version => version.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
-      )
-    ) {
-      completed.push('versions')
-    }
-    return completed
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formValues])
-
-  const handleStatusChange = (newStatus: DatastructureStatusTypes) => {
-    form.setValue('dataStructureStatus', newStatus, { shouldDirty: true })
-  }
-
-  const handleStatusUpdate = async (
-    mutationFn: UseMutationResult<ApiServiceResponse<Datastructure>, unknown, WithId, unknown>,
-    datastructureId: string,
-  ) => {
-    try {
-      await mutationFn.mutateAsync({ id: datastructureId })
-      toast.success(tCommon('success.statusChangeSuccess'))
-    } catch (error) {
-      toast.error(tCommon('errors.statusChangeError'))
-      throw error
-    }
-  }
-
-  const handleUpdateValues = async (values: DatastructureFormDraft) => {
-    try {
-      if (datastructure.dataStructureStatus === STATUS_TYPES.AVAILABLE)
-        await updatePublishedDatastructure.mutateAsync({ ...values, id: values.id })
-      else await updateDatastructure.mutateAsync({ ...values, id: values.id })
-      toast.success(t('messages.updateSuccess'))
-    } catch (error) {
-      toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructure') }))
-      throw error
-    }
-  }
-
-  const handleUpdateDatastructure = async (parsedValues: DatastructureFormDraft) => {
-    try {
-      const dirtyFields = form.formState.dirtyFields
-
-      const shouldPublish = !!dirtyFields.dataStructureStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
-      const shouldUnpublish = !!dirtyFields.dataStructureStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
-
-      const fieldsToUpdate = pickDirtyValues(parsedValues, dirtyFields)
-      const shouldUpdateValues = (Object.keys(fieldsToUpdate) as (keyof DatastructureFormDraft)[]).some(
-        key => key !== 'dataStructureStatus',
-      )
-      if (shouldUpdateValues) await handleUpdateValues(parsedValues)
-
-      if (shouldPublish) {
-        await handleStatusUpdate(publishDatastructure, parsedValues.id)
-      }
-      if (shouldUnpublish) {
-        await handleStatusUpdate(unpublishDatastructure, parsedValues.id)
-      }
-      router.refresh()
-    } catch (error) {
-      console.error('An error occurred while submitting datastructure data.', (error as AxiosError).message)
-    }
-    setIsExitModalOpen(false)
-  }
-
-  const submitDatastructure = async () => {
-    const values = form.getValues()
-    const parsed = isDraftMode
-      ? DatastructureFormDraftSchema.safeParse(values)
-      : DatastructureFormAvailableSchema.safeParse(values)
-    if (!parsed.success) {
-      console.error(parsed.error)
-      toast.error(tCommon('errors.formInvalid'))
-      return
-    }
-
-    await handleUpdateDatastructure(parsed.data)
-  }
-
-  const handleSave = () => {
-    submitDatastructure()
   }
 
   const handleExit = () => {
-    form.reset()
+    resetToInitialState()
     setIsReadOnly(true)
     setIsExitModalOpen(false)
   }
@@ -253,16 +82,6 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     else handleExit()
   }
 
-  const isConfirmButtonDisabled = useMemo(
-    () =>
-      !form.formState.isDirty ||
-      !!form.formState.errors.name ||
-      (statusWatch !== DATASTRUCTURE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
-      isLoading,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isLoading, statusWatch, formValues],
-  )
-
   const ActionButtonsAndStatusSwitch = (
     <div className="flex gap-6">
       <StatusDropdown
@@ -271,7 +90,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
         onStatusChange={handleStatusChange}
         canSetAvailable={canSetAvailable}
         canSetDraft={canSetDraft}
-        statusHint={!canSetDraft ? t('messages.isInUseStatusHint') : undefined}
+        statusHint={statusHint}
       />
       <ActionButtons
         confirmButtonType="button"

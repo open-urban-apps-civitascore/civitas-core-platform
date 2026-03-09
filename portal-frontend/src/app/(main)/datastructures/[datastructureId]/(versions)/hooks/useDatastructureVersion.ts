@@ -35,6 +35,7 @@ import {
   DatastructureVersionTab,
 } from '@/types/datastructures'
 import {
+  containsNonStatusField,
   mapDatastructureVersionApiToFormData,
   mapDatastructureVersionFormToApiData,
   parseDatastructureVersionFormData,
@@ -289,21 +290,21 @@ export const useDatastructureVersion = ({
     parsedFormValues: DatastructureVersionFormData,
   ) => {
     const dirtyFields = form.formState.dirtyFields
+    const fieldsToUpdate = pickDirtyValues(formValues, dirtyFields)
+
+    const shouldUpdateValues = containsNonStatusField(fieldsToUpdate)
     const shouldPublish =
       !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
     const shouldUnpublish = !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
-    const fieldsToUpdate = pickDirtyValues(formValues, dirtyFields)
-    const shouldUpdateValues = (Object.keys(fieldsToUpdate) as (keyof DatastructureVersionFormData)[]).some(
-      key => key !== 'dataStructureVersionStatus',
-    )
+    let versionResponse: DatastructureVersion | null = shouldUpdateValues
+      ? await handleUpdateValues(parsedValues)
+      : null
+    if (shouldPublish) versionResponse = await handleStatusUpdate(parsedValues.id, publishVersion.mutateAsync)
+    if (shouldUnpublish) versionResponse = await handleStatusUpdate(parsedValues.id, unpublishVersion.mutateAsync)
 
-    let finalVersion: DatastructureVersion | null = shouldUpdateValues ? await handleUpdateValues(parsedValues) : null
-    if (shouldPublish) finalVersion = await handleStatusUpdate(parsedValues.id, publishVersion.mutateAsync)
-    if (shouldUnpublish) finalVersion = await handleStatusUpdate(parsedValues.id, unpublishVersion.mutateAsync)
-
-    const updatedFormValues = finalVersion ? mapDatastructureVersionApiToFormData(finalVersion) : parsedFormValues
-    resetFormAndSession(updatedFormValues, finalVersion || version)
+    const updatedFormValues = versionResponse ? mapDatastructureVersionApiToFormData(versionResponse) : parsedFormValues
+    resetFormAndSession(updatedFormValues, versionResponse || version)
 
     router.refresh()
   }
