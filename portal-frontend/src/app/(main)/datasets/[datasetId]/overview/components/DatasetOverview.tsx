@@ -7,7 +7,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { usePatchDataset } from '@/app/services/api/datasets/clientRequests'
+import {
+  usePatchDataset,
+  usePublishDataset,
+  useReleaseDataset,
+  useUnpublishDataset,
+  useUnreleaseDataset,
+  useUpdatePublishedDatasetMeta,
+} from '@/app/services/api/datasets/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FooterElement } from '@/components/form/FooterElement'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -64,8 +71,19 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const updateDataset = usePatchDataset()
+  const updatePublishedMeta = useUpdatePublishedDatasetMeta()
+  const publishDataset = usePublishDataset()
+  const unpublishDataset = useUnpublishDataset()
+  const releaseDataset = useReleaseDataset()
+  const unreleaseDataset = useUnreleaseDataset()
 
-  const isLoading = updateDataset.isPending
+  const isLoading =
+    updateDataset.isPending ||
+    updatePublishedMeta.isPending ||
+    publishDataset.isPending ||
+    unpublishDataset.isPending ||
+    releaseDataset.isPending ||
+    unreleaseDataset.isPending
 
   const form = useForm<DatasetFormDraft>({
     resolver: zodResolver(DatasetFormDraftSchema),
@@ -108,53 +126,101 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canSetAvailable, dataSetStatus])
 
-  const handleUpdateDataset = async (formData: DatasetFormDraft) => {
-    const { dirtyFields } = form.formState
+  const getTransitionSteps = (
+    oldStatus: DatasetStatusTypes,
+    newStatus: DatasetStatusTypes,
+  ): ((id: string) => Promise<unknown>)[] => {
+    if (oldStatus === newStatus) return []
 
-    // Validation with all form data
-    const valuesForValidation = {
-      ...formData,
-      id: dataset.id,
+    const transitions: Record<string, ((id: string) => Promise<unknown>)[]> = {
+      'DRAFT->READY': [publishDataset.mutateAsync],
+      'READY->DRAFT': [unpublishDataset.mutateAsync],
+      'READY->AVAILABLE': [releaseDataset.mutateAsync],
+      'AVAILABLE->READY': [unreleaseDataset.mutateAsync],
+      'DRAFT->AVAILABLE': [publishDataset.mutateAsync, releaseDataset.mutateAsync],
+      'AVAILABLE->DRAFT': [unreleaseDataset.mutateAsync, unpublishDataset.mutateAsync],
     }
 
-    const parsed = isDraftMode
-      ? DatasetUpdateApiSchema.safeParse(valuesForValidation)
-      : DatasetFormAvailableSchema.safeParse(valuesForValidation)
+    return transitions[`${oldStatus}->${newStatus}`] ?? []
+  }
 
-    if (!parsed.success) {
-      console.error(parsed.error)
-      toast.error('Form data invalid')
-      return
-    }
+  const handleSaveAndTransition = async (formData: DatasetFormDraft) => {
+    const serverStatus = dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT
 
-    const fieldsToUpdate = pickDirtyValues(parsed.data, dirtyFields)
+    try {
+      // Step 1: Save form data if dirty
+      if (form.formState.isDirty) {
+        const { dirtyFields } = form.formState
+        const valuesForValidation = { ...formData, id: dataset.id }
+        const parsed = isDraftMode
+          ? DatasetUpdateApiSchema.safeParse(valuesForValidation)
+          : DatasetFormAvailableSchema.safeParse(valuesForValidation)
 
-    const updateData: DatasetUpdateApiData = {
-      id: dataset.id,
-      name: formData.name,
-      ...fieldsToUpdate,
-    }
+        if (!parsed.success) {
+          console.error(parsed.error)
+          toast.error('Form data invalid')
+          return
+        }
 
-    updateDataset.mutate(updateData, {
-      onSuccess: ({ data }) => {
+        const fieldsToUpdate = pickDirtyValues(parsed.data, dirtyFields)
+        const updateData: DatasetUpdateApiData = {
+          id: dataset.id,
+          name: formData.name,
+          ...fieldsToUpdate,
+        }
+
+        if (serverStatus === DATASET_STATUS_TYPES.DRAFT) {
+          await updateDataset.mutateAsync(updateData)
+        } else {
+          await updatePublishedMeta.mutateAsync(updateData)
+        }
+      }
+
+      // Step 2: Execute status transitions
+      const steps = getTransitionSteps(serverStatus, dataSetStatus)
+      for (const step of steps) {
+        await step(dataset.id)
+      }
+
+      // Success message
+      if (steps.length > 0) {
+        const messageMap: Record<string, string> = {
+          'DRAFT->READY': t('messages.publishSuccess'),
+          'READY->DRAFT': t('messages.unpublishSuccess'),
+          'READY->AVAILABLE': t('messages.releaseSuccess'),
+          'AVAILABLE->READY': t('messages.unreleaseSuccess'),
+          'DRAFT->AVAILABLE': t('messages.releaseSuccess'),
+          'AVAILABLE->DRAFT': t('messages.unpublishSuccess'),
+        }
+        toast.success(messageMap[`${serverStatus}->${dataSetStatus}`] ?? t('messages.updateSuccess'))
+      } else {
         toast.success(t('messages.updateSuccess'))
-        form.reset(mapDatasetToFormData(data))
-        router.refresh()
-        setIsReadOnly(true)
-      },
-      onError: () => toast.error(tCommon('errors.unexpectedError')),
-    })
+      }
+
+      form.reset(mapDatasetToFormData(dataset))
+      router.refresh()
+      setIsReadOnly(true)
+    } catch {
+      setDataSetStatus(serverStatus)
+      toast.error(t('messages.transitionError'))
+    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    // If only status changed (form not dirty), call transition directly
+    if (!form.formState.isDirty && hasStatusChanged) {
+      void handleSaveAndTransition(form.getValues() as DatasetFormDraft)
+      return
+    }
+
     void form.handleSubmit(data => {
-      handleUpdateDataset(data as DatasetFormDraft)
+      void handleSaveAndTransition(data as DatasetFormDraft)
     })(e)
   }
 
   const handleStatusChange = (newStatus: DatasetStatusTypes) => {
-    // TODO: Implement API call to update status at specific endpoint
     setDataSetStatus(newStatus)
   }
 
@@ -176,9 +242,10 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const handleSaveAndExit = () => {
     void form.handleSubmit(data => {
-      handleUpdateDataset(data as DatasetFormDraft)
-      setIsExitModalOpen(false)
-      setIsReadOnly(true)
+      void handleSaveAndTransition(data as DatasetFormDraft).then(() => {
+        setIsExitModalOpen(false)
+        setIsReadOnly(true)
+      })
     })()
   }
 
