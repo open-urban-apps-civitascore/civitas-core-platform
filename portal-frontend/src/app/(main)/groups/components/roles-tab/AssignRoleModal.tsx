@@ -4,7 +4,6 @@ import { DialogProps } from '@radix-ui/react-dialog'
 import {
   createColumnHelper,
   getCoreRowModel,
-  getSortedRowModel,
   PaginationState,
   RowSelectionState,
   SortingState,
@@ -12,7 +11,7 @@ import {
 } from '@tanstack/react-table'
 import { Info } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
@@ -41,7 +40,6 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
   const [sorting, setSorting] = useState<SortingState>([])
   const [searchString, setSearchString] = useState('')
   const [selection, setSelection] = useState<RowSelectionState>({})
-  const selectAllCheckbox = useRef<HTMLButtonElement>(null)
   const { getApiRequestParams } = useQueryParams()
 
   const roleTypeFilter =
@@ -51,14 +49,8 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
 
   const { data: rolesData, isFetching: isFetchingRoles } = useGetRoles({ params: rolesParams })
 
-  const roles = useMemo(() => {
-    if (!rolesData?.data || rolesData.data.length === 0) return []
-
-    return rolesData.data.filter(role => !assignedRoleIds.includes(role.id))
-  }, [rolesData?.data, assignedRoleIds])
-
-  const filteredOutCount = (rolesData?.data?.length ?? 0) - roles.length
-  const rowCount = (rolesData?.totalElements || 0) - filteredOutCount
+  const roles = rolesData?.data ?? []
+  const rowCount = rolesData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)
 
   useEffect(() => {
@@ -105,25 +97,29 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
     columnHelper.accessor('id', {
       header: () => (
         <Checkbox
-          ref={selectAllCheckbox}
           checked={
             table.getIsAllPageRowsSelected() ? true : table.getIsSomePageRowsSelected() ? 'indeterminate' : false
           }
           onCheckedChange={value => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all roles"
           id="selectAll"
         />
       ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={value => {
-            row.toggleSelected(!!value)
-            setFocus(row.id)
-          }}
-          aria-label={`Select role ${row.original.name}`}
-          id={row.id}
-        />
-      ),
+      cell: ({ row }) => {
+        const isAssigned = assignedRoleIds.includes(row.original.id)
+        return (
+          <Checkbox
+            checked={isAssigned || row.getIsSelected()}
+            onCheckedChange={value => {
+              row.toggleSelected(!!value)
+              setFocus(row.id)
+            }}
+            disabled={isAssigned}
+            aria-label={`Select role ${row.original.name}`}
+            id={row.id}
+          />
+        )
+      },
       enableSorting: false,
       enableHiding: false,
     }),
@@ -162,10 +158,10 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
       sorting,
       rowSelection: selection,
     },
+    enableRowSelection: row => !assignedRoleIds.includes(row.original.id),
     manualPagination: true,
     manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     onPaginationChange: updater => {
       handlePagination(resolveUpdater(updater, { pageIndex, pageSize }))
     },

@@ -168,11 +168,14 @@ describe('AssignRoleModal', () => {
     })
   })
 
-  it('excludes already assigned roles from the list', async () => {
+  it('shows already assigned roles with disabled checkbox', async () => {
     await renderModal({ roleType: 'SYSTEM' })
 
     await waitFor(() => {
-      expect(screen.queryByRole('cell', { name: 'Already Assigned' })).not.toBeInTheDocument()
+      expect(screen.getByRole('cell', { name: 'Already Assigned' })).toBeInTheDocument()
+      const checkbox = screen.getByRole('checkbox', { name: 'Select role Already Assigned' })
+      expect(checkbox).toBeDisabled()
+      expect(checkbox).toBeChecked()
     })
   })
 

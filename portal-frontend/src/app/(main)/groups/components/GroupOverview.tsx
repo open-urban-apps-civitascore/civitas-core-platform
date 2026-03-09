@@ -115,8 +115,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
                 navigateToGroup()
               },
               onError: (error: unknown) => {
-                toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
-                toast.error(t('errors.updateError'))
+                toast.error(t('errors.assignmentSaveError'))
                 console.error('Failed to save assignments', error)
                 navigateToGroup()
               },
@@ -163,7 +162,6 @@ export const GroupOverview = (props: GroupDetailsProps) => {
 
   const handleExitAndSafe = () => {
     form.handleSubmit(handleSave)()
-    setIsReadOnly(false)
   }
 
   const handleExitButtonClick = () => {

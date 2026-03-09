@@ -21,6 +21,8 @@ import { Role, ROLE_TYPES } from '@/types/roles'
 
 import { AssignRoleModal } from './AssignRoleModal'
 
+const columnHelper = createColumnHelper<Assignment>()
+
 type ScopeTab = 'platform' | 'datasets' | 'datasources' | 'datastructures'
 
 const SCOPE_TAB_CONFIG: Record<ScopeTab, { scopeType: string | null }> = {
@@ -56,7 +58,7 @@ export const RolesTab = (props: RolesTabProps) => {
   const formAssignments = form.watch('assignments')
 
   const existingAssignments: Assignment[] = useMemo(() => {
-    return (groupData.assignments as Assignment[]) ?? []
+    return groupData.assignments ?? []
   }, [groupData.assignments])
 
   const displayAssignments: Assignment[] = useMemo(() => {
@@ -151,78 +153,79 @@ export const RolesTab = (props: RolesTabProps) => {
     setAssignModalRoleType(null)
   }
 
-  const columnHelper = createColumnHelper<Assignment>()
-
-  const columns = [
-    columnHelper.accessor('role.name', {
-      id: 'name',
-      header: ({ column }) => <SortableTableHeader column={column} title={t('roles.columns.name')} />,
-      cell: info => info.getValue(),
-      meta: {
-        style: {
-          width: '20%',
-          minWidth: '150px',
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor('role.name', {
+        id: 'name',
+        header: ({ column }) => <SortableTableHeader column={column} title={t('roles.columns.name')} />,
+        cell: info => info.getValue(),
+        meta: {
+          style: {
+            width: '20%',
+            minWidth: '150px',
+          },
         },
-      },
-    }),
-    columnHelper.accessor('role.description', {
-      id: 'description',
-      header: t('roles.columns.description'),
-      cell: info => info.getValue() ?? '',
-      enableSorting: false,
-    }),
-    columnHelper.display({
-      id: 'object',
-      header: t('roles.columns.object'),
-      cell: ({ row }) => {
-        const roleType = row.original.role.roleType
-        if (roleType === ROLE_TYPES.SYSTEM) return t('roles.objectLabels.SYSTEM')
-        if (roleType === ROLE_TYPES.DATA) return t('roles.objectLabels.DATA')
-        if (roleType === ROLE_TYPES.GOVERNANCE) return t('roles.objectLabels.GOVERNANCE')
-        return roleType ?? ''
-      },
-      enableSorting: false,
-    }),
-    columnHelper.display({
-      id: 'type',
-      header: t('roles.columns.type'),
-      cell: ({ row }) => {
-        return row.original.role.readonly ? t('roles.originLabels.default') : t('roles.originLabels.custom')
-      },
-      enableSorting: false,
-    }),
-    columnHelper.display({
-      id: 'scope',
-      header: t('roles.columns.scope'),
-      cell: ({ row }) => {
-        if (isPlatformTab) return t('roles.scopePlatform')
-        return row.original.scope?.name ?? ''
-      },
-      enableSorting: false,
-    }),
-    ...(!isReadOnly && isPlatformTab
-      ? [
-          {
-            id: 'actions',
-            cell: ({ row }: { row: Row<Assignment> }) => (
-              <TableDropdownMenu
-                menuItems={[
-                  {
-                    label: tCommon('actions.removeItem', { item: tCommon('items.role') }),
-                    onClick: () => handleRemoveClick(row.original.id),
-                  },
-                ]}
-              />
-            ),
-            meta: {
-              style: {
-                width: '50px',
+      }),
+      columnHelper.accessor('role.description', {
+        id: 'description',
+        header: t('roles.columns.description'),
+        cell: info => info.getValue() ?? '',
+        enableSorting: false,
+      }),
+      columnHelper.display({
+        id: 'object',
+        header: t('roles.columns.object'),
+        cell: ({ row }) => {
+          const roleType = row.original.role.roleType
+          if (roleType === ROLE_TYPES.SYSTEM) return t('roles.objectLabels.SYSTEM')
+          if (roleType === ROLE_TYPES.DATA) return t('roles.objectLabels.DATA')
+          if (roleType === ROLE_TYPES.GOVERNANCE) return t('roles.objectLabels.GOVERNANCE')
+          return roleType ?? ''
+        },
+        enableSorting: false,
+      }),
+      columnHelper.display({
+        id: 'type',
+        header: t('roles.columns.type'),
+        cell: ({ row }) => {
+          return row.original.role.readonly ? t('roles.originLabels.default') : t('roles.originLabels.custom')
+        },
+        enableSorting: false,
+      }),
+      columnHelper.display({
+        id: 'scope',
+        header: t('roles.columns.scope'),
+        cell: ({ row }) => {
+          if (isPlatformTab) return t('roles.scopePlatform')
+          return row.original.scope?.name ?? ''
+        },
+        enableSorting: false,
+      }),
+      ...(!isReadOnly && isPlatformTab
+        ? [
+            {
+              id: 'actions',
+              cell: ({ row }: { row: Row<Assignment> }) => (
+                <TableDropdownMenu
+                  menuItems={[
+                    {
+                      label: tCommon('actions.removeItem', { item: tCommon('items.role') }),
+                      onClick: () => handleRemoveClick(row.original.id),
+                    },
+                  ]}
+                />
+              ),
+              meta: {
+                style: {
+                  width: '50px',
+                },
               },
             },
-          },
-        ]
-      : []),
-  ]
+          ]
+        : []),
+    ],
+    [isReadOnly, isPlatformTab, t, tCommon],
+  )
 
   const table = useReactTable({
     getRowId: row => row.id,
@@ -273,11 +276,13 @@ export const RolesTab = (props: RolesTabProps) => {
 
   return (
     <div className="h-full">
-      <div className="flex gap-2 mb-4">
+      <div className="flex gap-2 mb-4" role="tablist">
         {scopeTabs.map(tab => (
           <Button
             key={tab.key}
             type="button"
+            role="tab"
+            aria-selected={activeScopeTab === tab.key}
             variant={activeScopeTab === tab.key ? 'default' : 'outline'}
             size="sm"
             onClick={() => {

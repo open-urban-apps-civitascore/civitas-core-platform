@@ -415,7 +415,8 @@
       "createError": "Beim Anlegen der Gruppe ist ein Fehler aufgetreten",
       "updateError": "Beim Aktualisieren der Gruppe ist ein Fehler aufgetreten",
       "deleteError": "Beim Löschen der Gruppe ist ein Fehler aufgetreten",
-      "groupNameExists": "Der Gruppenname ist bereits vergeben. Bitte wählen sie einen anderen Namen."
+      "groupNameExists": "Der Gruppenname ist bereits vergeben. Bitte wählen sie einen anderen Namen.",
+      "assignmentSaveError": "Gruppe wurde erstellt, aber die Rollenzuweisungen konnten nicht gespeichert werden"
     },
     "warningModal": {
       "title": "Gruppe wirklich löschen?",
