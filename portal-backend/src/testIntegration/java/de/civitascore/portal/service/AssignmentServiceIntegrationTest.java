@@ -13,13 +13,13 @@ import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
-import de.civitascore.portal.model.input.AssignmentInputDTO;
 import de.civitascore.portal.model.input.CatalogInputDTO;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSpaceInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.RoleInputDTO;
+import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
@@ -427,8 +427,8 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       input.setScopeType(ScopeType.TENANT);
 
       assertThatThrownBy(() -> assignmentService.create(input))
-          .isInstanceOf(InvalidDataAccessApiUsageException.class)
-          .hasMessageContaining("SYSTEM roles cannot have scope");
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("SYSTEM roles cannot be scoped");
     }
 
     @Test

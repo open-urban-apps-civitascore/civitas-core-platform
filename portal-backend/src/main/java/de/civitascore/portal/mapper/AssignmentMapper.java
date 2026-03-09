@@ -1,7 +1,7 @@
 package de.civitascore.portal.mapper;
 
 import de.civitascore.portal.model.entity.Assignment;
-import de.civitascore.portal.model.input.AssignmentInputDTO;
+import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;

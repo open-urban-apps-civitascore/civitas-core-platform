@@ -10,7 +10,7 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
-import de.civitascore.portal.model.input.AssignmentInputDTO;
+import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.repository.CatalogRepository;

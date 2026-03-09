@@ -54,8 +54,17 @@ public class Group extends NamedEntity {
   @Setter(AccessLevel.NONE) // Custom setter needed for orphanRemoval
   private Set<Group> childGroups = new HashSet<>();
 
-  @OneToMany(mappedBy = "group", fetch = FetchType.LAZY)
+  @OneToMany(
+      mappedBy = "group",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
   private Set<Assignment> assignments = new HashSet<>();
+
+  public void setAssignments(Collection<Assignment> assignments) {
+    Assignment.replaceAll(getAssignments(), assignments, a -> a.setGroup(this));
+  }
 
   /**
    * Custom setter for childGroups to properly handle orphanRemoval. Hibernate requires that the

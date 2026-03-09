@@ -37,7 +37,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final DataSourceRepository dataSourceRepository;
   private final DataSourceMapper dataSourceMapper;
   private final ConnectorHandlerRegistry connectorHandlerRegistry;
-  private final ScopedAssignmentBuilderService assignmentBuilderService;
+  private final AssignmentBuilderService assignmentBuilderService;
   private final DataStructureVersionService dataStructureVersionService;
   private final DataSetRepository dataSetRepository;
 
@@ -57,7 +57,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   }
 
   @Override
-  protected ScopedAssignmentBuilderService getAssignmentBuilderService() {
+  protected AssignmentBuilderService getAssignmentBuilderService() {
     return assignmentBuilderService;
   }
 

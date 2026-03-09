@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.input;
 
+import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.Data;
