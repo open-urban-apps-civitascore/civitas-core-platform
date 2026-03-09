@@ -219,7 +219,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         sorting={sorting}
         onSortingChange={setSorting}
         totalPages={totalPages}
-        onRowClick={onRowClick}
+        onRowClick={canEdit ? undefined : onRowClick}
         isEditMode={canEdit}
         onRemoveGroup={canEdit ? group => setGroupToRemove(group) : undefined}
       />
