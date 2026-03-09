@@ -158,7 +158,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
         if (!parsed.success) {
           console.error(parsed.error)
-          toast.error('Form data invalid')
+          toast.error(tCommon('errors.formInvalid'))
           return
         }
 
@@ -197,11 +197,10 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
         toast.success(t('messages.updateSuccess'))
       }
 
-      form.reset(mapDatasetToFormData(dataset))
       router.refresh()
       setIsReadOnly(true)
     } catch {
-      setDataSetStatus(serverStatus)
+      router.refresh()
       toast.error(t('messages.transitionError'))
     }
   }
@@ -225,7 +224,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   }
 
   const handleExit = () => {
-    if (form.formState.isDirty) {
+    if (form.formState.isDirty || hasStatusChanged) {
       setIsExitModalOpen(true)
     } else {
       setIsReadOnly(true)
@@ -241,10 +240,17 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   }
 
   const handleSaveAndExit = () => {
+    // Handle status-only change (form not dirty)
+    if (!form.formState.isDirty && hasStatusChanged) {
+      void handleSaveAndTransition(form.getValues() as DatasetFormDraft).then(() => {
+        setIsExitModalOpen(false)
+      })
+      return
+    }
+
     void form.handleSubmit(data => {
       void handleSaveAndTransition(data as DatasetFormDraft).then(() => {
         setIsExitModalOpen(false)
-        setIsReadOnly(true)
       })
     })()
   }
