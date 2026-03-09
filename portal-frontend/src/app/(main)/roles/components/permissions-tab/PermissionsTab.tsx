@@ -9,7 +9,7 @@ import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Permission, PermissionItem } from '@/types/permissions'
-import { ROLE_TYPES } from '@/types/roles'
+import { ROLE_TYPES, RoleType } from '@/types/roles'
 
 import { CategoryList } from './CategoryList'
 import { DataPermissionsGrid } from './DataPermissionsGrid'
@@ -20,6 +20,7 @@ interface PermissionsTabProps {
   onPendingPermissionIdsChange: (ids: string[]) => void
   isReadOnly: boolean
   currentRoleId?: string
+  roleType: RoleType
 }
 
 const formatPermissionName = (name: string): string =>
@@ -37,10 +38,10 @@ const mapPermissions = (permissionsInput: Permission[]): PermissionItem[] => {
 }
 
 export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
-  const { pendingPermissionIds, onPendingPermissionIdsChange, isReadOnly, currentRoleId } = props
+  const { pendingPermissionIds, onPendingPermissionIdsChange, isReadOnly, currentRoleId, roleType } = props
   const t = useTranslations('common')
   const tRoles = useTranslations('roles')
-  const { getApiRequestParams, tabValue } = useQueryParams()
+  const { getApiRequestParams } = useQueryParams()
   const [roleTemplate, setRoleTemplate] = useState<string | null>(null)
   const [checkedPermissionItems, setCheckedPermissionItems] = useState<PermissionItem[]>([])
   const initializedForIds = useRef<string | null>(null)
@@ -58,8 +59,8 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   })
 
   const allRoles = useMemo(
-    () => (rolesData?.data || []).filter(role => role.roleType === (tabValue?.toUpperCase() ?? ROLE_TYPES.SYSTEM)),
-    [rolesData?.data, tabValue],
+    () => (rolesData?.data || []).filter(role => role.roleType === roleType),
+    [rolesData?.data, roleType],
   )
   const permissions = useMemo(() => mapPermissions(permissionsData?.data || []), [permissionsData?.data])
 
@@ -126,7 +127,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
         <div className="flex items-center justify-center text-sm mt-3.5">{t('noResults')}</div>
       ) : (
         <>
-          {tabValue?.toUpperCase() === ROLE_TYPES.DATA ? (
+          {roleType === ROLE_TYPES.DATA ? (
             <DataPermissionsGrid
               permissions={permissions}
               checkedItems={checkedPermissionItems}

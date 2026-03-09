@@ -66,7 +66,7 @@ const RolesPage = () => {
   }, [rowCount, setTotalPages, pageSize])
 
   const handleRowClick = (row: Row<Role>) => {
-    router.push(`/roles/${row.original.id}?_tab=${selectedRoleType}`)
+    router.push(`/roles/${row.original.id}?tab=${selectedRoleType}`)
   }
 
   return (
@@ -87,7 +87,7 @@ const RolesPage = () => {
           searchString={search}
           onChangeSearchString={setSearchParam}
           customElement={
-            <Button onClick={() => router.push(`/roles/create/?_tab=${selectedRoleType}`)}>
+            <Button onClick={() => router.push(`/roles/create/?tab=${selectedRoleType}`)}>
               <Plus /> {t('newRole')}
             </Button>
           }

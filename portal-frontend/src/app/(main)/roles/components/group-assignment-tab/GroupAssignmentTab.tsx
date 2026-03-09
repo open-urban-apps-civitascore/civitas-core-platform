@@ -1,7 +1,7 @@
 'use client'
 
 import { PaginationState, Row, RowSelectionState, SortingState } from '@tanstack/react-table'
-import { Plus, TriangleAlert } from 'lucide-react'
+import { Info, Plus, TriangleAlert } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -71,7 +71,9 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
 
   // Filter assignments by selected scope
   const scopeFilteredGroupIds = useMemo(() => {
-    return assignments.filter(a => a.scopeType === selectedScope).map(a => a.group.id)
+    return assignments
+      .filter(a => a.scopeType === selectedScope || (selectedScope === 'TENANT' && a.scopeType == null))
+      .map(a => a.group.id)
   }, [assignments, selectedScope])
 
   const groups = useMemo(() => {
@@ -157,6 +159,12 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
               <Plus /> {t('addGroup')}
             </Button>
           ) : null}
+          {isTenantScope && !canEdit && (
+            <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
+              <Info className="h-4 w-4 shrink-0" />
+              <span>{t('infoBox')}</span>
+            </div>
+          )}
         </div>
 
         <NoDataPage title={t('noGroupsAssigned')} />
@@ -192,6 +200,12 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
             <Plus /> {t('addGroup')}
           </Button>
         ) : null}
+        {isTenantScope && !canEdit && (
+          <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
+            <Info className="h-4 w-4 shrink-0" />
+            <span>{t('infoBox')}</span>
+          </div>
+        )}
       </div>
 
       <SearchHeader searchString={searchInput} onChangeSearchString={setSearchInput} />

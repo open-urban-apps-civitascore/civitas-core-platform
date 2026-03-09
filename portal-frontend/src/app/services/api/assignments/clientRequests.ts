@@ -18,6 +18,7 @@ export type AssignmentSummary = {
 export type CreateAssignmentData = {
   groupId: string
   roleId: string
+  scopeType?: AssignmentScopeType
 }
 
 const key = 'assignments'

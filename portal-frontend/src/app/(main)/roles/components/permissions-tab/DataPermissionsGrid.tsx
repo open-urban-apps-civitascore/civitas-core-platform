@@ -30,7 +30,12 @@ export const DataPermissionsGrid = (props: DataPermissionsGridProps): JSX.Elemen
   // Find a permission by constructing the name from prefix + action
   const findPermission = (prefix: string, action: string): PermissionItem | undefined => {
     const permissionName = `${prefix}_${action}`
-    return permissions.find(p => p.name === permissionName)
+    // Permission names are formatted (e.g. "Dataset Read"), so format the constructed name the same way
+    const formattedName = permissionName
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+    return permissions.find(p => p.name === formattedName)
   }
 
   const isChecked = (permission: PermissionItem | undefined): boolean => {

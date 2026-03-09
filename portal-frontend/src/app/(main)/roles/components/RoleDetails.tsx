@@ -185,7 +185,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         },
         {
           onSuccess: ({ data }) => {
-            router.push(`/roles/${data.id}?_tab=${tabValue}`)
+            router.push(`/roles/${data.id}?tab=${tabValue}`)
           },
         },
       )
@@ -215,7 +215,15 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     const groupIdsToAdd = newGroupIds.filter(id => !currentGroupIds.includes(id))
     const assignmentsToRemove = existingAssignments.filter(a => !newGroupIds.includes(a.group.id))
 
-    await Promise.all(groupIdsToAdd.map(groupId => createAssignment.mutateAsync({ groupId, roleId })))
+    await Promise.all(
+      groupIdsToAdd.map(groupId =>
+        createAssignment.mutateAsync({
+          groupId,
+          roleId,
+          ...(initialRole.roleType !== 'SYSTEM' && { scopeType: 'TENANT' as const }),
+        }),
+      ),
+    )
     await Promise.all(assignmentsToRemove.map(a => deleteAssignment(a.id)))
     await refetchAssignments()
   }
@@ -296,6 +304,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
             onPendingPermissionIdsChange={setPendingPermissionIds}
             isReadOnly={isReadOnly || isDefaultRole}
             currentRoleId={roleId}
+            roleType={(roleType as Role['roleType']) || DEFAULT_TAB}
           />
         )}
 
