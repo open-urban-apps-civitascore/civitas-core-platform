@@ -91,6 +91,13 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     defaultValues: mapDatasetToFormData(dataset),
   })
 
+  // Reset form and local status when dataset prop changes (e.g. after router.refresh())
+  useEffect(() => {
+    form.reset(mapDatasetToFormData(dataset))
+    setDataSetStatus(dataset.dataSetStatus ?? DATASET_STATUS_TYPES.DRAFT)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataset])
+
   const isDraftMode = dataSetStatus === DATASET_STATUS_TYPES.DRAFT || !dataSetStatus
   const hasStatusChanged = dataSetStatus !== dataset.dataSetStatus
 
