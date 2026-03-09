@@ -62,6 +62,9 @@ const useDatasetTransition = (action: 'publish' | 'unpublish' | 'release' | 'unr
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [key] })
     },
+    onError: error => {
+      console.error(`Error during ${action}:`, (error as Error).message)
+    },
   })
 }
 
@@ -83,6 +86,9 @@ export const useUpdatePublishedDatasetMeta = () => {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [key] })
+    },
+    onError: error => {
+      console.error('Error updating published dataset metadata:', (error as Error).message)
     },
   })
 }

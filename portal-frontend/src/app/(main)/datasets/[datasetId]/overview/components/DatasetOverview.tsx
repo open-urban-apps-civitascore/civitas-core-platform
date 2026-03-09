@@ -152,9 +152,10 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       if (form.formState.isDirty) {
         const { dirtyFields } = form.formState
         const valuesForValidation = { ...formData, id: dataset.id }
-        const parsed = isDraftMode
-          ? DatasetUpdateApiSchema.safeParse(valuesForValidation)
-          : DatasetFormAvailableSchema.safeParse(valuesForValidation)
+        const parsed =
+          serverStatus === DATASET_STATUS_TYPES.DRAFT
+            ? DatasetUpdateApiSchema.safeParse(valuesForValidation)
+            : DatasetFormAvailableSchema.safeParse(valuesForValidation)
 
         if (!parsed.success) {
           console.error(parsed.error)

@@ -262,7 +262,7 @@
       "unpublishSuccess": "Der Datensatz wurde erfolgreich zurückgezogen.",
       "releaseSuccess": "Der Datensatz wurde erfolgreich freigegeben.",
       "unreleaseSuccess": "Die Freigabe des Datensatzes wurde erfolgreich aufgehoben.",
-      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut."
+      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut."
     },
     "warningModal": {
       "title": "Datensatz löschen?",
