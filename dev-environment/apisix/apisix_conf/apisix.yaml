@@ -98,7 +98,7 @@ routes:
   # Protected API routes - require valid JWT and OPA authorization
   - id: portal-backend-api
     name: "Portal Backend API (AuthZ)"
-    uri: /v2/*
+    uri: /v1/*
     service_id: svc-portal-backend
     plugin_config_id: 1
 
