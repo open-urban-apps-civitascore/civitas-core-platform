@@ -218,7 +218,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     }
   }, [subTabValue, setSubTabValueParam, defaultSubTab])
 
-  const roleType = initialRole?.roleType || tabValue
+  const roleType = roleId ? initialRole?.roleType : tabValue || DEFAULT_TAB
   const badgeTitle = roleType ? tRoles(`${roleType.toLowerCase()}Roles`).slice(0, -1) : undefined
 
   return (
