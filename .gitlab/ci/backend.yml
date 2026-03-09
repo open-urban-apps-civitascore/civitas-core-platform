@@ -188,7 +188,6 @@ report-test-backend:
     paths:
       - portal-backend/target/*
     reports:
-      junit: portal-backend/target/surefire-reports/TEST-*.xml
       coverage_report:
         coverage_format: jacoco
         path: portal-backend/target/site/jacoco/jacoco.xml
