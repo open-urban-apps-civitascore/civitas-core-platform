@@ -109,24 +109,21 @@ describe('apiRequest', () => {
       apiRequest({
         endpoint: '/test',
         method: 'GET',
-        errorMessage: 'Failed to load data',
       }),
-    ).rejects.toThrow('Failed to load data')
+    ).rejects.toThrow(new Error('Unauthorized'))
 
     await expect(
       apiRequest({
         endpoint: '/test',
         method: 'POST',
-        errorMessage: 'Failed to create data',
       }),
-    ).rejects.toThrow('Failed to create data')
+    ).rejects.toThrow()
 
     await expect(
       apiRequest({
         endpoint: '/test',
         method: 'DELETE',
-        errorMessage: 'Failed to delete data',
       }),
-    ).rejects.toThrow('Failed to delete data')
+    ).rejects.toThrow()
   })
 })

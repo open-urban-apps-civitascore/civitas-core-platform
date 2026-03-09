@@ -1,0 +1,26 @@
+meta {
+  name: Create Dataset
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Sensor Readings Dataset",
+    "description": "Dataset containing sensor readings",
+    "openDataAccess": false,
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataSetId', res.body.id);
+  }
+}

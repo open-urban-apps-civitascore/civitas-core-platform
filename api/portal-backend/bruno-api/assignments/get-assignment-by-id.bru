@@ -1,0 +1,15 @@
+meta {
+  name: Get Assignment by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/assignments/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{assignmentId}}
+}

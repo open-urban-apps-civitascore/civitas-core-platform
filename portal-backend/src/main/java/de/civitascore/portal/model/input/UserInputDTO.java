@@ -18,10 +18,9 @@ public class UserInputDTO extends BaseInputDTO {
 
   @NotBlank(message = "Last name is required") private String lastName;
 
-  @NotBlank(message = "Email is required") @Email(message = "Invalid email format") private String email;
+  @NotBlank(message = "Email is required") @Email(regexp = ".+@.+\\..+", message = "Invalid email format") private String email;
 
   private String phone;
-  private String externalId;
   private Boolean active;
   private List<UUID> groupIds;
 }

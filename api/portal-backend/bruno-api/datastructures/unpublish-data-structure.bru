@@ -1,0 +1,15 @@
+meta {
+  name: Unpublish Data Structure
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/unpublish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+}

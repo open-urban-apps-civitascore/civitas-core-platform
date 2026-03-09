@@ -1,6 +1,7 @@
 // mapRolesData.test.ts
 import { describe, expect, it } from 'vitest'
 
+import { Assignment, ASSIGNMENT_SCOPE_TYPES, AssignmentRole } from '@/types/assignments'
 import type { Group } from '@/types/groups'
 import { ROLE_TYPES } from '@/types/roles'
 
@@ -12,18 +13,29 @@ const roles = [
   { id: 'r3', name: 'Support', roleType: ROLE_TYPES.GOVERNANCE },
 ]
 
-const groupRoles = [
-  { id: 'r1', name: 'Admin', roleType: 'SYSTEM' as const },
-  { id: 'r2', name: 'Editor', roleType: 'DATA' as const },
-  { id: 'r3', name: 'Support', roleType: 'GOVERNANCE' as const },
+const groupRoles: AssignmentRole[] = [
+  { id: 'r1', name: 'Admin', roleType: ROLE_TYPES.SYSTEM, description: '', readonly: false },
+  { id: 'r2', name: 'Editor', roleType: ROLE_TYPES.DATA, description: '', readonly: false },
+  { id: 'r3', name: 'Support', roleType: ROLE_TYPES.GOVERNANCE, description: '', readonly: false },
 ]
+
+const baseAssignment: Assignment = {
+  id: 'a1',
+  createdAt: new Date().toISOString(),
+  modifiedAt: new Date().toISOString(),
+  group: { id: 'g1', name: 'Group 01' },
+  role: groupRoles[0],
+  scopeType: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+  scope: { id: 's1', name: 'scope 01' },
+}
 
 const groups: Group[] = [
   {
     id: 'g1',
     name: 'Group 01',
     description: '',
-    roles: [groupRoles[0], groupRoles[1]],
+    roles: null,
+    assignments: [baseAssignment, { ...baseAssignment, role: groupRoles[1] }],
     members: null,
     contactUser: null,
     createdAt: '',
@@ -33,7 +45,8 @@ const groups: Group[] = [
     id: 'g2',
     name: 'Group 02',
     description: '',
-    roles: [groupRoles[0], groupRoles[2]],
+    roles: null,
+    assignments: [baseAssignment, { ...baseAssignment, role: groupRoles[2] }],
     members: [],
     contactUser: null,
     createdAt: '',

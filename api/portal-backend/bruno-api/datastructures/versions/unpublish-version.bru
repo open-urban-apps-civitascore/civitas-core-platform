@@ -1,0 +1,16 @@
+meta {
+  name: Unpublish Data Structure Version
+  type: http
+  seq: 18
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/unpublish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  versionId: {{dataStructureVersionId}}
+}

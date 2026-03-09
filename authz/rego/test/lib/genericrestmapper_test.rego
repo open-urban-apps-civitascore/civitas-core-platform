@@ -23,6 +23,7 @@ mock_endpoints := {
 	"/v2/datasets/{id}/published/meta": {"PUT": ["DATASET_UPDATE", "DATASET_RELEASE"]},
 	"/v2/datastructures/{id}/versions/{id}/publish": {"POST": "DATASTRUCTURE_RELEASE"},
 	"/v2/datastructures/{id}/versions/{id}/unpublish": {"POST": "DATASTRUCTURE_UPDATE"},
+	"/v2/datastructures/{id}/versions/{id}/published/meta": {"PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]},
 }
 
 # =============================================================================
@@ -305,4 +306,27 @@ test_match_pattern_6_segment_reserved_id if {
 test_match_pattern_6_segment_unpublish if {
 	result := restmapper.match_pattern("/v2/datastructures/dstr-123/versions/v-456/unpublish", mock_endpoints)
 	result == "/v2/datastructures/{id}/versions/{id}/unpublish"
+}
+
+# Pattern match - 7-segment literal tail (/v2/datastructures/{id}/versions/{id}/published/meta)
+test_match_pattern_7_segment_literal_tail if {
+	result := restmapper.match_pattern("/v2/datastructures/dstr-123/versions/v-456/published/meta", mock_endpoints)
+	result == "/v2/datastructures/{id}/versions/{id}/published/meta"
+}
+
+test_match_pattern_7_segment_literal_tail_uuids if {
+	result := restmapper.match_pattern("/v2/datastructures/550e8400-e29b-41d4-a716-446655440000/versions/660e8400-e29b-41d4-a716-446655440000/published/meta", mock_endpoints)
+	result == "/v2/datastructures/{id}/versions/{id}/published/meta"
+}
+
+# No match - 7-segment unknown action
+test_match_pattern_7_segment_unknown_action if {
+	result := restmapper.match_pattern("/v2/datastructures/dstr-123/versions/v-456/published/unknown", mock_endpoints)
+	result == ""
+}
+
+# No match - 7-segment with reserved ID
+test_match_pattern_7_segment_reserved_id if {
+	result := restmapper.match_pattern("/v2/datastructures/me/versions/v-456/published/meta", mock_endpoints)
+	result == ""
 }

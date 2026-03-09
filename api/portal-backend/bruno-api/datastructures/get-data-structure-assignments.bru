@@ -1,0 +1,15 @@
+meta {
+  name: Get Data Structure Assignments
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/datastructures/:id/assignments
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataStructureId}}
+}

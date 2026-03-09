@@ -40,7 +40,7 @@ describe('useQueryParams', () => {
     })
     const { result } = renderHook(() => useQueryParams())
 
-    expect(result.current.pageIndex).toBe(2) // 0-indexed, used as-is
+    expect(result.current.pageIndex).toBe(2)
     expect(result.current.pageSize).toBe(20)
   })
 

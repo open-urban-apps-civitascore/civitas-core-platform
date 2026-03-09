@@ -1,0 +1,15 @@
+meta {
+  name: Get Dataset Assignments
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id/assignments
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}

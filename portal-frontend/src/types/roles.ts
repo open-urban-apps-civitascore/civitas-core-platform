@@ -1,5 +1,7 @@
 import z from 'zod'
 
+import { enumFromConst } from '@/utils/common'
+
 import { WithId } from './common'
 
 export type RoleTab = 'basicInformation' | 'permissions' | 'groupAssignment'
@@ -9,6 +11,8 @@ export const ROLE_TYPES = {
   DATA: 'DATA',
   GOVERNANCE: 'GOVERNANCE',
 } as const
+
+export const RoleTypeEnum = enumFromConst(ROLE_TYPES)
 
 export type RoleType = (typeof ROLE_TYPES)[keyof typeof ROLE_TYPES]
 

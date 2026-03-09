@@ -1,0 +1,31 @@
+meta {
+  name: Update Group
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/groups/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{groupId}}
+}
+
+body:json {
+  {
+    "name": "Engineering",
+    "description": "Updated engineering team",
+    "contactUserId": null,
+    "parentGroupId": null,
+    "memberIds": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('groupId', res.body.id);
+  }
+}

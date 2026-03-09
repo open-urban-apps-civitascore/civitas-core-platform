@@ -1,0 +1,16 @@
+meta {
+  name: Delete Pipeline
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{pipelineId}}
+}

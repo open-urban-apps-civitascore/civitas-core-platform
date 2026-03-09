@@ -21,9 +21,6 @@ interface UserLastNameSpec extends BaseSpec<User> {}
 @Spec(path = "active", params = "active", spec = Equal.class)
 interface UserActiveSpec extends BaseSpec<User> {}
 
-@Spec(path = "externalId", params = "externalId", spec = Equal.class)
-interface UserExternalIdSpec extends BaseSpec<User> {}
-
 @Or({
   @Spec(
       path = "firstName,lastName",
@@ -39,5 +36,4 @@ public interface UserSpec
         UserFirstNameSpec,
         UserLastNameSpec,
         UserActiveSpec,
-        UserExternalIdSpec,
         UserQuickSearchSpec {}

@@ -2,11 +2,11 @@ import { getUser } from '@/app/services/api/users/serverRequests'
 
 import { UserOverview } from '../components/UserOverview'
 
-interface PageProps {
+interface EditUserPageProps {
   params: Promise<{ userId: string }>
 }
 
-const EditUserPage = async (props: PageProps) => {
+const EditUserPage = async (props: EditUserPageProps) => {
   const { params } = props
   const { userId } = await params
 
