@@ -38,8 +38,6 @@ public class SecurityConfig {
             auth ->
                 auth.requestMatchers(securityProperties.permitPaths().toArray(String[]::new))
                     .permitAll()
-                    .requestMatchers("/v2/**")
-                    .authenticated()
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(
