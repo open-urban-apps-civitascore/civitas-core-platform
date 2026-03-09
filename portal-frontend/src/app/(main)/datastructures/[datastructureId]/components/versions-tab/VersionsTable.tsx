@@ -13,6 +13,7 @@ interface VersionsTableProps extends TableProps<DatastructureVersionsListData> {
   datastructureId: string
   versions: DatastructureVersionsListData[]
   onDelete?: (id: string) => void
+  onVersionClick?: (versionId: string) => void
 }
 
 export const VersionsTable = (props: VersionsTableProps) => {
@@ -27,6 +28,7 @@ export const VersionsTable = (props: VersionsTableProps) => {
     rowSelection,
     onPaginationChange,
     onSortingChange,
+    onVersionClick,
   } = props
   const t = useTranslations('datastructures')
   const tVersion = useTranslations('datastructureVersions')
@@ -42,7 +44,12 @@ export const VersionsTable = (props: VersionsTableProps) => {
     columnHelper.accessor('versionNumber', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.versionNumber')} />,
       cell: ({ row }) => (
-        <LinkCell href={`/datastructures/${datastructureId}/${row.original.id}`}>{row.original.versionNumber}</LinkCell>
+        <LinkCell
+          href={onVersionClick ? undefined : `/datastructures/${datastructureId}/${row.original.id}`}
+          onClick={onVersionClick ? () => onVersionClick(row.original.id) : undefined}
+        >
+          {row.original.versionNumber}
+        </LinkCell>
       ),
       meta: {
         style: {

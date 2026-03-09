@@ -28,7 +28,6 @@
       "exit": "Beenden",
       "assignItem": "{item} hinzufügen",
       "assignTo": "zu {item}",
-      "close": "Schließen",
       "back": "Zurück"
     },
     "errors": {
@@ -562,6 +561,10 @@
     "infoModal": {
       "title": "Datenstruktur kann nicht gelöscht werden",
       "description": "Diese Datenstruktur ist in Verwendung und kann daher nicht gelöscht werden."
+    },
+    "unsavedChangesModal": {
+      "title": "Ungespeicherte Änderungen",
+      "description": "Diese Aktion führt zu einer anderen Seite und Ihre ungespeicherten Änderungen gehen verloren. Möchten Sie sie zuerst speichern?"
     }
   },
   "datastructureVersions": {

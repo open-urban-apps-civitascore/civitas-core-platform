@@ -572,6 +572,10 @@
     "infoModal": {
       "title": "Datenstructure can not be deleted",
       "description": "This Datenstructure is in use and can therefore not be deleted."
+    },
+    "unsavedChangesModal": {
+      "title": "Unsaved Changes",
+      "description": "This action will take you to another page and your unsaved changes will be lost. Do you want to save them first?"
     }
   },
   "datastructureVersion": {

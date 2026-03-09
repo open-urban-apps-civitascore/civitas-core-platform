@@ -122,6 +122,9 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             versions={mapDatastructureVersionsApiToListData(datastructure.dataStructureVersions)}
             rowCount={datastructure.dataStructureVersions.length}
             isReadOnly={isReadOnly}
+            isDirty={form.formState.isDirty}
+            isLoading={isLoading}
+            onSave={saveDatastructure}
           />
         )
       default:
