@@ -49,6 +49,8 @@ security:
     - /swagger-ui.html
     - /swagger-resources/**
     - /webjars/**
+    - /actuator/health/**
+    - /actuator/info
 
 model-atlas:
   baseUrl: "http://localhost:8086"
