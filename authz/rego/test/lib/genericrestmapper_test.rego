@@ -63,7 +63,7 @@ test_is_valid_path_rejects_backslash if {
 }
 
 test_is_valid_path_rejects_no_leading_slash if {
-	not restmapper.is_valid_path("v2/users")
+	not restmapper.is_valid_path("v1/users")
 }
 
 # =============================================================================
@@ -72,12 +72,12 @@ test_is_valid_path_rejects_no_leading_slash if {
 
 test_parse_path_collection if {
 	result := restmapper.parse_path("/v1/users")
-	result == ["v2", "users"]
+	result == ["v1", "users"]
 }
 
 test_parse_path_with_id if {
 	result := restmapper.parse_path("/v1/users/123")
-	result == ["v2", "users", "123"]
+	result == ["v1", "users", "123"]
 }
 
 test_parse_path_root if {
@@ -92,7 +92,7 @@ test_parse_path_invalid_returns_empty if {
 
 test_parse_path_double_slash if {
 	result := restmapper.parse_path("/v1//users")
-	result == ["v2", "", "users"]
+	result == ["v1", "", "users"]
 }
 
 # =============================================================================

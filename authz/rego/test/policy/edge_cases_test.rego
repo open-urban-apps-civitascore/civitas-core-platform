@@ -29,8 +29,8 @@ portal_request(path) := {
 test_double_slash if {
 	parts := resource_mapping.path_parts with input as portal_request("/v1//users")
 
-	# ["v2", "", "users"] - empty string between slashes
-	parts[0] == "v2"
+	# ["v1", "", "users"] - empty string between slashes
+	parts[0] == "v1"
 	parts[1] == ""
 	parts[2] == "users"
 }
