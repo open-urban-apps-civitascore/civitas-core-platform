@@ -40,5 +40,9 @@ export const useUpdateRole = () =>
     errorMessage: 'An error occurred while updating the role.',
   })
 
-export const useDeleteRole = (id: string) =>
-  useDeleteMutation({ id, key, errorMessage: 'An error occurred while deleting the role.' })
+export const useDeleteRole = () =>
+  useDeleteMutation<Role>({
+    key,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while deleting the role.',
+  })

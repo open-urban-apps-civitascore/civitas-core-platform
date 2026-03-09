@@ -1,0 +1,28 @@
+meta {
+  name: Patch Pipeline
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  id: {{pipelineId}}
+}
+
+body:json {
+  {
+    "description": "Patched pipeline description"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pipelineId', res.body.id);
+  }
+}

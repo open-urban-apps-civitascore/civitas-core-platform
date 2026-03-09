@@ -40,14 +40,13 @@ describe('useQueryParams', () => {
     })
     const { result } = renderHook(() => useQueryParams())
 
-    expect(result.current.pageIndex).toBe(1) // -1 offset
+    expect(result.current.pageIndex).toBe(2)
     expect(result.current.pageSize).toBe(20)
   })
 
   it('should parse sorting params correctly', () => {
     mockSearchParams = new URLSearchParams({
-      [QUERY_PARAMS.sortingId]: 'name',
-      [QUERY_PARAMS.order]: 'desc',
+      [QUERY_PARAMS.sort]: 'name,desc',
     })
     const { result } = renderHook(() => useQueryParams())
 
@@ -61,9 +60,7 @@ describe('useQueryParams', () => {
       result.current.setSortingParams([{ id: 'age', desc: false }])
     })
 
-    expect(push).toHaveBeenCalledWith(
-      `/test?${new URLSearchParams({ [QUERY_PARAMS.sortingId]: 'age', [QUERY_PARAMS.order]: 'asc' }).toString()}`,
-    )
+    expect(push).toHaveBeenCalledWith(`/test?${new URLSearchParams({ [QUERY_PARAMS.sort]: 'age,asc' }).toString()}`)
   })
 
   it('should update search param', () => {
@@ -98,7 +95,7 @@ describe('useQueryParams', () => {
     })
 
     expect(push).toHaveBeenCalledWith(
-      `${pathname}?${new URLSearchParams({ [QUERY_PARAMS.pageIndex]: '3', [QUERY_PARAMS.pageSize]: '50' }).toString()}`,
+      `${pathname}?${new URLSearchParams({ [QUERY_PARAMS.pageIndex]: '2', [QUERY_PARAMS.pageSize]: '50' }).toString()}`,
     )
   })
 
@@ -106,8 +103,7 @@ describe('useQueryParams', () => {
     mockSearchParams = new URLSearchParams({
       [QUERY_PARAMS.pageIndex]: '1',
       [QUERY_PARAMS.pageSize]: '25',
-      [QUERY_PARAMS.sortingId]: 'title',
-      [QUERY_PARAMS.order]: 'asc',
+      [QUERY_PARAMS.sort]: 'title,asc',
       [QUERY_PARAMS.search]: 'foo',
     })
     const { result } = renderHook(() => useQueryParams())
@@ -115,8 +111,7 @@ describe('useQueryParams', () => {
     const params = result.current.getApiRequestParamsByUrl()
     expect(params.get(QUERY_PARAMS.pageIndex)).toBe('1')
     expect(params.get(QUERY_PARAMS.pageSize)).toBe('25')
-    expect(params.get(QUERY_PARAMS.sortingId)).toBe('title')
-    expect(params.get(QUERY_PARAMS.order)).toBe('asc')
+    expect(params.get(QUERY_PARAMS.sort)).toBe('title,asc')
     expect(params.get(QUERY_PARAMS.search)).toBe('foo')
   })
 

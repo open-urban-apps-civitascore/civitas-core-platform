@@ -1,15 +1,16 @@
 import {
-  CellContext,
   createColumnHelper,
   getCoreRowModel,
   getExpandedRowModel,
   getSortedRowModel,
+  Row,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
-import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Group } from '@/types/groups'
 import { TableProps } from '@/types/table'
@@ -17,6 +18,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface GroupsTableProps extends TableProps<Group> {
   groups: Group[]
+  onDeleteGroupClick: (groupId: string) => void
 }
 
 export const GroupsTable = (props: GroupsTableProps) => {
@@ -28,12 +30,13 @@ export const GroupsTable = (props: GroupsTableProps) => {
     pageSize,
     sorting,
     rowSelection,
-    onRowClick,
     onPaginationChange,
     onSortingChange,
+    onDeleteGroupClick,
     isLoading,
   } = props
   const t = useTranslations('groups')
+  const tCommon = useTranslations('common')
   const columnHelper = createColumnHelper<Group>()
 
   const columns = [
@@ -44,15 +47,12 @@ export const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('list.title')} />,
-      cell: ({ row }: CellContext<Group, unknown>) => (
-        <ExpanderCell row={row} className="font-medium">
-          {row.original.name}
-        </ExpanderCell>
-      ),
+      cell: ({ row }) => <LinkCell href={`/groups/${row.id}`}>{row.original.name}</LinkCell>,
       meta: {
         style: {
-          minWidth: '200px',
+          minWidth: '150px',
           color: 'var(--foreground)',
+          fontWeight: '500',
         },
       },
     }),
@@ -76,6 +76,24 @@ export const GroupsTable = (props: GroupsTableProps) => {
         },
       },
     }),
+    {
+      id: 'actions',
+      cell: ({ row }: { row: Row<Group> }) => (
+        <TableDropdownMenu
+          menuItems={[
+            {
+              label: tCommon('actions.removeItem', { item: tCommon('items.group') }),
+              onClick: () => onDeleteGroupClick(row.id),
+            },
+          ]}
+        />
+      ),
+      meta: {
+        style: {
+          width: '50px',
+        },
+      },
+    },
   ]
 
   const table = useReactTable({
@@ -92,7 +110,6 @@ export const GroupsTable = (props: GroupsTableProps) => {
     state: { pagination: { pageIndex, pageSize }, sorting, rowSelection },
     manualPagination: true,
     manualSorting: true,
-    // getSubRows: row => row.subgroups || [],
     getExpandedRowModel: getExpandedRowModel(),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -102,17 +119,7 @@ export const GroupsTable = (props: GroupsTableProps) => {
     onSortingChange: updater => onSortingChange(resolveUpdater(updater, sorting)),
   })
 
-  // const checkIfRowClickable = (row: Row<Group>) => !row.original.parent
-
   return (
-    <DataTable
-      table={table}
-      pageIndex={pageIndex}
-      pageSize={pageSize}
-      totalPages={totalPages}
-      onRowClick={onRowClick}
-      isLoading={isLoading}
-      // isRowClickable={checkIfRowClickable}
-    />
+    <DataTable table={table} pageIndex={pageIndex} pageSize={pageSize} totalPages={totalPages} isLoading={isLoading} />
   )
 }

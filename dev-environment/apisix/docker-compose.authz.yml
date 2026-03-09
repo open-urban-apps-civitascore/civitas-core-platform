@@ -46,12 +46,12 @@ services:
       - "--log-format=json"
       - "--set=decision_logs.console=true"
       - "/policies"
-      - "/lib"
+      - "/helpers"
       - "/providers"
       - "/data"
     volumes:
       - ../../authz/rego/policy:/policies:ro
-      - ../../authz/rego/lib:/lib:ro
+      - ../../authz/rego/lib:/helpers:ro
       - ../../authz/rego/providers:/providers:ro
       - ${OPA_DATA_DIR:-../../authz/rego/data/backends}:/data/backends:ro
       - ./opa-config:/data/config:ro

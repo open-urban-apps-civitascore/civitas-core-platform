@@ -1,0 +1,16 @@
+meta {
+  name: Get Data Structure Version by ID
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  id: {{dataStructureVersionId}}
+}

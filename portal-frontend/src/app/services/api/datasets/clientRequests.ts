@@ -1,5 +1,6 @@
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
+import { useDeleteMutation } from '@/hooks/use-delete-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
 import { GetListInput } from '@/types/common'
 import { Dataset, DatasetCreateApiData, DatasetUpdateApiData } from '@/types/datasets'
@@ -7,15 +8,26 @@ import { Dataset, DatasetCreateApiData, DatasetUpdateApiData } from '@/types/dat
 const key = 'datasets'
 
 export const useGetDatasets = ({ params, isEnabled }: GetListInput = {}) =>
-  useDataQuery<Dataset[]>({ key, params, isEnabled, errorMessage: 'An error occurred while loading datasets.' })
+  useDataQuery<Dataset[]>({
+    key,
+    params,
+    isEnabled,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while loading datasets.',
+  })
 
 export const useCreateDataset = () =>
-  useCreateMutation<Dataset, DatasetCreateApiData>({ key, errorMessage: 'An error occured while creating dataset' })
+  useCreateMutation<Dataset, DatasetCreateApiData>({
+    key,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occured while creating dataset',
+  })
 
 export const useUpdateDataset = () =>
   useUpdateMutation<Dataset, DatasetUpdateApiData>({
     method: 'PUT',
     key,
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occured while updating dataset',
   })
 
@@ -23,5 +35,13 @@ export const usePatchDataset = () =>
   useUpdateMutation<Dataset, DatasetUpdateApiData>({
     method: 'PATCH',
     key,
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occured while updating dataset',
+  })
+
+export const useDeleteDataset = () =>
+  useDeleteMutation({
+    key,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while deleting the dataset.',
   })

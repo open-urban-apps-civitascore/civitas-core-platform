@@ -71,6 +71,17 @@ logging:
     kafka: WARN
     org.hibernate: WARN
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+security:
+  permit-paths:
+    - /actuator/health/**
+    - /actuator/info
+
 model-atlas:
   baseUrl: "http://model-atlas:8080"
   scope: default

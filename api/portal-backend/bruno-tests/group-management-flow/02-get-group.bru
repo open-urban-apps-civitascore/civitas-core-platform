@@ -1,0 +1,23 @@
+meta {
+  name: Get Created Group
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/groups/{{createdGroupId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("should return the created group", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.id).to.equal(bru.getVar('createdGroupId'));
+    expect(res.body.name).to.equal("Test Flow Group");
+  });
+}

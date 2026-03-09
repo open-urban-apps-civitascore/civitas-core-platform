@@ -26,7 +26,9 @@
       "saveAndContinue": "Erstellen und weiter",
       "exit": "Beenden",
       "assignItem": "{item} hinzufügen",
-      "assignTo": "zu {item}"
+      "assignTo": "zu {item}",
+      "close": "Schließen",
+      "back": "Zurück"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -34,6 +36,7 @@
       "invalidNumber": "Bitte geben Sie eine gültige Zahl ein",
       "required": "Dieses Feld ist erforderlich",
       "atLeast2": "Die Eingabe muss mindestens 2 Zeichen lang sein.",
+      "atLeast3": "Die Eingabe muss mindestens 3 Zeichen lang sein.",
       "atLeast10": "Die Eingabe muss mindestens 10 Zeichen lang sein.",
       "atLeast1Value": "Mindestens ein Wert ist erforderlich.",
       "minChar": "Die Eingabe muss mindestens {amount} Zeichen lang sein.",
@@ -44,7 +47,7 @@
       "nameRequired": "Name ist erforderlich",
       "descriptionRequired": "Beschreibung ist erforderlich",
       "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
-      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden"
+      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden. Überprüfen Sie Ihre Eingaben."
     },
     "items": {
       "users": "Users",
@@ -58,6 +61,11 @@
       "datasources": "Datenquellen",
       "datasource": "Datenquelle",
       "datastructures": "Datenstrukturen"
+    },
+    "messages": {
+      "updateSuccess": "{item} wurde erfolgreich aktualisiert",
+      "createSuccess": "{item} wurde erfolgreich angelegt",
+      "deleteSuccess": "{item} wurde erfolgreich gelöscht"
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
@@ -174,7 +182,14 @@
     },
     "messages": {
       "createSuccess": "Datensatz wurde erfolgreich angelegt.",
-      "updateSuccess": "Datensatz wurde erfolgreich aktualisiert."
+      "updateSuccess": "Datensatz wurde erfolgreich aktualisiert.",
+      "deleteSuccess": "Datensatz wurde erfolgreich gelöscht.",
+      "deleteError": "Fehler beim Löschen des Datensatzes. Bitte versuche es erneut."
+    },
+    "warningModal": {
+      "title": "Datensatz löschen?",
+      "description": "Diese Aktion kann nicht rückgängig gemacht werden. Dies wird den Datensatz und alle zugehörigen Daten dauerhaft löschen.",
+      "confirm": "Löschen"
     }
   },
   "users": {
@@ -253,8 +268,8 @@
     },
     "details": {
       "baseInfo": "Basisinformationen",
-      "name": "Name der Gruppe",
-      "description": "Beschreibung der Gruppe",
+      "name": "Name",
+      "description": "Beschreibung",
       "contact": { "label": "Ansprechpartner", "placeholder": "Nach Name oder Email suchen" }
     },
     "roles": {
@@ -272,13 +287,23 @@
       "noUsers": "Keine User",
       "noUsersSub": "Keine User in dieser Gruppe enthalten",
       "removeUserModal": {
-        "title": "User aus Gruppe entfernen?",
-        "description": "Diese Aktion löst die Zuordnung zwischen dem User, der Gruppe und ihre Rollen-Zuordnung auf."
+        "title": "User wirklich aus Gruppe entfernen?",
+        "description": "Diese Aktion kann nicht rückgängig gemacht werden."
       }
     },
-    "messages": {
-      "createSuccess": "Gruppe wurde erfolgreich angelegt.",
-      "updateSuccess": "Gruppe wurde erfolgreich aktualisiert."
+    "errors": {
+      "createError": "Beim Anlegen der Gruppe ist ein Fehler aufgetreten",
+      "updateError": "Beim Aktualisieren der Gruppe ist ein Fehler aufgetreten",
+      "deleteError": "Beim Löschen der Gruppe ist ein Fehler aufgetreten",
+      "groupNameExists": "Der Gruppenname ist bereits vergeben. Bitte wählen sie einen anderen Namen."
+    },
+    "warningModal": {
+      "title": "Gruppe wirklich löschen?",
+      "description": "Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "infoModal": {
+      "title": "Gruppe kann nicht gelöscht werden",
+      "description": "Zuerst müssen alle Zuordnungen zu Usern, Rollen und Geltungsbereichen entfernt werden."
     }
   },
   "pagination": {
@@ -373,6 +398,16 @@
         "description": "Rolle löschen",
         "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
         "deleteButton": "Rolle löschen"
+      },
+      "deleteConfirmModal": {
+        "title": "Rolle wirklich löschen?",
+        "description": "Diese Aktion kann nicht rückgängig gemacht werden.",
+        "confirm": "Löschen"
+      },
+      "deleteErrorModal": {
+        "title": "Rolle kann nicht gelöscht werden",
+        "description": "Zuerst müssen alle Zuordnungen zu Gruppen und Geltungsbereichen entfernt werden.",
+        "close": "Schliessen"
       }
     },
     "permissionsTab": {
@@ -458,6 +493,18 @@
     "status": {
       "DRAFT": "Entwurf",
       "AVAILABLE": "Verfügbar"
+    },
+    "deleteModal": {
+      "title": "Datenquelle wirklich löschen?",
+      "description": "Diese Aktion löscht die Datenquelle endgültig. Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "availableModal": {
+      "title": "Datenquelle kann nicht gelöscht werden",
+      "description": "Diese Datenquelle hat den Status \"Verfügbar\" und kann nicht gelöscht werden. Bitte setzen Sie den Status zuerst auf \"Entwurf\"."
+    },
+    "errors": {
+      "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
+      "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)"
     },
     "connection": {
       "active": "aktiv",
@@ -668,7 +715,12 @@
         "validateBeforeSave": "Klicke auf Validieren vor dem Speichern",
         "validate": "Validieren",
         "save": "Speichern",
-        "saving": "Speichert..."
+        "saving": "Speichert...",
+        "loading": "Pipelines werden geladen...",
+        "pipelineSettings": "Pipeline-Einstellungen",
+        "deletePipeline": "Pipeline löschen",
+        "deleteConfirmTitle": "Pipeline löschen?",
+        "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
       },
       "tabs": {
         "closeTab": "Tab schließen",

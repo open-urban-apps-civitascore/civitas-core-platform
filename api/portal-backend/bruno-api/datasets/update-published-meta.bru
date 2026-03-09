@@ -1,0 +1,24 @@
+meta {
+  name: Update Published Dataset Meta
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/datasets/:id/published/meta
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "Updated Dataset Name",
+    "description": "Updated description for published dataset",
+    "openDataAccess": false,
+    "assignments": []
+  }
+}

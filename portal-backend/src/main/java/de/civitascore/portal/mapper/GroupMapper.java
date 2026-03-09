@@ -18,7 +18,6 @@ import org.mapstruct.ReportingPolicy;
 public interface GroupMapper extends DtoMapper<GroupInputDTO, GroupOutputDTO, Group> {
 
   @Mapping(target = "members", ignore = true) // Service resolves
-  @Mapping(target = "roles", ignore = true)
   @Mapping(target = "contactUser", ignore = true) // Service resolves from ID
   @Mapping(target = "parentGroup", ignore = true) // Service resolves
   @Mapping(target = "childGroups", ignore = true)
@@ -26,7 +25,7 @@ public interface GroupMapper extends DtoMapper<GroupInputDTO, GroupOutputDTO, Gr
   Group toEntity(GroupInputDTO input);
 
   @Mapping(target = "members", ignore = true) // Assembler enriches
-  @Mapping(target = "roles", ignore = true)
+  @Mapping(target = "assignments", ignore = true)
   @Mapping(target = "contactUser", ignore = true)
   @Mapping(target = "parentGroup", ignore = true)
   @Mapping(target = "childGroups", ignore = true)
@@ -42,7 +41,6 @@ public interface GroupMapper extends DtoMapper<GroupInputDTO, GroupOutputDTO, Gr
   GroupSummaryDTO toSummary(Group entity);
 
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
-  @Mapping(target = "roles", ignore = true)
   @Mapping(target = "members", ignore = true)
   @Mapping(target = "contactUser", ignore = true)
   @Mapping(target = "parentGroup", ignore = true)

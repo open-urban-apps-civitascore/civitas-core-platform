@@ -9,29 +9,28 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { cn } from '@/lib/utils'
 import { SelectOption } from '@/types/common'
 import { ConnectorType } from '@/types/connectors'
-import { ConnectorField, DatasourceFormDraft } from '@/types/datasources'
+import { DatasourceFormDraft } from '@/types/datasources'
 
-import { CONNECTORS } from './connectorSources'
+import { CONNECTOR_INPUTS } from './connectorSources'
 import { DynamicFormField } from './DynamicFormField'
 
 interface ConnectorTabProps {
   form: UseFormReturn<DatasourceFormDraft>
-  isDraftMode: boolean
-  onConnectorTypeChange: (connectorType: ConnectorType) => void
+  readyConnectorType?: ConnectorType
+  isReadOnly?: boolean
 }
 export const ConnectorTab = (props: ConnectorTabProps) => {
-  const { form, isDraftMode, onConnectorTypeChange } = props
+  const { form, readyConnectorType, isReadOnly = false } = props
   const t = useTranslations('datasources.connectorTab')
   const tCommon = useTranslations('common')
-  const connectorTypeOptions: SelectOption[] = Object.entries(CONNECTORS).map(([type, def]) => ({
+  const connectorTypeOptions: SelectOption[] = Object.keys(CONNECTOR_INPUTS).map(type => ({
     value: type as ConnectorType,
-    label: def.label,
+    label: type,
   }))
 
-  const connectorType = form.watch('connector.type')
   const connectorConfig = useMemo(
-    () => (connectorType ? (CONNECTORS[connectorType].properties as ConnectorField[]) : []),
-    [connectorType],
+    () => (readyConnectorType ? CONNECTOR_INPUTS[readyConnectorType] : []),
+    [readyConnectorType],
   )
 
   const getLabel = (label: { label: string; labelHint: string | null }) => {
@@ -48,11 +47,11 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
           form={form}
           id="connector-type"
           label={t('type')}
-          name="connector.type"
+          name="connectorType"
           options={connectorTypeOptions}
           formItemProps={{ className: 'py-6' }}
           required
-          onChange={(value: string) => onConnectorTypeChange(value as ConnectorType)}
+          disabled={isReadOnly}
         />
       </ContentCard>
 
@@ -62,15 +61,17 @@ export const ConnectorTab = (props: ConnectorTabProps) => {
           {connectorConfig.map(property => (
             <DynamicFormField<DatasourceFormDraft>
               key={property.key}
+              id={property.key}
               form={form}
               label={getLabel(property.label)}
-              name={`connector.config.${property.key}` as Path<DatasourceFormDraft>}
-              placeholder={property.placeholder}
+              name={`configuration.${property.key}` as Path<DatasourceFormDraft>}
+              placeholder={property.placeholder ?? ''}
               type={property.type}
               options={property.options?.map(option => ({ value: option, label: option }))}
-              shouldShowErrors={!isDraftMode}
+              shouldShowErrors
               required={property.required}
               className="py-3"
+              disabled={isReadOnly}
             />
           ))}
         </ContentCard>

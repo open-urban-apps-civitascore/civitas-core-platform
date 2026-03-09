@@ -15,13 +15,11 @@ import { useGetUsers } from '@/app/services/api/users/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-area/SearchArea'
-import { StatusLabel } from '@/components/status-label/StatusLabel'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Item2 } from '@/types/common'
 import { ListUser } from '@/types/users'
 import { isPageIndexHigherThanTotalPages, resolveUpdater } from '@/utils/table'
 import { mapListUsers } from '@/utils/users'
@@ -29,14 +27,14 @@ import { mapListUsers } from '@/utils/users'
 export type UserSelection = { selectAll: boolean; selectedIds: string[]; excludedIds: string[] }
 
 interface AssignUsersModalProps extends DialogProps {
-  originalUsers: Item2[]
+  assignedFormUsers: string[]
   groupTitle: string
-  onUpdateUsers: (userSelection: RowSelectionState) => void
+  onAssignUsers: (userSelection: RowSelectionState) => void
   isUpdating?: boolean
 }
 
 export const AssignUsersModal = (props: AssignUsersModalProps) => {
-  const { originalUsers, groupTitle, open, onOpenChange = () => {}, onUpdateUsers, isUpdating = false } = props
+  const { assignedFormUsers, groupTitle, open, onOpenChange = () => {}, onAssignUsers, isUpdating = false } = props
   const t = useTranslations('groups')
   const tCommon = useTranslations('common')
   const tUsers = useTranslations('users')
@@ -57,10 +55,10 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
   const users = useMemo(() => {
     if (usersData?.data && usersData?.data.length > 0) {
       const allUsers = mapListUsers(usersData?.data)
-      const unassignedUsers = allUsers.filter(user => !originalUsers.find(original => original.id === user.id))
+      const unassignedUsers = allUsers.filter(user => !assignedFormUsers.find(assignedUser => assignedUser === user.id))
       return unassignedUsers
     } else return []
-  }, [usersData?.data, originalUsers])
+  }, [usersData?.data, assignedFormUsers])
 
   const rowCount = usersData?.totalElements || 0
   const totalPages = Math.ceil(rowCount / pageSize)
@@ -132,10 +130,6 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.email')} />,
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor('active', {
-      header: tUsers('info.status.active'),
-      cell: info => <StatusLabel isChecked={info.getValue()} />,
-    }),
   ]
 
   const table = useReactTable({
@@ -188,7 +182,7 @@ export const AssignUsersModal = (props: AssignUsersModalProps) => {
         </div>
         <ActionButtons
           confirmButtonType="button"
-          onConfirmClick={() => onUpdateUsers(selection)}
+          onConfirmClick={() => onAssignUsers(selection)}
           onCancelClick={() => onOpenChange(false)}
           isConfirmButtonDisabled={isUpdating || isFetchingUsers}
           hasCard={false}

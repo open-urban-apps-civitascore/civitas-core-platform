@@ -1,0 +1,15 @@
+meta {
+  name: Get Permission by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/permissions/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{permissionId}}
+}

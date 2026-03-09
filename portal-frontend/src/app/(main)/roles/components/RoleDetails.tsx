@@ -13,12 +13,20 @@ import {
 } from '@/app/services/api/assignments/clientRequests'
 import { useCreateRole, useDeleteRole, useGetRole, useUpdateRole } from '@/app/services/api/roles/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
-import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { FormRole, Role, roleSchema, RoleTab } from '@/types/roles'
 
@@ -70,8 +78,15 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const [pendingPermissionIds, setPendingPermissionIds] = useState<string[]>([])
+  const tBaseInfo = useTranslations('roles.baseInfoTab')
+  const [hasPermissionsTabBeenSaved, setHasPermissionsTabBeenSaved] = useState<boolean>(false)
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [isDeleteErrorOpen, setIsDeleteErrorOpen] = useState(false)
 
-  const { data: roleData, isFetching: isLoadingRole } = useGetRole({ id: roleId || '', isEnabled: !!roleId })
+  const deleteRole = useDeleteRole()
+  const isRoleQueryEnabled = !!roleId && !deleteRole.isPending && !deleteRole.isSuccess
+
+  const { data: roleData, isFetching: isLoadingRole } = useGetRole({ id: roleId || '', isEnabled: isRoleQueryEnabled })
 
   // Fetch existing assignments for this role
   const assignmentsParams = new URLSearchParams(`roleId=${roleId}`)
@@ -89,7 +104,6 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const createRole = useCreateRole()
   const updateRole = useUpdateRole()
-  const deleteRole = useDeleteRole(roleId || '')
 
   const isLoading = isLoadingRole || createRole.isPending || updateRole.isPending || deleteRole.isPending
 
@@ -130,8 +144,12 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const isAnyDirty = form.formState.isDirty || arePermissionsDirty
 
   const handleDeleteRole = () => {
-    deleteRole.mutate(undefined, {
+    setIsDeleteConfirmOpen(false)
+    deleteRole.mutate(roleId || '', {
       onSuccess: () => router.push('/roles'),
+      onError: () => {
+        setIsDeleteErrorOpen(true)
+      },
     })
   }
 
@@ -218,7 +236,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     }
   }, [subTabValue, setSubTabValueParam, defaultSubTab])
 
-  const roleType = initialRole?.roleType || tabValue
+  const roleType = roleId ? initialRole?.roleType : tabValue || DEFAULT_TAB
   const badgeTitle = roleType ? tRoles(`${roleType.toLowerCase()}Roles`).slice(0, -1) : undefined
 
   // Header custom elements
@@ -268,7 +286,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
             form={form}
             isDefaultRole={isDefaultRole}
             isReadOnly={isReadOnly || isDefaultRole}
-            deleteRole={() => roleId && handleDeleteRole()}
+            deleteRole={() => roleId && setIsDeleteConfirmOpen(true)}
           />
         )}
 
@@ -292,13 +310,30 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         )}
       </PageBackground>
 
-      <ExitWarningModal
-        open={isExitModalOpen}
-        onOpenChange={() => setIsExitModalOpen(false)}
-        onDiscard={handleExit}
-        onConfirm={handleSave}
-        isLoading={isLoading}
+      <WarningModal
+        title={tBaseInfo('deleteConfirmModal.title')}
+        description={tBaseInfo('deleteConfirmModal.description')}
+        open={isDeleteConfirmOpen}
+        onOpenChange={setIsDeleteConfirmOpen}
+        onDiscard={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={handleDeleteRole}
+        confirmButtonTitle={tBaseInfo('deleteConfirmModal.confirm')}
+        isLoading={deleteRole.isPending}
       />
+
+      <Dialog open={isDeleteErrorOpen} onOpenChange={setIsDeleteErrorOpen}>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>{tBaseInfo('deleteErrorModal.title')}</DialogTitle>
+            <DialogDescription>{tBaseInfo('deleteErrorModal.description')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex sm:justify-end">
+            <Button type="button" onClick={() => setIsDeleteErrorOpen(false)}>
+              {tBaseInfo('deleteErrorModal.close')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   )
 }

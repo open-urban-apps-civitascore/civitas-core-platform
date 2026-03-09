@@ -1,0 +1,28 @@
+meta {
+  name: Patch Data Structure Version
+  type: http
+  seq: 15
+}
+
+patch {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  id: {{dataStructureVersionId}}
+}
+
+body:json {
+  {
+    "description": "Patched version description"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('dataStructureVersionId', res.body.id);
+  }
+}

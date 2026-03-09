@@ -1,0 +1,15 @@
+meta {
+  name: Publish Dataset
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/publish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}

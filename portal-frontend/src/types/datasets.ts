@@ -2,7 +2,7 @@ import { CheckedState } from '@radix-ui/react-checkbox'
 import { JSX } from 'react'
 import { z } from 'zod'
 
-import { Item2, STATUS_TYPES, WithId } from './common'
+import { ItemType, STATUS_TYPES, WithId } from './common'
 
 export const DATASET_STATUS_TYPES = {
   [STATUS_TYPES.DRAFT]: 'DRAFT',
@@ -71,8 +71,8 @@ export type DatasetUpdateApiData = z.infer<typeof DatasetUpdateApiSchema> & With
 
 export const DatasetBaseFormSchema = z.object({
   id: z.string(),
-  name: z.string(),
-  description: z.string(),
+  name: z.string().trim().min(3, 'common.errors.atLeast3'),
+  description: z.string().trim().min(1, 'common.errors.descriptionRequired'),
   openDataAccess: z.boolean(),
 })
 
@@ -81,14 +81,17 @@ export type DatasetBaseFormData = z.input<typeof DatasetBaseFormSchema>
 // ---------- Create Form ----------
 
 export const DatasetCreateFormSchema = z.object({
-  name: z.string().trim().min(1, 'common.errors.nameRequired'),
+  name: z.string().trim().min(3, 'common.errors.atLeast3'),
 })
 
 export type DatasetCreateFormData = z.input<typeof DatasetCreateFormSchema>
 
 // ---------- Draft Mode (minimal validation) ----------
 
-export const DatasetFormDraftSchema = DatasetBaseFormSchema.partial()
+export const DatasetFormDraftSchema = DatasetBaseFormSchema.partial().extend({
+  id: z.string(),
+  name: z.string().trim().min(3, 'common.errors.atLeast3'),
+})
 
 export type DatasetFormDraft = z.input<typeof DatasetFormDraftSchema>
 
@@ -96,7 +99,7 @@ export type DatasetFormDraft = z.input<typeof DatasetFormDraftSchema>
 
 export const DatasetFormAvailableSchema = z.object({
   id: z.string().min(1),
-  name: z.string().trim().min(2, 'common.errors.atLeast2'),
+  name: z.string().trim().min(2, 'common.errors.atLeast3'),
   description: z.string().trim().min(1, 'common.errors.descriptionRequired'),
   openDataAccess: z.boolean(),
 })
@@ -105,7 +108,7 @@ export type DatasetTableData = {
   id: string
   name: string
   modifiedAt: string
-  createdBy: Item2
+  createdBy: ItemType
   dataSetStatus: DatasetStatusTypes
 }
 

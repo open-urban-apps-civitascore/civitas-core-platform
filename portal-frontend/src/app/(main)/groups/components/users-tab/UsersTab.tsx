@@ -2,33 +2,37 @@
 
 import { RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import { toast } from 'sonner'
+import { UseFormReturn } from 'react-hook-form'
 
-import { usePatchGroup } from '@/app/services/api/groups/clientRequests'
 import { useGetUsers } from '@/app/services/api/users/clientRequests'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Group } from '@/types/groups'
+import { GroupBaseFormData } from '@/types/groups'
 import { mapGroupListUsers } from '@/utils/users'
 
 import { AssignUsersModal } from './AssignUsersModal'
 import { UsersTable } from './UsersTable'
 
 interface UsersTabProps {
-  groupData: Group
+  form: UseFormReturn<GroupBaseFormData>
+  originalUsers: string[]
+  isReadOnly: boolean
+  isUpdatingGroup: boolean
 }
 export const UsersTab = (props: UsersTabProps) => {
-  const { groupData } = props
+  const { form, originalUsers, isReadOnly, isUpdatingGroup } = props
   const t = useTranslations('groups')
   const tCommon = useTranslations('common')
-  const router = useRouter()
+  const [userToRemove, setUserToRemove] = useState<string | null>(null)
   const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false)
+  const [isRemoveUserWarningModalOpen, setIsRemoveUserWarningModalOpen] = useState(false)
 
   const {
     setSortingParams,
@@ -43,24 +47,24 @@ export const UsersTab = (props: UsersTabProps) => {
     totalPages,
   } = useQueryParams()
 
-  const originalUsers = useMemo(() => groupData.members || [], [groupData])
-  const shouldLoadUsers = originalUsers?.length > 0
+  const usersWatch = form.watch('members')
+  const nameWatch = form.watch('name')
+
+  const shouldLoadUsers = usersWatch.length > 0
   const userRequestParams = useMemo(() => {
     const params = new URLSearchParams(getApiRequestParamsByUrl())
-    originalUsers?.forEach(user => {
-      params.append('id', user.id)
+    usersWatch?.forEach(user => {
+      params.append('id', user)
     })
     return params
-  }, [getApiRequestParamsByUrl, originalUsers])
+  }, [getApiRequestParamsByUrl, usersWatch])
 
   const { data: usersData, isFetching: isFetchingUsers } = useGetUsers({
     params: userRequestParams,
     isEnabled: shouldLoadUsers,
   })
 
-  const updateGroup = usePatchGroup()
-
-  const isLoading = isFetchingUsers || updateGroup.isPending
+  const isLoading = isFetchingUsers || isUpdatingGroup
   const rowCount = usersData?.totalElements || 0
 
   useEffect(() => {
@@ -68,83 +72,84 @@ export const UsersTab = (props: UsersTabProps) => {
   }, [rowCount, setTotalPages, pageSize])
 
   const users = useMemo(
-    () => (isLoading ? [] : mapGroupListUsers(shouldLoadUsers && usersData?.data ? usersData?.data : [])),
-    [usersData?.data, isLoading, shouldLoadUsers],
+    () => mapGroupListUsers(shouldLoadUsers && usersData?.data ? usersData?.data : []),
+    [usersData?.data, shouldLoadUsers],
   )
 
-  // closes the user assignment modal after update
-  useEffect(() => {
-    if (!updateGroup.isPending) {
-      setIsAssignUsersOpen(false)
-    }
-  }, [updateGroup.isPending])
-
-  const handleUpdateGroupUsers = async (userSelection: RowSelectionState) => {
+  const handleAssignUsers = (userSelection: RowSelectionState) => {
     const selectedUserIds = Object.keys(userSelection).filter(key => userSelection[key])
-    const updateUserData = selectedUserIds.concat(originalUsers.map(user => user.id))
-    updateGroup.mutate(
-      { id: groupData.id, memberIds: updateUserData },
-      {
-        onSuccess: () => {
-          toast.success(t('messages.updateSuccess'))
-          router.refresh()
-        },
-        onError: () => toast.error(tCommon('errors.unexpectedError')),
-      },
-    )
+    const newUsers = Array.from(new Set([...usersWatch, ...selectedUserIds]))
+    form.setValue('members', newUsers, { shouldDirty: true })
+    setIsAssignUsersOpen(false)
+  }
+
+  const handleRemoveUser = () => {
+    const newUsers = usersWatch.filter(user => user !== userToRemove)
+    form.setValue('members', newUsers, { shouldDirty: true })
+    setIsRemoveUserWarningModalOpen(false)
+  }
+
+  const handleRemoveUserClick = (userId: string) => {
+    setUserToRemove(userId)
+    setIsRemoveUserWarningModalOpen(true)
   }
 
   const CustomElement = (
-    <Button onClick={() => setIsAssignUsersOpen(true)}>
+    <Button type="button" onClick={() => setIsAssignUsersOpen(true)}>
       <Plus />
       {t('users.assign')}
     </Button>
   )
 
-  if (!isLoading && users.length === 0 && originalUsers.length === 0) {
-    return (
-      <div className="h-full">
+  return (
+    <div className="h-full">
+      {isLoading && users.length === 0 && <LoadingSpinner className="h-full" />}
+      {!isLoading && users.length === 0 && originalUsers.length === 0 ? (
         <NoDataPage
           title={t('users.noUsers')}
           subTitle={t('users.noUsersSub')}
-          buttonText={t('users.assign')}
+          buttonText={!isReadOnly ? t('users.assign') : undefined}
           onButtonClick={() => setIsAssignUsersOpen(true)}
         />
-        <AssignUsersModal
-          isUpdating={updateGroup.isPending}
-          originalUsers={originalUsers}
-          groupTitle={groupData.name}
-          open={isAssignUsersOpen}
-          onOpenChange={setIsAssignUsersOpen}
-          onUpdateUsers={handleUpdateGroupUsers}
-        />
-      </div>
-    )
-  }
-
-  return (
-    <div className="h-full">
-      <SearchHeader searchString={search} onChangeSearchString={setSearchParam} customElement={CustomElement} />
-      <TableContainer>
-        <UsersTable
-          users={users}
-          rowCount={rowCount}
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          sorting={sorting}
-          totalPages={totalPages}
-          onSortingChange={setSortingParams}
-          onPaginationChange={setPaginationParams}
-          isLoading={isLoading}
-        />
-      </TableContainer>
+      ) : (
+        <>
+          <SearchHeader
+            searchString={search}
+            onChangeSearchString={setSearchParam}
+            customElement={!isReadOnly ? CustomElement : undefined}
+          />
+          <TableContainer>
+            <UsersTable
+              users={users}
+              rowCount={rowCount}
+              pageIndex={pageIndex}
+              pageSize={pageSize}
+              sorting={sorting}
+              totalPages={totalPages}
+              onSortingChange={setSortingParams}
+              onPaginationChange={setPaginationParams}
+              onRemoveUserClick={handleRemoveUserClick}
+              isLoading={isLoading}
+              isReadOnly={isReadOnly}
+            />
+            <WarningModal
+              open={isRemoveUserWarningModalOpen}
+              title={t('users.removeUserModal.title')}
+              description={t('users.removeUserModal.description')}
+              onConfirm={handleRemoveUser}
+              onDiscard={() => setIsRemoveUserWarningModalOpen(false)}
+              confirmButtonTitle={tCommon('actions.remove')}
+            />
+          </TableContainer>
+        </>
+      )}
       <AssignUsersModal
-        isUpdating={updateGroup.isPending}
-        originalUsers={originalUsers}
-        groupTitle={groupData.name}
+        isUpdating={isUpdatingGroup}
+        assignedFormUsers={usersWatch}
+        groupTitle={nameWatch}
         open={isAssignUsersOpen}
         onOpenChange={setIsAssignUsersOpen}
-        onUpdateUsers={handleUpdateGroupUsers}
+        onAssignUsers={handleAssignUsers}
       />
     </div>
   )
