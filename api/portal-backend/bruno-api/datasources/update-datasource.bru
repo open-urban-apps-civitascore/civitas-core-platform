@@ -40,5 +40,7 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('dataSourceId', res.body.id);
+    bru.setVar('scopeType', 'DATASOURCE');
+    bru.setVar('scopeId', res.body.id);
   }
 }
