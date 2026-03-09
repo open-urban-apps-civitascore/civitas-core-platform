@@ -82,7 +82,11 @@ export const useDatastructureVersion = ({
   const unpublishVersion = useUnpublishDatastructureVersion(datastructureId)
 
   const isLoading =
-    updateVersion.isPending || createVersion.isPending || publishVersion.isPending || unpublishVersion.isPending
+    updateVersion.isPending ||
+    createVersion.isPending ||
+    publishVersion.isPending ||
+    unpublishVersion.isPending ||
+    updatePublishedVersion.isPending
 
   const initialSession = useMemo(() => {
     const diagram = version?.styles || null
