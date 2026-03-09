@@ -93,6 +93,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
             <FormItem className={isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]'}>
               <FormLabel>{tRolesBaseInfo('form.inputs.roleOrigin')}</FormLabel>
               <Input
+                aria-label={tRolesBaseInfo('form.inputs.roleOrigin')}
                 value={isDefaultRole ? tRoles('defaultRole') : tRoles('customRole')}
                 disabled={true}
                 className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
