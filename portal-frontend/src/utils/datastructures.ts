@@ -1,6 +1,12 @@
+import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import {
   Datastructure,
   DatastructuresListData,
+  DatastructureVersion,
+  DatastructureVersionFormAvailableSchema,
+  DatastructureVersionFormData,
+  DatastructureVersionFormDraftSchema,
+  DatastructureVersionPutData,
   DatastructureVersionsListData,
   DatastructureVersionSummary,
 } from '@/types/datastructures'
@@ -46,3 +52,46 @@ export const mapDatastructureVersionsApiToListData = (
     status: version.dataStructureVersionStatus,
     source: version.dataStructureVersionSource,
   }))
+
+export const mapDatastructureVersionApiToFormData = (version: DatastructureVersion): DatastructureVersionFormData => ({
+  id: version.id,
+  version: version.version,
+  description: version.description || '',
+  dataStructureVersionStatus: version.dataStructureVersionStatus,
+  dataStructureVersionSource: version.dataStructureVersionSource,
+  modelAtlasUri: version.modelAtlasUri,
+  modelName: version.modelName,
+  nodes: version.styles?.nodes || [],
+  edges: version.styles?.edges || [],
+})
+
+export const mapDatastructureVersionFormToApiData = (
+  version: DatastructureVersionFormData,
+  sessionDiagram: UMLDiagram | null,
+  umlModel: string | null,
+): DatastructureVersionPutData => {
+  return {
+    id: version.id,
+    version: version.version,
+    description: version.description,
+    dataStructureVersionSource: version.dataStructureVersionSource,
+    dataStructureVersionStatus: version.dataStructureVersionStatus,
+    modelAtlasUri: version.modelAtlasUri,
+    modelName: version.modelName,
+    model: umlModel,
+    styles: sessionDiagram,
+  }
+}
+
+export const parseDatastructureVersionFormData = (
+  values: DatastructureVersionFormData,
+  isDraftMode: boolean,
+): DatastructureVersionFormData | undefined => {
+  const parsed = isDraftMode
+    ? DatastructureVersionFormDraftSchema.safeParse(values)
+    : DatastructureVersionFormAvailableSchema.safeParse(values)
+  if (!parsed.success) {
+    console.error(parsed.error)
+  }
+  return parsed.data
+}

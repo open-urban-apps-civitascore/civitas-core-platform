@@ -598,6 +598,7 @@
       "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available datastructure. Set the datastructure to draft first."
     },
     "errors": {
+      "creationError": "An error occurred while creating the datastructure version.",
       "versionAlreadyExists": "A version with the same version number already exists in this data structure."
     }
   },

@@ -167,7 +167,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   ) => {
     try {
       mutationFn.mutateAsync({ id: datastructureId })
-      toast.success(tCommon('info.statusChangeSuccess'))
+      toast.success(tCommon('success.statusChangeSuccess'))
     } catch (error) {
       toast.error(tCommon('errors.statusChangeError'))
       throw error

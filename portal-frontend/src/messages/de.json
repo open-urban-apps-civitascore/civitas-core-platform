@@ -588,6 +588,7 @@
       "isLastAvailableVersion": "Kann nicht auf Entwurf gesetzt werden, da dies die letzte verfügbare Version einer verfügbaren Datenstruktur ist. Setzen Sie zuerst die Datenstruktur auf Entwurf."
     },
     "errors": {
+      "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
       "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur."
     }
   },

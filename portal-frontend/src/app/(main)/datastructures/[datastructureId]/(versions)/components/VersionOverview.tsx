@@ -48,6 +48,12 @@ import { pickDirtyValues } from '@/utils/form'
 
 import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
 import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
+import {
+  mapDatastructureVersionApiToFormData,
+  mapDatastructureVersionFormToApiData,
+  parseDatastructureVersionFormData,
+} from '@/utils/datastructures'
+import { AxiosError } from 'axios'
 
 export const defaultFormData: DatastructureVersionFormData = {
   id: '',
@@ -59,36 +65,6 @@ export const defaultFormData: DatastructureVersionFormData = {
   modelName: null,
   nodes: [],
   edges: [],
-}
-
-const mapApiToFormData = (version: DatastructureVersion): DatastructureVersionFormData => ({
-  id: version.id,
-  version: version.version,
-  description: version.description || '',
-  dataStructureVersionStatus: version.dataStructureVersionStatus,
-  dataStructureVersionSource: version.dataStructureVersionSource,
-  modelAtlasUri: version.modelAtlasUri,
-  modelName: version.modelName,
-  nodes: version.styles?.nodes || [],
-  edges: version.styles?.edges || [],
-})
-
-const mapDatastructureVersionFormToApiData = (
-  version: DatastructureVersionFormData,
-  session: UMLDiagram | null,
-  umlModel: string | null,
-): DatastructureVersionPutData => {
-  return {
-    id: version.id,
-    version: version.version,
-    description: version.description,
-    dataStructureVersionSource: version.dataStructureVersionSource,
-    dataStructureVersionStatus: version.dataStructureVersionStatus,
-    modelAtlasUri: version.modelAtlasUri,
-    modelName: version.modelName,
-    model: umlModel,
-    styles: session,
-  }
 }
 
 const tabs: Tab<DatastructureVersionTab>[] = [
@@ -227,6 +203,8 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   // A version that is in use can not be set back to draft
   const isInUse = version?.inUse
+
+  // The last available version in an available datastructure can not be set back to draft
   const isLastAvailableVersionInAvailableDatastructure =
     isDatastructureAvailable &&
     !otherVersions.some(version => version.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE)
@@ -283,8 +261,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   ) => {
     try {
       await mutationFn.mutateAsync({ id: versionId })
-      toast.success(tCommon('info.statusChangeSuccess'))
-      router.refresh()
+      toast.success(tCommon('success.statusChangeSuccess'))
     } catch (error) {
       toast.error(tCommon('errors.statusChangeError'))
       throw error
@@ -294,25 +271,27 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const handleCreateVersion = (createData: DatastructureVersionCreateData) => {
     const isStausfieldDirty = form.formState.dirtyFields.dataStructureVersionStatus
     const shouldPublish = !!isStausfieldDirty && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+    setIsExitModalOpen(false)
     createVersion.mutate(createData, {
       onSuccess: async ({ data }) => {
         toast.success(t('messages.createSuccess'))
         if (shouldPublish) {
           try {
             await handleStatusUpdate(publishVersion, data.id)
+            router.push(
+              `/datastructures/${datastructureId}/${data.id}?mode=edit&${QUERY_PARAMS.subTabValue}=${subTabValue}`,
+            )
           } catch (error) {
             console.error(error)
           }
         } else {
-          setIsExitModalOpen(false)
           router.push(
             `/datastructures/${datastructureId}/${data.id}?mode=edit&${QUERY_PARAMS.subTabValue}=${subTabValue}`,
           )
         }
       },
       onError: () => {
-        toast.error(tCommon('errors.unexpectedError'))
-        setIsExitModalOpen(false)
+        toast.error(t('errors.creationError'))
       },
     })
   }
@@ -347,6 +326,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
       const shouldUpdateValues = (Object.keys(fieldsToUpdate) as (keyof DatastructureVersionFormData)[]).some(
         key => key !== 'dataStructureVersionStatus',
       )
+      setIsExitModalOpen(false)
       if (shouldUpdateValues) await handleUpdateValues(parsedValues)
 
       if (shouldPublish) {
@@ -357,25 +337,21 @@ export const VersionOverview = (props: VersionOverviewProps) => {
       }
       resetValues()
       router.refresh()
-    } catch (error) {
-      console.error('An error occurred while submitting datastructure version data.', error)
+    } catch (error: unknown) {
+      console.error('An error occurred while submitting datastructure version data.', (error as AxiosError).message)
     }
-    setIsExitModalOpen(false)
   }
 
   const handleSave = async () => {
-    const values = form.getValues()
-    const parsed = isDraftMode
-      ? DatastructureVersionFormDraftSchema.safeParse(values)
-      : DatastructureVersionFormAvailableSchema.safeParse(values)
-    if (!parsed.success) {
-      console.error(parsed.error)
+    const versionData = parseDatastructureVersionFormData(form.getValues(), isDraftMode)
+    if (!versionData) {
       toast.error(tCommon('errors.formInvalid'))
       return
     }
-    const diagram = nodesWatch.length > 0 ? modelSessionManager.activeSession?.diagram || null : null
-    const { model } = diagram ? buildUMLModelPayload(diagram, modelUri) : { model: null }
-    const payload = mapDatastructureVersionFormToApiData(parsed.data, diagram, model)
+
+    const sessionDiagram = nodesWatch.length > 0 ? activeSession?.diagram || null : null
+    const { model } = sessionDiagram ? buildUMLModelPayload(sessionDiagram, modelUri) : { model: null }
+    const payload = mapDatastructureVersionFormToApiData(versionData, sessionDiagram, model)
     if (isCreateMode) {
       // eslint-disable-next-line unused-imports/no-unused-vars
       const { id, ...createData } = payload
@@ -392,7 +368,6 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     form.reset(initialFormValues)
     setIsReadOnly(true)
     setIsExitModalOpen(false)
-    router.refresh()
   }
 
   const handleExitButtonClick = () => {
@@ -473,7 +448,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         }}
         customElement={isReadOnly ? EditButton : ActionButtonsAndStatusSwitch}
       />
-      {isLoading ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
+      {isLoading ? <LoadingSpinner className="h-full" /> : renderTabContent()}
 
       <ExitWarningModal
         open={isExitModalOpen}
