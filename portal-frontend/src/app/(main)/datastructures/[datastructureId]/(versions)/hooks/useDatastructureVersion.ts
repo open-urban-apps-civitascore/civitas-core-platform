@@ -115,6 +115,7 @@ export const useDatastructureVersion = ({
   const modelName = modelSessionManager.activeSession?.diagram.name
   const activeSession = modelSessionManager.activeSession
   const activeSessionId = modelSessionManager.activeSessionId
+  const shouldMarkModelFieldsDirty = !!activeSession?.isDirty
 
   const initialFormValues = useMemo(
     () => (version ? mapDatastructureVersionApiToFormData(version) : defaultDatastructureVersionFormData),
@@ -140,25 +141,25 @@ export const useDatastructureVersion = ({
   const modelUri = `http://civitas.org/model/${datastructureId}/${versionWatch}`
 
   useEffect(() => {
-    form.setValue('modelName', modelName || null, { shouldDirty: true })
-  }, [modelName, form])
+    form.setValue('modelName', modelName || null, { shouldDirty: shouldMarkModelFieldsDirty })
+  }, [modelName, form, shouldMarkModelFieldsDirty])
 
   useEffect(() => {
-    form.setValue('edges', edges || [], { shouldDirty: true })
-  }, [edges, form])
+    form.setValue('edges', edges || [], { shouldDirty: shouldMarkModelFieldsDirty })
+  }, [edges, form, shouldMarkModelFieldsDirty])
 
   /**
    * Set form values nodes and modelAtlasUri depending on the nodes amount in the diagram
    * If there are no nodes, the diagram is considered not existing, and modelAtlasUri gets set to null
    */
   useEffect(() => {
-    form.setValue('nodes', nodes || [], { shouldDirty: true })
+    form.setValue('nodes', nodes || [], { shouldDirty: shouldMarkModelFieldsDirty })
     const hasDiagram = nodes && nodes.length > 0
     const modelAtlasUriValue = hasDiagram ? modelUri : null
     form.setValue('modelAtlasUri', modelAtlasUriValue, {
-      shouldDirty: modelAtlasUriValue !== initialFormValues.modelAtlasUri,
+      shouldDirty: shouldMarkModelFieldsDirty,
     })
-  }, [nodes, form, modelUri, initialFormValues.modelAtlasUri])
+  }, [nodes, form, modelUri, shouldMarkModelFieldsDirty])
 
   /**
    * after closing the diagram, a new session gets created. This session is clean.
@@ -353,13 +354,21 @@ export const useDatastructureVersion = ({
     return undefined
   }, [isInUse, isLastAvailableVersionInAvailableDatastructure, t])
 
-  const isConfirmButtonDisabled = useMemo(
-    () => {
-      return !form.formState.isDirty || !!form.formState.errors.version || !!versionAlreadyExistsError || isLoading
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isLoading, statusWatch, formValues],
-  )
+  const dirtyFields = form.formState.dirtyFields
+  const hasMetadataChanges =
+    dirtyFields.version ||
+    dirtyFields.description ||
+    dirtyFields.dataStructureVersionSource ||
+    dirtyFields.dataStructureVersionStatus
+  const hasModelChanges = activeSession?.isDirty
+  const hasUserChanges = hasMetadataChanges || hasModelChanges
+
+  const isConfirmButtonDisabled =
+    !hasUserChanges ||
+    versionWatch.trim().length === 0 ||
+    !!form.formState.errors.version ||
+    !!versionAlreadyExistsError ||
+    isLoading
 
   return {
     activeSessionId,
