@@ -3,18 +3,24 @@ package de.civitascore.portal.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.GroupMapper;
+import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.input.GroupInputDTO;
+import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +29,7 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
   private final GroupRepository groupRepository;
   private final GroupMapper groupMapper;
   private final UserService userService;
+  private final AssignmentBuilderService assignmentBuilderService;
   private final ObjectMapper objectMapper;
 
   @Override
@@ -68,6 +75,18 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
     }
 
     return super.postConvertToEntity(entity, input);
+  }
+
+  @Transactional
+  public Group replaceAssignments(UUID groupId, List<AssignmentGroupInputDTO> assignmentInputs) {
+    Group group = findByIdOrThrow(groupId);
+
+    Set<Assignment> newAssignments =
+        assignmentInputs.stream().map(assignmentBuilderService::build).collect(Collectors.toSet());
+
+    group.setAssignments(newAssignments);
+
+    return save(group);
   }
 
   @Override
