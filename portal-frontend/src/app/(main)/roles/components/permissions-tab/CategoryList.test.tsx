@@ -8,7 +8,7 @@ import { PermissionItem } from '@/types/permissions'
 import { CategoryList } from './CategoryList'
 
 vi.mock('next-intl', () => ({
-  useTranslations: () => (key: string, params: { count: number }) => `${params.count} selected`,
+  useTranslations: () => (key: string, params?: { count: number }) => (params ? `${params.count} selected` : ''),
 }))
 
 describe('CategoryList', () => {
