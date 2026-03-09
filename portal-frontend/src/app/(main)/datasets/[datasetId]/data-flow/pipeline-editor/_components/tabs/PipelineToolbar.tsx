@@ -40,8 +40,18 @@ interface PipelineToolbarProps {
  */
 export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
-  const { pipeline, runValidation, savePipeline, isDirty, canSave, isValidationRequired, isSaving } =
-    useActivePipeline()
+  const {
+    pipeline,
+    runValidation,
+    savePipeline,
+    deletePipeline,
+    isDirty,
+    canSave,
+    isValidationRequired,
+    isSaving,
+    isDeleting,
+  } = useActivePipeline()
+
   const [shouldShowDeleteConfirm, setShouldShowDeleteConfirm] = useState(false)
 
   /**
