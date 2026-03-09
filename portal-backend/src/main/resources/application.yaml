@@ -108,6 +108,12 @@ springdoc:
     enabled: true
 
 
+# Security: paths permitted without authentication
+security:
+  permit-paths:
+    - /actuator/health/**
+    - /actuator/info
+
 model-atlas:
   baseUrl: "http://model-atlas:8080"
   scope: civitas

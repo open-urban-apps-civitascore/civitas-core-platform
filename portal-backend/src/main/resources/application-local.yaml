@@ -41,6 +41,17 @@ kafka:
   acks: all
   retries: 3
 
+# Security: add Swagger/API docs paths for local development
+security:
+  permit-paths:
+    - /actuator/health/**
+    - /actuator/info
+    - /api-docs/**
+    - /swagger-ui/**
+    - /swagger-ui.html
+    - /swagger-resources/**
+    - /webjars/**
+
 model-atlas:
   baseUrl: "http://localhost:8086"
   scope: civitas

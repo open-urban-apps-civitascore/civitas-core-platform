@@ -16,6 +16,7 @@
    - [Kafka Consumer](#24-kafka-consumer)
    - [Logging](#25-logging)
    - [OpenAPI / Swagger UI](#26-openapi--swagger-ui)
+   - [Security Permit Paths](#27-security-permit-paths)
 3. [Local Development Only](#3-local-development-only)
    - [Local Defaults](#31-local-defaults)
    - [Seed Data Profile (local-init)](#32-seed-data-profile-local-init)
@@ -140,6 +141,26 @@ Defaults are tuned for production. Only adjust for specific throughput/latency r
 | `springdoc.swagger-ui.enabled` | `true` | Set to `false` in production to hide API docs |
 | `springdoc.api-docs.path` | `/v2/api-docs` | OpenAPI JSON path |
 | `springdoc.swagger-ui.path` | `/swagger-ui.html` | Swagger UI path |
+
+---
+
+### 2.7 Security Permit Paths
+
+Paths that are accessible **without authentication**. Defined in `application.yaml` via `security.permit-paths` and bound to `SecurityProperties`.
+
+| Property | Default | Description |
+|---|---|---|
+| `security.permit-paths` | `/actuator/health/**`, `/actuator/info` | List of URL patterns permitted without JWT authentication |
+
+Production defaults to actuator endpoints only. The `local` profile adds Swagger/API docs paths (`/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html`, `/swagger-resources/**`, `/webjars/**`) via `application-local.yaml`.
+
+To add paths in a deployed environment, override with a comma-separated env var:
+
+```
+SECURITY_PERMIT_PATHS_0=/actuator/health/**
+SECURITY_PERMIT_PATHS_1=/actuator/info
+SECURITY_PERMIT_PATHS_2=/api-docs/**
+```
 
 ---
 
