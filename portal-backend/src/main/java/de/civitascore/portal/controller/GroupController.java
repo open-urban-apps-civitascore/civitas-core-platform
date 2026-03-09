@@ -13,7 +13,7 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -86,7 +86,7 @@ public class GroupController
 
   @PutMapping("/{groupId}/assignments")
   public ResponseEntity<GroupOutputDTO> replaceAssignments(
-      @PathVariable UUID groupId, @Valid @RequestBody List<AssignmentGroupInputDTO> assignments) {
+      @PathVariable UUID groupId, @Valid @RequestBody Set<AssignmentGroupInputDTO> assignments) {
     Group updated = groupService.replaceAssignments(groupId, assignments);
     GroupOutputDTO output = groupAssembler.toOutput(updated);
     return ResponseEntity.ok(output);

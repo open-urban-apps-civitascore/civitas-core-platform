@@ -11,7 +11,6 @@ import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -78,7 +77,7 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
   }
 
   @Transactional
-  public Group replaceAssignments(UUID groupId, List<AssignmentGroupInputDTO> assignmentInputs) {
+  public Group replaceAssignments(UUID groupId, Set<AssignmentGroupInputDTO> assignmentInputs) {
     Group group = findByIdOrThrow(groupId);
 
     Set<Assignment> newAssignments =

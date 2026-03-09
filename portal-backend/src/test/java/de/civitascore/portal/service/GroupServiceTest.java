@@ -19,6 +19,7 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -82,7 +83,7 @@ class GroupServiceTest {
       when(assignmentBuilderService.build(input)).thenReturn(newAssignment);
       when(groupRepository.save(group)).thenReturn(group);
 
-      Group result = groupService.replaceAssignments(groupId, List.of(input));
+      Group result = groupService.replaceAssignments(groupId, Set.of(input));
 
       assertThat(result).isEqualTo(group);
       assertThat(result.getAssignments()).containsExactly(newAssignment);
@@ -95,8 +96,38 @@ class GroupServiceTest {
       UUID groupId = UUID.randomUUID();
       when(groupRepository.findByIdWithRelations(groupId)).thenReturn(Optional.empty());
 
-      assertThatThrownBy(() -> groupService.replaceAssignments(groupId, List.of()))
+      assertThatThrownBy(() -> groupService.replaceAssignments(groupId, Set.of()))
           .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("Should silently discard duplicate assignments in input")
+    void shouldDiscardDuplicateAssignments() {
+      UUID groupId = UUID.randomUUID();
+      UUID roleId = UUID.randomUUID();
+      Role role = createRole(roleId, RoleType.DATA);
+
+      Group group = new Group();
+      group.setId(groupId);
+      group.setName("Test Group");
+      group.setAssignments(new HashSet<>());
+
+      Assignment newAssignment = createExistingAssignment(role, ScopeType.TENANT);
+
+      AssignmentGroupInputDTO input1 = new AssignmentGroupInputDTO();
+      input1.setRoleId(roleId);
+      input1.setScopeType(ScopeType.TENANT);
+
+      when(groupRepository.findByIdWithRelations(groupId)).thenReturn(Optional.of(group));
+      when(assignmentBuilderService.build(input1)).thenReturn(newAssignment);
+      when(groupRepository.save(group)).thenReturn(group);
+
+      // input1 appears twice but Set deduplicates, so only one assignment is created
+      Set<AssignmentGroupInputDTO> inputs = new HashSet<>(List.of(input1, input1));
+      Group result = groupService.replaceAssignments(groupId, inputs);
+
+      assertThat(result.getAssignments()).hasSize(1);
+      verify(groupRepository).save(group);
     }
 
     @Test
@@ -115,7 +146,7 @@ class GroupServiceTest {
       when(groupRepository.findByIdWithRelations(groupId)).thenReturn(Optional.of(group));
       when(groupRepository.save(group)).thenReturn(group);
 
-      Group result = groupService.replaceAssignments(groupId, List.of());
+      Group result = groupService.replaceAssignments(groupId, Set.of());
 
       assertThat(result.getAssignments()).isEmpty();
       verify(groupRepository).save(any(Group.class));
