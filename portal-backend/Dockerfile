@@ -29,7 +29,7 @@ ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.securit
 
 # Health check with correct endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8089/v2/actuator/health || exit 1
+    CMD curl -f http://localhost:8089/v1/actuator/health || exit 1
 
 # Run the application
 CMD ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
