@@ -36,7 +36,7 @@ class GroupServiceTest {
   @Mock private GroupRepository groupRepository;
   @Mock private GroupMapper groupMapper;
   @Mock private UserService userService;
-  @Mock private AssignmentBuilderService assignmentBuilderService;
+  @Mock private AssignmentFactory assignmentFactory;
   @Mock private ObjectMapper objectMapper;
 
   @InjectMocks private GroupService groupService;
@@ -80,7 +80,7 @@ class GroupServiceTest {
       input.setScopeType(ScopeType.TENANT);
 
       when(groupRepository.findByIdWithRelations(groupId)).thenReturn(Optional.of(group));
-      when(assignmentBuilderService.build(input)).thenReturn(newAssignment);
+      when(assignmentFactory.build(input)).thenReturn(newAssignment);
       when(groupRepository.save(group)).thenReturn(group);
 
       Group result = groupService.replaceAssignments(groupId, Set.of(input));
@@ -119,7 +119,7 @@ class GroupServiceTest {
       input1.setScopeType(ScopeType.TENANT);
 
       when(groupRepository.findByIdWithRelations(groupId)).thenReturn(Optional.of(group));
-      when(assignmentBuilderService.build(input1)).thenReturn(newAssignment);
+      when(assignmentFactory.build(input1)).thenReturn(newAssignment);
       when(groupRepository.save(group)).thenReturn(group);
 
       // input1 appears twice but Set deduplicates, so only one assignment is created

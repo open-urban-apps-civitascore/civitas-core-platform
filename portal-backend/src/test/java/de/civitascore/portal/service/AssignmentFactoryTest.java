@@ -33,8 +33,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AssignmentBuilderService Tests")
-class AssignmentBuilderServiceTest {
+@DisplayName("AssignmentFactory Tests")
+class AssignmentFactoryTest {
 
   @Mock private GroupRepository groupRepository;
   @Mock private RoleRepository roleRepository;
@@ -42,7 +42,7 @@ class AssignmentBuilderServiceTest {
   @Mock private DataStructureRepository dataStructureRepository;
   @Mock private DataSourceRepository dataSourceRepository;
 
-  @InjectMocks private AssignmentBuilderService assignmentBuilderService;
+  @InjectMocks private AssignmentFactory assignmentFactory;
 
   private Group createGroup(UUID id) {
     Group group = new Group();
@@ -74,7 +74,7 @@ class AssignmentBuilderServiceTest {
       dto.setRoleId(roleId);
       dto.setScopeType(ScopeType.TENANT);
 
-      Assignment result = assignmentBuilderService.build(dto);
+      Assignment result = assignmentFactory.build(dto);
 
       assertThat(result.getRole()).isEqualTo(role);
       assertThat(result.getScopeType()).isEqualTo(ScopeType.TENANT);
@@ -98,7 +98,7 @@ class AssignmentBuilderServiceTest {
       dto.setScopeType(ScopeType.DATASET);
       dto.setScopeId(scopeId);
 
-      Assignment result = assignmentBuilderService.build(dto);
+      Assignment result = assignmentFactory.build(dto);
 
       assertThat(result.getRole()).isEqualTo(role);
       assertThat(result.getScopeType()).isEqualTo(ScopeType.DATASET);
@@ -115,7 +115,7 @@ class AssignmentBuilderServiceTest {
       AssignmentGroupInputDTO dto = new AssignmentGroupInputDTO();
       dto.setRoleId(roleId);
 
-      Assignment result = assignmentBuilderService.build(dto);
+      Assignment result = assignmentFactory.build(dto);
 
       assertThat(result.getRole()).isEqualTo(role);
       assertThat(result.getScopeType()).isNull();
@@ -133,7 +133,7 @@ class AssignmentBuilderServiceTest {
       dto.setScopeType(ScopeType.DATASET);
       dto.setScopeId(UUID.randomUUID());
 
-      assertThatThrownBy(() -> assignmentBuilderService.build(dto))
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("SYSTEM roles cannot be scoped");
     }
@@ -143,7 +143,7 @@ class AssignmentBuilderServiceTest {
     void shouldThrowWhenRoleIdIsNull() {
       AssignmentGroupInputDTO dto = new AssignmentGroupInputDTO();
 
-      assertThatThrownBy(() -> assignmentBuilderService.build(dto))
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("roleId is required");
     }
@@ -157,7 +157,7 @@ class AssignmentBuilderServiceTest {
       AssignmentGroupInputDTO dto = new AssignmentGroupInputDTO();
       dto.setRoleId(roleId);
 
-      assertThatThrownBy(() -> assignmentBuilderService.build(dto))
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
           .isInstanceOf(ResourceNotFoundException.class)
           .hasMessageContaining("Role");
     }
@@ -188,7 +188,7 @@ class AssignmentBuilderServiceTest {
       dto.setScopeType(ScopeType.DATASOURCE);
       dto.setScopeId(scopeId);
 
-      Assignment result = assignmentBuilderService.build(dto);
+      Assignment result = assignmentFactory.build(dto);
 
       assertThat(result.getGroup()).isEqualTo(group);
       assertThat(result.getRole()).isEqualTo(role);
@@ -202,7 +202,7 @@ class AssignmentBuilderServiceTest {
       AssignmentInputDTO dto = new AssignmentInputDTO();
       dto.setRoleId(UUID.randomUUID());
 
-      assertThatThrownBy(() -> assignmentBuilderService.build(dto))
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("groupId is required");
     }
@@ -218,7 +218,7 @@ class AssignmentBuilderServiceTest {
       dto.setGroupId(groupId);
       dto.setRoleId(UUID.randomUUID());
 
-      assertThatThrownBy(() -> assignmentBuilderService.build(dto))
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
           .isInstanceOf(ResourceNotFoundException.class)
           .hasMessageContaining("Group");
     }
@@ -238,7 +238,7 @@ class AssignmentBuilderServiceTest {
       dto.setGroupId(groupId);
       dto.setRoleId(roleId);
 
-      Assignment result = assignmentBuilderService.build(dto);
+      Assignment result = assignmentFactory.build(dto);
 
       assertThat(result.getGroup()).isEqualTo(group);
       assertThat(result.getRole()).isEqualTo(role);
@@ -265,7 +265,7 @@ class AssignmentBuilderServiceTest {
       dto.setGroupId(groupId);
       dto.setRoleId(roleId);
 
-      Assignment result = assignmentBuilderService.build(dto);
+      Assignment result = assignmentFactory.build(dto);
 
       assertThat(result.getGroup()).isEqualTo(group);
       assertThat(result.getRole()).isEqualTo(role);
@@ -287,7 +287,7 @@ class AssignmentBuilderServiceTest {
       dto.setGroupId(groupId);
       dto.setRoleId(roleId);
 
-      assertThatThrownBy(() -> assignmentBuilderService.build(dto))
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("SYSTEM roles cannot be scoped");
     }
@@ -314,7 +314,7 @@ class AssignmentBuilderServiceTest {
       dto.setScopeType(ScopeType.DATASTRUCTURE);
       dto.setScopeId(scopeId);
 
-      Assignment result = assignmentBuilderService.build(dto);
+      Assignment result = assignmentFactory.build(dto);
 
       assertThat(result.getDataStructure()).isEqualTo(dataStructure);
       assertThat(result.getScopeType()).isEqualTo(ScopeType.DATASTRUCTURE);
@@ -335,7 +335,7 @@ class AssignmentBuilderServiceTest {
       dto.setScopeType(ScopeType.DATASET);
       dto.setScopeId(scopeId);
 
-      assertThatThrownBy(() -> assignmentBuilderService.build(dto))
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
           .isInstanceOf(ResourceNotFoundException.class)
           .hasMessageContaining("DataSet");
     }
@@ -353,7 +353,7 @@ class AssignmentBuilderServiceTest {
       dto.setScopeType(ScopeType.DATASPACE);
       dto.setScopeId(UUID.randomUUID());
 
-      assertThatThrownBy(() -> assignmentBuilderService.build(dto))
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("not available in this release");
     }
@@ -371,7 +371,7 @@ class AssignmentBuilderServiceTest {
       dto.setScopeType(ScopeType.CATALOG);
       dto.setScopeId(UUID.randomUUID());
 
-      assertThatThrownBy(() -> assignmentBuilderService.build(dto))
+      assertThatThrownBy(() -> assignmentFactory.build(dto))
           .isInstanceOf(InvalidInputException.class)
           .hasMessageContaining("not available in this release");
     }

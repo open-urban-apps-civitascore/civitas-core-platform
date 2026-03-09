@@ -18,7 +18,7 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
 
   private final AssignmentRepository assignmentRepository;
   private final AssignmentMapper assignmentMapper;
-  private final AssignmentBuilderService assignmentBuilderService;
+  private final AssignmentFactory assignmentFactory;
 
   @Override
   protected AssignmentRepository getRepository() {
@@ -59,7 +59,7 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
 
   @Override
   protected Assignment postConvertToEntity(Assignment entity, AssignmentInputDTO input) {
-    return assignmentBuilderService.build(entity, input);
+    return assignmentFactory.build(entity, input);
   }
 
   /**

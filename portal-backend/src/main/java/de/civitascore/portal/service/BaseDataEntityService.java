@@ -10,14 +10,14 @@ public abstract class BaseDataEntityService<
         E extends BaseDataEntity, I extends BaseDataEntityInputDTO>
     extends BaseService<E, I> {
 
-  protected abstract AssignmentBuilderService getAssignmentBuilderService();
+  protected abstract AssignmentFactory getAssignmentFactory();
 
   @Override
   protected E postConvertToEntity(E entity, I input) {
     if (input.getAssignments() != null) {
       Set<Assignment> assignments =
           input.getAssignments().stream()
-              .map(dto -> getAssignmentBuilderService().build(dto))
+              .map(dto -> getAssignmentFactory().build(dto))
               .collect(Collectors.toSet());
       entity.setAssignments(assignments);
     }

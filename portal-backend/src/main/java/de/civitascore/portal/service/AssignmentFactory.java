@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class AssignmentBuilderService {
+public class AssignmentFactory {
 
   private final GroupRepository groupRepository;
   private final RoleRepository roleRepository;

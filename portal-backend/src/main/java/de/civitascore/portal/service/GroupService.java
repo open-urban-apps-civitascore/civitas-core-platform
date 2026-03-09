@@ -28,7 +28,7 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
   private final GroupRepository groupRepository;
   private final GroupMapper groupMapper;
   private final UserService userService;
-  private final AssignmentBuilderService assignmentBuilderService;
+  private final AssignmentFactory assignmentFactory;
   private final ObjectMapper objectMapper;
 
   @Override
@@ -81,7 +81,7 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
     Group group = findByIdOrThrow(groupId);
 
     Set<Assignment> newAssignments =
-        assignmentInputs.stream().map(assignmentBuilderService::build).collect(Collectors.toSet());
+        assignmentInputs.stream().map(assignmentFactory::build).collect(Collectors.toSet());
 
     group.setAssignments(newAssignments);
 
