@@ -101,9 +101,31 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     const { id, ...createGroupData } = mapGroupFormToApiData(formData)
     createGroup.mutate(createGroupData, {
       onSuccess: ({ data }) => {
-        toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
-        setIsNavigating(true)
-        router.push(`/groups/${data.id}?mode=edit`)
+        const navigateToGroup = () => {
+          setIsNavigating(true)
+          router.push(`/groups/${data.id}?mode=edit`)
+        }
+
+        if (formData.assignments.length > 0) {
+          replaceAssignments.mutate(
+            { groupId: data.id, assignments: formData.assignments },
+            {
+              onSuccess: () => {
+                toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
+                navigateToGroup()
+              },
+              onError: (error: unknown) => {
+                toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
+                toast.error(t('errors.updateError'))
+                console.error('Failed to save assignments', error)
+                navigateToGroup()
+              },
+            },
+          )
+        } else {
+          toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
+          navigateToGroup()
+        }
       },
       onError: (error: unknown) => handleGroupRequestError(error, 'errors.createError'),
     })
@@ -115,14 +137,15 @@ export const GroupOverview = (props: GroupDetailsProps) => {
         replaceAssignments.mutate(
           { groupId: data.id, assignments: formData.assignments },
           {
-            onSuccess: () => {
+            onSuccess: ({ data: assignmentData }) => {
               toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.group') }))
-              setInitialGroupData(data)
+              setInitialGroupData(assignmentData)
               setPendingRoles([])
               setIsExitModalOpen(false)
             },
             onError: (error: unknown) => {
               toast.error(t('errors.updateError'))
+              setInitialGroupData(data)
               console.error('Failed to save assignments', error)
             },
           },

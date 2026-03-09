@@ -77,8 +77,8 @@ export const RolesTab = (props: RolesTabProps) => {
         const role = pendingRoles.find(r => r.id === fa.roleId)
         return {
           id: `pending-${fa.roleId}`,
-          createdAt: new Date().toISOString(),
-          modifiedAt: new Date().toISOString(),
+          createdAt: '',
+          modifiedAt: '',
           group: { id: fa.groupId, name: groupData.name },
           role: {
             id: fa.roleId,

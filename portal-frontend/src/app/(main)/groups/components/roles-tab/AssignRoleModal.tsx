@@ -57,7 +57,8 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
     return rolesData.data.filter(role => !assignedRoleIds.includes(role.id))
   }, [rolesData?.data, assignedRoleIds])
 
-  const rowCount = rolesData?.totalElements || 0
+  const filteredOutCount = (rolesData?.data?.length ?? 0) - roles.length
+  const rowCount = (rolesData?.totalElements || 0) - filteredOutCount
   const totalPages = Math.ceil(rowCount / pageSize)
 
   useEffect(() => {
@@ -202,7 +203,7 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
           confirmButtonType="button"
           onConfirmClick={handleAssign}
           onCancelClick={() => onOpenChange(false)}
-          isConfirmButtonDisabled={isFetchingRoles || Object.keys(selection).length === 0}
+          isConfirmButtonDisabled={isFetchingRoles || !Object.values(selection).some(Boolean)}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.add')}
         />
