@@ -111,7 +111,7 @@ test_user_context_fetched_with_header if {
 		with data.config as mock_http.mock_config
 		with input as {"request": {
 			"method": "GET",
-			"path": "/v2/users",
+			"path": "/v1/users",
 			"headers": {"x-userinfo": mock_http.encode_userinfo("keycloak-sub-123")},
 		}}
 	ctx.userId == "user-123"
@@ -125,7 +125,7 @@ test_user_context_with_only_external_id if {
 		with data.config as mock_http.mock_config
 		with input as {"request": {
 			"method": "GET",
-			"path": "/v2/users",
+			"path": "/v1/users",
 			"headers": {"x-userinfo": mock_http.encode_userinfo("keycloak-sub-456")},
 		}}
 	ctx.externalId == "keycloak-sub-456"
@@ -137,7 +137,7 @@ test_user_context_source_is_fetched if {
 		with data.config as mock_http.mock_config
 		with input as {"request": {
 			"method": "GET",
-			"path": "/v2/users",
+			"path": "/v1/users",
 			"headers": {"x-userinfo": mock_http.encode_userinfo("keycloak-sub-123")},
 		}}
 	source == "fetched"
@@ -147,7 +147,7 @@ test_user_context_source_is_fetched if {
 test_user_context_undefined_without_header if {
 	not user_context_fetcher.user_context with input as {"request": {
 		"method": "GET",
-		"path": "/v2/users",
+		"path": "/v1/users",
 		"headers": {},
 	}}
 }
@@ -273,7 +273,7 @@ test_fetch_uncached_path if {
 		with data.config as mock_http.mock_config
 		with input as {"request": {
 			"method": "GET",
-			"path": "/v2/users",
+			"path": "/v1/users",
 			"headers": {"x-userinfo": mock_http.encode_userinfo("keycloak-sub-123")},
 		}}
 	ctx.userId == "user-123"
@@ -286,7 +286,7 @@ test_fetch_cached_path if {
 		with data.config as cached_config
 		with input as {"request": {
 			"method": "GET",
-			"path": "/v2/users",
+			"path": "/v1/users",
 			"headers": {"x-userinfo": mock_http.encode_userinfo("keycloak-sub-123")},
 		}}
 	ctx.userId == "user-123"

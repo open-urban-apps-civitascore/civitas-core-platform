@@ -22,7 +22,7 @@ authz/rego/
 │   └── resource_mapping.rego    # Dispatcher: routes to backend providers
 │
 ├── lib/                         # Shared libraries
-│   └── genericrestmapper.rego   # Reusable REST path parsing (/v2/resource/{id})
+│   └── genericrestmapper.rego   # Reusable REST path parsing (/v1/resource/{id})
 │
 ├── providers/                   # Backend-specific implementations
 │   ├── portal_backend.rego      # Portal Backend API (REST)
@@ -91,7 +91,7 @@ OPA reads `input.service.name` to dispatch to the correct provider.
 ### Why This Architecture?
 
 **Problem**: Different backends have different URL patterns:
-- Portal Backend: REST style `/v2/users/123`
+- Portal Backend: REST style `/v1/users/123`
 - FROST Server: OData style `/v1.1/Things(123)/Datastreams`
 
 **Solution**: Provider pattern with shared library:
@@ -146,7 +146,7 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision \
     "input": {
       "request": {
         "method": "GET",
-        "path": "/v2/users",
+        "path": "/v1/users",
         "headers": {}
       },
       "service": {"name": "portal-backend"}
