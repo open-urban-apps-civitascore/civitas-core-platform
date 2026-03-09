@@ -9,7 +9,7 @@ info:
     name: CIVITAS CORE Team
   version: 2.0.0
 servers:
-- url: http://localhost:8089/v2
+- url: http://localhost:8089/v1
   description: Local development
 tags:
 - name: Users
