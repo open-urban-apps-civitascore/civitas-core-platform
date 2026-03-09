@@ -23,6 +23,16 @@ spring:
           # Token issuer validation
           issuer-uri: "${keycloak.issuer-uri}/realms/${keycloak.realm}"
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  data:
+    web:
+      pageable:
+        max-page-size: 200
+
   # Kafka Configuration
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
@@ -97,6 +107,12 @@ springdoc:
     path: /swagger-ui.html
     enabled: true
 
+
+# Security: paths permitted without authentication
+security:
+  permit-paths:
+    - /actuator/health/**
+    - /actuator/info
 
 model-atlas:
   baseUrl: "http://model-atlas:8080"

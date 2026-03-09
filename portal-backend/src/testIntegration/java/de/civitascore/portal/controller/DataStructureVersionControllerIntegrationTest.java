@@ -356,7 +356,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should roll back create when Model Atlas upload fails")
+    @DisplayName("Should return 502 and roll back create when Model Atlas upload fails")
     void shouldRollBackCreateWhenModelAtlasUploadFails() {
       String expectedPath =
           String.format(
@@ -382,7 +382,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
               new HttpEntity<>(input, createAuthHeaders()),
               String.class);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
 
       List<DataStructureVersion> versions = dataStructureVersionRepository.findAll();
       assertThat(versions).noneMatch(v -> "3.0.0".equals(v.getVersion()));
@@ -699,7 +699,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should roll back update when Model Atlas upload fails")
+    @DisplayName("Should return 502 and roll back update when Model Atlas upload fails")
     void shouldRollBackUpdateWhenModelAtlasUploadFails() {
       String expectedPath =
           String.format(
@@ -725,7 +725,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
               new HttpEntity<>(input, createAuthHeaders()),
               String.class);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
 
       // Stub download for the verification GET (version1 rolled back to original modelAtlasUri)
       stubModelDownload("https://modelatlas.example.com/model1");

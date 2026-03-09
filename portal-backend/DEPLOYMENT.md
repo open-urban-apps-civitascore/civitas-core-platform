@@ -16,6 +16,7 @@
    - [Kafka Consumer](#24-kafka-consumer)
    - [Logging](#25-logging)
    - [OpenAPI / Swagger UI](#26-openapi--swagger-ui)
+   - [Security Permit Paths](#27-security-permit-paths)
 3. [Local Development Only](#3-local-development-only)
    - [Local Defaults](#31-local-defaults)
    - [Seed Data Profile (local-init)](#32-seed-data-profile-local-init)
@@ -30,12 +31,12 @@
 
 | Property / Env Var | Example Value | Description |
 |---|---|---|
-| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://postgres:5432/portal_backend` | JDBC connection URL |
+| `SPRING_DATASOURCE_URL` | `jdbc:postgresql://postgres:5432/portal_backend?sslmode=require` | JDBC connection URL |
 | `SPRING_DATASOURCE_USERNAME` | `admin` | Database username |
 | `SPRING_DATASOURCE_PASSWORD` | `secret` | Database password |
 | `CIVITAS_MASTER_KEY` | `0000...0000` (64 hex chars) | 256-bit master key for credential encryption, hex-encoded. Shared with config-adapter. Stretched via PBKDF2 at startup; per-credential keys derived via HKDF-Expand. |
 
-> `application-postgres.yaml` defaults to `localhost:5432 / admin / admin` — always override in production.
+> `application-postgres.yaml` defaults to `localhost:5432 / admin / admin` with `sslmode=require` — always override `SPRING_DATASOURCE_URL` in production with your actual host and credentials.
 > `application-local.yaml` sets a fallback value for `CIVITAS_MASTER_KEY` — never use it in production.
 
 ---
@@ -143,6 +144,26 @@ Defaults are tuned for production. Only adjust for specific throughput/latency r
 
 ---
 
+### 2.7 Security Permit Paths
+
+Paths that are accessible **without authentication**. Defined in `application.yaml` via `security.permit-paths` and bound to `SecurityProperties`.
+
+| Property | Default | Description |
+|---|---|---|
+| `security.permit-paths` | `/actuator/health/**`, `/actuator/info` | List of URL patterns permitted without JWT authentication |
+
+Production defaults to actuator endpoints only. The `local` profile adds Swagger/API docs paths (`/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html`, `/swagger-resources/**`, `/webjars/**`) via `application-local.yaml`.
+
+To add paths in a deployed environment, override with a comma-separated env var:
+
+```
+SECURITY_PERMIT_PATHS_0=/actuator/health/**
+SECURITY_PERMIT_PATHS_1=/actuator/info
+SECURITY_PERMIT_PATHS_2=/api-docs/**
+```
+
+---
+
 ## 3. Local Development Only
 
 ### 3.1 Local Defaults
@@ -211,7 +232,7 @@ environment:
   SPRING_PROFILES_ACTIVE: postgres
 
   # Database
-  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/portal_backend
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/portal_backend?sslmode=require
   SPRING_DATASOURCE_USERNAME: portal_user
   SPRING_DATASOURCE_PASSWORD: <secret>
 

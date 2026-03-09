@@ -88,24 +88,27 @@ public class KafkaCloudEventPublisher implements CloudEventPublisher {
               resultEvent.operation(),
               resultEvent.resourceId());
           future.complete(resultEvent);
+        } else {
+          log.error(
+              "Config Adapter FAILURE: messageId={}, operation={}, error={}, message={}",
+              originalMessageId,
+              resultEvent.operation(),
+              resultEvent.errorCode(),
+              resultEvent.message());
+          future.completeExceptionally(
+              new CloudPublishException(
+                  "Config Adapter processing failed: "
+                      + resultEvent.message()
+                      + " (errorCode="
+                      + resultEvent.errorCode()
+                      + ")"));
         }
       } else {
-        log.error(
-            "Config Adapter FAILURE: messageId={}, operation={}, error={}, message={}",
-            originalMessageId,
-            resultEvent.operation(),
-            resultEvent.errorCode(),
-            resultEvent.message());
-        future.completeExceptionally(
-            new CloudPublishException(
-                "Config Adapter processing failed: "
-                    + resultEvent.message()
-                    + " (errorCode="
-                    + resultEvent.errorCode()
-                    + ")"));
+        log.warn(
+            "Received result for unknown messageId={} (may have timed out)", originalMessageId);
       }
     } else {
-      log.warn("Received result for unknown messageId={} (may have timed out)", originalMessageId);
+      log.warn("Received Config Adapter result with null messageId — ignoring");
     }
   }
 

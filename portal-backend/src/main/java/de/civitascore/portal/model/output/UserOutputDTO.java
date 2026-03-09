@@ -14,7 +14,6 @@ public class UserOutputDTO extends BaseOutputDTO {
   private String lastName;
   private String email;
   private String phone;
-  private String externalId;
   private Boolean active;
 
   private List<GroupSummaryDTO> groups;
