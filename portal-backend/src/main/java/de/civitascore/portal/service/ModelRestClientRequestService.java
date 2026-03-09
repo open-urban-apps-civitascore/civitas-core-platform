@@ -66,7 +66,7 @@ public class ModelRestClientRequestService {
       throw new ExternalSystemTimeoutException("Model Atlas did not respond in time", e);
     } catch (RestClientException e) {
       log.error("Failed to upload model file to Model Atlas: nsUri={}", nsUri, e);
-      throw new ExternalSystemRejectionException("Failed to upload model file to Model Atlas");
+      throw new ExternalSystemRejectionException("Failed to upload model file to Model Atlas", e);
     }
   }
 
@@ -94,7 +94,7 @@ public class ModelRestClientRequestService {
       throw new ExternalSystemTimeoutException("Model Atlas did not respond in time", e);
     } catch (RestClientException e) {
       log.error("Failed to upload model string to Model Atlas: nsUri={}", nsUri, e);
-      throw new ExternalSystemRejectionException("Failed to upload model string to Model Atlas");
+      throw new ExternalSystemRejectionException("Failed to upload model string to Model Atlas", e);
     }
   }
 
@@ -120,7 +120,8 @@ public class ModelRestClientRequestService {
       throw new ExternalSystemTimeoutException("Model Atlas did not respond in time", e);
     } catch (RestClientException e) {
       log.error("Failed to download model file from Model Atlas: nsUri={}", nsUri, e);
-      throw new ExternalSystemRejectionException("Failed to download model file from Model Atlas");
+      throw new ExternalSystemRejectionException(
+          "Failed to download model file from Model Atlas", e);
     }
   }
 }

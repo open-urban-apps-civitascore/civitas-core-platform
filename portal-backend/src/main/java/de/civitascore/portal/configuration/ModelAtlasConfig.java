@@ -1,10 +1,10 @@
 package de.civitascore.portal.configuration;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.validator.constraints.URL;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
@@ -18,9 +18,7 @@ import org.springframework.validation.annotation.Validated;
 public class ModelAtlasConfig {
 
   /** Base URL of the Model Atlas service. Must be an http or https URL. */
-  @NotBlank @Pattern(
-      regexp = "^https?://[^\\s/$.?#].[^\\s]*$",
-      message = "model-atlas.baseUrl must be a valid http or https URL")
+  @NotBlank @URL(message = "model-atlas.baseUrl must be a valid URL")
   private String baseUrl;
 
   /** Scope of the model atlas to be used for requests */
