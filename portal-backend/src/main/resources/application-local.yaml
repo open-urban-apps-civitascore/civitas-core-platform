@@ -44,8 +44,6 @@ kafka:
 # Security: add Swagger/API docs paths for local development
 security:
   permit-paths:
-    - /actuator/health/**
-    - /actuator/info
     - /api-docs/**
     - /swagger-ui/**
     - /swagger-ui.html
