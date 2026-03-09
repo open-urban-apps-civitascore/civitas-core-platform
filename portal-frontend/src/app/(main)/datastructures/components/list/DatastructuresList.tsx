@@ -4,7 +4,11 @@ import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
+import { useDeleteDatastructure } from '@/app/services/api/datastructures/clientRequests'
+import { InfoModal } from '@/components/modals/info-modal/InfoModal'
+import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
@@ -15,10 +19,6 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { DatastructuresListData } from '@/types/datastructures'
 
 import { DatastructuresTable } from './DatastructuresTable'
-import { useDeleteDatastructure } from '@/app/services/api/datastructures/clientRequests'
-import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
-import { toast } from 'sonner'
-import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 
 interface DatastructuresListProps {
   datastructures: DatastructuresListData[]

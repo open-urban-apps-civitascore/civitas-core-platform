@@ -12,7 +12,7 @@ import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Form } from '@/components/ui/form'
-import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceTab } from '@/types/datasources'
+import { Datasource, DatasourceTab } from '@/types/datasources'
 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'

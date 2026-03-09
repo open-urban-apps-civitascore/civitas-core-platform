@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { UseMutationResult } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -27,7 +28,6 @@ import { Button } from '@/components/ui/button'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
-import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import { DirtyField } from '@/components/uml-modeler/types/session'
 import { QUERY_PARAMS } from '@/const/searchParams'
 import { useQueryParams } from '@/hooks/use-query-params'
@@ -44,16 +44,15 @@ import {
   DatastructureVersionPutData,
   DatastructureVersionTab,
 } from '@/types/datastructures'
-import { pickDirtyValues } from '@/utils/form'
-
-import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
-import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
 import {
   mapDatastructureVersionApiToFormData,
   mapDatastructureVersionFormToApiData,
   parseDatastructureVersionFormData,
 } from '@/utils/datastructures'
-import { AxiosError } from 'axios'
+import { pickDirtyValues } from '@/utils/form'
+
+import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
+import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
 
 export const defaultFormData: DatastructureVersionFormData = {
   id: '',
@@ -134,7 +133,10 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const activeSession = modelSessionManager.activeSession
   const activeSessionId = modelSessionManager.activeSessionId
 
-  const initialFormValues = useMemo(() => (version ? mapApiToFormData(version) : defaultFormData), [version])
+  const initialFormValues = useMemo(
+    () => (version ? mapDatastructureVersionApiToFormData(version) : defaultFormData),
+    [version],
+  )
 
   const form = useForm<DatastructureVersionFormData>({
     resolver: zodResolver(DatastructureVersionFormDraftSchema),

@@ -10,6 +10,7 @@ import {
 import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
@@ -17,7 +18,6 @@ import { SortableTableHeader } from '@/components/table/sortable-table-header/So
 import { DATASTRUCTURE_STATUS_TYPES, DatastructuresListData } from '@/types/datastructures'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
-import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 
 interface DatastructuresTableProps extends TableProps<DatastructuresListData> {
   datastructures: DatastructuresListData[]
