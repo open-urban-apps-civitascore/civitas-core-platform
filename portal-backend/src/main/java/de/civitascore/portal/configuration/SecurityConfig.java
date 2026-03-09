@@ -12,6 +12,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
@@ -36,7 +37,10 @@ public class SecurityConfig {
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
-                auth.requestMatchers(securityProperties.permitPaths().toArray(String[]::new))
+                auth.requestMatchers(
+                        securityProperties.permitPaths().stream()
+                            .map(PathPatternRequestMatcher.withDefaults()::matcher)
+                            .toArray(PathPatternRequestMatcher[]::new))
                     .permitAll()
                     .anyRequest()
                     .authenticated())
