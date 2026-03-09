@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { UseMutationResult } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -40,7 +41,6 @@ import { pickDirtyValues } from '@/utils/form'
 
 import { BasicInfoTab } from './basic-info-tab/BasicInfoTab'
 import { VersionsTab } from './versions-tab/VersionsTab'
-import { AxiosError } from 'axios'
 
 const tabs: Tab<DatastructureTab>[] = [
   {

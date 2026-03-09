@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { vi } from 'vitest'
 
-import { DatastructureCreateFormData } from './DatastructureCreateForm'
+import { DatastructureCreateForm } from './DatastructureCreateForm'
 
 const mockPush = vi.fn()
 const mockMutate = vi.fn()
@@ -30,7 +30,7 @@ const setup = () => {
   const client = new QueryClient()
   return render(
     <QueryClientProvider client={client}>
-      <DatastructureCreateFormData />
+      <DatastructureCreateForm />
     </QueryClientProvider>,
   )
 }
@@ -83,7 +83,9 @@ describe('DatastructureCreateForm', () => {
         expect.objectContaining({
           name: 'Test Datastructure',
           description: '',
-          status: 'DRAFT',
+          createdFromDataSource: false,
+          dataStructureVersionIds: [],
+          assignments: [],
         }),
         expect.any(Object),
       )
