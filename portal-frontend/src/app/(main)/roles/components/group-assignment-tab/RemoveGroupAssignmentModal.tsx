@@ -6,18 +6,18 @@ import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 interface RemoveGroupAssignmentModalProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  isOpen: boolean
+  onOpenChange: (isOpen: boolean) => void
   groupName: string
   onConfirm: () => void
 }
 
 export const RemoveGroupAssignmentModal = (props: RemoveGroupAssignmentModalProps) => {
-  const { open, onOpenChange, groupName, onConfirm } = props
+  const { isOpen, onOpenChange, groupName, onConfirm } = props
   const t = useTranslations('roles.groupAssignmentTab')
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{t('removeModal.title')}</DialogTitle>

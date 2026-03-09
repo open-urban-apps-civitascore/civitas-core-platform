@@ -125,28 +125,24 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
 
       {permissions.length === 0 ? (
         <div className="flex items-center justify-center text-sm mt-3.5">{t('noResults')}</div>
+      ) : roleType === ROLE_TYPES.DATA ? (
+        <DataPermissionsGrid
+          permissions={permissions}
+          checkedItems={checkedPermissionItems}
+          setCheckedItems={handleCheckedItemsChange}
+          isReadOnly={isReadOnly}
+        />
       ) : (
-        <>
-          {roleType === ROLE_TYPES.DATA ? (
-            <DataPermissionsGrid
-              permissions={permissions}
+        categories.map(category => (
+          <div key={category}>
+            <CategoryList
+              permissionList={permissions.filter(permission => permission.category.id === category)}
               checkedItems={checkedPermissionItems}
               setCheckedItems={handleCheckedItemsChange}
               isReadOnly={isReadOnly}
             />
-          ) : (
-            categories.map(category => (
-              <div key={category}>
-                <CategoryList
-                  permissionList={permissions.filter(permission => permission.category.id === category)}
-                  checkedItems={checkedPermissionItems}
-                  setCheckedItems={handleCheckedItemsChange}
-                  isReadOnly={isReadOnly}
-                />
-              </div>
-            ))
-          )}
-        </>
+          </div>
+        ))
       )}
     </div>
   )

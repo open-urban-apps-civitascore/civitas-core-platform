@@ -13,6 +13,7 @@ import {
 } from '@/app/services/api/assignments/clientRequests'
 import { useCreateRole, useDeleteRole, useGetRole, useUpdateRole } from '@/app/services/api/roles/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
+import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
@@ -79,7 +80,6 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const [pendingPermissionIds, setPendingPermissionIds] = useState<string[]>([])
   const tBaseInfo = useTranslations('roles.baseInfoTab')
-  const [hasPermissionsTabBeenSaved, setHasPermissionsTabBeenSaved] = useState<boolean>(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [isDeleteErrorOpen, setIsDeleteErrorOpen] = useState(false)
 
@@ -343,6 +343,14 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ExitWarningModal
+        open={isExitModalOpen}
+        onOpenChange={() => setIsExitModalOpen(false)}
+        onDiscard={handleExit}
+        onConfirm={handleSave}
+        isLoading={isLoading}
+      />
     </PageContainer>
   )
 }

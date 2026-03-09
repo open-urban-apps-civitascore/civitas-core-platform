@@ -128,12 +128,6 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const isTenantScope = selectedScope === 'TENANT'
   const canEdit = isEditMode && isTenantScope
 
-  const customElement = canEdit ? (
-    <Button onClick={() => setIsModalOpen(true)}>
-      <Plus /> {t('addGroup')}
-    </Button>
-  ) : null
-
   const haveGroupsBeenTouched =
     Object.keys(groupSelection).every(key => assignedGroupIds.includes(key)) === false ||
     assignedGroupIds.every(id => Object.keys(groupSelection).includes(id)) === false
@@ -239,7 +233,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
 
       {groupToRemove && (
         <RemoveGroupAssignmentModal
-          open={!!groupToRemove}
+          isOpen={!!groupToRemove}
           onOpenChange={open => {
             if (!open) setGroupToRemove(null)
           }}
