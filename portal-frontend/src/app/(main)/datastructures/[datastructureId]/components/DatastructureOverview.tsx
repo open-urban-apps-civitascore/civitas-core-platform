@@ -40,6 +40,7 @@ import { pickDirtyValues } from '@/utils/form'
 
 import { BasicInfoTab } from './basic-info-tab/BasicInfoTab'
 import { VersionsTab } from './versions-tab/VersionsTab'
+import { AxiosError } from 'axios'
 
 const tabs: Tab<DatastructureTab>[] = [
   {
@@ -74,8 +75,8 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     name: datastructure.name ?? '',
     description: datastructure.description ?? '',
     dataStructureStatus: datastructure.dataStructureStatus ?? DATASTRUCTURE_STATUS_TYPES.DRAFT,
-    dataStructureVersionIds: [],
-    assignments: [],
+    dataStructureVersionIds: datastructure.dataStructureVersions.map(version => version.id) || [],
+    assignments: datastructure.assignments || [],
   }
 
   const router = useRouter()
@@ -88,7 +89,11 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const updatePublishedDatastructure = useUpdateDatastructurePublished()
   const publishDatastructure = usePublishDatastructure()
   const unpublishDatastructure = useUnpublishDatastructure()
-  const isLoading = updateDatastructure.isPending
+  const isLoading =
+    updateDatastructure.isPending ||
+    updatePublishedDatastructure.isPending ||
+    publishDatastructure.isPending ||
+    unpublishDatastructure.isPending
 
   const form = useForm<DatastructureFormDraft>({
     resolver: zodResolver(DatastructureFormDraftSchema),
@@ -153,6 +158,13 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     if (nameWatch.length > 0 && descriptionWatch.length > 0) {
       completed.push('basicInfo')
     }
+    if (
+      datastructure.dataStructureVersions.find(
+        version => version.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+      )
+    ) {
+      completed.push('versions')
+    }
     return completed
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formValues])
@@ -166,7 +178,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     datastructureId: string,
   ) => {
     try {
-      mutationFn.mutateAsync({ id: datastructureId })
+      await mutationFn.mutateAsync({ id: datastructureId })
       toast.success(tCommon('success.statusChangeSuccess'))
     } catch (error) {
       toast.error(tCommon('errors.statusChangeError'))
@@ -207,7 +219,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       }
       router.refresh()
     } catch (error) {
-      console.error('An error occurred while submitting datastructure data.', error)
+      console.error('An error occurred while submitting datastructure data.', (error as AxiosError).message)
     }
     setIsExitModalOpen(false)
   }

@@ -30,7 +30,7 @@ export const useUpdateDatastructurePublished = () =>
   useUpdateMutation<Datastructure, DatastructurePutData>({
     method: 'PUT',
     key,
-    endpoint: ({ id }) => `datastructures/${id}/published/meta`,
+    endpoint: ({ id }) => `/datastructures/${id}/published/meta`,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating datastructure',
   })
@@ -38,7 +38,7 @@ export const useUpdateDatastructurePublished = () =>
 export const usePublishDatastructure = () =>
   useCreateMutation<Datastructure, WithId>({
     key,
-    endpoint: ({ id }) => `datastructures/${id}/publish`,
+    endpoint: ({ id }) => `/datastructures/${id}/publish`,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while publishing datastructure',
   })
@@ -46,7 +46,7 @@ export const usePublishDatastructure = () =>
 export const useUnpublishDatastructure = () =>
   useCreateMutation<Datastructure, WithId>({
     key,
-    endpoint: ({ id }) => `datastructures/${id}/unpublish`,
+    endpoint: ({ id }) => `/datastructures/${id}/unpublish`,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while publishing datastructure',
   })
