@@ -59,17 +59,15 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
 
   const {
-    activeSessionId,
     canSetAvailable,
     canSetDraft,
     completedTabs,
     form,
-    initialFormValues,
-    initialSession,
     isConfirmButtonDisabled,
     isInUse,
     isLoading,
     modelSessionManager,
+    resetToInitialState,
     saveDatastructureVersion,
     statusHint,
     statusWatch,
@@ -92,10 +90,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }
 
   const handleExit = () => {
-    if (activeSessionId) {
-      modelSessionManager.setSession(activeSessionId, initialSession)
-    }
-    form.reset(initialFormValues)
+    resetToInitialState()
     setIsReadOnly(true)
     setIsExitModalOpen(false)
   }

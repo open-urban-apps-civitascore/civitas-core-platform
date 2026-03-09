@@ -15,6 +15,7 @@ import {
   useUpdateDatastructureVersion,
   useUpdateDatastructureVersionPublished,
 } from '@/app/services/api/datastructures/versions/clientRequests'
+import { ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
@@ -88,20 +89,24 @@ export const useDatastructureVersion = ({
     unpublishVersion.isPending ||
     updatePublishedVersion.isPending
 
-  const initialSession = useMemo(() => {
-    const diagram = version?.styles || null
-    const modelName = version?.modelName || null
+  const buildSessionFromVersion = (versionData: DatastructureVersion | null, sessionId?: string, created?: Date) => {
+    const diagram = versionData?.styles || null
+    const modelName = versionData?.modelName || null
+    const fallbackSession = createEmptySession(modelName || undefined)
 
-    if (!diagram) return createEmptySession(modelName || undefined)
     return {
-      id: diagram.id,
-      name: modelName || 'Untitled Diagram',
-      diagram,
+      id: sessionId || diagram?.id || fallbackSession.id,
+      name: modelName || diagram?.name || fallbackSession.name,
+      diagram: diagram ? { ...diagram } : fallbackSession.diagram,
       isDirty: false,
       dirtyFields: new Set<DirtyField>(),
-      lastModified: diagram.lastModified,
-      created: diagram.lastModified,
+      lastModified: diagram?.lastModified || fallbackSession.lastModified,
+      created: created || diagram?.lastModified || fallbackSession.created,
     }
+  }
+
+  const initialSession = useMemo(() => {
+    return buildSessionFromVersion(version)
   }, [version])
 
   const modelSessionManager = useMultiSessionManager({ initialSession })
@@ -230,10 +235,14 @@ export const useDatastructureVersion = ({
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
   }
 
-  const handleStatusUpdate = async (versionId: string, mutateAsync: (payload: { id: string }) => Promise<unknown>) => {
+  const handleStatusUpdate = async (
+    versionId: string,
+    mutateAsync: (payload: { id: string }) => Promise<ApiServiceResponse<DatastructureVersion>>,
+  ): Promise<DatastructureVersion> => {
     try {
-      await mutateAsync({ id: versionId })
+      const response = await mutateAsync({ id: versionId })
       toast.success(tCommon('success.statusChangeSuccess'))
+      return response.data
     } catch (error) {
       toast.error(tCommon('errors.statusChangeError'))
       throw error
@@ -255,19 +264,19 @@ export const useDatastructureVersion = ({
 
     toast.success(t('messages.createSuccess'))
 
-    if (shouldPublish) {
-      await handleStatusUpdate(data.id, publishVersion.mutateAsync)
-    }
+    if (shouldPublish) await handleStatusUpdate(data.id, publishVersion.mutateAsync)
 
     router.push(`/datastructures/${datastructureId}/${data.id}?mode=edit&${QUERY_PARAMS.subTabValue}=${subTabValue}`)
   }
 
-  const handleUpdateValues = async (values: DatastructureVersionPutData) => {
+  const handleUpdateValues = async (values: DatastructureVersionPutData): Promise<DatastructureVersion> => {
     try {
+      let response: { data: DatastructureVersion }
       if (initialFormValues.dataStructureVersionStatus === STATUS_TYPES.AVAILABLE)
-        await updatePublishedVersion.mutateAsync({ ...values, id: values.id })
-      else await updateVersion.mutateAsync({ ...values, id: values.id })
+        response = await updatePublishedVersion.mutateAsync({ ...values, id: values.id })
+      else response = await updateVersion.mutateAsync({ ...values, id: values.id })
       toast.success(t('messages.updateSuccess'))
+      return response.data
     } catch (error) {
       toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructureVersion') }))
       throw error
@@ -288,12 +297,28 @@ export const useDatastructureVersion = ({
       key => key !== 'dataStructureVersionStatus',
     )
 
-    if (shouldUpdateValues) await handleUpdateValues(parsedValues)
-    if (shouldPublish) await handleStatusUpdate(parsedValues.id, publishVersion.mutateAsync)
-    if (shouldUnpublish) await handleStatusUpdate(parsedValues.id, unpublishVersion.mutateAsync)
+    let finalVersion: DatastructureVersion | null = shouldUpdateValues ? await handleUpdateValues(parsedValues) : null
+    if (shouldPublish) finalVersion = await handleStatusUpdate(parsedValues.id, publishVersion.mutateAsync)
+    if (shouldUnpublish) finalVersion = await handleStatusUpdate(parsedValues.id, unpublishVersion.mutateAsync)
 
-    form.reset(parsedFormValues)
+    const updatedFormValues = finalVersion ? mapDatastructureVersionApiToFormData(finalVersion) : parsedFormValues
+    resetFormAndSession(updatedFormValues, finalVersion || version)
+
     router.refresh()
+  }
+
+  const resetFormAndSession = (
+    formValuesToReset: DatastructureVersionFormData,
+    versionDataForSession: DatastructureVersion | null,
+  ) => {
+    form.reset(formValuesToReset)
+    if (!activeSessionId) return
+    const syncedSession = buildSessionFromVersion(versionDataForSession, activeSessionId, activeSession?.created)
+    modelSessionManager.setSession(activeSessionId, syncedSession)
+  }
+
+  const resetToInitialState = () => {
+    resetFormAndSession(initialFormValues, version)
   }
 
   const saveDatastructureVersion = async () => {
@@ -353,5 +378,6 @@ export const useDatastructureVersion = ({
     statusWatch,
     versionAlreadyExistsError,
     handleStatusChange,
+    resetToInitialState,
   }
 }
