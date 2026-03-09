@@ -1,0 +1,15 @@
+meta {
+  name: Get Data Structure by ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/datastructures/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataStructureId}}
+}

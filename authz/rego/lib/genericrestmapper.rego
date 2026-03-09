@@ -188,5 +188,22 @@ match_pattern(path, endpoints) := pattern if {
 	endpoints[pattern]
 }
 
-# 7. No match - return empty string
+# 7. Pattern match - 7-segment with literal tail: /version/resource/id/sub/id/literal/literal
+# e.g., /v2/datastructures/{id}/versions/{id}/published/meta
+match_pattern(path, endpoints) := pattern if {
+	is_valid_path(path)
+	not endpoints[path]
+
+	parts := parse_path(path)
+	count(parts) == 7
+	parts[2] != ""
+	not is_reserved_segment(parts[2])
+	parts[4] != ""
+	not is_reserved_segment(parts[4])
+
+	pattern := concat("/", ["", parts[0], parts[1], "{id}", parts[3], "{id}", parts[5], parts[6]])
+	endpoints[pattern]
+}
+
+# 8. No match - return empty string
 default match_pattern(_, _) := ""
