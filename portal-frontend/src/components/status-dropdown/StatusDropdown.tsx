@@ -67,11 +67,7 @@ export const StatusDropdown = <T extends StatusTypes>(props: StatusDropdownProps
             disabled={isReadOnly}
           >
             <div className="flex items-center gap-2">
-              {status === STATUS_TYPES.DRAFT ? (
-                <CircleDashed className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <CircleCheckBig className="w-4 h-4 text-muted-foreground" />
-              )}
+              {getStatusIcon(status)}
               <span>{getStatusLabel(status)}</span>
             </div>
             <ChevronDown className="w-4 h-4" />
