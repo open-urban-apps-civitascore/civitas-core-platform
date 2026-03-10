@@ -194,11 +194,15 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   // Exit edit mode
   const handleExit = useCallback(() => {
+    if (!roleId) {
+      router.push('/roles')
+      return
+    }
     form.reset()
     setPendingPermissionIds(initialPermissionIds)
     setIsReadOnly(true)
     setIsExitModalOpen(false)
-  }, [form, initialPermissionIds])
+  }, [form, initialPermissionIds, roleId, router])
 
   const handleExitButtonClick = useCallback(() => {
     if (isAnyDirty) setIsExitModalOpen(true)
@@ -267,8 +271,10 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     />
   )
 
+  const isGroupAssignmentTab = subTabValue === subTabValues.groupAssignment.value
+
   const getCustomElement = () => {
-    if (isDefaultRole) return undefined
+    if (isDefaultRole || isGroupAssignmentTab) return undefined
     if (!roleId) return ActionButtonsElement
     if (isReadOnly) return EditButton
     return ActionButtonsElement
@@ -294,7 +300,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
             form={form}
             isDefaultRole={isDefaultRole}
             isReadOnly={isReadOnly || isDefaultRole}
-            deleteRole={() => roleId && setIsDeleteConfirmOpen(true)}
+            deleteRole={roleId ? () => setIsDeleteConfirmOpen(true) : undefined}
           />
         )}
 

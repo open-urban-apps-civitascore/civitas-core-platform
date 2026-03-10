@@ -17,7 +17,7 @@ interface BaseInfoTabProps {
   form: UseFormReturn<FormRole>
   isDefaultRole: boolean
   isReadOnly: boolean
-  deleteRole: () => void
+  deleteRole?: () => void
 }
 
 export const BaseInfoTab = (props: BaseInfoTabProps) => {
@@ -81,13 +81,11 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           </DetailsFieldContainer>
         </ContentCard>
 
-        {!isDefaultRole && !isReadOnly && (
+        {!isDefaultRole && !isReadOnly && deleteRole && (
           <ContentCard className="mt-0">
             <DetailsFieldContainer className="pt-0 pb-3 text-xl border-none">
               <SubHeader title={tRolesBaseInfo('securityArea.heading')} className="border-b pb-2" />
               <div className="flex flex-col gap-2 mt-4">
-                <h2 className="text-sm">{tRolesBaseInfo('securityArea.description')}</h2>
-                <span className="text-[16px] text-muted-foreground">{tRolesBaseInfo('securityArea.note')}</span>
                 <Button
                   variant="outline"
                   type="button"

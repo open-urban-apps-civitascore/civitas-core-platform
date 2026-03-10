@@ -395,8 +395,6 @@
       },
       "securityArea": {
         "heading": "Sicherheitsbereich",
-        "description": "Rolle löschen",
-        "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
         "deleteButton": "Rolle löschen"
       },
       "deleteConfirmModal": {

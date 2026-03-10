@@ -59,7 +59,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   })
 
   const allRoles = useMemo(
-    () => (rolesData?.data || []).filter(role => role.roleType === roleType),
+    () => (rolesData?.data || []).filter(role => role.roleType === roleType && role.readonly),
     [rolesData?.data, roleType],
   )
   const permissions = useMemo(() => mapPermissions(permissionsData?.data || []), [permissionsData?.data])
@@ -103,6 +103,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
         const selected = permissions.filter(permission => selectedRolePermissionIds.includes(permission.value))
         handleCheckedItemsChange(selected)
       }
+      setRoleTemplate(null)
     }
   }, [roleTemplate, allRoles, permissions, handleCheckedItemsChange])
 

@@ -136,6 +136,12 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     return <LoadingSpinner />
   }
 
+  const addGroupButton = isTenantScope ? (
+    <Button onClick={() => setIsModalOpen(true)}>
+      <Plus /> {t('addGroup')}
+    </Button>
+  ) : null
+
   // No data state
   if (!isFetching && scopeFilteredGroupIds.length === 0 && filteredGroups.length === 0) {
     return (
@@ -143,17 +149,14 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         <div className="flex items-center justify-between gap-4">
           <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />
 
-          {!isTenantScope ? (
+          {!isTenantScope && (
             <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
               <TriangleAlert className="h-4 w-4 shrink-0" />
               <span>{t(`scopeReadOnlyMessage${selectedScope}`)}</span>
             </div>
-          ) : canEdit ? (
-            <Button onClick={() => setIsModalOpen(true)}>
-              <Plus /> {t('addGroup')}
-            </Button>
-          ) : null}
-          {isTenantScope && !canEdit && (
+          )}
+
+          {isTenantScope && (
             <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
               <Info className="h-4 w-4 shrink-0" />
               <span>{t('infoBox')}</span>
@@ -161,9 +164,11 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
           )}
         </div>
 
+        <SearchHeader searchString={searchInput} onChangeSearchString={setSearchInput} customElement={addGroupButton} />
+
         <NoDataPage title={t('noGroupsAssigned')} />
 
-        {canEdit && (
+        {isTenantScope && (
           <GroupAssignmentModal
             open={isModalOpen}
             onOpenChange={setIsModalOpen}
@@ -184,17 +189,13 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
       <div className="flex items-center justify-between gap-4">
         <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />
 
-        {!isTenantScope ? (
+        {!isTenantScope && (
           <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
             <TriangleAlert className="h-4 w-4 shrink-0" />
             <span>{t(`scopeReadOnlyMessage${selectedScope}`)}</span>
           </div>
-        ) : canEdit ? (
-          <Button onClick={() => setIsModalOpen(true)}>
-            <Plus /> {t('addGroup')}
-          </Button>
-        ) : null}
-        {isTenantScope && !canEdit && (
+        )}
+        {isTenantScope && (
           <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
             <Info className="h-4 w-4 shrink-0" />
             <span>{t('infoBox')}</span>
@@ -202,7 +203,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         )}
       </div>
 
-      <SearchHeader searchString={searchInput} onChangeSearchString={setSearchInput} />
+      <SearchHeader searchString={searchInput} onChangeSearchString={setSearchInput} customElement={addGroupButton} />
       <GroupTable
         groups={filteredGroups}
         isLoading={isFetching}
@@ -218,7 +219,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         onRemoveGroup={canEdit ? group => setGroupToRemove(group) : undefined}
       />
 
-      {canEdit && (
+      {isTenantScope && (
         <GroupAssignmentModal
           open={isModalOpen}
           onOpenChange={setIsModalOpen}
