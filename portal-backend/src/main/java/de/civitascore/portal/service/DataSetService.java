@@ -40,13 +40,13 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   public DataSetService(
       DataSetRepository dataSetRepository,
       DataSetMapper dataSetMapper,
-      ScopedAssignmentBuilderService assignmentBuilderService,
+      AssignmentFactory assignmentFactory,
       DistributionService distributionService,
       ObjectMapper objectMapper,
       DataSetSagaPublisher sagaPublisher) {
     this.dataSetRepository = dataSetRepository;
     this.dataSetMapper = dataSetMapper;
-    this.assignmentBuilderService = assignmentBuilderService;
+    this.assignmentFactory = assignmentFactory;
     this.distributionService = distributionService;
     this.objectMapper = objectMapper;
     this.sagaPublisher = sagaPublisher;

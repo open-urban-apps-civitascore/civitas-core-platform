@@ -36,7 +36,7 @@ class DataSetServiceTest {
 
   @Mock private DataSetRepository dataSetRepository;
   @Mock private DataSetMapper dataSetMapper;
-  @Mock private ScopedAssignmentBuilderService assignmentBuilderService;
+  @Mock private AssignmentFactory assignmentFactory;
   @Mock private DistributionService distributionService;
   @Mock private ObjectMapper objectMapper;
   @Mock private DataSetSagaPublisher sagaPublisher;
@@ -45,7 +45,7 @@ class DataSetServiceTest {
     return new DataSetService(
         dataSetRepository,
         dataSetMapper,
-        assignmentBuilderService,
+        assignmentFactory,
         distributionService,
         objectMapper,
         sagaPublisher);
