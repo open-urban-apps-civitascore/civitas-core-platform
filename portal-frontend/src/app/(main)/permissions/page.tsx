@@ -1,6 +1,5 @@
 'use client'
 
-import { RowSelectionState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
@@ -8,12 +7,11 @@ import { useGetPermissions } from '@/app/services/api/permissions/clientRequests
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
-import { SearchHeader } from '@/components/search-area/SearchArea'
-import { TableContainer } from '@/components/table-container/TableContainer'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { ROLE_TYPES } from '@/types/roles'
 
-import { PermissionsTable } from './components/PermissionsTable'
+import { DataPermissionsTab } from './components/DataPermissionsTab'
+import { SystemPermissionsTab } from './components/SystemPermissionsTab'
 
 const tabsValues = {
   systemPermissions: { value: ROLE_TYPES.SYSTEM, label: 'permissions.systemPermissions' },
@@ -24,23 +22,9 @@ export const DEFAULT_TAB = ROLE_TYPES.SYSTEM
 
 const PermissionsPage = () => {
   const t = useTranslations()
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const tabs = [tabsValues.systemPermissions, tabsValues.dataPermissions]
 
-  const {
-    setSortingParams,
-    setPaginationParams,
-    setSearchParam,
-    getApiRequestParamsByUrl,
-    setTabValueParam,
-    setTotalPages,
-    pageIndex,
-    pageSize,
-    sorting,
-    search,
-    tabValue,
-    totalPages,
-  } = useQueryParams()
+  const { setTabValueParam, setTotalPages, getApiRequestParamsByUrl, pageSize, tabValue } = useQueryParams()
 
   const [permissionType, setPermissionsType] = useState<string>(tabValue || DEFAULT_TAB)
 
@@ -52,6 +36,18 @@ const PermissionsPage = () => {
   useEffect(() => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, setTotalPages, pageSize])
+
+  const permissions = permissionsData?.data && !isFetching ? permissionsData.data : []
+
+  const getSystemPermissions = () => {
+    const systemPermissions = permissions.filter(permission => permission.permissionType === ROLE_TYPES.SYSTEM)
+    return systemPermissions
+  }
+
+  const getDataPermissions = () => {
+    const dataPermissions = permissions.filter(permission => permission.permissionType === ROLE_TYPES.DATA)
+    return dataPermissions
+  }
 
   const getTitle = () => {
     const label = tabs.find(tab => tab.value === permissionType)?.label
@@ -73,22 +69,11 @@ const PermissionsPage = () => {
         }}
       />
       <PageBackground>
-        <SearchHeader searchString={search} onChangeSearchString={setSearchParam} />
-        <TableContainer>
-          <PermissionsTable
-            permissions={permissionsData?.data && !isFetching ? permissionsData?.data : []}
-            isLoading={isFetching}
-            rowCount={rowCount}
-            pageIndex={pageIndex}
-            pageSize={pageSize}
-            totalPages={totalPages}
-            sorting={sorting}
-            rowSelection={rowSelection}
-            setRowSelection={setRowSelection}
-            onSortingChange={setSortingParams}
-            onPaginationChange={setPaginationParams}
-          />
-        </TableContainer>
+        {permissionType === ROLE_TYPES.SYSTEM ? (
+          <SystemPermissionsTab permissions={getSystemPermissions()} isLoading={isFetching} rowCount={rowCount} />
+        ) : (
+          <DataPermissionsTab permissions={getDataPermissions()} isLoading={isFetching} rowCount={rowCount} />
+        )}
       </PageBackground>
     </PageContainer>
   )
