@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { type JSX, useEffect, useMemo, useState } from 'react'
+import { type JSX, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useGetPermissions } from '@/app/services/api/permissions/clientRequests'
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
@@ -10,9 +10,8 @@ import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Item } from '@/types/common'
 import { Permission, PermissionItem } from '@/types/permissions'
-import { ROLE_ORIGINS, ROLE_TYPES } from '@/types/roles'
+import { ROLE_TYPES } from '@/types/roles'
 
 import { CategoryList } from './CategoryList'
 import { RoleTemplateSelect } from './RoleTemplateSelect'
@@ -28,9 +27,9 @@ interface PermissionsTabProps {
 
 const mapPermissions = (permissionsInput: Permission[]): PermissionItem[] => {
   return permissionsInput.map(permission => ({
-    name: permission.title,
+    name: permission.name,
     value: permission.id,
-    category: permission.category,
+    category: { id: permission.category, title: permission.category },
   }))
 }
 
@@ -49,11 +48,14 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   const { getApiRequestParams, tabValue } = useQueryParams()
   const [roleTemplate, setRoleTemplate] = useState<string | null>(null)
   const [checkedPermissionItems, setCheckedPermissionItems] = useState<PermissionItem[]>([])
+  const initializedForIds = useRef<string | null>(null)
   const [searchInput, setSearchInput] = useState<string>('')
 
-  const rolesRequestParams = new URLSearchParams(`type=${tabValue}&roleOrigin=${ROLE_ORIGINS.DEFAULT}`)
+  // Fetch all readonly (default) roles to use as permission templates.
+  const rolesRequestParams = new URLSearchParams('readonly=true')
   const permissionsRequestParams = new URLSearchParams(
-    `type=${tabValue}&${getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput })}`,
+    // TODO - implement backend filtering by search term instead of fetching all permissions and filtering client-side
+    getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput }),
   )
 
   const { data: rolesData } = useGetRoles({ params: rolesRequestParams })
@@ -62,21 +64,17 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     params: permissionsRequestParams,
   })
 
-  const allRoles = useMemo(() => rolesData?.data || [], [rolesData?.data])
+  // Filter roles client-side by the current tab's roleType
+  const allRoles = useMemo(
+    () => (rolesData?.data || []).filter(role => role.roleType === (tabValue?.toUpperCase() ?? ROLE_TYPES.SYSTEM)),
+    [rolesData?.data, tabValue],
+  )
   const permissions = useMemo(() => mapPermissions(permissionsData?.data || []), [permissionsData?.data])
 
-  const getUniqueCategories = (): Item[] => {
-    const seenIds = new Set()
-    const uniqueCategories: Item[] = []
-
-    permissions.forEach(permission => {
-      if (!seenIds.has(permission.category.id)) {
-        seenIds.add(permission.category.id)
-        uniqueCategories.push(permission.category)
-      }
-    })
-
-    return uniqueCategories
+  const getUniqueCategories = (): string[] => {
+    const seen = new Set<string>()
+    permissions.forEach(permission => seen.add(permission.category.id))
+    return Array.from(seen)
   }
 
   const categories = getUniqueCategories()
@@ -86,17 +84,20 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   }, [currentSelectedPermissionIds, permissions])
 
   useEffect(() => {
-    if (selectedPermissions.length > 0) {
-      setCheckedPermissionItems(selectedPermissions)
-    }
-  }, [selectedPermissions])
+    if (permissions.length === 0) return
+    const idsKey = (currentSelectedPermissionIds ?? []).slice().sort().join(',')
+    if (initializedForIds.current === idsKey) return
+    initializedForIds.current = idsKey
+    setCheckedPermissionItems(selectedPermissions)
+  }, [currentSelectedPermissionIds, selectedPermissions, permissions])
 
   useEffect(() => {
     if (roleTemplate) {
       const selectedRole = allRoles.find(role => role.id === roleTemplate)
       if (selectedRole) {
+        const selectedRolePermissionIds = selectedRole.permissions.map(p => p.id)
         const selectedPermissions = permissions.filter(permission =>
-          selectedRole?.permissions?.includes(permission.value),
+          selectedRolePermissionIds.includes(permission.value),
         )
         setCheckedPermissionItems(selectedPermissions)
       }
@@ -111,11 +112,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
 
     if (selectedIdsSet.size !== checkedIdsSet.size) return true
 
-    selectedIdsSet.forEach(id => {
-      if (!checkedIdsSet.has(id)) return true
-    })
-
-    return false
+    return Array.from(selectedIdsSet).some(id => !checkedIdsSet.has(id))
   }, [checkedPermissionItems, currentSelectedPermissionIds])
 
   useEffect(() => {
@@ -142,9 +139,9 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
       ) : (
         <>
           {categories.map(category => (
-            <div key={category.id}>
+            <div key={category}>
               <CategoryList
-                permissionList={permissions.filter(permission => permission.category.id === category.id)}
+                permissionList={permissions.filter(permission => permission.category.id === category)}
                 checkedItems={checkedPermissionItems}
                 setCheckedItems={setCheckedPermissionItems}
                 isDefaultRole={isDefaultRole}

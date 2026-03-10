@@ -5,7 +5,7 @@ import { ItemSchema, WithId } from './common'
 
 export type GroupTab = 'info' | 'roles' | 'users'
 
-export const GroupRoleTypes = z.enum(['system', 'data', 'governance'])
+export const GroupRoleTypes = z.enum(['SYSTEM', 'DATA', 'GOVERNANCE'])
 
 export const GroupRoleScheme = ItemSchema.extend({
   roleType: GroupRoleTypes,
@@ -17,9 +17,12 @@ export const GroupApiResponseSchema = z.object({
     message: 'common.errors.atLeast2',
   }),
   description: z.string(),
+  roles: z.array(GroupRoleScheme).nullable(),
   members: z.array(ItemSchema).nullable(),
-  assignments: z.array(AssignmentApiResponseSchema).nullable(),
   contactUser: ItemSchema.nullable(),
+  parentGroup: ItemSchema.nullable().optional(),
+  childGroups: z.array(ItemSchema).nullable().optional(),
+  assignments: z.array(AssignmentApiResponseSchema).nullable(),
   createdAt: z.string(),
   modifiedAt: z.string(),
 })

@@ -7,14 +7,14 @@ import { UseFormReturn } from 'react-hook-form'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { FormSelect } from '@/components/form/fields/FormSelect'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
-import { Form } from '@/components/ui/form'
+import { Form, FormItem, FormLabel } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { FormRole, ROLE_ORIGINS, ROLE_TYPES } from '@/types/roles'
+import { FormRole, ROLE_TYPES } from '@/types/roles'
 
 interface BaseInfoTabProps {
   form: UseFormReturn<FormRole>
@@ -47,11 +47,11 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
     setIsReadOnly(true)
   }
 
-  const roleOrigin = useMemo(() => (isDefaultRole ? ROLE_ORIGINS.DEFAULT : ROLE_ORIGINS.CUSTOM), [isDefaultRole])
+  const isReadonly = useMemo(() => isDefaultRole, [isDefaultRole])
 
   useEffect(() => {
-    form.setValue('roleOrigin', roleOrigin)
-  }, [roleOrigin, form])
+    form.setValue('readonly', isReadonly)
+  }, [isReadonly, form])
 
   return (
     <Form {...form}>
@@ -90,19 +90,15 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           </DetailsFieldContainer>
 
           <DetailsFieldContainer className="border-0">
-            <FormSelect
-              id="role-origin-select"
-              form={form}
-              options={[
-                { value: ROLE_ORIGINS.DEFAULT, label: tRoles('defaultRole') },
-                { value: ROLE_ORIGINS.CUSTOM, label: tRoles('customRole') },
-              ]}
-              label={tRolesBaseInfo('form.inputs.roleOrigin')}
-              name="roleOrigin"
-              placeholder={isDefaultRole ? tRoles('defaultRole') : tRoles('customRole')}
-              disabled={true}
-              onChange={() => form.setValue('roleOrigin', roleOrigin)}
-            />
+            <FormItem className={isMobile ? 'grid gap-4' : 'grid grid-cols-[minmax(0,270px)_minmax(0,384px)]'}>
+              <FormLabel>{tRolesBaseInfo('form.inputs.roleOrigin')}</FormLabel>
+              <Input
+                aria-label={tRolesBaseInfo('form.inputs.roleOrigin')}
+                value={isDefaultRole ? tRoles('defaultRole') : tRoles('customRole')}
+                disabled={true}
+                className="disabled:opacity-100 disabled:text-muted-foreground disabled:border-transparent disabled:shadow-none disabled:h-9 disabled:py-0"
+              />
+            </FormItem>
           </DetailsFieldContainer>
         </ContentCard>
 

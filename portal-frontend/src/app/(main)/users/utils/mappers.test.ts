@@ -8,9 +8,9 @@ import { ROLE_TYPES } from '@/types/roles'
 import { mapRolesData } from './mappers'
 
 const roles = [
-  { id: 'r1', name: 'Admin', type: ROLE_TYPES.SYSTEM },
-  { id: 'r2', name: 'Editor', type: ROLE_TYPES.DATA },
-  { id: 'r3', name: 'Support', type: ROLE_TYPES.GOVERNANCE },
+  { id: 'r1', name: 'Admin', roleType: ROLE_TYPES.SYSTEM },
+  { id: 'r2', name: 'Editor', roleType: ROLE_TYPES.DATA },
+  { id: 'r3', name: 'Support', roleType: ROLE_TYPES.GOVERNANCE },
 ]
 
 const groupRoles: AssignmentRole[] = [
@@ -34,6 +34,7 @@ const groups: Group[] = [
     id: 'g1',
     name: 'Group 01',
     description: '',
+    roles: null,
     assignments: [baseAssignment, { ...baseAssignment, role: groupRoles[1] }],
     members: null,
     contactUser: null,
@@ -44,6 +45,7 @@ const groups: Group[] = [
     id: 'g2',
     name: 'Group 02',
     description: '',
+    roles: null,
     assignments: [baseAssignment, { ...baseAssignment, role: groupRoles[2] }],
     members: [],
     contactUser: null,

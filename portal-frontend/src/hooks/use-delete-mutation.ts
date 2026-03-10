@@ -15,7 +15,8 @@ export const useDeleteMutation = <TResponse>({ key: mutationKey, errorMessage, h
         endpoint: `/${mutationKey}/${id}`,
         errorMessage: errorMessage,
       }),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      queryClient.removeQueries({ queryKey: [mutationKey, id] })
       queryClient.invalidateQueries({
         queryKey: [mutationKey],
       })
