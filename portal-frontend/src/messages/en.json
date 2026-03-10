@@ -81,7 +81,8 @@
     },
     "success": {
       "statusChangeSuccess": "The availability status has been successfully updated.",
-      "deletionSuccess": "{item} has successfully been deleted."
+      "deletionSuccess": "{item} has successfully been deleted.",
+      "creationSuccess": "{item} has been successfully created."
     },
     "status": {
       "DRAFT": "Draft",
@@ -567,7 +568,8 @@
       "isInUseStatusHint": "Can not be set to draft since this datastructure is already in use."
     },
     "errors": {
-      "deletionError": "An error occurred while deleting the datastructure."
+      "deletionError": "An error occurred while deleting the datastructure.",
+      "creationError": "An error occurred while creating the datastructure."
     },
     "infoModal": {
       "title": "Datenstructure can not be deleted",

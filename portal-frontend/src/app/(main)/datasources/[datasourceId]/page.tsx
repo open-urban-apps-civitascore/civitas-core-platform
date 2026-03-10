@@ -1,8 +1,15 @@
 import { getTranslations } from 'next-intl/server'
 
 import { getDatasource } from '@/app/services/api/datasources/serverRequests'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
+import { getDatastructure } from '@/app/services/api/datastructures/serverRequests'
+import { getDatastructureVersion } from '@/app/services/api/datastructures/versions/serverRequests'
 import { DatasourceApiResponseSchema } from '@/types/datasources'
+import {
+  Datastructure,
+  DatastructureApiResponseSchema,
+  DatastructureVersion,
+  DatastructureVersionApiResponseSchema,
+} from '@/types/datastructures'
 
 import { DatasourceOverview } from './components/DatasourceOverview'
 
@@ -13,14 +20,44 @@ type Props = {
 const DatasourceDetailsPage = async ({ params }: Props) => {
   const { datasourceId } = await params
   const t = await getTranslations('common')
+  let datastructure: Datastructure | null = null
+  let datastructureVersion: DatastructureVersion | null = null
+
   const datasourceResponse = await getDatasource(datasourceId)
   const parsedDatasource = DatasourceApiResponseSchema.safeParse(datasourceResponse.data)
   if (!parsedDatasource.success) {
     console.error(t('errors.loadingError'), parsedDatasource)
-    return <NoDataPage title={t('errors.loadingError')} />
+    throw new Error()
+  }
+  const datastructureVersionId = parsedDatasource.data.dataStructureVersion?.id
+  const datastructureId = parsedDatasource.data.dataStructureVersion?.dataStructureId
+
+  if (datastructureId) {
+    const datastructuresResponse = await getDatastructure(datastructureId)
+    const parsedDatastructure = DatastructureApiResponseSchema.safeParse(datastructuresResponse.data)
+    if (!parsedDatastructure.data) {
+      console.error(t('errors.loadingError'))
+      throw new Error()
+    }
+    datastructure = parsedDatastructure.data
   }
 
-  return <DatasourceOverview datasource={parsedDatasource.data} />
+  if (datastructureVersionId && datastructureId) {
+    const datastructureVersionResponse = await getDatastructureVersion(datastructureId, datastructureVersionId)
+    const parsedVersion = DatastructureVersionApiResponseSchema.safeParse(datastructureVersionResponse.data)
+    if (!parsedVersion.success) {
+      console.error(t('errors.loadingError'), parsedVersion)
+      throw new Error()
+    }
+    datastructureVersion = parsedVersion.data
+  }
+  return (
+    <DatasourceOverview
+      datasource={parsedDatasource.data}
+      datastructure={datastructure}
+      datastructureVersion={datastructureVersion}
+    />
+  )
 }
 
 export default DatasourceDetailsPage

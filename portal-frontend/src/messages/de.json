@@ -80,7 +80,8 @@
     },
     "success": {
       "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert.",
-      "deletionSuccess": "{item} wurde erfolgreich gelöscht."
+      "deletionSuccess": "{item} wurde erfolgreich gelöscht.",
+      "creationSuccess": "{item} wurde erfolgreich angelegt."
     },
     "status": {
       "DRAFT": "Entwurf",
@@ -556,7 +557,8 @@
       "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Datenstruktur bereits verwendet wird."
     },
     "errors": {
-      "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten."
+      "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten.",
+      "creationError": "Beim Anlegen der Datenstruktur ist ein Felher aufgetreten."
     },
     "infoModal": {
       "title": "Datenstruktur kann nicht gelöscht werden",

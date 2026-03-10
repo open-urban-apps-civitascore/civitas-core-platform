@@ -2,25 +2,21 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
   useCreateDatastructureVersion,
-  usePublishDatastructureVersion,
-  useUnpublishDatastructureVersion,
+  useStatusUpdateDatastructureVersion,
   useUpdateDatastructureVersion,
   useUpdateDatastructureVersionPublished,
 } from '@/app/services/api/datastructures/versions/clientRequests'
-import { ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
 import { DirtyField } from '@/components/uml-modeler/types/session'
-import { QUERY_PARAMS } from '@/const/searchParams'
 import { STATUS_TYPES } from '@/types/common'
 import {
   DATASTRUCTURE_STATUS_TYPES,
@@ -28,11 +24,9 @@ import {
   DatastructureStatusTypes,
   DatastructureVersion,
   DatastructureVersionCreateData,
-  DatastructureVersionFormAvailableSchema,
   DatastructureVersionFormData,
   DatastructureVersionFormDraftSchema,
   DatastructureVersionPutData,
-  DatastructureVersionTab,
 } from '@/types/datastructures'
 import {
   containsNonStatusField,
@@ -54,41 +48,31 @@ export const defaultDatastructureVersionFormData: DatastructureVersionFormData =
   edges: [],
 }
 
-type OtherVersion = { id: string; version: string; dataStructureVersionStatus: DatastructureStatusTypes }
-
 interface UseDatastructureVersionProps {
   datastructureId: string
   version: DatastructureVersion | null
   isCreateMode: boolean
-  otherVersions: OtherVersion[]
-  isDatastructureAvailable: boolean
-  subTabValue: string
+  onCreateVersion?: (data: DatastructureVersion) => void
+  canSetAvailable?: boolean
 }
 
 export const useDatastructureVersion = ({
   datastructureId,
   version,
   isCreateMode,
-  otherVersions,
-  isDatastructureAvailable,
-  subTabValue,
+  onCreateVersion,
+  canSetAvailable = true,
 }: UseDatastructureVersionProps) => {
-  const router = useRouter()
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
 
-  const updateVersion = useUpdateDatastructureVersion(datastructureId)
-  const updatePublishedVersion = useUpdateDatastructureVersionPublished(datastructureId)
-  const createVersion = useCreateDatastructureVersion(datastructureId)
-  const publishVersion = usePublishDatastructureVersion(datastructureId)
-  const unpublishVersion = useUnpublishDatastructureVersion(datastructureId)
+  const updateVersion = useUpdateDatastructureVersion()
+  const updatePublishedVersion = useUpdateDatastructureVersionPublished()
+  const createVersion = useCreateDatastructureVersion()
+  const updateStatus = useStatusUpdateDatastructureVersion()
 
   const isLoading =
-    updateVersion.isPending ||
-    createVersion.isPending ||
-    publishVersion.isPending ||
-    unpublishVersion.isPending ||
-    updatePublishedVersion.isPending
+    updateVersion.isPending || createVersion.isPending || updateStatus.isPending || updatePublishedVersion.isPending
 
   const buildSessionFromVersion = (versionData: DatastructureVersion | null, sessionId?: string, created?: Date) => {
     const diagram = versionData?.styles || null
@@ -129,14 +113,9 @@ export const useDatastructureVersion = ({
     defaultValues: initialFormValues,
   })
 
-  const formValues = useWatch({ control: form.control })
-  const descriptionWatch = form.watch('description')
   const statusWatch = form.watch('dataStructureVersionStatus')
-  const versionWatch = form.watch('version')
   const nodesWatch = form.watch('nodes')
-  const modelUriWatch = form.watch('modelAtlasUri')
-  const modelNameWatch = form.watch('modelName')
-  const sourceWatch = form.watch('dataStructureVersionSource')
+  const versionWatch = form.watch('version')
 
   const isDraftMode = statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
   const modelUri = `http://civitas.org/model/${datastructureId}/${versionWatch}`
@@ -176,28 +155,6 @@ export const useDatastructureVersion = ({
     }
   }, [activeSession, initialSession, form, activeSessionId])
 
-  const versionAlreadyExistsError = useMemo(() => {
-    const versionExists = otherVersions.find(otherVersion => otherVersion.version === versionWatch.trim())
-    if (versionExists) {
-      return t('errors.versionAlreadyExists')
-    }
-    return undefined
-  }, [otherVersions, versionWatch, t])
-
-  const isInUse = version?.inUse || false
-
-  const isLastAvailableVersionInAvailableDatastructure =
-    isDatastructureAvailable &&
-    !otherVersions.some(
-      otherVersion => otherVersion.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
-    )
-
-  const canSetDraft = !isInUse && !isLastAvailableVersionInAvailableDatastructure
-
-  const canSetAvailable = useMemo(() => {
-    return DatastructureVersionFormAvailableSchema.safeParse(formValues).success
-  }, [formValues])
-
   const revalidateForm = () => {
     if (!isDraftMode) {
       void form.trigger()
@@ -225,24 +182,20 @@ export const useDatastructureVersion = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canSetAvailable, statusWatch])
 
-  const completedTabs = useMemo((): DatastructureVersionTab[] => {
-    const completed: DatastructureVersionTab[] = []
-    if (versionWatch.length > 0 && descriptionWatch.length > 0 && sourceWatch) completed.push('versionInfo')
-    if (nodesWatch.length > 0 && modelUriWatch && modelNameWatch) completed.push('structure')
-    return completed
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formValues])
-
   const handleStatusChange = (newStatus: DatastructureStatusTypes) => {
     form.setValue('dataStructureVersionStatus', newStatus, { shouldDirty: true })
   }
 
   const handleStatusUpdate = async (
     versionId: string,
-    mutateAsync: (payload: { id: string }) => Promise<ApiServiceResponse<DatastructureVersion>>,
+    endpoint: 'publish' | 'unpublish',
+    datastructureId: string,
   ): Promise<DatastructureVersion> => {
     try {
-      const response = await mutateAsync({ id: versionId })
+      const response = await updateStatus.mutateAsync({
+        data: undefined,
+        endpoint: `/datastructures/${datastructureId}/versions/${versionId}/${endpoint}`,
+      })
       toast.success(tCommon('success.statusChangeSuccess'))
       return response.data
     } catch (error) {
@@ -251,13 +204,16 @@ export const useDatastructureVersion = ({
     }
   }
 
-  const handleCreateVersion = async (createData: DatastructureVersionCreateData) => {
+  const handleCreateVersion = async (createData: DatastructureVersionCreateData, datastructureId: string) => {
     const isStatusFieldDirty = form.formState.dirtyFields.dataStructureVersionStatus
     const shouldPublish = !!isStatusFieldDirty && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
 
     let data: DatastructureVersion
     try {
-      const response = await createVersion.mutateAsync(createData)
+      const response = await createVersion.mutateAsync({
+        data: createData,
+        endpoint: `/datastructures/${datastructureId}/versions`,
+      })
       data = response.data
     } catch (error) {
       toast.error(t('errors.creationError'))
@@ -266,17 +222,27 @@ export const useDatastructureVersion = ({
 
     toast.success(t('messages.createSuccess'))
 
-    if (shouldPublish) await handleStatusUpdate(data.id, publishVersion.mutateAsync)
+    if (shouldPublish) await handleStatusUpdate(data.id, 'publish', datastructureId)
 
-    router.push(`/datastructures/${datastructureId}/${data.id}?mode=edit&${QUERY_PARAMS.subTabValue}=${subTabValue}`)
+    onCreateVersion?.(data)
   }
 
-  const handleUpdateValues = async (values: DatastructureVersionPutData): Promise<DatastructureVersion> => {
+  const handleUpdateValues = async (
+    values: DatastructureVersionPutData,
+    datastructureId: string,
+  ): Promise<DatastructureVersion> => {
     try {
       let response: { data: DatastructureVersion }
       if (initialFormValues.dataStructureVersionStatus === STATUS_TYPES.AVAILABLE)
-        response = await updatePublishedVersion.mutateAsync({ ...values, id: values.id })
-      else response = await updateVersion.mutateAsync({ ...values, id: values.id })
+        response = await updatePublishedVersion.mutateAsync({
+          data: values,
+          endpoint: `/datastructures/${datastructureId}/versions/${values.id}/published/meta`,
+        })
+      else
+        response = await updateVersion.mutateAsync({
+          data: values,
+          endpoint: `/datastructures/${datastructureId}/versions/${values.id}`,
+        })
       toast.success(t('messages.updateSuccess'))
       return response.data
     } catch (error) {
@@ -286,9 +252,11 @@ export const useDatastructureVersion = ({
   }
 
   const handleUpdateVersion = async (
-    parsedValues: DatastructureVersionPutData,
+    parsedPayload: DatastructureVersionPutData,
     parsedFormValues: DatastructureVersionFormData,
+    datastructureId: string,
   ) => {
+    const formValues = form.getValues()
     const dirtyFields = form.formState.dirtyFields
     const fieldsToUpdate = pickDirtyValues(formValues, dirtyFields)
 
@@ -298,15 +266,14 @@ export const useDatastructureVersion = ({
     const shouldUnpublish = !!dirtyFields.dataStructureVersionStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
     let versionResponse: DatastructureVersion | null = shouldUpdateValues
-      ? await handleUpdateValues(parsedValues)
+      ? await handleUpdateValues(parsedPayload, datastructureId)
       : null
-    if (shouldPublish) versionResponse = await handleStatusUpdate(parsedValues.id, publishVersion.mutateAsync)
-    if (shouldUnpublish) versionResponse = await handleStatusUpdate(parsedValues.id, unpublishVersion.mutateAsync)
+    if (shouldPublish) versionResponse = await handleStatusUpdate(parsedPayload.id, 'publish', datastructureId)
+    if (shouldUnpublish) versionResponse = await handleStatusUpdate(parsedPayload.id, 'unpublish', datastructureId)
 
     const updatedFormValues = versionResponse ? mapDatastructureVersionApiToFormData(versionResponse) : parsedFormValues
-    resetFormAndSession(updatedFormValues, versionResponse || version)
 
-    router.refresh()
+    resetFormAndSession(updatedFormValues, versionResponse || version)
   }
 
   const resetFormAndSession = (
@@ -323,9 +290,9 @@ export const useDatastructureVersion = ({
     resetFormAndSession(initialFormValues, version)
   }
 
-  const saveDatastructureVersion = async () => {
-    const versionData = parseDatastructureVersionFormData(form.getValues(), isDraftMode)
-    if (!versionData) {
+  const saveDatastructureVersion = async (datastructureId: string) => {
+    const formData = parseDatastructureVersionFormData(form.getValues(), isDraftMode)
+    if (!formData) {
       toast.error(tCommon('errors.formInvalid'))
       return false
     }
@@ -333,14 +300,14 @@ export const useDatastructureVersion = ({
     try {
       const sessionDiagram = nodesWatch.length > 0 ? activeSession?.diagram || null : null
       const { model } = sessionDiagram ? buildUMLModelPayload(sessionDiagram, modelUri) : { model: null }
-      const payload = mapDatastructureVersionFormToApiData(versionData, sessionDiagram, model)
+      const payload = mapDatastructureVersionFormToApiData(formData, sessionDiagram, model)
 
       if (isCreateMode) {
         // eslint-disable-next-line unused-imports/no-unused-vars
         const { id, ...createData } = payload
-        await handleCreateVersion(createData)
+        await handleCreateVersion(createData, datastructureId)
       } else {
-        await handleUpdateVersion(payload, versionData)
+        await handleUpdateVersion(payload, formData, datastructureId)
       }
       return true
     } catch (error: unknown) {
@@ -348,12 +315,6 @@ export const useDatastructureVersion = ({
       return false
     }
   }
-
-  const statusHint = useMemo(() => {
-    if (isInUse) return t('messages.isInUseStatusHint')
-    if (isLastAvailableVersionInAvailableDatastructure) return t('messages.isLastAvailableVersion')
-    return undefined
-  }, [isInUse, isLastAvailableVersionInAvailableDatastructure, t])
 
   const dirtyFields = form.formState.dirtyFields
   const hasMetadataChanges =
@@ -364,30 +325,17 @@ export const useDatastructureVersion = ({
   const hasModelChanges = activeSession?.isDirty
   const hasUserChanges = hasMetadataChanges || hasModelChanges
 
-  const isConfirmButtonDisabled =
-    !hasUserChanges ||
-    versionWatch.trim().length === 0 ||
-    !!form.formState.errors.version ||
-    !!versionAlreadyExistsError ||
-    isLoading
-
   return {
     activeSessionId,
     canSetAvailable,
-    canSetDraft,
-    completedTabs,
     form,
     initialFormValues,
     initialSession,
-    isConfirmButtonDisabled,
-    isInUse,
     isLoading,
     modelSessionManager,
     saveDatastructureVersion,
-    statusHint,
-    statusWatch,
-    versionAlreadyExistsError,
     handleStatusChange,
     resetToInitialState,
+    hasUserChanges,
   }
 }
