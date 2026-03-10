@@ -28,7 +28,8 @@
       "exit": "Exit",
       "assignItem": "Assign {item}",
       "assignTo": "to {item}",
-      "back": "Back"
+      "back": "Back",
+      "import": "Import"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
@@ -523,6 +524,12 @@
       "type": "Type",
       "connection": "Connection",
       "establishConnection": "Establish Connection"
+    },
+    "dataModel": {
+      "importModal": {
+        "title": "Import Data Model",
+        "to": "into {name}"
+      }
     }
   },
   "datastructures": {

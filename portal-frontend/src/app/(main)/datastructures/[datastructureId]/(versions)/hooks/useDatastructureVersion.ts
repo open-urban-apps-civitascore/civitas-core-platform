@@ -276,14 +276,19 @@ export const useDatastructureVersion = ({
     resetFormAndSession(updatedFormValues, versionResponse || version)
   }
 
+  const resetSession = (version: DatastructureVersion | null, shouldMarkDirty = false) => {
+    if (!activeSessionId) return
+    const syncedSession = buildSessionFromVersion(version, activeSessionId, activeSession?.created)
+    modelSessionManager.setSession(activeSessionId, syncedSession)
+    if (shouldMarkDirty) modelSessionManager.markSessionDirty(activeSessionId, 'model')
+  }
+
   const resetFormAndSession = (
     formValuesToReset: DatastructureVersionFormData,
-    versionDataForSession: DatastructureVersion | null,
+    version: DatastructureVersion | null,
   ) => {
     form.reset(formValuesToReset)
-    if (!activeSessionId) return
-    const syncedSession = buildSessionFromVersion(versionDataForSession, activeSessionId, activeSession?.created)
-    modelSessionManager.setSession(activeSessionId, syncedSession)
+    resetSession(version)
   }
 
   const resetToInitialState = () => {
@@ -327,7 +332,6 @@ export const useDatastructureVersion = ({
 
   return {
     activeSessionId,
-    canSetAvailable,
     form,
     initialFormValues,
     initialSession,
@@ -337,5 +341,6 @@ export const useDatastructureVersion = ({
     handleStatusChange,
     resetToInitialState,
     hasUserChanges,
+    resetSession,
   }
 }

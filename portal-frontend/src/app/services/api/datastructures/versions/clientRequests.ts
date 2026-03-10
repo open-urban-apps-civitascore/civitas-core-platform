@@ -2,6 +2,7 @@ import { useMutation } from '@tanstack/react-query'
 import { Method } from 'axios'
 
 import { useCreateMutation } from '@/hooks/use-create-mutation'
+import { useDataQuery } from '@/hooks/use-data-query'
 import { WithId } from '@/types/common'
 import {
   DatastructureVersion,
@@ -38,6 +39,24 @@ export const useDatastructureVersionMutation = <TResponse, TData>({
     },
   })
 }
+
+type UseGetDatastructureVersionOptions = {
+  datastructureId: string
+  versionId: string
+  isEnabled?: boolean
+}
+export const useGetDatastructureVersion = ({
+  datastructureId,
+  versionId,
+  isEnabled,
+}: UseGetDatastructureVersionOptions) =>
+  useDataQuery<DatastructureVersion>({
+    id: versionId,
+    key: `datastructures/${datastructureId}/versions`,
+    isEnabled,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while fetching groups.',
+  })
 
 export const useCreateDatastructureVersion = () =>
   useDatastructureVersionMutation<DatastructureVersion, DatastructureVersionCreateData>({

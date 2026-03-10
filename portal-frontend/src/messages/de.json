@@ -28,7 +28,8 @@
       "exit": "Beenden",
       "assignItem": "{item} hinzufügen",
       "assignTo": "zu {item}",
-      "back": "Zurück"
+      "back": "Zurück",
+      "import": "Importieren"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -513,6 +514,12 @@
       "type": "Typ",
       "connection": "Verbindung",
       "establishConnection": "Verbindung herstellen"
+    },
+    "dataModel": {
+      "importModal": {
+        "title": "Datenmodell importieren",
+        "to": "in {name}"
+      }
     }
   },
   "datastructures": {

@@ -1,12 +1,12 @@
 'use client'
 
+import { RowSelectionState } from '@tanstack/react-table'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useState } from 'react'
 
-import { StructureDefinitionTab } from '@/app/(main)/datastructures/[datastructureId]/(versions)/components/structure-definition-tab/StructureDefinitionTab'
 import { useDatastructureVersion } from '@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion'
-import { useDatastructureCreation } from '@/app/(main)/datastructures/[datastructureId]/hooks/useDatastructureCreation'
+import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -21,6 +21,7 @@ import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureVersion } from 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
+import { DatastructureTab } from './datastructure-tab/DatastructureTab'
 
 interface DatasourceOverviewProps {
   datasource: Datasource
@@ -51,7 +52,7 @@ const tabs: Tab<DatasourceTab>[] = [
 const disabledTabs: DatasourceTab[] = ['accessPermissions']
 
 export const DatasourceOverview = (props: DatasourceOverviewProps) => {
-  const { datasource, datastructure: initialDatastructure, datastructureVersion } = props
+  const { datasource, datastructure: initialDatastructure, datastructureVersion: initialDatastructureVersion } = props
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
   const router = useRouter()
@@ -59,8 +60,32 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const pathname = usePathname()
 
   const [datastructure, setDatastructure] = useState<Datastructure>(initialDatastructure || defaultDatastructure)
-  const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
+  const [datastructureVersion, setDatastructureVersion] = useState<DatastructureVersion | null>(
+    initialDatastructureVersion,
+  )
 
+  const [selectedDatastructureVersionId, setSelectedDatastructureVersionId] = useState<string | null>(
+    initialDatastructureVersion?.id || null,
+  )
+  const [selectedDatastructureId, setSelectedDatastructureId] = useState<string | null>(
+    initialDatastructure?.id || null,
+  )
+
+  const { data: datastructureVersionData, isFetching: isFetchingDatastructureVersion } = useGetDatastructureVersion({
+    datastructureId: selectedDatastructureId || '',
+    versionId: selectedDatastructureVersionId || '',
+    isEnabled:
+      !!selectedDatastructureId &&
+      !!selectedDatastructureVersionId &&
+      initialDatastructureVersion?.id !== selectedDatastructureVersionId,
+  })
+
+  useEffect(() => {
+    const newVersion = selectedDatastructureVersionId ? datastructureVersionData?.data || null : null
+    setDatastructureVersion(newVersion)
+  }, [selectedDatastructureVersionId, datastructureVersionData?.data])
+
+  const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit' || !datastructureVersionData)
   useEffect(() => {
     setIsReadOnly(searchParams.get('mode') !== 'edit')
   }, [searchParams])
@@ -92,17 +117,23 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   } = useDatasourceForm(datasource)
 
   const {
-    isInUse,
     modelSessionManager,
     hasUserChanges: hasDatastructureBeenEdited,
+    form,
+    isLoading: isUpdatingDataStructureVerison,
+    saveDatastructureVersion,
+    resetToInitialState,
+    resetSession,
   } = useDatastructureVersion({
-    datastructureId: datastructure.id,
-    version: datastructureVersion,
-    isCreateMode: true,
+    datastructureId: selectedDatastructureId || '',
+    version: initialDatastructureVersion || null,
+    isCreateMode: false,
   })
 
-  const handleDatastructureCreation = (datastructureResponse: Datastructure) => setDatastructure(datastructureResponse)
-  const { saveDatastructure: createDatastructure, isLoading: isCreatingDatastructure } = useDatastructureCreation()
+  // sets the active session with the new selected version's diagram
+  useEffect(() => {
+    if (datastructureVersion !== initialDatastructureVersion) resetSession(datastructureVersion, true)
+  }, [datastructureVersion, initialDatastructureVersion])
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -126,14 +157,24 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const handleSaveAndExit = async () => {
-    if (hasDatastructureBeenEdited && !initialDatastructure) {
-      const response = await createDatastructure()
-    }
     submitDatasource(() => {
       setIsExitModalOpen(false)
       updateMode(false)
     })
   }
+
+  const handleSelectDatastructureVersion = (selection: RowSelectionState) => {
+    console.log('selection', selection)
+    const [selectedDatastructureId, selectedVersionId] = Object.keys(selection)[0]?.split('/') || [null, null]
+    setSelectedDatastructureId(selectedDatastructureId)
+    setSelectedDatastructureVersionId(selectedVersionId)
+  }
+
+  const isConfirmButtonDisabled =
+    (!DatasourceForm.formState.isDirty && !hasDatastructureBeenEdited) ||
+    !!DatasourceForm.formState.errors.name ||
+    (dataSourceStatus !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(DatasourceForm.formState.errors).length > 0) ||
+    isLoadingDatasource
 
   const renderTabContent = () => {
     switch (selectedTab) {
@@ -143,7 +184,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         return <ConnectorTab form={DatasourceForm} readyConnectorType={readyConnectorType} isReadOnly={isReadOnly} />
       case 'dataStructure':
         return (
-          <StructureDefinitionTab isReadOnly={isReadOnly} isInUse={isInUse} modelSessionManager={modelSessionManager} />
+          <DatastructureTab
+            datasourceTitle={datasource.name}
+            selectedVersionId={datasource.dataStructureVersion?.id || null}
+            onSelectDatastructureVersion={handleSelectDatastructureVersion}
+            isReadOnly={isReadOnly}
+            isInUse={!!initialDatastructureVersion?.inUse}
+            modelSessionManager={modelSessionManager}
+          />
         )
       case 'accessPermissions':
       default:
@@ -171,13 +219,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             canSetAvailable={canSetAvailable}
             confirmButtonType="button"
             onConfirmClick={handleSave}
-            isConfirmButtonDisabled={
-              !DatasourceForm.formState.isDirty ||
-              !!DatasourceForm.formState.errors.name ||
-              (dataSourceStatus !== DATASOURCE_STATUS_TYPES.DRAFT &&
-                Object.keys(DatasourceForm.formState.errors).length > 0) ||
-              isLoadingDatasource
-            }
+            isConfirmButtonDisabled={isConfirmButtonDisabled}
             isCancelButtonDisabled={isLoadingDatasource}
             onCancelClick={handleExit}
             hasCard={false}
