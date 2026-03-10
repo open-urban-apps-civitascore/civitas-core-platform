@@ -1,8 +1,11 @@
 package de.civitascore.portal.service;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.config.SagaInfraVerifier;
 import de.civitascore.portal.config.SagaOrchestratorTestHelper;
 import de.civitascore.portal.config.SagaTestDataFactory;
@@ -30,6 +33,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -95,6 +99,7 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DistributionRepository distributionRepository;
   @Autowired private PipelineRepository pipelineRepository;
+  @Autowired private KafkaTemplate<String, String> kafkaTemplate;
 
   @Autowired private SagaTestDataFactory data;
   private SagaInfraVerifier verifier;
@@ -548,6 +553,209 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
       assertThat(afterDelete.getProjectId()).isNull();
 
       log.info("Full CREATE → UPDATE → DELETE cycle completed successfully");
+    }
+  }
+
+  @Nested
+  @DisplayName("DataSetSagaResultListener direct message handling")
+  class ResultListenerTests {
+
+    private static final String SAGA_RESULT_TOPIC = "de.civitascore.saga.result";
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /**
+     * Sends a SAGA_COMPLETED message directly to Kafka and verifies the listener persists
+     * infrastructure fields on the DataSet.
+     */
+    @Test
+    @DisplayName("SAGA_COMPLETED message persists infrastructure fields on DataSet")
+    void completedMessage_persistsInfrastructureFields() throws Exception {
+      DataSource dataSource = data.createMqttDataSource();
+      DataSet dataSet = data.createDataSet("Listener Completed Dataset");
+      data.createGeneratePipeline(dataSet, dataSource);
+      data.seedGroupAndAssignment(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      // Put dataset in AVAILABLE + pending CREATE state (as if release() was called)
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      dataSet.setPendingSagaType(PendingSagaType.CREATE);
+      dataSetRepository.save(dataSet);
+
+      // Send SAGA_COMPLETED directly to the result topic
+      String projectId = "proj-" + UUID.randomUUID();
+      String message =
+          objectMapper.writeValueAsString(
+              Map.of(
+                  "type",
+                  "SAGA_COMPLETED",
+                  "result",
+                  Map.of(
+                      "datasetId", dataSetId.toString(),
+                      "projectId", projectId,
+                      "baseUrl", "http://frost:8080/FROST-Server/v1.1/Projects(" + projectId + ")",
+                      "routeId", dataSetId.toString(),
+                      "serviceId", dataSetId.toString(),
+                      "publicUrl", "http://gateway/datasets/" + dataSetId,
+                      "pipelineIds", List.of("pipe-1"))));
+      kafkaTemplate.send(SAGA_RESULT_TOPIC, dataSetId.toString(), message).get();
+
+      await()
+          .atMost(30, SECONDS)
+          .pollInterval(1, SECONDS)
+          .untilAsserted(
+              () -> {
+                DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
+                assertThat(ds.getPendingSagaType()).as("pendingSagaType cleared").isNull();
+                assertThat(ds.getProjectId()).as("projectId persisted").isEqualTo(projectId);
+              });
+
+      DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(persisted.getDataSetStatus()).isEqualTo(DataSetStatus.AVAILABLE);
+      assertThat(persisted.getFrostBaseUrl()).contains(projectId);
+      assertThat(persisted.getRouteId()).isEqualTo(dataSetId.toString());
+      assertThat(persisted.getServiceId()).isEqualTo(dataSetId.toString());
+      assertThat(persisted.getPublicUrl()).contains("/datasets/" + dataSetId);
+      assertThat(persisted.getPipelineIds()).containsExactly("pipe-1");
+
+      log.info("ResultListener SAGA_COMPLETED test passed for dataset {}", dataSetId);
+    }
+
+    /**
+     * Sends a SAGA_FAILED message directly to Kafka for a CREATE saga and verifies the listener
+     * reverts the dataset status to READY.
+     */
+    @Test
+    @DisplayName("SAGA_FAILED for CREATE reverts dataset to READY")
+    void failedMessage_createSaga_revertsToReady() throws Exception {
+      DataSource dataSource = data.createMqttDataSource();
+      DataSet dataSet = data.createDataSet("Listener Failed Dataset");
+      data.createGeneratePipeline(dataSet, dataSource);
+      data.seedGroupAndAssignment(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      // Put dataset in AVAILABLE + pending CREATE
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      dataSet.setPendingSagaType(PendingSagaType.CREATE);
+      dataSetRepository.save(dataSet);
+
+      String message =
+          objectMapper.writeValueAsString(
+              Map.of(
+                  "type", "SAGA_FAILED",
+                  "datasetId", dataSetId.toString(),
+                  "failedStep", "FROST",
+                  "error", "Connection refused",
+                  "compensated", true));
+      kafkaTemplate.send(SAGA_RESULT_TOPIC, dataSetId.toString(), message).get();
+
+      await()
+          .atMost(30, SECONDS)
+          .pollInterval(1, SECONDS)
+          .untilAsserted(
+              () -> {
+                DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
+                assertThat(ds.getPendingSagaType()).as("pendingSagaType cleared").isNull();
+              });
+
+      DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(persisted.getDataSetStatus())
+          .as("CREATE failure should revert to READY")
+          .isEqualTo(DataSetStatus.READY);
+      assertThat(persisted.getProjectId()).as("No infra fields should be set").isNull();
+
+      log.info("ResultListener SAGA_FAILED test passed for dataset {}", dataSetId);
+    }
+
+    /**
+     * Sends a SAGA_FAILED message for a DELETE saga and verifies the dataset stays AVAILABLE (since
+     * stale infrastructure may still exist).
+     */
+    @Test
+    @DisplayName("SAGA_FAILED for DELETE keeps dataset AVAILABLE")
+    void failedMessage_deleteSaga_staysAvailable() throws Exception {
+      DataSource dataSource = data.createMqttDataSource();
+      DataSet dataSet = data.createDataSet("Listener Delete Failed Dataset");
+      data.createGeneratePipeline(dataSet, dataSource);
+      data.seedGroupAndAssignment(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      // Simulate an AVAILABLE dataset with infra, pending DELETE
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      dataSet.setProjectId("proj-existing");
+      dataSet.setRouteId("route-existing");
+      dataSet.setPendingSagaType(PendingSagaType.DELETE);
+      dataSetRepository.save(dataSet);
+
+      String message =
+          objectMapper.writeValueAsString(
+              Map.of(
+                  "type", "SAGA_FAILED",
+                  "datasetId", dataSetId.toString(),
+                  "failedStep", "APISIX",
+                  "error", "Route not found",
+                  "compensated", false));
+      kafkaTemplate.send(SAGA_RESULT_TOPIC, dataSetId.toString(), message).get();
+
+      await()
+          .atMost(30, SECONDS)
+          .pollInterval(1, SECONDS)
+          .untilAsserted(
+              () -> {
+                DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
+                assertThat(ds.getPendingSagaType()).as("pendingSagaType cleared").isNull();
+              });
+
+      DataSet persisted = dataSetRepository.findById(dataSetId).orElseThrow();
+      assertThat(persisted.getDataSetStatus())
+          .as("DELETE failure should keep AVAILABLE (stale infra may exist)")
+          .isEqualTo(DataSetStatus.AVAILABLE);
+      assertThat(persisted.getProjectId())
+          .as("Infra fields should be preserved on DELETE failure")
+          .isEqualTo("proj-existing");
+
+      log.info("ResultListener DELETE SAGA_FAILED test passed for dataset {}", dataSetId);
+    }
+
+    /** Messages with unknown type should be silently ignored — no dataset changes. */
+    @Test
+    @DisplayName("Unknown message type is silently ignored")
+    void unknownType_silentlyIgnored() throws Exception {
+      DataSource dataSource = data.createMqttDataSource();
+      DataSet dataSet = data.createDataSet("Listener Unknown Type Dataset");
+      data.createGeneratePipeline(dataSet, dataSource);
+      data.seedGroupAndAssignment(dataSet);
+      UUID dataSetId = dataSet.getId();
+
+      dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+      dataSet.setPendingSagaType(PendingSagaType.CREATE);
+      dataSetRepository.save(dataSet);
+
+      String message =
+          objectMapper.writeValueAsString(
+              Map.of("type", "SAGA_UNKNOWN", "datasetId", dataSetId.toString()));
+      kafkaTemplate.send(SAGA_RESULT_TOPIC, dataSetId.toString(), message).get();
+
+      // Send a valid COMPLETED after to prove the listener is consuming
+      String validMessage =
+          objectMapper.writeValueAsString(
+              Map.of(
+                  "type",
+                  "SAGA_COMPLETED",
+                  "result",
+                  Map.of("datasetId", dataSetId.toString(), "projectId", "proj-after-unknown")));
+      kafkaTemplate.send(SAGA_RESULT_TOPIC, dataSetId.toString(), validMessage).get();
+
+      await()
+          .atMost(30, SECONDS)
+          .pollInterval(1, SECONDS)
+          .untilAsserted(
+              () -> {
+                DataSet ds = dataSetRepository.findById(dataSetId).orElseThrow();
+                assertThat(ds.getPendingSagaType()).isNull();
+                assertThat(ds.getProjectId()).isEqualTo("proj-after-unknown");
+              });
+
+      log.info("ResultListener unknown type test passed — ignored and continued processing");
     }
   }
 }

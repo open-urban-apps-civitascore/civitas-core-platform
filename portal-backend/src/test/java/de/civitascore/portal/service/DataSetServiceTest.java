@@ -181,7 +181,10 @@ class DataSetServiceTest {
               "route-1",
               "svc-1",
               "https://public.example.com",
-              List.of("pipe-1"));
+              List.of("pipe-1"),
+              null,
+              null,
+              null);
 
       createService().handleSagaCompleted(id, result);
 
@@ -211,7 +214,9 @@ class DataSetServiceTest {
 
       createService()
           .handleSagaCompleted(
-              id, new SagaResultPayload(id.toString(), null, null, null, null, null, null));
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
 
       ArgumentCaptor<DataSet> saved = ArgumentCaptor.forClass(DataSet.class);
       verify(dataSetRepository).save(saved.capture());
@@ -231,7 +236,9 @@ class DataSetServiceTest {
 
       createService()
           .handleSagaCompleted(
-              id, new SagaResultPayload(id.toString(), null, null, null, null, null, null));
+              id,
+              new SagaResultPayload(
+                  id.toString(), null, null, null, null, null, null, null, null, null));
 
       verify(dataSetRepository, never()).save(any());
     }
@@ -287,7 +294,10 @@ class DataSetServiceTest {
               "route-1",
               "svc-1",
               "https://public.example.com/",
-              List.of());
+              List.of(),
+              null,
+              null,
+              null);
 
       createService().handleSagaCompleted(id, result);
 

@@ -1,5 +1,6 @@
 package de.civitascore.portal.messaging.saga;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.model.embedded.SagaResultType;
@@ -41,13 +42,25 @@ public class DataSetSagaResultListener {
       }
 
       switch (type) {
-        case SAGA_COMPLETED -> handleSagaCompleted(message);
-        case SAGA_FAILED -> handleSagaFailed(message);
+        case SAGA_COMPLETED -> {
+          if (!(message.get("result") instanceof Map<?, ?> resultRaw)) {
+            log.warn("SAGA_COMPLETED message missing or invalid result payload");
+            return;
+          }
+          SagaResultPayload result = objectMapper.convertValue(resultRaw, SagaResultPayload.class);
+          handleSagaCompleted(result);
+        }
+        case SAGA_FAILED -> {
+          SagaResultPayload result = objectMapper.convertValue(message, SagaResultPayload.class);
+          handleSagaFailed(result);
+        }
       }
-    } catch (Exception e) {
-      log.error("Failed to process saga result: {}", e.getMessage(), e);
-      // Re-throw so the DLQ error handler can retry and eventually dead-letter the message
-      throw new RuntimeException("Saga result processing failed", e);
+    } catch (JsonProcessingException e) {
+      log.error("Failed to deserialize saga result: {}", e.getMessage(), e);
+      throw new IllegalStateException("Saga result deserialization failed", e);
+    } catch (IllegalArgumentException e) {
+      log.error("Invalid saga result payload: {}", e.getMessage(), e);
+      throw new IllegalStateException("Saga result processing failed", e);
     }
   }
 
@@ -64,13 +77,7 @@ public class DataSetSagaResultListener {
     }
   }
 
-  private void handleSagaCompleted(Map<String, Object> message) {
-    if (!(message.get("result") instanceof Map<?, ?> resultRaw)) {
-      log.warn("SAGA_COMPLETED message missing or invalid result payload");
-      return;
-    }
-
-    SagaResultPayload result = objectMapper.convertValue(resultRaw, SagaResultPayload.class);
+  private void handleSagaCompleted(SagaResultPayload result) {
     if (result.datasetId() == null) {
       log.warn("SAGA_COMPLETED result missing datasetId");
       return;
@@ -85,31 +92,29 @@ public class DataSetSagaResultListener {
     dataSetService.handleSagaCompleted(datasetId, result);
   }
 
-  private void handleSagaFailed(Map<String, Object> message) {
-    String datasetIdStr = (String) message.get("datasetId");
-    if (datasetIdStr == null) {
+  private void handleSagaFailed(SagaResultPayload result) {
+    if (result.datasetId() == null) {
       log.warn("SAGA_FAILED message missing datasetId");
       return;
     }
 
-    UUID datasetId = parseDatasetId(datasetIdStr);
+    UUID datasetId = parseDatasetId(result.datasetId());
     if (datasetId == null) {
       return;
     }
 
-    String failedStep = (String) message.get("failedStep");
-    String error = (String) message.get("error");
-    Boolean compensated = (Boolean) message.get("compensated");
-
     log.info(
         "Saga failed for dataset {}: step={}, error={}, compensated={}",
         datasetId,
-        failedStep,
-        error,
-        compensated);
+        result.failedStep(),
+        result.error(),
+        result.compensated());
 
     dataSetService.handleSagaFailed(
-        datasetId, failedStep, error, compensated != null && compensated);
+        datasetId,
+        result.failedStep(),
+        result.error(),
+        result.compensated() != null && result.compensated());
   }
 
   private UUID parseDatasetId(String datasetIdStr) {

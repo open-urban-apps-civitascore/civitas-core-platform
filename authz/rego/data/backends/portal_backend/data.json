@@ -73,10 +73,10 @@
     "/v1/datasets/{id}/unpublish": {
       "POST": "DATASET_UPDATE"
     },
-    "/v1/datasets/{id}/ready": {
-      "POST": "DATASET_UPDATE"
+    "/v1/datasets/{id}/release": {
+      "POST": "DATASET_RELEASE"
     },
-    "/v1/datasets/{id}/unready": {
+    "/v1/datasets/{id}/unrelease": {
       "POST": "DATASET_UPDATE"
     },
     "/v1/datasets/{id}/published/meta": {
