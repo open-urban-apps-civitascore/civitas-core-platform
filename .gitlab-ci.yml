@@ -80,6 +80,8 @@ variables:
 secret_detection:
   stage: qa
   needs: []
+  variables:
+    SECRET_DETECTION_EXCLUDED_PATHS: "**/src/test/**,**/src/**/__tests__/**,**/*.test.*"
 
 gitlab-advanced-sast:
   stage: qa

@@ -27,7 +27,7 @@ import java.util.Objects;
  *   "sni": "backend.example.com",
  *   "verify": true,
  *   "client_cert": "-----BEGIN CERTIFICATE-----\n...",
- *   "client_key": "-----BEGIN RSA PRIVATE KEY-----\n...",
+ *   "client_key": "-----BEGIN RSA PRIVATE KEY-----\n...", // gitleaks:allow
  *   "client_cert_id": "ssl-cert-ref-id"
  * }
  * }</pre>
