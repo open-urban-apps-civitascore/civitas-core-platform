@@ -1,6 +1,6 @@
 'use client'
 
-import { Row, RowSelectionState } from '@tanstack/react-table'
+import { RowSelectionState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 
@@ -11,7 +11,6 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Permission } from '@/types/permissions'
 import { ROLE_TYPES } from '@/types/roles'
 
 import { PermissionsTable } from './components/PermissionsTable'
@@ -54,10 +53,6 @@ const PermissionsPage = () => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, setTotalPages, pageSize])
 
-  const handleOpenButtonClick = (row: Row<Permission>) => {
-    console.log(`/permissions/${row.original.id}?_tab=${permissionType}`)
-  }
-
   const getTitle = () => {
     const label = tabs.find(tab => tab.value === permissionType)?.label
     const labelTranslation = label ? t(label) : ''
@@ -88,7 +83,6 @@ const PermissionsPage = () => {
             pageSize={pageSize}
             totalPages={totalPages}
             sorting={sorting}
-            onOpenButtonClick={handleOpenButtonClick}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
             onSortingChange={setSortingParams}
