@@ -30,5 +30,7 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('dataStructureVersionId', res.body.id);
+    bru.setVar('scopeType', 'DATASTRUCTURE');
+    bru.setVar('scopeId', bru.getVar('dataStructureId'));
   }
 }

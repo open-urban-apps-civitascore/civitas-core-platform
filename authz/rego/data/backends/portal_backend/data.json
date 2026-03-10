@@ -38,6 +38,9 @@
       "PATCH": "GROUP_UPDATE",
       "DELETE": "GROUP_DELETE"
     },
+    "/v1/groups/{id}/assignments": {
+      "PUT": ["ASSIGNMENT_CREATE", "ASSIGNMENT_DELETE"]
+    },
     "/v1/permissions": {
       "_collection": true,
       "GET": "PERMISSION_READ"

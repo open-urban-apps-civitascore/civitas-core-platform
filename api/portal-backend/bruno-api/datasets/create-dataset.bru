@@ -22,5 +22,7 @@ body:json {
 script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('dataSetId', res.body.id);
+    bru.setVar('scopeType', 'DATASET');
+    bru.setVar('scopeId', res.body.id);
   }
 }

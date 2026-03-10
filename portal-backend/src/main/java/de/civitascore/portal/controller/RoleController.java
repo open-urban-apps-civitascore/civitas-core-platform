@@ -42,6 +42,11 @@ public class RoleController extends BaseController<RoleInputDTO, RoleOutputDTO, 
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "Full access")),
     @Parameter(
+        name = "roleType",
+        description = "Filter by role type (exact match, comma-separated for multiple).",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "string", example = "SYSTEM")),
+    @Parameter(
         name = "q",
         description = "Search in name or description (partial match, case-insensitive).",
         in = ParameterIn.QUERY,

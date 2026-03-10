@@ -2,7 +2,7 @@ package de.civitascore.portal.controller;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.portal.model.entity.Assignment;
-import de.civitascore.portal.model.input.AssignmentInputDTO;
+import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.assembler.AssignmentAssembler;
 import de.civitascore.portal.repository.specification.AssignmentSpec;

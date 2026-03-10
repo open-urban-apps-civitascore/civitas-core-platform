@@ -26,7 +26,7 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   private final DataSetRepository dataSetRepository;
   private final DataSetMapper dataSetMapper;
 
-  private final ScopedAssignmentBuilderService assignmentBuilderService;
+  private final AssignmentFactory assignmentFactory;
   private final DistributionService distributionService;
 
   private final ObjectMapper objectMapper;
@@ -47,8 +47,8 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
   }
 
   @Override
-  protected ScopedAssignmentBuilderService getAssignmentBuilderService() {
-    return assignmentBuilderService;
+  protected AssignmentFactory getAssignmentFactory() {
+    return assignmentFactory;
   }
 
   /**

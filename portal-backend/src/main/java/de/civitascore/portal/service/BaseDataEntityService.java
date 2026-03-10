@@ -10,20 +10,15 @@ public abstract class BaseDataEntityService<
         E extends BaseDataEntity, I extends BaseDataEntityInputDTO>
     extends BaseService<E, I> {
 
-  protected abstract ScopedAssignmentBuilderService getAssignmentBuilderService();
+  protected abstract AssignmentFactory getAssignmentFactory();
 
   @Override
   protected E postConvertToEntity(E entity, I input) {
     if (input.getAssignments() != null) {
       Set<Assignment> assignments =
           input.getAssignments().stream()
-              .distinct()
-              .map(dto -> getAssignmentBuilderService().build(dto))
+              .map(dto -> getAssignmentFactory().build(dto))
               .collect(Collectors.toSet());
-      // Clear and flush DELETEs before INSERTs to avoid unique constraint violation
-      // when re-inserting the same group+role+scope combination.
-      entity.getAssignments().clear();
-      getRepository().flush();
       entity.setAssignments(assignments);
     }
     return super.postConvertToEntity(entity, input);

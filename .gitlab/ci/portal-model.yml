@@ -46,7 +46,7 @@ setup-version-portal-model:
       elif [ "$CI_COMMIT_BRANCH" = "develop" ]; then
         PORTAL_MODEL_VERSION="${BASE_VERSION}-SNAPSHOT"
       elif [ "$CI_PIPELINE_SOURCE" = "merge_request_event" ]; then
-        PORTAL_MODEL_VERSION="${BASE_VERSION}-MR-${CI_MERGE_REQUEST_IID}"
+        PORTAL_MODEL_VERSION="${BASE_VERSION}-MR-${CI_MERGE_REQUEST_IID}-SNAPSHOT"
       else
         PORTAL_MODEL_VERSION="${BASE_VERSION}-${CI_COMMIT_SHORT_SHA}"
       fi
