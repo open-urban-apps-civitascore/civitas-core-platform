@@ -81,9 +81,13 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   })
 
   useEffect(() => {
-    const newVersion = selectedDatastructureVersionId ? datastructureVersionData?.data || null : null
+    const newVersion = !selectedDatastructureVersionId
+      ? null
+      : selectedDatastructureVersionId === initialDatastructureVersion?.id
+        ? initialDatastructureVersion
+        : datastructureVersionData?.data || null
     setDatastructureVersion(newVersion)
-  }, [selectedDatastructureVersionId, datastructureVersionData?.data])
+  }, [selectedDatastructureVersionId, datastructureVersionData?.data, initialDatastructureVersion])
 
   const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit' || !datastructureVersionData)
   useEffect(() => {
@@ -132,8 +136,20 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   // sets the active session with the new selected version's diagram
   useEffect(() => {
+    const hasNoSelectedVersion = !selectedDatastructureId || !selectedDatastructureVersionId
+
+    if (hasNoSelectedVersion) {
+      resetSession(null, true)
+      return
+    }
+
     if (datastructureVersion !== initialDatastructureVersion) resetSession(datastructureVersion, true)
-  }, [datastructureVersion, initialDatastructureVersion])
+  }, [
+    datastructureVersion,
+    initialDatastructureVersion,
+    selectedDatastructureId,
+    selectedDatastructureVersionId,
+  ])
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -164,7 +180,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const handleSelectDatastructureVersion = (selection: RowSelectionState) => {
-    console.log('selection', selection)
     const [selectedDatastructureId, selectedVersionId] = Object.keys(selection)[0]?.split('/') || [null, null]
     setSelectedDatastructureId(selectedDatastructureId)
     setSelectedDatastructureVersionId(selectedVersionId)
@@ -186,7 +201,11 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         return (
           <DatastructureTab
             datasourceTitle={datasource.name}
-            selectedVersionId={datasource.dataStructureVersion?.id || null}
+            selectedVersionId={
+              selectedDatastructureId && selectedDatastructureVersionId
+                ? `${selectedDatastructureId}/${selectedDatastructureVersionId}`
+                : null
+            }
             onSelectDatastructureVersion={handleSelectDatastructureVersion}
             isReadOnly={isReadOnly}
             isInUse={!!initialDatastructureVersion?.inUse}

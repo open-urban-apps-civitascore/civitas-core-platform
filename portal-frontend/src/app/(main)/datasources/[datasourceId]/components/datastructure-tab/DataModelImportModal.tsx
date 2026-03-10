@@ -50,9 +50,8 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
   const { getApiRequestParams } = useQueryParams()
 
   useEffect(() => {
-    if (open && selectedVersion) {
-      setSelection({ [selectedVersion]: true })
-    }
+    if (!open) return
+    setSelection(selectedVersion ? { [selectedVersion]: true } : {})
   }, [open, selectedVersion])
 
   const { data: datastructuresData, isFetching: isFetchingDatasources } = useGetDatastructures({
@@ -206,7 +205,9 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
     },
     onRowSelectionChange: updater => {
       const next = resolveUpdater(updater, selection)
-      const selectedIds = Object.keys(next)
+      const selectedIds = Object.entries(next)
+        .filter(([, isSelected]) => isSelected)
+        .map(([id]) => id)
       if (selectedIds.length === 0) {
         setSelection({})
         return
