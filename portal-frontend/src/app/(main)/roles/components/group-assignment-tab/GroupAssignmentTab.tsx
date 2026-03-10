@@ -6,13 +6,14 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 
-import { AssignmentScopeType, AssignmentSummary } from '@/app/services/api/assignments/clientRequests'
+import { AssignmentSummary } from '@/app/services/api/assignments/clientRequests'
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
+import { ASSIGNMENT_SCOPE_TYPES, AssignmentScope } from '@/types/assignments'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
 
@@ -28,11 +29,11 @@ interface GroupAssignmentTabProps {
   assignments: AssignmentSummary[]
 }
 
-const SCOPE_TABS: Tab<AssignmentScopeType>[] = [
-  { label: 'roles.groupAssignmentTab.scopeTabs.platformWide', value: 'TENANT' },
-  { label: 'roles.groupAssignmentTab.scopeTabs.dataset', value: 'DATASET' },
-  { label: 'roles.groupAssignmentTab.scopeTabs.datasource', value: 'DATASOURCE' },
-  { label: 'roles.groupAssignmentTab.scopeTabs.datastructure', value: 'DATASTRUCTURE' },
+const SCOPE_TABS: Tab<AssignmentScope>[] = [
+  { label: 'roles.groupAssignmentTab.scopeTabs.platformWide', value: ASSIGNMENT_SCOPE_TYPES.TENANT },
+  { label: 'roles.groupAssignmentTab.scopeTabs.dataset', value: ASSIGNMENT_SCOPE_TYPES.DATASET },
+  { label: 'roles.groupAssignmentTab.scopeTabs.datasource', value: ASSIGNMENT_SCOPE_TYPES.DATASOURCE },
+  { label: 'roles.groupAssignmentTab.scopeTabs.datastructure', value: ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE },
 ]
 
 const getGroupSelection = (groupIds: Group['id'][]) =>
@@ -50,7 +51,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [groupSelection, setGroupSelection] = useState<RowSelectionState>(getGroupSelection(assignedGroupIds))
   const originalGroupSelection = getGroupSelection(assignedGroupIds)
-  const [selectedScope, setSelectedScope] = useState<AssignmentScopeType>('TENANT')
+  const [selectedScope, setSelectedScope] = useState<AssignmentScope>(ASSIGNMENT_SCOPE_TYPES.TENANT)
   const [groupToRemove, setGroupToRemove] = useState<GroupTableRow | null>(null)
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
 
   // Build a map from group ID to scopeType from assignments
   const groupScopeMap = useMemo(() => {
-    const map: Record<string, AssignmentScopeType> = {}
+    const map: Record<string, AssignmentScope> = {}
     assignments.forEach(a => {
       map[a.group.id] = a.scopeType
     })
@@ -72,7 +73,9 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   // Filter assignments by selected scope
   const scopeFilteredGroupIds = useMemo(() => {
     return assignments
-      .filter(a => a.scopeType === selectedScope || (selectedScope === 'TENANT' && a.scopeType == null))
+      .filter(
+        a => a.scopeType === selectedScope || (selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT && a.scopeType == null),
+      )
       .map(a => a.group.id)
   }, [assignments, selectedScope])
 
@@ -125,7 +128,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     setGroupToRemove(null)
   }
 
-  const isTenantScope = selectedScope === 'TENANT'
+  const isTenantScope = selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT
   const canEdit = isEditMode && isTenantScope
 
   const haveGroupsBeenTouched =

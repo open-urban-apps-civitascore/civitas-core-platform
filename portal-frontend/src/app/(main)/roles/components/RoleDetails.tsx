@@ -29,6 +29,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { FormRole, Role, roleSchema, RoleTab } from '@/types/roles'
 
 import { DEFAULT_TAB } from '../page'
@@ -224,7 +225,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         createAssignment.mutateAsync({
           groupId,
           roleId,
-          ...(initialRole.roleType !== 'SYSTEM' && { scopeType: 'TENANT' as const }),
+          ...(initialRole.roleType !== 'SYSTEM' && { scopeType: ASSIGNMENT_SCOPE_TYPES.TENANT }),
         }),
       ),
     )

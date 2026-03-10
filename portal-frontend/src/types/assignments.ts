@@ -6,6 +6,9 @@ import { ItemSchema } from './common'
 import { RoleTypeEnum } from './roles'
 
 export const ASSIGNMENT_SCOPE_TYPES = {
+  TENANT: 'TENANT',
+  DATASET: 'DATASET',
+  DATASOURCE: 'DATASOURCE',
   DATASTRUCTURE: 'DATASTRUCTURE',
 } as const
 

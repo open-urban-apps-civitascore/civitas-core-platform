@@ -3,22 +3,21 @@ import { useQueryClient } from '@tanstack/react-query'
 import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
+import { AssignmentScope } from '@/types/assignments'
 import { GetListInput } from '@/types/common'
-
-export type AssignmentScopeType = 'TENANT' | 'DATASET' | 'DATASOURCE' | 'DATASTRUCTURE'
 
 export type AssignmentSummary = {
   id: string
   group: { id: string; name: string }
   role: { id: string; name: string; roleType: string }
-  scopeType: AssignmentScopeType
+  scopeType: AssignmentScope
   scope: { id: string; name: string } | null
 }
 
 export type CreateAssignmentData = {
   groupId: string
   roleId: string
-  scopeType?: AssignmentScopeType
+  scopeType?: AssignmentScope
 }
 
 const key = 'assignments'

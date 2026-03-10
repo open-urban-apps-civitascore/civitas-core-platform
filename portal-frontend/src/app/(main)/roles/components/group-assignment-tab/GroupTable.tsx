@@ -1,16 +1,16 @@
 import { createColumnHelper, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 
-import { AssignmentScopeType } from '@/app/services/api/assignments/clientRequests'
 import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { AssignmentScope } from '@/types/assignments'
 import { Group } from '@/types/groups'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
 export interface GroupTableRow extends Group {
-  scopeType?: AssignmentScopeType
+  scopeType?: AssignmentScope
 }
 
 interface GroupTableProps extends TableProps<GroupTableRow> {
