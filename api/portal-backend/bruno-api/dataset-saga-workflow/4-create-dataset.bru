@@ -1,0 +1,35 @@
+meta {
+  name: 4. Create DataSet
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Saga Test DataSet",
+    "description": "Dataset for end-to-end saga workflow test",
+    "openDataAccess": false
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaDataSetId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Status is DRAFT", function() {
+    expect(res.body.dataSetStatus).to.equal("DRAFT");
+  });
+}

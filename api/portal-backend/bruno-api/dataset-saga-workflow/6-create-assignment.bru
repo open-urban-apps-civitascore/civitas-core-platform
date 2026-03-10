@@ -1,0 +1,36 @@
+meta {
+  name: 6. Create Assignment
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/assignments
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "groupId": "{{sagaGroupId}}",
+    "roleId": "{{sagaRoleId}}",
+    "scopeType": "DATASET",
+    "scopeId": "{{sagaDataSetId}}"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaAssignmentId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("ScopeType is DATASET", function() {
+    expect(res.body.scopeType).to.equal("DATASET");
+  });
+}

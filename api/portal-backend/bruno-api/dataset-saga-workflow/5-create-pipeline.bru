@@ -1,0 +1,60 @@
+meta {
+  name: 5. Create Pipeline
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sagaDataSetId}}
+}
+
+body:json {
+  {
+    "name": "Saga Test Pipeline",
+    "description": "Pipeline for saga workflow test",
+    "dataSourceIds": ["{{sagaDataSourceId}}"],
+    "apis": ["http://frost:8080/FROST-Server/v1.1"],
+    "persistences": [],
+    "styles": {},
+    "model": {
+      "input": {
+        "generate": {
+          "interval": "1s",
+          "count": 1,
+          "mapping": "root = {\"name\": \"Test Sensor\", \"description\": \"test\"}"
+        }
+      },
+      "output": {
+        "http_client": {
+          "url": "${FROST_BASE}/Things",
+          "verb": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        }
+      }
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaPipelineId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+}

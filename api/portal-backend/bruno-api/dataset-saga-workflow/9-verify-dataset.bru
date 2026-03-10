@@ -1,0 +1,35 @@
+meta {
+  name: 9. Verify DataSet (after saga)
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Status is AVAILABLE", function() {
+    expect(res.body.dataSetStatus).to.equal("AVAILABLE");
+  });
+
+  test("Saga completed - infrastructure fields populated", function() {
+    if (res.body.pendingSagaType === null) {
+      expect(res.body.projectId).to.be.a('string').that.is.not.empty;
+      expect(res.body.frostBaseUrl).to.be.a('string').that.is.not.empty;
+      expect(res.body.routeId).to.be.a('string').that.is.not.empty;
+      expect(res.body.serviceId).to.be.a('string').that.is.not.empty;
+      expect(res.body.publicUrl).to.be.a('string').that.is.not.empty;
+    }
+  });
+}

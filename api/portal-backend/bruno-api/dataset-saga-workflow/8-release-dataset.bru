@@ -1,0 +1,29 @@
+meta {
+  name: 8. Release DataSet (triggers saga)
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+tests {
+  test("Status code is 202", function() {
+    expect(res.getStatus()).to.equal(202);
+  });
+
+  test("Status is AVAILABLE", function() {
+    expect(res.body.dataSetStatus).to.equal("AVAILABLE");
+  });
+
+  test("Pending saga type is CREATE", function() {
+    expect(res.body.pendingSagaType).to.equal("CREATE");
+  });
+}

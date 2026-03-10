@@ -1,0 +1,37 @@
+meta {
+  name: 2. Create Group
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/groups
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Saga Test Group",
+    "description": "Group for saga workflow test",
+    "contactUserId": null,
+    "parentGroupId": null,
+    "memberIds": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaGroupId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+}

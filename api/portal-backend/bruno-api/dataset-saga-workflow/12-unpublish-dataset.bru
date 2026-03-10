@@ -1,0 +1,25 @@
+meta {
+  name: 12. Unpublish DataSet
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/unpublish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Status is DRAFT", function() {
+    expect(res.body.dataSetStatus).to.equal("DRAFT");
+  });
+}

@@ -1,0 +1,54 @@
+meta {
+  name: 1. Create DataSource (MQTT)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasources
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Saga Test MQTT Sensor",
+    "description": "MQTT broker for saga workflow test",
+    "connectorType": "MQTT",
+    "configuration": {
+      "urls": ["tcp://broker.local:1883"],
+      "topics": ["sensor/temperature"],
+      "client_id": "civitas-saga-test",
+      "qos": 1,
+      "connect_timeout": "5s",
+      "keepalive": "30s",
+      "tls": {
+        "enabled": false
+      },
+      "user": "mqttuser",
+      "password": "secret"
+    },
+    "dataStructureVersionId": null,
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaDataSourceId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+
+  test("ConnectorType is MQTT", function() {
+    expect(res.body.connectorType).to.equal("MQTT");
+  });
+}

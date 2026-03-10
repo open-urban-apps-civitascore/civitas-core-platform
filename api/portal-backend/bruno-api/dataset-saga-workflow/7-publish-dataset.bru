@@ -1,0 +1,29 @@
+meta {
+  name: 7. Publish DataSet
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/publish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Status is READY", function() {
+    expect(res.body.dataSetStatus).to.equal("READY");
+  });
+
+  test("Has distributions", function() {
+    expect(res.body.distributions).to.be.an('array');
+  });
+}
