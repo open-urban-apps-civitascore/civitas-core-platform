@@ -63,7 +63,7 @@ plugin_configs:
 routes:
   - id: portal-backend-api
     name: "Portal Backend API (Allow-All)"
-    uri: /v2/*
+    uri: /v1/*
     service_id: svc-portal-backend
     plugin_config_id: 1
 

@@ -127,7 +127,7 @@ backend_endpoints := frost_server.endpoints if {
 # This enables permission_eval.rego to verify that user's permission scope
 # matches the resource being accessed.
 
-# Resource ID extracted from path (e.g., /v2/datasets/{id} -> id)
+# Resource ID extracted from path (e.g., /v1/datasets/{id} -> id)
 # Undefined for collection endpoints
 resource_id := portal_backend.resource_id if {
 	backend_data_key == "portal_backend"

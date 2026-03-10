@@ -8,7 +8,7 @@ const JSON_SERVER_URL = `${process.env.JSON_SERVER_HOST}:${process.env.JSON_SERV
 // APISIX Gateway URL - requests go through the gateway for JWT validation
 // The gateway validates the Bearer token and forwards to the backend
 // See .env.local.template for configuration
-const API_URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v2`
+const API_URL = `${process.env.API_BASE_URL}:${process.env.API_PORT}/v1`
 
 // Log configured endpoints on module initialization
 logger.debug({ jsonServerUrl: JSON_SERVER_URL, apiUrl: API_URL }, 'Proxy endpoints configured')

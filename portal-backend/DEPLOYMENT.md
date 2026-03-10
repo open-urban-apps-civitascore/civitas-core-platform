@@ -79,7 +79,7 @@
 | Property / Env Var | Default | Description |
 |---|---|---|
 | `SERVER_PORT` | `8089` | HTTP port |
-| `server.servlet.context-path` | `/v2` | API path prefix |
+| `server.servlet.context-path` | `/v1` | API path prefix |
 | `server.max-http-request-header-size` | `32KB` | Max HTTP request header size — increase if users belong to many dataspaces (large `X-Allowed-Scope-Ids` header from OPA) |
 
 ---
@@ -139,7 +139,7 @@ Defaults are tuned for production. Only adjust for specific throughput/latency r
 |---|---|---|
 | `app.url` | `http://localhost:8089` | Server URL shown in Swagger UI — set to the external-facing URL |
 | `springdoc.swagger-ui.enabled` | `true` | Set to `false` in production to hide API docs |
-| `springdoc.api-docs.path` | `/v2/api-docs` | OpenAPI JSON path |
+| `springdoc.api-docs.path` | `/v1/api-docs` | OpenAPI JSON path |
 | `springdoc.swagger-ui.path` | `/swagger-ui.html` | Swagger UI path |
 
 ---
