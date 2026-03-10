@@ -45,6 +45,7 @@ export const appSidebarNavSections: NavSection[] = [
           { title: 'users', url: '/users', requiredPermission: PERMISSION_NAMES.USER_READ },
           { title: 'groups', url: '/groups', requiredPermission: PERMISSION_NAMES.GROUP_READ },
           { title: 'roles', url: '/roles', requiredPermission: PERMISSION_NAMES.ROLE_READ },
+          { title: 'permissions', url: '/permissions', requiredPermission: PERMISSION_NAMES.PERMISSION_READ },
         ],
       },
     ],
