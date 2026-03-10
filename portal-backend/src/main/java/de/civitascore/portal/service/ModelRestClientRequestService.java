@@ -7,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
-import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
@@ -20,7 +19,10 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Service
 @RequiredArgsConstructor
 public class ModelRestClientRequestService {
-  private static final String UML_CONTENT_TYPE = "application/uml";
+
+  private static final MediaType UML_UTF8 =
+      MediaType.parseMediaType("application/uml; charset=UTF-8");
+
   private final ModelAtlasConfig modelAtlasConfig;
   private final RestClient.Builder restClientBuilder;
 
@@ -54,12 +56,12 @@ public class ModelRestClientRequestService {
    */
   public String uploadModelFile(MultipartFile modelFile, String nsUri) {
     try {
-      RestClient restClient = createRestClient();
+      RestClient restClient = restClientBuilder.baseUrl(getBaseUrl()).build();
 
       return restClient
           .post()
           .uri(getUploadEndpoint(nsUri))
-          .contentType(MediaType.parseMediaType(UML_CONTENT_TYPE))
+          .contentType(UML_UTF8)
           .accept(MediaType.APPLICATION_JSON)
           .body(modelFile.getResource())
           .retrieve()
@@ -82,12 +84,12 @@ public class ModelRestClientRequestService {
    */
   public String uploadModelString(String modelContent, String nsUri) {
     try {
-      RestClient restClient = createRestClient();
+      RestClient restClient = restClientBuilder.baseUrl(getBaseUrl()).build();
 
       return restClient
           .post()
           .uri(getUploadEndpoint(nsUri))
-          .contentType(MediaType.parseMediaType(UML_CONTENT_TYPE))
+          .contentType(UML_UTF8)
           .accept(MediaType.APPLICATION_JSON)
           .body(modelContent)
           .retrieve()
@@ -99,17 +101,6 @@ public class ModelRestClientRequestService {
       log.error("Failed to upload model string to Model Atlas: nsUri={}", nsUri, e);
       throw new ExternalSystemRejectionException("Failed to upload model string to Model Atlas", e);
     }
-  }
-
-  private RestClient createRestClient() {
-    RestTemplate restTemplate = new RestTemplate();
-    restTemplate
-        .getMessageConverters()
-        .add(0, new StringHttpMessageConverter(StandardCharsets.UTF_8));
-    return restClientBuilder
-        .baseUrl(getBaseUrl())
-        .messageConverters(restTemplate.getMessageConverters())
-        .build();
   }
 
   /**
