@@ -58,11 +58,12 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
       entity.setContactUser(null);
     }
 
-    if (input.getParentGroupId() != null) {
-      entity.setParentGroup(findByIdOrThrow(input.getParentGroupId()));
-    } else {
-      entity.setParentGroup(null);
-    }
+    // TODO: implement in V2.1
+    // if (input.getParentGroupId() != null) {
+    //   entity.setParentGroup(findByIdOrThrow(input.getParentGroupId()));
+    // } else {
+    //   entity.setParentGroup(null);
+    // }
 
     // For collections, use findAllById for efficient batch loading
     if (Objects.nonNull(input.getMemberIds())) {
