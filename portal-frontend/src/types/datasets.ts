@@ -2,6 +2,7 @@ import { CheckedState } from '@radix-ui/react-checkbox'
 import { JSX } from 'react'
 import { z } from 'zod'
 
+import { AssignmentScopedInputSchema } from './assignments'
 import { ItemType, STATUS_TYPES, WithId } from './common'
 
 export const DATASET_STATUS_TYPES = {
@@ -46,24 +47,36 @@ export const DatasetApiResponseSchema = z.object({
 
 export type Dataset = z.infer<typeof DatasetApiResponseSchema>
 
+// ---------- API Base Input ----------
+
+export const DatasetBaseInputSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  openDataAccess: z.boolean(),
+  assignments: AssignmentScopedInputSchema.array(),
+})
+
 // ---------- API Create ----------
 
-export const DatasetCreateApiSchema = z.object({
-  name: z.string(),
-  description: z.string().optional(),
-  openDataAccess: z.boolean().optional(),
-  dataSetStatus: DatasetStatusSchema.optional(), // Is neccessary for JSON server usage. Needs to be removed, when backend API is implemented.
+export const DatasetCreateApiSchema = DatasetBaseInputSchema.partial().required({
+  name: true,
 })
 
 export type DatasetCreateApiData = z.infer<typeof DatasetCreateApiSchema>
 
 // ---------- API Update ----------
 
-export const DatasetUpdateApiSchema = DatasetCreateApiSchema.extend({
-  assignments: z.array(z.any()).optional(),
+export const DatasetUpdateApiSchema = DatasetBaseInputSchema.partial().required({
+  name: true,
 })
 
 export type DatasetUpdateApiData = z.infer<typeof DatasetUpdateApiSchema> & WithId
+
+// ---------- API Patch ----------
+
+export const DatasetPatchApiSchema = DatasetBaseInputSchema.partial()
+
+export type DatasetPatchApiData = z.infer<typeof DatasetPatchApiSchema> & WithId
 
 //  FORM SCHEMAS
 
@@ -112,7 +125,7 @@ export type DatasetTableData = {
   dataSetStatus: DatasetStatusTypes
 }
 
-export type CompletionStepParam = 'accessManagement' | 'data-flow'
+export type CompletionStepParam = 'access-management' | 'data-flow'
 
 export type CompletionStepData = {
   title: string

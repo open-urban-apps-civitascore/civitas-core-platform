@@ -88,6 +88,59 @@
     "english": "Englisch",
     "selectLanguagePlaceholder": "Sprache wählen"
   },
+  "accessManagement": {
+    "title": "Zugriffsberechtigungen",
+    "subtitle": "Hier werden Zuständigkeiten und Zugriffsrechte definiert.",
+    "addAssignment": "Gruppe hinzufügen",
+    "addRole": "Rolle hinzufügen",
+    "deleteGroup": "Gruppe entfernen",
+    "tableHeaders": {
+      "group": "Gruppe",
+      "role": "Rolle",
+      "description": "Beschreibung",
+      "action": "Aktion"
+    },
+    "noDataPage": {
+      "title": "Keine Gruppen und Rollen vorhanden",
+      "description": "Keine Gruppe besitzt Berechtigungen."
+    },
+    "addGroupModal": {
+      "title": "Gruppe hinzufügen",
+      "description": "Wähle eine Gruppe aus, um Berechtigungen zuzuweisen.",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Beschreibung"
+      },
+      "noGroupsAvailable": "Keine Gruppen verfügbar, die hinzugefügt werden können",
+      "selectAll": "Alle Gruppen auswählen",
+      "selectGroup": "Gruppe auswählen",
+      "selectedGroups": "{number} ausgewählt"
+    },
+    "addRoleModal": {
+      "title": "Rolle hinzufügen",
+      "description": "Zur Gruppe {groupName}",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "roleType": "Typ"
+      },
+      "noRolesAvailable": "Keine Rollen verfügbar, die hinzugefügt werden können",
+      "selectRole": "Rolle auswählen",
+      "selectAll": "Alle Rollen auswählen",
+      "selectedRoles": "{number} ausgewählt",
+      "roleTypes": {
+        "default": "Standard",
+        "custom": "Eigene"
+      }
+    },
+    "infoBoxes": {
+      "firstBox": "Gruppen, die plattformweite Berechtigungen an allen Datenobjekten besitzen, haben Zugriff.",
+      "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen."
+    },
+    "messages": {
+      "updateSuccess": "Berechtigungen wurden erfolgreich aktualisiert."
+    }
+  },
   "sidebar": {
     "home": "Home",
     "menu-item": "Menüpunkt",

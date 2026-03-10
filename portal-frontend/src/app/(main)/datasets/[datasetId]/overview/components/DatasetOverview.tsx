@@ -214,7 +214,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     {
       title: t('overview.completion.accessManagement.title'),
       isCompleted: groupCount > 0 && roleCount > 0,
-      buttons: [{ text: t('overview.completion.accessManagement.button'), routeParam: 'accessManagement' }],
+      buttons: [{ text: t('overview.completion.accessManagement.button'), routeParam: 'access-management' }],
       content: (
         <>
           {groupCount > 0 || roleCount > 0 ? (
