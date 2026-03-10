@@ -367,9 +367,9 @@
     "customRole": "Eigene",
     "searchRoles": "Rollen durchsuchen",
     "tabLabels": {
-      "basicInformation": "Informationen",
-      "permissions": "Berechtigungen",
-      "groupAssignment": "Gruppen Zuweisungen"
+      "basicInformation": "Basisinformationen",
+      "permissions": "Systemberechtigungen",
+      "groupAssignment": "Gruppen"
     },
     "baseInfoTab": {
       "heading": "Basisinformationen",
