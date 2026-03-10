@@ -3,7 +3,6 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.configuration.ModelAtlasConfig;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
-import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -11,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -21,7 +19,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class ModelRestClientRequestService {
 
   private static final MediaType UML_UTF8 =
-      MediaType.parseMediaType("application/uml; charset=UTF-8");
+      MediaType.parseMediaType("application/uml;charset=UTF-8");
 
   private final ModelAtlasConfig modelAtlasConfig;
   private final RestClient.Builder restClientBuilder;
