@@ -490,9 +490,9 @@
     }
   },
   "permissions": {
-    "title": "Permissions",
+    "title": "Overview: {permissionType}",
     "systemPermissions": "System Permissions",
-    "dataPermissions": "Daten Permissions",
+    "dataPermissions": "Data Permissions",
     "tableHeaders": {
       "title": "Name",
       "category": "Category"

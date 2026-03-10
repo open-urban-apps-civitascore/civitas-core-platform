@@ -60,7 +60,8 @@ const PermissionsPage = () => {
 
   const getTitle = () => {
     const label = tabs.find(tab => tab.value === permissionType)?.label
-    return label ? t(label) : ''
+    const labelTranslation = label ? t(label) : ''
+    return t('permissions.title', { permissionType: labelTranslation })
   }
 
   return (
