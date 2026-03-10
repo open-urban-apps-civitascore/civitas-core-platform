@@ -21,10 +21,18 @@ interface MultiSessionLayoutProps {
   isMultiSessionMode: boolean
   canExportXmi: boolean
   canImportXmi: boolean
+  onImportFromDatastructure?: () => void
 }
 
 export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
-  const { className, externalSessionManager, isMultiSessionMode, canExportXmi, canImportXmi } = props
+  const {
+    className,
+    externalSessionManager,
+    isMultiSessionMode,
+    canExportXmi,
+    canImportXmi,
+    onImportFromDatastructure,
+  } = props
   const t = useTranslations('umlModeler')
   const tCommon = useTranslations('common')
   const { isReadOnly } = useReadOnly()
@@ -86,7 +94,8 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
 
   const activeSession = sessionManager.getActiveSession()
 
-  const shouldShowToolBar = !isReadOnly && (!isControlledExternally || canImportXmi || canExportXmi)
+  const shouldShowToolBar =
+    !isReadOnly && (!isControlledExternally || canImportXmi || canExportXmi || onImportFromDatastructure)
 
   return (
     <ActiveDiagramProviderComponent sessionManager={sessionManager}>
@@ -115,6 +124,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
               hasUnsavedChanges={activeSession?.isDirty || false}
               canExportXmi={canExportXmi}
               canImportXmi={canImportXmi}
+              onImportFromDatastructure={onImportFromDatastructure}
             />
           )}
 

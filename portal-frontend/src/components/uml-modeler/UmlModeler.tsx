@@ -14,6 +14,7 @@ interface UmlModelerProps {
   modelSessionManager?: UseMultiSessionReturn
   canExportXmi?: boolean
   canImportXmi?: boolean
+  onImportFromDatastructure?: () => void
 }
 
 export const UmlModeler = (props: UmlModelerProps) => {
@@ -24,6 +25,7 @@ export const UmlModeler = (props: UmlModelerProps) => {
     modelSessionManager,
     canExportXmi = true,
     canImportXmi = true,
+    onImportFromDatastructure,
   } = props
   return (
     <div className={cn('flex h-full w-full flex-1 flex-col gap-4 p-4', className)}>
@@ -35,6 +37,7 @@ export const UmlModeler = (props: UmlModelerProps) => {
             isMultiSessionMode={isMultiSessionMode}
             canExportXmi={canExportXmi}
             canImportXmi={canImportXmi}
+            onImportFromDatastructure={onImportFromDatastructure}
           />
         </ReadOnlyProvider>
       </div>
