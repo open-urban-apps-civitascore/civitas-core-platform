@@ -7,7 +7,7 @@
     # Always run on main and develop branch
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "develop"
-    # Run on MR only when backend files change
+    # Run on MR only when config-adapter files change
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - config-adapter/**/*

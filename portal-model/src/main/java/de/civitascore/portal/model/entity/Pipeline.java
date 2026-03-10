@@ -56,4 +56,8 @@ public class Pipeline extends NamedEntity {
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "model", columnDefinition = "jsonb")
   private Map<String, Object> model;
+
+  /** Auto-incremented on each update, passed through to saga triggers. */
+  @Column(name = "version", nullable = false)
+  private long version = 1L;
 }

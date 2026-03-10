@@ -71,16 +71,16 @@
       "DELETE": "DATASET_DELETE"
     },
     "/v1/datasets/{id}/publish": {
-      "POST": "DATASET_RELEASE"
+      "POST": "DATASET_UPDATE"
     },
     "/v1/datasets/{id}/unpublish": {
       "POST": "DATASET_UPDATE"
     },
-    "/v1/datasets/{id}/ready": {
-      "POST": "DATASET_UPDATE"
+    "/v1/datasets/{id}/release": {
+      "POST": "DATASET_RELEASE"
     },
-    "/v1/datasets/{id}/unready": {
-      "POST": "DATASET_UPDATE"
+    "/v1/datasets/{id}/unrelease": {
+      "POST": "DATASET_RELEASE"
     },
     "/v1/datasets/{id}/published/meta": {
       "PUT": ["DATASET_UPDATE", "DATASET_RELEASE"]
