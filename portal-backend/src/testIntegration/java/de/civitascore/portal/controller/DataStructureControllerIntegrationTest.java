@@ -15,8 +15,8 @@ import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
-import de.civitascore.portal.model.input.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
+import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureVersionSummaryDTO;
@@ -31,6 +31,7 @@ import de.civitascore.portal.util.RestPage;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -1071,7 +1072,7 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
       input.setName("Data Structure With Assignments");
       input.setDescription("Test");
       input.setCreatedFromDataSource(false);
-      input.setAssignments(List.of(assignment));
+      input.setAssignments(Set.of(assignment));
 
       ResponseEntity<DataStructureOutputDTO> createResponse =
           restTemplate.exchange(
@@ -1112,7 +1113,7 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
       createInput.setName("Data Structure For Update " + System.currentTimeMillis());
       createInput.setDescription("Test");
       createInput.setCreatedFromDataSource(false);
-      createInput.setAssignments(List.of(assignment1));
+      createInput.setAssignments(Set.of(assignment1));
 
       ResponseEntity<DataStructureOutputDTO> createResponse =
           restTemplate.exchange(
@@ -1132,7 +1133,7 @@ class DataStructureControllerIntegrationTest extends BaseKeycloakIntegrationTest
       updateInput.setName(createInput.getName());
       updateInput.setDescription("Updated");
       updateInput.setCreatedFromDataSource(false);
-      updateInput.setAssignments(List.of(assignment2));
+      updateInput.setAssignments(Set.of(assignment2));
 
       restTemplate.exchange(
           ENDPOINT + "/" + id,

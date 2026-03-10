@@ -1,5 +1,5 @@
 meta {
-  name: Create Assignment
+  name: Create Scoped Assignment
   type: http
   seq: 3
 }
@@ -14,8 +14,8 @@ body:json {
   {
     "groupId": "{{groupId}}",
     "roleId": "{{roleId}}",
-    "scopeType": {{scopeType}},
-    "scopeId": {{scopeId}}
+    "scopeType": "{{scopeType}}",
+    "scopeId": "{{scopeId}}"
   }
 }
 

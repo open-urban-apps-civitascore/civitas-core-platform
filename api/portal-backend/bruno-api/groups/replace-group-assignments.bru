@@ -1,0 +1,25 @@
+meta {
+  name: Replace Group Assignments
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/groups/:id/assignments
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{groupId}}
+}
+
+body:json {
+  [
+    {
+      "roleId": "{{roleId}}",
+      "scopeType": "{{scopeType}}",
+      "scopeId": "{{scopeId}}"
+    }
+  ]
+}

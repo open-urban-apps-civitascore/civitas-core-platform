@@ -13,3 +13,15 @@ get {
 params:path {
   id: {{groupId}}
 }
+
+script:post-response {
+  if (res.body && res.body.id) {
+    const assignments = (res.body.assignments || []).map(a => ({
+      groupId: a.group.id,
+      roleId: a.role.id,
+      scopeType: a.scopeType || null,
+      scopeId: a.scope?.id || null,
+    }));
+    bru.setVar('groupAssignments', JSON.stringify(assignments));
+  }
+}

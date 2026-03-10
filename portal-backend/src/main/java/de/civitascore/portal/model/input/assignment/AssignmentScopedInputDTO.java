@@ -1,5 +1,6 @@
-package de.civitascore.portal.model.input;
+package de.civitascore.portal.model.input.assignment;
 
+import de.civitascore.portal.model.input.BaseInputDTO;
 import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 import lombok.Data;
