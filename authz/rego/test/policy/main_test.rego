@@ -538,19 +538,19 @@ test_unpublish_allowed if {
 	result.required_permissions == {"DATASET_UPDATE"}
 }
 
-# Test: POST /datasets/{id}/publish requires DATASET_RELEASE (single-perm)
+# Test: POST /datasets/{id}/publish requires DATASET_UPDATE
 test_publish_single_perm if {
-	result := authz.decision with http.send as mock_send_specific_and_perms
+	result := authz.decision with http.send as mock_send_specific_partial
 		with data.config as mock_http.mock_config
 		with input as portal_request("POST", "/v1/datasets/dataset-abc/publish")
 	result.allow == true
 	result.reason == "permission_granted"
-	result.required_permissions == {"DATASET_RELEASE"}
+	result.required_permissions == {"DATASET_UPDATE"}
 }
 
 # Test: POST /datasets/{id}/release requires DATASET_RELEASE
 test_release_allowed if {
-	result := authz.decision with http.send as mock_send_specific_partial
+	result := authz.decision with http.send as mock_send_specific_and_perms
 		with data.config as mock_http.mock_config
 		with input as portal_request("POST", "/v1/datasets/dataset-abc/release")
 	result.allow == true
@@ -558,14 +558,14 @@ test_release_allowed if {
 	result.required_permissions == {"DATASET_RELEASE"}
 }
 
-# Test: POST /datasets/{id}/unrelease requires only DATASET_UPDATE
+# Test: POST /datasets/{id}/unrelease requires DATASET_RELEASE
 test_unrelease_allowed if {
-	result := authz.decision with http.send as mock_send_specific_partial
+	result := authz.decision with http.send as mock_send_specific_and_perms
 		with data.config as mock_http.mock_config
 		with input as portal_request("POST", "/v1/datasets/dataset-abc/unrelease")
 	result.allow == true
 	result.reason == "permission_granted"
-	result.required_permissions == {"DATASET_UPDATE"}
+	result.required_permissions == {"DATASET_RELEASE"}
 }
 
 # Test: PUT /datasets/{id}/published/meta requires AND-permission
