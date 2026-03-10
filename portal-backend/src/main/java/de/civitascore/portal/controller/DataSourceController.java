@@ -137,7 +137,7 @@ public class DataSourceController
   @Override
   protected DataSourceInputDTO patchInput(
       DataSourceInputDTO currentDto, DataSource entity, JsonNode updates) throws IOException {
-    DataSourceInputDTO patchedDto = objectMapper.readerForUpdating(currentDto).readValue(updates);
+    DataSourceInputDTO patchedDto = super.patchInput(currentDto, entity, updates);
     getService().mergeConfigurationForPatch(patchedDto, entity, updates);
     return patchedDto;
   }

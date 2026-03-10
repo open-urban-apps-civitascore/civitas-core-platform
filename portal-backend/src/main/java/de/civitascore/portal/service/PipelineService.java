@@ -3,14 +3,17 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.mapper.PipelineMapper;
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
@@ -88,11 +91,16 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
                   DataSet.class.getSimpleName(), input.getDataSetId());
             });
 
-    // Set dataSources
-    Optional.ofNullable(input.getDataSourceIds())
-        .map(dataSourceRepository::findAllById)
-        .map(HashSet::new)
-        .ifPresent(entity::setDataSources);
+    if (input.getDataSourceIds() != null && !input.getDataSourceIds().isEmpty()) {
+      List<DataSource> dataSources = dataSourceRepository.findAllById(input.getDataSourceIds());
+      if (dataSources.size() != input.getDataSourceIds().size()) {
+        throw new InvalidInputException(
+            "Pipeline", "dataSourceIds", "One or more DataSource IDs not found");
+      }
+      entity.setDataSources(new HashSet<>(dataSources));
+    } else {
+      entity.setDataSources(null);
+    }
 
     return super.postConvertToEntity(entity, input);
   }
@@ -130,7 +138,9 @@ public class PipelineService extends BaseService<Pipeline, PipelineInputDTO> {
 
     if (pipeline.getDataSet() != null
         && pipeline.getDataSet().getDataSetStatus() != DataSetStatus.DRAFT) {
-      throw new IllegalStateException(
+      throw new InvalidInputException(
+          "Pipeline",
+          id,
           "Cannot delete pipeline associated with a dataset that is not in DRAFT status.");
     }
 

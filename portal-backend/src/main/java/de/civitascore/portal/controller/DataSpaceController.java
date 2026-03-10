@@ -34,7 +34,7 @@ public class DataSpaceController
   private final DataSpaceAssembler dataSpaceAssembler;
 
   @Override
-  DataSpaceService getService() {
+  protected DataSpaceService getService() {
     return dataSpaceService;
   }
 

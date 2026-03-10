@@ -96,7 +96,7 @@ TOKEN=$(curl -sf -X POST "http://civitas-keycloak:8080/realms/civitas-core/proto
   | jq -r '.access_token')
 
 # Test authorized request
-curl -H "Authorization: Bearer $TOKEN" http://localhost:9080/v2/datasets
+curl -H "Authorization: Bearer $TOKEN" http://localhost:9080/v1/datasets
 # Expected: 200
 
 # Test unauthorized request (as reader, trying to delete)
@@ -104,7 +104,7 @@ READER_TOKEN=$(curl -sf -X POST "http://civitas-keycloak:8080/realms/civitas-cor
   -d "grant_type=password&client_id=portal-frontend&client_secret=dev-only-portal-frontend-secret&username=authz.reader@e2e.civitas.dev&password=test123" \
   | jq -r '.access_token')
 
-curl -X DELETE -H "Authorization: Bearer $READER_TOKEN" http://localhost:9080/v2/datasets/123
+curl -X DELETE -H "Authorization: Bearer $READER_TOKEN" http://localhost:9080/v1/datasets/123
 # Expected: 403
 ```
 
@@ -135,7 +135,7 @@ curl -X POST http://localhost:8181/v1/data/civitas/authz/decision -d '{
   "input": {
     "request": {
       "method": "GET",
-      "path": "/v2/datasets",
+      "path": "/v1/datasets",
       "headers": {}
     },
     "service": {"name": "portal-backend"}

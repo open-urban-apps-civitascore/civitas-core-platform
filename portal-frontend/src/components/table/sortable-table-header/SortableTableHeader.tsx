@@ -16,6 +16,7 @@ export const SortableTableHeader = <T, TValue>(props: SortableTableHeaderProps<T
     <div data-testid="sortableTableHeader">
       {title}
       <Button
+        type="button"
         className={cn('hover:bg-transparent hover:cursor-pointer', className)}
         variant="ghost"
         onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}

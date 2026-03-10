@@ -20,11 +20,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -75,22 +73,21 @@ public class PipelineController
 
   @Override
   public ResponseEntity<PipelineOutputDTO> getById(@PathVariable UUID id) {
-    UUID dataSetId = UUID.fromString(extractPathVariables().get("dataSetId"));
+    UUID dataSetId = extractDataSetId();
     Pipeline pipeline = pipelineService.findByIdAndDataSetOrThrow(id, dataSetId);
     return ResponseEntity.ok(pipelineAssembler.toOutput(pipeline));
   }
 
   @Override
-  @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable UUID id) {
-    UUID dataSetId = UUID.fromString(extractPathVariables().get("dataSetId"));
+    UUID dataSetId = extractDataSetId();
     pipelineService.findByIdAndDataSetOrThrow(id, dataSetId);
     super.delete(id);
   }
 
   @Override
   protected PipelineInputDTO preProcessInput(PipelineInputDTO input) {
-    Optional.of(extractPathVariables().get("dataSetId"))
+    Optional.ofNullable(extractPathVariables().get("dataSetId"))
         .map(UUID::fromString)
         .ifPresentOrElse(
             input::setDataSetId,
@@ -99,5 +96,14 @@ public class PipelineController
                   "Pipeline", "dataSetId", "Missing or invalid dataSetId in path variables");
             });
     return super.preProcessInput(input);
+  }
+
+  private UUID extractDataSetId() {
+    return Optional.ofNullable(extractPathVariables().get("dataSetId"))
+        .map(UUID::fromString)
+        .orElseThrow(
+            () ->
+                new InvalidInputException(
+                    "Pipeline", "dataSetId", "Missing or invalid dataSetId in path variables"));
   }
 }

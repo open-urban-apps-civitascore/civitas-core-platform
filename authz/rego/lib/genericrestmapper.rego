@@ -87,8 +87,8 @@ is_collection_pattern(pattern, endpoints) if {
 # Tries exact match first, then pattern with {id} substitution.
 #
 # Args:
-#   path: The request path (e.g., "/v2/users/123")
-#   endpoints: Map of pattern -> method config (e.g., {"/v2/users/{id}": {...}})
+#   path: The request path (e.g., "/v1/users/123")
+#   endpoints: Map of pattern -> method config (e.g., {"/v1/users/{id}": {...}})
 #
 # Returns:
 #   The matched pattern string, or "" if no match
@@ -145,12 +145,12 @@ match_pattern(path, endpoints) := pattern if {
 }
 
 # 5. Pattern match - 5-segment with literal tail: /version/resource/id/literal/literal
-# e.g., /v2/datasets/{id}/published/meta (only parts[2] is {id})
+# e.g., /v1/datasets/{id}/published/meta (only parts[2] is {id})
 # Guard: only fires if the both-{id} variant does NOT exist in endpoints,
 # preventing conflict with rule 4.
 #
 # KNOWN LIMITATION (TD-024): Rules 4 and 5 are mutually exclusive per prefix.
-# If data.json contains BOTH /v2/foo/{id}/bar/{id} AND /v2/foo/{id}/bar/literal,
+# If data.json contains BOTH /v1/foo/{id}/bar/{id} AND /v1/foo/{id}/bar/literal,
 # the guard suppresses rule 5 and rule 4 treats the literal as an {id}.
 # Fix: replace positional heuristics with pattern-iterating matcher (iterate
 # all patterns, match {id} as wildcard, literals as exact). See BACKLOG.md.
@@ -172,7 +172,7 @@ match_pattern(path, endpoints) := pattern if {
 }
 
 # 6. Pattern match - 6-segment sub-resource: /version/resource/id/sub/id/action
-# e.g., /v2/datastructures/{id}/versions/{id}/publish
+# e.g., /v1/datastructures/{id}/versions/{id}/publish
 match_pattern(path, endpoints) := pattern if {
 	is_valid_path(path)
 	not endpoints[path]
@@ -188,5 +188,22 @@ match_pattern(path, endpoints) := pattern if {
 	endpoints[pattern]
 }
 
-# 7. No match - return empty string
+# 7. Pattern match - 7-segment with literal tail: /version/resource/id/sub/id/literal/literal
+# e.g., /v1/datastructures/{id}/versions/{id}/published/meta
+match_pattern(path, endpoints) := pattern if {
+	is_valid_path(path)
+	not endpoints[path]
+
+	parts := parse_path(path)
+	count(parts) == 7
+	parts[2] != ""
+	not is_reserved_segment(parts[2])
+	parts[4] != ""
+	not is_reserved_segment(parts[4])
+
+	pattern := concat("/", ["", parts[0], parts[1], "{id}", parts[3], "{id}", parts[5], parts[6]])
+	endpoints[pattern]
+}
+
+# 8. No match - return empty string
 default match_pattern(_, _) := ""

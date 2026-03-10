@@ -559,19 +559,6 @@ class UserControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().getActive()).isFalse();
     }
-
-    @Test
-    @DisplayName("Should handle external ID")
-    void shouldHandleExternalId() {
-      UserInputDTO input = createValidInput();
-      input.setExternalId("ext-123");
-
-      ResponseEntity<UserOutputDTO> response = performCreate(input);
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getExternalId()).isEqualTo("ext-123");
-    }
   }
 
   @Nested

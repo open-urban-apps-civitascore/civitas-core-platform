@@ -1,0 +1,16 @@
+meta {
+  name: Get All Authorities
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/authorities
+  body: none
+  auth: inherit
+}
+
+params:query {
+  ~page: 0
+  ~size: 20
+}

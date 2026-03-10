@@ -1,47 +1,59 @@
 import z from 'zod'
 
+import { enumFromConst } from '@/utils/common'
+
 import { WithId } from './common'
-import { Group } from './groups'
-import { Permission } from './permissions'
-import { User } from './users'
 
 export type RoleTab = 'basicInformation' | 'permissions' | 'groupAssignment'
 
 export const ROLE_TYPES = {
-  SYSTEM: 'system',
-  DATA: 'data',
-  GOVERNANCE: 'governance',
+  SYSTEM: 'SYSTEM',
+  DATA: 'DATA',
+  GOVERNANCE: 'GOVERNANCE',
 } as const
 
+export const RoleTypeEnum = enumFromConst(ROLE_TYPES)
+
 export type RoleType = (typeof ROLE_TYPES)[keyof typeof ROLE_TYPES]
+
+export type PermissionSummary = {
+  id: string
+  name: string
+  permissionType: string
+}
+
+export type UserSummary = {
+  id: string
+  name: string
+}
 
 export type BaseRole = {
   id: string
   name: string
   description?: string
-  type: RoleType
+  roleType: RoleType
 }
-
-export const ROLE_ORIGINS = {
-  DEFAULT: 'default',
-  CUSTOM: 'custom',
-} as const
-
-export type RoleOrigin = (typeof ROLE_ORIGINS)[keyof typeof ROLE_ORIGINS]
 
 export type Role = BaseRole & {
-  tenant: string
-  permissions: Permission['id'][]
-  users: User['id'][]
+  permissions: PermissionSummary[]
+  readonly: boolean
+  modifiedBy: UserSummary | null
+  modifiedAt: string | null
   createdAt: string
-  lastUpdated: string | null
-  updatedBy: string | null
-  groups: Group['id'][]
-  roleOrigin: RoleOrigin
+  groupCount: number
+  userCount: number
 }
 
-export type CreateRoleData = Omit<Role, 'id'>
-export type UpdateRoleData = Role
+export type CreateRoleData = {
+  name: string
+  description?: string
+  roleType: RoleType
+  permissionIds?: string[]
+  readonly?: boolean
+}
+
+export type UpdateRoleData = CreateRoleData & WithId
+
 export type PatchRoleData = Partial<CreateRoleData> & WithId
 
 export type UserRolesTableData = {
@@ -52,16 +64,17 @@ export type UserRolesTableData = {
   type: RoleType
   roleId: string
 }
-export type RoleInput = Omit<Role, 'id' | 'lastUpdated' | 'updatedBy'>
 
-export type RoleUpdate = Role
+export type RoleInput = Omit<CreateRoleData, 'id'>
+
+export type RoleUpdate = UpdateRoleData
 
 export const roleSchema = z.object({
   name: z.string().trim().min(2, {
     message: 'common.errors.atLeast2',
   }),
   description: z.string().optional(),
-  roleOrigin: z.enum(['default', 'custom']),
+  readonly: z.boolean(),
 })
 
 export type FormRole = z.infer<typeof roleSchema>

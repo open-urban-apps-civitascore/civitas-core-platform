@@ -187,7 +187,7 @@ cd apisix    && docker compose up -d
 | Service | URL | Notes |
 |---------|-----|-------|
 | Keycloak | http://localhost:8080 | admin / admin |
-| Portal Backend | http://localhost:8089 | Swagger: /v2/swagger-ui.html |
+| Portal Backend | http://localhost:8089 | Swagger: /v1/swagger-ui.html |
 | Config Adapter | http://localhost:8088 | |
 | APISIX Gateway | http://localhost:9080 | Routes to backend via OPA authz |
 | OPA | http://localhost:8181 | Policy decision point |

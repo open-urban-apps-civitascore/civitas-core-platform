@@ -24,25 +24,25 @@ portal_request(method, path) := {
 # =============================================================================
 
 test_backend_from_service if {
-	result := resource_mapping.backend with input as portal_request("GET", "/v2/users")
+	result := resource_mapping.backend with input as portal_request("GET", "/v1/users")
 	result == "portal-backend"
 }
 
 test_backend_unknown_without_service if {
-	result := resource_mapping.backend with input as {"request": {"path": "/v2/users", "headers": {}}}
+	result := resource_mapping.backend with input as {"request": {"path": "/v1/users", "headers": {}}}
 	result == "unknown"
 }
 
 test_backend_unknown_empty_service_name if {
 	result := resource_mapping.backend with input as {
-		"request": {"path": "/v2/users", "headers": {}},
+		"request": {"path": "/v1/users", "headers": {}},
 		"service": {"name": ""},
 	}
 	result == "unknown"
 }
 
 test_backend_data_key_conversion if {
-	result := resource_mapping.backend_data_key with input as portal_request("GET", "/v2/users")
+	result := resource_mapping.backend_data_key with input as portal_request("GET", "/v1/users")
 	result == "portal_backend"
 }
 
@@ -52,40 +52,40 @@ test_backend_data_key_conversion if {
 
 # Collection endpoints (no ID) - exact match
 test_path_pattern_collection if {
-	result := resource_mapping.path_pattern with input as portal_request("GET", "/v2/users")
-	result == "/v2/users"
+	result := resource_mapping.path_pattern with input as portal_request("GET", "/v1/users")
+	result == "/v1/users"
 }
 
 test_path_pattern_datasets_collection if {
-	result := resource_mapping.path_pattern with input as portal_request("GET", "/v2/datasets")
-	result == "/v2/datasets"
+	result := resource_mapping.path_pattern with input as portal_request("GET", "/v1/datasets")
+	result == "/v1/datasets"
 }
 
 # Resource endpoints (with ID) - pattern match
 test_path_pattern_with_id if {
-	result := resource_mapping.path_pattern with input as portal_request("GET", "/v2/users/abc-123")
-	result == "/v2/users/{id}"
+	result := resource_mapping.path_pattern with input as portal_request("GET", "/v1/users/abc-123")
+	result == "/v1/users/{id}"
 }
 
 test_path_pattern_with_numeric_id if {
-	result := resource_mapping.path_pattern with input as portal_request("GET", "/v2/datasets/12345")
-	result == "/v2/datasets/{id}"
+	result := resource_mapping.path_pattern with input as portal_request("GET", "/v1/datasets/12345")
+	result == "/v1/datasets/{id}"
 }
 
 test_path_pattern_with_uuid if {
-	result := resource_mapping.path_pattern with input as portal_request("DELETE", "/v2/groups/550e8400-e29b-41d4-a716-446655440000")
-	result == "/v2/groups/{id}"
+	result := resource_mapping.path_pattern with input as portal_request("DELETE", "/v1/groups/550e8400-e29b-41d4-a716-446655440000")
+	result == "/v1/groups/{id}"
 }
 
 # Special endpoint - /users/me (not an ID)
 test_path_pattern_users_me if {
-	result := resource_mapping.path_pattern with input as portal_request("GET", "/v2/users/me")
-	result == "/v2/users/me"
+	result := resource_mapping.path_pattern with input as portal_request("GET", "/v1/users/me")
+	result == "/v1/users/me"
 }
 
 # Unknown path - not in mappings
 test_path_pattern_unknown if {
-	result := resource_mapping.path_pattern with input as portal_request("GET", "/v2/foobar")
+	result := resource_mapping.path_pattern with input as portal_request("GET", "/v1/foobar")
 	result == ""
 }
 
@@ -94,12 +94,12 @@ test_path_pattern_unknown if {
 # =============================================================================
 
 test_request_path if {
-	result := resource_mapping.request_path with input as portal_request("GET", "/v2/users/123")
-	result == "/v2/users/123"
+	result := resource_mapping.request_path with input as portal_request("GET", "/v1/users/123")
+	result == "/v1/users/123"
 }
 
 test_request_method if {
-	result := resource_mapping.request_method with input as portal_request("POST", "/v2/users")
+	result := resource_mapping.request_method with input as portal_request("POST", "/v1/users")
 	result == "POST"
 }
 
@@ -109,26 +109,26 @@ test_request_method if {
 
 # Valid paths should be allowed
 test_valid_path if {
-	result := resource_mapping.is_valid_path with input as portal_request("GET", "/v2/users")
+	result := resource_mapping.is_valid_path with input as portal_request("GET", "/v1/users")
 	result == true
 }
 
 # Path traversal attempts should be rejected
 test_path_traversal_rejected if {
-	result := resource_mapping.is_valid_path with input as portal_request("GET", "/v2/users/../admin")
+	result := resource_mapping.is_valid_path with input as portal_request("GET", "/v1/users/../admin")
 	result == false
 }
 
 test_path_traversal_encoded_rejected if {
 	# Even if somehow URL-encoded .. gets through, reject it
-	result := resource_mapping.request_path with input as portal_request("GET", "/v2/users/../admin")
+	result := resource_mapping.request_path with input as portal_request("GET", "/v1/users/../admin")
 	result == ""
 }
 
 # Null byte injection should be rejected
 test_null_byte_rejected if {
 	result := resource_mapping.is_valid_path with input as {
-		"request": {"path": "/v2/users\u0000/admin", "method": "GET", "headers": {}},
+		"request": {"path": "/v1/users\u0000/admin", "method": "GET", "headers": {}},
 		"service": {"name": "portal-backend"},
 	}
 	result == false
@@ -136,14 +136,14 @@ test_null_byte_rejected if {
 
 # Backslash injection should be rejected
 test_backslash_rejected if {
-	result := resource_mapping.is_valid_path with input as portal_request("GET", "/v2/users\\admin")
+	result := resource_mapping.is_valid_path with input as portal_request("GET", "/v1/users\\admin")
 	result == false
 }
 
 # Backend ID validation - valid IDs
 test_valid_backend_id if {
 	result := resource_mapping.backend with input as {
-		"request": {"path": "/v2/users", "method": "GET", "headers": {}},
+		"request": {"path": "/v1/users", "method": "GET", "headers": {}},
 		"service": {"name": "portal-backend"},
 	}
 	result == "portal-backend"
@@ -152,7 +152,7 @@ test_valid_backend_id if {
 # Backend ID with special characters should be rejected
 test_invalid_backend_id_traversal if {
 	result := resource_mapping.backend with input as {
-		"request": {"path": "/v2/users", "method": "GET", "headers": {}},
+		"request": {"path": "/v1/users", "method": "GET", "headers": {}},
 		"service": {"name": "../etc/passwd"},
 	}
 	result == "unknown"
@@ -160,7 +160,7 @@ test_invalid_backend_id_traversal if {
 
 test_invalid_backend_id_spaces if {
 	result := resource_mapping.backend with input as {
-		"request": {"path": "/v2/users", "method": "GET", "headers": {}},
+		"request": {"path": "/v1/users", "method": "GET", "headers": {}},
 		"service": {"name": "portal backend"},
 	}
 	result == "unknown"
@@ -173,22 +173,22 @@ test_invalid_backend_id_spaces if {
 test_all_resource_paths if {
 	# Test all endpoints in portal_backend/data.json resolve correctly
 	patterns := [
-		["/v2/users", "/v2/users"],
-		["/v2/users/123", "/v2/users/{id}"],
-		["/v2/datasets", "/v2/datasets"],
-		["/v2/datasets/xyz", "/v2/datasets/{id}"],
-		["/v2/datasources", "/v2/datasources"],
-		["/v2/datasources/ds1", "/v2/datasources/{id}"],
-		["/v2/datastructures", "/v2/datastructures"],
-		["/v2/datastructures/dstr1", "/v2/datastructures/{id}"],
-		["/v2/groups", "/v2/groups"],
-		["/v2/groups/g1", "/v2/groups/{id}"],
-		["/v2/roles", "/v2/roles"],
-		["/v2/roles/r1", "/v2/roles/{id}"],
-		["/v2/permissions", "/v2/permissions"],
-		["/v2/permissions/p1", "/v2/permissions/{id}"],
-		["/v2/assignments", "/v2/assignments"],
-		["/v2/assignments/a1", "/v2/assignments/{id}"],
+		["/v1/users", "/v1/users"],
+		["/v1/users/123", "/v1/users/{id}"],
+		["/v1/datasets", "/v1/datasets"],
+		["/v1/datasets/xyz", "/v1/datasets/{id}"],
+		["/v1/datasources", "/v1/datasources"],
+		["/v1/datasources/ds1", "/v1/datasources/{id}"],
+		["/v1/datastructures", "/v1/datastructures"],
+		["/v1/datastructures/dstr1", "/v1/datastructures/{id}"],
+		["/v1/groups", "/v1/groups"],
+		["/v1/groups/g1", "/v1/groups/{id}"],
+		["/v1/roles", "/v1/roles"],
+		["/v1/roles/r1", "/v1/roles/{id}"],
+		["/v1/permissions", "/v1/permissions"],
+		["/v1/permissions/p1", "/v1/permissions/{id}"],
+		["/v1/assignments", "/v1/assignments"],
+		["/v1/assignments/a1", "/v1/assignments/{id}"],
 	]
 	every pattern in patterns {
 		actual := resource_mapping.path_pattern with input as portal_request("GET", pattern[0])
@@ -199,15 +199,15 @@ test_all_resource_paths if {
 # Test: Sub-resource paths resolve correctly
 test_sub_resource_paths if {
 	patterns := [
-		["/v2/datasets/abc/publish", "/v2/datasets/{id}/publish"],
-		["/v2/datasets/abc/unpublish", "/v2/datasets/{id}/unpublish"],
-		["/v2/datasets/abc/assignments", "/v2/datasets/{id}/assignments"],
-		["/v2/datasets/abc/pipelines", "/v2/datasets/{id}/pipelines"],
-		["/v2/datasources/abc/publish", "/v2/datasources/{id}/publish"],
-		["/v2/datasources/abc/unpublish", "/v2/datasources/{id}/unpublish"],
-		["/v2/datastructures/abc/publish", "/v2/datastructures/{id}/publish"],
-		["/v2/datastructures/abc/unpublish", "/v2/datastructures/{id}/unpublish"],
-		["/v2/datastructures/abc/versions", "/v2/datastructures/{id}/versions"],
+		["/v1/datasets/abc/publish", "/v1/datasets/{id}/publish"],
+		["/v1/datasets/abc/unpublish", "/v1/datasets/{id}/unpublish"],
+		["/v1/datasets/abc/assignments", "/v1/datasets/{id}/assignments"],
+		["/v1/datasets/abc/pipelines", "/v1/datasets/{id}/pipelines"],
+		["/v1/datasources/abc/publish", "/v1/datasources/{id}/publish"],
+		["/v1/datasources/abc/unpublish", "/v1/datasources/{id}/unpublish"],
+		["/v1/datastructures/abc/publish", "/v1/datastructures/{id}/publish"],
+		["/v1/datastructures/abc/unpublish", "/v1/datastructures/{id}/unpublish"],
+		["/v1/datastructures/abc/versions", "/v1/datastructures/{id}/versions"],
 	]
 	every pattern in patterns {
 		actual := resource_mapping.path_pattern with input as portal_request("POST", pattern[0])
@@ -218,30 +218,30 @@ test_sub_resource_paths if {
 # Test: 5-segment paths resolve correctly (both literal-tail and both-{id} variants)
 test_5_segment_paths if {
 	# Literal tail: published/meta
-	result1 := resource_mapping.path_pattern with input as portal_request("PUT", "/v2/datasets/abc/published/meta")
-	result1 == "/v2/datasets/{id}/published/meta"
+	result1 := resource_mapping.path_pattern with input as portal_request("PUT", "/v1/datasets/abc/published/meta")
+	result1 == "/v1/datasets/{id}/published/meta"
 
 	# Both-{id}: pipelines/{id}
-	result2 := resource_mapping.path_pattern with input as portal_request("GET", "/v2/datasets/abc/pipelines/pipe-1")
-	result2 == "/v2/datasets/{id}/pipelines/{id}"
+	result2 := resource_mapping.path_pattern with input as portal_request("GET", "/v1/datasets/abc/pipelines/pipe-1")
+	result2 == "/v1/datasets/{id}/pipelines/{id}"
 
 	# Both-{id}: versions/{id}
-	result3 := resource_mapping.path_pattern with input as portal_request("GET", "/v2/datastructures/abc/versions/v1")
-	result3 == "/v2/datastructures/{id}/versions/{id}"
+	result3 := resource_mapping.path_pattern with input as portal_request("GET", "/v1/datastructures/abc/versions/v1")
+	result3 == "/v1/datastructures/{id}/versions/{id}"
 }
 
 # Test: 6-segment paths resolve correctly
 test_6_segment_paths if {
-	result1 := resource_mapping.path_pattern with input as portal_request("POST", "/v2/datastructures/abc/versions/xyz/publish")
-	result1 == "/v2/datastructures/{id}/versions/{id}/publish"
+	result1 := resource_mapping.path_pattern with input as portal_request("POST", "/v1/datastructures/abc/versions/xyz/publish")
+	result1 == "/v1/datastructures/{id}/versions/{id}/publish"
 
-	result2 := resource_mapping.path_pattern with input as portal_request("POST", "/v2/datastructures/abc/versions/xyz/unpublish")
-	result2 == "/v2/datastructures/{id}/versions/{id}/unpublish"
+	result2 := resource_mapping.path_pattern with input as portal_request("POST", "/v1/datastructures/abc/versions/xyz/unpublish")
+	result2 == "/v1/datastructures/{id}/versions/{id}/unpublish"
 }
 
 # Test: Dataspaces and catalogs do NOT resolve (removed from v2.0, see #989)
 test_dataspaces_do_not_resolve if {
-	patterns := ["/v2/dataspaces", "/v2/dataspaces/abc", "/v2/catalogs", "/v2/catalogs/c1"]
+	patterns := ["/v1/dataspaces", "/v1/dataspaces/abc", "/v1/catalogs", "/v1/catalogs/c1"]
 	every path in patterns {
 		actual := resource_mapping.path_pattern with input as portal_request("GET", path)
 		actual == ""

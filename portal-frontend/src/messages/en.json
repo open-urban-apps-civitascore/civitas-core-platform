@@ -27,6 +27,7 @@
       "exit": "Exit",
       "assignItem": "Assign {item}",
       "assignTo": "to {item}",
+      "close": "Close",
       "back": "Back"
     },
     "errors": {
@@ -62,6 +63,11 @@
       "datasource": "Datasource",
       "datastructures": "Datastructures"
     },
+    "messages": {
+      "updateSuccess": "{item} has been successfully updated",
+      "createSuccess": "{item} has been successfully created",
+      "deleteSuccess": "{item} has been successfully deleted"
+    },
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "commaSeparated": "comma-separated",
@@ -82,6 +88,59 @@
     "german": "German",
     "english": "English",
     "selectLanguagePlaceholder": "Select language"
+  },
+  "accessManagement": {
+    "title": "Access Management",
+    "subtitle": "Here, responsibilities and access rights are defined.",
+    "addAssignment": "Add Group",
+    "addRole": "Add Role",
+    "deleteGroup": "Remove Group",
+    "tableHeaders": {
+      "group": "Group",
+      "role": "Role",
+      "description": "Description",
+      "action": "Action"
+    },
+    "noDataPage": {
+      "title": "No groups and roles available",
+      "description": "No group has permissions."
+    },
+    "addGroupModal": {
+      "title": "Add Group",
+      "description": "Select a group to assign permissions.",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Description"
+      },
+      "noGroupsAvailable": "No groups available to add",
+      "selectAll": "Select all groups",
+      "selectGroup": "Select group",
+      "selectedGroups": "{number} selected"
+    },
+    "addRoleModal": {
+      "title": "Add Role",
+      "description": "To group {groupName}",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Description",
+        "roleType": "Type"
+      },
+      "noRolesAvailable": "No roles available to add",
+      "selectRole": "Select role",
+      "selectAll": "Select all roles",
+      "selectedRoles": "{number} selected",
+      "roleTypes": {
+        "default": "Default",
+        "custom": "Custom"
+      }
+    },
+    "infoBoxes": {
+      "firstBox": "Groups with platform-wide permissions on all data objects have access.",
+      "secondBox": "By removing your own group-role assignment, you may lose your permissions."
+    },
+    "messages": {
+      "updateSuccess": "Permissions have been successfully updated."
+    }
   },
   "sidebar": {
     "home": "Home",
@@ -162,7 +221,7 @@
         "dataFlow": {
           "title": "Data flow",
           "button": "Load and provide data",
-          "pipeline": "Pipeline",
+          "pipelines": "Pipeline",
           "sensorThingsAPI": "SensorThings API",
           "noDataFlow": "No data flow available yet."
         }
@@ -179,7 +238,8 @@
       "createSuccess": "Dataset has been successfully created.",
       "updateSuccess": "Dataset has been successfully updated.",
       "deleteSuccess": "Dataset has been successfully deleted.",
-      "deleteError": "An error occurred while deleting the dataset. Please try again."
+      "deleteError": "An error occurred while deleting the dataset. Please try again.",
+      "updateAccessManagementSuccess": "Access management has been successfully updated."
     },
     "warningModal": {
       "title": "Delete dataset?",
@@ -264,9 +324,9 @@
     },
     "details": {
       "baseInfo": "Base Information",
-      "name": "Name of the Group",
-      "description": "Group Description",
-      "contact": { "label": "Contact", "placeholder": "Search by name or email" }
+      "name": "Name",
+      "description": "Description",
+      "contact": { "label": "Contact Person", "placeholder": "Search by name or email" }
     },
     "roles": {
       "groupInfo": "Group Information",
@@ -284,12 +344,26 @@
       "noUsersSub": "No users assigned to this group",
       "removeUserModal": {
         "title": "Remove User from Group?",
-        "description": "This action removes the association between the user, the group, and their role assignment."
+        "description": "This action can not be undone."
       }
     },
     "messages": {
       "createSuccess": "Group has been successfully created.",
       "updateSuccess": "Group has been successfully updated."
+    },
+    "errors": {
+      "createError": "An error occurred while creating the group",
+      "updateError": "An error occurred while updating the group",
+      "deleteError": "An error occurred while deleting the group",
+      "groupNameExists": "The group name is already in use. Please, chose another name."
+    },
+    "warningModal": {
+      "title": "Delete the group?",
+      "description": "This action can not be undone."
+    },
+    "infoModal": {
+      "title": "Group can not be deleted",
+      "description": "First, all assignments to users, roles and scopes have to be removed."
     }
   },
   "pagination": {
@@ -385,6 +459,16 @@
         "description": "Rolle löschen",
         "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
         "deleteButton": "Rolle löschen"
+      },
+      "deleteConfirmModal": {
+        "title": "Delete role?",
+        "description": "This action cannot be undone.",
+        "confirm": "Delete"
+      },
+      "deleteErrorModal": {
+        "title": "Role cannot be deleted",
+        "description": "All assignments to groups and scopes must be removed first.",
+        "close": "Close"
       }
     },
     "permissionsTab": {

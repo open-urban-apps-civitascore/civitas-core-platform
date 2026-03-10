@@ -1,0 +1,25 @@
+meta {
+  name: Update Published Version Meta
+  type: http
+  seq: 19
+}
+
+put {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/published/meta
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{dataStructureId}}
+  versionId: {{dataStructureVersionId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "1.0.1",
+    "modelName": "UpdatedModelName",
+    "styles": {}
+  }
+}

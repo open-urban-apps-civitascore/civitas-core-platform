@@ -47,7 +47,7 @@
 
 | Env Var | Example Value | Description |
 |---|---|---|
-| `API_BASE_URL` | `http://apisix` | Base URL of the APISIX gateway (host only, no port, no path). Combined with `API_PORT` to form `API_BASE_URL:API_PORT/v2`. In Kubernetes, point to the APISIX service. |
+| `API_BASE_URL` | `http://apisix` | Base URL of the APISIX gateway (host only, no port, no path). Combined with `API_PORT` to form `API_BASE_URL:API_PORT/v1`. In Kubernetes, point to the APISIX service. |
 | `API_PORT` | `9080` | Port of the APISIX gateway. |
 
 ---

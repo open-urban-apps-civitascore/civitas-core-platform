@@ -60,11 +60,6 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
         in = ParameterIn.QUERY,
         schema = @Schema(type = "boolean", example = "true")),
     @Parameter(
-        name = "externalId",
-        description = "Filter by external ID (exact match).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "ext-123")),
-    @Parameter(
         name = "q",
         description = "Search in full name, or email (partial match, case-insensitive).",
         in = ParameterIn.QUERY,

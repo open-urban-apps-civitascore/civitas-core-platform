@@ -245,7 +245,6 @@ report-test-backend:
     paths:
       - portal-backend/target/*
     reports:
-      junit: portal-backend/target/surefire-reports/TEST-*.xml
       coverage_report:
         coverage_format: jacoco
         path: portal-backend/target/site/jacoco/jacoco.xml
@@ -317,7 +316,7 @@ build-backend-image:
   script:
     - cd portal-backend
     - |
-      export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/backend-portal:${REVISION}-scan
+      export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/backend-portal:${CI_COMMIT_REF_SLUG}-scan
       docker buildx build \
         --platform linux/amd64,linux/arm64 \
         --tag $SCAN_IMAGE_TAG \
@@ -342,7 +341,7 @@ container-scan-backend:
   script:
     - apk add --no-cache curl >/dev/null
     - curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/gitlab.tpl -o gitlab.tpl
-    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/backend-portal:${REVISION}-scan
+    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/backend-portal:${CI_COMMIT_REF_SLUG}-scan
     - trivy image --scanners vuln --format template --template "@gitlab.tpl" --output gl-container-scanning-report.json $SCAN_IMAGE_TAG
   artifacts:
     when: always
@@ -367,7 +366,7 @@ deploy-backend:
     - docker info
     - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
   script:
-    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/backend-portal:${REVISION}-scan
+    - export SCAN_IMAGE_TAG=$CI_REGISTRY_IMAGE/backend-portal:${CI_COMMIT_REF_SLUG}-scan
     - docker buildx imagetools create $SCAN_IMAGE_TAG --tag $CI_REGISTRY_IMAGE/backend-portal:$REVISION
     - docker buildx imagetools rm $SCAN_IMAGE_TAG || true
     - |

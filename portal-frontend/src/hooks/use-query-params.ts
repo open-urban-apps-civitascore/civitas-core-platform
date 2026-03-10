@@ -93,16 +93,18 @@ export const useQueryParams = () => {
     sorting?: SortingState
   }
 
-  const getApiRequestParams = useCallback((params: ApiRequestParams) => {
+  const getApiRequestParams = useCallback((params: ApiRequestParams): URLSearchParams => {
     const apiParams = new URLSearchParams()
     apiParams.set(QUERY_PARAMS.pageIndex, String(params.pageIndex))
     apiParams.set(QUERY_PARAMS.pageSize, String(params.pageSize))
     if (params.sorting?.[0]) {
       apiParams.set(QUERY_PARAMS.sort, `${params.sorting[0].id},${params.sorting[0].desc ? 'desc' : 'asc'}`)
     }
-    if (params.search) {
-      apiParams.set(QUERY_PARAMS.search, params.search)
+
+    if (params.search && params.search.trim().length > 0) {
+      apiParams.set(QUERY_PARAMS.search, params.search.trim())
     }
+
     return apiParams
   }, [])
 

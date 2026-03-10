@@ -1216,7 +1216,7 @@ Complete CloudEvent for creating a route with `proxy-rewrite`:
 | Use Case | Configuration |
 |----------|---------------|
 | Strip `/api/v1` prefix | `"regex_uri": ["^/api/v1/(.*)", "/$1"]` |
-| Strip `/v2` prefix | `"regex_uri": ["^/v2/(.*)", "/$1"]` |
+| Strip `/v1` prefix | `"regex_uri": ["^/v1/(.*)", "/$1"]` |
 | Add prefix to path | `"regex_uri": ["^/(.*)", "/backend/$1"]` |
 | Replace entire path | `"uri": "/fixed-path"` |
 | Change host header | `"host": "internal.example.com"` |

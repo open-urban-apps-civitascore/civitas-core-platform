@@ -79,7 +79,7 @@ export const serverFetch = async <TResponse>({
   const API_PORT = process.env.API_PORT
 
   const JSON_SERVER_URL = `${JSON_SERVER_HOST}:${JSON_SERVER_PORT}`
-  const API_URL = API_BASE_URL && API_PORT ? `${API_BASE_URL}:${API_PORT}/v2` : undefined
+  const API_URL = API_BASE_URL && API_PORT ? `${API_BASE_URL}:${API_PORT}/v1` : undefined
 
   // Choose base URL based on isApiBackend flag
   const baseUrl = isApiBackend ? API_URL : JSON_SERVER_URL

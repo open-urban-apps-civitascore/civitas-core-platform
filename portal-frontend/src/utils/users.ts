@@ -16,7 +16,6 @@ export const mapGroupListUsers = (users: User[]): ListUser[] =>
       id: user.id,
       fullName: `${user.firstName} ${user.lastName}`,
       email: user.email,
-      active: user.active,
     }
   })
 

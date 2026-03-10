@@ -120,7 +120,7 @@ mock_send_tenant_both_and_perms(_) := {"status_code": 200, "body": mock_http.use
 test_permission_granted if {
 	result := authz.decision with http.send as mock_send_admin
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users")
+		with input as portal_request("GET", "/v1/users")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {"USER_READ"}
@@ -130,7 +130,7 @@ test_permission_granted if {
 test_permission_denied if {
 	result := authz.decision with http.send as mock_send_reader
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v2/users/123")
+		with input as portal_request("DELETE", "/v1/users/123")
 	result.allow == false
 	result.reason == "permission_denied"
 	result.required_permissions == {"USER_DELETE"}
@@ -140,7 +140,7 @@ test_permission_denied if {
 test_create_permission if {
 	result := authz.decision with http.send as mock_send_dataset_creator
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v2/datasets")
+		with input as portal_request("POST", "/v1/datasets")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {"DATASET_CREATE"}
@@ -150,7 +150,7 @@ test_create_permission if {
 test_update_permission if {
 	result := authz.decision with http.send as mock_send_datasource_updater
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasources/abc-123")
+		with input as portal_request("PUT", "/v1/datasources/abc-123")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -163,14 +163,14 @@ test_update_permission if {
 test_users_me_allowed_for_authenticated if {
 	result := authz.decision with http.send as mock_send_authenticated_no_groups
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users/me")
+		with input as portal_request("GET", "/v1/users/me")
 	result.allow == true
 	result.reason == "authenticated_endpoint"
 }
 
 # Test: /users/me denied for unauthenticated request (no X-Userinfo header)
 test_users_me_denied_without_auth if {
-	result := authz.decision with input as portal_request_no_auth("GET", "/v2/users/me")
+	result := authz.decision with input as portal_request_no_auth("GET", "/v1/users/me")
 	result.allow == false
 	result.reason == "authentication_required"
 }
@@ -183,14 +183,14 @@ test_users_me_denied_without_auth if {
 test_empty_user_context_denied if {
 	result := authz.decision with http.send as mock_send_empty
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasets")
+		with input as portal_request("GET", "/v1/datasets")
 	result.allow == false
 	result.reason == "missing_user_context"
 }
 
 # Test: Missing X-Userinfo header results in denial (AuthZ Repository not called)
 test_missing_userinfo_header_denied if {
-	result := authz.decision with input as portal_request_no_auth("GET", "/v2/users")
+	result := authz.decision with input as portal_request_no_auth("GET", "/v1/users")
 	result.allow == false
 	result.reason == "missing_user_context"
 }
@@ -199,7 +199,7 @@ test_missing_userinfo_header_denied if {
 test_null_user_ids_denied if {
 	result := authz.decision with http.send as mock_send_null_ids
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasets")
+		with input as portal_request("GET", "/v1/datasets")
 	result.allow == false
 	result.reason == "missing_user_context"
 }
@@ -208,17 +208,17 @@ test_null_user_ids_denied if {
 test_malformed_user_context_allows_null_permission if {
 	result := authz.decision with http.send as mock_send_authenticated_no_groups_field
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users/me")
+		with input as portal_request("GET", "/v1/users/me")
 	result.allow == true
 	result.reason == "authenticated_endpoint"
 }
 
-# Test: Known path but unsupported HTTP method is denied (e.g., POST /v2/permissions — only GET defined)
+# Test: Known path but unsupported HTTP method is denied (e.g., POST /v1/permissions — only GET defined)
 # Path matches but method has no permission mapping → is_known_endpoint=false → "unknown_endpoint"
 test_unsupported_method_on_known_path_denied if {
 	result := authz.decision with http.send as mock_send_admin
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v2/permissions")
+		with input as portal_request("POST", "/v1/permissions")
 	result.allow == false
 	result.reason == "unknown_endpoint"
 }
@@ -227,7 +227,7 @@ test_unsupported_method_on_known_path_denied if {
 test_delete_on_readonly_endpoint_denied if {
 	result := authz.decision with http.send as mock_send_admin
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v2/permissions/perm-123")
+		with input as portal_request("DELETE", "/v1/permissions/perm-123")
 	result.allow == false
 	result.reason == "unknown_endpoint"
 }
@@ -236,7 +236,7 @@ test_delete_on_readonly_endpoint_denied if {
 test_unknown_endpoint_denied if {
 	result := authz.decision with http.send as mock_send_all_read
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/unknown-resource")
+		with input as portal_request("GET", "/v1/unknown-resource")
 	result.allow == false
 	result.reason == "unknown_endpoint"
 }
@@ -247,7 +247,7 @@ test_unknown_backend_denied if {
 		with data.config as mock_http.mock_config
 		with input as {"request": {
 			"method": "GET",
-			"path": "/v2/users",
+			"path": "/v1/users",
 			"headers": {"x-userinfo": mock_http.encode_userinfo("test-user")},
 		}}
 	result.allow == false
@@ -258,7 +258,7 @@ test_unknown_backend_denied if {
 test_http_send_error_denied if {
 	result := authz.decision with http.send as mock_send_error
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users")
+		with input as portal_request("GET", "/v1/users")
 	result.allow == false
 	result.reason == "missing_user_context"
 }
@@ -276,7 +276,7 @@ test_default_deny if {
 test_scope_datasource_correct if {
 	result := authz.decision with http.send as mock_send_ds123_reader
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasources/ds-123")
+		with input as portal_request("GET", "/v1/datasources/ds-123")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -285,7 +285,7 @@ test_scope_datasource_correct if {
 test_scope_datasource_wrong if {
 	result := authz.decision with http.send as mock_send_wrong_scope
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasources/ds-123")
+		with input as portal_request("GET", "/v1/datasources/ds-123")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -294,7 +294,7 @@ test_scope_datasource_wrong if {
 test_scope_dataset_correct if {
 	result := authz.decision with http.send as mock_send_dataset_abc_reader
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasets/dataset-abc")
+		with input as portal_request("GET", "/v1/datasets/dataset-abc")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -303,7 +303,7 @@ test_scope_dataset_correct if {
 test_scope_dataset_wrong if {
 	result := authz.decision with http.send as mock_send_dataset_abc_reader
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasets/other-dataset")
+		with input as portal_request("GET", "/v1/datasets/other-dataset")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -312,7 +312,7 @@ test_scope_dataset_wrong if {
 test_scope_tenant_user_access if {
 	result := authz.decision with http.send as mock_send_admin
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users/user-123")
+		with input as portal_request("GET", "/v1/users/user-123")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -321,7 +321,7 @@ test_scope_tenant_user_access if {
 test_scope_collection_matching_scope if {
 	result := authz.decision with http.send as mock_send_ds123_reader
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasources")
+		with input as portal_request("GET", "/v1/datasources")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -336,7 +336,7 @@ test_scope_collection_matching_scope if {
 test_scope_header_tenant_wildcard if {
 	result := authz.decision with http.send as mock_send_admin
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users")
+		with input as portal_request("GET", "/v1/users")
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "*"
 }
@@ -345,7 +345,7 @@ test_scope_header_tenant_wildcard if {
 test_scope_header_multiple_datasources if {
 	result := authz.decision with http.send as mock_send_multi_datasource
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasources")
+		with input as portal_request("GET", "/v1/datasources")
 	result.allow == true
 
 	# IDs are sorted alphabetically: ds-aaa, ds-zzz
@@ -356,7 +356,7 @@ test_scope_header_multiple_datasources if {
 test_scope_header_tenant_priority if {
 	result := authz.decision with http.send as mock_send_tenant_and_datasource
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasources")
+		with input as portal_request("GET", "/v1/datasources")
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "*"
 }
@@ -365,7 +365,7 @@ test_scope_header_tenant_priority if {
 test_scope_header_multiple_groups if {
 	result := authz.decision with http.send as mock_send_multi_groups_datasource
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasources")
+		with input as portal_request("GET", "/v1/datasources")
 	result.allow == true
 
 	# IDs from both groups, sorted
@@ -376,7 +376,7 @@ test_scope_header_multiple_groups if {
 test_scope_header_single_datasource if {
 	result := authz.decision with http.send as mock_send_ds123_reader
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasources")
+		with input as portal_request("GET", "/v1/datasources")
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "ds-123"
 }
@@ -385,7 +385,7 @@ test_scope_header_single_datasource if {
 test_scope_header_resource_endpoint if {
 	result := authz.decision with http.send as mock_send_ds123_reader
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasources/ds-123")
+		with input as portal_request("GET", "/v1/datasources/ds-123")
 	result.allow == true
 
 	# Resource endpoint allowed (scope matches), header still present
@@ -396,18 +396,18 @@ test_scope_header_resource_endpoint if {
 test_scope_header_dataset_endpoint if {
 	result := authz.decision with http.send as mock_send_dataset_scope
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasets")
+		with input as portal_request("GET", "/v1/datasets")
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "dataset-123"
 }
 
 # Test: Q-006 fail-secure — scope type mismatch on collection endpoint denies access
-# User has DATASET scope with DATASOURCE_READ permission, but accessing /v2/datasources
+# User has DATASET scope with DATASOURCE_READ permission, but accessing /v1/datasources
 # which expects DATASOURCE scope type. Neither TENANT nor DATASOURCE match → denied.
 test_scope_header_wrong_scope_type if {
 	result := authz.decision with http.send as mock_send_dataset_scope_with_datasource_perm
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasources")
+		with input as portal_request("GET", "/v1/datasources")
 
 	# Q-006: Fail-secure — scope type mismatch on collection endpoint denies access.
 	# User has DATASOURCE_READ but only via DATASET scope (not DATASOURCE or TENANT),
@@ -420,7 +420,7 @@ test_scope_header_wrong_scope_type if {
 test_scope_header_structure if {
 	result := authz.decision with http.send as mock_send_admin
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users")
+		with input as portal_request("GET", "/v1/users")
 	result.headers != null
 	object.keys(result.headers) == {"X-Allowed-Scope-Ids"}
 }
@@ -438,7 +438,7 @@ test_scope_header_structure if {
 test_scope_header_and_tenant_wildcard if {
 	result := authz.decision with http.send as mock_send_tenant_and_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/abc/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/abc/published/meta")
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "*"
 }
@@ -447,7 +447,7 @@ test_scope_header_and_tenant_wildcard if {
 test_scope_header_and_tenant_missing_one if {
 	result := authz.decision with http.send as mock_send_tenant_missing_one
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/abc/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/abc/published/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -456,7 +456,7 @@ test_scope_header_and_tenant_missing_one if {
 test_scope_header_and_specific_both if {
 	result := authz.decision with http.send as mock_send_specific_and_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/dataset-abc/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/dataset-abc/published/meta")
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "dataset-abc"
 }
@@ -465,7 +465,7 @@ test_scope_header_and_specific_both if {
 test_scope_header_and_specific_partial if {
 	result := authz.decision with http.send as mock_send_specific_partial
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/dataset-abc/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/dataset-abc/published/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -480,7 +480,7 @@ test_scope_header_and_specific_partial if {
 test_and_cross_group_allowed if {
 	result := authz.decision with http.send as mock_send_and_cross_group
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/dataset-abc/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/dataset-abc/published/meta")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.headers["X-Allowed-Scope-Ids"] == "dataset-abc"
@@ -490,7 +490,7 @@ test_and_cross_group_allowed if {
 test_and_scope_intersection if {
 	result := authz.decision with http.send as mock_send_and_partial_overlap
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/ds-2/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/ds-2/published/meta")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.headers["X-Allowed-Scope-Ids"] == "ds-2"
@@ -500,7 +500,7 @@ test_and_scope_intersection if {
 test_and_scope_intersection_denied_missing_release if {
 	result := authz.decision with http.send as mock_send_and_partial_overlap
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/ds-1/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/ds-1/published/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -509,7 +509,7 @@ test_and_scope_intersection_denied_missing_release if {
 test_and_scope_intersection_denied_missing_update if {
 	result := authz.decision with http.send as mock_send_and_partial_overlap
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/ds-3/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/ds-3/published/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -518,7 +518,7 @@ test_and_scope_intersection_denied_missing_update if {
 test_and_disjoint_scopes_denied if {
 	result := authz.decision with http.send as mock_send_and_disjoint
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/ds-1/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/ds-1/published/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -532,7 +532,7 @@ test_and_disjoint_scopes_denied if {
 test_unpublish_allowed if {
 	result := authz.decision with http.send as mock_send_specific_partial
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v2/datasets/dataset-abc/unpublish")
+		with input as portal_request("POST", "/v1/datasets/dataset-abc/unpublish")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {"DATASET_UPDATE"}
@@ -542,7 +542,7 @@ test_unpublish_allowed if {
 test_publish_single_perm if {
 	result := authz.decision with http.send as mock_send_specific_and_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v2/datasets/dataset-abc/publish")
+		with input as portal_request("POST", "/v1/datasets/dataset-abc/publish")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {"DATASET_RELEASE"}
@@ -552,7 +552,7 @@ test_publish_single_perm if {
 test_ready_allowed if {
 	result := authz.decision with http.send as mock_send_specific_partial
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v2/datasets/dataset-abc/ready")
+		with input as portal_request("POST", "/v1/datasets/dataset-abc/ready")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {"DATASET_UPDATE"}
@@ -562,7 +562,7 @@ test_ready_allowed if {
 test_unready_allowed if {
 	result := authz.decision with http.send as mock_send_specific_partial
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v2/datasets/dataset-abc/unready")
+		with input as portal_request("POST", "/v1/datasets/dataset-abc/unready")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {"DATASET_UPDATE"}
@@ -572,7 +572,7 @@ test_unready_allowed if {
 test_published_meta_and_perm if {
 	result := authz.decision with http.send as mock_send_specific_and_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/dataset-abc/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/dataset-abc/published/meta")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {"DATASET_UPDATE", "DATASET_RELEASE"}
@@ -592,7 +592,7 @@ test_published_meta_and_perm if {
 test_tenant_scope_cascades_to_dataset_resource if {
 	result := authz.decision with http.send as mock_send_tenant_dataset_read
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasets/some-dataset-id")
+		with input as portal_request("GET", "/v1/datasets/some-dataset-id")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -602,7 +602,7 @@ test_tenant_scope_cascades_to_dataset_resource if {
 test_tenant_scope_allows_dataset_collection if {
 	result := authz.decision with http.send as mock_send_tenant_dataset_read
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasets")
+		with input as portal_request("GET", "/v1/datasets")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -611,7 +611,7 @@ test_tenant_scope_allows_dataset_collection if {
 test_tenant_scope_cascades_to_datasource_resource if {
 	result := authz.decision with http.send as mock_send_tenant_datasource_read
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasources/some-datasource-id")
+		with input as portal_request("GET", "/v1/datasources/some-datasource-id")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -620,7 +620,7 @@ test_tenant_scope_cascades_to_datasource_resource if {
 test_tenant_scope_cascades_to_datastructure_resource if {
 	result := authz.decision with http.send as mock_send_tenant_datastructure_read
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datastructures/some-ds-id")
+		with input as portal_request("GET", "/v1/datastructures/some-ds-id")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -630,7 +630,7 @@ test_tenant_scope_cascades_to_datastructure_resource if {
 test_no_upward_inheritance if {
 	result := authz.decision with http.send as mock_send_dataset_scoped_user_read
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users/user-123")
+		with input as portal_request("GET", "/v1/users/user-123")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -641,7 +641,7 @@ test_no_upward_inheritance if {
 test_and_mixed_scopes_allowed if {
 	result := authz.decision with http.send as mock_send_and_mixed_scopes
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/ds-1/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/ds-1/published/meta")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -651,7 +651,7 @@ test_and_mixed_scopes_allowed if {
 test_tenant_and_permission_both_tenant if {
 	result := authz.decision with http.send as mock_send_tenant_both_and_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/abc/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/abc/published/meta")
 	result.allow == true
 	result.reason == "permission_granted"
 }
@@ -660,7 +660,7 @@ test_tenant_and_permission_both_tenant if {
 test_tenant_and_permission_one_missing if {
 	result := authz.decision with http.send as mock_send_tenant_missing_one
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/abc/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/abc/published/meta")
 	result.allow == false
 	result.reason == "permission_denied"
 }

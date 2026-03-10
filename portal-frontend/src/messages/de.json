@@ -27,6 +27,7 @@
       "exit": "Beenden",
       "assignItem": "{item} hinzufügen",
       "assignTo": "zu {item}",
+      "close": "Schließen",
       "back": "Zurück"
     },
     "errors": {
@@ -46,7 +47,7 @@
       "nameRequired": "Name ist erforderlich",
       "descriptionRequired": "Beschreibung ist erforderlich",
       "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
-      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden"
+      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden. Überprüfen Sie Ihre Eingaben."
     },
     "items": {
       "users": "Users",
@@ -60,6 +61,11 @@
       "datasources": "Datenquellen",
       "datasource": "Datenquelle",
       "datastructures": "Datenstrukturen"
+    },
+    "messages": {
+      "updateSuccess": "{item} wurde erfolgreich aktualisiert",
+      "createSuccess": "{item} wurde erfolgreich angelegt",
+      "deleteSuccess": "{item} wurde erfolgreich gelöscht"
     },
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
@@ -81,6 +87,59 @@
     "german": "Deutsch",
     "english": "Englisch",
     "selectLanguagePlaceholder": "Sprache wählen"
+  },
+  "accessManagement": {
+    "title": "Zugriffsberechtigungen",
+    "subtitle": "Hier werden Zuständigkeiten und Zugriffsrechte definiert.",
+    "addAssignment": "Gruppe hinzufügen",
+    "addRole": "Rolle hinzufügen",
+    "deleteGroup": "Gruppe entfernen",
+    "tableHeaders": {
+      "group": "Gruppe",
+      "role": "Rolle",
+      "description": "Beschreibung",
+      "action": "Aktion"
+    },
+    "noDataPage": {
+      "title": "Keine Gruppen und Rollen vorhanden",
+      "description": "Keine Gruppe besitzt Berechtigungen."
+    },
+    "addGroupModal": {
+      "title": "Gruppe hinzufügen",
+      "description": "Wähle eine Gruppe aus, um Berechtigungen zuzuweisen.",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Beschreibung"
+      },
+      "noGroupsAvailable": "Keine Gruppen verfügbar, die hinzugefügt werden können",
+      "selectAll": "Alle Gruppen auswählen",
+      "selectGroup": "Gruppe auswählen",
+      "selectedGroups": "{number} ausgewählt"
+    },
+    "addRoleModal": {
+      "title": "Rolle hinzufügen",
+      "description": "Zur Gruppe {groupName}",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "roleType": "Typ"
+      },
+      "noRolesAvailable": "Keine Rollen verfügbar, die hinzugefügt werden können",
+      "selectRole": "Rolle auswählen",
+      "selectAll": "Alle Rollen auswählen",
+      "selectedRoles": "{number} ausgewählt",
+      "roleTypes": {
+        "default": "Standard",
+        "custom": "Eigene"
+      }
+    },
+    "infoBoxes": {
+      "firstBox": "Gruppen, die plattformweite Berechtigungen an allen Datenobjekten besitzen, haben Zugriff.",
+      "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen."
+    },
+    "messages": {
+      "updateSuccess": "Berechtigungen wurden erfolgreich aktualisiert."
+    }
   },
   "sidebar": {
     "home": "Home",
@@ -262,8 +321,8 @@
     },
     "details": {
       "baseInfo": "Basisinformationen",
-      "name": "Name der Gruppe",
-      "description": "Beschreibung der Gruppe",
+      "name": "Name",
+      "description": "Beschreibung",
       "contact": { "label": "Ansprechpartner", "placeholder": "Nach Name oder Email suchen" }
     },
     "roles": {
@@ -281,13 +340,23 @@
       "noUsers": "Keine User",
       "noUsersSub": "Keine User in dieser Gruppe enthalten",
       "removeUserModal": {
-        "title": "User aus Gruppe entfernen?",
-        "description": "Diese Aktion löst die Zuordnung zwischen dem User, der Gruppe und ihre Rollen-Zuordnung auf."
+        "title": "User wirklich aus Gruppe entfernen?",
+        "description": "Diese Aktion kann nicht rückgängig gemacht werden."
       }
     },
-    "messages": {
-      "createSuccess": "Gruppe wurde erfolgreich angelegt.",
-      "updateSuccess": "Gruppe wurde erfolgreich aktualisiert."
+    "errors": {
+      "createError": "Beim Anlegen der Gruppe ist ein Fehler aufgetreten",
+      "updateError": "Beim Aktualisieren der Gruppe ist ein Fehler aufgetreten",
+      "deleteError": "Beim Löschen der Gruppe ist ein Fehler aufgetreten",
+      "groupNameExists": "Der Gruppenname ist bereits vergeben. Bitte wählen sie einen anderen Namen."
+    },
+    "warningModal": {
+      "title": "Gruppe wirklich löschen?",
+      "description": "Diese Aktion kann nicht rückgängig gemacht werden."
+    },
+    "infoModal": {
+      "title": "Gruppe kann nicht gelöscht werden",
+      "description": "Zuerst müssen alle Zuordnungen zu Usern, Rollen und Geltungsbereichen entfernt werden."
     }
   },
   "pagination": {
@@ -384,6 +453,16 @@
         "description": "Rolle löschen",
         "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
         "deleteButton": "Rolle löschen"
+      },
+      "deleteConfirmModal": {
+        "title": "Rolle wirklich löschen?",
+        "description": "Diese Aktion kann nicht rückgängig gemacht werden.",
+        "confirm": "Löschen"
+      },
+      "deleteErrorModal": {
+        "title": "Rolle kann nicht gelöscht werden",
+        "description": "Zuerst müssen alle Zuordnungen zu Gruppen und Geltungsbereichen entfernt werden.",
+        "close": "Schliessen"
       }
     },
     "permissionsTab": {

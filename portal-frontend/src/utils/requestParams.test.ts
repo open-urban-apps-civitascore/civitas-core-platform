@@ -11,7 +11,7 @@ describe('getApiRequestParams', () => {
   it('should return the correct request params when all URL params are set', () => {
     const mockParams: ApiRequestParams = {
       page: '1',
-      pageSize: '20',
+      size: '20',
       sort: ['fullName,ASC'],
       q: 'firstName lastName',
     }

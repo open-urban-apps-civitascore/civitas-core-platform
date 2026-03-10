@@ -1,0 +1,33 @@
+meta {
+  name: Create Pipeline
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "Traffic Data Pipeline",
+    "description": "Processes traffic sensor data",
+    "styles": {},
+    "model": {},
+    "dataSourceIds": [],
+    "apis": [],
+    "persistences": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('pipelineId', res.body.id);
+  }
+}

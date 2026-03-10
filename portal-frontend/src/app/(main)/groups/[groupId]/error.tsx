@@ -4,10 +4,10 @@ import { useTranslations } from 'next-intl'
 
 import { ErrorPage } from '@/components/error-page/ErrorPage'
 
-const UsersErrorPage = () => {
+const GroupsErrorPage = () => {
   const t = useTranslations('common')
 
-  return <ErrorPage testId="editUserErrorPage" title={t('errors.itemNotFound', { item: t('items.group') })} />
+  return <ErrorPage testId="editGroupErrorPage" title={t('errors.itemNotFound', { item: t('items.group') })} />
 }
 
-export default UsersErrorPage
+export default GroupsErrorPage

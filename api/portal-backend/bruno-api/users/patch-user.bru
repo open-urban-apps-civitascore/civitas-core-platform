@@ -1,0 +1,27 @@
+meta {
+  name: Patch User
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/users/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{userId}}
+}
+
+body:json {
+  {
+    "firstName": "Jane"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('userId', res.body.id);
+  }
+}

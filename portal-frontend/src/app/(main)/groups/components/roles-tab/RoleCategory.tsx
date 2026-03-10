@@ -35,8 +35,8 @@ export const RoleCategory = (props: RolesCategoryProps) => {
   const [isSaving, _setIsSaving] = useState(false)
   const [isAddRoleOpen, setIsAddRoleOpen] = useState(false)
 
-  const assignedRoles = allRoles.filter(role => groupRoles.includes(role.id) && role.type === category)
-  const availableRoles = allRoles.filter(role => !groupRoles.includes(role.id) && role.type === category)
+  const assignedRoles = allRoles.filter(role => groupRoles.includes(role.id) && role.roleType === category)
+  const availableRoles = allRoles.filter(role => !groupRoles.includes(role.id) && role.roleType === category)
 
   return (
     <DetailsFieldContainer className={cn('min-h-21 flex itme-center', className)}>

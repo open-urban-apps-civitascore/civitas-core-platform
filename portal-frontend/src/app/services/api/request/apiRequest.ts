@@ -1,4 +1,4 @@
-import { AxiosRequestConfig, Method } from 'axios'
+import { AxiosError, AxiosRequestConfig, Method } from 'axios'
 
 import { axiosClient } from '../client/client'
 
@@ -73,8 +73,9 @@ export const apiRequest = async <TResponse, TBody = unknown>({
       totalElements: response.data.totalElements,
       totalPages: response.data.totalPages,
     }
-  } catch (error) {
-    console.error(`${errorMessage} ${error}` || `Failed to fetch data. ${error}`)
-    throw new Error(`${errorMessage} ${error}` || `Failed to fetch data. ${error}`)
+  } catch (error: unknown) {
+    const axiosError = error as AxiosError
+    console.error(`${errorMessage || 'Failed to fetch data.'} ${axiosError.status}: ${axiosError.message}`)
+    throw axiosError
   }
 }

@@ -2,6 +2,7 @@ package de.civitascore.portal.configuration;
 
 import de.civitascore.portal.controller.exception.SecurityExceptionHandler;
 import de.civitascore.portal.security.CustomJwtAuthenticationConverter;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
@@ -11,17 +12,22 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(proxyTargetClass = true)
 @EnableJpaAuditing(auditorAwareRef = "auditorAwareImpl")
+@EnableConfigurationProperties(SecurityProperties.class)
 public class SecurityConfig {
 
   private final CustomJwtAuthenticationConverter customJwtConverter;
+  private final SecurityProperties securityProperties;
 
-  public SecurityConfig(CustomJwtAuthenticationConverter customJwtConverter) {
+  public SecurityConfig(
+      CustomJwtAuthenticationConverter customJwtConverter, SecurityProperties securityProperties) {
     this.customJwtConverter = customJwtConverter;
+    this.securityProperties = securityProperties;
   }
 
   @Bean
@@ -32,16 +38,10 @@ public class SecurityConfig {
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(
-                        "/actuator/health/**",
-                        "/actuator/info",
-                        "/v2/api-docs/**",
-                        "/swagger-ui/**",
-                        "/swagger-ui.html",
-                        "/swagger-resources/**",
-                        "/webjars/**")
+                        securityProperties.permitPaths().stream()
+                            .map(PathPatternRequestMatcher.withDefaults()::matcher)
+                            .toArray(PathPatternRequestMatcher[]::new))
                     .permitAll()
-                    .requestMatchers("/v2/**")
-                    .authenticated()
                     .anyRequest()
                     .authenticated())
         .oauth2ResourceServer(
