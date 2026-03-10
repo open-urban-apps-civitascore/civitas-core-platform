@@ -494,8 +494,13 @@
     "systemPermissions": "System Permissions",
     "dataPermissions": "Data Permissions",
     "tableHeaders": {
-      "title": "Name",
-      "category": "Category"
+      "name": "Object",
+      "category": "Category",
+      "read": "Read",
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete",
+      "release": "Release"
     }
   },
   "roles": {

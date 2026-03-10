@@ -487,8 +487,13 @@
     "systemPermissions": "Systemberechtigungen",
     "dataPermissions": "Datenberechtigungen",
     "tableHeaders": {
-      "title": "Name",
-      "category": "Kategorie"
+      "name": "Objekt",
+      "category": "Kategorie",
+      "read": "Read",
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete",
+      "release": "Release"
     }
   },
   "roles": {

@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Permission } from '@/types/permissions'
+import { Permission, RoleWithPermissions } from '@/types/permissions'
 import { ROLE_CATEGORIES } from '@/types/roles'
 
 import { PermissionsTable } from './PermissionsTable'
@@ -16,6 +16,16 @@ interface SystemPermissionsTabProps {
   isLoading: boolean
   rowCount: number
 }
+
+const toRolesWithPermissions = (permissions: Permission[]): RoleWithPermissions[] =>
+  permissions.map(p => ({
+    name: p.name,
+    read: false,
+    create: false,
+    update: false,
+    delete: false,
+    release: false,
+  }))
 
 const KNOWN_CATEGORIES = [ROLE_CATEGORIES.DATA.toString(), ROLE_CATEGORIES.TENANTADMINISTRATION.toString()] as const
 
@@ -45,7 +55,7 @@ export const SystemPermissionsTab = ({ permissions, isLoading, rowCount }: Syste
             <h2 className="text-lg font-semibold mb-4 mt-8">{category}</h2>
             <TableContainer>
               <PermissionsTable
-                permissions={groupedPermissions ?? []}
+                permissions={toRolesWithPermissions(groupedPermissions ?? [])}
                 isLoading={isLoading}
                 rowCount={rowCount}
                 pageIndex={pageIndex}
