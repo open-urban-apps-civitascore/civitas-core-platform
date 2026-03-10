@@ -1,13 +1,8 @@
 'use client'
 
-import { zodResolver } from '@hookform/resolvers/zod'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
-import { toast } from 'sonner'
+import { useState } from 'react'
 
-import { useUpdateDatastructure } from '@/app/services/api/datastructures/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -18,18 +13,14 @@ import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
-import { Status, STATUS_TYPES } from '@/types/common'
-import {
-  Datastructure,
-  DatastructureFormAvailableSchema,
-  DatastructureFormDraft,
-  DatastructureFormDraftSchema,
-  DatastructureTab,
-} from '@/types/datastructures'
+import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureTab } from '@/types/datastructures'
+import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
 
+import { useDatastructure } from '../hooks/useDatastructure'
 import { BasicInfoTab } from './basic-info-tab/BasicInfoTab'
+import { VersionsTab } from './versions-tab/VersionsTab'
 
-const tabs: Tab<DatastructureTab>[] = [
+export const tabs: Tab<DatastructureTab>[] = [
   {
     value: 'basicInfo',
     label: 'datastructures.tabs.basicInfo',
@@ -44,7 +35,7 @@ const tabs: Tab<DatastructureTab>[] = [
   },
 ]
 
-const disabledTabs: DatastructureTab[] = ['versions', 'accessPermissions']
+const disabledTabs: DatastructureTab[] = ['accessPermissions']
 
 interface DatastructureOverviewProps {
   datastructure: Datastructure
@@ -52,120 +43,36 @@ interface DatastructureOverviewProps {
 
 export const DatastructureOverview = (props: DatastructureOverviewProps) => {
   const { datastructure } = props
-  const params = useSearchParams()
-  const mode = params.get('mode')
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
 
-  const defaultValues: DatastructureFormDraft = {
-    id: datastructure.id,
-    name: datastructure.name ?? '',
-    description: datastructure.description ?? '',
-    status: datastructure.status ?? STATUS_TYPES.DRAFT,
-  }
-
-  const router = useRouter()
-
-  const [selectedTab, setSelectedTab] = useState<DatastructureTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-  const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
+  const [isReadOnly, setIsReadOnly] = useState(true)
+  const {
+    canSetAvailable,
+    canSetDraft,
+    completedTabs,
+    form,
+    handleStatusChange,
+    isConfirmButtonDisabled,
+    isLoading,
+    resetToInitialState,
+    saveDatastructure,
+    selectedTab,
+    setSelectedTab,
+    statusHint,
+    statusWatch,
+  } = useDatastructure({ datastructure })
 
-  const updateDatastructure = useUpdateDatastructure()
-  const isLoading = updateDatastructure.isPending
-
-  const form = useForm<DatastructureFormDraft>({
-    resolver: zodResolver(DatastructureFormDraftSchema),
-    mode: 'onChange',
-    defaultValues,
-  })
-
-  useEffect(() => {
-    form.reset(defaultValues)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datastructure])
-
-  const formValues = useWatch({ control: form.control })
-  const statusWatch = form.watch('status')
-  const nameWatch = form.watch('name')
-  const descriptionWatch = form.watch('description')
-
-  const isDraftMode = statusWatch === STATUS_TYPES.DRAFT
-
-  // Allow "Available" only when the form would be valid in AVAILABLE mode
-  const canSetAvailable = useMemo(() => {
-    return (
-      DatastructureFormAvailableSchema.safeParse(formValues).success &&
-      !!datastructure.versions.find(version => version.status === STATUS_TYPES.AVAILABLE)
-    )
-  }, [formValues, datastructure.versions])
-
-  const revalidateForm = () => {
-    if (!isDraftMode) {
-      void form.trigger()
+  const handleSave = async () => {
+    const isSaved = await saveDatastructure()
+    if (isSaved) {
+      setIsExitModalOpen(false)
     }
-  }
-  // Auto-revert status to draft when required fields become empty
-  const revalidateDraftMode = () => {
-    if (statusWatch === STATUS_TYPES.AVAILABLE && !canSetAvailable) {
-      form.setValue('status', STATUS_TYPES.DRAFT, { shouldDirty: true })
-      toast.info(tCommon('info.switchMode'))
-    }
-  }
-
-  useEffect(() => {
-    if (isDraftMode) {
-      form.clearErrors()
-    } else {
-      revalidateForm()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDraftMode])
-
-  useEffect(() => {
-    revalidateDraftMode()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSetAvailable, statusWatch])
-
-  const completedTabs = useMemo((): DatastructureTab[] => {
-    const completed: DatastructureTab[] = []
-    if (nameWatch.length > 0 && descriptionWatch.length > 0) {
-      completed.push('basicInfo')
-    }
-    return completed
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formValues])
-
-  const handleStatusChange = (newStatus: Status) => {
-    form.setValue('status', newStatus, { shouldDirty: true })
-  }
-
-  const submitDatastructure = () => {
-    const values = form.getValues()
-    const parsed = isDraftMode
-      ? DatastructureFormDraftSchema.safeParse(values)
-      : DatastructureFormAvailableSchema.safeParse(values)
-    if (!parsed.success) {
-      console.error(parsed.error)
-      toast.error(tCommon('errors.formInvalid'))
-      return
-    }
-
-    updateDatastructure.mutate(parsed.data, {
-      onSuccess: () => {
-        toast.success(t('messages.updateSuccess'))
-        setIsExitModalOpen(false)
-        router.refresh()
-      },
-      onError: () => toast.error(tCommon('errors.unexpectedError')),
-    })
-  }
-
-  const handleSave = () => {
-    submitDatastructure()
   }
 
   const handleExit = () => {
-    form.reset()
+    resetToInitialState()
     setIsReadOnly(true)
     setIsExitModalOpen(false)
   }
@@ -175,32 +82,15 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     else handleExit()
   }
 
-  const renderTabContent = () => {
-    switch (selectedTab) {
-      case 'basicInfo':
-        return <BasicInfoTab form={form} isReadOnly={isReadOnly} />
-      default:
-        return null
-    }
-  }
-
-  const isConfirmButtonDisabled = useMemo(
-    () =>
-      !form.formState.isDirty ||
-      !!form.formState.errors.name ||
-      (statusWatch !== STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
-      isLoading,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isLoading, statusWatch, formValues],
-  )
-
   const ActionButtonsAndStatusSwitch = (
     <div className="flex gap-6">
       <StatusDropdown
-        statusOptions={Object.values(STATUS_TYPES)}
+        statusOptions={Object.values(DATASTRUCTURE_STATUS_TYPES)}
         status={statusWatch}
         onStatusChange={handleStatusChange}
         canSetAvailable={canSetAvailable}
+        canSetDraft={canSetDraft}
+        statusHint={statusHint}
       />
       <ActionButtons
         confirmButtonType="button"
@@ -220,6 +110,27 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
       {tCommon('actions.edit')}
     </Button>
   )
+
+  const renderTabContent = () => {
+    switch (selectedTab) {
+      case 'basicInfo':
+        return <BasicInfoTab form={form} isReadOnly={isReadOnly} />
+      case 'versions':
+        return (
+          <VersionsTab
+            datastructureId={datastructure.id}
+            versions={mapDatastructureVersionsApiToListData(datastructure.dataStructureVersions)}
+            rowCount={datastructure.dataStructureVersions.length}
+            isReadOnly={isReadOnly}
+            isDirty={form.formState.isDirty}
+            isLoading={isLoading}
+            onSave={saveDatastructure}
+          />
+        )
+      default:
+        return null
+    }
+  }
 
   return (
     <PageContainer testId="datastructureOverviewPage" headerType="withSubTabsOrSubtitle" className="overflow-hidden">

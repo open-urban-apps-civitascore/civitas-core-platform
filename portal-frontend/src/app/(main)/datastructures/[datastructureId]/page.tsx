@@ -6,11 +6,11 @@ import { DatastructureApiResponseSchema } from '@/types/datastructures'
 
 import { DatastructureOverview } from './components/DatastructureOverview'
 
-type Props = {
+type EditDatastructurePageProps = {
   params: Promise<{ datastructureId: string }>
 }
 
-const DatasourceDetailsPage = async ({ params }: Props) => {
+const EditDatastructurePage = async ({ params }: EditDatastructurePageProps) => {
   const { datastructureId } = await params
   const t = await getTranslations('common')
   const datastructureResponse = await getDatastructure(datastructureId)
@@ -23,4 +23,4 @@ const DatasourceDetailsPage = async ({ params }: Props) => {
   return <DatastructureOverview datastructure={parsedDatastructure.data} />
 }
 
-export default DatasourceDetailsPage
+export default EditDatastructurePage

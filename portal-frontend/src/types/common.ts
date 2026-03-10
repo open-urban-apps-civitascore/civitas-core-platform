@@ -2,8 +2,6 @@ import { AxiosRequestConfig } from 'axios'
 import { InputHTMLAttributes } from 'react'
 import z from 'zod'
 
-import { enumFromConst } from '@/utils/common'
-
 export type Item = {
   id: string
   title: string
@@ -24,11 +22,10 @@ export type SelectOption = {
 export const STATUS_TYPES = {
   DRAFT: 'DRAFT',
   AVAILABLE: 'AVAILABLE',
+  READY: 'READY',
 } as const
 
-export const StatusEnum = enumFromConst(STATUS_TYPES)
-
-export type Status = (typeof STATUS_TYPES)[keyof typeof STATUS_TYPES]
+export type StatusTypes = (typeof STATUS_TYPES)[keyof typeof STATUS_TYPES]
 
 export type InputPropsWithoutForm = Omit<InputHTMLAttributes<HTMLInputElement>, 'form' | 'onChange'>
 
@@ -64,16 +61,17 @@ export type UpdateInput = {
   method: UpdateMutationMethod
 }
 
-export type BaseMutationInput = {
+export type BaseMutationInput<TData> = {
   key: string
+  endpoint?: string | ((value: TData) => string)
   errorMessage: string
   headers?: AxiosRequestConfig['headers']
 }
 
-export type CreateMutationInput = BaseMutationInput
+export type CreateMutationInput<TData> = BaseMutationInput<TData>
 
-export type UpdateMutationInput = BaseMutationInput & {
+export type UpdateMutationInput<TData> = BaseMutationInput<TData> & {
   method: UpdateMutationMethod
 }
 
-export type DeleteMutationInput = BaseMutationInput
+export type DeleteMutationInput<TData> = BaseMutationInput<TData>

@@ -12,8 +12,7 @@ import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Form } from '@/components/ui/form'
-import { STATUS_TYPES } from '@/types/common'
-import { Datasource, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
+import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
@@ -127,14 +126,14 @@ export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
           <PageEditControls<DatasourceStatusType>
             status={dataSourceStatus}
             onStatusChange={handleStatusChange}
-            statusOptions={Object.values(STATUS_TYPES)}
+            statusOptions={Object.values(DATASOURCE_STATUS_TYPES)}
             canSetAvailable={canSetAvailable}
             confirmButtonType="button"
             onConfirmClick={handleSave}
             isConfirmButtonDisabled={
               !form.formState.isDirty ||
               !!form.formState.errors.name ||
-              (dataSourceStatus !== STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
+              (dataSourceStatus !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
               isLoading
             }
             isCancelButtonDisabled={isLoading}

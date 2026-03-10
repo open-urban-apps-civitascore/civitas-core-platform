@@ -1,46 +1,115 @@
+import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
 import {
   Datastructure,
-  DatastructureCreateFormData,
-  DatastructureCreateJsonServerData,
+  DATASTRUCTURE_STATUS_TYPES,
+  DatastructureFormDraft,
   DatastructuresListData,
+  DatastructureVersion,
+  DatastructureVersionFormAvailableSchema,
+  DatastructureVersionFormData,
+  DatastructureVersionFormDraftSchema,
+  DatastructureVersionPutData,
+  DatastructureVersionsListData,
   DatastructureVersionSummary,
 } from '@/types/datastructures'
 
+export const mapDatastructureApiToFormData = (datastructure: Datastructure): DatastructureFormDraft => ({
+  id: datastructure.id,
+  name: datastructure.name ?? '',
+  description: datastructure.description ?? '',
+  dataStructureStatus: datastructure.dataStructureStatus ?? DATASTRUCTURE_STATUS_TYPES.DRAFT,
+  dataStructureVersionIds: datastructure.dataStructureVersions.map(version => version.id),
+  assignments: datastructure.assignments || [],
+})
+
 export const mapDatastructuresApiToListData = (datastructures: Datastructure[]): DatastructuresListData[] => {
   return datastructures.map(datastructure => {
-    const highestVersion = datastructure.versions.reduce<DatastructureVersionSummary | null>((highest, current) => {
-      if (!highest) return current
-      return current.versionNumber.localeCompare(highest.versionNumber, undefined, { numeric: true }) > 0
-        ? current
-        : highest
-    }, null)
+    const highestVersion: DatastructureVersionSummary | null =
+      datastructure.dataStructureVersions.reduce<DatastructureVersionSummary | null>((highest, current) => {
+        if (!highest) return current
+        return current.version.localeCompare(highest.version, undefined, { numeric: true }) > 0 ? current : highest
+      }, null)
     return {
       id: datastructure.id,
       dataStructureId: datastructure.id,
       name: datastructure.name,
-      description: datastructure.description,
-      status: datastructure.status,
-      versionNumber: highestVersion?.versionNumber || null,
-      source: highestVersion?.source || null,
+      description: datastructure.description || '-',
+      status: datastructure.dataStructureStatus,
+      versionNumber: highestVersion?.version || null,
+      source: highestVersion?.dataStructureVersionSource || null,
+      inUse: datastructure.inUse,
       // add versions field to versions for showing subrows in table
-      versions: datastructure.versions.map(version => ({
-        ...version,
+      versions: datastructure.dataStructureVersions.map(version => ({
+        id: version.id,
+        versionNumber: version.version,
+        name: `Version ${version.version}`,
+        description: version.description || '-',
+        status: version.dataStructureVersionStatus,
+        source: version.dataStructureVersionSource,
         versions: [],
-        name: `Version ${version.versionNumber}`,
       })),
     }
   })
 }
 
-// TODO: This mapper is needed for creating json-server data. remove it when API is implemented
-export const mapdatastructureFormToApiData = (
-  datastructure: DatastructureCreateFormData,
-): DatastructureCreateJsonServerData => ({
-  name: datastructure.name,
-  dataStructureId: '',
-  description: '',
-  source: 'OWN',
-  status: 'DRAFT',
-  inUse: false,
-  versions: [],
+export const mapDatastructureVersionsApiToListData = (
+  versions: DatastructureVersionSummary[],
+): DatastructureVersionsListData[] =>
+  versions.map(version => ({
+    id: version.id,
+    versionNumber: version.version,
+    name: `Version ${version.version}`,
+    description: version.description || '-',
+    status: version.dataStructureVersionStatus,
+    source: version.dataStructureVersionSource,
+  }))
+
+export const mapDatastructureVersionApiToFormData = (version: DatastructureVersion): DatastructureVersionFormData => ({
+  id: version.id,
+  version: version.version,
+  description: version.description || '',
+  dataStructureVersionStatus: version.dataStructureVersionStatus,
+  dataStructureVersionSource: version.dataStructureVersionSource,
+  modelAtlasUri: version.modelAtlasUri,
+  modelName: version.modelName,
+  nodes: version.styles?.nodes || [],
+  edges: version.styles?.edges || [],
 })
+
+export const mapDatastructureVersionFormToApiData = (
+  version: DatastructureVersionFormData,
+  sessionDiagram: UMLDiagram | null,
+  umlModel: string | null,
+): DatastructureVersionPutData => {
+  return {
+    id: version.id,
+    version: version.version,
+    description: version.description,
+    dataStructureVersionSource: version.dataStructureVersionSource,
+    dataStructureVersionStatus: version.dataStructureVersionStatus,
+    modelAtlasUri: version.modelAtlasUri,
+    modelName: version.modelName,
+    model: umlModel,
+    styles: sessionDiagram,
+  }
+}
+
+export const parseDatastructureVersionFormData = (
+  values: DatastructureVersionFormData,
+  isDraftMode: boolean,
+): DatastructureVersionFormData | undefined => {
+  const parsed = isDraftMode
+    ? DatastructureVersionFormDraftSchema.safeParse(values)
+    : DatastructureVersionFormAvailableSchema.safeParse(values)
+  if (!parsed.success) {
+    console.error(parsed.error)
+  }
+  return parsed.data
+}
+
+type FormFields = DatastructureFormDraft | DatastructureVersionFormData
+
+export const containsNonStatusField = <TData extends FormFields>(fieldsToUpdate: Partial<TData>) =>
+  (Object.keys(fieldsToUpdate) as (keyof TData)[]).some(
+    key => key !== 'dataStructureStatus' && key !== 'dataStructureVersionStatus',
+  )

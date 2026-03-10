@@ -15,13 +15,15 @@ import {
 } from '@/components/ui/dialog'
 
 interface ExitWarningModalProps extends DialogProps {
+  title?: string
+  description?: string
   isLoading?: boolean
   onDiscard: () => void
   onConfirm: () => void
 }
 
 export const ExitWarningModal = (props: ExitWarningModalProps) => {
-  const { open, onOpenChange, onDiscard, onConfirm, isLoading = false } = props
+  const { title, description, open, onOpenChange, onDiscard, onConfirm, isLoading = false } = props
   const t = useTranslations('common.exitModal')
   const tCommon = useTranslations('common')
 
@@ -29,8 +31,8 @@ export const ExitWarningModal = (props: ExitWarningModalProps) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent data-testid="exitWarningModal" className="sm:max-w-md" showCloseButton={false}>
         <DialogHeader>
-          <DialogTitle>{t('title')}</DialogTitle>
-          <DialogDescription>{t('description')}</DialogDescription>
+          <DialogTitle>{title || t('title')}</DialogTitle>
+          <DialogDescription>{description || t('description')}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex gap-2 sm:justify-end">
           <Button

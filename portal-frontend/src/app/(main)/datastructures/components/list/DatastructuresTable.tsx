@@ -4,23 +4,25 @@ import {
   getCoreRowModel,
   getExpandedRowModel,
   getSortedRowModel,
+  Row,
   useReactTable,
 } from '@tanstack/react-table'
 import { CircleCheckBig, CircleDashed } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
+import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { STATUS_TYPES } from '@/types/common'
-import { DatastructuresListData } from '@/types/datastructures'
+import { DATASTRUCTURE_STATUS_TYPES, DatastructuresListData } from '@/types/datastructures'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
 interface DatastructuresTableProps extends TableProps<DatastructuresListData> {
   datastructures: DatastructuresListData[]
   onDelete?: (id: string) => void
+  onDeleteDatastructureClick: (id: string) => void
 }
 
 export const DatastructuresTable = (props: DatastructuresTableProps) => {
@@ -34,8 +36,10 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     rowSelection,
     onPaginationChange,
     onSortingChange,
+    onDeleteDatastructureClick,
   } = props
   const t = useTranslations('datastructures')
+  const tVersion = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
   const columnHelper = createColumnHelper<DatastructuresListData>()
 
@@ -47,19 +51,21 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
-      // TODO: Implement cell click for navigation to datastructure
       cell: ({ row }: CellContext<DatastructuresListData, unknown>) => (
         <ExpanderCell row={row} className="font-medium">
-          {row.depth > 0 ? (
-            row.original.name
-          ) : (
-            <LinkCell href={`datastructures/${row.original.id}`}>{row.original.name}</LinkCell>
-          )}
+          <LinkCell
+            href={
+              row.depth === 0
+                ? `datastructures/${row.original.id}`
+                : `datastructures/${row.parentId}/${row.original.id}`
+            }
+          >
+            {row.original.name}
+          </LinkCell>
         </ExpanderCell>
       ),
       meta: {
         style: {
-          width: '20%',
           minWidth: '200px',
           color: 'var(--foreground)',
           fontWeight: '500',
@@ -71,14 +77,13 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       cell: info => info.getValue(),
       meta: {
         style: {
-          width: '25%',
           minWidth: '200px',
         },
       },
     }),
     columnHelper.accessor('source', {
       header: t('tableHeaders.source'),
-      cell: info => (info.getValue() ? t(`source.${info.getValue()}`) : '-'),
+      cell: info => (info.getValue() ? tVersion(`source.${info.getValue()}`) : '-'),
       meta: {
         style: {
           width: '10%',
@@ -91,7 +96,6 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       cell: info => info.getValue() || '-',
       meta: {
         style: {
-          width: '10%',
           minWidth: '100px',
         },
       },
@@ -102,7 +106,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
         const status = info.getValue()
         return (
           <div className="flex items-center gap-2">
-            {status === STATUS_TYPES.DRAFT ? (
+            {status === DATASTRUCTURE_STATUS_TYPES.DRAFT ? (
               <CircleDashed className="text-muted-foreground" size={16} />
             ) : (
               <CircleCheckBig className="text-muted-foreground" size={16} />
@@ -113,11 +117,29 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       },
       meta: {
         style: {
-          width: '10%',
           minWidth: '120px',
         },
       },
     }),
+    {
+      id: 'actions',
+      cell: ({ row }: { row: Row<DatastructuresListData> }) => (
+        <TableDropdownMenu
+          menuContentClassName="w-50"
+          menuItems={[
+            {
+              label: tCommon('actions.removeItem', { item: tCommon('items.datastructure') }),
+              onClick: () => onDeleteDatastructureClick(row.original.id),
+            },
+          ]}
+        />
+      ),
+      meta: {
+        style: {
+          width: '50px',
+        },
+      },
+    },
   ]
 
   const table = useReactTable({

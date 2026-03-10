@@ -83,7 +83,9 @@ describe('DatastructureCreateForm', () => {
         expect.objectContaining({
           name: 'Test Datastructure',
           description: '',
-          status: 'DRAFT',
+          createdFromDataSource: false,
+          dataStructureVersionIds: [],
+          assignments: [],
         }),
         expect.any(Object),
       )

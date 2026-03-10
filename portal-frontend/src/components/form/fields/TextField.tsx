@@ -16,10 +16,21 @@ interface TextFieldProps<T extends FieldValues> extends InputPropsWithoutForm {
   required?: boolean
   formItemProps?: DetailedHTMLProps<HTMLAttributes<HTMLDivElement>, HTMLDivElement>
   shouldShowErrors?: boolean
+  manualError?: string
 }
 
 export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
-  const { form, name, placeholder, label, required = false, formItemProps, disabled, shouldShowErrors = true } = props
+  const {
+    form,
+    name,
+    placeholder,
+    label,
+    required = false,
+    formItemProps,
+    disabled,
+    shouldShowErrors = true,
+    manualError,
+  } = props
   const isMobile = useIsMobile()
   return (
     <FormField
@@ -45,9 +56,15 @@ export const TextField = <T extends FieldValues>(props: TextFieldProps<T>) => {
                 placeholder={placeholder}
                 {...field}
                 disabled={disabled}
+                aria-invalid={!!manualError || !!form.formState.errors[name]}
               />
             </FormControl>
             {shouldShowErrors && <FormMessage data-testid={`${name}FormMessage`} className="mt-2" />}
+            {manualError && (
+              <FormMessage data-testid={`${name}ManualFormMessage`} className="mt-2">
+                {manualError}
+              </FormMessage>
+            )}
           </div>
         </FormItem>
       )}

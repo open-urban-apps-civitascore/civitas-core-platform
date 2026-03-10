@@ -4,10 +4,14 @@ import { AxiosError } from 'axios'
 import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { DeleteMutationInput } from '@/types/common'
 
-export const useDeleteMutation = <TResponse>({ key: mutationKey, errorMessage, headers }: DeleteMutationInput) => {
+export const useDeleteMutation = <TResponse, TData>({
+  key: mutationKey,
+  errorMessage,
+  headers,
+}: DeleteMutationInput<TData>) => {
   const queryClient = useQueryClient()
 
-  return useMutation<ApiServiceResponse, Error, string>({
+  return useMutation<ApiServiceResponse<TResponse>, Error, string>({
     mutationFn: (id: string) =>
       apiRequest<TResponse>({
         method: 'DELETE',

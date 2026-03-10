@@ -6,11 +6,6 @@ export const CONNECTION_TYPES = {
   STATIC: 'static',
 } as const
 
-export const DATASOURCE_STATUS_TYPES = {
-  DRAFT: 'draft',
-  AVAILABLE: 'available',
-} as const
-
 export const CONNECTOR_TYPES = {
   MQTT: 'MQTT',
   SQL: 'SQL',

@@ -5,14 +5,15 @@ import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
-import { Status, STATUS_TYPES } from '@/types/common'
 import { ConnectorFormToApiSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
   Datasource,
+  DATASOURCE_STATUS_TYPES,
   DatasourceApiToFormSchema,
   DatasourceFormAvailableSchema,
   DatasourceFormDraft,
   DatasourceFormDraftSchema,
+  DatasourceStatusType,
   DatasourceTab,
   DatasourceUpdateData,
 } from '@/types/datasources'
@@ -24,7 +25,7 @@ export const useDatasourceForm = (datasource: Datasource) => {
 
   const defaultValues = useMemo(() => DatasourceApiToFormSchema.parse(datasource), [datasource])
 
-  const [dataSourceStatus, setDataSourceStatus] = useState<Status>(datasource.dataSourceStatus)
+  const [dataSourceStatus, setDataSourceStatus] = useState<DatasourceStatusType>(datasource.dataSourceStatus)
 
   const updateDatasource = useUpdateDatasource()
   const isLoading = updateDatasource.isPending
@@ -60,7 +61,7 @@ export const useDatasourceForm = (datasource: Datasource) => {
     }
   }, [connectorTypeWatch, form])
 
-  const isDraftMode = dataSourceStatus === STATUS_TYPES.DRAFT
+  const isDraftMode = dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
 
   // Zod v4 discriminatedUnion safeParse can throw on stale keys
   const canSetAvailable = useMemo(() => {
@@ -83,8 +84,8 @@ export const useDatasourceForm = (datasource: Datasource) => {
 
   // Revert to draft when required fields become empty
   useEffect(() => {
-    if (dataSourceStatus === STATUS_TYPES.AVAILABLE && !canSetAvailable) {
-      setDataSourceStatus(STATUS_TYPES.DRAFT)
+    if (dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
+      setDataSourceStatus(DATASOURCE_STATUS_TYPES.DRAFT)
       toast.info(tCommon('info.switchMode'))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,7 +103,7 @@ export const useDatasourceForm = (datasource: Datasource) => {
     return completed
   }, [nameWatch, formValues])
 
-  const handleStatusChange = (newStatus: Status) => {
+  const handleStatusChange = (newStatus: DatasourceStatusType) => {
     setDataSourceStatus(newStatus)
   }
 

@@ -8,8 +8,7 @@ import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
-import { STATUS_TYPES } from '@/types/common'
-import { Datasource } from '@/types/datasources'
+import { Datasource, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
@@ -98,7 +97,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
         const status = info.getValue()
         return (
           <div className="flex items-center gap-2">
-            {status === STATUS_TYPES.DRAFT ? (
+            {status === DATASOURCE_STATUS_TYPES.DRAFT ? (
               <CircleDashed className="text-muted-foreground" size={16} />
             ) : (
               <CircleCheckBig className="text-muted-foreground" size={16} />

@@ -20,6 +20,7 @@ interface BasicInfoTabProps {
 export const BasicInfoTab = (props: BasicInfoTabProps) => {
   const { form, isReadOnly = false } = props
   const t = useTranslations('datastructures')
+  const tCommon = useTranslations('common')
 
   return (
     <ContentCard className={cn('h-full overflow-auto')} footerElement={<FooterElement />}>
@@ -46,7 +47,7 @@ export const BasicInfoTab = (props: BasicInfoTabProps) => {
             name="description"
             label={t('form.description')}
             placeholder={t('form.description')}
-            hint={t('form.descriptionHint')}
+            hint={tCommon('info.descriptionHint')}
             maxLength={150}
             hasCharacterCount
             disabled={isReadOnly}
