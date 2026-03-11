@@ -347,7 +347,7 @@
       "description": "Beschreibung"
     },
     "detailsTabs": {
-      "info": "Informationen",
+      "info": "Basisinformationen",
       "roles": "Rollen",
       "users": "User",
       "subgroups": "Untergruppen"

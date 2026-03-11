@@ -350,7 +350,7 @@
       "description": "Description"
     },
     "detailsTabs": {
-      "info": "Information",
+      "info": "Base Information",
       "roles": "Roles",
       "users": "Users",
       "subgroups": "Subgroups"
