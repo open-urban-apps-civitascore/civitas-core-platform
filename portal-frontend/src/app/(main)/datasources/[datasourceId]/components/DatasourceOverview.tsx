@@ -5,7 +5,10 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useState } from 'react'
 
-import { useDatastructureVersion } from '@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion'
+import {
+  defaultDatastructureVersionFormData,
+  useDatastructureVersion,
+} from '@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion'
 import { useGetDatastructureVersion } from '@/app/services/api/datastructures/versions/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -15,8 +18,10 @@ import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Form } from '@/components/ui/form'
+import { cn } from '@/lib/utils'
 import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
-import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureVersion } from '@/types/datastructures'
+import { Datastructure, DatastructureVersion } from '@/types/datastructures'
+import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
@@ -27,19 +32,6 @@ interface DatasourceOverviewProps {
   datasource: Datasource
   datastructure: Datastructure | null
   datastructureVersion: DatastructureVersion | null
-}
-
-const defaultDatastructure = {
-  id: '',
-  name: '',
-  description: null,
-  dataStructureStatus: DATASTRUCTURE_STATUS_TYPES.DRAFT,
-  createdFromDataSource: true,
-  assignments: [],
-  inUse: false,
-  createdAt: new Date().toISOString(),
-  modifiedAt: new Date().toISOString(),
-  dataStructureVersions: [],
 }
 
 const tabs: Tab<DatasourceTab>[] = [
@@ -59,7 +51,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const searchParams = useSearchParams()
   const pathname = usePathname()
 
-  const [datastructure, setDatastructure] = useState<Datastructure>(initialDatastructure || defaultDatastructure)
   const [datastructureVersion, setDatastructureVersion] = useState<DatastructureVersion | null>(
     initialDatastructureVersion,
   )
@@ -71,7 +62,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     initialDatastructure?.id || null,
   )
 
-  const { data: datastructureVersionData, isFetching: isFetchingDatastructureVersion } = useGetDatastructureVersion({
+  const { data: datastructureVersionData } = useGetDatastructureVersion({
     datastructureId: selectedDatastructureId || '',
     versionId: selectedDatastructureVersionId || '',
     isEnabled:
@@ -81,15 +72,17 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   })
 
   useEffect(() => {
-    const newVersion = !selectedDatastructureVersionId
-      ? null
-      : selectedDatastructureVersionId === initialDatastructureVersion?.id
-        ? initialDatastructureVersion
-        : datastructureVersionData?.data || null
-    setDatastructureVersion(newVersion)
+    if (!selectedDatastructureVersionId) {
+      setDatastructureVersion(null)
+      return
+    } else if (selectedDatastructureVersionId === initialDatastructureVersion?.id)
+      setDatastructureVersion(initialDatastructureVersion)
+    else setDatastructureVersion(datastructureVersionData?.data || null)
   }, [selectedDatastructureVersionId, datastructureVersionData?.data, initialDatastructureVersion])
 
-  const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit' || !datastructureVersionData)
+  console.log('datastructureVersion', datastructureVersion)
+
+  const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
   useEffect(() => {
     setIsReadOnly(searchParams.get('mode') !== 'edit')
   }, [searchParams])
@@ -110,7 +103,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   )
 
   const {
-    form: DatasourceForm,
+    form: datasourceForm,
     readyConnectorType,
     dataSourceStatus,
     handleStatusChange,
@@ -121,58 +114,68 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   } = useDatasourceForm(datasource)
 
   const {
+    form: datastructureVersionForm,
+
     modelSessionManager,
     hasUserChanges: hasDatastructureBeenEdited,
-    form,
-    isLoading: isUpdatingDataStructureVerison,
     saveDatastructureVersion,
     resetToInitialState,
-    resetSession,
+    resetFormAndSession,
   } = useDatastructureVersion({
     datastructureId: selectedDatastructureId || '',
     version: initialDatastructureVersion || null,
     isCreateMode: false,
   })
 
-  // sets the active session with the new selected version's diagram
+
+  const shouldSaveDatastructureVersion =
+    hasDatastructureBeenEdited && selectedDatastructureId && selectedDatastructureVersionId
+
+  // sets the active session with the new selected version's diagram or null if no version is selected
   useEffect(() => {
-    const hasNoSelectedVersion = !selectedDatastructureId || !selectedDatastructureVersionId
-
-    if (hasNoSelectedVersion) {
-      resetSession(null, true)
+    const isInitialVersion = selectedDatastructureId === initialDatastructureVersion?.id
+    if (isInitialVersion) {
+      resetToInitialState()
       return
+    } else {
+      if (!datastructureVersion) resetFormAndSession(defaultDatastructureVersionFormData, null)
+      else resetFormAndSession(mapDatastructureVersionApiToFormData(datastructureVersion), datastructureVersion)
     }
-
-    if (datastructureVersion !== initialDatastructureVersion) resetSession(datastructureVersion, true)
-  }, [
-    datastructureVersion,
-    initialDatastructureVersion,
-    selectedDatastructureId,
-    selectedDatastructureVersionId,
-  ])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datastructureVersion, initialDatastructureVersion, selectedDatastructureId, selectedDatastructureVersionId])
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (shouldSaveDatastructureVersion) {
+      const isDatastructureVersionSaved = await saveDatastructureVersion(selectedDatastructureId)
+      if (!isDatastructureVersionSaved) return
+    }
+
     submitDatasource(() => router.refresh())
   }
 
   const handleExit = () => {
-    if (DatasourceForm.formState.isDirty) {
+    if (datasourceForm.formState.isDirty) {
       setIsExitModalOpen(true)
     } else {
-      DatasourceForm.reset()
+      datasourceForm.reset()
       updateMode(false)
     }
   }
 
   const handleDiscardAndExit = () => {
     setIsExitModalOpen(false)
-    DatasourceForm.reset()
+    datasourceForm.reset()
     updateMode(false)
   }
 
   const handleSaveAndExit = async () => {
+    if (shouldSaveDatastructureVersion) {
+      const isDatastructureVersionSaved = await saveDatastructureVersion(selectedDatastructureId)
+      if (!isDatastructureVersionSaved) return
+    }
+
     submitDatasource(() => {
       setIsExitModalOpen(false)
       updateMode(false)
@@ -183,20 +186,24 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     const [selectedDatastructureId, selectedVersionId] = Object.keys(selection)[0]?.split('/') || [null, null]
     setSelectedDatastructureId(selectedDatastructureId)
     setSelectedDatastructureVersionId(selectedVersionId)
+    datasourceForm.setValue('dataStructureVersionId', selectedVersionId, {
+      shouldDirty: true,
+      shouldValidate: true,
+    })
   }
 
   const isConfirmButtonDisabled =
-    (!DatasourceForm.formState.isDirty && !hasDatastructureBeenEdited) ||
-    !!DatasourceForm.formState.errors.name ||
-    (dataSourceStatus !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(DatasourceForm.formState.errors).length > 0) ||
+    !(datasourceForm.formState.isDirty || hasDatastructureBeenEdited) ||
+    !!datasourceForm.formState.errors.name ||
+    (dataSourceStatus !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(datasourceForm.formState.errors).length > 0) ||
     isLoadingDatasource
 
   const renderTabContent = () => {
     switch (selectedTab) {
       case 'basicInfo':
-        return <BasicInfoTab form={DatasourceForm} isReadOnly={isReadOnly} />
+        return <BasicInfoTab form={datasourceForm} isReadOnly={isReadOnly} />
       case 'connector':
-        return <ConnectorTab form={DatasourceForm} readyConnectorType={readyConnectorType} isReadOnly={isReadOnly} />
+        return <ConnectorTab form={datasourceForm} readyConnectorType={readyConnectorType} isReadOnly={isReadOnly} />
       case 'dataStructure':
         return (
           <DatastructureTab
@@ -250,11 +257,12 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
         }
       />
       <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
-        <Form {...DatasourceForm}>
+        <Form {...datasourceForm}>
           <form
             data-testid="datasourceEditForm"
             aria-label={`${tCommon('form')} ${t('edit.basicInfo.title')}`}
             onSubmit={e => e.preventDefault()}
+            className={cn(selectedTab === 'dataStructure' && 'h-full')}
           >
             {isLoadingDatasource ? <LoadingSpinner className="h-[300px]" /> : renderTabContent()}
           </form>

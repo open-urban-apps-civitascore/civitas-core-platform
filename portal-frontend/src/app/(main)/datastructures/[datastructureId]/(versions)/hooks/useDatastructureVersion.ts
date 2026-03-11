@@ -342,5 +342,6 @@ export const useDatastructureVersion = ({
     resetToInitialState,
     hasUserChanges,
     resetSession,
+    resetFormAndSession,
   }
 }
