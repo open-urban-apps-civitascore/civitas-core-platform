@@ -12,7 +12,7 @@ import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
-import { ASSIGNMENT_SCOPE_TYPES, type Assignment, type AssignmentScope } from '@/types/assignments'
+import { type Assignment, ASSIGNMENT_SCOPE_TYPES, type AssignmentScope } from '@/types/assignments'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
 

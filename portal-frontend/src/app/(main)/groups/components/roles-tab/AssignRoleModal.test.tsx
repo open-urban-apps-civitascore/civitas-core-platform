@@ -85,9 +85,7 @@ vi.mock('@/hooks/use-query-params', () => ({
 vi.mock('@/app/services/api/roles/clientRequests', () => ({
   useGetRoles: ({ params }: { params?: URLSearchParams } = {}) => {
     const roleTypeFilter = params?.get('roleType')
-    const filtered = roleTypeFilter
-      ? mockRoles.filter(r => roleTypeFilter.split(',').includes(r.roleType))
-      : mockRoles
+    const filtered = roleTypeFilter ? mockRoles.filter(r => roleTypeFilter.split(',').includes(r.roleType)) : mockRoles
     return {
       data: { data: filtered, totalElements: filtered.length },
       isFetching: false,
