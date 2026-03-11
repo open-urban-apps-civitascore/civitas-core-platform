@@ -5,7 +5,7 @@ import { AxiosError } from 'axios'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
+import { FieldErrors, useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
@@ -349,6 +349,11 @@ export const useDatastructureVersion = ({
     }
   }
 
+  const handleSubmitValidationErrors = (errors: FieldErrors<DatastructureVersionFormData>) => {
+    console.error('Validation errors: ', errors)
+    toast.error(tCommon('errors.formInvalid'))
+  }
+
   const statusHint = useMemo(() => {
     if (isInUse) return t('messages.isInUseStatusHint')
     if (isLastAvailableVersionInAvailableDatastructure) return t('messages.isLastAvailableVersion')
@@ -365,11 +370,7 @@ export const useDatastructureVersion = ({
   const hasUserChanges = hasMetadataChanges || hasModelChanges
 
   const isConfirmButtonDisabled =
-    !hasUserChanges ||
-    versionWatch.trim().length === 0 ||
-    !!form.formState.errors.version ||
-    !!versionAlreadyExistsError ||
-    isLoading
+    !hasUserChanges || !!form.formState.errors.version || !!versionAlreadyExistsError || isLoading
 
   return {
     activeSessionId,
@@ -389,5 +390,6 @@ export const useDatastructureVersion = ({
     versionAlreadyExistsError,
     handleStatusChange,
     resetToInitialState,
+    handleSubmitValidationErrors,
   }
 }

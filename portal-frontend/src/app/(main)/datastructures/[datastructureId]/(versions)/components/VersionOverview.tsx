@@ -26,12 +26,12 @@ import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
 
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
-    value: 'structure',
-    label: 'datastructureVersions.tabs.structure',
-  },
-  {
     value: 'versionInfo',
     label: 'datastructureVersions.tabs.versionInfo',
+  },
+  {
+    value: 'structure',
+    label: 'datastructureVersions.tabs.structure',
   },
 ]
 
@@ -73,6 +73,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     statusWatch,
     versionAlreadyExistsError,
     handleStatusChange,
+    handleSubmitValidationErrors,
   } = useDatastructureVersion({
     datastructureId,
     version,
@@ -82,12 +83,12 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     subTabValue,
   })
 
-  const handleSave = async () => {
+  const handleSave = form.handleSubmit(async () => {
     const isSaved = await saveDatastructureVersion()
     if (isSaved) {
       setIsExitModalOpen(false)
     }
-  }
+  }, handleSubmitValidationErrors)
 
   const handleExit = () => {
     resetToInitialState()
@@ -131,14 +132,14 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const renderTabContent = () => {
     switch (subTabValue) {
-      case 'versionInfo':
-        return (
-          <VersionInfoTab form={form} isReadOnly={isReadOnly} versionAlreadyExistsError={versionAlreadyExistsError} />
-        )
       case 'structure':
-      default:
         return (
           <StructureDefinitionTab isReadOnly={isReadOnly} modelSessionManager={modelSessionManager} isInUse={isInUse} />
+        )
+      case 'versionInfo':
+      default:
+        return (
+          <VersionInfoTab form={form} isReadOnly={isReadOnly} versionAlreadyExistsError={versionAlreadyExistsError} />
         )
     }
   }

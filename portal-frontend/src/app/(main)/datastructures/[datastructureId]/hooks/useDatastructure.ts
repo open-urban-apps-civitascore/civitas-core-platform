@@ -131,8 +131,11 @@ export const useDatastructure = ({ datastructure }: UseDatastructureProps) => {
     try {
       let response: { data: Datastructure }
       if (datastructure.dataStructureStatus === STATUS_TYPES.AVAILABLE)
-        response = await updatePublishedDatastructure.mutateAsync({ ...values, id: values.id })
-      else response = await updateDatastructure.mutateAsync({ ...values, id: values.id })
+        response = await updatePublishedDatastructure.mutateAsync({
+          ...values,
+          createdFromDataSource: datastructure.createdFromDataSource,
+        })
+      else response = await updateDatastructure.mutateAsync(values)
       toast.success(t('messages.updateSuccess'))
       return response.data
     } catch (error) {
