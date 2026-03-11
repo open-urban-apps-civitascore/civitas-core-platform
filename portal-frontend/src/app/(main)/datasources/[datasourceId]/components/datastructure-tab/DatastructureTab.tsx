@@ -10,12 +10,12 @@ interface DatastructureTab {
   datasourceTitle: string
   selectedVersionId: string | null
   isReadOnly: boolean
-  isInUse: boolean
+  isDatasourceInUse: boolean
   modelSessionManager: UseMultiSessionReturn
   onSelectDatastructureVersion: (selection: RowSelectionState) => void
 }
 export const DatastructureTab = (props: DatastructureTab) => {
-  const { modelSessionManager, datasourceTitle, selectedVersionId, onSelectDatastructureVersion } = props
+  const { modelSessionManager, datasourceTitle, selectedVersionId, isDatasourceInUse, onSelectDatastructureVersion } = props
   const [isImportDatastructureModalOpen, setIsImportDatastructureModalOpen] = useState(false)
 
   const handleImportFromDatastructure = () => {
@@ -35,7 +35,7 @@ export const DatastructureTab = (props: DatastructureTab) => {
         isMultiSessionMode={false}
         canExportXmi={false}
         canImportXmi={false}
-        onImportFromDatastructure={handleImportFromDatastructure}
+        onImportFromDatastructure={isDatasourceInUse ? undefined : handleImportFromDatastructure}
       />
       <DataModelImportModal
         datasourceTitle={datasourceTitle}

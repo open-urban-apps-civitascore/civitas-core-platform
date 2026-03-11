@@ -123,7 +123,6 @@ export const serverFetch = async <TResponse>({
           content: res,
           totalElements: Array.isArray(res) ? Number(response.headers.get('x-total-count')) || 0 : undefined,
         }
-    console.log('data', JSON.stringify(data, null, 4))
     return {
       data: data.content,
       totalElements: data.totalElements,

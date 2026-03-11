@@ -214,7 +214,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             }
             onSelectDatastructureVersion={handleSelectDatastructureVersion}
             isReadOnly={isReadOnly}
-            isInUse={!!initialDatastructureVersion?.inUse}
+            isDatasourceInUse={datasource.inUse}
             modelSessionManager={modelSessionManager}
           />
         )
