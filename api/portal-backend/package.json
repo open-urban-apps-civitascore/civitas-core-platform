@@ -7,9 +7,13 @@
     "lint": "redocly lint openapi.yaml",
     "preview": "redocly preview-docs openapi.yaml --port 8096",
     "lint:fix": "redocly lint openapi.yaml --format stylish",
-    "api-docs": "pnpm dlx http-server . -p 8095 -o /docs.html -c-1"
+    "api-docs": "pnpm dlx http-server . -p 8095 -o /docs.html -c-1",
+    "generate": "orval",
+    "export": "curl -sf http://localhost:8089/v1/api-docs.yaml -o openapi.yaml && echo 'Exported openapi.yaml' && git rev-parse HEAD > .last-sync && echo \"Updated .last-sync to $(cat .last-sync)\""
   },
   "devDependencies": {
-    "@redocly/cli": "^1"
+    "@redocly/cli": "^2.20.4",
+    "orval": "^8.5.3",
+    "prettier": "^3.8.1"
   }
 }
