@@ -36,49 +36,58 @@ public class OpenApiConfig {
   private static final String APPLICATION_JSON = "application/json";
   private static final String APPLICATION_PROBLEM_JSON = "application/problem+json";
 
-  @Value("${keycloak.auth-server-url}")
+  @Value("${keycloak.auth-server-url:}")
   private String keycloakUrl;
 
-  @Value("${keycloak.realm}")
+  @Value("${keycloak.realm:}")
   private String realm;
 
   @Bean
   public OpenAPI customOpenAPI() {
-    String authUrl = keycloakUrl + "/realms/" + realm + "/protocol/openid-connect/auth";
-    String tokenUrl = keycloakUrl + "/realms/" + realm + "/protocol/openid-connect/token";
+    OpenAPI openAPI =
+        new OpenAPI()
+            .info(
+                new Info()
+                    .title("CIVITAS/CORE Data Management API")
+                    .summary("Smart city data management REST API")
+                    .version("2.0.0")
+                    .description(
+                        "REST API for the CIVITAS/CORE smart city data management platform. "
+                            + "Manages datasets, data sources, data structures, users, groups, "
+                            + "roles, and permissions.")
+                    .license(new License().name("EUPL-1.2").url("https://eupl.eu/1.2/en/"))
+                    .contact(
+                        new Contact()
+                            .name("CIVITAS Connect")
+                            .url("https://civitasconnect.digital")))
+            .externalDocs(
+                new ExternalDocumentation()
+                    .description("CIVITAS/CORE Developer Documentation")
+                    .url("https://docs.core.civitasconnect.digital/docs_v2/Development/intro"));
 
-    return new OpenAPI()
-        .info(
-            new Info()
-                .title("CIVITAS/CORE Data Management API")
-                .summary("Smart city data management REST API")
-                .version("2.0.0")
-                .description(
-                    "REST API for the CIVITAS/CORE smart city data management platform. "
-                        + "Manages datasets, data sources, data structures, users, groups, roles, "
-                        + "and permissions.")
-                .license(new License().name("EUPL-1.2").url("https://eupl.eu/1.2/en/"))
-                .contact(
-                    new Contact().name("CIVITAS Connect").url("https://civitasconnect.digital")))
-        .externalDocs(
-            new ExternalDocumentation()
-                .description("CIVITAS/CORE Developer Documentation")
-                .url("https://docs.core.civitasconnect.digital/docs_v2/Development/intro"))
-        .components(
-            new Components()
-                .addSecuritySchemes(
-                    "oauth2",
-                    new SecurityScheme()
-                        .type(SecurityScheme.Type.OAUTH2)
-                        .description("Keycloak OAuth2 Authorization Code with PKCE")
-                        .flows(
-                            new OAuthFlows()
-                                .authorizationCode(
-                                    new OAuthFlow()
-                                        .authorizationUrl(authUrl)
-                                        .tokenUrl(tokenUrl)
-                                        .scopes(new Scopes())))))
-        .addSecurityItem(new SecurityRequirement().addList("oauth2"));
+    if (!keycloakUrl.isBlank() && !realm.isBlank()) {
+      String authUrl = keycloakUrl + "/realms/" + realm + "/protocol/openid-connect/auth";
+      String tokenUrl = keycloakUrl + "/realms/" + realm + "/protocol/openid-connect/token";
+
+      openAPI
+          .components(
+              new Components()
+                  .addSecuritySchemes(
+                      "oauth2",
+                      new SecurityScheme()
+                          .type(SecurityScheme.Type.OAUTH2)
+                          .description("Keycloak OAuth2 Authorization Code with PKCE")
+                          .flows(
+                              new OAuthFlows()
+                                  .authorizationCode(
+                                      new OAuthFlow()
+                                          .authorizationUrl(authUrl)
+                                          .tokenUrl(tokenUrl)
+                                          .scopes(new Scopes())))))
+          .addSecurityItem(new SecurityRequirement().addList("oauth2"));
+    }
+
+    return openAPI;
   }
 
   /**

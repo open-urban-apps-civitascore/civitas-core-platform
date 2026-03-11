@@ -58,6 +58,8 @@ security:
 springdoc:
   swagger-ui:
     oauth:
+      client-id: portal-frontend
+      use-pkce-with-authorization-code-grant: true
       # Dev-only secret for local Swagger UI OAuth — never use in deployed environments
       client-secret: dev-only-portal-frontend-secret
 
