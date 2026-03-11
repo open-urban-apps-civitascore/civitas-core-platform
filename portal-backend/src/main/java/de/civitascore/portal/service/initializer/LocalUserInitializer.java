@@ -1,7 +1,9 @@
 package de.civitascore.portal.service.initializer;
 
+import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.portal.configuration.LocalInitProperties;
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
@@ -12,7 +14,10 @@ import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.ConfigEventPublisherService;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
@@ -31,7 +36,12 @@ public class LocalUserInitializer {
   private final RoleRepository roleRepository;
   private final AssignmentRepository assignmentRepository;
   private final ConfigEventPublisherService configEventPublisher;
-  private final String targetRealm;
+
+  @Value("${keycloak.target-realm}")
+  private String targetRealm;
+
+  @Value("${event.config-adapter-timeout-seconds:10}")
+  private int configAdapterTimeoutSeconds;
 
   public LocalUserInitializer(
       LocalInitProperties properties,
@@ -39,15 +49,13 @@ public class LocalUserInitializer {
       GroupRepository groupRepository,
       RoleRepository roleRepository,
       AssignmentRepository assignmentRepository,
-      ConfigEventPublisherService configEventPublisher,
-      @Value("${keycloak.target-realm}") String targetRealm) {
+      ConfigEventPublisherService configEventPublisher) {
     this.properties = properties;
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.roleRepository = roleRepository;
     this.assignmentRepository = assignmentRepository;
     this.configEventPublisher = configEventPublisher;
-    this.targetRealm = targetRealm;
   }
 
   @EventListener(ApplicationReadyEvent.class)
@@ -86,19 +94,24 @@ public class LocalUserInitializer {
       groupsByName.put(entry.getName(), group);
 
       if (entry.getRoleName() != null) {
-        createAssignmentIfAbsent(group, entry.getRoleName());
+        createAssignmentIfAbsent(group, entry.getRoleName(), entry.getScopeType());
       }
     }
 
     return groupsByName;
   }
 
-  private void createAssignmentIfAbsent(Group group, String roleName) {
+  private void createAssignmentIfAbsent(Group group, String roleName, ScopeType scopeType) {
     roleRepository
         .findByName(roleName)
         .ifPresentOrElse(
             role -> {
-              if (assignmentRepository.existsByGroupAndRoleAndScopeTypeIsNull(group, role)) {
+              boolean exists =
+                  scopeType == null
+                      ? assignmentRepository.existsByGroupAndRoleAndScopeTypeIsNull(group, role)
+                      : assignmentRepository.existsByGroupAndRoleAndScopeType(
+                          group, role, scopeType);
+              if (exists) {
                 log.debug(
                     "Assignment for group '{}' and role '{}' already exists — skipping",
                     group.getName(),
@@ -108,6 +121,7 @@ public class LocalUserInitializer {
               Assignment assignment = new Assignment();
               assignment.setGroup(group);
               assignment.setRole(role);
+              assignment.setScopeType(scopeType);
               assignmentRepository.save(assignment);
               log.info(
                   "Created assignment for group '{}' with role '{}'",
@@ -173,15 +187,33 @@ public class LocalUserInitializer {
     userConfig.setEnabled(true);
     userConfig.setEmailVerified(true);
 
-    configEventPublisher
-        .publishUserCreated(targetRealm, userConfig)
-        .whenComplete(
-            (ignored, ex) -> {
-              if (ex != null) {
-                log.error("Failed to sync local user '{}' to Keycloak", user.getEmail(), ex);
-              } else {
-                log.info("Synced local user '{}' to Keycloak via config adapter", user.getEmail());
-              }
-            });
+    try {
+      ConfigResultEvent result =
+          configEventPublisher
+              .publishUserCreated(targetRealm, userConfig)
+              .get(configAdapterTimeoutSeconds, TimeUnit.SECONDS);
+
+      if (result != null
+          && result.status() == ConfigResultEvent.Status.SUCCESS
+          && !Strings.isBlank(result.resourceId())) {
+        user.setExternalId(result.resourceId());
+        userRepository.save(user);
+        log.info(
+            "Synced local user '{}' to Keycloak, externalId={}",
+            user.getEmail(),
+            result.resourceId());
+      } else {
+        log.warn(
+            "Keycloak sync for local user '{}' returned no resourceId — externalId not set",
+            user.getEmail());
+      }
+    } catch (TimeoutException e) {
+      log.error("Timeout waiting for Keycloak sync for local user '{}'", user.getEmail());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      log.error("Interrupted while waiting for Keycloak sync for local user '{}'", user.getEmail());
+    } catch (Exception e) {
+      log.error("Failed to sync local user '{}' to Keycloak", user.getEmail(), e);
+    }
   }
 }

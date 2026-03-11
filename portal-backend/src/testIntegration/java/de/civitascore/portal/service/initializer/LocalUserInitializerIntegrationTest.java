@@ -2,6 +2,7 @@ package de.civitascore.portal.service.initializer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.User;
@@ -21,7 +22,9 @@ import org.springframework.test.context.ActiveProfiles;
 class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest {
 
   private static final String TEST_EMAIL = "init-test@example.com";
+  private static final String TEST_SYNC_EMAIL = "init-sync@example.com";
   private static final String TEST_GROUP_NAME = "Init Test Admins";
+  private static final String TEST_SCOPED_GROUP_NAME = "Init Test Architects";
   private static final String TEST_EXTERNAL_ID = "00000000-0000-0000-0000-000000000002";
 
   @Autowired private LocalUserInitializer localUserInitializer;
@@ -50,8 +53,22 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   }
 
   @Test
-  @DisplayName("Should create user and assign to group in database")
-  void shouldCreateUserAssignedToGroup() {
+  @DisplayName("Should create group with scoped Data Architect assignment")
+  void shouldCreateGroupWithScopedAssignment() {
+    localUserInitializer.initialize();
+
+    Group group = groupRepository.findByName(TEST_SCOPED_GROUP_NAME).orElseThrow();
+    assertThat(group.getDescription()).isEqualTo("Init test data architect group");
+
+    List<Assignment> assignments = assignmentRepository.findAllByGroupId(group.getId());
+    assertThat(assignments).hasSize(1);
+    assertThat(assignments.get(0).getRole().getName()).isEqualTo("Data Architect");
+    assertThat(assignments.get(0).getScopeType()).isEqualTo(ScopeType.TENANT);
+  }
+
+  @Test
+  @DisplayName("Should create user with pre-configured externalId")
+  void shouldCreateUserWithExternalId() {
     localUserInitializer.initialize();
 
     Optional<User> user = userRepository.findByEmail(TEST_EMAIL);
@@ -69,23 +86,38 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   }
 
   @Test
-  @DisplayName("Should not duplicate group, user or assignment when called twice")
+  @DisplayName("Should sync user without externalId to Keycloak and persist externalId")
+  void shouldSyncUserWithoutExternalIdToKeycloak() {
+    localUserInitializer.initialize();
+
+    Optional<User> user = userRepository.findByEmail(TEST_SYNC_EMAIL);
+    assertThat(user).isPresent();
+    assertThat(user.get().getFirstName()).isEqualTo("Init");
+    assertThat(user.get().getLastName()).isEqualTo("SyncUser");
+    assertThat(user.get().getActive()).isTrue();
+    assertThat(user.get().getExternalId()).isNotBlank();
+
+    assertThat(findKeycloakUserByEmail(TEST_SYNC_EMAIL)).isNotNull();
+  }
+
+  @Test
+  @DisplayName("Should not duplicate groups, users or assignments when called twice")
   void shouldBeIdempotent() {
     localUserInitializer.initialize();
     localUserInitializer.initialize();
 
-    assertThat(groupRepository.count()).isEqualTo(1);
-    assertThat(userRepository.count()).isEqualTo(1);
-    assertThat(assignmentRepository.count()).isEqualTo(1);
+    assertThat(groupRepository.count()).isEqualTo(2);
+    assertThat(userRepository.count()).isEqualTo(2);
+    assertThat(assignmentRepository.count()).isEqualTo(2);
   }
 
   @Test
-  @DisplayName("Should create configured group, user and assignment")
-  void shouldCreateConfiguredGroupAndUser() {
+  @DisplayName("Should create all configured groups, users and assignments")
+  void shouldCreateConfiguredGroupsAndUsers() {
     localUserInitializer.initialize();
 
-    assertThat(groupRepository.count()).isEqualTo(1);
-    assertThat(userRepository.count()).isEqualTo(1);
-    assertThat(assignmentRepository.count()).isEqualTo(1);
+    assertThat(groupRepository.count()).isEqualTo(2);
+    assertThat(userRepository.count()).isEqualTo(2);
+    assertThat(assignmentRepository.count()).isEqualTo(2);
   }
 }

@@ -1,5 +1,6 @@
 package de.civitascore.portal.configuration;
 
+import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.embedded.UserTitleType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -31,6 +32,7 @@ public class LocalInitProperties {
   public static class GroupEntry {
     @NotBlank private String name;
     private String roleName;
+    private ScopeType scopeType;
     private String description;
   }
 

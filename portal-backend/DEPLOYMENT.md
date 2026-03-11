@@ -64,11 +64,11 @@
 
 ### 1.4 Model Atlas
 
-| Property / Env Var | Default | Description |
-|---|---|---|
+| Property / Env Var | Default                   | Description |
+|---|---------------------------|---|
 | `model-atlas.baseUrl` | `http://model-atlas:8080` | Model Atlas base URL |
-| `model-atlas.scope` | `default` | Scope for requests |
-| `model-atlas.stage` | `draft` | Stage for requests |
+| `model-atlas.scope` | `civitas`                 | Scope for requests |
+| `model-atlas.stage` | `draft`                   | Stage for requests |
 
 ---
 
@@ -187,28 +187,31 @@ Set by `application-local.yaml` and `application-postgres.yaml`. Override via en
 
 ### 3.2 Seed Data Profile (local-init)
 
-Activate with `SPRING_PROFILES_ACTIVE=local,postgres,local-init`. Seeds groups and users on startup. **Never use in production.**
+Activate with `SPRING_PROFILES_ACTIVE=local,postgres,local-init`. Seeds groups and users on startup. Requires `kafka.enabled=true` for Keycloak sync. **Never use in production.**
 
 Configured in `application-local-init.yaml` (`@ConfigurationProperties(prefix = "local.init")`).
 
 **Groups** (`local.init.groups[]`):
 
-| Field | Example | Description |
-|---|---|---|
-| `name` | `Local Admins` | Group name |
-| `roleName` | `Tenant Admin` | Role assigned to the group |
-| `description` | `Local development admin group` | Optional |
+| Env Var | Required | Example | Description |
+|---|---|---|---|
+| `LOCAL_INIT_GROUPS_0_NAME` | yes | `Tenant Admins` | Group name |
+| `LOCAL_INIT_GROUPS_0_ROLENAME` | no | `Tenant Admin` | Role assigned to the group (must match a `RoleDefault` name) |
+| `LOCAL_INIT_GROUPS_0_SCOPETYPE` | no | `TENANT` | Assignment scope. Required for DATA/GOVERNANCE roles. Omit for SYSTEM roles. Values: `TENANT`, `DATASET`, `DATASOURCE`, `DATASTRUCTURE` |
+| `LOCAL_INIT_GROUPS_0_DESCRIPTION` | no | `Local admin group` | Group description |
 
 **Users** (`local.init.users[]`):
 
-| Field | Example | Description |
-|---|---|---|
-| `firstName` | `Developer` | — |
-| `lastName` | `User` | — |
-| `email` | `dev@civitas.local` | Also used as Keycloak username |
-| `externalId` | `00000000-0000-0000-0000-000000000001` | Must match the Keycloak user ID in `dev-environment/keycloak/realm-export.json` |
-| `title` | `OTHER` | — |
-| `groups` | `["Local Admins"]` | — |
+| Env Var | Required | Example | Description |
+|---|---|---|---|
+| `LOCAL_INIT_USERS_0_FIRSTNAME` | yes | `Tenant` | — |
+| `LOCAL_INIT_USERS_0_LASTNAME` | yes | `Admin` | — |
+| `LOCAL_INIT_USERS_0_EMAIL` | yes | `tenant-admin@civitas.local` | Also used as Keycloak username |
+| `LOCAL_INIT_USERS_0_EXTERNALID` | no | `00000000-...` | Keycloak user ID. If omitted, the user is created in Keycloak via config-adapter and the ID is set from the response. |
+| `LOCAL_INIT_USERS_0_TITLE` | no | `OTHER` | `MR`, `MS`, or `OTHER` (default: `OTHER`) |
+| `LOCAL_INIT_USERS_0_GROUPS_0` | no | `Tenant Admins` | Group name to assign the user to. Increment index for multiple groups. |
+
+Increment the `_0_` index for additional entries (e.g. `LOCAL_INIT_GROUPS_1_NAME`, `LOCAL_INIT_USERS_1_EMAIL`).
 
 ---
 
