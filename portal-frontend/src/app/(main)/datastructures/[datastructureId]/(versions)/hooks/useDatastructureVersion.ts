@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FieldErrors, useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -18,8 +18,6 @@ import {
 import { ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
-import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
-import { DirtyField } from '@/components/uml-modeler/types/session'
 import { QUERY_PARAMS } from '@/const/searchParams'
 import { STATUS_TYPES } from '@/types/common'
 import {
@@ -35,6 +33,7 @@ import {
   DatastructureVersionTab,
 } from '@/types/datastructures'
 import {
+  buildSessionFromVersion,
   containsNonStatusField,
   mapDatastructureVersionApiToFormData,
   mapDatastructureVersionFormToApiData,
@@ -76,6 +75,7 @@ export const useDatastructureVersion = ({
   const router = useRouter()
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
+  const [initialSession, setInitialSession] = useState(() => buildSessionFromVersion(version))
 
   const updateVersion = useUpdateDatastructureVersion(datastructureId)
   const updatePublishedVersion = useUpdateDatastructureVersionPublished(datastructureId)
@@ -90,25 +90,6 @@ export const useDatastructureVersion = ({
     unpublishVersion.isPending ||
     updatePublishedVersion.isPending
 
-  const buildSessionFromVersion = (versionData: DatastructureVersion | null, sessionId?: string, created?: Date) => {
-    const diagram = versionData?.styles || null
-    const modelName = versionData?.modelName || null
-    const fallbackSession = createEmptySession(modelName || undefined)
-
-    return {
-      id: sessionId || diagram?.id || fallbackSession.id,
-      name: modelName || diagram?.name || fallbackSession.name,
-      diagram: diagram ? { ...diagram } : fallbackSession.diagram,
-      isDirty: false,
-      dirtyFields: new Set<DirtyField>(),
-      lastModified: diagram?.lastModified || fallbackSession.lastModified,
-      created: created || diagram?.lastModified || fallbackSession.created,
-    }
-  }
-
-  const initialSession = useMemo(() => {
-    return buildSessionFromVersion(version)
-  }, [version])
 
   const modelSessionManager = useMultiSessionManager({ initialSession })
   const nodes = modelSessionManager.activeSession?.diagram.nodes
@@ -316,6 +297,7 @@ export const useDatastructureVersion = ({
     form.reset(formValuesToReset)
     if (!activeSessionId) return
     const syncedSession = buildSessionFromVersion(versionDataForSession, activeSessionId, activeSession?.created)
+    setInitialSession(syncedSession)
     modelSessionManager.setSession(activeSessionId, syncedSession)
   }
 
@@ -366,7 +348,7 @@ export const useDatastructureVersion = ({
     dirtyFields.description ||
     dirtyFields.dataStructureVersionSource ||
     dirtyFields.dataStructureVersionStatus
-  const hasModelChanges = activeSession?.isDirty
+  const hasModelChanges = activeSession?.isDirty || activeSessionId !== initialSession.id
   const hasUserChanges = hasMetadataChanges || hasModelChanges
 
   const isConfirmButtonDisabled =
