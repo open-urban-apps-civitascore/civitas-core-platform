@@ -197,7 +197,7 @@ Configured in `application-local-init.yaml` (`@ConfigurationProperties(prefix = 
 |---|---|---|---|
 | `LOCAL_INIT_GROUPS_0_NAME` | yes | `Tenant Admins` | Group name |
 | `LOCAL_INIT_GROUPS_0_ROLENAME` | no | `Tenant Admin` | Role assigned to the group. Valid values: `Tenant Admin`, `Data Architect`, `Data Consumer`, `Data Steward`, `Data Owner`, `Data Gatekeeper` |
-| `LOCAL_INIT_GROUPS_0_SCOPETYPE` | no | `TENANT` | Assignment scope. Required for DATA/GOVERNANCE roles. Omit for SYSTEM roles. Values: `TENANT`, `DATASET`, `DATASOURCE`, `DATASTRUCTURE` |
+| `LOCAL_INIT_GROUPS_0_SCOPETYPE` | no | `TENANT` | Assignment scope. Required for DATA/GOVERNANCE roles. Not needed for SYSTEM roles (e.g. Tenant Admin). Values: `TENANT`, `DATASET`, `DATASOURCE`, `DATASTRUCTURE` |
 | `LOCAL_INIT_GROUPS_0_DESCRIPTION` | no | `Local admin group` | Group description |
 
 **Users** (`local.init.users[]`):
