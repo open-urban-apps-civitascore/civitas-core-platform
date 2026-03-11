@@ -43,6 +43,7 @@ public class DataStructureVersionController
   private final DataStructureVersionAssembler dataStructureVersionAssembler;
 
   @Override
+  @Operation(hidden = true)
   public ResponseEntity<Page<DataStructureVersionOutputDTO>> getAll(
       @ParameterObject DataStructureVersionSpec spec, @ParameterObject Pageable pageable) {
     throw new MethodNotAllowedException(HttpMethod.GET, Collections.emptySet());
@@ -59,6 +60,9 @@ public class DataStructureVersionController
   }
 
   @Override
+  @Operation(
+      operationId = "createDataStructureVersion",
+      summary = "Create a new data structure version")
   public ResponseEntity<DataStructureVersionOutputDTO> create(
       @Valid @RequestBody DataStructureVersionInputDTO input) {
     ResponseEntity<DataStructureVersionOutputDTO> response = super.create(input);
@@ -72,11 +76,39 @@ public class DataStructureVersionController
 
   @Override
   @GetMapping("/{id}")
+  @Operation(operationId = "getDataStructureVersion", summary = "Get data structure version by ID")
   public ResponseEntity<DataStructureVersionOutputDTO> getById(@PathVariable UUID id) {
     DataStructureVersion entity = getService().findByIdOrThrow(id);
     DataStructureVersionOutputDTO output = getAssembler().toOutput(entity);
     getService().findModelForDataStructureVersion(entity).ifPresent(output::setModel);
     return ResponseEntity.ok(output);
+  }
+
+  @Override
+  @Operation(
+      operationId = "updateDataStructureVersion",
+      summary = "Replace a data structure version")
+  public ResponseEntity<DataStructureVersionOutputDTO> update(
+      @PathVariable UUID id, @Valid @RequestBody DataStructureVersionInputDTO input) {
+    return super.update(id, input);
+  }
+
+  @Override
+  @Operation(
+      operationId = "patchDataStructureVersion",
+      summary = "Partially update a data structure version")
+  public ResponseEntity<DataStructureVersionOutputDTO> patch(
+      @PathVariable UUID id, @RequestBody com.fasterxml.jackson.databind.JsonNode updates)
+      throws java.io.IOException {
+    return super.patch(id, updates);
+  }
+
+  @Override
+  @Operation(
+      operationId = "deleteDataStructureVersion",
+      summary = "Delete a data structure version")
+  public void delete(@PathVariable UUID id) {
+    super.delete(id);
   }
 
   @Override
@@ -96,7 +128,8 @@ public class DataStructureVersionController
 
   @PutMapping("/{versionId}/published/meta")
   @Operation(
-      summary = "Update a published data structure version",
+      operationId = "updateDataStructureVersionPublishedMeta",
+      summary = "Update metadata of a published data structure version",
       description =
           "Updates a published data structure version (AVAILABLE status). If the version is not in use by any DataSource, all fields including model, modelAtlasUri, version, and styles can be updated. If the version is in use, only description and modelName can be changed. For DRAFT versions, use PUT /datastructures/{dataStructureId}/versions/{versionId} instead.")
   public ResponseEntity<DataStructureVersionOutputDTO> updatePublishedMeta(
@@ -112,6 +145,7 @@ public class DataStructureVersionController
 
   @PostMapping("/{versionId}/publish")
   @Operation(
+      operationId = "publishDataStructureVersion",
       summary = "Publish a data structure version",
       description =
           "Publishes a data structure version by setting status to AVAILABLE. Requires modelAtlasUri to be present.")
@@ -124,6 +158,7 @@ public class DataStructureVersionController
 
   @PostMapping("/{versionId}/unpublish")
   @Operation(
+      operationId = "unpublishDataStructureVersion",
       summary = "Unpublish a data structure version",
       description =
           "Unpublishes a data structure version by setting status back to DRAFT. "

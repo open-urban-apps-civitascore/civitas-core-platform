@@ -8,6 +8,7 @@ import de.civitascore.portal.model.output.PermissionOutputDTO;
 import de.civitascore.portal.model.output.assembler.PermissionAssembler;
 import de.civitascore.portal.repository.specification.PermissionSpec;
 import de.civitascore.portal.service.PermissionService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -92,6 +93,9 @@ public class PermissionController {
         in = ParameterIn.QUERY,
         schema = @Schema(implementation = PermissionSource.class))
   })
+  @Operation(
+      summary = "List all permissions",
+      description = "Returns a filterable, sorted list of permissions.")
   @GetMapping
   public ResponseEntity<List<PermissionOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") PermissionSpec spec,
@@ -102,6 +106,9 @@ public class PermissionController {
     return ResponseEntity.ok(output);
   }
 
+  @Operation(
+      summary = "Get permission by ID",
+      description = "Returns a single permission identified by its UUID.")
   @GetMapping("/{id}")
   public ResponseEntity<PermissionOutputDTO> getById(@PathVariable UUID id) {
     Permission entity = getService().findByIdOrThrow(id);

@@ -7,6 +7,7 @@ import de.civitascore.portal.model.output.assembler.PipelineAssembler;
 import de.civitascore.portal.repository.specification.PipelineSpec;
 import de.civitascore.portal.service.PipelineService;
 import de.civitascore.portal.util.InvalidInputException;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -52,6 +53,7 @@ public class PipelineController
         in = ParameterIn.QUERY,
         schema = @Schema(type = "string", example = "traffic"))
   })
+  @Operation(operationId = "listPipelines", summary = "List all pipelines")
   @Override
   public ResponseEntity<Page<PipelineOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") PipelineSpec spec,
@@ -72,6 +74,7 @@ public class PipelineController
   }
 
   @Override
+  @Operation(operationId = "getPipeline", summary = "Get pipeline by ID")
   public ResponseEntity<PipelineOutputDTO> getById(@PathVariable UUID id) {
     UUID dataSetId = extractDataSetId();
     Pipeline pipeline = pipelineService.findByIdAndDataSetOrThrow(id, dataSetId);
@@ -79,10 +82,38 @@ public class PipelineController
   }
 
   @Override
+  @Operation(operationId = "deletePipeline", summary = "Delete a pipeline")
   public void delete(@PathVariable UUID id) {
     UUID dataSetId = extractDataSetId();
     pipelineService.findByIdAndDataSetOrThrow(id, dataSetId);
     super.delete(id);
+  }
+
+  @Override
+  @Operation(operationId = "createPipeline", summary = "Create a new pipeline")
+  public ResponseEntity<PipelineOutputDTO> create(
+      @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody
+          PipelineInputDTO input) {
+    return super.create(input);
+  }
+
+  @Override
+  @Operation(operationId = "updatePipeline", summary = "Replace a pipeline")
+  public ResponseEntity<PipelineOutputDTO> update(
+      @PathVariable UUID id,
+      @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody
+          PipelineInputDTO input) {
+    return super.update(id, input);
+  }
+
+  @Override
+  @Operation(operationId = "patchPipeline", summary = "Partially update a pipeline")
+  public ResponseEntity<PipelineOutputDTO> patch(
+      @PathVariable UUID id,
+      @org.springframework.web.bind.annotation.RequestBody
+          com.fasterxml.jackson.databind.JsonNode updates)
+      throws java.io.IOException {
+    return super.patch(id, updates);
   }
 
   @Override

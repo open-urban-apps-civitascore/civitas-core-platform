@@ -13,6 +13,9 @@ import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.AllowedScopesFilter;
 import de.civitascore.portal.service.AssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
@@ -20,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -70,8 +74,14 @@ public abstract class BaseDataEntityController<
 
   @GetMapping("/{id}/assignments")
   @Operation(
+      operationId = "get{Entity}Assignments",
       summary = "Get assignments",
-      description = "Returns all role assignments scoped to this resource.")
+      description = "Returns all role assignments scoped to this {entity}.")
+  @ApiResponse(responseCode = "200", description = "Assignments returned successfully")
+  @ApiResponse(
+      responseCode = "404",
+      description = "{Entity} not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<List<AssignmentOutputDTO>> getAssignments(@PathVariable UUID id) {
     getService().findByIdOrThrow(id);
     List<Assignment> assignments =

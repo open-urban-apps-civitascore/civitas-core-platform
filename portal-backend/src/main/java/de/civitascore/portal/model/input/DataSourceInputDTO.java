@@ -13,10 +13,15 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataSourceInputDTO extends BaseDataEntityInputDTO {
-  @NotBlank(message = "Name is required") private String name;
 
+  @Schema(description = "Data source name (required)")
+  @NotBlank(message = "Name is required")
+  private String name;
+
+  @Schema(description = "Data source description")
   private String description;
 
+  @Schema(description = "Type of connector (e.g. MQTT, SQL)")
   private ConnectorType connectorType;
 
   @Schema(
@@ -24,5 +29,6 @@ public class DataSourceInputDTO extends BaseDataEntityInputDTO {
       description = "Connector-specific configuration. Structure depends on connectorType.")
   private Map<String, Object> configuration;
 
+  @Schema(description = "ID of the data structure version to associate")
   private UUID dataStructureVersionId;
 }
