@@ -28,7 +28,7 @@ interface UMLCanvasProps {
 export const UMLCanvas: React.FC<UMLCanvasProps> = props => {
   const { className, placeHolder } = props
   const { isReadOnly } = useReadOnly()
-  const { diagram, dispatch, addEdge, validateConnection, addNode } = useActiveDiagram()
+  const { diagram, dispatch, addEdge, validateConnection, addNode, isDirty } = useActiveDiagram()
   const { screenToFlowPosition } = useReactFlow()
 
   // Node types registry - UML node components
@@ -119,7 +119,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = props => {
   return (
     <div className={`h-full w-full ${className}`}>
       <UMLMarkers />
-      {diagram.nodes.length === 0 && placeHolder && (
+      {diagram.nodes.length === 0 && !isDirty && placeHolder && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">{placeHolder}</div>
       )}
       <ReactFlow
