@@ -1,5 +1,6 @@
 package de.civitascore.portal.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.model.output.PipelineOutputDTO;
@@ -12,7 +13,10 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -91,28 +95,21 @@ public class PipelineController
 
   @Override
   @Operation(operationId = "createPipeline", summary = "Create a new pipeline")
-  public ResponseEntity<PipelineOutputDTO> create(
-      @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody
-          PipelineInputDTO input) {
+  public ResponseEntity<PipelineOutputDTO> create(@Valid @RequestBody PipelineInputDTO input) {
     return super.create(input);
   }
 
   @Override
   @Operation(operationId = "updatePipeline", summary = "Replace a pipeline")
   public ResponseEntity<PipelineOutputDTO> update(
-      @PathVariable UUID id,
-      @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody
-          PipelineInputDTO input) {
+      @PathVariable UUID id, @Valid @RequestBody PipelineInputDTO input) {
     return super.update(id, input);
   }
 
   @Override
   @Operation(operationId = "patchPipeline", summary = "Partially update a pipeline")
   public ResponseEntity<PipelineOutputDTO> patch(
-      @PathVariable UUID id,
-      @org.springframework.web.bind.annotation.RequestBody
-          com.fasterxml.jackson.databind.JsonNode updates)
-      throws java.io.IOException {
+      @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
     return super.patch(id, updates);
   }
 
