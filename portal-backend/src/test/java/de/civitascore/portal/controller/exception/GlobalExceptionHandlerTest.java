@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
@@ -49,12 +50,11 @@ class GlobalExceptionHandlerTest {
       UUID id = UUID.randomUUID();
       ResourceNotFoundException ex = new ResourceNotFoundException("DataSet", id);
 
-      ResponseEntity<Map<String, Object>> response = handler.handleNotFound(ex);
+      ProblemDetail problemDetail = handler.handleNotFound(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("NOT_FOUND");
-      assertThat((String) response.getBody().get("message")).contains(id.toString());
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:NOT_FOUND");
+      assertThat(problemDetail.getDetail()).contains(id.toString());
     }
 
     @Test
@@ -63,12 +63,11 @@ class GlobalExceptionHandlerTest {
       InvalidInputException ex =
           new InvalidInputException("Pipeline", UUID.randomUUID(), "Name is required");
 
-      ResponseEntity<Map<String, Object>> response = handler.handleInvalidInput(ex);
+      ProblemDetail problemDetail = handler.handleInvalidInput(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("INVALID_INPUT");
-      assertThat(response.getBody().get("message")).isEqualTo("Name is required");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INVALID_INPUT");
+      assertThat(problemDetail.getDetail()).isEqualTo("Name is required");
     }
 
     @Test
@@ -77,11 +76,11 @@ class GlobalExceptionHandlerTest {
       UniqueConstraintViolationException ex =
           new UniqueConstraintViolationException("Pipeline", "name", "test-pipeline");
 
-      ResponseEntity<Map<String, Object>> response = handler.handleUniqueConstraint(ex);
+      ProblemDetail problemDetail = handler.handleUniqueConstraint(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("UNIQUE_CONSTRAINT_VIOLATION");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getType())
+          .hasToString("urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION");
     }
 
     @Test
@@ -91,12 +90,11 @@ class GlobalExceptionHandlerTest {
       ResourceInUseException ex =
           new ResourceInUseException("DataStructureVersion", id, "Referenced by DataSource");
 
-      ResponseEntity<Map<String, Object>> response = handler.handleResourceInUse(ex);
+      ProblemDetail problemDetail = handler.handleResourceInUse(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("RESOURCE_IN_USE");
-      assertThat(response.getBody().get("message")).isEqualTo("Referenced by DataSource");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
+      assertThat(problemDetail.getDetail()).isEqualTo("Referenced by DataSource");
     }
 
     @Test
@@ -105,12 +103,11 @@ class GlobalExceptionHandlerTest {
       ForbiddenException ex =
           new ForbiddenException("Role", UUID.randomUUID(), "Cannot delete system role");
 
-      ResponseEntity<Map<String, Object>> response = handler.handleForbidden(ex);
+      ProblemDetail problemDetail = handler.handleForbidden(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("FORBIDDEN");
-      assertThat(response.getBody().get("message")).isEqualTo("Cannot delete system role");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:FORBIDDEN");
+      assertThat(problemDetail.getDetail()).isEqualTo("Cannot delete system role");
     }
   }
 
@@ -130,11 +127,11 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ResponseEntity<Map<String, Object>> response = handler.handleDataIntegrityViolation(ex);
+      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("UNIQUE_CONSTRAINT_VIOLATION");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getType())
+          .hasToString("urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION");
     }
 
     @Test
@@ -148,11 +145,10 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ResponseEntity<Map<String, Object>> response = handler.handleDataIntegrityViolation(ex);
+      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("FOREIGN_KEY_VIOLATION");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:FOREIGN_KEY_VIOLATION");
     }
 
     @Test
@@ -166,11 +162,10 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ResponseEntity<Map<String, Object>> response = handler.handleDataIntegrityViolation(ex);
+      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("NOT_NULL_VIOLATION");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:NOT_NULL_VIOLATION");
     }
 
     @Test
@@ -181,11 +176,10 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ResponseEntity<Map<String, Object>> response = handler.handleDataIntegrityViolation(ex);
+      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("DATA_INTEGRITY_ERROR");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:DATA_INTEGRITY_ERROR");
     }
 
     @Test
@@ -195,11 +189,10 @@ class GlobalExceptionHandlerTest {
           new DataIntegrityViolationException(
               "could not execute statement", new RuntimeException("some unknown database error"));
 
-      ResponseEntity<Map<String, Object>> response = handler.handleDataIntegrityViolation(ex);
+      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("DATA_INTEGRITY_ERROR");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:DATA_INTEGRITY_ERROR");
     }
   }
 
@@ -213,12 +206,11 @@ class GlobalExceptionHandlerTest {
       PersistenceException ex =
           new PersistenceException(new IllegalStateException("scopeType requires scopeId"));
 
-      ResponseEntity<Map<String, Object>> response = handler.handlePersistenceException(ex);
+      ProblemDetail problemDetail = handler.handlePersistenceException(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("ENTITY_VALIDATION_FAILED");
-      assertThat(response.getBody().get("message")).isEqualTo("scopeType requires scopeId");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:ENTITY_VALIDATION_FAILED");
+      assertThat(problemDetail.getDetail()).isEqualTo("scopeType requires scopeId");
     }
 
     @Test
@@ -226,11 +218,10 @@ class GlobalExceptionHandlerTest {
     void shouldReturn500ForOtherPersistenceCauses() {
       PersistenceException ex = new PersistenceException(new RuntimeException("unexpected error"));
 
-      ResponseEntity<Map<String, Object>> response = handler.handlePersistenceException(ex);
+      ProblemDetail problemDetail = handler.handlePersistenceException(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("PERSISTENCE_ERROR");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
     }
 
     @Test
@@ -238,11 +229,10 @@ class GlobalExceptionHandlerTest {
     void shouldReturn500WhenCauseIsNull() {
       PersistenceException ex = new PersistenceException("persistence error");
 
-      ResponseEntity<Map<String, Object>> response = handler.handlePersistenceException(ex);
+      ProblemDetail problemDetail = handler.handlePersistenceException(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().get("error")).isEqualTo("PERSISTENCE_ERROR");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
     }
   }
 
@@ -267,12 +257,13 @@ class GlobalExceptionHandlerTest {
               ex, new HttpHeaders(), HttpStatus.BAD_REQUEST, mock(WebRequest.class));
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody()).isInstanceOf(ProblemDetail.class);
 
-      Map<String, Object> body = (Map<String, Object>) response.getBody();
-      assertThat(body.get("error")).isEqualTo("VALIDATION_FAILED");
+      ProblemDetail problemDetail = (ProblemDetail) response.getBody();
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:VALIDATION_FAILED");
 
-      List<Map<String, String>> fieldErrors = (List<Map<String, String>>) body.get("fieldErrors");
+      List<Map<String, String>> fieldErrors =
+          (List<Map<String, String>>) problemDetail.getProperties().get("fieldErrors");
       assertThat(fieldErrors).hasSize(2);
       assertThat(fieldErrors)
           .extracting(fe -> fe.get("field"))
@@ -291,11 +282,10 @@ class GlobalExceptionHandlerTest {
               ex, new HttpHeaders(), HttpStatus.BAD_REQUEST, mock(WebRequest.class));
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody()).isInstanceOf(ProblemDetail.class);
 
-      @SuppressWarnings("unchecked")
-      Map<String, Object> body = (Map<String, Object>) response.getBody();
-      assertThat(body.get("error")).isEqualTo("MALFORMED_REQUEST");
+      ProblemDetail problemDetail = (ProblemDetail) response.getBody();
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MALFORMED_REQUEST");
     }
   }
 }

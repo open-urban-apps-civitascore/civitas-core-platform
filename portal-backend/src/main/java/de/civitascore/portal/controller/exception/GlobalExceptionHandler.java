@@ -8,8 +8,7 @@ import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
-import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -20,10 +19,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
@@ -32,6 +33,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @Slf4j
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
+  private static final String ERROR_URN_PREFIX = "urn:civitas:error:";
   private static final Pattern UNIQUE_DETAIL_PATTERN =
       Pattern.compile("Key \\((.+?)\\)=\\((.+?)\\) already exists");
 
@@ -40,44 +42,42 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
   private static final String NOT_NULL_VIOLATION_STATE = "23502";
 
   @ExceptionHandler(ResourceNotFoundException.class)
-  public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex) {
+  @ResponseStatus(HttpStatus.NOT_FOUND)
+  public ProblemDetail handleNotFound(ResourceNotFoundException ex) {
     log.warn("Resource not found: {}", ex.getMessage());
-    return ResponseEntity.status(HttpStatus.NOT_FOUND)
-        .body(createErrorMap("NOT_FOUND", ex.getMessage()));
+    return createProblemDetail(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage());
   }
 
   @ExceptionHandler(InvalidInputException.class)
-  public ResponseEntity<Map<String, Object>> handleInvalidInput(InvalidInputException ex) {
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public ProblemDetail handleInvalidInput(InvalidInputException ex) {
     log.warn("Invalid input: {}", ex.getMessage());
-    return ResponseEntity.badRequest().body(createErrorMap("INVALID_INPUT", ex.getMessage()));
+    return createProblemDetail(HttpStatus.BAD_REQUEST, "INVALID_INPUT", ex.getMessage());
   }
 
   @ExceptionHandler(UniqueConstraintViolationException.class)
-  public ResponseEntity<Map<String, Object>> handleUniqueConstraint(
-      UniqueConstraintViolationException ex) {
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ProblemDetail handleUniqueConstraint(UniqueConstraintViolationException ex) {
     log.warn("Unique constraint violation: {}", ex.getMessage());
-    return ResponseEntity.status(HttpStatus.CONFLICT)
-        .body(createErrorMap("UNIQUE_CONSTRAINT_VIOLATION", ex.getMessage()));
+    return createProblemDetail(HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", ex.getMessage());
   }
 
   @ExceptionHandler(ResourceInUseException.class)
-  public ResponseEntity<Map<String, Object>> handleResourceInUse(ResourceInUseException ex) {
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ProblemDetail handleResourceInUse(ResourceInUseException ex) {
     log.warn("Resource in use: {}", ex.getMessage());
-    return ResponseEntity.status(HttpStatus.CONFLICT)
-        .body(createErrorMap("RESOURCE_IN_USE", ex.getMessage()));
+    return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage());
   }
 
   @ExceptionHandler(ForbiddenException.class)
-  public ResponseEntity<Map<String, Object>> handleForbidden(ForbiddenException ex) {
+  @ResponseStatus(HttpStatus.FORBIDDEN)
+  public ProblemDetail handleForbidden(ForbiddenException ex) {
     log.warn("Forbidden: {}", ex.getMessage());
-    return ResponseEntity.status(HttpStatus.FORBIDDEN)
-        .body(createErrorMap("FORBIDDEN", ex.getMessage()));
+    return createProblemDetail(HttpStatus.FORBIDDEN, "FORBIDDEN", ex.getMessage());
   }
 
   @ExceptionHandler(DataIntegrityViolationException.class)
-  public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(
-      DataIntegrityViolationException ex) {
-
+  public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex) {
     if (ex.getCause() instanceof ConstraintViolationException cve) {
       String sqlState = cve.getSQLState();
 
@@ -85,8 +85,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         String dbMessage = ex.getMostSpecificCause().getMessage();
         UniqueConstraintViolationException mapped = extractUniqueViolationException(dbMessage);
         log.warn("Unique constraint violation: {}", mapped.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(createErrorMap("UNIQUE_CONSTRAINT_VIOLATION", mapped.getMessage()));
+        return createProblemDetail(
+            HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", mapped.getMessage());
       }
 
       if (FOREIGN_KEY_VIOLATION_STATE.equals(sqlState)) {
@@ -94,56 +94,57 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "Foreign key violation on constraint '{}': {}",
             cve.getConstraintName(),
             cve.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(
-                createErrorMap(
-                    "FOREIGN_KEY_VIOLATION",
-                    "Referenced entity does not exist or is still in use"));
+        return createProblemDetail(
+            HttpStatus.CONFLICT,
+            "FOREIGN_KEY_VIOLATION",
+            "Referenced entity does not exist or is still in use");
       }
 
       if (NOT_NULL_VIOLATION_STATE.equals(sqlState)) {
         log.warn(
             "Not-null violation on constraint '{}': {}", cve.getConstraintName(), cve.getMessage());
-        return ResponseEntity.badRequest()
-            .body(createErrorMap("NOT_NULL_VIOLATION", "A required field is missing"));
+        return createProblemDetail(
+            HttpStatus.BAD_REQUEST, "NOT_NULL_VIOLATION", "A required field is missing");
       }
     }
 
     log.error("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
-    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .body(createErrorMap("DATA_INTEGRITY_ERROR", "A data integrity error occurred"));
+    return createProblemDetail(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        "DATA_INTEGRITY_ERROR",
+        "A data integrity error occurred");
   }
 
   @ExceptionHandler(PersistenceException.class)
-  public ResponseEntity<Map<String, Object>> handlePersistenceException(PersistenceException ex) {
+  public ProblemDetail handlePersistenceException(PersistenceException ex) {
     if (ex.getCause() instanceof IllegalStateException ise) {
       log.warn("Entity validation failed: {}", ise.getMessage());
-      return ResponseEntity.badRequest()
-          .body(createErrorMap("ENTITY_VALIDATION_FAILED", ise.getMessage()));
+      return createProblemDetail(
+          HttpStatus.BAD_REQUEST, "ENTITY_VALIDATION_FAILED", ise.getMessage());
     }
     log.error("Persistence error: {}", ex.getMessage(), ex);
-    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .body(createErrorMap("PERSISTENCE_ERROR", "A persistence error occurred"));
+    return createProblemDetail(
+        HttpStatus.INTERNAL_SERVER_ERROR, "PERSISTENCE_ERROR", "A persistence error occurred");
   }
 
   @ExceptionHandler(ExternalSystemRejectionException.class)
-  public ResponseEntity<Map<String, Object>> handleExternalSystemRejection(
-      ExternalSystemRejectionException ex) {
+  @ResponseStatus(HttpStatus.BAD_GATEWAY)
+  public ProblemDetail handleExternalSystemRejection(ExternalSystemRejectionException ex) {
     log.error("External system rejected request: {}", ex.getMessage());
-    return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-        .body(
-            createErrorMap(
-                "EXTERNAL_SYSTEM_ERROR", "The request was rejected by an external system"));
+    return createProblemDetail(
+        HttpStatus.BAD_GATEWAY,
+        "EXTERNAL_SYSTEM_ERROR",
+        "The request was rejected by an external system");
   }
 
   @ExceptionHandler(ExternalSystemTimeoutException.class)
-  public ResponseEntity<Map<String, Object>> handleExternalSystemTimeout(
-      ExternalSystemTimeoutException ex) {
+  @ResponseStatus(HttpStatus.GATEWAY_TIMEOUT)
+  public ProblemDetail handleExternalSystemTimeout(ExternalSystemTimeoutException ex) {
     log.error("External system timed out: {}", ex.getMessage());
-    return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
-        .body(
-            createErrorMap(
-                "EXTERNAL_SYSTEM_TIMEOUT", "An external system did not respond in time"));
+    return createProblemDetail(
+        HttpStatus.GATEWAY_TIMEOUT,
+        "EXTERNAL_SYSTEM_TIMEOUT",
+        "An external system did not respond in time");
   }
 
   @Override
@@ -163,14 +164,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                         fe.getDefaultMessage() != null ? fe.getDefaultMessage() : ""))
             .toList();
 
-    Map<String, Object> body = new LinkedHashMap<>();
-    body.put("error", "VALIDATION_FAILED");
-    body.put("message", "Input validation failed");
-    body.put("fieldErrors", fieldErrors);
-    body.put("timestamp", LocalDateTime.now().toString());
+    ProblemDetail problemDetail =
+        createProblemDetail(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", "Input validation failed");
+    problemDetail.setProperty("fieldErrors", fieldErrors);
 
     log.warn("Validation failed: {} field error(s)", fieldErrors.size());
-    return ResponseEntity.badRequest().body(body);
+    return ResponseEntity.badRequest().body(problemDetail);
   }
 
   @Override
@@ -180,15 +179,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       HttpStatusCode status,
       WebRequest request) {
     log.warn("Malformed request body: {}", ex.getMessage());
-    return ResponseEntity.badRequest()
-        .body(createErrorMap("MALFORMED_REQUEST", "Request body is missing or malformed"));
+    ProblemDetail problemDetail =
+        createProblemDetail(
+            HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", "Request body is missing or malformed");
+    return ResponseEntity.badRequest().body(problemDetail);
   }
 
-  private Map<String, Object> createErrorMap(String error, String message) {
-    return Map.of(
-        "error", error,
-        "message", message,
-        "timestamp", LocalDateTime.now().toString());
+  private ProblemDetail createProblemDetail(HttpStatus status, String errorCode, String detail) {
+    ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detail);
+    problemDetail.setType(URI.create(ERROR_URN_PREFIX + errorCode));
+    problemDetail.setTitle(status.getReasonPhrase());
+    return problemDetail;
   }
 
   private UniqueConstraintViolationException extractUniqueViolationException(String dbMessage) {
