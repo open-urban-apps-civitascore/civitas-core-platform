@@ -14,7 +14,7 @@ export const useGetBredcrumbs = (breadcrumbs: Breadcrumb[]) =>
       enabled: crumb.isDynamic && !!crumb.href,
       queryFn: () =>
         apiRequest<BreadcrumbApiResponse>({
-          endpoint: crumb.href,
+          endpoint: crumb.apiHref ?? crumb.href,
           method: 'GET',
           headers: { 'x-api-request': 'true' },
           errorMessage: 'An error occurred while fetching breadcrumbs data.',

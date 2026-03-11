@@ -7,9 +7,12 @@ import { apiRequest } from '@/app/services/api/request/apiRequest'
 import { BreadcrumbNavigation } from './BreadcrumbNavigation'
 
 const mockPush = vi.fn()
+const mockUsePathname = vi.fn().mockReturnValue('/admin/users/123')
+const mockUseParams = vi.fn().mockReturnValue({ id: '123' })
+
 vi.mock('next/navigation', async () => ({
-  usePathname: vi.fn().mockReturnValue('/admin/users/123'),
-  useParams: vi.fn().mockReturnValue({ id: '123' }),
+  usePathname: () => mockUsePathname(),
+  useParams: () => mockUseParams(),
   useRouter: () => ({ push: mockPush }),
 }))
 
@@ -38,6 +41,8 @@ describe('BreadcrumbNavigation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     queryClient.clear()
+    mockUsePathname.mockReturnValue('/admin/users/123')
+    mockUseParams.mockReturnValue({ id: '123' })
   })
 
   it('renders Home Breadcrumb', () => {
@@ -100,6 +105,28 @@ describe('BreadcrumbNavigation', () => {
     await waitFor(() => {
       const current = screen.getByText('123')
       expect(current).toHaveAttribute('aria-current', 'page')
+    })
+  })
+
+  it('uses datastructure version endpoint for version breadcrumbs', async () => {
+    mockUsePathname.mockReturnValue('/datastructures/ds-1/version-2')
+    mockUseParams.mockReturnValue({ datastructureId: 'ds-1', versionId: 'version-2' })
+
+    vi.mocked(apiRequest)
+      .mockResolvedValueOnce({ data: { name: 'Datastructure A' } })
+      .mockResolvedValueOnce({ data: { version: '2' } })
+
+    renderWithClient()
+
+    await waitFor(() => {
+      expect(apiRequest).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          endpoint: '/datastructures/ds-1/versions/version-2',
+          method: 'GET',
+        }),
+      )
+      expect(screen.getByText('Version 2')).toBeInTheDocument()
     })
   })
 })
