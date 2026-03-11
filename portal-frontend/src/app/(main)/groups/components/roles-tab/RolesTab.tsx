@@ -1,7 +1,7 @@
 'use client'
 
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, Row, useReactTable } from '@tanstack/react-table'
-import { Info, Plus } from 'lucide-react'
+import { Plus, TriangleAlert } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { UseFormReturn } from 'react-hook-form'
@@ -275,31 +275,33 @@ export const RolesTab = (props: RolesTabProps) => {
 
   return (
     <div className="h-full">
-      <div className="flex gap-2 mb-4" role="tablist">
-        {scopeTabs.map(tab => (
-          <Button
-            key={tab.key}
-            type="button"
-            role="tab"
-            aria-selected={activeScopeTab === tab.key}
-            variant={activeScopeTab === tab.key ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => {
-              setActiveScopeTab(tab.key)
-              setSearchString('')
-            }}
-          >
-            {tab.label}
-          </Button>
-        ))}
-      </div>
-
-      {infoBannerText && (
-        <div className="flex items-center gap-2 p-3 mb-4 rounded-md bg-muted text-muted-foreground text-sm">
-          <Info className="h-4 w-4 shrink-0" />
-          <span>{infoBannerText}</span>
+      <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex gap-2" role="tablist">
+          {scopeTabs.map(tab => (
+            <Button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={activeScopeTab === tab.key}
+              variant={activeScopeTab === tab.key ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                setActiveScopeTab(tab.key)
+                setSearchString('')
+              }}
+            >
+              {tab.label}
+            </Button>
+          ))}
         </div>
-      )}
+
+        {infoBannerText && (
+          <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
+            <TriangleAlert className="h-4 w-4 shrink-0" />
+            <span>{infoBannerText}</span>
+          </div>
+        )}
+      </div>
 
       {isEmpty ? (
         <NoDataPage
