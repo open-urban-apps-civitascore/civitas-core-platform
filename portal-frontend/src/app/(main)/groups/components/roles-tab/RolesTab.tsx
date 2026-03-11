@@ -11,6 +11,7 @@ import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { DataTable } from '@/components/table/DataTable'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
@@ -158,7 +159,7 @@ export const RolesTab = (props: RolesTabProps) => {
       columnHelper.accessor('role.name', {
         id: 'name',
         header: ({ column }) => <SortableTableHeader column={column} title={t('roles.columns.name')} />,
-        cell: info => info.getValue(),
+        cell: ({ row }) => <LinkCell href={`/roles/${row.original.role.id}`}>{row.original.role.name}</LinkCell>,
         meta: {
           style: {
             width: '20%',
