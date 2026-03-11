@@ -4,6 +4,7 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.ExternalDocumentation;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.examples.Example;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
@@ -18,6 +19,7 @@ import io.swagger.v3.oas.models.security.Scopes;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,6 +37,7 @@ public class OpenApiConfig {
 
   private static final String APPLICATION_JSON = "application/json";
   private static final String APPLICATION_PROBLEM_JSON = "application/problem+json";
+  private static final String EXAMPLE_PATH = "/v1/datasets";
 
   @Value("${keycloak.auth-server-url:}")
   private String keycloakUrl;
@@ -436,6 +439,174 @@ public class OpenApiConfig {
   private Content newProblemContent() {
     Schema<?> schema = new Schema<>().$ref("#/components/schemas/ProblemDetail");
     return new Content().addMediaType(APPLICATION_PROBLEM_JSON, new MediaType().schema(schema));
+  }
+
+  /**
+   * Adds realistic ProblemDetail examples (RFC 9457) with actual {@code urn:civitas:error:*} type
+   * URNs to all error responses. Shared responses (401, 403, 502, 504) get examples on the
+   * component definition; inline responses (400, 404, 409, 500) get examples per-operation.
+   */
+  @Bean
+  @Order(3)
+  public OpenApiCustomizer problemDetailExamplesCustomizer() {
+    return openApi -> {
+      // Add examples to shared component responses
+      if (openApi.getComponents() != null && openApi.getComponents().getResponses() != null) {
+        addExamplesToResponse(
+            openApi.getComponents().getResponses().get("Unauthorized"),
+            problemExamples(
+                orderedMap(
+                    "expired_token",
+                    problemExample(401, "UNAUTHORIZED", "Authentication required", EXAMPLE_PATH),
+                    "invalid_token",
+                    problemExample(401, "INVALID_TOKEN", "JWT validation failed", EXAMPLE_PATH))));
+        addExamplesToResponse(
+            openApi.getComponents().getResponses().get("Forbidden"),
+            problemExamples(
+                orderedMap(
+                    "access_denied",
+                    problemExample(
+                        403, "ACCESS_DENIED", "Insufficient privileges", EXAMPLE_PATH))));
+        addExamplesToResponse(
+            openApi.getComponents().getResponses().get("BadGateway"),
+            problemExamples(
+                orderedMap(
+                    "external_system_error",
+                    problemExample(
+                        502,
+                        "EXTERNAL_SYSTEM_ERROR",
+                        "External system rejected the request: Keycloak user creation failed",
+                        "/v1/users"))));
+        addExamplesToResponse(
+            openApi.getComponents().getResponses().get("GatewayTimeout"),
+            problemExamples(
+                orderedMap(
+                    "external_system_timeout",
+                    problemExample(
+                        504,
+                        "EXTERNAL_SYSTEM_TIMEOUT",
+                        "External system did not respond within 10 seconds",
+                        "/v1/users"))));
+      }
+
+      // Add examples to inline error responses
+      openApi
+          .getPaths()
+          .forEach(
+              (path, pathItem) ->
+                  pathItem
+                      .readOperations()
+                      .forEach(
+                          operation ->
+                              operation
+                                  .getResponses()
+                                  .forEach(
+                                      (code, response) -> {
+                                        if (response.get$ref() != null) return;
+                                        Map<String, Example> examples =
+                                            inlineExamplesForCode(code, path);
+                                        if (examples != null) {
+                                          addExamplesToResponse(response, examples);
+                                        }
+                                      })));
+    };
+  }
+
+  private Map<String, Example> inlineExamplesForCode(String code, String path) {
+    return switch (code) {
+      case "400" ->
+          problemExamples(
+              orderedMap(
+                  "invalid_input",
+                  problemExample(
+                      400, "INVALID_INPUT", "Validation failed: name must not be blank", path),
+                  "validation_failed",
+                  problemExample(400, "VALIDATION_FAILED", "Request body validation failed", path),
+                  "malformed_request",
+                  problemExample(400, "MALFORMED_REQUEST", "Failed to read request body", path)));
+      case "404" ->
+          problemExamples(
+              orderedMap(
+                  "not_found",
+                  problemExample(
+                      404,
+                      "NOT_FOUND",
+                      "Resource not found: 550e8400-e29b-41d4-a716-446655440000",
+                      path)));
+      case "409" ->
+          problemExamples(
+              orderedMap(
+                  "unique_constraint",
+                  problemExample(
+                      409,
+                      "UNIQUE_CONSTRAINT_VIOLATION",
+                      "A resource with this name already exists",
+                      path),
+                  "resource_in_use",
+                  problemExample(
+                      409,
+                      "RESOURCE_IN_USE",
+                      "Cannot delete: resource is referenced by other entities",
+                      path),
+                  "foreign_key_violation",
+                  problemExample(
+                      409, "FOREIGN_KEY_VIOLATION", "Referenced entity does not exist", path)));
+      case "500" ->
+          problemExamples(
+              orderedMap(
+                  "data_integrity_error",
+                  problemExample(
+                      500, "DATA_INTEGRITY_ERROR", "A database constraint was violated", path),
+                  "persistence_error",
+                  problemExample(
+                      500, "PERSISTENCE_ERROR", "An unexpected database error occurred", path)));
+      default -> null;
+    };
+  }
+
+  private void addExamplesToResponse(ApiResponse response, Map<String, Example> examples) {
+    if (response == null || response.getContent() == null) return;
+    MediaType media = response.getContent().get(APPLICATION_PROBLEM_JSON);
+    if (media == null) return;
+    examples.forEach(media::addExamples);
+  }
+
+  private Map<String, Example> problemExamples(Map<String, Map<String, Object>> entries) {
+    Map<String, Example> examples = new LinkedHashMap<>();
+    entries.forEach((name, value) -> examples.put(name, new Example().summary(name).value(value)));
+    return examples;
+  }
+
+  private Map<String, Object> problemExample(
+      int status, String errorCode, String detail, String instance) {
+    String title =
+        switch (status) {
+          case 400 -> "Bad Request";
+          case 401 -> "Unauthorized";
+          case 403 -> "Forbidden";
+          case 404 -> "Not Found";
+          case 409 -> "Conflict";
+          case 500 -> "Internal Server Error";
+          case 502 -> "Bad Gateway";
+          case 504 -> "Gateway Timeout";
+          default -> "Error";
+        };
+    Map<String, Object> map = new LinkedHashMap<>();
+    map.put("type", "urn:civitas:error:" + errorCode);
+    map.put("title", title);
+    map.put("status", status);
+    map.put("detail", detail);
+    map.put("instance", instance);
+    return map;
+  }
+
+  @SuppressWarnings("unchecked")
+  private <V> Map<String, V> orderedMap(Object... keyValues) {
+    Map<String, V> map = new LinkedHashMap<>();
+    for (int i = 0; i < keyValues.length; i += 2) {
+      map.put((String) keyValues[i], (V) keyValues[i + 1]);
+    }
+    return map;
   }
 
   private boolean isProblemDetailRef(Schema<?> schema) {
