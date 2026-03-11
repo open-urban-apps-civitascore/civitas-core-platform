@@ -417,8 +417,8 @@ class DataSetSagaLifecycleIntegrationTest extends AbstractSagaIntegrationTest {
             .toList();
     assertThat(distUrls)
         .as("Should have distributions for both pipeline APIs")
-        .anyMatch(url -> url.contains("/v1.1/Things"))
-        .anyMatch(url -> url.contains("/v1.1/Datastreams"));
+        .anyMatch(url -> url.endsWith("/Things"))
+        .anyMatch(url -> url.endsWith("/Datastreams"));
 
     log.info(
         "Multi-pipeline saga completed: pipelineIds={}, distributionCount={}",

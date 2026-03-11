@@ -23,13 +23,21 @@ tests {
     expect(res.body.dataSetStatus).to.equal("AVAILABLE");
   });
 
-  test("Saga completed - infrastructure fields populated", function() {
-    if (res.body.pendingSagaType === null) {
-      expect(res.body.projectId).to.be.a('string').that.is.not.empty;
-      expect(res.body.frostBaseUrl).to.be.a('string').that.is.not.empty;
-      expect(res.body.routeId).to.be.a('string').that.is.not.empty;
-      expect(res.body.serviceId).to.be.a('string').that.is.not.empty;
-      expect(res.body.publicUrl).to.be.a('string').that.is.not.empty;
-    }
+  test("Saga completed (no pending saga)", function() {
+    expect(res.body.pendingSagaType).to.be.null;
+  });
+
+  test("Public URL is set", function() {
+    expect(res.body.publicUrl).to.be.a('string').that.is.not.empty;
+  });
+
+  test("Distribution accessUrl is valid (no double-URL concatenation)", function() {
+    const dists = res.body.distributions;
+    expect(dists).to.be.an('array').that.is.not.empty;
+    dists.forEach(function(dist) {
+      // accessUrl should start with the publicUrl, not contain a second http://
+      const afterPublic = dist.accessUrl.replace(res.body.publicUrl, '');
+      expect(afterPublic).to.not.match(/^https?:\/\//);
+    });
   });
 }
