@@ -3,8 +3,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo } from 'react'
-import { useForm } from 'react-hook-form'
+import { useEffect, useMemo, useState } from 'react'
+import { FieldErrors, useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
@@ -17,6 +17,7 @@ import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
 import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
 import { DirtyField } from '@/components/uml-modeler/types/session'
+import { QUERY_PARAMS } from '@/const/searchParams'
 import { STATUS_TYPES } from '@/types/common'
 import {
   DATASTRUCTURE_STATUS_TYPES,
@@ -29,6 +30,7 @@ import {
   DatastructureVersionPutData,
 } from '@/types/datastructures'
 import {
+  buildSessionFromVersion,
   containsNonStatusField,
   mapDatastructureVersionApiToFormData,
   mapDatastructureVersionFormToApiData,
@@ -65,6 +67,7 @@ export const useDatastructureVersion = ({
 }: UseDatastructureVersionProps) => {
   const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
+  const [initialSession, setInitialSession] = useState(() => buildSessionFromVersion(version))
 
   const updateVersion = useUpdateDatastructureVersion()
   const updatePublishedVersion = useUpdateDatastructureVersionPublished()
@@ -73,26 +76,6 @@ export const useDatastructureVersion = ({
 
   const isLoading =
     updateVersion.isPending || createVersion.isPending || updateStatus.isPending || updatePublishedVersion.isPending
-
-  const buildSessionFromVersion = (versionData: DatastructureVersion | null, sessionId?: string, created?: Date) => {
-    const diagram = versionData?.styles || null
-    const modelName = versionData?.modelName || null
-    const fallbackSession = createEmptySession(modelName || undefined)
-
-    return {
-      id: sessionId || diagram?.id || fallbackSession.id,
-      name: modelName || diagram?.name || fallbackSession.name,
-      diagram: diagram ? { ...diagram } : fallbackSession.diagram,
-      isDirty: false,
-      dirtyFields: new Set<DirtyField>(),
-      lastModified: diagram?.lastModified || fallbackSession.lastModified,
-      created: created || diagram?.lastModified || fallbackSession.created,
-    }
-  }
-
-  const initialSession = useMemo(() => {
-    return buildSessionFromVersion(version)
-  }, [version])
 
   const modelSessionManager = useMultiSessionManager({ initialSession })
   const nodes = modelSessionManager.activeSession?.diagram.nodes
@@ -281,6 +264,7 @@ export const useDatastructureVersion = ({
     const syncedSession = buildSessionFromVersion(version, activeSessionId, activeSession?.created)
     modelSessionManager.setSession(activeSessionId, syncedSession)
     if (shouldMarkDirty) modelSessionManager.markSessionDirty(activeSessionId, 'model')
+    return syncedSession
   }
 
   const resetFormAndSession = (
@@ -288,7 +272,8 @@ export const useDatastructureVersion = ({
     version: DatastructureVersion | null,
   ) => {
     form.reset(formValuesToReset)
-    resetSession(version)
+    const syncedSession = resetSession(version)
+    if (syncedSession) setInitialSession(syncedSession)
   }
 
   const resetToInitialState = () => {
@@ -321,13 +306,18 @@ export const useDatastructureVersion = ({
     }
   }
 
+  const handleSubmitValidationErrors = (errors: FieldErrors<DatastructureVersionFormData>) => {
+    console.error('Validation errors: ', errors)
+    toast.error(tCommon('errors.formInvalid'))
+  }
+
   const dirtyFields = form.formState.dirtyFields
   const hasMetadataChanges =
     dirtyFields.version ||
     dirtyFields.description ||
     dirtyFields.dataStructureVersionSource ||
     dirtyFields.dataStructureVersionStatus
-  const hasModelChanges = activeSession?.isDirty
+  const hasModelChanges = activeSession?.isDirty || activeSessionId !== initialSession.id
   const hasUserChanges = hasMetadataChanges || hasModelChanges
 
   return {
@@ -343,5 +333,6 @@ export const useDatastructureVersion = ({
     hasUserChanges,
     resetSession,
     resetFormAndSession,
+    handleSubmitValidationErrors,
   }
 }

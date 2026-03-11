@@ -1,4 +1,6 @@
+import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
 import { UMLDiagram } from '@/components/uml-modeler/types/diagram'
+import { DirtyField } from '@/components/uml-modeler/types/session'
 import {
   Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
@@ -113,3 +115,23 @@ export const containsNonStatusField = <TData extends FormFields>(fieldsToUpdate:
   (Object.keys(fieldsToUpdate) as (keyof TData)[]).some(
     key => key !== 'dataStructureStatus' && key !== 'dataStructureVersionStatus',
   )
+
+export const buildSessionFromVersion = (
+  versionData: DatastructureVersion | null,
+  sessionId?: string,
+  created?: Date,
+) => {
+  const diagram = versionData?.styles || null
+  const modelName = versionData?.modelName || null
+  const fallbackSession = createEmptySession(modelName || undefined)
+
+  return {
+    id: sessionId || diagram?.id || fallbackSession.id,
+    name: modelName || diagram?.name || fallbackSession.name,
+    diagram: diagram ? { ...diagram } : fallbackSession.diagram,
+    isDirty: false,
+    dirtyFields: new Set<DirtyField>(),
+    lastModified: diagram?.lastModified || fallbackSession.lastModified,
+    created: created || diagram?.lastModified || fallbackSession.created,
+  }
+}

@@ -9,6 +9,7 @@ import type {
 } from '@/types/datastructures'
 
 import {
+  buildSessionFromVersion,
   mapDatastructuresApiToListData,
   mapDatastructureVersionApiToFormData,
   mapDatastructureVersionFormToApiData,
@@ -326,5 +327,69 @@ describe('parseDatastructureVersionFormData', () => {
     } finally {
       consoleErrorSpy.mockRestore()
     }
+  })
+})
+
+describe('buildSessionFromVersion', () => {
+  it('prefers explicit sessionId and modelName over diagram values', () => {
+    const created = new Date('2024-01-01T10:00:00.000Z')
+    const version = createVersionDetail({
+      modelName: 'Canonical Model Name',
+      styles: {
+        id: 'diagram-id',
+        name: 'Diagram Label',
+        nodes: [],
+        edges: [],
+        lastModified: new Date('2024-02-01T10:00:00.000Z'),
+        isDirty: true,
+      },
+    })
+
+    const result = buildSessionFromVersion(version, 'session-123', created)
+
+    expect(result.id).toBe('session-123')
+    expect(result.name).toBe('Canonical Model Name')
+    expect(result.diagram).toEqual(version.styles)
+    expect(result.diagram).not.toBe(version.styles)
+    expect(result.isDirty).toBe(false)
+    expect(result.dirtyFields).toEqual(new Set())
+    expect(result.lastModified).toEqual(version.styles?.lastModified)
+    expect(result.created).toBe(created)
+  })
+
+  it('uses diagram id and lastModified when no explicit values are provided', () => {
+    const lastModified = new Date('2024-03-01T12:00:00.000Z')
+    const version = createVersionDetail({
+      modelName: null,
+      styles: {
+        id: 'diagram-456',
+        name: 'Diagram Name',
+        nodes: [],
+        edges: [],
+        lastModified,
+        isDirty: true,
+      },
+    })
+
+    const result = buildSessionFromVersion(version)
+
+    expect(result.id).toBe('diagram-456')
+    expect(result.name).toBe('Diagram Name')
+    expect(result.lastModified).toBe(lastModified)
+    expect(result.created).toBe(lastModified)
+  })
+
+  it('falls back to an empty clean session when version data is missing', () => {
+    const result = buildSessionFromVersion(null)
+
+    expect(result.id).toBeTruthy()
+    expect(result.name).toBe('Untitled Diagram')
+    expect(result.diagram.name).toBe('Untitled Diagram')
+    expect(result.diagram.nodes).toEqual([])
+    expect(result.diagram.edges).toEqual([])
+    expect(result.isDirty).toBe(false)
+    expect(result.dirtyFields).toEqual(new Set())
+    expect(result.lastModified).toBeInstanceOf(Date)
+    expect(result.created).toBeInstanceOf(Date)
   })
 })

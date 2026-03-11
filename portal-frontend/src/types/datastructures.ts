@@ -165,7 +165,7 @@ export const DatastructureCreateDataSchema = z.object({
 export type DatastructureCreateFormData = z.infer<typeof DatastructureCreateFormSchema>
 export type DatastructureCreateData = z.infer<typeof DatastructureCreateDataSchema>
 
-export type DatastructurePutData = DatastructureFormDraft
+export type DatastructurePutData = DatastructureFormDraft & { createdFromDataSource: boolean }
 export type DatastructurePatchData = Partial<DatastructureCreateData> & WithId
 
 // DATASTRUCTURE LIST DATA

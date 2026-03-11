@@ -30,12 +30,12 @@ import { VersionInfoTab } from './version-info-tab/VersionInfoTab'
 
 const tabs: Tab<DatastructureVersionTab>[] = [
   {
-    value: 'structure',
-    label: 'datastructureVersions.tabs.structure',
-  },
-  {
     value: 'versionInfo',
     label: 'datastructureVersions.tabs.versionInfo',
+  },
+  {
+    value: 'structure',
+    label: 'datastructureVersions.tabs.structure',
   },
 ]
 
@@ -90,6 +90,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     resetToInitialState,
     saveDatastructureVersion,
     handleStatusChange,
+    handleSubmitValidationErrors,
     hasUserChanges,
   } = useDatastructureVersion({
     version,
@@ -123,12 +124,12 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     setCanSetAvailable(DatastructureVersionFormAvailableSchema.safeParse(formValues).success)
   }, [formValues])
 
-  const handleSave = async () => {
+  const handleSave = form.handleSubmit(async () => {
     const isSaved = await saveDatastructureVersion(datastructure.id)
     if (isSaved) {
       setIsExitModalOpen(false)
     }
-  }
+  }, handleSubmitValidationErrors)
 
   const handleExit = () => {
     resetToInitialState()
@@ -156,11 +157,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }, [isInUse, isLastAvailableVersionInAvailableDatastructure, t])
 
   const isConfirmButtonDisabled =
-    !hasUserChanges ||
-    versionWatch.trim().length === 0 ||
-    !!form.formState.errors.version ||
-    !!versionAlreadyExistsError ||
-    isLoading
+    !hasUserChanges || !!form.formState.errors.version || !!versionAlreadyExistsError || isLoading
 
   const ActionButtonsAndStatusSwitch = (
     <div className="flex gap-6">
@@ -193,14 +190,14 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const renderTabContent = () => {
     switch (subTabValue) {
-      case 'versionInfo':
-        return (
-          <VersionInfoTab form={form} isReadOnly={isReadOnly} versionAlreadyExistsError={versionAlreadyExistsError} />
-        )
       case 'structure':
-      default:
         return (
           <StructureDefinitionTab isReadOnly={isReadOnly} modelSessionManager={modelSessionManager} isInUse={isInUse} />
+        )
+      case 'versionInfo':
+      default:
+        return (
+          <VersionInfoTab form={form} isReadOnly={isReadOnly} versionAlreadyExistsError={versionAlreadyExistsError} />
         )
     }
   }
