@@ -31,7 +31,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
       throws IOException {
     log.warn("Authentication failed: {}", ex.getMessage());
     writeProblemDetailResponse(
-        response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required");
+        request, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required");
   }
 
   @Override
@@ -40,26 +40,32 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
       throws IOException {
     log.warn("Access denied: {}", ex.getMessage());
     writeProblemDetailResponse(
-        response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Insufficient privileges");
+        request, response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Insufficient privileges");
   }
 
   @ExceptionHandler(JwtException.class)
   @ResponseStatus(HttpStatus.UNAUTHORIZED)
-  public ProblemDetail handleJwtException(JwtException ex) {
+  public ProblemDetail handleJwtException(JwtException ex, HttpServletRequest request) {
     log.warn("JWT validation failed: {}", ex.getMessage());
     ProblemDetail problemDetail =
         ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "JWT validation failed");
     problemDetail.setType(URI.create(ERROR_URN_PREFIX + "INVALID_TOKEN"));
     problemDetail.setTitle(HttpStatus.UNAUTHORIZED.getReasonPhrase());
+    problemDetail.setInstance(URI.create(request.getRequestURI()));
     return problemDetail;
   }
 
   private void writeProblemDetailResponse(
-      HttpServletResponse response, HttpStatus status, String errorCode, String detail)
+      HttpServletRequest request,
+      HttpServletResponse response,
+      HttpStatus status,
+      String errorCode,
+      String detail)
       throws IOException {
     ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detail);
     problemDetail.setType(URI.create(ERROR_URN_PREFIX + errorCode));
     problemDetail.setTitle(status.getReasonPhrase());
+    problemDetail.setInstance(URI.create(request.getRequestURI()));
 
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
     response.setStatus(status.value());

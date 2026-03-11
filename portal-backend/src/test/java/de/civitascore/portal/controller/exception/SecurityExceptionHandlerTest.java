@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URI;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,6 +30,8 @@ import org.springframework.security.oauth2.jwt.JwtException;
 @ExtendWith(MockitoExtension.class)
 class SecurityExceptionHandlerTest {
 
+  private static final String TEST_URI = "/v1/datasets";
+
   @InjectMocks private SecurityExceptionHandler SUT;
 
   private HttpServletRequest request;
@@ -39,6 +42,7 @@ class SecurityExceptionHandlerTest {
   void setUp() {
     request = mock(HttpServletRequest.class);
     response = mock(HttpServletResponse.class);
+    when(request.getRequestURI()).thenReturn(TEST_URI);
   }
 
   @Test
@@ -66,7 +70,8 @@ class SecurityExceptionHandlerTest {
         .containsEntry("type", "urn:civitas:error:UNAUTHORIZED")
         .containsEntry("detail", "Authentication required")
         .containsEntry("title", "Unauthorized")
-        .containsEntry("status", HttpStatus.UNAUTHORIZED.value());
+        .containsEntry("status", HttpStatus.UNAUTHORIZED.value())
+        .containsEntry("instance", TEST_URI);
   }
 
   @Test
@@ -93,7 +98,8 @@ class SecurityExceptionHandlerTest {
         .containsEntry("type", "urn:civitas:error:ACCESS_DENIED")
         .containsEntry("detail", "Insufficient privileges")
         .containsEntry("title", "Forbidden")
-        .containsEntry("status", HttpStatus.FORBIDDEN.value());
+        .containsEntry("status", HttpStatus.FORBIDDEN.value())
+        .containsEntry("instance", TEST_URI);
   }
 
   @Test
@@ -103,7 +109,7 @@ class SecurityExceptionHandlerTest {
     JwtException jwtException = new JwtException("Token expired");
 
     // when
-    ProblemDetail problemDetail = SUT.handleJwtException(jwtException);
+    ProblemDetail problemDetail = SUT.handleJwtException(jwtException, request);
 
     // then
     assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
@@ -119,11 +125,12 @@ class SecurityExceptionHandlerTest {
     JwtException jwtException = new JwtException(null);
 
     // when
-    ProblemDetail problemDetail = SUT.handleJwtException(jwtException);
+    ProblemDetail problemDetail = SUT.handleJwtException(jwtException, request);
 
     // then
     assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
     assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INVALID_TOKEN");
     assertThat(problemDetail.getDetail()).isEqualTo("JWT validation failed");
+    assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
   }
 }

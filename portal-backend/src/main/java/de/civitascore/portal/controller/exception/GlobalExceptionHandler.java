@@ -8,6 +8,7 @@ import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
+import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -43,41 +44,44 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
   @ExceptionHandler(ResourceNotFoundException.class)
   @ResponseStatus(HttpStatus.NOT_FOUND)
-  public ProblemDetail handleNotFound(ResourceNotFoundException ex) {
+  public ProblemDetail handleNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
     log.warn("Resource not found: {}", ex.getMessage());
-    return createProblemDetail(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage());
+    return createProblemDetail(HttpStatus.NOT_FOUND, "NOT_FOUND", ex.getMessage(), request);
   }
 
   @ExceptionHandler(InvalidInputException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
-  public ProblemDetail handleInvalidInput(InvalidInputException ex) {
+  public ProblemDetail handleInvalidInput(InvalidInputException ex, HttpServletRequest request) {
     log.warn("Invalid input: {}", ex.getMessage());
-    return createProblemDetail(HttpStatus.BAD_REQUEST, "INVALID_INPUT", ex.getMessage());
+    return createProblemDetail(HttpStatus.BAD_REQUEST, "INVALID_INPUT", ex.getMessage(), request);
   }
 
   @ExceptionHandler(UniqueConstraintViolationException.class)
   @ResponseStatus(HttpStatus.CONFLICT)
-  public ProblemDetail handleUniqueConstraint(UniqueConstraintViolationException ex) {
+  public ProblemDetail handleUniqueConstraint(
+      UniqueConstraintViolationException ex, HttpServletRequest request) {
     log.warn("Unique constraint violation: {}", ex.getMessage());
-    return createProblemDetail(HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", ex.getMessage());
+    return createProblemDetail(
+        HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", ex.getMessage(), request);
   }
 
   @ExceptionHandler(ResourceInUseException.class)
   @ResponseStatus(HttpStatus.CONFLICT)
-  public ProblemDetail handleResourceInUse(ResourceInUseException ex) {
+  public ProblemDetail handleResourceInUse(ResourceInUseException ex, HttpServletRequest request) {
     log.warn("Resource in use: {}", ex.getMessage());
-    return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage());
+    return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
   }
 
   @ExceptionHandler(ForbiddenException.class)
   @ResponseStatus(HttpStatus.FORBIDDEN)
-  public ProblemDetail handleForbidden(ForbiddenException ex) {
+  public ProblemDetail handleForbidden(ForbiddenException ex, HttpServletRequest request) {
     log.warn("Forbidden: {}", ex.getMessage());
-    return createProblemDetail(HttpStatus.FORBIDDEN, "FORBIDDEN", ex.getMessage());
+    return createProblemDetail(HttpStatus.FORBIDDEN, "FORBIDDEN", ex.getMessage(), request);
   }
 
   @ExceptionHandler(DataIntegrityViolationException.class)
-  public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+  public ResponseEntity<ProblemDetail> handleDataIntegrityViolation(
+      DataIntegrityViolationException ex, HttpServletRequest request) {
     if (ex.getCause() instanceof ConstraintViolationException cve) {
       String sqlState = cve.getSQLState();
 
@@ -85,8 +89,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         String dbMessage = ex.getMostSpecificCause().getMessage();
         UniqueConstraintViolationException mapped = extractUniqueViolationException(dbMessage);
         log.warn("Unique constraint violation: {}", mapped.getMessage());
-        return createProblemDetail(
-            HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", mapped.getMessage());
+        return toProblemDetailResponse(
+            HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", mapped.getMessage(), request);
       }
 
       if (FOREIGN_KEY_VIOLATION_STATE.equals(sqlState)) {
@@ -94,57 +98,67 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             "Foreign key violation on constraint '{}': {}",
             cve.getConstraintName(),
             cve.getMessage());
-        return createProblemDetail(
+        return toProblemDetailResponse(
             HttpStatus.CONFLICT,
             "FOREIGN_KEY_VIOLATION",
-            "Referenced entity does not exist or is still in use");
+            "Referenced entity does not exist or is still in use",
+            request);
       }
 
       if (NOT_NULL_VIOLATION_STATE.equals(sqlState)) {
         log.warn(
             "Not-null violation on constraint '{}': {}", cve.getConstraintName(), cve.getMessage());
-        return createProblemDetail(
-            HttpStatus.BAD_REQUEST, "NOT_NULL_VIOLATION", "A required field is missing");
+        return toProblemDetailResponse(
+            HttpStatus.BAD_REQUEST, "NOT_NULL_VIOLATION", "A required field is missing", request);
       }
     }
 
     log.error("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
-    return createProblemDetail(
+    return toProblemDetailResponse(
         HttpStatus.INTERNAL_SERVER_ERROR,
         "DATA_INTEGRITY_ERROR",
-        "A data integrity error occurred");
+        "A data integrity error occurred",
+        request);
   }
 
   @ExceptionHandler(PersistenceException.class)
-  public ProblemDetail handlePersistenceException(PersistenceException ex) {
+  public ResponseEntity<ProblemDetail> handlePersistenceException(
+      PersistenceException ex, HttpServletRequest request) {
     if (ex.getCause() instanceof IllegalStateException ise) {
       log.warn("Entity validation failed: {}", ise.getMessage());
-      return createProblemDetail(
-          HttpStatus.BAD_REQUEST, "ENTITY_VALIDATION_FAILED", ise.getMessage());
+      return toProblemDetailResponse(
+          HttpStatus.BAD_REQUEST, "ENTITY_VALIDATION_FAILED", ise.getMessage(), request);
     }
     log.error("Persistence error: {}", ex.getMessage(), ex);
-    return createProblemDetail(
-        HttpStatus.INTERNAL_SERVER_ERROR, "PERSISTENCE_ERROR", "A persistence error occurred");
+    return toProblemDetailResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        "PERSISTENCE_ERROR",
+        "A persistence error occurred",
+        request);
   }
 
   @ExceptionHandler(ExternalSystemRejectionException.class)
   @ResponseStatus(HttpStatus.BAD_GATEWAY)
-  public ProblemDetail handleExternalSystemRejection(ExternalSystemRejectionException ex) {
+  public ProblemDetail handleExternalSystemRejection(
+      ExternalSystemRejectionException ex, HttpServletRequest request) {
     log.error("External system rejected request: {}", ex.getMessage());
     return createProblemDetail(
         HttpStatus.BAD_GATEWAY,
         "EXTERNAL_SYSTEM_ERROR",
-        "The request was rejected by an external system");
+        "The request was rejected by an external system",
+        request);
   }
 
   @ExceptionHandler(ExternalSystemTimeoutException.class)
   @ResponseStatus(HttpStatus.GATEWAY_TIMEOUT)
-  public ProblemDetail handleExternalSystemTimeout(ExternalSystemTimeoutException ex) {
+  public ProblemDetail handleExternalSystemTimeout(
+      ExternalSystemTimeoutException ex, HttpServletRequest request) {
     log.error("External system timed out: {}", ex.getMessage());
     return createProblemDetail(
         HttpStatus.GATEWAY_TIMEOUT,
         "EXTERNAL_SYSTEM_TIMEOUT",
-        "An external system did not respond in time");
+        "An external system did not respond in time",
+        request);
   }
 
   @Override
@@ -190,6 +204,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     problemDetail.setType(URI.create(ERROR_URN_PREFIX + errorCode));
     problemDetail.setTitle(status.getReasonPhrase());
     return problemDetail;
+  }
+
+  private ProblemDetail createProblemDetail(
+      HttpStatus status, String errorCode, String detail, HttpServletRequest request) {
+    ProblemDetail problemDetail = createProblemDetail(status, errorCode, detail);
+    problemDetail.setInstance(URI.create(request.getRequestURI()));
+    return problemDetail;
+  }
+
+  private ResponseEntity<ProblemDetail> toProblemDetailResponse(
+      HttpStatus status, String errorCode, String detail, HttpServletRequest request) {
+    return ResponseEntity.status(status)
+        .body(createProblemDetail(status, errorCode, detail, request));
   }
 
   private UniqueConstraintViolationException extractUniqueViolationException(String dbMessage) {

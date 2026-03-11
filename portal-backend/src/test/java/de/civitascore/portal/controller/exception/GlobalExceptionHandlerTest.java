@@ -2,6 +2,7 @@ package de.civitascore.portal.controller.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
@@ -9,6 +10,8 @@ import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
+import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +35,15 @@ import org.springframework.web.context.request.WebRequest;
 @DisplayName("GlobalExceptionHandler Unit Tests")
 class GlobalExceptionHandlerTest {
 
+  private static final String TEST_URI = "/v1/datasets";
+
   private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+  private static HttpServletRequest mockRequest() {
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getRequestURI()).thenReturn(TEST_URI);
+    return request;
+  }
 
   private static ConstraintViolationException constraintViolation(
       String sqlState, String message, String constraintName) {
@@ -50,11 +61,12 @@ class GlobalExceptionHandlerTest {
       UUID id = UUID.randomUUID();
       ResourceNotFoundException ex = new ResourceNotFoundException("DataSet", id);
 
-      ProblemDetail problemDetail = handler.handleNotFound(ex);
+      ProblemDetail problemDetail = handler.handleNotFound(ex, mockRequest());
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:NOT_FOUND");
       assertThat(problemDetail.getDetail()).contains(id.toString());
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -63,11 +75,12 @@ class GlobalExceptionHandlerTest {
       InvalidInputException ex =
           new InvalidInputException("Pipeline", UUID.randomUUID(), "Name is required");
 
-      ProblemDetail problemDetail = handler.handleInvalidInput(ex);
+      ProblemDetail problemDetail = handler.handleInvalidInput(ex, mockRequest());
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INVALID_INPUT");
       assertThat(problemDetail.getDetail()).isEqualTo("Name is required");
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -76,11 +89,12 @@ class GlobalExceptionHandlerTest {
       UniqueConstraintViolationException ex =
           new UniqueConstraintViolationException("Pipeline", "name", "test-pipeline");
 
-      ProblemDetail problemDetail = handler.handleUniqueConstraint(ex);
+      ProblemDetail problemDetail = handler.handleUniqueConstraint(ex, mockRequest());
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
       assertThat(problemDetail.getType())
           .hasToString("urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION");
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -90,11 +104,12 @@ class GlobalExceptionHandlerTest {
       ResourceInUseException ex =
           new ResourceInUseException("DataStructureVersion", id, "Referenced by DataSource");
 
-      ProblemDetail problemDetail = handler.handleResourceInUse(ex);
+      ProblemDetail problemDetail = handler.handleResourceInUse(ex, mockRequest());
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
       assertThat(problemDetail.getDetail()).isEqualTo("Referenced by DataSource");
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -103,11 +118,12 @@ class GlobalExceptionHandlerTest {
       ForbiddenException ex =
           new ForbiddenException("Role", UUID.randomUUID(), "Cannot delete system role");
 
-      ProblemDetail problemDetail = handler.handleForbidden(ex);
+      ProblemDetail problemDetail = handler.handleForbidden(ex, mockRequest());
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:FORBIDDEN");
       assertThat(problemDetail.getDetail()).isEqualTo("Cannot delete system role");
+      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
   }
 
@@ -127,11 +143,13 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
+      ResponseEntity<ProblemDetail> response =
+          handler.handleDataIntegrityViolation(ex, mockRequest());
 
-      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
-      assertThat(problemDetail.getType())
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody().getType())
           .hasToString("urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION");
+      assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -145,10 +163,13 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
+      ResponseEntity<ProblemDetail> response =
+          handler.handleDataIntegrityViolation(ex, mockRequest());
 
-      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
-      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:FOREIGN_KEY_VIOLATION");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+      assertThat(response.getBody().getType())
+          .hasToString("urn:civitas:error:FOREIGN_KEY_VIOLATION");
+      assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -162,10 +183,12 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
+      ResponseEntity<ProblemDetail> response =
+          handler.handleDataIntegrityViolation(ex, mockRequest());
 
-      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
-      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:NOT_NULL_VIOLATION");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:NOT_NULL_VIOLATION");
+      assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -176,10 +199,12 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
+      ResponseEntity<ProblemDetail> response =
+          handler.handleDataIntegrityViolation(ex, mockRequest());
 
-      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
-      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:DATA_INTEGRITY_ERROR");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+      assertThat(response.getBody().getType())
+          .hasToString("urn:civitas:error:DATA_INTEGRITY_ERROR");
     }
 
     @Test
@@ -189,10 +214,12 @@ class GlobalExceptionHandlerTest {
           new DataIntegrityViolationException(
               "could not execute statement", new RuntimeException("some unknown database error"));
 
-      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
+      ResponseEntity<ProblemDetail> response =
+          handler.handleDataIntegrityViolation(ex, mockRequest());
 
-      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
-      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:DATA_INTEGRITY_ERROR");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+      assertThat(response.getBody().getType())
+          .hasToString("urn:civitas:error:DATA_INTEGRITY_ERROR");
     }
   }
 
@@ -206,11 +233,14 @@ class GlobalExceptionHandlerTest {
       PersistenceException ex =
           new PersistenceException(new IllegalStateException("scopeType requires scopeId"));
 
-      ProblemDetail problemDetail = handler.handlePersistenceException(ex);
+      ResponseEntity<ProblemDetail> response =
+          handler.handlePersistenceException(ex, mockRequest());
 
-      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
-      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:ENTITY_VALIDATION_FAILED");
-      assertThat(problemDetail.getDetail()).isEqualTo("scopeType requires scopeId");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getBody().getType())
+          .hasToString("urn:civitas:error:ENTITY_VALIDATION_FAILED");
+      assertThat(response.getBody().getDetail()).isEqualTo("scopeType requires scopeId");
+      assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -218,10 +248,11 @@ class GlobalExceptionHandlerTest {
     void shouldReturn500ForOtherPersistenceCauses() {
       PersistenceException ex = new PersistenceException(new RuntimeException("unexpected error"));
 
-      ProblemDetail problemDetail = handler.handlePersistenceException(ex);
+      ResponseEntity<ProblemDetail> response =
+          handler.handlePersistenceException(ex, mockRequest());
 
-      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
-      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
     }
 
     @Test
@@ -229,10 +260,11 @@ class GlobalExceptionHandlerTest {
     void shouldReturn500WhenCauseIsNull() {
       PersistenceException ex = new PersistenceException("persistence error");
 
-      ProblemDetail problemDetail = handler.handlePersistenceException(ex);
+      ResponseEntity<ProblemDetail> response =
+          handler.handlePersistenceException(ex, mockRequest());
 
-      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
-      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
     }
   }
 
