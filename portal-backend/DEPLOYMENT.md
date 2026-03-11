@@ -196,7 +196,7 @@ Configured in `application-local-init.yaml` (`@ConfigurationProperties(prefix = 
 | Env Var | Required | Example | Description |
 |---|---|---|---|
 | `LOCAL_INIT_GROUPS_0_NAME` | yes | `Tenant Admins` | Group name |
-| `LOCAL_INIT_GROUPS_0_ROLENAME` | no | `Tenant Admin` | Role assigned to the group (must match a `RoleDefault` name) |
+| `LOCAL_INIT_GROUPS_0_ROLENAME` | no | `Tenant Admin` | Role assigned to the group. Valid values: `Tenant Admin`, `Data Architect`, `Data Consumer`, `Data Steward`, `Data Owner`, `Data Gatekeeper` |
 | `LOCAL_INIT_GROUPS_0_SCOPETYPE` | no | `TENANT` | Assignment scope. Required for DATA/GOVERNANCE roles. Omit for SYSTEM roles. Values: `TENANT`, `DATASET`, `DATASOURCE`, `DATASTRUCTURE` |
 | `LOCAL_INIT_GROUPS_0_DESCRIPTION` | no | `Local admin group` | Group description |
 
@@ -207,7 +207,7 @@ Configured in `application-local-init.yaml` (`@ConfigurationProperties(prefix = 
 | `LOCAL_INIT_USERS_0_FIRSTNAME` | yes | `Tenant` | — |
 | `LOCAL_INIT_USERS_0_LASTNAME` | yes | `Admin` | — |
 | `LOCAL_INIT_USERS_0_EMAIL` | yes | `tenant-admin@civitas.local` | Also used as Keycloak username |
-| `LOCAL_INIT_USERS_0_EXTERNALID` | no | `00000000-...` | Keycloak user ID. If omitted, the user is created in Keycloak via config-adapter and the ID is set from the response. |
+| `LOCAL_INIT_USERS_0_EXTERNALID` | no | `00000000-...` | Keycloak user ID. When provided, the user is only created in the portal DB. When left empty, the user is automatically synced to Keycloak via config-adapter and the returned ID is persisted. |
 | `LOCAL_INIT_USERS_0_TITLE` | no | `OTHER` | `MR`, `MS`, or `OTHER` (default: `OTHER`) |
 | `LOCAL_INIT_USERS_0_GROUPS_0` | no | `Tenant Admins` | Group name to assign the user to. Increment index for multiple groups. |
 
