@@ -61,7 +61,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
-  const [canSetAvailable, setCanSetAvailable] = useState(false)
+  const [canSetAvailable, setCanSetAvailable] = useState(true)
 
   const isInUse = version?.inUse || false
 
