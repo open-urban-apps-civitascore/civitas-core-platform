@@ -53,7 +53,12 @@ export const serverFetch = async <TResponse>({
 }: ServerFetchConfig): Promise<ServerFetchResponse<TResponse>> => {
   // Read the JWT token directly from the encrypted cookie
   const requestHeaders = await nextHeaders()
-  const forwardedProto = requestHeaders.get('x-forwarded-proto')
+
+  const forwardedProto =
+    requestHeaders.get('x-forwarded-scheme') ??
+    requestHeaders.get('x-scheme') ??
+    requestHeaders.get('x-forwarded-proto')
+
   const isSecure = forwardedProto === 'https'
 
   const token = await getToken({
