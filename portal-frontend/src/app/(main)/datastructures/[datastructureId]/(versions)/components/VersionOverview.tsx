@@ -8,6 +8,7 @@ import { useWatch } from 'react-hook-form'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
+import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
@@ -217,7 +218,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         }}
         customElement={isReadOnly ? EditButton : ActionButtonsAndStatusSwitch}
       />
-      {isLoading ? <LoadingSpinner className="h-full" /> : renderTabContent()}
+      <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
+        {isLoading ? <LoadingSpinner className="h-full" /> : renderTabContent()}
+      </PageBackground>
 
       <ExitWarningModal
         open={isExitModalOpen}

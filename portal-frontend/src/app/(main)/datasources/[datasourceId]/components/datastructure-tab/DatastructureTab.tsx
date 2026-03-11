@@ -3,7 +3,6 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
-import { PageBackground } from '@/components/page-background/PageBackground'
 import { UseMultiSessionReturn } from '@/components/uml-modeler/types/session'
 import { UmlModeler } from '@/components/uml-modeler/UmlModeler'
 
@@ -36,16 +35,10 @@ export const DatastructureTab = (props: DatastructureTab) => {
     setIsImportDatastructureModalOpen(false)
   }
 
-  return isReadOnly || isInUse ? (
-    <UmlModeler
-      isReadOnly={isReadOnly || isInUse}
-      modelSessionManager={modelSessionManager}
-      isMultiSessionMode={false}
-    />
-  ) : (
-    <PageBackground className="overflow-y-auto p-0" hasBackground={!isReadOnly && !isInUse}>
+  return (
+    <>
       <UmlModeler
-        isReadOnly={isReadOnly || isInUse}
+        isReadOnly={true}
         modelSessionManager={modelSessionManager}
         isMultiSessionMode={false}
         canExportXmi={false}
@@ -59,6 +52,6 @@ export const DatastructureTab = (props: DatastructureTab) => {
         onSelectVersion={handleSelectVersion}
         onOpenChange={() => setIsImportDatastructureModalOpen(false)}
       />
-    </PageBackground>
+    </>
   )
 }

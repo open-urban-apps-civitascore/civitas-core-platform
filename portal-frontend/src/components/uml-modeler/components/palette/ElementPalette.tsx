@@ -26,7 +26,7 @@ export const ElementPalette: React.FC<ElementPaletteProps> = props => {
     (isNextCollapsed: boolean) => {
       setIsCollapsed(isNextCollapsed)
       requestAnimationFrame(() => {
-        void fitView({ padding: 0.1})
+        void fitView({ padding: 0.1 })
       })
     },
     [fitView],

@@ -4,9 +4,9 @@ import { ChevronLeft, ChevronRight, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { useReadOnly } from '../../hooks/use-read-only'
 import { EdgePropertyEditor } from './EdgePropertyEditor'
 import { NodePropertyEditor } from './NodePropertyEditor'
-import { useReadOnly } from '../../hooks/use-read-only'
 
 interface PropertyInspectorProps {
   className?: string
