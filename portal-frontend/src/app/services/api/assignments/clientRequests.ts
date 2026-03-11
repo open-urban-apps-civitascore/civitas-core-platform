@@ -9,8 +9,8 @@ import { GetListInput } from '@/types/common'
 export type AssignmentSummary = {
   id: string
   group: { id: string; name: string }
-  role: { id: string; name: string; roleType: string }
-  scopeType: AssignmentScope
+  role: { id: string; name: string; roleType: string; description: string; readonly: boolean }
+  scopeType: AssignmentScope | null
   scope: { id: string; name: string } | null
 }
 

@@ -63,7 +63,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
 
   // Build a map from group ID to scopeType from assignments
   const groupScopeMap = useMemo(() => {
-    const map: Record<string, AssignmentScope> = {}
+    const map: Record<string, AssignmentScope | null> = {}
     assignments.forEach(a => {
       map[a.group.id] = a.scopeType
     })

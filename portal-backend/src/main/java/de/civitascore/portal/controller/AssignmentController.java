@@ -9,7 +9,6 @@ import de.civitascore.portal.repository.specification.AssignmentSpec;
 import de.civitascore.portal.service.AssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
@@ -48,28 +47,45 @@ public class AssignmentController
     return assignmentAssembler;
   }
 
-  @Parameters({
-    @Parameter(
-        name = "roleId",
-        description = "Filter by role ID (exact match).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "role-123")),
-    @Parameter(
-        name = "userId",
-        description = "Filter by user ID (exact match).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "user-456")),
-    @Parameter(
-        name = "groupId",
-        description = "Filter by group ID (exact match).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "group-789")),
-    @Parameter(
-        name = "scopeId",
-        description = "Filter by scope ID (exact match).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "scope-101112"))
-  })
+  @Parameter(
+      name = "roleId",
+      description = "Filter by role ID (exact match).",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", example = "role-123"))
+  @Parameter(
+      name = "userId",
+      description = "Filter by user ID (exact match).",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", example = "user-456"))
+  @Parameter(
+      name = "groupId",
+      description = "Filter by group ID (exact match).",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", example = "group-789"))
+  @Parameter(
+      name = "scopeId",
+      description = "Filter by scope ID (exact match).",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", example = "scope-101112"))
+  @Parameter(
+      name = "scopeType",
+      description =
+          "Filter by scope type (exact match). One of: TENANT, DATASET, DATASOURCE,"
+              + " DATASTRUCTURE, DATASPACE, CATALOG.",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", example = "DATASET"))
+  @Parameter(
+      name = "roleType",
+      description = "Filter by role type (exact match). One of: SYSTEM, DATA, GOVERNANCE.",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", example = "DATA"))
+  @Parameter(
+      name = "q",
+      description =
+          "Search in role name, role description, or group name"
+              + " (partial match, case-insensitive).",
+      in = ParameterIn.QUERY,
+      schema = @Schema(type = "string", example = "admin"))
   @Override
   public ResponseEntity<Page<AssignmentOutputDTO>> getAll(
       @ParameterObject @Parameter(description = "Search/filter spec") AssignmentSpec spec,

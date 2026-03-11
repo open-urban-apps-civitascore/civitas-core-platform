@@ -10,6 +10,7 @@ import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSpace;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
+import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.repository.AssignmentRepository;
@@ -18,6 +19,7 @@ import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSpaceRepository;
 import de.civitascore.portal.repository.GroupRepository;
 import de.civitascore.portal.repository.RoleRepository;
+import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.util.RestPage;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,7 @@ class AssignmentControllerIntegrationTest
   @Autowired private DataSpaceRepository dataSpaceRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private CatalogRepository catalogRepository;
+  @Autowired private UserRepository userRepository;
 
   @Override
   protected String getEndpointPath() {
@@ -108,6 +111,30 @@ class AssignmentControllerIntegrationTest
 
   private UUID createTestRole() {
     return createTestRole("Test Role " + System.currentTimeMillis());
+  }
+
+  private UUID createTestRole(String name, RoleType roleType) {
+    Role role = new Role();
+    role.setName(name);
+    role.setDescription("Test role for assignment");
+    role.setRoleType(roleType);
+    return roleRepository.save(role).getId();
+  }
+
+  private User createTestUser() {
+    User user = new User();
+    user.setFirstName("Test");
+    user.setLastName("User " + UUID.randomUUID().toString().substring(0, 8));
+    user.setEmail("test" + UUID.randomUUID().toString().substring(0, 8) + "@example.com");
+    return userRepository.save(user);
+  }
+
+  private Group createTestGroupWithMember(User user) {
+    Group group = new Group();
+    group.setName("Test Group " + UUID.randomUUID().toString().substring(0, 8));
+    group.setDescription("Test group for assignment");
+    group.setMembers(Set.of(user));
+    return groupRepository.save(group);
   }
 
   private UUID createTestDataSpace() {
@@ -482,6 +509,160 @@ class AssignmentControllerIntegrationTest
       ResponseEntity<AssignmentOutputDTO> response = performCreate(input);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    }
+  }
+
+  @Nested
+  @DisplayName("Filter Parameter Tests")
+  class FilterParameterTests {
+
+    @Test
+    @DisplayName("Should filter assignments by userId via group membership")
+    void shouldFilterAssignmentsByUserId() {
+      User user = createTestUser();
+      Group group = createTestGroupWithMember(user);
+      UUID roleId =
+          createTestRole(
+              "Filter Role " + UUID.randomUUID().toString().substring(0, 8), RoleType.DATA);
+
+      AssignmentInputDTO input = new AssignmentInputDTO();
+      input.setGroupId(group.getId());
+      input.setRoleId(roleId);
+      input.setScopeType(ScopeType.TENANT);
+      performCreate(input);
+
+      // Create another assignment in a group the user is NOT a member of
+      UUID otherGroupId = createTestGroup();
+      UUID otherRoleId =
+          createTestRole(
+              "Other Role " + UUID.randomUUID().toString().substring(0, 8), RoleType.DATA);
+      AssignmentInputDTO otherInput = new AssignmentInputDTO();
+      otherInput.setGroupId(otherGroupId);
+      otherInput.setRoleId(otherRoleId);
+      otherInput.setScopeType(ScopeType.TENANT);
+      performCreate(otherInput);
+
+      ResponseEntity<RestPage<AssignmentOutputDTO>> response =
+          performGetAll(Map.of("userId", user.getId().toString()));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getContent())
+          .as("Should only return assignments from groups the user belongs to")
+          .hasSize(1)
+          .allSatisfy(
+              assignment -> assertThat(assignment.getGroup().getId()).isEqualTo(group.getId()));
+    }
+
+    @Test
+    @DisplayName("Should filter assignments by scopeType")
+    void shouldFilterAssignmentsByScopeType() {
+      UUID groupId = createTestGroup();
+      String suffix = UUID.randomUUID().toString().substring(0, 8);
+      UUID tenantRoleId = createTestRole("Tenant Role " + suffix, RoleType.DATA);
+      UUID datasetRoleId = createTestRole("Dataset Role " + suffix, RoleType.DATA);
+      UUID dataSetId = createTestDataSet(createTestDataSpace());
+
+      AssignmentInputDTO tenantInput = new AssignmentInputDTO();
+      tenantInput.setGroupId(groupId);
+      tenantInput.setRoleId(tenantRoleId);
+      tenantInput.setScopeType(ScopeType.TENANT);
+      performCreate(tenantInput);
+
+      AssignmentInputDTO datasetInput = new AssignmentInputDTO();
+      datasetInput.setGroupId(groupId);
+      datasetInput.setRoleId(datasetRoleId);
+      datasetInput.setScopeType(ScopeType.DATASET);
+      datasetInput.setScopeId(dataSetId);
+      performCreate(datasetInput);
+
+      ResponseEntity<RestPage<AssignmentOutputDTO>> response =
+          performGetAll(Map.of("scopeType", "DATASET"));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getContent())
+          .as("Should only return DATASET-scoped assignments")
+          .allSatisfy(
+              assignment -> assertThat(assignment.getScopeType()).isEqualTo(ScopeType.DATASET));
+    }
+
+    @Test
+    @DisplayName("Should filter by scopeType OR roleType for platform-wide segment")
+    void shouldFilterByScopeTypeOrRoleType() {
+      UUID groupId = createTestGroup();
+
+      String suffix = UUID.randomUUID().toString().substring(0, 8);
+
+      // SYSTEM role (scopeType=null) — should match roleType=SYSTEM
+      UUID systemRoleId = createTestRole("System Role " + suffix, RoleType.SYSTEM);
+      AssignmentInputDTO systemInput = new AssignmentInputDTO();
+      systemInput.setGroupId(groupId);
+      systemInput.setRoleId(systemRoleId);
+      systemInput.setScopeType(null);
+      performCreate(systemInput);
+
+      // TENANT-scoped DATA role — should match scopeType=TENANT
+      UUID tenantDataRoleId = createTestRole("Tenant Data Role " + suffix, RoleType.DATA);
+      AssignmentInputDTO tenantInput = new AssignmentInputDTO();
+      tenantInput.setGroupId(groupId);
+      tenantInput.setRoleId(tenantDataRoleId);
+      tenantInput.setScopeType(ScopeType.TENANT);
+      performCreate(tenantInput);
+
+      // DATASET-scoped DATA role — should NOT match
+      UUID datasetRoleId = createTestRole("Dataset Role " + suffix, RoleType.DATA);
+      UUID dataSetId = createTestDataSet(createTestDataSpace());
+      AssignmentInputDTO datasetInput = new AssignmentInputDTO();
+      datasetInput.setGroupId(groupId);
+      datasetInput.setRoleId(datasetRoleId);
+      datasetInput.setScopeType(ScopeType.DATASET);
+      datasetInput.setScopeId(dataSetId);
+      performCreate(datasetInput);
+
+      ResponseEntity<RestPage<AssignmentOutputDTO>> response =
+          performGetAll(Map.of("scopeType", "TENANT", "roleType", "SYSTEM"));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getContent())
+          .as("Should return both TENANT-scoped and SYSTEM-role assignments")
+          .hasSize(2);
+    }
+
+    @Test
+    @DisplayName("Should search assignments by q parameter (role name)")
+    void shouldSearchByQuickSearchParam() {
+      UUID groupId = createTestGroup();
+      String uniqueToken = "Xyz" + UUID.randomUUID().toString().substring(0, 6);
+      UUID matchingRoleId = createTestRole(uniqueToken + " Matching Role", RoleType.DATA);
+      UUID nonMatchingRoleId =
+          createTestRole(
+              "Unrelated Role " + UUID.randomUUID().toString().substring(0, 8), RoleType.DATA);
+
+      AssignmentInputDTO matchingInput = new AssignmentInputDTO();
+      matchingInput.setGroupId(groupId);
+      matchingInput.setRoleId(matchingRoleId);
+      matchingInput.setScopeType(ScopeType.TENANT);
+      performCreate(matchingInput);
+
+      AssignmentInputDTO nonMatchingInput = new AssignmentInputDTO();
+      nonMatchingInput.setGroupId(groupId);
+      nonMatchingInput.setRoleId(nonMatchingRoleId);
+      nonMatchingInput.setScopeType(ScopeType.TENANT);
+      performCreate(nonMatchingInput);
+
+      ResponseEntity<RestPage<AssignmentOutputDTO>> response =
+          performGetAll(Map.of("q", uniqueToken));
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getContent())
+          .as("Should only return assignments matching the search query")
+          .hasSize(1)
+          .allSatisfy(
+              assignment ->
+                  assertThat(assignment.getRole().getName()).containsIgnoringCase(uniqueToken));
     }
   }
 

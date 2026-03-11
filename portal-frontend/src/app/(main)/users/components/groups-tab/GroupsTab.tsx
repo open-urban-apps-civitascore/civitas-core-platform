@@ -33,7 +33,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
   const [searchString, setSearchString] = useState('')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'title', desc: false }])
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'name', desc: false }])
   const [isGroupAssignmentModalOpen, setIsGroupAssignmentModalOpen] = useState(false)
   const [groupToRemove, setGroupToRemove] = useState<string | null>(null)
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
