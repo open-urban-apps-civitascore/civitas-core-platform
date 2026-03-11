@@ -199,11 +199,15 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       router.push('/roles')
       return
     }
-    form.reset()
+    form.reset({
+      name: initialRole.name,
+      description: initialRole.description || '',
+      readonly: initialRole.readonly,
+    })
     setPendingPermissionIds(initialPermissionIds)
     setIsReadOnly(true)
     setIsExitModalOpen(false)
-  }, [form, initialPermissionIds, roleId, router])
+  }, [form, initialRole, initialPermissionIds, roleId, router])
 
   const handleExitButtonClick = useCallback(() => {
     if (isAnyDirty) setIsExitModalOpen(true)
