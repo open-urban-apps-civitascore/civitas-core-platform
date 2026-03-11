@@ -90,7 +90,6 @@ export const useDatastructureVersion = ({
     unpublishVersion.isPending ||
     updatePublishedVersion.isPending
 
-
   const modelSessionManager = useMultiSessionManager({ initialSession })
   const nodes = modelSessionManager.activeSession?.diagram.nodes
   const edges = modelSessionManager.activeSession?.diagram.edges
