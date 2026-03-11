@@ -757,6 +757,11 @@
     "closeTabModal": {
       "title": "Discard model?",
       "description": "This action deletes the model. It can not be undone."
+    },
+    "import": {
+      "title": "Import",
+      "fromPlatform": "from the platform",
+      "fromFile": "from file"
     }
   }
 }

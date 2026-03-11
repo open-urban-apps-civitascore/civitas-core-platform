@@ -746,6 +746,11 @@
     "closeTabModal": {
       "title": "Modell wirklich verwerfen?",
       "description": "Diese Aktion löscht das Modell. Sie kann nicht rückgängig gemacht werden."
+    },
+    "import": {
+      "title": "Importieren",
+      "fromPlatform": "aus der Plattform",
+      "fromFile": "aus Datei"
     }
   }
 }

@@ -11,6 +11,7 @@ import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { buildUMLModelPayload } from '../../services/modelUploadService'
 import { downloadXmi } from '../../services/xmiExportService'
 import { importXmiFromFile } from '../../services/xmiImportService'
+import { useTranslations } from 'next-intl'
 
 interface ToolbarProps {
   onSave?: () => void
@@ -34,6 +35,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const createModel = useCreateModel()
   const isSaving = createModel.isPending
+  const t = useTranslations('umlModeler.import')
 
   const handleSave = useCallback(() => {
     if (isSaving) return
@@ -118,12 +120,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         {(canImportXmi || onImportFromDatastructure) && (
           <BasicDropdownMenu
-            title="Import"
+            title={t('title')}
             menuItems={[
               ...(canImportXmi
                 ? [
                     {
-                      label: 'from file',
+                      label: t('fromFile'),
                       onClick: () => handleImportClick(),
                     },
                   ]
@@ -131,7 +133,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               ...(onImportFromDatastructure
                 ? [
                     {
-                      label: 'from the platform',
+                      label: t('fromPlatform'),
                       onClick: () => onImportFromDatastructure(),
                     },
                   ]
