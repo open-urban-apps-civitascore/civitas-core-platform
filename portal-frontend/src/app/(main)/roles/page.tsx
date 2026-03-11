@@ -28,9 +28,8 @@ const RolesPage = () => {
   const tabsValues = {
     systemRoles: { value: ROLE_TYPES.SYSTEM, label: t('systemRoles') },
     dataRoles: { value: ROLE_TYPES.DATA, label: t('dataRoles') },
-    governanceRoles: { value: ROLE_TYPES.GOVERNANCE, label: t('governanceRoles') },
   }
-  const tabs = [tabsValues.systemRoles, tabsValues.dataRoles, tabsValues.governanceRoles]
+  const tabs = [tabsValues.systemRoles, tabsValues.dataRoles]
 
   const {
     setSortingParams,
@@ -67,7 +66,7 @@ const RolesPage = () => {
   }, [rowCount, setTotalPages, pageSize])
 
   const handleRowClick = (row: Row<Role>) => {
-    router.push(`/roles/${row.original.id}?_tab=${selectedRoleType}`)
+    router.push(`/roles/${row.original.id}?tab=${selectedRoleType}`)
   }
 
   return (
@@ -88,7 +87,7 @@ const RolesPage = () => {
           searchString={search}
           onChangeSearchString={setSearchParam}
           customElement={
-            <Button onClick={() => router.push(`/roles/create/?_tab=${selectedRoleType}`)}>
+            <Button onClick={() => router.push(`/roles/create/?tab=${selectedRoleType}`)}>
               <Plus /> {t('newRole')}
             </Button>
           }

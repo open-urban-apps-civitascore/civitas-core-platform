@@ -79,15 +79,6 @@ export const RolesTab = (props: RolesTabProps) => {
           onRemoveRole={handleRemoveRole}
           groupRoles={roles}
           allRoles={rolesdata?.data || []}
-        />
-
-        <RoleCategory
-          title={tRoles('governanceRoles')}
-          category={ROLE_TYPES.GOVERNANCE}
-          onAddRole={handleAddRole}
-          onRemoveRole={handleRemoveRole}
-          groupRoles={roles}
-          allRoles={rolesdata?.data || []}
           className="border-0"
         />
       </ContentCard>

@@ -1,11 +1,10 @@
 import { createColumnHelper, getCoreRowModel, useReactTable } from '@tanstack/react-table'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Role } from '@/types/roles'
 import { TableProps } from '@/types/table'
-import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
 
 interface RolesTableProps extends TableProps<Role> {
@@ -27,7 +26,6 @@ export const RolesTable = (props: RolesTableProps) => {
     onSortingChange,
   } = props
   const t = useTranslations('roles')
-  const locale = useLocale()
 
   const columnHelper = createColumnHelper<Role>()
 
@@ -74,16 +72,6 @@ export const RolesTable = (props: RolesTableProps) => {
       meta: {
         style: {
           width: '10%',
-        },
-      },
-    }),
-    columnHelper.accessor('modifiedAt', {
-      header: () => t('tableHeaders.lastUpdated'),
-      cell: info => formatDate(info.getValue(), locale),
-      meta: {
-        style: {
-          width: '12.5%',
-          textAlign: 'center',
         },
       },
     }),

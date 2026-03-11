@@ -9,7 +9,6 @@ export type RoleTab = 'basicInformation' | 'permissions' | 'groupAssignment'
 export const ROLE_TYPES = {
   SYSTEM: 'SYSTEM',
   DATA: 'DATA',
-  GOVERNANCE: 'GOVERNANCE',
 } as const
 
 export const RoleTypeEnum = enumFromConst(ROLE_TYPES)

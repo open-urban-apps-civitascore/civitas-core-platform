@@ -7,7 +7,7 @@ export const mapRolesData = (roles: BaseRole[], groupData: Group[]) => {
   const allRoles = groupData.flatMap(group => {
     if (!group.assignments) return []
     return group.assignments?.flatMap(assignment => {
-      const currentRole = roleMap.get(assignment.role.id)
+      const currentRole = roleMap.get(assignment.role?.id)
       if (!currentRole) return []
       return {
         id: `${group.id}-${currentRole.id}`,

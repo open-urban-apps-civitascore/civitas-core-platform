@@ -7,20 +7,28 @@ import { Role } from '@/types/roles'
 interface RoleTemplateSelectProps {
   setRoleTemplate: (roleId: string) => void
   allRoles: Role[]
+  currentRoleId?: string
 }
 
 export const RoleTemplateSelect = (props: RoleTemplateSelectProps): JSX.Element => {
-  const { setRoleTemplate, allRoles } = props
+  const { setRoleTemplate, allRoles, currentRoleId } = props
   const t = useTranslations('roles.permissionsTab')
 
   const rolesForSelect = useMemo((): { label: string; value: string }[] => {
-    return allRoles.map(role => ({
-      label: role.name,
-      value: role.id,
-    }))
-  }, [allRoles])
+    return allRoles
+      .filter(role => role.id !== currentRoleId)
+      .map(role => ({
+        label: role.name,
+        value: role.id,
+      }))
+  }, [allRoles, currentRoleId])
 
   return (
-    <BasicSelect onValueChange={setRoleTemplate} options={rolesForSelect} placeholder={t('roleTemplate.placeholder')} />
+    <BasicSelect
+      onValueChange={setRoleTemplate}
+      options={rolesForSelect}
+      placeholder={t('roleTemplate.placeholder')}
+      triggerClassName="bg-white"
+    />
   )
 }

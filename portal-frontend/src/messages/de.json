@@ -394,7 +394,6 @@
     "title": "Berechtigungen",
     "systemPermissions": "Systemberechtigungen",
     "dataPermissions": "Datenberechtigungen",
-    "governancePermissions": "Governanceberechtigungen",
     "tableHeaders": {
       "title": "Name",
       "category": "Kategorie"
@@ -406,7 +405,6 @@
     "overView": "Übersicht:",
     "systemRoles": " Systemrollen",
     "dataRoles": "Datenrollen",
-    "governanceRoles": "Governancerollen",
     "roles": "Einzelrollen",
     "roleSets": "Rollensets",
     "tableHeaders": {
@@ -422,9 +420,9 @@
     "customRole": "Eigene",
     "searchRoles": "Rollen durchsuchen",
     "tabLabels": {
-      "basicInformation": "Informationen",
-      "permissions": "Berechtigungen",
-      "groupAssignment": "Mitgliedschaft"
+      "basicInformation": "Basisinformationen",
+      "permissions": "Systemberechtigungen",
+      "groupAssignment": "Gruppen"
     },
     "baseInfoTab": {
       "heading": "Basisinformationen",
@@ -450,8 +448,6 @@
       },
       "securityArea": {
         "heading": "Sicherheitsbereich",
-        "description": "Rolle löschen",
-        "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
         "deleteButton": "Rolle löschen"
       },
       "deleteConfirmModal": {
@@ -471,18 +467,56 @@
       "selectedPersmissions": "{count} ausgewählt",
       "roleTemplate": {
         "placeholder": "Rolle als Vorlage auswählen"
+      },
+      "categories": {
+        "TENANT_ADMINISTRATION": "Mandantenverwaltung",
+        "DATA": "Datenverwaltung"
+      },
+      "dataPermissions": {
+        "dataset": "Datensatz",
+        "datasetPayload": "Datensatz-Payload",
+        "datasource": "Datenquelle",
+        "datastructure": "Datenstruktur",
+        "read": "Lesen",
+        "create": "Erstellen",
+        "update": "Aktualisieren",
+        "delete": "Löschen",
+        "release": "Freigeben"
       }
     },
     "groupAssignmentTab": {
-      "heading": "Mitgliedschaften",
+      "heading": "Gruppen Zuweisungen",
       "addGroup": "Gruppen hinzufügen",
       "tableHeaders": {
         "name": "Name",
         "usersCount": "Anzahl User",
         "contact": "Ansprechpartner",
-        "description": "Beschreibung"
+        "description": "Beschreibung",
+        "scope": "Geltungsbereich"
       },
       "noGroupsAssigned": "Es sind noch keine Gruppen zugeordnet.",
+      "removeAssignment": "Zuweisung entfernen",
+      "removeModal": {
+        "title": "Gruppenzuweisung entfernen",
+        "description": "Möchten Sie die Gruppe \"{groupName}\" wirklich aus dieser Rolle entfernen? Diese Aktion kann nicht rückgängig gemacht werden.",
+        "confirm": "Entfernen"
+      },
+      "scopeTabs": {
+        "platformWide": "Plattformweit",
+        "dataset": "Datensatz",
+        "datasource": "Datenquelle",
+        "datastructure": "Datenstruktur"
+      },
+      "scopeLabels": {
+        "TENANT": "Plattformweit",
+        "DATASET": "Datensatz",
+        "DATASOURCE": "Datenquelle",
+        "DATASTRUCTURE": "Datenstruktur"
+      },
+      "infoBox": "Gruppen, die hier zugeordnet werden, erhalten den Typ Plattformweit (Berechtigungen auf alle Datenobjekte der Plattform)",
+      "scopeReadOnlyMessageDATASET": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz",
+      "scopeReadOnlyMessageDATASOURCE": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle",
+      "scopeReadOnlyMessageDATASTRUCTURE": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur",
       "modal": {
         "title": "Gruppe hinzufügen",
         "description": "zur Rolle {roleName}",

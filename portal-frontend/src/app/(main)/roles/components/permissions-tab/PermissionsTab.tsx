@@ -1,60 +1,54 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { type JSX, useEffect, useMemo, useRef, useState } from 'react'
+import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useGetPermissions } from '@/app/services/api/permissions/clientRequests'
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
-import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Permission, PermissionItem } from '@/types/permissions'
-import { ROLE_TYPES } from '@/types/roles'
+import { ROLE_TYPES, RoleType } from '@/types/roles'
 
 import { CategoryList } from './CategoryList'
+import { DataPermissionsGrid } from './DataPermissionsGrid'
 import { RoleTemplateSelect } from './RoleTemplateSelect'
 
 interface PermissionsTabProps {
-  onPermissionUpdate: (permissionIds: string[]) => void
-  currentSelectedPermissionIds?: Permission['id'][]
-  roleType: string
-  hasPermissionsTabBeenSaved: boolean
-  setHasPermissionsTabBeenSaved: (value: boolean) => void
-  isDefaultRole: boolean
+  pendingPermissionIds: string[]
+  onPendingPermissionIdsChange: (ids: string[]) => void
+  isReadOnly: boolean
+  currentRoleId?: string
+  roleType: RoleType
 }
+
+const formatPermissionName = (name: string): string =>
+  name
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
 
 const mapPermissions = (permissionsInput: Permission[]): PermissionItem[] => {
   return permissionsInput.map(permission => ({
-    name: permission.name,
+    name: formatPermissionName(permission.name),
     value: permission.id,
     category: { id: permission.category, title: permission.category },
   }))
 }
 
 export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
-  const {
-    onPermissionUpdate,
-    currentSelectedPermissionIds,
-    roleType,
-    hasPermissionsTabBeenSaved,
-    setHasPermissionsTabBeenSaved,
-    isDefaultRole,
-  } = props
-  const router = useRouter()
+  const { pendingPermissionIds, onPendingPermissionIdsChange, isReadOnly, currentRoleId, roleType } = props
   const t = useTranslations('common')
   const tRoles = useTranslations('roles')
-  const { getApiRequestParams, tabValue } = useQueryParams()
+  const { getApiRequestParams } = useQueryParams()
   const [roleTemplate, setRoleTemplate] = useState<string | null>(null)
   const [checkedPermissionItems, setCheckedPermissionItems] = useState<PermissionItem[]>([])
   const initializedForIds = useRef<string | null>(null)
   const [searchInput, setSearchInput] = useState<string>('')
 
-  // Fetch all readonly (default) roles to use as permission templates.
   const rolesRequestParams = new URLSearchParams('readonly=true')
   const permissionsRequestParams = new URLSearchParams(
-    // TODO - implement backend filtering by search term instead of fetching all permissions and filtering client-side
     getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput }),
   )
 
@@ -64,10 +58,9 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     params: permissionsRequestParams,
   })
 
-  // Filter roles client-side by the current tab's roleType
   const allRoles = useMemo(
-    () => (rolesData?.data || []).filter(role => role.roleType === (tabValue?.toUpperCase() ?? ROLE_TYPES.SYSTEM)),
-    [rolesData?.data, tabValue],
+    () => (rolesData?.data || []).filter(role => role.roleType === roleType && role.readonly),
+    [rolesData?.data, roleType],
   )
   const permissions = useMemo(() => mapPermissions(permissionsData?.data || []), [permissionsData?.data])
 
@@ -79,45 +72,40 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
 
   const categories = getUniqueCategories()
 
+  // Initialize checked items from pending permission IDs
   const selectedPermissions = useMemo(() => {
-    return permissions.filter(permission => currentSelectedPermissionIds?.includes(permission.value))
-  }, [currentSelectedPermissionIds, permissions])
+    return permissions.filter(permission => pendingPermissionIds.includes(permission.value))
+  }, [pendingPermissionIds, permissions])
 
   useEffect(() => {
     if (permissions.length === 0) return
-    const idsKey = (currentSelectedPermissionIds ?? []).slice().sort().join(',')
+    const idsKey = pendingPermissionIds.slice().sort().join(',')
     if (initializedForIds.current === idsKey) return
     initializedForIds.current = idsKey
     setCheckedPermissionItems(selectedPermissions)
-  }, [currentSelectedPermissionIds, selectedPermissions, permissions])
+  }, [pendingPermissionIds, selectedPermissions, permissions])
 
+  // Sync checked items to parent
+  const handleCheckedItemsChange = useCallback(
+    (items: PermissionItem[]) => {
+      setCheckedPermissionItems(items)
+      onPendingPermissionIdsChange(items.map(item => item.value))
+    },
+    [onPendingPermissionIdsChange],
+  )
+
+  // When template is selected
   useEffect(() => {
     if (roleTemplate) {
       const selectedRole = allRoles.find(role => role.id === roleTemplate)
       if (selectedRole) {
-        const selectedRolePermissionIds = selectedRole.permissions.map(p => p.id)
-        const selectedPermissions = permissions.filter(permission =>
-          selectedRolePermissionIds.includes(permission.value),
-        )
-        setCheckedPermissionItems(selectedPermissions)
+        const selectedRolePermissionIds = (selectedRole.permissions ?? []).map(p => p.id)
+        const selected = permissions.filter(permission => selectedRolePermissionIds.includes(permission.value))
+        handleCheckedItemsChange(selected)
       }
+      setRoleTemplate(null)
     }
-  }, [roleTemplate, allRoles, permissions])
-
-  const arePermissionsTouched = useMemo(() => {
-    if (!currentSelectedPermissionIds) return false
-
-    const selectedIdsSet = new Set(currentSelectedPermissionIds)
-    const checkedIdsSet = new Set(checkedPermissionItems.map(item => item.value))
-
-    if (selectedIdsSet.size !== checkedIdsSet.size) return true
-
-    return Array.from(selectedIdsSet).some(id => !checkedIdsSet.has(id))
-  }, [checkedPermissionItems, currentSelectedPermissionIds])
-
-  useEffect(() => {
-    setHasPermissionsTabBeenSaved(false)
-  }, [checkedPermissionItems, setHasPermissionsTabBeenSaved])
+  }, [roleTemplate, allRoles, permissions, handleCheckedItemsChange])
 
   if (isFetchingPermissions) {
     return <LoadingSpinner />
@@ -129,36 +117,33 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
         searchString={searchInput}
         onChangeSearchString={setSearchInput}
         customElement={
-          isDefaultRole ? null : <RoleTemplateSelect allRoles={allRoles} setRoleTemplate={setRoleTemplate} />
+          isReadOnly ? null : (
+            <RoleTemplateSelect allRoles={allRoles} setRoleTemplate={setRoleTemplate} currentRoleId={currentRoleId} />
+          )
         }
         placeholder={tRoles('permissionsTab.searchPermissions')}
       />
 
       {permissions.length === 0 ? (
         <div className="flex items-center justify-center text-sm mt-3.5">{t('noResults')}</div>
+      ) : roleType === ROLE_TYPES.DATA ? (
+        <DataPermissionsGrid
+          permissions={permissions}
+          checkedItems={checkedPermissionItems}
+          setCheckedItems={handleCheckedItemsChange}
+          isReadOnly={isReadOnly}
+        />
       ) : (
-        <>
-          {categories.map(category => (
-            <div key={category}>
-              <CategoryList
-                permissionList={permissions.filter(permission => permission.category.id === category)}
-                checkedItems={checkedPermissionItems}
-                setCheckedItems={setCheckedPermissionItems}
-                isDefaultRole={isDefaultRole}
-              />
-            </div>
-          ))}
-
-          {!isDefaultRole && (
-            <ActionButtons
-              confirmButtonType="button"
-              onConfirmClick={() => onPermissionUpdate(checkedPermissionItems.map(item => item.value))}
-              onCancelClick={() => router.push(`/roles?_tab=${roleType || ROLE_TYPES.SYSTEM}`)}
-              isConfirmButtonDisabled={isFetchingPermissions || !arePermissionsTouched || hasPermissionsTabBeenSaved}
-              isCancelButtonDisabled={isFetchingPermissions}
+        categories.map(category => (
+          <div key={category}>
+            <CategoryList
+              permissionList={permissions.filter(permission => permission.category.id === category)}
+              checkedItems={checkedPermissionItems}
+              setCheckedItems={handleCheckedItemsChange}
+              isReadOnly={isReadOnly}
             />
-          )}
-        </>
+          </div>
+        ))
       )}
     </div>
   )
