@@ -289,6 +289,33 @@
         "noRolesAssigned": "No {roleType} assigned"
       }
     },
+    "rolesTab": {
+      "segments": {
+        "platformWide": "Platform-wide",
+        "datasets": "Datasets",
+        "datasources": "Data Sources",
+        "datastructures": "Data Structures"
+      },
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "role": "Role",
+        "type": "Type",
+        "scope": "Scope"
+      },
+      "roleTypes": {
+        "SYSTEM": "System Role",
+        "DATA": "Data Role",
+        "GOVERNANCE": "Governance Role"
+      },
+      "types": {
+        "standard": "Standard",
+        "custom": "Custom"
+      },
+      "scopes": {
+        "platform": "Platform"
+      }
+    },
     "groupsTab": {
       "title": "Group Membership",
       "addGroup": "Add Group",
@@ -454,6 +481,8 @@
       },
       "securityArea": {
         "heading": "Security Area",
+        "description": "Delete role",
+        "note": "Instructions or description of what happens.",
         "deleteButton": "Delete role"
       },
       "deleteConfirmModal": {

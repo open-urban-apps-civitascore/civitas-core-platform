@@ -286,6 +286,33 @@
         "noRolesAssigned": "Keine {roleType} zugewiesen"
       }
     },
+    "rolesTab": {
+      "segments": {
+        "platformWide": "Plattformweit",
+        "datasets": "Datensätze",
+        "datasources": "Datenquellen",
+        "datastructures": "Datenstrukturen"
+      },
+      "columns": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "role": "Rolle",
+        "type": "Typ",
+        "scope": "Geltungsbereich"
+      },
+      "roleTypes": {
+        "SYSTEM": "Systemrolle",
+        "DATA": "Datenrolle",
+        "GOVERNANCE": "Governancerolle"
+      },
+      "types": {
+        "standard": "Standard",
+        "custom": "Eigene"
+      },
+      "scopes": {
+        "platform": "Plattform"
+      }
+    },
     "groupsTab": {
       "title": "Gruppenmitgliedschaft",
       "addGroup": "Gruppe hinzufügen",
