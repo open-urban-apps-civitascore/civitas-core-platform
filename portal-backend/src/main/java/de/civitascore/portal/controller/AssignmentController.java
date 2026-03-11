@@ -68,7 +68,14 @@ public class AssignmentController
         name = "scopeId",
         description = "Filter by scope ID (exact match).",
         in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "scope-101112"))
+        schema = @Schema(type = "string", example = "scope-101112")),
+    @Parameter(
+        name = "q",
+        description =
+            "Search in role name, role description, or group name"
+                + " (partial match, case-insensitive).",
+        in = ParameterIn.QUERY,
+        schema = @Schema(type = "string", example = "admin"))
   })
   @Override
   public ResponseEntity<Page<AssignmentOutputDTO>> getAll(
