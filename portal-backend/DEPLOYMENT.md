@@ -213,6 +213,8 @@ Configured in `application-local-init.yaml` (`@ConfigurationProperties(prefix = 
 
 Increment the `_0_` index for additional entries (e.g. `LOCAL_INIT_GROUPS_1_NAME`, `LOCAL_INIT_USERS_1_EMAIL`).
 
+> **Note:** User passwords are not managed by the initializer. After users are synced to Keycloak, passwords must be set directly in the Keycloak Admin Console.
+
 ---
 
 ## 4. Spring Profiles
