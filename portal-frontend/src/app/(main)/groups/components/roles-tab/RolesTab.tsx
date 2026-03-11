@@ -275,6 +275,12 @@ export const RolesTab = (props: RolesTabProps) => {
 
   return (
     <div className="h-full">
+      <SearchHeader
+        searchString={searchString}
+        onChangeSearchString={setSearchString}
+        customElement={!isReadOnly && isPlatformTab ? AddRoleDropdown : undefined}
+      />
+
       <div className="flex items-center justify-between gap-4 mb-4">
         <div className="flex gap-2" role="tablist">
           {scopeTabs.map(tab => (
@@ -304,29 +310,18 @@ export const RolesTab = (props: RolesTabProps) => {
       </div>
 
       {isEmpty ? (
-        <NoDataPage
-          title={t('roles.noRoles')}
-          subTitle={t('roles.noRolesDescription')}
-          customElement={!isReadOnly && isPlatformTab ? AddRoleDropdown : undefined}
-        />
+        <NoDataPage title={t('roles.noRoles')} subTitle={t('roles.noRolesDescription')} />
       ) : (
-        <>
-          <SearchHeader
-            searchString={searchString}
-            onChangeSearchString={setSearchString}
-            customElement={!isReadOnly && isPlatformTab ? AddRoleDropdown : undefined}
+        <TableContainer className="pb-4">
+          <DataTable
+            table={table}
+            pageIndex={0}
+            pageSize={filteredAssignments.length || 10}
+            totalPages={1}
+            isLoading={false}
+            isPaginationHidden
           />
-          <TableContainer className="pb-4">
-            <DataTable
-              table={table}
-              pageIndex={0}
-              pageSize={filteredAssignments.length || 10}
-              totalPages={1}
-              isLoading={false}
-              isPaginationHidden
-            />
-          </TableContainer>
-        </>
+        </TableContainer>
       )}
 
       <WarningModal
