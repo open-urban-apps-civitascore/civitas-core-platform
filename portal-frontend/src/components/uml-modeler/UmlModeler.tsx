@@ -28,7 +28,7 @@ export const UmlModeler = (props: UmlModelerProps) => {
     onImportFromDatastructure,
   } = props
   return (
-    <div className={cn('flex h-full w-full flex-1 flex-col gap-4 p-4', className)}>
+    <div className={cn('flex h-full w-full flex-1 flex-col gap-4', className)}>
       <div className="h-full w-full rounded-xl border bg-background overflow-hidden">
         <ReadOnlyProvider isReadOnly={isReadOnly}>
           <MultiSessionLayout

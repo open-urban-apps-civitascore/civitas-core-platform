@@ -1,12 +1,12 @@
 'use client'
 
+import { ReactFlowProvider } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useMemo, useState } from 'react'
 
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 
 import { useMultiSessionManager } from '../../hooks/use-multi-session-manager'
-import { useReadOnly } from '../../hooks/use-read-only'
 import { UseMultiSessionReturn } from '../../types/session'
 import { PropertyInspector } from '../inspector/PropertyInspector'
 import { ElementPalette } from '../palette/ElementPalette'
@@ -35,7 +35,6 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
   } = props
   const t = useTranslations('umlModeler')
   const tCommon = useTranslations('common')
-  const { isReadOnly } = useReadOnly()
   const sessionManager = useMultiSessionManager({ sessionManager: externalSessionManager })
   const isControlledExternally = !!externalSessionManager
   const [isWarningModalOpen, setIsWarningModalOpen] = useState(false)
@@ -94,51 +93,56 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
 
   const activeSession = sessionManager.getActiveSession()
 
-  const shouldShowToolBar =
-    !isReadOnly && (!isControlledExternally || canImportXmi || canExportXmi || onImportFromDatastructure)
+  const shouldShowToolBar = !isControlledExternally || canImportXmi || canExportXmi || onImportFromDatastructure
 
   return (
     <ActiveDiagramProviderComponent sessionManager={sessionManager}>
-      <div className={`h-full flex bg-gray-100 ${className}`}>
-        {/* Element Palette - Left Sidebar */}
-        <ElementPalette className="flex-shrink-0" />
+      <ReactFlowProvider>
+        <div className={`h-full flex bg-gray-100 ${className}`}>
+          {/* Element Palette - Left Sidebar */}
+          <ElementPalette className="flex-shrink-0" />
 
-        {/* Center Area with Tabs, Toolbar, and Canvas */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Tab Bar */}
-          <TabBar
-            sessions={sessionManager.sessions}
-            activeSessionId={sessionManager.activeSessionId}
-            onSelectSession={handleSelectSession}
-            onCloseSession={handleCloseSession}
-            onRenameSession={handleRenameSession}
-            onCreateSession={handleCreateSession}
-            isMultiSessionMode={isMultiSessionMode}
-          />
-
-          {/* Toolbar */}
-          {shouldShowToolBar && (
-            <Toolbar
-              onSave={isControlledExternally ? undefined : handleSave}
-              onExport={handleExport}
-              hasUnsavedChanges={activeSession?.isDirty || false}
-              canExportXmi={canExportXmi}
-              canImportXmi={canImportXmi}
-              onImportFromDatastructure={onImportFromDatastructure}
+          {/* Center Area with Tabs, Toolbar, and Canvas */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Tab Bar */}
+            <TabBar
+              sessions={sessionManager.sessions}
+              activeSessionId={sessionManager.activeSessionId}
+              onSelectSession={handleSelectSession}
+              onCloseSession={handleCloseSession}
+              onRenameSession={handleRenameSession}
+              onCreateSession={handleCreateSession}
+              isMultiSessionMode={isMultiSessionMode}
             />
-          )}
 
-          {/* Tab Content Area */}
-          <div className="flex-1 relative overflow-hidden">
-            {sessionManager.sessions.map(session => (
-              <TabContent key={session.id} session={session} isActive={session.id === sessionManager.activeSessionId} />
-            ))}
+            {/* Toolbar */}
+            {shouldShowToolBar && (
+              <Toolbar
+                onSave={isControlledExternally ? undefined : handleSave}
+                onExport={handleExport}
+                hasUnsavedChanges={activeSession?.isDirty || false}
+                canExportXmi={canExportXmi}
+                canImportXmi={canImportXmi}
+                onImportFromDatastructure={onImportFromDatastructure}
+              />
+            )}
+
+            {/* Tab Content Area */}
+            <div className="flex-1 relative overflow-hidden">
+              {sessionManager.sessions.map(session => (
+                <TabContent
+                  key={session.id}
+                  session={session}
+                  isActive={session.id === sessionManager.activeSessionId}
+                />
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Property Inspector - Right Sidebar */}
-        <PropertyInspector className="flex-shrink-0" />
-      </div>
+          {/* Property Inspector - Right Sidebar */}
+          <PropertyInspector className="flex-shrink-0" />
+        </div>
+      </ReactFlowProvider>
       <WarningModal
         title={t('closeTabModal.title')}
         description={t('closeTabModal.description')}
