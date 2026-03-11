@@ -58,9 +58,18 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
     params: getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString }),
   })
 
-  const datastructures = mapDatastructuresApiToListData(datastructuresData?.data || [])
+  const filteredDatastructures = datastructuresData?.data
+    .filter(datastructure => datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE)
+    .map(datastructure => ({
+      ...datastructure,
+      dataStructureVersions: datastructure.dataStructureVersions.filter(
+        version => version.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+      ),
+    }))
 
-  const rowCount = datastructuresData?.totalElements || 0
+  const datastructures = mapDatastructuresApiToListData(filteredDatastructures || [])
+
+  const rowCount = filteredDatastructures?.length || 0
   const totalPages = Math.ceil(rowCount / pageSize)
 
   useEffect(() => {

@@ -23,7 +23,14 @@ import { pickDirtyValues } from '@/utils/form'
 export const useDatasourceForm = (datasource: Datasource) => {
   const tCommon = useTranslations('common')
 
-  const defaultValues = useMemo(() => DatasourceApiToFormSchema.parse(datasource), [datasource])
+  const defaultValues = useMemo(() => {
+    const parsedDatasource = DatasourceApiToFormSchema.parse(datasource)
+
+    return {
+      ...parsedDatasource,
+      dataStructureVersionId: parsedDatasource.dataStructureVersionId ?? null,
+    }
+  }, [datasource])
 
   const [dataSourceStatus, setDataSourceStatus] = useState<DatasourceStatusType>(datasource.dataSourceStatus)
 
@@ -44,6 +51,7 @@ export const useDatasourceForm = (datasource: Datasource) => {
   const formValues = useWatch({ control: form.control })
   const connectorTypeWatch = formValues.connectorType
   const nameWatch = formValues.name ?? ''
+  const dataStructureVersionIdWatch = form.watch('dataStructureVersionId')
 
   // Reset configuration on connector type change; readyConnectorType gates field rendering
   // to avoid flashes while form.reset() applies the new defaults.
@@ -100,8 +108,9 @@ export const useDatasourceForm = (datasource: Datasource) => {
     } catch {
       // Zod v4: safeParse throws on stale keys
     }
+    if (dataStructureVersionIdWatch) completed.push('dataStructure')
     return completed
-  }, [nameWatch, formValues])
+  }, [nameWatch, formValues, dataStructureVersionIdWatch])
 
   const handleStatusChange = (newStatus: DatasourceStatusType) => {
     setDataSourceStatus(newStatus)

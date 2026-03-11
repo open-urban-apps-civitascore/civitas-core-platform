@@ -80,8 +80,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     else setDatastructureVersion(datastructureVersionData?.data || null)
   }, [selectedDatastructureVersionId, datastructureVersionData?.data, initialDatastructureVersion])
 
-  console.log('datastructureVersion', datastructureVersion)
-
   const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
   useEffect(() => {
     setIsReadOnly(searchParams.get('mode') !== 'edit')
@@ -114,22 +112,16 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   } = useDatasourceForm(datasource)
 
   const {
-    form: datastructureVersionForm,
-
     modelSessionManager,
     hasUserChanges: hasDatastructureBeenEdited,
-    saveDatastructureVersion,
     resetToInitialState,
     resetFormAndSession,
+    // saveDatastructureVersion,
   } = useDatastructureVersion({
     datastructureId: selectedDatastructureId || '',
     version: initialDatastructureVersion || null,
     isCreateMode: false,
   })
-
-
-  const shouldSaveDatastructureVersion =
-    hasDatastructureBeenEdited && selectedDatastructureId && selectedDatastructureVersionId
 
   // sets the active session with the new selected version's diagram or null if no version is selected
   useEffect(() => {
@@ -146,11 +138,17 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+
+  // TODO: use this check when saving changes in datastructure version is implemented
+  // const shouldSaveDatastructureVersion =
+  // hasDatastructureBeenEdited && selectedDatastructureId && selectedDatastructureVersionId
+
   const handleSave = async () => {
-    if (shouldSaveDatastructureVersion) {
-      const isDatastructureVersionSaved = await saveDatastructureVersion(selectedDatastructureId)
-      if (!isDatastructureVersionSaved) return
-    }
+    // TODO: use this function when implementing save datastructure version changes
+    // if (shouldSaveDatastructureVersion) {
+    //   const isDatastructureVersionSaved = await saveDatastructureVersion(selectedDatastructureId)
+    //   if (!isDatastructureVersionSaved) return
+    // }
 
     submitDatasource(() => router.refresh())
   }
@@ -171,10 +169,11 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const handleSaveAndExit = async () => {
-    if (shouldSaveDatastructureVersion) {
-      const isDatastructureVersionSaved = await saveDatastructureVersion(selectedDatastructureId)
-      if (!isDatastructureVersionSaved) return
-    }
+    // TODO: use this function when implementing save datastructure version changes
+    // if (shouldSaveDatastructureVersion) {
+    //   const isDatastructureVersionSaved = await saveDatastructureVersion(selectedDatastructureId)
+    //   if (!isDatastructureVersionSaved) return
+    // }
 
     submitDatasource(() => {
       setIsExitModalOpen(false)
