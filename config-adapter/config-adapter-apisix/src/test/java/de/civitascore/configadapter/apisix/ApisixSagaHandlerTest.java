@@ -72,14 +72,20 @@ class ApisixSagaHandlerTest {
             createCommand(
                 "EXECUTE_STEP",
                 "CREATE_ROUTE",
-                Map.of("datasetId", "ds-001", "upstreamUrl", "frost:8080", "openDataAccess", true));
+                Map.of(
+                    "datasetId",
+                    "ds-001",
+                    "upstreamUrl",
+                    "http://frost:8080/FROST-Server/v1.1/Projects(1)",
+                    "openDataAccess",
+                    true));
 
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("ds-001", result.resultData().get("routeId"));
         assertEquals("ds-001", result.resultData().get("serviceId"));
-        assertNotNull(result.resultData().get("publicUrl"));
+        assertEquals("http://gateway:9080/datasets/ds-001", result.resultData().get("publicUrl"));
         assertEquals("ds-001", result.compensationData().get("routeId"));
         assertEquals("ds-001", result.compensationData().get("serviceId"));
       }
@@ -98,7 +104,12 @@ class ApisixSagaHandlerTest {
                 "EXECUTE_STEP",
                 "CREATE_ROUTE",
                 Map.of(
-                    "datasetId", "ds-001", "upstreamUrl", "frost:8080", "openDataAccess", false));
+                    "datasetId",
+                    "ds-001",
+                    "upstreamUrl",
+                    "http://frost:8080/FROST-Server/v1.1/Projects(1)",
+                    "openDataAccess",
+                    false));
 
         SagaCommandResult result = handler.handle(command);
 
@@ -119,7 +130,11 @@ class ApisixSagaHandlerTest {
             createCommand(
                 "EXECUTE_STEP",
                 "CREATE_ROUTE",
-                Map.of("datasetId", "ds-001", "upstreamUrl", "frost:8080"));
+                Map.of(
+                    "datasetId",
+                    "ds-001",
+                    "upstreamUrl",
+                    "http://frost:8080/FROST-Server/v1.1/Projects(1)"));
 
         SagaCommandResult result = handler.handle(command);
 
@@ -139,7 +154,11 @@ class ApisixSagaHandlerTest {
             createCommand(
                 "EXECUTE_STEP",
                 "CREATE_ROUTE",
-                Map.of("datasetId", "ds-001", "upstreamUrl", "frost:8080"));
+                Map.of(
+                    "datasetId",
+                    "ds-001",
+                    "upstreamUrl",
+                    "http://frost:8080/FROST-Server/v1.1/Projects(1)"));
 
         SagaCommandResult result = handler.handle(command);
 
@@ -168,10 +187,10 @@ class ApisixSagaHandlerTest {
                         "plugin_config_id", "auth-plugin-1")));
         when(mockBuilder.get()).thenReturn(getResponse);
 
-        // Mock PUT for the update
-        Response putResponse = mock(Response.class);
-        when(putResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResponse);
+        // Mock PATCH for the update
+        Response patchResponse = mock(Response.class);
+        when(patchResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.method(any(String.class), any(Entity.class))).thenReturn(patchResponse);
 
         SagaCommandMessage command =
             createCommand(
@@ -264,7 +283,7 @@ class ApisixSagaHandlerTest {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+        when(mockBuilder.method(any(String.class), any(Entity.class))).thenReturn(mockResponse);
 
         SagaCommandMessage command =
             createCommand(
@@ -289,7 +308,7 @@ class ApisixSagaHandlerTest {
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(500);
         when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+        when(mockBuilder.method(any(String.class), any(Entity.class))).thenReturn(mockResponse);
 
         SagaCommandMessage command =
             createCommand(
@@ -311,7 +330,7 @@ class ApisixSagaHandlerTest {
     @DisplayName("returns COMPENSATION_FAILED on network error")
     void shouldReturnCompensationFailureOnNetworkError() {
       try (ApisixSagaHandler handler = createHandler()) {
-        when(mockBuilder.put(any(Entity.class)))
+        when(mockBuilder.method(any(String.class), any(Entity.class)))
             .thenThrow(new ProcessingException("Connection refused"));
 
         SagaCommandMessage command =
@@ -370,6 +389,8 @@ class ApisixSagaHandlerTest {
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("test-admin-key");
     when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
         .thenReturn("http://apisix:9180");
+    when(mockConfig.getProperty("apisix.gateway.url", "http://localhost:9080"))
+        .thenReturn("http://gateway:9080");
     when(mockConfig.getProperty("apisix.plugin.config.id")).thenReturn(pluginConfig);
     handler.initialize(mockConfig);
 
@@ -382,6 +403,7 @@ class ApisixSagaHandlerTest {
     when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
     when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
     when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
+    when(mockBuilder.method(any(String.class), any(Entity.class))).thenReturn(mock(Response.class));
 
     handler.setTestClient(mockClient);
     return handler;
