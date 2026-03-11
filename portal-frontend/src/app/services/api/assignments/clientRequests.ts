@@ -10,7 +10,7 @@ export type AssignmentSummary = {
   id: string
   group: { id: string; name: string }
   role: { id: string; name: string; roleType: string; description: string; readonly: boolean }
-  scopeType: string | null
+  scopeType: AssignmentScope | null
   scope: { id: string; name: string } | null
 }
 
