@@ -516,6 +516,16 @@
       "establishConnection": "Verbindung herstellen"
     },
     "dataModel": {
+      "placeholder": {
+        "title": "Keine Datenstruktur importiert",
+        "description1": "Importieren Sie eine existierende Datenstruktur aus der Plattform, um sie in dieser Datenquelle zu nutzen.",
+        "noDatastructures": "Noch keine Datenstrukturen vorhanden?",
+        "creationSteps": {
+          "step1": "Diese Datenquelle als Entwurf speichern",
+          "step2": "Eine Datenstruktur in <link>Datenstrukturen</link> erstellen",
+          "step3": "Wieder hierher zurückkommen und die Datenstruktur importieren"
+        }
+      },
       "importModal": {
         "title": "Datenmodell importieren",
         "to": "in {name}"

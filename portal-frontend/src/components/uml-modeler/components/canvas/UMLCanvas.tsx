@@ -11,7 +11,7 @@ import {
   ReactFlow,
   useReactFlow,
 } from '@xyflow/react'
-import { useCallback, useMemo } from 'react'
+import { JSX, useCallback, useMemo } from 'react'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { useReadOnly } from '../../hooks/use-read-only'
@@ -22,10 +22,11 @@ import { nodeTypes as umlNodeTypes } from '../nodes/nodeTypes'
 
 interface UMLCanvasProps {
   className?: string
+  placeHolder?: JSX.Element
 }
 
 export const UMLCanvas: React.FC<UMLCanvasProps> = props => {
-  const { className } = props
+  const { className, placeHolder } = props
   const { isReadOnly } = useReadOnly()
   const { diagram, dispatch, addEdge, validateConnection, addNode } = useActiveDiagram()
   const { screenToFlowPosition } = useReactFlow()
@@ -118,6 +119,9 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = props => {
   return (
     <div className={`h-full w-full ${className}`}>
       <UMLMarkers />
+      {diagram.nodes.length === 0 && placeHolder && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">{placeHolder}</div>
+      )}
       <ReactFlow
         nodesDraggable={!isReadOnly}
         nodesConnectable={!isReadOnly}

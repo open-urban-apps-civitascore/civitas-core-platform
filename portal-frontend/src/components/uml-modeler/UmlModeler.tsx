@@ -1,6 +1,8 @@
 'use client'
 import '@xyflow/react/dist/style.css'
 
+import { JSX } from 'react'
+
 import { cn } from '@/lib/utils'
 
 import { MultiSessionLayout } from './components/layout/MultiSessionLayout'
@@ -14,6 +16,7 @@ interface UmlModelerProps {
   modelSessionManager?: UseMultiSessionReturn
   canExportXmi?: boolean
   canImportXmi?: boolean
+  placeHolder?: JSX.Element
   onImportFromDatastructure?: () => void
 }
 
@@ -25,6 +28,7 @@ export const UmlModeler = (props: UmlModelerProps) => {
     modelSessionManager,
     canExportXmi = true,
     canImportXmi = true,
+    placeHolder,
     onImportFromDatastructure,
   } = props
   return (
@@ -37,6 +41,7 @@ export const UmlModeler = (props: UmlModelerProps) => {
             isMultiSessionMode={isMultiSessionMode}
             canExportXmi={canExportXmi}
             canImportXmi={canImportXmi}
+            placeHolder={placeHolder}
             onImportFromDatastructure={onImportFromDatastructure}
           />
         </ReadOnlyProvider>

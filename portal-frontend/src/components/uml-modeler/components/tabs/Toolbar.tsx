@@ -1,6 +1,7 @@
 'use client'
 
 import { FileDown, Loader2, Save } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useCallback, useRef } from 'react'
 
 import { useCreateModel } from '@/app/services/api/models/clientRequests'
@@ -11,7 +12,6 @@ import { useActiveDiagram } from '../../hooks/use-active-diagram'
 import { buildUMLModelPayload } from '../../services/modelUploadService'
 import { downloadXmi } from '../../services/xmiExportService'
 import { importXmiFromFile } from '../../services/xmiImportService'
-import { useTranslations } from 'next-intl'
 
 interface ToolbarProps {
   onSave?: () => void

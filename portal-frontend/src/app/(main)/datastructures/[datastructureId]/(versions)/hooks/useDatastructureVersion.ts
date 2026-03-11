@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
-import { FieldErrors, useForm, useWatch } from 'react-hook-form'
+import { FieldErrors, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import {
@@ -15,9 +15,6 @@ import {
 } from '@/app/services/api/datastructures/versions/clientRequests'
 import { useMultiSessionManager } from '@/components/uml-modeler/hooks/use-multi-session-manager'
 import { buildUMLModelPayload } from '@/components/uml-modeler/services/modelUploadService'
-import { createEmptySession } from '@/components/uml-modeler/services/sessionService'
-import { DirtyField } from '@/components/uml-modeler/types/session'
-import { QUERY_PARAMS } from '@/const/searchParams'
 import { STATUS_TYPES } from '@/types/common'
 import {
   DATASTRUCTURE_STATUS_TYPES,

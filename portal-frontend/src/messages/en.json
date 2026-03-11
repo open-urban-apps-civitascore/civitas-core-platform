@@ -526,6 +526,16 @@
       "establishConnection": "Establish Connection"
     },
     "dataModel": {
+      "placeholder": {
+        "title": "No data structure imported",
+        "description1": "Import an existing data structure from the platform to use it in this data source.",
+        "noDatastructures": "Don't have a data structure yet?",
+        "creationSteps": {
+          "step1": "Save this data source as draft",
+          "step2": "Create a data structure in <link>Data Structures</link>",
+          "step3": "Return here and import it"
+        }
+      },
       "importModal": {
         "title": "Import Data Model",
         "to": "into {name}"

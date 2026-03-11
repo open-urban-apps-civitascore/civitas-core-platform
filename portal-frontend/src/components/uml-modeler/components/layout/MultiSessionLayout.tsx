@@ -2,7 +2,7 @@
 
 import { ReactFlowProvider } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
-import { useCallback, useMemo, useState } from 'react'
+import { JSX, useCallback, useMemo, useState } from 'react'
 
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 
@@ -21,6 +21,7 @@ interface MultiSessionLayoutProps {
   isMultiSessionMode: boolean
   canExportXmi: boolean
   canImportXmi: boolean
+  placeHolder?: JSX.Element
   onImportFromDatastructure?: () => void
 }
 
@@ -31,6 +32,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
     isMultiSessionMode,
     canExportXmi,
     canImportXmi,
+    placeHolder,
     onImportFromDatastructure,
   } = props
   const t = useTranslations('umlModeler')
@@ -134,6 +136,7 @@ export const MultiSessionLayout: React.FC<MultiSessionLayoutProps> = props => {
                   key={session.id}
                   session={session}
                   isActive={session.id === sessionManager.activeSessionId}
+                  placeHolder={placeHolder}
                 />
               ))}
             </div>
