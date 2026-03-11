@@ -1,6 +1,7 @@
 'use client'
 
 import { PaginationState, SortingState } from '@tanstack/react-table'
+import { TriangleAlert } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 
@@ -67,6 +68,15 @@ export const RolesTab = (props: RolesTabProps) => {
   const rowCount = assignmentsData?.totalElements ?? 0
   const totalPages = Math.ceil(rowCount / pageSize) || 1
 
+  const getScopedInfoBannerText = (): string | null => {
+    if (activeSegment === 'dataset') return t('users.rolesTab.scopedInfoBanner.dataset')
+    if (activeSegment === 'datasource') return t('users.rolesTab.scopedInfoBanner.datasource')
+    if (activeSegment === 'datastructure') return t('users.rolesTab.scopedInfoBanner.datastructure')
+    return null
+  }
+
+  const infoBannerText = getScopedInfoBannerText()
+
   const handleSegmentChange = (segment: ScopeSegment) => {
     setActiveSegment(segment)
     setPageIndex(0)
@@ -94,12 +104,15 @@ export const RolesTab = (props: RolesTabProps) => {
             }}
             className="my-2"
           />
-          <SegmentedControlBar
-            tabs={segments}
-            selectedTab={activeSegment}
-            onTabChange={handleSegmentChange}
-            className="mb-4"
-          />
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <SegmentedControlBar tabs={segments} selectedTab={activeSegment} onTabChange={handleSegmentChange} />
+            {infoBannerText && (
+              <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
+                <TriangleAlert className="h-4 w-4 shrink-0" />
+                <span>{infoBannerText}</span>
+              </div>
+            )}
+          </div>
           <TableContainer shouldRespectSearchHeight={false} className="h-[calc(100%-7.5rem)]">
             <RolesAssignmentTable
               assignments={assignments}

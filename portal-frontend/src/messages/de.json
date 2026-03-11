@@ -311,6 +311,11 @@
       },
       "scopes": {
         "platform": "Plattform"
+      },
+      "scopedInfoBanner": {
+        "dataset": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz.",
+        "datasource": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle.",
+        "datastructure": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur."
       }
     },
     "groupsTab": {

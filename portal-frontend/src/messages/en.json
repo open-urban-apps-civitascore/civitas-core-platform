@@ -314,6 +314,11 @@
       },
       "scopes": {
         "platform": "Platform"
+      },
+      "scopedInfoBanner": {
+        "dataset": "Dataset-related assignments are made at the respective dataset.",
+        "datasource": "Datasource-related assignments are made at the respective datasource.",
+        "datastructure": "Datastructure-related assignments are made at the respective datastructure."
       }
     },
     "groupsTab": {
