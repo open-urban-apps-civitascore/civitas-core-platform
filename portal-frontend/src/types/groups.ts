@@ -11,7 +11,6 @@ export const GroupRoleScheme = ItemSchema.extend({
   roleType: GroupRoleTypes,
 })
 
-
 export const GroupApiResponseSchema = z.object({
   id: z.string(),
   name: z.string().min(2, {

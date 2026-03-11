@@ -42,8 +42,7 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
   const [selection, setSelection] = useState<RowSelectionState>({})
   const { getApiRequestParams } = useQueryParams()
 
-  const roleTypeFilter =
-    roleType === ROLE_TYPES.SYSTEM ? ROLE_TYPES.SYSTEM : `${ROLE_TYPES.DATA},${ROLE_TYPES.GOVERNANCE}`
+  const roleTypeFilter = roleType === ROLE_TYPES.SYSTEM ? ROLE_TYPES.SYSTEM : ROLE_TYPES.DATA
   const rolesParams = getApiRequestParams({ pageIndex, pageSize, sorting, search: searchString })
   rolesParams.set('roleType', roleTypeFilter)
 
@@ -138,11 +137,10 @@ export const AssignRoleModal = (props: AssignRoleModalProps) => {
       cell: info => info.getValue() ?? '',
       enableSorting: false,
     }),
-    columnHelper.accessor('roleOrigin', {
+    columnHelper.accessor('readonly', {
       header: t('roles.columns.type'),
       cell: info => {
-        const origin = info.getValue()
-        return origin === 'default' ? t('roles.originLabels.default') : t('roles.originLabels.custom')
+        return info.getValue() ? t('roles.originLabels.default') : t('roles.originLabels.custom')
       },
       enableSorting: false,
     }),

@@ -9,7 +9,7 @@ import { mapGroupApiToFormData, mapGroupDetailsData, mapGroupFormToApiData, mapG
 const groupRoles: AssignmentRole[] = [
   { id: 'r1', name: 'Admin', roleType: ROLE_TYPES.SYSTEM, description: '', readonly: false },
   { id: 'r2', name: 'Editor', roleType: ROLE_TYPES.DATA, description: '', readonly: false },
-  { id: 'r3', name: 'Support', roleType: ROLE_TYPES.GOVERNANCE, description: '', readonly: false },
+  { id: 'r3', name: 'Support', roleType: ROLE_TYPES.DATA, description: '', readonly: false },
 ]
 
 const baseAssignment: Assignment = {

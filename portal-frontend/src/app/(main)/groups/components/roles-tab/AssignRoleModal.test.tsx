@@ -10,57 +10,53 @@ const mockRoles: Role[] = [
     id: 'r1',
     name: 'System Admin',
     description: 'Administrates the system',
-    type: 'SYSTEM',
-    tenant: 't1',
+    roleType: 'SYSTEM',
     permissions: [],
-    users: [],
+    readonly: true,
+    modifiedBy: null,
+    modifiedAt: null,
     createdAt: '',
-    lastUpdated: null,
-    updatedBy: null,
-    groups: [],
-    roleOrigin: 'default',
+    groupCount: 0,
+    userCount: 0,
   },
   {
     id: 'r2',
     name: 'Data Manager',
     description: 'Manages data',
-    type: 'DATA',
-    tenant: 't1',
+    roleType: 'DATA',
     permissions: [],
-    users: [],
+    readonly: false,
+    modifiedBy: null,
+    modifiedAt: null,
     createdAt: '',
-    lastUpdated: null,
-    updatedBy: null,
-    groups: [],
-    roleOrigin: 'custom',
+    groupCount: 0,
+    userCount: 0,
   },
   {
     id: 'r3',
-    name: 'Governance Lead',
-    description: 'Governance role',
-    type: 'GOVERNANCE',
-    tenant: 't1',
+    name: 'Data Lead',
+    description: 'Data role',
+    roleType: 'DATA',
     permissions: [],
-    users: [],
+    readonly: true,
+    modifiedBy: null,
+    modifiedAt: null,
     createdAt: '',
-    lastUpdated: null,
-    updatedBy: null,
-    groups: [],
-    roleOrigin: 'default',
+    groupCount: 0,
+    userCount: 0,
   },
   {
     id: 'r-assigned',
     name: 'Already Assigned',
     description: 'Already assigned role',
-    type: 'SYSTEM',
-    tenant: 't1',
+    roleType: 'SYSTEM',
     permissions: [],
-    users: [],
+    readonly: true,
+    modifiedBy: null,
+    modifiedAt: null,
     createdAt: '',
-    lastUpdated: null,
-    updatedBy: null,
-    groups: [],
-    roleOrigin: 'default',
+    groupCount: 0,
+    userCount: 0,
   },
 ]
 
@@ -89,7 +85,9 @@ vi.mock('@/hooks/use-query-params', () => ({
 vi.mock('@/app/services/api/roles/clientRequests', () => ({
   useGetRoles: ({ params }: { params?: URLSearchParams } = {}) => {
     const roleTypeFilter = params?.get('roleType')
-    const filtered = roleTypeFilter ? mockRoles.filter(r => roleTypeFilter.split(',').includes(r.type)) : mockRoles
+    const filtered = roleTypeFilter
+      ? mockRoles.filter(r => roleTypeFilter.split(',').includes(r.roleType))
+      : mockRoles
     return {
       data: { data: filtered, totalElements: filtered.length },
       isFetching: false,
@@ -154,16 +152,16 @@ describe('AssignRoleModal', () => {
     await waitFor(() => {
       expect(screen.getByRole('cell', { name: 'System Admin' })).toBeInTheDocument()
       expect(screen.queryByRole('cell', { name: 'Data Manager' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('cell', { name: 'Governance Lead' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('cell', { name: 'Data Lead' })).not.toBeInTheDocument()
     })
   })
 
-  it('shows data and governance roles when roleType is data', async () => {
+  it('shows data roles when roleType is data', async () => {
     await renderModal({ roleType: 'DATA' })
 
     await waitFor(() => {
       expect(screen.getByRole('cell', { name: 'Data Manager' })).toBeInTheDocument()
-      expect(screen.getByRole('cell', { name: 'Governance Lead' })).toBeInTheDocument()
+      expect(screen.getByRole('cell', { name: 'Data Lead' })).toBeInTheDocument()
       expect(screen.queryByRole('cell', { name: 'System Admin' })).not.toBeInTheDocument()
     })
   })
@@ -200,7 +198,7 @@ describe('AssignRoleModal', () => {
     fireEvent.click(confirmButton)
 
     expect(defaultProps.onAssignRoles).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'r1', name: 'System Admin', type: 'SYSTEM' }),
+      expect.objectContaining({ id: 'r1', name: 'System Admin', roleType: 'SYSTEM' }),
     ])
   })
 

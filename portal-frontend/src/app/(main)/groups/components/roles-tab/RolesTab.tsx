@@ -85,9 +85,9 @@ export const RolesTab = (props: RolesTabProps) => {
           role: {
             id: fa.roleId,
             name: role?.name ?? '',
-            roleType: role?.type ?? 'SYSTEM',
+            roleType: role?.roleType ?? 'SYSTEM',
             description: role?.description ?? '',
-            readonly: role?.roleOrigin === 'default',
+            readonly: role?.readonly ?? false,
           },
           scopeType: fa.scopeType ?? null,
           scope: fa.scopeId ? { id: fa.scopeId, name: '' } : null,
@@ -179,7 +179,6 @@ export const RolesTab = (props: RolesTabProps) => {
           const roleType = row.original.role.roleType
           if (roleType === ROLE_TYPES.SYSTEM) return t('roles.objectLabels.SYSTEM')
           if (roleType === ROLE_TYPES.DATA) return t('roles.objectLabels.DATA')
-          if (roleType === ROLE_TYPES.GOVERNANCE) return t('roles.objectLabels.GOVERNANCE')
           return roleType ?? ''
         },
         enableSorting: false,
