@@ -1,0 +1,15 @@
+meta {
+  name: Unrelease Dataset
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}

@@ -1,0 +1,15 @@
+meta {
+  name: Unpublish Dataset
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/unpublish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}
