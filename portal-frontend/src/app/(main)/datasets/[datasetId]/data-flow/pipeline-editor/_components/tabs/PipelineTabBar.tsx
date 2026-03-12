@@ -112,7 +112,7 @@ export const PipelineTabBar: React.FC<PipelineTabBarProps> = ({
   onRenameSession,
   onCreateSession,
 }) => {
-  const t = useTranslations('datastructures.pipelineEditor')
+  const t = useTranslations('pipelineEditor')
 
   return (
     <div className="flex items-center overflow-hidden border-b border-border bg-muted/30">

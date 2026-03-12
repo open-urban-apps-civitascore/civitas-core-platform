@@ -18,7 +18,7 @@ interface FrostPanelProps {
 }
 
 export const FrostPanel: React.FC<FrostPanelProps> = ({ data }) => {
-  const t = useTranslations('datastructures.pipelineEditor')
+  const t = useTranslations('pipelineEditor')
 
   return (
     <div className="space-y-4 p-4">

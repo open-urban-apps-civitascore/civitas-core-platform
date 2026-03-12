@@ -17,8 +17,11 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
-import { DatastructureCreateFormData, DatastructureCreateFormSchema } from '@/types/datastructures'
-import { mapdatastructureFormToApiData } from '@/utils/datastructures'
+import {
+  DatastructureCreateDataSchema,
+  DatastructureCreateFormData,
+  DatastructureCreateFormSchema,
+} from '@/types/datastructures'
 
 export const DatastructureCreateForm = () => {
   const t = useTranslations('datastructures')
@@ -32,14 +35,25 @@ export const DatastructureCreateForm = () => {
 
   const form = useForm<DatastructureCreateFormData>({
     resolver: zodResolver(DatastructureCreateFormSchema),
-    defaultValues: {
-      name: '',
-    },
+    defaultValues: { name: '' },
   })
 
   const handleCreateDatastructure = async (formData: DatastructureCreateFormData) => {
-    const datastructureCreateData = formData
-    createDatastructure.mutate(mapdatastructureFormToApiData(datastructureCreateData), {
+    const createDatastructureData = {
+      name: formData.name,
+      description: '',
+      createdFromDataSource: false,
+      dataStructureVersionIds: [],
+      assignments: [],
+    }
+    const parsed = DatastructureCreateDataSchema.safeParse(createDatastructureData)
+    if (!parsed.success) {
+      console.error(parsed.error)
+      toast.error(tCommon('errors.formInvalid'))
+      return
+    }
+
+    createDatastructure.mutate(parsed.data, {
       onSuccess: ({ data }) => {
         toast.success(t('messages.createSuccess'))
         router.push(`/datastructures/${data.id}?mode=edit`)

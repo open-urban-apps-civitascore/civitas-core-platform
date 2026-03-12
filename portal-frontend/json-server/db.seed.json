@@ -3630,82 +3630,160 @@
       "id": "ds1",
       "name": "Test Datastructure 1",
       "description": "Description 1",
-      "source": "OWN",
+      "createdFromDataSource": false,
       "inUse": false,
-      "status": "DRAFT",
-      "versions": [
+      "assignments": [],
+      "dataStructureStatus": "DRAFT",
+      "dataStructureVersions": [
         {
           "id": "v1",
           "description": "Version Description 1.0",
-          "versionNumber": "1.0",
-          "source": "OWN",
-          "status": "DRAFT"
+          "version": "1.0",
+          "dataStructureVersionSource": "OWN",
+          "dataStructureVersionStatus": "DRAFT",
+          "datastructure": {
+            "id": "ds1",
+            "name": "Test Datastructure 1"
+          },
+          "createdAt": "",
+          "modifiedAt": "",
+          "inUse": false,
+          "modelAtlasUri": null,
+          "modelName": null,
+          "model": null,
+          "styles": null
         }
-      ]
+      ],
+      "createdAt": "",
+      "modifiedAt": ""
     },
     {
       "id": "ds2",
       "name": "Test Datastructure 2",
       "description": "Description 2",
-      "source": "OWN",
+      "createdFromDataSource": false,
       "inUse": false,
-      "status": "DRAFT",
-      "versions": [
+      "assignments": [],
+      "dataStructureStatus": "DRAFT",
+      "dataStructureVersions": [
         {
           "id": "v2",
           "description": "Version Description 1.0",
-          "versionNumber": "1.0",
-          "source": "OWN",
-          "status": "DRAFT"
+          "version": "1.0",
+          "dataStructureVersionSource": "OWN",
+          "dataStructureVersionStatus": "DRAFT",
+          "datastructure": {
+            "id": "ds2",
+            "name": "Test Datastructure 2"
+          },
+          "createdAt": "",
+          "modifiedAt": "",
+          "inUse": false,
+          "modelAtlasUri": null,
+          "modelName": null,
+          "model": null,
+          "styles": null
         },
         {
           "id": "v3",
           "description": "Version Description 1.1",
-          "versionNumber": "1.1",
-          "source": "OWN",
-          "status": "DRAFT"
+          "version": "1.1",
+          "dataStructureVersionSource": "OWN",
+          "dataStructureVersionStatus": "DRAFT",
+          "datastructure": {
+            "id": "ds2",
+            "name": "Test Datastructure 2"
+          },
+          "createdAt": "",
+          "modifiedAt": "",
+          "inUse": false,
+          "modelAtlasUri": null,
+          "modelName": null,
+          "model": null,
+          "styles": null
         }
-      ]
+      ],
+      "createdAt": "",
+      "modifiedAt": ""
     },
     {
       "id": "ds3",
       "name": "Test Datastructure 3",
       "description": "Description 3",
-      "source": "OWN",
+      "createdFromDataSource": false,
       "inUse": false,
-      "status": "DRAFT",
-      "versions": [
+      "assignments": [],
+      "dataStructureStatus": "DRAFT",
+      "dataStructureVersions": [
         {
           "id": "v4",
           "description": "Version Description 1.0",
-          "versionNumber": "1.0",
-          "source": "OWN",
-          "status": "DRAFT"
+          "version": "1.0",
+          "dataStructureVersionSource": "OWN",
+          "dataStructureVersionStatus": "DRAFT",
+          "datastructure": {
+            "id": "ds3",
+            "name": "Test Datastructure 3"
+          },
+          "createdAt": "",
+          "modifiedAt": "",
+          "inUse": false,
+          "modelAtlasUri": null,
+          "modelName": null,
+          "model": null,
+          "styles": null
         },
         {
           "id": "v5",
           "description": "Version Description 1.1",
-          "versionNumber": "1.1",
-          "source": "OWN",
-          "status": "DRAFT"
+          "version": "1.1",
+          "dataStructureVersionSource": "OWN",
+          "dataStructureVersionStatus": "DRAFT",
+          "datastructure": {
+            "id": "ds3",
+            "name": "Test Datastructure 3"
+          },
+          "createdAt": "",
+          "modifiedAt": "",
+          "inUse": false,
+          "modelAtlasUri": null,
+          "modelName": null,
+          "model": null,
+          "styles": null
         },
         {
           "id": "v6",
           "description": "Version Description 2.0",
-          "versionNumber": "2.0",
-          "source": "OWN",
-          "status": "DRAFT"
+          "version": "2.0",
+          "dataStructureVersionSource": "OWN",
+          "dataStructureVersionStatus": "DRAFT",
+          "datastructure": {
+            "id": "ds3",
+            "name": "Test Datastructure 3"
+          },
+          "createdAt": "",
+          "modifiedAt": "",
+          "inUse": false,
+          "modelAtlasUri": null,
+          "modelName": null,
+          "model": null,
+          "styles": null
         }
-      ]
+      ],
+      "createdAt": "",
+      "modifiedAt": ""
     },
     {
       "id": "ds4",
       "name": "Test Datastructure 4",
       "description": "Description 4",
-      "source": "OWN",
+      "createdFromDataSource": false,
       "inUse": false,
-      "status": "DRAFT",
-      "versions": []
+      "assignments": [],
+      "dataStructureStatus": "DRAFT",
+      "dataStructureVersions": [],
+      "createdAt": "",
+      "modifiedAt": ""
     }
   ]
 }

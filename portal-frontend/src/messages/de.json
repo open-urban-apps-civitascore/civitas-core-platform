@@ -15,6 +15,7 @@
     "actions": {
       "submit": "Speichern",
       "cancel": "Abbrechen",
+      "close": "Schließen",
       "delete": "Löschen",
       "deleteItem": "{item} löschen",
       "remove": "Entfernen",
@@ -27,7 +28,6 @@
       "exit": "Beenden",
       "assignItem": "{item} hinzufügen",
       "assignTo": "zu {item}",
-      "close": "Schließen",
       "back": "Zurück"
     },
     "errors": {
@@ -47,9 +47,12 @@
       "nameRequired": "Name ist erforderlich",
       "descriptionRequired": "Beschreibung ist erforderlich",
       "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
-      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden. Überprüfen Sie Ihre Eingaben."
+      "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden. Überprüfen Sie Ihre Eingaben.",
+      "statusChangeError": "Beim Ändern des Verfügbarkeitsstatus ist ein Fehler aufgetreten.",
+      "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten."
     },
     "items": {
+      "data": "Daten",
       "users": "Users",
       "user": "User",
       "groups": "Gruppen",
@@ -60,7 +63,9 @@
       "permissions": "Berechtigungen",
       "datasources": "Datenquellen",
       "datasource": "Datenquelle",
-      "datastructures": "Datenstrukturen"
+      "datastructures": "Datenstrukturen",
+      "datastructure": "Datenstruktur",
+      "datastructureVersion": "Version"
     },
     "messages": {
       "updateSuccess": "{item} wurde erfolgreich aktualisiert",
@@ -70,7 +75,12 @@
     "info": {
       "switchMode": "Wechsel zum Entwurfs-Modus, da die Anforderungen für den Verfügbar-Modus nicht erfüllt sind.",
       "commaSeparated": "durch Kommas getrennt",
-      "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus."
+      "requiredInAvailable": "Dieses Feld ist ein Pflichtfeld im Verfügbar-Modus.",
+      "descriptionHint": "max. 150 Zeichen"
+    },
+    "success": {
+      "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert.",
+      "deletionSuccess": "{item} wurde erfolgreich gelöscht."
     },
     "status": {
       "DRAFT": "Entwurf",
@@ -81,6 +91,10 @@
       "title": "Vor dem Beenden speichern?",
       "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
       "discard": "Verwerfen"
+    },
+    "deletionWarningModal": {
+      "title": "{item} wirklich löschen?",
+      "description": "Diese Aktion kann nicht rückgängig gemacht werden."
     }
   },
   "languages": {
@@ -157,6 +171,7 @@
     "permissions": "Berechtigungen",
     "roles": "Rollen",
     "create": "erstellen",
+    "createVersion": "Neue Version",
     "edit": "bearbeiten",
     "users": "User",
     "groups": "Gruppen",
@@ -611,8 +626,7 @@
     "form": {
       "name": "Name",
       "namePlaceholder": "Name der Datenquelle",
-      "description": "Beschreibung",
-      "descriptionHint": "max. 150 Zeichen"
+      "description": "Beschreibung"
     },
     "tabs": {
       "basicInfo": "Basisinformationen",
@@ -633,15 +647,13 @@
     "title": "Übersicht: Datenstrukturen",
     "subtitle": "Alle Datenstrukturen, die in unserem Mandanten verfügbar sind.",
     "newDatasource": "Datenstruktur erstellen",
+    "newVersion": "Version anlegen",
     "tableHeaders": {
       "name": "Name",
       "description": "Beschreibung",
       "source": "Quelle",
       "versionNumber": "Version",
       "status": "Status"
-    },
-    "source": {
-      "OWN": "Eigene"
     },
     "create": {
       "title": "Neue Datenstruktur",
@@ -654,8 +666,7 @@
     "form": {
       "name": "Name",
       "namePlaceholder": "Name der Datenstruktur",
-      "description": "Beschreibung",
-      "descriptionHint": "max. 150 Zeichen"
+      "description": "Beschreibung"
     },
     "tabs": {
       "basicInfo": "Basisinformationen",
@@ -670,150 +681,191 @@
     },
     "messages": {
       "createSuccess": "Datenstruktur wurde erfolgreich angelegt.",
-      "updateSuccess": "Datenstruktur wurde erfolgreich aktualisiert."
+      "updateSuccess": "Datenstruktur wurde erfolgreich aktualisiert.",
+      "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Datenstruktur bereits verwendet wird."
     },
-    "pipelineEditor": {
-      "canvas": {
-        "noPipeline": "Keine Pipeline verfügbar"
-      },
-      "inspector": {
-        "edgeProperties": "Kantenattribute",
-        "source": "Quelle",
-        "target": "Ziel",
-        "properties": "Eigenschaften",
-        "noNodeSelected": "Kein Knoten ausgewählt",
-        "noNodeSelectedHint": "Wähle einen Knoten auf der Arbeitsfläche aus, um seine Eigenschaften anzuzeigen und zu bearbeiten",
-        "configured": "Konfiguriert",
-        "notConfigured": "Nicht konfiguriert"
-      },
-      "nodeTypes": {
-        "start": "Start",
-        "end": "Ende",
-        "dataSource": "Datenquelle",
-        "apiRequest": "API-Request",
-        "apiResponse": "API-Response",
-        "cronTrigger": "CRON-Trigger",
-        "frostStorage": "FROST-Server",
-        "mapping": "Mapping"
-      },
-      "palette": {
-        "title": "Knoten"
-      },
-      "categories": {
-        "general": "Allgemein",
-        "sources": "Quellen",
-        "trigger": "Trigger",
-        "storage": "Speicher",
-        "transformation": "Transformation"
-      },
-      "paletteItems": {
-        "flowStart": "Flow Start",
-        "flowStartDesc": "Pipeline-Einstiegspunkt. Ausführung beginnt hier.",
-        "flowEnd": "Flow Ende",
-        "flowEndDesc": "Pipeline-Endpunkt. Ausführung endet hier.",
-        "dataSource": "Datenquelle",
-        "dataSourceDesc": "Datenquelle. Wähle eine konfigurierte Datenquelle aus.",
-        "apiRequest": "API-Request",
-        "apiRequestDesc": "REST-API Request. Erstellt Endpunkt, der Daten bereitstellt.",
-        "apiResponse": "API-Response",
-        "apiResponseDesc": "REST-API Response.",
-        "cron": "CRON",
-        "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
-        "frostServer": "FROST Server",
-        "frostServerDesc": "SensorThings API Persistenz. Daten speichern oder abrufen.",
-        "mapping": "Mapping",
-        "mappingDesc": "Bloblang-Datentransformation. Daten zuordnen und transformieren."
-      },
-      "controlPanel": {
-        "entryPoint": "Pipeline-Einstiegspunkt",
-        "entryPointDesc": "Der Start-Knoten markiert, wo die Pipeline-Ausführung beginnt. Verbinde ihn mit einem Trigger- oder Datenquellen-Knoten, um festzulegen, wie die Pipeline aktiviert wird.",
-        "exitPoint": "Pipeline-Endpunkt",
-        "exitPointDesc": "Der End-Knoten markiert, wo die Pipeline-Ausführung endet. Alle Datenfluss-Pfade sollten schließlich zu diesem Knoten führen.",
-        "nodeInformation": "Knoteninformation",
-        "type": "Typ",
-        "configurable": "Konfigurierbar",
-        "no": "Nein"
-      },
-      "cronPanel": {
-        "cronExpression": "CRON-Ausdruck",
-        "invalidCron": "Ungültiger CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein (Sekunden Minuten Stunden Tag-des-Monats Monat Wochentag).",
-        "cronHint": "Ein CRON-Ausdruck legt fest, wann die Pipeline automatisch ausgeführt werden soll.",
-        "learnCron": "Über CRON-Ausdrücke erfahren",
-        "currentExpression": "Aktueller Ausdruck"
-      },
-      "dataSourcePanel": {
-        "label": "Datenquelle",
-        "placeholder": "Datenquelle auswählen...",
-        "details": "Datenquellen-Details",
-        "connector": "Konnektor",
-        "connection": "Verbindung",
-        "status": "Status",
-        "description": "Beschreibung",
-        "tags": "Tags",
-        "showDataStructure": "Datenstruktur anzeigen"
-      },
-      "apiPanel": {
-        "requestDetails": "API-Request-Details",
-        "responseDetails": "API-Response-Details",
-        "apiPath": "API-Pfad"
-      },
-      "frostPanel": {
-        "details": "FROST Server Details",
-        "serverName": "Servername",
-        "serverUrl": "Server-URL",
-        "version": "Version"
-      },
-      "mappingPanel": {
-        "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
-        "mappingCode": "Mapping-Code",
-        "loadingEditor": "Editor wird geladen...",
-        "status": "Status",
-        "mappingConfigured": "Mapping konfiguriert",
-        "noMappingDefined": "Kein Mapping definiert"
-      },
-      "entitySelector": {
-        "selectEntity": "Entität auswählen...",
-        "errorLoading": "Fehler beim Laden der Entitäten",
-        "clearSelection": "Auswahl aufheben"
-      },
-      "validation": {
-        "results": "Validierungsergebnisse",
-        "pipelineValid": "Pipeline ist gültig",
-        "allChecksPassed": "Alle Validierungsprüfungen bestanden. Die Pipeline kann gespeichert werden.",
-        "errors": "Fehler ({count})",
-        "warnings": "Warnungen ({count})",
-        "fixErrors": "Behebe die obigen Fehler, bevor du die Pipeline speicherst.",
-        "hasWarnings": "Pipeline hat Warnungen, kann aber gespeichert werden.",
-        "messages": {
-          "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
-          "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",
-          "apiPairing": "API-Request-Knoten benötigt einen API-Response-Knoten in der Pipeline",
-          "nodeNotConfigured": "{label} ist nicht konfiguriert",
-          "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
-          "orphanNode": "{label} ist mit keinem anderen Knoten verbunden"
-        }
-      },
-      "toolbar": {
-        "unsavedChanges": "(ungespeicherte Änderungen)",
-        "validateBeforeSave": "Klicke auf Validieren vor dem Speichern",
-        "validate": "Validieren",
-        "save": "Speichern",
-        "saving": "Speichert...",
-        "loading": "Pipelines werden geladen...",
-        "pipelineSettings": "Pipeline-Einstellungen",
-        "deletePipeline": "Pipeline löschen",
-        "deleteConfirmTitle": "Pipeline löschen?",
-        "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
-      },
-      "tabs": {
-        "closeTab": "Tab schließen",
-        "newPipeline": "Neue Pipeline",
-        "untitledPipeline": "Unbenannte Pipeline"
-      },
-      "nodeLabels": {
-        "notConfigured": "Nicht konfiguriert"
-      },
-      "lines": "{count, plural, one {# Zeile} other {# Zeilen}}"
+    "errors": {
+      "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten."
+    },
+    "infoModal": {
+      "title": "Datenstruktur kann nicht gelöscht werden",
+      "description": "Diese Datenstruktur ist in Verwendung und kann daher nicht gelöscht werden."
+    },
+    "unsavedChangesModal": {
+      "title": "Ungespeicherte Änderungen",
+      "description": "Diese Aktion führt zu einer anderen Seite und Ihre ungespeicherten Änderungen gehen verloren. Möchten Sie sie zuerst speichern?"
+    }
+  },
+  "datastructureVersions": {
+    "newVersion": "Neue Version",
+    "tabs": {
+      "structure": "Strukturdefinition",
+      "versionInfo": "Versionsinformationen"
+    },
+    "versionInfo": {
+      "title": "Versionsinformationen",
+      "versionNumber": "Versionsnummer",
+      "versionNumberPlaceholder": "z. B. 1.0",
+      "description": "Versionsbeschreibung",
+      "source": "Quelle"
+    },
+    "source": {
+      "OWN": "Eigene"
+    },
+    "messages": {
+      "createSuccess": "Die Version der Datenstruktur wurde erfolgreich angelegt.",
+      "updateSuccess": "Die Version der Datenstruktur wurde erfolgreich aktualisiert.",
+      "isInUseModelHint": "Das Datenmodell kann nicht bearbeitet werden, da es bereits verwendet wird.",
+      "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Version bereits verwendet wird.",
+      "isLastAvailableVersion": "Kann nicht auf Entwurf gesetzt werden, da dies die letzte verfügbare Version einer verfügbaren Datenstruktur ist. Setzen Sie zuerst die Datenstruktur auf Entwurf."
+    },
+    "errors": {
+      "creationError": "Beim Anlegen der Version der Datenstruktur ist ein Fehler aufgetreten.",
+      "versionAlreadyExists": "Es existiert bereits eine Version mit der gleichen Versionsnummer in dieser Datenstruktur."
+    }
+  },
+  "pipelineEditor": {
+    "canvas": {
+      "noPipeline": "Keine Pipeline verfügbar"
+    },
+    "inspector": {
+      "edgeProperties": "Kantenattribute",
+      "source": "Quelle",
+      "target": "Ziel",
+      "properties": "Eigenschaften",
+      "noNodeSelected": "Kein Knoten ausgewählt",
+      "noNodeSelectedHint": "Wähle einen Knoten auf der Arbeitsfläche aus, um seine Eigenschaften anzuzeigen und zu bearbeiten",
+      "configured": "Konfiguriert",
+      "notConfigured": "Nicht konfiguriert"
+    },
+    "nodeTypes": {
+      "start": "Start",
+      "end": "Ende",
+      "dataSource": "Datenquelle",
+      "apiRequest": "API-Request",
+      "apiResponse": "API-Response",
+      "cronTrigger": "CRON-Trigger",
+      "frostStorage": "FROST-Server",
+      "mapping": "Mapping"
+    },
+    "palette": {
+      "title": "Knoten"
+    },
+    "categories": {
+      "general": "Allgemein",
+      "sources": "Quellen",
+      "trigger": "Trigger",
+      "storage": "Speicher",
+      "transformation": "Transformation"
+    },
+    "paletteItems": {
+      "flowStart": "Flow Start",
+      "flowStartDesc": "Pipeline-Einstiegspunkt. Ausführung beginnt hier.",
+      "flowEnd": "Flow Ende",
+      "flowEndDesc": "Pipeline-Endpunkt. Ausführung endet hier.",
+      "dataSource": "Datenquelle",
+      "dataSourceDesc": "Datenquelle. Wähle eine konfigurierte Datenquelle aus.",
+      "apiRequest": "API-Request",
+      "apiRequestDesc": "REST-API Request. Erstellt Endpunkt, der Daten bereitstellt.",
+      "apiResponse": "API-Response",
+      "apiResponseDesc": "REST-API Response.",
+      "cron": "CRON",
+      "cronDesc": "Geplanter Trigger. Führt Pipeline nach Zeitplan aus.",
+      "frostServer": "FROST Server",
+      "frostServerDesc": "SensorThings API Persistenz. Daten speichern oder abrufen.",
+      "mapping": "Mapping",
+      "mappingDesc": "Bloblang-Datentransformation. Daten zuordnen und transformieren."
+    },
+    "controlPanel": {
+      "entryPoint": "Pipeline-Einstiegspunkt",
+      "entryPointDesc": "Der Start-Knoten markiert, wo die Pipeline-Ausführung beginnt. Verbinde ihn mit einem Trigger- oder Datenquellen-Knoten, um festzulegen, wie die Pipeline aktiviert wird.",
+      "exitPoint": "Pipeline-Endpunkt",
+      "exitPointDesc": "Der End-Knoten markiert, wo die Pipeline-Ausführung endet. Alle Datenfluss-Pfade sollten schließlich zu diesem Knoten führen.",
+      "nodeInformation": "Knoteninformation",
+      "type": "Typ",
+      "configurable": "Konfigurierbar",
+      "no": "Nein"
+    },
+    "cronPanel": {
+      "cronExpression": "CRON-Ausdruck",
+      "invalidCron": "Ungültiger CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein (Sekunden Minuten Stunden Tag-des-Monats Monat Wochentag).",
+      "cronHint": "Ein CRON-Ausdruck legt fest, wann die Pipeline automatisch ausgeführt werden soll.",
+      "learnCron": "Über CRON-Ausdrücke erfahren",
+      "currentExpression": "Aktueller Ausdruck"
+    },
+    "dataSourcePanel": {
+      "label": "Datenquelle",
+      "placeholder": "Datenquelle auswählen...",
+      "details": "Datenquellen-Details",
+      "connector": "Konnektor",
+      "connection": "Verbindung",
+      "status": "Status",
+      "description": "Beschreibung",
+      "tags": "Tags",
+      "showDataStructure": "Datenstruktur anzeigen"
+    },
+    "apiPanel": {
+      "requestDetails": "API-Request-Details",
+      "responseDetails": "API-Response-Details",
+      "apiPath": "API-Pfad"
+    },
+    "frostPanel": {
+      "details": "FROST Server Details",
+      "serverName": "Servername",
+      "serverUrl": "Server-URL",
+      "version": "Version"
+    },
+    "mappingPanel": {
+      "hint": "Definiere deine Datentransformations-Zuordnung im YAML- oder JSON-Format.",
+      "mappingCode": "Mapping-Code",
+      "loadingEditor": "Editor wird geladen...",
+      "status": "Status",
+      "mappingConfigured": "Mapping konfiguriert",
+      "noMappingDefined": "Kein Mapping definiert"
+    },
+    "entitySelector": {
+      "selectEntity": "Entität auswählen...",
+      "errorLoading": "Fehler beim Laden der Entitäten",
+      "clearSelection": "Auswahl aufheben"
+    },
+    "validation": {
+      "results": "Validierungsergebnisse",
+      "pipelineValid": "Pipeline ist gültig",
+      "allChecksPassed": "Alle Validierungsprüfungen bestanden. Die Pipeline kann gespeichert werden.",
+      "errors": "Fehler ({count})",
+      "warnings": "Warnungen ({count})",
+      "fixErrors": "Behebe die obigen Fehler, bevor du die Pipeline speicherst.",
+      "hasWarnings": "Pipeline hat Warnungen, kann aber gespeichert werden.",
+      "messages": {
+        "startNodeRequired": "Pipeline muss mindestens einen Start-Knoten haben",
+        "endNodeRequired": "Pipeline muss mindestens einen End-Knoten haben",
+        "apiPairing": "API-Request-Knoten benötigt einen API-Response-Knoten in der Pipeline",
+        "nodeNotConfigured": "{label} ist nicht konfiguriert",
+        "invalidCronExpression": "{label} hat einen ungültigen CRON-Ausdruck. Muss 6-Feld Quartz-Syntax sein.",
+        "orphanNode": "{label} ist mit keinem anderen Knoten verbunden"
+      }
+    },
+    "toolbar": {
+      "unsavedChanges": "(ungespeicherte Änderungen)",
+      "validateBeforeSave": "Klicke auf Validieren vor dem Speichern",
+      "validate": "Validieren",
+      "save": "Speichern",
+      "saving": "Speichert..."
+    },
+    "tabs": {
+      "closeTab": "Tab schließen",
+      "newPipeline": "Neue Pipeline",
+      "untitledPipeline": "Unbenannte Pipeline"
+    },
+    "nodeLabels": {
+      "notConfigured": "Nicht konfiguriert"
+    },
+    "lines": "{count, plural, one {# Zeile} other {# Zeilen}}"
+  },
+  "umlModeler": {
+    "closeTabModal": {
+      "title": "Modell wirklich verwerfen?",
+      "description": "Diese Aktion löscht das Modell. Sie kann nicht rückgängig gemacht werden."
     }
   }
 }

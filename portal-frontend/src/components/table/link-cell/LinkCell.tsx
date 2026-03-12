@@ -3,7 +3,6 @@ import Link, { LinkProps } from 'next/link'
 import React, { JSX } from 'react'
 
 import { cn } from '@/lib/utils'
-
 interface LinkCellProps extends LinkProps {
   children: JSX.Element | string
   className?: string

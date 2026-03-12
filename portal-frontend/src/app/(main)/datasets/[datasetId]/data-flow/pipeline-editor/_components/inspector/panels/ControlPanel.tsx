@@ -26,7 +26,7 @@ interface ControlPanelProps {
 // ============================================================================
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({ data }) => {
-  const t = useTranslations('datastructures.pipelineEditor')
+  const t = useTranslations('pipelineEditor')
   const isStart = data.nodeType === 'start'
 
   return (

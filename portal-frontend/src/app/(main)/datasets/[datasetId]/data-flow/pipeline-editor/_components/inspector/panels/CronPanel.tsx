@@ -22,7 +22,7 @@ interface CronPanelProps {
 }
 
 export const CronPanel: React.FC<CronPanelProps> = ({ data, onUpdate }) => {
-  const t = useTranslations('datastructures.pipelineEditor')
+  const t = useTranslations('pipelineEditor')
 
   const handleExpressionChange = (expression: string) => {
     const trimmed = expression.trim()

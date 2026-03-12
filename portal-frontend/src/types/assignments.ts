@@ -38,6 +38,10 @@ export const AssignmentApiResponseSchema = z.object({
   scope: ItemSchema.nullable(),
 })
 
+export const AssignmentSchema = z.object({
+  groupId: z.string(),
+  roleId: z.string(),
+})
 export type Assignment = z.infer<typeof AssignmentApiResponseSchema>
 
 export type CreateAssignmentData = { groupId: string; roleId: string }

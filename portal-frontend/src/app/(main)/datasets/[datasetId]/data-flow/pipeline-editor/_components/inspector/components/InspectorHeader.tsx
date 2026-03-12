@@ -56,7 +56,7 @@ const NODE_TYPE_TO_TRANSLATION_KEY: Record<PipelineNodeType, string> = {
 // ============================================================================
 
 export const InspectorHeader: React.FC<InspectorHeaderProps> = ({ nodeType, label, isConfigured }) => {
-  const t = useTranslations('datastructures.pipelineEditor')
+  const t = useTranslations('pipelineEditor')
   const icon = NODE_TYPE_ICONS[nodeType]
   const translationKey = NODE_TYPE_TO_TRANSLATION_KEY[nodeType]
   const typeLabel = t(`nodeTypes.${translationKey}`)

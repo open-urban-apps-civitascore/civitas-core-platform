@@ -13,6 +13,7 @@ export const getDatastructures = async (params?: URLSearchParams) => {
       endpoint: '/datastructures',
       method: 'GET',
       params,
+      isApiBackend: true,
     })
   } catch (error) {
     console.error('An error occurred while fetching datastructures.', error)
@@ -25,6 +26,7 @@ export const getDatastructure = async (id: string) => {
     return await serverFetch<Datastructure[]>({
       endpoint: `/datastructures/${id}`,
       method: 'GET',
+      isApiBackend: true,
     })
   } catch (error) {
     console.error(`An error occurred while fetching datastructure ${id}.`, error)

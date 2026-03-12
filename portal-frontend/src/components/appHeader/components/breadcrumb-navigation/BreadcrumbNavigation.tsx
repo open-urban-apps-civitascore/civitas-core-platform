@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 export type Breadcrumb = {
   title: string
   href: string
+  apiHref?: string
   isLast: boolean
   isDynamic: boolean
 }
@@ -27,9 +28,41 @@ export type BreadcrumbApiResponse = {
   firstName?: string
   lastName?: string
   title?: string
+  version?: string
 }
 
 const getName = (firstName?: string, lastName?: string) => (firstName && lastName ? `${firstName} ${lastName}` : null)
+
+const isDatastructureVersionBreadcrumb = (segments: string[], index: number) =>
+  segments[0] === 'datastructures' && index === 2
+
+const getBreadcrumbApiHref = (segments: string[], index: number) => {
+  const href = `/${segments.slice(0, index + 1).join('/')}`
+
+  if (isDatastructureVersionBreadcrumb(segments, index)) {
+    const [, datastructureId, versionId] = segments
+    return `/datastructures/${datastructureId}/versions/${versionId}`
+  }
+
+  return href
+}
+
+const getTitle = (
+  breadcrumb: Breadcrumb,
+  data: BreadcrumbApiResponse | undefined,
+  t: ReturnType<typeof useTranslations>,
+  isDatastructureVersion: boolean,
+) => {
+  if (!breadcrumb.isDynamic) {
+    return t(breadcrumb.title)
+  }
+
+  if (isDatastructureVersion && data?.version) {
+    return `Version ${data.version}`
+  }
+
+  return data?.name || getName(data?.firstName, data?.lastName) || data?.title || breadcrumb.title
+}
 
 export const BreadcrumbNavigation = () => {
   const pathname = usePathname()
@@ -43,6 +76,7 @@ export const BreadcrumbNavigation = () => {
   const breadcrumbs: Breadcrumb[] = segments.map((segment, index) => ({
     title: segment,
     href: `/${segments.slice(0, index + 1).join('/')}`,
+    apiHref: getBreadcrumbApiHref(segments, index),
     isLast: index === segments.length - 1,
     isDynamic: Object.values(params).includes(segment),
   }))
@@ -51,9 +85,7 @@ export const BreadcrumbNavigation = () => {
 
   const updatedBreadcrumbs = breadcrumbs.map((crumb, index) => {
     const data = results[index]?.data?.data
-    const title = crumb.isDynamic
-      ? data?.name || getName(data?.firstName, data?.lastName) || data?.title || crumb.title
-      : t(crumb.title)
+    const title = getTitle(crumb, data, t, isDatastructureVersionBreadcrumb(segments, index))
     return { ...crumb, title }
   })
 

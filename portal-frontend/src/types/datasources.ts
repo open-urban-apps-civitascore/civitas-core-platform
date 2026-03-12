@@ -9,13 +9,18 @@ import { DatastructureVersionSummaryApiResponseSchema } from './datastructures'
 
 export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'accessPermissions'
 
-export type DatasourceStatusType = (typeof STATUS_TYPES)[keyof typeof STATUS_TYPES]
+export const DATASOURCE_STATUS_TYPES = {
+  DRAFT: 'DRAFT',
+  AVAILABLE: 'AVAILABLE',
+} as const satisfies Partial<typeof STATUS_TYPES>
+
+export type DatasourceStatusType = (typeof DATASOURCE_STATUS_TYPES)[keyof typeof DATASOURCE_STATUS_TYPES]
 
 const enumFromConst = <T extends Record<string, string>>(obj: T) =>
   z.enum(Object.values(obj) as [T[keyof T], ...T[keyof T][]])
 
 export const ConnectorTypeSchema = enumFromConst(CONNECTOR_TYPES)
-export const DatasourceStatusSchema = enumFromConst(STATUS_TYPES)
+export const DatasourceStatusSchema = enumFromConst(DATASOURCE_STATUS_TYPES)
 
 export type FormFieldType = 'input' | 'textArea' | 'select' | 'checkbox'
 

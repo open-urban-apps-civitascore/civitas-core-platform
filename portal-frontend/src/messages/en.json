@@ -14,6 +14,7 @@
     "form": "Form",
     "actions": {
       "submit": "Save",
+      "close": "Close",
       "cancel": "Cancel",
       "delete": "Delete",
       "deleteItem": "Delete {item}",
@@ -27,7 +28,6 @@
       "exit": "Exit",
       "assignItem": "Assign {item}",
       "assignTo": "to {item}",
-      "close": "Close",
       "back": "Back"
     },
     "errors": {
@@ -48,9 +48,12 @@
       "nameRequired": "Name is required",
       "descriptionRequired": "Description is required",
       "descriptionMaxLength": "Description must be 150 characters or less",
-      "formInvalid": "All required information must be provided correctly."
+      "formInvalid": "All required information must be provided correctly. Please, verify your input.",
+      "statusChangeError": "An error occurred while changing the availability status.",
+      "updateError": "An error occurred while updating the {item}."
     },
     "items": {
+      "data": "data",
       "users": "Users",
       "user": "User",
       "groups": "Groups",
@@ -61,7 +64,9 @@
       "permissions": "Permissions",
       "datasources": "Datasources",
       "datasource": "Datasource",
-      "datastructures": "Datastructures"
+      "datastructures": "Datastructures",
+      "datastructure": "Datastructure",
+      "datastructureVersion": "Version"
     },
     "messages": {
       "updateSuccess": "{item} has been successfully updated",
@@ -71,7 +76,12 @@
     "info": {
       "switchMode": "Switch to draft mode, as the requirements for available mode are not met.",
       "commaSeparated": "comma-separated",
-      "requiredInAvailable": "This field is required in the available mode."
+      "requiredInAvailable": "This field is required in the available mode.",
+      "descriptionHint": "max. 150 characters"
+    },
+    "success": {
+      "statusChangeSuccess": "The availability status has been successfully updated.",
+      "deletionSuccess": "{item} has successfully been deleted."
     },
     "status": {
       "DRAFT": "Draft",
@@ -82,6 +92,10 @@
       "title": "Vor dem Beenden speichern?",
       "description": "Es gibt ungespeicherte Informationen. \"Verwerfen\" kann nicht rückgängig gemacht werden.",
       "discard": "Verwerfen"
+    },
+    "deletionWarningModal": {
+      "title": "Delete {item}?",
+      "description": "This action can not be undone."
     }
   },
   "languages": {
@@ -158,6 +172,7 @@
     "permissions": "Permissions",
     "roles": "Roles",
     "create": "create",
+    "createVersion": "New Version",
     "edit": "edit",
     "users": "User",
     "groups": "Groups",
@@ -626,8 +641,7 @@
     "form": {
       "name": "Name",
       "namePlaceholder": "Name of the data source",
-      "description": "Description",
-      "descriptionHint": "max. 150 characters"
+      "description": "Description"
     },
     "exitModal": {
       "title": "Save before exiting?",
@@ -646,15 +660,14 @@
     "title": "Overview: Data Structures",
     "subtitle": "All data sources available in our tenant.",
     "newDatasource": "Create Data Structure",
+    "newVersion": "Create version",
+
     "tableHeaders": {
       "name": "Name",
       "description": "Description",
       "source": "Source",
       "versionNumber": "Version",
       "status": "Status"
-    },
-    "source": {
-      "OWN": "Own"
     },
     "create": {
       "title": "New Data Structure",
@@ -667,8 +680,7 @@
     "form": {
       "name": "Name",
       "namePlaceholder": "Name of the data structure",
-      "description": "Description",
-      "descriptionHint": "max. 150 characters"
+      "description": "Description"
     },
     "tabs": {
       "basicInfo": "Base Information",
@@ -683,150 +695,191 @@
     },
     "messages": {
       "createSuccess": "Data structure has been successfully created.",
-      "updateSuccess": "Data structure  has been successfully updated."
+      "updateSuccess": "Data structure  has been successfully updated.",
+      "isInUseStatusHint": "Can not be set to draft since this datastructure is already in use."
     },
-    "pipelineEditor": {
-      "canvas": {
-        "noPipeline": "No pipeline available"
-      },
-      "inspector": {
-        "edgeProperties": "Edge Properties",
-        "source": "Source",
-        "target": "Target",
-        "properties": "Properties",
-        "noNodeSelected": "No node selected",
-        "noNodeSelectedHint": "Select a node on the canvas to view and edit its properties",
-        "configured": "Configured",
-        "notConfigured": "Not configured"
-      },
-      "nodeTypes": {
-        "start": "Start",
-        "end": "End",
-        "dataSource": "Data Source",
-        "apiRequest": "API Request",
-        "apiResponse": "API Response",
-        "cronTrigger": "CRON Trigger",
-        "frostStorage": "FROST Server",
-        "mapping": "Mapping"
-      },
-      "palette": {
-        "title": "Nodes"
-      },
-      "categories": {
-        "general": "General",
-        "sources": "Sources",
-        "trigger": "Trigger",
-        "storage": "Storage",
-        "transformation": "Transformation"
-      },
-      "paletteItems": {
-        "flowStart": "Flow Start",
-        "flowStartDesc": "Pipeline entry point. Execution starts here.",
-        "flowEnd": "Flow End",
-        "flowEndDesc": "Pipeline exit point. Execution ends here.",
-        "dataSource": "Data Source",
-        "dataSourceDesc": "Data source. Select a configured data source.",
-        "apiRequest": "API Request",
-        "apiRequestDesc": "REST API request trigger. Creates endpoint that serves data on HTTP request.",
-        "apiResponse": "API Response",
-        "apiResponseDesc": "REST API response. Returns data to client.",
-        "cron": "CRON",
-        "cronDesc": "Scheduled trigger. Executes pipeline on schedule.",
-        "frostServer": "FROST Server",
-        "frostServerDesc": "SensorThings API persistence. Store or retrieve data.",
-        "mapping": "Mapping",
-        "mappingDesc": "Bloblang data transformation. Map and transform data."
-      },
-      "controlPanel": {
-        "entryPoint": "Pipeline Entry Point",
-        "entryPointDesc": "The Start node marks where the pipeline execution begins. Connect it to a trigger or data source node to define how the pipeline is activated.",
-        "exitPoint": "Pipeline Exit Point",
-        "exitPointDesc": "The End node marks where the pipeline execution completes. All data flow paths should eventually lead to this node.",
-        "nodeInformation": "Node Information",
-        "type": "Type",
-        "configurable": "Configurable",
-        "no": "No"
-      },
-      "cronPanel": {
-        "cronExpression": "CRON Expression",
-        "invalidCron": "Invalid cron expression. Must be 6-field Quartz syntax (seconds minutes hours day-of-month month day-of-week).",
-        "cronHint": "A CRON expression defines when the pipeline should run automatically.",
-        "learnCron": "Learn about CRON expressions",
-        "currentExpression": "Current Expression"
-      },
-      "dataSourcePanel": {
-        "label": "Data Source",
-        "placeholder": "Select a datasource...",
-        "details": "Data Source Details",
-        "connector": "Connector",
-        "connection": "Connection",
-        "status": "Status",
-        "description": "Description",
-        "tags": "Tags",
-        "showDataStructure": "Show Data Structure"
-      },
-      "apiPanel": {
-        "requestDetails": "API Request Details",
-        "responseDetails": "API Response Details",
-        "apiPath": "API Path"
-      },
-      "frostPanel": {
-        "details": "FROST Server Details",
-        "serverName": "Server Name",
-        "serverUrl": "Server URL",
-        "version": "Version"
-      },
-      "mappingPanel": {
-        "hint": "Define your data transformation mapping using YAML or JSON format.",
-        "mappingCode": "Mapping Code",
-        "loadingEditor": "Loading editor...",
-        "status": "Status",
-        "mappingConfigured": "Mapping configured",
-        "noMappingDefined": "No mapping defined"
-      },
-      "entitySelector": {
-        "selectEntity": "Select an entity...",
-        "errorLoading": "Error loading entities",
-        "clearSelection": "Clear selection"
-      },
-      "validation": {
-        "results": "Validation Results",
-        "pipelineValid": "Pipeline is valid",
-        "allChecksPassed": "All validation checks passed. You can save the pipeline.",
-        "errors": "Errors ({count})",
-        "warnings": "Warnings ({count})",
-        "fixErrors": "Fix the errors above before saving the pipeline.",
-        "hasWarnings": "Pipeline has warnings but can be saved.",
-        "messages": {
-          "startNodeRequired": "Pipeline must have at least one Start node",
-          "endNodeRequired": "Pipeline must have at least one End node",
-          "apiPairing": "API Request node requires an API Response node in the pipeline",
-          "nodeNotConfigured": "{label} is not configured",
-          "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
-          "orphanNode": "{label} is not connected to any other node"
-        }
-      },
-      "toolbar": {
-        "unsavedChanges": "(unsaved changes)",
-        "validateBeforeSave": "Click Validate before saving",
-        "validate": "Validate",
-        "save": "Save",
-        "saving": "Saving...",
-        "loading": "Loading pipelines...",
-        "pipelineSettings": "Pipeline settings",
-        "deletePipeline": "Delete Pipeline",
-        "deleteConfirmTitle": "Delete Pipeline?",
-        "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone."
-      },
-      "tabs": {
-        "closeTab": "Close tab",
-        "newPipeline": "New pipeline",
-        "untitledPipeline": "Untitled Pipeline"
-      },
-      "nodeLabels": {
-        "notConfigured": "Not configured"
-      },
-      "lines": "{count, plural, one {# line} other {# lines}}"
+    "errors": {
+      "deletionError": "An error occurred while deleting the datastructure."
+    },
+    "infoModal": {
+      "title": "Datenstructure can not be deleted",
+      "description": "This Datenstructure is in use and can therefore not be deleted."
+    },
+    "unsavedChangesModal": {
+      "title": "Unsaved Changes",
+      "description": "This action will take you to another page and your unsaved changes will be lost. Do you want to save them first?"
+    }
+  },
+  "datastructureVersion": {
+    "title": "New Version",
+    "tabs": {
+      "structure": "Strukturdefinition",
+      "versionInfo": "Versionsinformationen"
+    },
+    "versionInfo": {
+      "title": "Version Informationen",
+      "versionNumber": "Version Number",
+      "versionNumberPlaceholder": "e. g. 1.0",
+      "description": "Version Description",
+      "source": "Source"
+    },
+    "source": {
+      "OWN": "Own"
+    },
+    "messages": {
+      "createSuccess": "The version of the data structure has been successfully created.",
+      "updateSuccess": "The version of the data has been successfully updated.",
+      "isInUseModelHint": "The data model can not be edited since it is already in use.",
+      "isInUseStatusHint": "Can not be set to draft since this version is already in use.",
+      "isLastAvailableVersion": "Can not be set to draft because this is the last available version in an available datastructure. Set the datastructure to draft first."
+    },
+    "errors": {
+      "creationError": "An error occurred while creating the datastructure version.",
+      "versionAlreadyExists": "A version with the same version number already exists in this data structure."
+    }
+  },
+  "pipelineEditor": {
+    "canvas": {
+      "noPipeline": "No pipeline available"
+    },
+    "inspector": {
+      "edgeProperties": "Edge Properties",
+      "source": "Source",
+      "target": "Target",
+      "properties": "Properties",
+      "noNodeSelected": "No node selected",
+      "noNodeSelectedHint": "Select a node on the canvas to view and edit its properties",
+      "configured": "Configured",
+      "notConfigured": "Not configured"
+    },
+    "nodeTypes": {
+      "start": "Start",
+      "end": "End",
+      "dataSource": "Data Source",
+      "apiRequest": "API Request",
+      "apiResponse": "API Response",
+      "cronTrigger": "CRON Trigger",
+      "frostStorage": "FROST Server",
+      "mapping": "Mapping"
+    },
+    "palette": {
+      "title": "Nodes"
+    },
+    "categories": {
+      "general": "General",
+      "sources": "Sources",
+      "trigger": "Trigger",
+      "storage": "Storage",
+      "transformation": "Transformation"
+    },
+    "paletteItems": {
+      "flowStart": "Flow Start",
+      "flowStartDesc": "Pipeline entry point. Execution starts here.",
+      "flowEnd": "Flow End",
+      "flowEndDesc": "Pipeline exit point. Execution ends here.",
+      "dataSource": "Data Source",
+      "dataSourceDesc": "Data source. Select a configured data source.",
+      "apiRequest": "API Request",
+      "apiRequestDesc": "REST API request trigger. Creates endpoint that serves data on HTTP request.",
+      "apiResponse": "API Response",
+      "apiResponseDesc": "REST API response. Returns data to client.",
+      "cron": "CRON",
+      "cronDesc": "Scheduled trigger. Executes pipeline on schedule.",
+      "frostServer": "FROST Server",
+      "frostServerDesc": "SensorThings API persistence. Store or retrieve data.",
+      "mapping": "Mapping",
+      "mappingDesc": "Bloblang data transformation. Map and transform data."
+    },
+    "controlPanel": {
+      "entryPoint": "Pipeline Entry Point",
+      "entryPointDesc": "The Start node marks where the pipeline execution begins. Connect it to a trigger or data source node to define how the pipeline is activated.",
+      "exitPoint": "Pipeline Exit Point",
+      "exitPointDesc": "The End node marks where the pipeline execution completes. All data flow paths should eventually lead to this node.",
+      "nodeInformation": "Node Information",
+      "type": "Type",
+      "configurable": "Configurable",
+      "no": "No"
+    },
+    "cronPanel": {
+      "cronExpression": "CRON Expression",
+      "invalidCron": "Invalid cron expression. Must be 6-field Quartz syntax (seconds minutes hours day-of-month month day-of-week).",
+      "cronHint": "A CRON expression defines when the pipeline should run automatically.",
+      "learnCron": "Learn about CRON expressions",
+      "currentExpression": "Current Expression"
+    },
+    "dataSourcePanel": {
+      "label": "Data Source",
+      "placeholder": "Select a datasource...",
+      "details": "Data Source Details",
+      "connector": "Connector",
+      "connection": "Connection",
+      "status": "Status",
+      "description": "Description",
+      "tags": "Tags",
+      "showDataStructure": "Show Data Structure"
+    },
+    "apiPanel": {
+      "requestDetails": "API Request Details",
+      "responseDetails": "API Response Details",
+      "apiPath": "API Path"
+    },
+    "frostPanel": {
+      "details": "FROST Server Details",
+      "serverName": "Server Name",
+      "serverUrl": "Server URL",
+      "version": "Version"
+    },
+    "mappingPanel": {
+      "hint": "Define your data transformation mapping using YAML or JSON format.",
+      "mappingCode": "Mapping Code",
+      "loadingEditor": "Loading editor...",
+      "status": "Status",
+      "mappingConfigured": "Mapping configured",
+      "noMappingDefined": "No mapping defined"
+    },
+    "entitySelector": {
+      "selectEntity": "Select an entity...",
+      "errorLoading": "Error loading entities",
+      "clearSelection": "Clear selection"
+    },
+    "validation": {
+      "results": "Validation Results",
+      "pipelineValid": "Pipeline is valid",
+      "allChecksPassed": "All validation checks passed. You can save the pipeline.",
+      "errors": "Errors ({count})",
+      "warnings": "Warnings ({count})",
+      "fixErrors": "Fix the errors above before saving the pipeline.",
+      "hasWarnings": "Pipeline has warnings but can be saved.",
+      "messages": {
+        "startNodeRequired": "Pipeline must have at least one Start node",
+        "endNodeRequired": "Pipeline must have at least one End node",
+        "apiPairing": "API Request node requires an API Response node in the pipeline",
+        "nodeNotConfigured": "{label} is not configured",
+        "invalidCronExpression": "{label} has an invalid cron expression. Must be a 6-field Quartz syntax.",
+        "orphanNode": "{label} is not connected to any other node"
+      }
+    },
+    "toolbar": {
+      "unsavedChanges": "(unsaved changes)",
+      "validateBeforeSave": "Click Validate before saving",
+      "validate": "Validate",
+      "save": "Save",
+      "saving": "Saving..."
+    },
+    "tabs": {
+      "closeTab": "Close tab",
+      "newPipeline": "New pipeline",
+      "untitledPipeline": "Untitled Pipeline"
+    },
+    "nodeLabels": {
+      "notConfigured": "Not configured"
+    },
+    "lines": "{count, plural, one {# line} other {# lines}}"
+  },
+  "umlModeler": {
+    "closeTabModal": {
+      "title": "Discard model?",
+      "description": "This action deletes the model. It can not be undone."
     }
   }
 }

@@ -9,7 +9,7 @@
  */
 import { useTranslations } from 'next-intl'
 
-import { STATUS_TYPES } from '@/types/common'
+import { DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 
 import { datasourceToSelectable, useDataSourceEntities } from '../../../_services/entityService'
 import type { DataSourceNodeData } from '../../../_types/nodes'
@@ -30,7 +30,7 @@ interface DataSourcePanelProps {
 // ============================================================================
 
 export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate }) => {
-  const t = useTranslations('datastructures.pipelineEditor')
+  const t = useTranslations('pipelineEditor')
   const { entities, isLoading, isError, getEntityById } = useDataSourceEntities()
 
   const selectedEntity = data.entityId !== undefined ? getEntityById(data.entityId) : undefined
@@ -52,7 +52,7 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
   }
 
   const selectableEntities = entities
-    .filter(entity => entity.dataSourceStatus === STATUS_TYPES.AVAILABLE)
+    .filter(entity => entity.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE)
     .map(datasourceToSelectable)
 
   return (

@@ -43,7 +43,7 @@ export const EntitySelector: React.FC<EntitySelectorProps> = ({
   onChange,
   isDisabled = false,
 }) => {
-  const t = useTranslations('datastructures.pipelineEditor')
+  const t = useTranslations('pipelineEditor')
   const tCommon = useTranslations('common')
   const resolvedPlaceholder = placeholder ?? t('entitySelector.selectEntity')
 
