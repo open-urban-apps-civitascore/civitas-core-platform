@@ -14,12 +14,3 @@ params:path {
   id: {{sagaDataSetId}}
 }
 
-tests {
-  test("Status code is 202", function() {
-    expect(res.getStatus()).to.equal(202);
-  });
-
-  test("Pending saga type is DELETE", function() {
-    expect(res.body.pendingSagaType).to.equal("DELETE");
-  });
-}

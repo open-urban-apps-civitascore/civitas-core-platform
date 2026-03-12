@@ -1,0 +1,16 @@
+meta {
+  name: 14. Cleanup - Delete DataSource
+  type: http
+  seq: 14
+}
+
+delete {
+  url: {{baseUrl}}/datasources/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSourceId}}
+}
+

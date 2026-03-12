@@ -104,7 +104,7 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     putResource(UPSTREAMS_PATH + datasetId, upstreamBody, "CREATE upstream");
 
     // 2. Create route (PUT with deterministic ID)
-    Map<String, Object> routeBody = buildRouteBody(datasetId, openDataAccess, upstreamPath);
+    Map<String, Object> routeBody = buildCreateRouteBody(datasetId, openDataAccess, upstreamPath);
     putResource(ROUTES_PATH + datasetId, routeBody, "CREATE route");
 
     String publicUrl = gatewayUrl + "/datasets/" + datasetId;
@@ -129,7 +129,7 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     // Read current route state before updating (needed for compensation)
     boolean previousOpenDataAccess = readCurrentOpenDataAccess(routeId);
 
-    Map<String, Object> routeBody = buildRouteBody(serviceId, openDataAccess, null);
+    Map<String, Object> routeBody = buildAuthPatchBody(openDataAccess);
     patchResource(ROUTES_PATH + routeId, routeBody, "UPDATE route");
 
     Map<String, Object> resultData = Map.of("routeId", routeId, "serviceId", serviceId);
@@ -173,7 +173,7 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     String serviceId = requireString(command, "serviceId");
     Object previousOpenDataAccess = command.payload().getOrDefault("previousOpenDataAccess", false);
 
-    Map<String, Object> routeBody = buildRouteBody(serviceId, previousOpenDataAccess, null);
+    Map<String, Object> routeBody = buildAuthPatchBody(previousOpenDataAccess);
     patchResource(ROUTES_PATH + routeId, routeBody, "RESTORE route");
 
     log.info(
@@ -258,38 +258,41 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     return body;
   }
 
-  /**
-   * Builds a route body. When {@code upstreamPath} is non-null (CREATE), includes uris +
-   * proxy-rewrite plugin for path rewriting. When null (UPDATE/RESTORE), only sets auth-related
-   * fields — used with PATCH to preserve existing route/plugin configuration.
-   */
-  private Map<String, Object> buildRouteBody(
-      String upstreamId, Object openDataAccess, String upstreamPath) {
+  /** Builds a full route body for CREATE — includes URIs, upstream, and proxy-rewrite plugin. */
+  private Map<String, Object> buildCreateRouteBody(
+      String datasetId, Object openDataAccess, String upstreamPath) {
     Map<String, Object> body = new HashMap<>();
+    body.put("uris", new String[] {"/datasets/" + datasetId, "/datasets/" + datasetId + "/*"});
+    body.put("upstream_id", datasetId);
+    body.put("status", 1);
 
-    if (upstreamPath != null) {
-      // Full route creation: set URIs, upstream, proxy-rewrite
-      body.put("uris", new String[] {"/datasets/" + upstreamId, "/datasets/" + upstreamId + "/*"});
-      body.put("upstream_id", upstreamId);
-      body.put("status", 1);
+    // Rewrite gateway path to upstream FROST path
+    // e.g. /datasets/{id}/Things → /FROST-Server/v1.1/Projects(1)/Things
+    Map<String, Object> plugins = new HashMap<>();
+    plugins.put(
+        "proxy-rewrite",
+        Map.of(
+            "regex_uri",
+            new String[] {"^/datasets/" + datasetId + "(/.*)?$", upstreamPath + "$1"}));
+    body.put("plugins", plugins);
 
-      // Rewrite gateway path to upstream FROST path
-      // e.g. /datasets/{id}/Things → /FROST-Server/v1.1/Projects(1)/Things
-      Map<String, Object> plugins = new HashMap<>();
-      plugins.put(
-          "proxy-rewrite",
-          Map.of(
-              "regex_uri",
-              new String[] {"^/datasets/" + upstreamId + "(/.*)?$", upstreamPath + "$1"}));
-      body.put("plugins", plugins);
-    }
+    applyAuthConfig(body, openDataAccess);
+    return body;
+  }
 
-    // Auth: attach shared plugin config for non-open-data, or omit for open data
+  /** Builds an auth-only route body for UPDATE/RESTORE — used with PATCH to preserve routing. */
+  private Map<String, Object> buildAuthPatchBody(Object openDataAccess) {
+    Map<String, Object> body = new HashMap<>();
+    applyAuthConfig(body, openDataAccess);
+    return body;
+  }
+
+  private void applyAuthConfig(Map<String, Object> body, Object openDataAccess) {
     boolean isOpenData = Boolean.TRUE.equals(openDataAccess);
     if (!isOpenData && pluginConfigId != null) {
       body.put("plugin_config_id", pluginConfigId);
+    } else if (isOpenData) {
+      body.put("plugin_config_id", null);
     }
-
-    return body;
   }
 }

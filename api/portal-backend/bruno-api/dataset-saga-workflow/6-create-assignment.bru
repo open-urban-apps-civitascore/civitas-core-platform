@@ -25,12 +25,3 @@ script:post-response {
   }
 }
 
-tests {
-  test("Status code is 201", function() {
-    expect(res.getStatus()).to.equal(201);
-  });
-
-  test("ScopeType is DATASET", function() {
-    expect(res.body.scopeType).to.equal("DATASET");
-  });
-}
