@@ -2,15 +2,12 @@ package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.PermissionMapper;
 import de.civitascore.portal.mapper.RoleMapper;
-import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.service.AssignmentService;
-import de.civitascore.portal.service.UserService;
-import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -23,9 +20,6 @@ public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
 
   private final RoleMapper roleMapper;
   private final PermissionMapper permissionMapper;
-
-  private final UserService userService;
-  private final UserMapper userMapper;
 
   private final AssignmentService assignmentService;
 
@@ -51,21 +45,8 @@ public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
 
   @Override
   public RoleOutputDTO enrichDto(RoleOutputDTO dto, Role entity) {
-    dto.setModifiedBy(null);
     dto.setGroupCount(0L);
     dto.setUserCount(0L);
-
-    try {
-      UUID modifierId = entity.getModifiedBy();
-
-      if (modifierId != null) {
-        User modifier = userService.findByIdOrThrow(modifierId);
-
-        dto.setModifiedBy(userMapper.toSummary(modifier));
-      }
-    } catch (ResourceNotFoundException e) {
-      // modifierId refers to a user that no longer exists -> leave modifiedBy as null
-    }
 
     Set<Group> groups =
         assignmentService.findAllByRoleId(entity.getId()).stream()
