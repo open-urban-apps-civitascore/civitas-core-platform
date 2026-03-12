@@ -93,7 +93,17 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     // Parse upstream URL into host:port and path components
     // e.g. "http://civitas-frost:8080/FROST-Server/v1.1/Projects(1)"
     //   → node = "civitas-frost:8080", path = "/FROST-Server/v1.1/Projects(1)"
-    URI upstream = URI.create(upstreamUrl);
+    URI upstream;
+    try {
+      upstream = URI.create(upstreamUrl);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "CREATE_ROUTE: invalid upstreamUrl: " + Encode.forJava(upstreamUrl), e);
+    }
+    if (upstream.getHost() == null) {
+      throw new IllegalArgumentException(
+          "CREATE_ROUTE: upstreamUrl has no host: " + Encode.forJava(upstreamUrl));
+    }
     String upstreamNode =
         upstream.getPort() > 0 ? upstream.getHost() + ":" + upstream.getPort() : upstream.getHost();
     String upstreamPath = upstream.getPath() != null ? upstream.getPath() : "/";
