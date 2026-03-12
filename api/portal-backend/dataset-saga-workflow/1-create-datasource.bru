@@ -12,13 +12,13 @@ post {
 
 body:json {
   {
-    "name": "TAF10 Energy Meter",
-    "description": "HiveMQ public MQTT broker — TAF10 energy meter demo data",
+    "name": "Energy Meter",
+    "description": "Public MQTT broker — Energy meter demo data",
     "connectorType": "MQTT",
     "configuration": {
-      "urls": ["tcp://broker.hivemq.com:1883"],
-      "topics": ["+/civitas+/civitas/core/energy/meter/+/taf10"],
-      "client_id": "civitas-saga-demo",
+      "urls": ["tcp://civitas.local:1234"],
+      "topics": ["+/civitas+/civitas/core/+/123"],
+      "client_id": "civitas-demo",
       "qos": 1,
       "connect_timeout": "5s",
       "keepalive": "30s",
@@ -36,4 +36,3 @@ script:post-response {
     bru.setVar('sagaDataSourceId', res.body.id);
   }
 }
-
