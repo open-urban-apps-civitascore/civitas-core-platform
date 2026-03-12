@@ -45,6 +45,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   private static final String DEFAULT_SERVER_URL = "http://localhost:8080/v1.1";
 
   private String serverUrl;
+  private String publicUrl;
   private String apiKey;
   private String apiKeyHeader;
   private String basicAuthUsername;
@@ -58,6 +59,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
   @Override
   protected void doInitialize(AdapterConfig config) {
     this.serverUrl = getProperty("url", DEFAULT_SERVER_URL).replaceAll("/$", "");
+    this.publicUrl = getProperty("public.url", this.serverUrl);
     this.apiKey = getProperty("api.key");
     this.apiKeyHeader = getProperty("api.key.header", "X-API-Key");
     this.basicAuthUsername = getProperty("basic.auth.username");
@@ -116,7 +118,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
       checkResponse(response, "CREATE_PROJECT");
 
       String projectId = FrostUtils.extractIdFromLocation(response.getHeaderString("Location"));
-      String baseUrl = serverUrl + "/Projects(" + projectId + ")";
+      String baseUrl = publicUrl + "/Projects(" + projectId + ")";
 
       Map<String, Object> resultData = Map.of("projectId", projectId, "baseUrl", baseUrl);
       Map<String, Object> compensationData = Map.of("projectId", projectId);
@@ -167,7 +169,7 @@ public class FrostSagaHandler extends AbstractSagaCommandHandler {
 
       checkResponse(response, "UPDATE_PROJECT");
 
-      String baseUrl = serverUrl + "/Projects(" + projectId + ")";
+      String baseUrl = publicUrl + "/Projects(" + projectId + ")";
       Map<String, Object> resultData = Map.of("projectId", projectId, "baseUrl", baseUrl);
       Map<String, Object> compensationData =
           Map.of(

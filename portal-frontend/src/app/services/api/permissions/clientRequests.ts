@@ -9,5 +9,6 @@ export const useGetPermissions = ({ params, isEnabled }: GetListInput = {}) =>
     key,
     params,
     isEnabled,
+    headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while loading permissions data.',
   })

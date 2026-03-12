@@ -70,6 +70,7 @@ variables:
   AST_ENABLE_MR_PIPELINES: 'true' # Enable secret detection in MR pipelines
   SAST_EXCLUDED_ANALYZERS: 'semgrep' # Disable fall bock sast scanner (only use advanced sast)
   DS_ENFORCE_NEW_ANALYZER: 'true'
+  DS_INCLUDE_DEV_DEPENDENCIES: 'false'
   DS_MAX_DEPTH: 3
 
 # ============================================
@@ -80,6 +81,8 @@ variables:
 secret_detection:
   stage: qa
   needs: []
+  variables:
+    SECRET_DETECTION_EXCLUDED_PATHS: "**/src/test/**,**/src/**/__tests__/**,**/*.test.*"
 
 gitlab-advanced-sast:
   stage: qa

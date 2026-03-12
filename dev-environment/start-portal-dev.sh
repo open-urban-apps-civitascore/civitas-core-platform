@@ -671,6 +671,7 @@ if [ "$backend_option" = "1" ]; then
 cd "$BACKEND_DIR"
 export SPRING_DATASOURCE_USERNAME=admin
 export SPRING_DATASOURCE_PASSWORD=admin
+export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable"
 export MODEL_ATLAS_BASE_URL=http://localhost:8086
 mvn clean spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION
 exec bash
@@ -697,6 +698,7 @@ else
     echo "Environment variables to set in IDE:"
     echo "  SPRING_DATASOURCE_USERNAME=admin"
     echo "  SPRING_DATASOURCE_PASSWORD=admin"
+    echo "  SPRING_DATASOURCE_URL=\"jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable\""
     echo "  MODEL_ATLAS_BASE_URL=http://localhost:8086"
     echo
 fi
@@ -711,7 +713,7 @@ if [ "$backend_option" = "1" ]; then
     echo "Waiting for Portal Backend to be healthy..."
     BACKEND_READY=false
     for i in $(seq 1 60); do
-        if curl -s -f "http://localhost:8089/v2/actuator/health" >/dev/null 2>&1; then
+        if curl -s -f "http://localhost:8089/v1/actuator/health" >/dev/null 2>&1; then
             echo "  Portal Backend is ready"
             BACKEND_READY=true
             break
@@ -853,20 +855,20 @@ if [ "$backend_option" = "1" ] && [ "$BACKEND_READY" = true ]; then
         SMOKE_SKIP=3
     else
         # Test 1: Unauthenticated request should be rejected
-        STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:9080/v2/users/me" 2>/dev/null) || true
-        smoke_test "Unauthenticated /v2/users/me -> 401" "401" "$STATUS"
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:9080/v1/users/me" 2>/dev/null) || true
+        smoke_test "Unauthenticated /v1/users/me -> 401" "401" "$STATUS"
 
         # Test 2: Authenticated /users/me should succeed
         STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
-            "http://localhost:9080/v2/users/me" 2>/dev/null) || true
-        smoke_test "Authenticated /v2/users/me -> 200" "200" "$STATUS"
+            "http://localhost:9080/v1/users/me" 2>/dev/null) || true
+        smoke_test "Authenticated /v1/users/me -> 200" "200" "$STATUS"
 
         # Test 3: Authenticated /users list should succeed
         STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $ACCESS_TOKEN" \
-            "http://localhost:9080/v2/users" 2>/dev/null) || true
-        smoke_test "Authenticated /v2/users -> 200" "200" "$STATUS"
+            "http://localhost:9080/v1/users" 2>/dev/null) || true
+        smoke_test "Authenticated /v1/users -> 200" "200" "$STATUS"
     fi
 
     echo

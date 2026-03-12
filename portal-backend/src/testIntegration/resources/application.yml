@@ -6,7 +6,7 @@ logging:
 
 server:
   servlet:
-    context-path: /v2
+    context-path: /v1
 
 spring:
   profiles:
@@ -18,3 +18,13 @@ spring:
           # Keycloak's JWK Set URI for token validation
           jwk-set-uri: ${keycloak.auth-server-url}/realms/${keycloak.realm}/protocol/openid_connect/certs
           issuer-uri: ${keycloak.auth-server-url}/realms/${keycloak.realm}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+security:
+  permit-paths:
+    - /actuator/health/**
+    - /actuator/info

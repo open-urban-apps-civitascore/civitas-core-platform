@@ -1,88 +1,134 @@
 'use client'
 
+import { PaginationState, SortingState } from '@tanstack/react-table'
+import { TriangleAlert } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
-import { useGetGroups } from '@/app/services/api/groups/clientRequests'
-import { useGetRoles } from '@/app/services/api/roles/clientRequests'
+import { useGetAssignments } from '@/app/services/api/assignments/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
-import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { PageBackground } from '@/components/page-background/PageBackground'
-import { cn } from '@/lib/utils'
-import { ROLE_TYPES } from '@/types/roles'
+import { SearchHeader } from '@/components/search-area/SearchArea'
+import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
+import { TableContainer } from '@/components/table-container/TableContainer'
 
-import { mapRolesData } from '../../utils/mappers'
-import { RoleCategory } from './RoleCategory'
+import { RolesAssignmentTable } from './RolesAssignmentTable'
+
+type ScopeSegment = 'platformWide' | 'dataset' | 'datasource' | 'datastructure'
+
+const SCOPE_SEGMENT_PARAMS: Record<ScopeSegment, string[][]> = {
+  platformWide: [
+    ['scopeType', 'TENANT'],
+    ['roleType', 'SYSTEM'],
+  ],
+  dataset: [['scopeType', 'DATASET']],
+  datasource: [['scopeType', 'DATASOURCE']],
+  datastructure: [['scopeType', 'DATASTRUCTURE']],
+}
 
 interface RolesTabProps {
-  groupIds: string[]
+  userId: string
+  isReadOnly?: boolean
 }
 
 export const RolesTab = (props: RolesTabProps) => {
-  const { groupIds } = props
+  const { userId, isReadOnly = true } = props
   const t = useTranslations()
 
-  const groupsRequestParams = new URLSearchParams(groupIds.map(id => `id=${id}`).join('&'))
-  const {
-    data: groupsData,
-    isFetching: isLoadingGroups,
-    error: groupsError,
-  } = useGetGroups({ params: groupsRequestParams, isEnabled: groupIds.length > 0 })
+  const [activeSegment, setActiveSegment] = useState<ScopeSegment>('platformWide')
+  const [searchString, setSearchString] = useState('')
+  const [pageIndex, setPageIndex] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'role.name', desc: false }])
 
-  const roleIds = useMemo(
-    () => new Set(groupsData?.data.flatMap(group => group.assignments?.map(assignment => assignment.role.id))),
-    [groupsData],
-  )
-  const rolesRequestparams = new URLSearchParams([...roleIds].map(role => `id=${role}`).join('&'))
-  const {
-    data: rolesData,
-    isLoading: areRolesLoading,
-    error: rolesError,
-  } = useGetRoles({ params: rolesRequestparams, isEnabled: roleIds.size > 0 })
+  const segments: Tab<ScopeSegment>[] = [
+    { value: 'platformWide', label: 'users.rolesTab.segments.platformWide' },
+    { value: 'dataset', label: 'users.rolesTab.segments.datasets' },
+    { value: 'datasource', label: 'users.rolesTab.segments.datasources' },
+    { value: 'datastructure', label: 'users.rolesTab.segments.datastructures' },
+  ]
 
-  const roles = useMemo(
-    () => (rolesData && groupsData ? mapRolesData(rolesData.data, groupsData.data) : []),
-    [rolesData, groupsData],
-  )
+  const requestParams = useMemo(() => {
+    const params = new URLSearchParams(SCOPE_SEGMENT_PARAMS[activeSegment])
+    params.set('userId', userId)
+    params.set('page', String(pageIndex))
+    params.set('size', String(pageSize))
+    if (searchString) {
+      params.set('q', searchString)
+    }
+    if (sorting.length > 0) {
+      params.set('sort', `${sorting[0].id},${sorting[0].desc ? 'desc' : 'asc'}`)
+    }
+    return params
+  }, [activeSegment, userId, pageIndex, pageSize, searchString, sorting])
 
-  const error = groupsError || rolesError
-  const isLoading = isLoadingGroups || areRolesLoading
+  const { data: assignmentsData, isFetching: isLoading, error } = useGetAssignments({ params: requestParams })
+
+  const assignments = assignmentsData?.data ?? []
+  const rowCount = assignmentsData?.totalElements ?? 0
+  const totalPages = Math.ceil(rowCount / pageSize) || 1
+
+  const getScopedInfoBannerText = (): string | null => {
+    if (activeSegment === 'dataset') return t('users.rolesTab.scopedInfoBanner.dataset')
+    if (activeSegment === 'datasource') return t('users.rolesTab.scopedInfoBanner.datasource')
+    if (activeSegment === 'datastructure') return t('users.rolesTab.scopedInfoBanner.datastructure')
+    return null
+  }
+
+  const infoBannerText = getScopedInfoBannerText()
+
+  const handleSegmentChange = (segment: ScopeSegment) => {
+    setActiveSegment(segment)
+    setPageIndex(0)
+    setSearchString('')
+  }
+
+  const handlePagination = (newPagination: PaginationState) => {
+    setPageIndex(newPagination.pageIndex)
+    setPageSize(newPagination.pageSize)
+  }
 
   return (
-    <PageBackground>
-      <ContentCard className={cn((error || isLoading) && 'h-50')}>
-        {!error && !isLoading && (
-          <>
-            <DetailsFieldContainer isTitleField>
-              <h2>{t('users.roles.title')}</h2>
-            </DetailsFieldContainer>
-            <RoleCategory
-              title={t('roles.systemRoles')}
-              rolesType={ROLE_TYPES.SYSTEM}
-              roles={roles.filter(role => role.type === ROLE_TYPES.SYSTEM)}
+    <PageBackground hasBackground={!isReadOnly}>
+      {error ? (
+        <ContentCard className="h-50">
+          <p className="h-full flex items-center justify-center">{t('common.errors.loadingError')}</p>
+        </ContentCard>
+      ) : (
+        <>
+          <SearchHeader
+            searchString={searchString}
+            onChangeSearchString={value => {
+              setSearchString(value)
+              setPageIndex(0)
+            }}
+            className="my-2"
+          />
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <SegmentedControlBar tabs={segments} selectedTab={activeSegment} onTabChange={handleSegmentChange} />
+            {infoBannerText && (
+              <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
+                <TriangleAlert className="h-4 w-4 shrink-0" />
+                <span>{infoBannerText}</span>
+              </div>
+            )}
+          </div>
+          <TableContainer shouldRespectSearchHeight={false} className="h-[calc(100%-7.5rem)]">
+            <RolesAssignmentTable
+              assignments={assignments}
+              rowCount={rowCount}
+              pageIndex={pageIndex}
+              pageSize={pageSize}
+              sorting={sorting}
+              totalPages={totalPages}
               isLoading={isLoading}
+              isPlatformWide={activeSegment === 'platformWide'}
+              onPaginationChange={handlePagination}
+              onSortingChange={setSorting}
             />
-
-            <RoleCategory
-              title={t('roles.dataRoles')}
-              rolesType={ROLE_TYPES.DATA}
-              roles={roles.filter(role => role.type === ROLE_TYPES.DATA)}
-              isLoading={isLoading}
-            />
-
-            <RoleCategory
-              title={t('roles.governanceRoles')}
-              rolesType={ROLE_TYPES.GOVERNANCE}
-              roles={roles.filter(role => role.type === ROLE_TYPES.GOVERNANCE)}
-              isLoading={isLoading}
-              className="border-b-0"
-            />
-          </>
-        )}
-        {isLoading && <LoadingSpinner className="h-full" />}
-        {error && <p className="h-full flex items-center justify-center">{t('common.errors.loadingError')}</p>}
-      </ContentCard>
+          </TableContainer>
+        </>
+      )}
     </PageBackground>
   )
 }

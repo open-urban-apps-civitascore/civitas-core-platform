@@ -4,160 +4,163 @@
   "_backend_id": "portal-backend",
 
   "endpoints": {
-    "/v2/users/me": {
+    "/v1/users/me": {
       "GET": null
     },
-    "/v2/users": {
+    "/v1/users": {
       "_collection": true,
       "GET": "USER_READ",
       "POST": "USER_CREATE"
     },
-    "/v2/users/{id}": {
+    "/v1/users/{id}": {
       "GET": "USER_READ",
       "PUT": "USER_UPDATE",
       "PATCH": "USER_UPDATE",
       "DELETE": "USER_DELETE"
     },
-    "/v2/assignments": {
+    "/v1/assignments": {
       "_collection": true,
       "GET": "ASSIGNMENT_READ",
       "POST": "ASSIGNMENT_CREATE"
     },
-    "/v2/assignments/{id}": {
+    "/v1/assignments/{id}": {
       "GET": "ASSIGNMENT_READ",
       "DELETE": "ASSIGNMENT_DELETE"
     },
-    "/v2/groups": {
+    "/v1/groups": {
       "_collection": true,
       "GET": "GROUP_READ",
       "POST": "GROUP_CREATE"
     },
-    "/v2/groups/{id}": {
+    "/v1/groups/{id}": {
       "GET": "GROUP_READ",
       "PUT": "GROUP_UPDATE",
       "PATCH": "GROUP_UPDATE",
       "DELETE": "GROUP_DELETE"
     },
-    "/v2/permissions": {
+    "/v1/groups/{id}/assignments": {
+      "PUT": ["ASSIGNMENT_CREATE", "ASSIGNMENT_DELETE"]
+    },
+    "/v1/permissions": {
       "_collection": true,
       "GET": "PERMISSION_READ"
     },
-    "/v2/permissions/{id}": {
+    "/v1/permissions/{id}": {
       "GET": "PERMISSION_READ"
     },
-    "/v2/roles": {
+    "/v1/roles": {
       "_collection": true,
       "GET": "ROLE_READ",
       "POST": "ROLE_CREATE"
     },
-    "/v2/roles/{id}": {
+    "/v1/roles/{id}": {
       "GET": "ROLE_READ",
       "PUT": "ROLE_UPDATE",
       "PATCH": "ROLE_UPDATE",
       "DELETE": "ROLE_DELETE"
     },
-    "/v2/datasets": {
+    "/v1/datasets": {
       "_collection": true,
       "GET": "DATASET_READ",
       "POST": "DATASET_CREATE"
     },
-    "/v2/datasets/{id}": {
+    "/v1/datasets/{id}": {
       "GET": "DATASET_READ",
       "PUT": "DATASET_UPDATE",
       "PATCH": "DATASET_UPDATE",
       "DELETE": "DATASET_DELETE"
     },
-    "/v2/datasets/{id}/publish": {
+    "/v1/datasets/{id}/publish": {
+      "POST": "DATASET_UPDATE"
+    },
+    "/v1/datasets/{id}/unpublish": {
+      "POST": "DATASET_UPDATE"
+    },
+    "/v1/datasets/{id}/release": {
       "POST": "DATASET_RELEASE"
     },
-    "/v2/datasets/{id}/unpublish": {
-      "POST": "DATASET_UPDATE"
+    "/v1/datasets/{id}/unrelease": {
+      "POST": "DATASET_RELEASE"
     },
-    "/v2/datasets/{id}/ready": {
-      "POST": "DATASET_UPDATE"
-    },
-    "/v2/datasets/{id}/unready": {
-      "POST": "DATASET_UPDATE"
-    },
-    "/v2/datasets/{id}/published/meta": {
+    "/v1/datasets/{id}/published/meta": {
       "PUT": ["DATASET_UPDATE", "DATASET_RELEASE"]
     },
-    "/v2/datasets/{id}/assignments": {
+    "/v1/datasets/{id}/assignments": {
       "GET": "DATASET_READ"
     },
-    "/v2/datasets/{id}/pipelines": {
+    "/v1/datasets/{id}/pipelines": {
       "GET": "DATASET_READ",
       "POST": "DATASET_CREATE"
     },
-    "/v2/datasets/{id}/pipelines/{id}": {
+    "/v1/datasets/{id}/pipelines/{id}": {
       "GET": "DATASET_READ",
       "PUT": "DATASET_UPDATE",
       "PATCH": "DATASET_UPDATE",
       "DELETE": "DATASET_DELETE"
     },
-    "/v2/datasources": {
+    "/v1/datasources": {
       "_collection": true,
       "GET": "DATASOURCE_READ",
       "POST": "DATASOURCE_CREATE"
     },
-    "/v2/datasources/{id}": {
+    "/v1/datasources/{id}": {
       "GET": "DATASOURCE_READ",
       "PUT": "DATASOURCE_UPDATE",
       "PATCH": "DATASOURCE_UPDATE",
       "DELETE": "DATASOURCE_DELETE"
     },
-    "/v2/datasources/{id}/publish": {
+    "/v1/datasources/{id}/publish": {
       "POST": "DATASOURCE_RELEASE"
     },
-    "/v2/datasources/{id}/unpublish": {
+    "/v1/datasources/{id}/unpublish": {
       "POST": "DATASOURCE_UPDATE"
     },
-    "/v2/datasources/{id}/published/meta": {
+    "/v1/datasources/{id}/published/meta": {
       "PUT": ["DATASOURCE_UPDATE", "DATASOURCE_RELEASE"]
     },
-    "/v2/datasources/{id}/assignments": {
+    "/v1/datasources/{id}/assignments": {
       "GET": "DATASOURCE_READ"
     },
-    "/v2/datastructures": {
+    "/v1/datastructures": {
       "_collection": true,
       "GET": "DATASTRUCTURE_READ",
       "POST": "DATASTRUCTURE_CREATE"
     },
-    "/v2/datastructures/{id}": {
+    "/v1/datastructures/{id}": {
       "GET": "DATASTRUCTURE_READ",
       "PUT": "DATASTRUCTURE_UPDATE",
       "PATCH": "DATASTRUCTURE_UPDATE",
       "DELETE": "DATASTRUCTURE_DELETE"
     },
-    "/v2/datastructures/{id}/publish": {
+    "/v1/datastructures/{id}/publish": {
       "POST": "DATASTRUCTURE_RELEASE"
     },
-    "/v2/datastructures/{id}/unpublish": {
+    "/v1/datastructures/{id}/unpublish": {
       "POST": "DATASTRUCTURE_UPDATE"
     },
-    "/v2/datastructures/{id}/published/meta": {
+    "/v1/datastructures/{id}/published/meta": {
       "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
     },
-    "/v2/datastructures/{id}/assignments": {
+    "/v1/datastructures/{id}/assignments": {
       "GET": "DATASTRUCTURE_READ"
     },
-    "/v2/datastructures/{id}/versions": {
+    "/v1/datastructures/{id}/versions": {
       "GET": "DATASTRUCTURE_READ",
       "POST": "DATASTRUCTURE_CREATE"
     },
-    "/v2/datastructures/{id}/versions/{id}": {
+    "/v1/datastructures/{id}/versions/{id}": {
       "GET": "DATASTRUCTURE_READ",
       "PUT": "DATASTRUCTURE_UPDATE",
       "PATCH": "DATASTRUCTURE_UPDATE",
       "DELETE": "DATASTRUCTURE_DELETE"
     },
-    "/v2/datastructures/{id}/versions/{id}/publish": {
+    "/v1/datastructures/{id}/versions/{id}/publish": {
       "POST": "DATASTRUCTURE_RELEASE"
     },
-    "/v2/datastructures/{id}/versions/{id}/unpublish": {
+    "/v1/datastructures/{id}/versions/{id}/unpublish": {
       "POST": "DATASTRUCTURE_UPDATE"
     },
-    "/v2/datastructures/{id}/versions/{id}/published/meta": {
+    "/v1/datastructures/{id}/versions/{id}/published/meta": {
       "PUT": ["DATASTRUCTURE_UPDATE", "DATASTRUCTURE_RELEASE"]
     },
     "_removed_for_v2": "catalogs and dataspaces removed — not implemented in v2.0 (see #989). OPA denies as unknown_endpoint."

@@ -1,15 +1,18 @@
-import { Item } from './common'
-import { ROLE_TYPES } from './roles'
-
 export type Permission = {
   id: string
+  name: string
+  description?: string
+  permissionType: string
+  category: string
+}
+
+export type PermissionCategory = {
+  id: string
   title: string
-  category: Item
-  type: (typeof ROLE_TYPES)[keyof typeof ROLE_TYPES]
 }
 
 export type PermissionItem = {
-  name: Permission['title']
+  name: Permission['name']
   value: Permission['id']
-  category: Item
+  category: PermissionCategory
 }

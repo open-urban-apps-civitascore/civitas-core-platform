@@ -26,6 +26,7 @@
           <url>${env.CI_API_V4_URL}/projects/${env.CI_PROJECT_ID}/packages/maven</url>
           <snapshots>
             <enabled>true</enabled>
+            <updatePolicy>always</updatePolicy>
           </snapshots>
         </repository>
       </repositories>

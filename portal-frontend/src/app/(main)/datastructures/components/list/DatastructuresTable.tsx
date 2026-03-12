@@ -125,7 +125,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       id: 'actions',
       cell: ({ row }: { row: Row<DatastructuresListData> }) => (
         <TableDropdownMenu
-          menuContentClassName="w-50"
+          classNameDropdownContent="w-50"
           menuItems={[
             {
               label: tCommon('actions.removeItem', { item: tCommon('items.datastructure') }),

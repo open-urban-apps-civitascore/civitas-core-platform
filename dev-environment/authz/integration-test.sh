@@ -133,7 +133,7 @@ echo ""
 # HEALTH CHECKS
 # =============================================================================
 echo "=== Health Checks ==="
-check_health "Backend (direct)" "http://localhost:8089/v2/actuator/health" || true
+check_health "Backend (direct)" "http://localhost:8089/v1/actuator/health" || true
 check_health "OPA" "http://localhost:8181/health" || true
 check_health "AuthZ Repository" "http://localhost:8091/actuator/health" || true
 echo ""
@@ -175,50 +175,50 @@ echo ""
 # =============================================================================
 
 echo "=== Test 1: Admin User (Full Permissions) ==="
-test_endpoint "GET /v2/users (USER_READ)" "GET" "/v2/users" "$ADMIN_TOKEN" "200"
-test_endpoint "GET /v2/datasets (DATASET_READ)" "GET" "/v2/datasets" "$ADMIN_TOKEN" "200"
-test_endpoint "GET /v2/users/me (null-permission)" "GET" "/v2/users/me" "$ADMIN_TOKEN" "200"
+test_endpoint "GET /v1/users (USER_READ)" "GET" "/v1/users" "$ADMIN_TOKEN" "200"
+test_endpoint "GET /v1/datasets (DATASET_READ)" "GET" "/v1/datasets" "$ADMIN_TOKEN" "200"
+test_endpoint "GET /v1/users/me (null-permission)" "GET" "/v1/users/me" "$ADMIN_TOKEN" "200"
 echo ""
 
 echo "=== Test 2: Reader User (Read-Only Permissions) ==="
-test_endpoint "GET /v2/users (USER_READ)" "GET" "/v2/users" "$READER_TOKEN" "200"
-test_endpoint "GET /v2/datasets (DATASET_READ)" "GET" "/v2/datasets" "$READER_TOKEN" "200"
-test_endpoint "GET /v2/users/me (null-permission)" "GET" "/v2/users/me" "$READER_TOKEN" "200"
+test_endpoint "GET /v1/users (USER_READ)" "GET" "/v1/users" "$READER_TOKEN" "200"
+test_endpoint "GET /v1/datasets (DATASET_READ)" "GET" "/v1/datasets" "$READER_TOKEN" "200"
+test_endpoint "GET /v1/users/me (null-permission)" "GET" "/v1/users/me" "$READER_TOKEN" "200"
 echo ""
 
 echo "=== Test 3: Reader User Denied Write Operations ==="
 # POST to create should be denied (lacks DATASET_CREATE)
-test_endpoint "POST /v2/datasets (DATASET_CREATE - denied)" "POST" "/v2/datasets" "$READER_TOKEN" "403"
+test_endpoint "POST /v1/datasets (DATASET_CREATE - denied)" "POST" "/v1/datasets" "$READER_TOKEN" "403"
 # DELETE should be denied (lacks USER_DELETE)
-test_endpoint "DELETE /v2/users/fake-id (USER_DELETE - denied)" "DELETE" "/v2/users/fake-id" "$READER_TOKEN" "403"
+test_endpoint "DELETE /v1/users/fake-id (USER_DELETE - denied)" "DELETE" "/v1/users/fake-id" "$READER_TOKEN" "403"
 echo ""
 
 echo "=== Test 4: No-Perms User (No Permissions) ==="
-test_endpoint "GET /v2/users (denied - no permissions)" "GET" "/v2/users" "$NONE_TOKEN" "403"
-test_endpoint "GET /v2/datasets (denied - no permissions)" "GET" "/v2/datasets" "$NONE_TOKEN" "403"
+test_endpoint "GET /v1/users (denied - no permissions)" "GET" "/v1/users" "$NONE_TOKEN" "403"
+test_endpoint "GET /v1/datasets (denied - no permissions)" "GET" "/v1/datasets" "$NONE_TOKEN" "403"
 # But /users/me should work (null-permission, any authenticated user)
-test_endpoint "GET /v2/users/me (null-permission - allowed)" "GET" "/v2/users/me" "$NONE_TOKEN" "200"
+test_endpoint "GET /v1/users/me (null-permission - allowed)" "GET" "/v1/users/me" "$NONE_TOKEN" "200"
 echo ""
 
 echo "=== Test 5: Unauthenticated Requests ==="
-test_endpoint "GET /v2/users (no token - 401)" "GET" "/v2/users" "" "401"
-test_endpoint "GET /v2/datasets (no token - 401)" "GET" "/v2/datasets" "" "401"
-test_endpoint "GET /v2/users/me (no token - 401)" "GET" "/v2/users/me" "" "401"
+test_endpoint "GET /v1/users (no token - 401)" "GET" "/v1/users" "" "401"
+test_endpoint "GET /v1/datasets (no token - 401)" "GET" "/v1/datasets" "" "401"
+test_endpoint "GET /v1/users/me (no token - 401)" "GET" "/v1/users/me" "" "401"
 echo ""
 
 echo "=== Test 6: Resource Endpoints (Datasources/Datastructures) ==="
 # Backend has controllers for these resources. OPA enforces permissions.
-test_endpoint "GET /v2/datasources (DATASOURCE_READ - admin)" "GET" "/v2/datasources" "$ADMIN_TOKEN" "200"
-test_endpoint "GET /v2/datastructures (DATASTRUCTURE_READ - admin)" "GET" "/v2/datastructures" "$ADMIN_TOKEN" "200"
-test_endpoint "GET /v2/datasources (DATASOURCE_READ - reader)" "GET" "/v2/datasources" "$READER_TOKEN" "200"
-test_endpoint "POST /v2/datasources (DATASOURCE_CREATE - reader denied)" "POST" "/v2/datasources" "$READER_TOKEN" "403"
+test_endpoint "GET /v1/datasources (DATASOURCE_READ - admin)" "GET" "/v1/datasources" "$ADMIN_TOKEN" "200"
+test_endpoint "GET /v1/datastructures (DATASTRUCTURE_READ - admin)" "GET" "/v1/datastructures" "$ADMIN_TOKEN" "200"
+test_endpoint "GET /v1/datasources (DATASOURCE_READ - reader)" "GET" "/v1/datasources" "$READER_TOKEN" "200"
+test_endpoint "POST /v1/datasources (DATASOURCE_CREATE - reader denied)" "POST" "/v1/datasources" "$READER_TOKEN" "403"
 echo ""
 
 echo "=== Test 7: Removed Endpoints (Dataspaces/Catalogs) ==="
 # Dataspaces and catalogs are not implemented in v2.0 (see #989).
 # Removed from OPA data.json — OPA denies as unknown_endpoint (403).
-test_endpoint "GET /v2/dataspaces (removed - 403)" "GET" "/v2/dataspaces" "$ADMIN_TOKEN" "403"
-test_endpoint "GET /v2/catalogs (removed - 403)" "GET" "/v2/catalogs" "$ADMIN_TOKEN" "403"
+test_endpoint "GET /v1/dataspaces (removed - 403)" "GET" "/v1/dataspaces" "$ADMIN_TOKEN" "403"
+test_endpoint "GET /v1/catalogs (removed - 403)" "GET" "/v1/catalogs" "$ADMIN_TOKEN" "403"
 echo ""
 
 # =============================================================================

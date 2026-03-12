@@ -7,7 +7,7 @@ logging:
 server:
   port: 8089
   servlet:
-    context-path: /v2
+    context-path: /v1
   # M5.5: Increase max header size for X-Allowed-Scope-Ids from OPA
   # When users have many dataspaces, the scope ID list can be large
   max-http-request-header-size: 32KB
@@ -22,6 +22,16 @@ spring:
           jwk-set-uri: "${keycloak.auth-server-url}/realms/${keycloak.realm}/protocol/openid-connect/certs"
           # Token issuer validation
           issuer-uri: "${keycloak.issuer-uri}/realms/${keycloak.realm}"
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  data:
+    web:
+      pageable:
+        max-page-size: 200
 
   # Kafka Configuration
   kafka:
@@ -91,12 +101,18 @@ management:
 
 springdoc:
   api-docs:
-    path: /v2/api-docs
+    path: /api-docs
     version: openapi-3-1
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
 
+
+# Security: paths permitted without authentication
+security:
+  permit-paths:
+    - /actuator/health/**
+    - /actuator/info
 
 model-atlas:
   baseUrl: "http://model-atlas:8080"

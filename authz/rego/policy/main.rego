@@ -128,7 +128,7 @@ evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
 # SCOPE HEADER GENERATION (M5.5 - Collection Endpoint Filtering)
 # =============================================================================
 # Generate X-Allowed-Scope-Ids header for backend collection filtering.
-# Backend uses this to filter list endpoints (e.g., GET /v2/datasets).
+# Backend uses this to filter list endpoints (e.g., GET /v1/datasets).
 #
 # Header values:
 #   - "*"              : User has TENANT scope for all required permissions (collection-level wildcard)

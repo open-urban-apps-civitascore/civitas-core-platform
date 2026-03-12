@@ -53,8 +53,8 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
 
 ### Access Points
 
-* API: [http://localhost:8089/v2](http://localhost:8089/v2)
-* Swagger: [http://localhost:8089/v2/swagger-ui.html](http://localhost:8089/v2/swagger-ui.html)
+* API: [http://localhost:8089/v1](http://localhost:8089/v1)
+* Swagger: [http://localhost:8089/v1/swagger-ui.html](http://localhost:8089/v1/swagger-ui.html)
 * Keycloak: [http://localhost:8080](http://localhost:8080)
 * Kafka UI: [http://localhost:8090](http://localhost:8090)
 * Config Adapter: [http://localhost:8088/health/ready](http://localhost:8088/health/ready)
@@ -67,7 +67,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
 
 | Service           | URL / Host        | Port | Credentials       |
 | ----------------- | ----------------- | ---- | ----------------- |
-| Backend API       | localhost:8089/v2 | 8089 | –                 |
+| Backend API       | localhost:8089/v1 | 8089 | –                 |
 | Config Adapter    | localhost         | 8088 | –                 |
 | Keycloak          | localhost         | 8080 | admin/admin       |
 | App Database      | localhost         | 5432 | admin/admin       |
@@ -82,7 +82,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
 server:
   port: 8089
   servlet:
-    context-path: /v2
+    context-path: /v1
 
 # application-local.yaml
 keycloak:
@@ -181,7 +181,7 @@ curl -X POST http://localhost:8080/realms/civitas-core/protocol/openid-connect/t
 
 ```bash
 curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-     http://localhost:8089/v2/api/your-endpoint
+     http://localhost:8089/v1/api/your-endpoint
 ```
 
 ---
@@ -207,10 +207,10 @@ curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
 
 ## 📚 API Documentation
 
-* **Swagger UI:** [http://localhost:8089/v2/swagger-ui.html](http://localhost:8089/v2/swagger-ui.html)
-* **OpenAPI Spec:** [http://localhost:8089/v2/v3/api-docs](http://localhost:8089/v2/v3/api-docs)
-* **Health Check:** [http://localhost:8089/v2/actuator/health](http://localhost:8089/v2/actuator/health)
-* **Metrics:** [http://localhost:8089/v2/actuator/prometheus](http://localhost:8089/v2/actuator/prometheus)
+* **Swagger UI:** [http://localhost:8089/v1/swagger-ui.html](http://localhost:8089/v1/swagger-ui.html)
+* **OpenAPI Spec:** [http://localhost:8089/v1/v3/api-docs](http://localhost:8089/v1/v3/api-docs)
+* **Health Check:** [http://localhost:8089/v1/actuator/health](http://localhost:8089/v1/actuator/health)
+* **Metrics:** [http://localhost:8089/v1/actuator/prometheus](http://localhost:8089/v1/actuator/prometheus)
 
 ---
 

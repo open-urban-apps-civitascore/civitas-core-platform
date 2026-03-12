@@ -172,7 +172,7 @@ export const UserOverview = (props: UserOverviewProps) => {
           />
         )
       case tabValues.roles.value:
-        return <RolesTab groupIds={groupWatch} />
+        return <RolesTab userId={userData.id} isReadOnly={isReadOnly} />
       case tabValues.userData.value:
       default:
         return <UserBasicInfoTab userData={userData} form={form} isReadOnly={isReadOnly} isLoading={isLoading} />

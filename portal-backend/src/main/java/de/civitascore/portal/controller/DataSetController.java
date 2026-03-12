@@ -22,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -113,5 +114,50 @@ public class DataSetController
     DataSet published = dataSetService.publish(id);
     DataSetOutputDTO output = dataSetAssembler.toOutput(published);
     return ResponseEntity.ok(output);
+  }
+
+  @PostMapping("/{id}/unpublish")
+  @Operation(
+      summary = "Unpublish a dataset",
+      description =
+          "Unpublishes a dataset by removing auto-generated distributions and reverting status from READY to DRAFT.")
+  public ResponseEntity<DataSetOutputDTO> unpublishDataSet(@PathVariable UUID id) {
+    DataSet unpublished = dataSetService.unpublish(id);
+    DataSetOutputDTO output = dataSetAssembler.toOutput(unpublished);
+    return ResponseEntity.ok(output);
+  }
+
+  @PostMapping("/{id}/release")
+  @Operation(
+      summary = "Release a dataset",
+      description =
+          "Releases a dataset by transitioning it from READY to AVAILABLE and triggering infrastructure provisioning via saga.")
+  public ResponseEntity<DataSetOutputDTO> releaseDataSet(@PathVariable UUID id) {
+    DataSet released = dataSetService.release(id);
+    DataSetOutputDTO output = dataSetAssembler.toOutput(released);
+    return ResponseEntity.accepted().body(output);
+  }
+
+  @PostMapping("/{id}/unrelease")
+  @Operation(
+      summary = "Unrelease a dataset",
+      description =
+          "Unreleases a dataset by triggering infrastructure teardown via saga. The dataset transitions from AVAILABLE to READY after the saga completes.")
+  public ResponseEntity<DataSetOutputDTO> unreleaseDataSet(@PathVariable UUID id) {
+    DataSet unreleased = dataSetService.unrelease(id);
+    DataSetOutputDTO output = dataSetAssembler.toOutput(unreleased);
+    return ResponseEntity.accepted().body(output);
+  }
+
+  @Override
+  @DeleteMapping("/{id}")
+  @Operation(
+      summary = "Delete a dataset",
+      description =
+          "Deletes a DRAFT dataset immediately (204 No Content). "
+              + "READY datasets cannot be deleted — unpublish first. "
+              + "AVAILABLE datasets cannot be deleted directly — unrelease first (POST /{id}/unrelease) to tear down infrastructure, then delete.")
+  public void delete(@PathVariable UUID id) {
+    dataSetService.deleteById(id);
   }
 }

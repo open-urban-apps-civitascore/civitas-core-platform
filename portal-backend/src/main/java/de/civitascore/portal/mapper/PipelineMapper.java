@@ -36,6 +36,7 @@ public interface PipelineMapper extends DtoMapper<PipelineInputDTO, PipelineOutp
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "dataSet", ignore = true)
   @Mapping(target = "dataSources", ignore = true)
+  @Mapping(target = "version", ignore = true)
   @Override
   void updateEntity(@MappingTarget Pipeline entity, PipelineInputDTO input);
 }

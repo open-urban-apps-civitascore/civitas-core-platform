@@ -3,7 +3,7 @@ import { useDataQuery } from '@/hooks/use-data-query'
 import { useDeleteMutation } from '@/hooks/use-delete-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
 import { GetListInput } from '@/types/common'
-import { Dataset, DatasetCreateApiData, DatasetUpdateApiData } from '@/types/datasets'
+import { Dataset, DatasetCreateApiData, DatasetPatchApiData, DatasetUpdateApiData } from '@/types/datasets'
 
 const key = 'datasets'
 
@@ -32,7 +32,7 @@ export const useUpdateDataset = () =>
   })
 
 export const usePatchDataset = () =>
-  useUpdateMutation<Dataset, DatasetUpdateApiData>({
+  useUpdateMutation<Dataset, DatasetPatchApiData>({
     method: 'PATCH',
     key,
     headers: { 'x-api-request': 'true' },

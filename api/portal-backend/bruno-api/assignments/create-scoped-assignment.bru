@@ -1,0 +1,26 @@
+meta {
+  name: Create Scoped Assignment
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/assignments
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "groupId": "{{groupId}}",
+    "roleId": "{{roleId}}",
+    "scopeType": "{{scopeType}}",
+    "scopeId": "{{scopeId}}"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('assignmentId', res.body.id);
+  }
+}

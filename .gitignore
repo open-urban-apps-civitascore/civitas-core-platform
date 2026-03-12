@@ -23,6 +23,7 @@ authz/rego/data/backends-allowall/
 api/**/node_modules/
 
 # Claude Code state (symlinked to private archive repo)
-/CLAUDE.md
+**/CLAUDE.md
 /.claude
 /docs/claude
+/.playwright-mcp
