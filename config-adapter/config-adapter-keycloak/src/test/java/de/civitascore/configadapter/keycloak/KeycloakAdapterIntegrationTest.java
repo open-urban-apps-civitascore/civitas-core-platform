@@ -63,6 +63,7 @@ import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
@@ -74,10 +75,22 @@ import org.testcontainers.utility.DockerImageName;
 @Testcontainers
 class KeycloakAdapterIntegrationTest {
 
+  static Network network = Network.newNetwork();
+
+  @SuppressWarnings("resource")
+  @Container
+  static GenericContainer<?> mailpit =
+      new GenericContainer<>(DockerImageName.parse("axllent/mailpit:latest"))
+          .withNetwork(network)
+          .withNetworkAliases("mailpit")
+          .withExposedPorts(1025, 8025);
+
   @SuppressWarnings("resource") // suppress false positive warning
   @Container
   static GenericContainer<?> keycloak =
       new GenericContainer<>(DockerImageName.parse("quay.io/keycloak/keycloak:23.0"))
+          .withNetwork(network)
+          .withNetworkAliases("keycloak")
           .withExposedPorts(8080)
           .withEnv("KEYCLOAK_ADMIN", "admin")
           .withEnv("KEYCLOAK_ADMIN_PASSWORD", "admin")
@@ -867,6 +880,79 @@ class KeycloakAdapterIntegrationTest {
     assertTrue(clients.isEmpty(), "Client should be deleted");
 
     // Verify success result
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  @Test
+  void shouldCreateUserAndSendActionsEmail()
+      throws FatalAdapterException, RetryableAdapterException {
+    // Given - create realm with SMTP pointing to Mailpit
+    String realmName = "email-realm";
+    RealmRepresentation realmRep = new RealmRepresentation();
+    realmRep.setRealm(realmName);
+    realmRep.setEnabled(true);
+
+    Map<String, String> smtpConfig = new HashMap<>();
+    smtpConfig.put("host", "mailpit");
+    smtpConfig.put("port", "1025");
+    smtpConfig.put("from", "noreply@test.local");
+    smtpConfig.put("fromDisplayName", "Test");
+    smtpConfig.put("ssl", "false");
+    smtpConfig.put("starttls", "false");
+    smtpConfig.put("auth", "false");
+    realmRep.setSmtpServer(smtpConfig);
+
+    keycloakClient.realms().create(realmRep);
+
+    // Create UserConfig with required actions
+    UserConfig userConfig = new UserConfig();
+    userConfig.setUsername("emailuser");
+    userConfig.setEmail("emailuser@test.local");
+    userConfig.setFirstName("Email");
+    userConfig.setLastName("User");
+    userConfig.setEnabled(true);
+    userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+
+    ConfigEvent event = createConfigEvent(realmName, "user", Operation.CREATE, userConfig);
+
+    // When
+    adapter.processConfigEvent(Topics.USER_CREATED.toString(), event);
+
+    // Then - user exists with required actions
+    List<UserRepresentation> users = keycloakClient.realm(realmName).users().search("emailuser");
+    assertEquals(1, users.size());
+    UserRepresentation createdUser = users.getFirst();
+    assertTrue(
+        createdUser.getRequiredActions().contains("VERIFY_EMAIL"),
+        "Required action VERIFY_EMAIL should be set");
+    assertTrue(
+        createdUser.getRequiredActions().contains("UPDATE_PASSWORD"),
+        "Required action UPDATE_PASSWORD should be set");
+
+    // Then - email was sent (verify via Mailpit API)
+    String mailpitUrl =
+        "http://" + mailpit.getHost() + ":" + mailpit.getMappedPort(8025) + "/api/v1/messages";
+    await()
+        .atMost(10, SECONDS)
+        .pollInterval(1, SECONDS)
+        .untilAsserted(
+            () -> {
+              var httpClient = java.net.http.HttpClient.newHttpClient();
+              var request =
+                  java.net.http.HttpRequest.newBuilder()
+                      .uri(java.net.URI.create(mailpitUrl))
+                      .GET()
+                      .build();
+              var response =
+                  httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+              assertTrue(
+                  response.body().contains("emailuser@test.local"),
+                  "Email should have been sent to emailuser@test.local");
+            });
+
+    // Then - success result published
     assertEquals(1, eventPublisher.getPublishedEvents().size());
     assertEquals(
         ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
