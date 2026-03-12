@@ -157,7 +157,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
     stubFor(
         post(urlEqualTo(expectedPath))
-            .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml;charset=UTF-8"))
+            .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml"))
             .withRequestBody(binaryEqualTo(modelContentBinary))
             .willReturn(
                 aResponse()
@@ -365,7 +365,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       stubFor(
           post(urlEqualTo(expectedPath))
-              .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml;charset=UTF-8"))
+              .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml"))
               .willReturn(aResponse().withStatus(500).withBody("Internal Server Error")));
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
@@ -630,7 +630,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       stubFor(
           post(urlEqualTo(expectedPath))
-              .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml;charset=UTF-8"))
+              .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml"))
               .willReturn(
                   aResponse()
                       .withStatus(200)
@@ -708,7 +708,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
       stubFor(
           post(urlEqualTo(expectedPath))
-              .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml;charset=UTF-8"))
+              .withHeader(HttpHeaders.CONTENT_TYPE, equalTo("application/uml"))
               .willReturn(aResponse().withStatus(500).withBody("Internal Server Error")));
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
