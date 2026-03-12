@@ -1,0 +1,29 @@
+meta {
+  name: 4. Create DataStructure Version
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{sagaDataStructureId}}
+}
+
+body:json {
+  {
+    "dataStructureVersionSource": "OWN",
+    "version": "1.0.0",
+    "description": "Initial version for sensor data"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaDataStructureVersionId', res.body.id);
+  }
+}

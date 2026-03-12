@@ -1,11 +1,11 @@
 meta {
-  name: 7. Publish DataSet
+  name: 16. Cleanup - Delete DataSet
   type: http
-  seq: 7
+  seq: 16
 }
 
-post {
-  url: {{baseUrl}}/datasets/:id/publish
+delete {
+  url: {{baseUrl}}/datasets/:id
   body: none
   auth: inherit
 }

@@ -1,0 +1,15 @@
+meta {
+  name: 18. Cleanup - Delete DataStructure
+  type: http
+  seq: 18
+}
+
+delete {
+  url: {{baseUrl}}/datastructures/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataStructureId}}
+}
