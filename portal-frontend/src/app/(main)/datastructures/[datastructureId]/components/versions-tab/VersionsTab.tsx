@@ -28,6 +28,8 @@ export const VersionsTab = (props: VersionsTabProps) => {
   const { datastructureId, versions, rowCount, isReadOnly, isDirty, isLoading, onSave } = props
   const t = useTranslations('datastructures')
   const router = useRouter()
+  const createVersionPath = `/datastructures/${datastructureId}/createVersion?mode=edit`
+  const [pathToNavigate, setPathToNavigate] = useState<string>(createVersionPath)
   const [isUnsavedChangesModalOpen, setIsUnsavedChangesModalOpen] = useState(false)
   const {
     pageIndex,
@@ -43,10 +45,9 @@ export const VersionsTab = (props: VersionsTabProps) => {
 
   useEffect(() => setTotalPages(Math.ceil(rowCount / pageSize) || 1), [rowCount, pageSize, setTotalPages])
 
-  const createVersionPath = `/datastructures/${datastructureId}/createVersion?mode=edit`
-
   const handleNavigate = (path: string) => {
     if (isDirty) {
+      setPathToNavigate(path)
       setIsUnsavedChangesModalOpen(true)
     } else {
       router.push(path)
@@ -55,7 +56,7 @@ export const VersionsTab = (props: VersionsTabProps) => {
 
   const handleDiscardAndNavigate = () => {
     if (isUnsavedChangesModalOpen) {
-      router.push(createVersionPath)
+      router.push(pathToNavigate)
     }
     setIsUnsavedChangesModalOpen(false)
   }
@@ -63,14 +64,13 @@ export const VersionsTab = (props: VersionsTabProps) => {
   const handleSaveAndNavigate = async () => {
     const isSaved = await onSave()
     if (isSaved && isUnsavedChangesModalOpen) {
-      router.push(createVersionPath)
-      setIsUnsavedChangesModalOpen(false)
+      router.push(pathToNavigate)
     }
   }
 
   const CustomElement = (
     <Button data-testid="addVersionButton" onClick={() => handleNavigate(createVersionPath)}>
-      <Plus />
+      <Plus /> 
       {t('newVersion')}
     </Button>
   )
