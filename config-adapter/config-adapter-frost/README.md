@@ -103,6 +103,11 @@ The adapter subscribes to all SensorThings entity lifecycle events:
 # FROST-Server URL (optional, defaults to http://localhost:8080/v1.1)
 frost.url=http://localhost:8080/FROST-Server/v1.1
 
+# Public FROST URL used in saga results (optional, defaults to frost.url)
+# Use this when the FROST server is reachable at a different URL from downstream
+# consumers (e.g. Docker network alias) than from the config-adapter itself.
+frost.public.url=http://frost-server:8080/FROST-Server/v1.1
+
 # Topics to subscribe to (comma-separated, required)
 frost.topics=de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
 ```
@@ -132,6 +137,7 @@ All properties can be overridden with environment variables (dots → underscore
 
 ```bash
 FROST_URL=http://frost-server:8080/FROST-Server/v1.1
+FROST_PUBLIC_URL=http://frost-server:8080/FROST-Server/v1.1
 FROST_TOPICS=de.civitascore.data.thing.created,de.civitascore.data.thing.updated
 
 # API key auth

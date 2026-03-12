@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.configuration.ModelAtlasConfig;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -17,7 +18,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Service
 @RequiredArgsConstructor
 public class ModelRestClientRequestService {
-  private static final String UML_CONTENT_TYPE = "application/uml";
+
+  private static final MediaType UML = MediaType.parseMediaType("application/uml");
+
   private final ModelAtlasConfig modelAtlasConfig;
   private final RestClient.Builder restClientBuilder;
 
@@ -56,7 +59,7 @@ public class ModelRestClientRequestService {
       return restClient
           .post()
           .uri(getUploadEndpoint(nsUri))
-          .contentType(MediaType.parseMediaType(UML_CONTENT_TYPE))
+          .contentType(UML)
           .accept(MediaType.APPLICATION_JSON)
           .body(modelFile.getResource())
           .retrieve()
@@ -84,9 +87,9 @@ public class ModelRestClientRequestService {
       return restClient
           .post()
           .uri(getUploadEndpoint(nsUri))
-          .contentType(MediaType.parseMediaType(UML_CONTENT_TYPE))
+          .contentType(UML)
           .accept(MediaType.APPLICATION_JSON)
-          .body(modelContent)
+          .body(modelContent.getBytes(StandardCharsets.UTF_8))
           .retrieve()
           .body(String.class);
     } catch (ResourceAccessException e) {

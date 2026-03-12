@@ -4,7 +4,7 @@ import { Row, RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -28,9 +28,8 @@ const RolesPage = () => {
   const tabsValues = {
     systemRoles: { value: ROLE_TYPES.SYSTEM, label: t('systemRoles') },
     dataRoles: { value: ROLE_TYPES.DATA, label: t('dataRoles') },
-    governanceRoles: { value: ROLE_TYPES.GOVERNANCE, label: t('governanceRoles') },
   }
-  const tabs = [tabsValues.systemRoles, tabsValues.dataRoles, tabsValues.governanceRoles]
+  const tabs = [tabsValues.systemRoles, tabsValues.dataRoles]
 
   const {
     setSortingParams,
@@ -49,17 +48,25 @@ const RolesPage = () => {
 
   const [selectedRoleType, setSelectedRoleType] = useState<string>(tabValue || DEFAULT_TAB)
 
-  const requestParams = new URLSearchParams(`type=${selectedRoleType}&${getApiRequestParamsByUrl()}`)
+  // TODO: Fetch all roles without type filter — backend RoleSpec does not support roleType filtering.
+  // Backend filter will be implemented in a later stage
+  const requestParams = new URLSearchParams(getApiRequestParamsByUrl())
 
   const { data: rolesData, isFetching } = useGetRoles({ params: requestParams })
 
-  const rowCount = rolesData?.totalElements || 0
+  // Filter roles client-side by the selected tab's roleType
+  const filteredRoles = useMemo<Role[]>(() => {
+    if (!rolesData?.data) return []
+    return rolesData.data.filter(role => role.roleType === selectedRoleType)
+  }, [rolesData?.data, selectedRoleType])
+
+  const rowCount = filteredRoles.length
   useEffect(() => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, setTotalPages, pageSize])
 
   const handleRowClick = (row: Row<Role>) => {
-    router.push(`/roles/${row.original.id}?_tab=${selectedRoleType}`)
+    router.push(`/roles/${row.original.id}?tab=${selectedRoleType}`)
   }
 
   return (
@@ -80,14 +87,14 @@ const RolesPage = () => {
           searchString={search}
           onChangeSearchString={setSearchParam}
           customElement={
-            <Button onClick={() => router.push(`/roles/create/?_tab=${selectedRoleType}`)}>
+            <Button onClick={() => router.push(`/roles/create/?tab=${selectedRoleType}`)}>
               <Plus /> {t('newRole')}
             </Button>
           }
         />
         <TableContainer>
           <RolesTable
-            roles={rolesData?.data && !isFetching ? rolesData?.data : []}
+            roles={isFetching ? [] : filteredRoles}
             isLoading={isFetching}
             rowCount={rowCount}
             pageIndex={pageIndex}

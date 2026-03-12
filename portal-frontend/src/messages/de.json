@@ -105,6 +105,59 @@
     "english": "Englisch",
     "selectLanguagePlaceholder": "Sprache wählen"
   },
+  "accessManagement": {
+    "title": "Zugriffsberechtigungen",
+    "subtitle": "Hier werden Zuständigkeiten und Zugriffsrechte definiert.",
+    "addAssignment": "Gruppe hinzufügen",
+    "addRole": "Rolle hinzufügen",
+    "deleteGroup": "Gruppe entfernen",
+    "tableHeaders": {
+      "group": "Gruppe",
+      "role": "Rolle",
+      "description": "Beschreibung",
+      "action": "Aktion"
+    },
+    "noDataPage": {
+      "title": "Keine Gruppen und Rollen vorhanden",
+      "description": "Keine Gruppe besitzt Berechtigungen."
+    },
+    "addGroupModal": {
+      "title": "Gruppe hinzufügen",
+      "description": "Wähle eine Gruppe aus, um Berechtigungen zuzuweisen.",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Beschreibung"
+      },
+      "noGroupsAvailable": "Keine Gruppen verfügbar, die hinzugefügt werden können",
+      "selectAll": "Alle Gruppen auswählen",
+      "selectGroup": "Gruppe auswählen",
+      "selectedGroups": "{number} ausgewählt"
+    },
+    "addRoleModal": {
+      "title": "Rolle hinzufügen",
+      "description": "Zur Gruppe {groupName}",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "roleType": "Typ"
+      },
+      "noRolesAvailable": "Keine Rollen verfügbar, die hinzugefügt werden können",
+      "selectRole": "Rolle auswählen",
+      "selectAll": "Alle Rollen auswählen",
+      "selectedRoles": "{number} ausgewählt",
+      "roleTypes": {
+        "default": "Standard",
+        "custom": "Eigene"
+      }
+    },
+    "infoBoxes": {
+      "firstBox": "Gruppen, die plattformweite Berechtigungen an allen Datenobjekten besitzen, haben Zugriff.",
+      "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen."
+    },
+    "messages": {
+      "updateSuccess": "Berechtigungen wurden erfolgreich aktualisiert."
+    }
+  },
   "sidebar": {
     "home": "Home",
     "menu-item": "Menüpunkt",
@@ -251,6 +304,38 @@
         "noRolesAssigned": "Keine {roleType} zugewiesen"
       }
     },
+    "rolesTab": {
+      "segments": {
+        "platformWide": "Plattformweit",
+        "datasets": "Datensätze",
+        "datasources": "Datenquellen",
+        "datastructures": "Datenstrukturen"
+      },
+      "columns": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "role": "Rolle",
+        "type": "Typ",
+        "scope": "Geltungsbereich"
+      },
+      "roleTypes": {
+        "SYSTEM": "Systemrolle",
+        "DATA": "Datenrolle",
+        "GOVERNANCE": "Governancerolle"
+      },
+      "types": {
+        "standard": "Standard",
+        "custom": "Eigene"
+      },
+      "scopes": {
+        "platform": "Plattform"
+      },
+      "scopedInfoBanner": {
+        "dataset": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz.",
+        "datasource": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle.",
+        "datastructure": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur."
+      }
+    },
     "groupsTab": {
       "title": "Gruppenmitgliedschaft",
       "addGroup": "Gruppe hinzufügen",
@@ -359,7 +444,6 @@
     "title": "Berechtigungen",
     "systemPermissions": "Systemberechtigungen",
     "dataPermissions": "Datenberechtigungen",
-    "governancePermissions": "Governanceberechtigungen",
     "tableHeaders": {
       "title": "Name",
       "category": "Kategorie"
@@ -371,7 +455,6 @@
     "overView": "Übersicht:",
     "systemRoles": " Systemrollen",
     "dataRoles": "Datenrollen",
-    "governanceRoles": "Governancerollen",
     "roles": "Einzelrollen",
     "roleSets": "Rollensets",
     "tableHeaders": {
@@ -387,9 +470,9 @@
     "customRole": "Eigene",
     "searchRoles": "Rollen durchsuchen",
     "tabLabels": {
-      "basicInformation": "Informationen",
-      "permissions": "Berechtigungen",
-      "groupAssignment": "Mitgliedschaft"
+      "basicInformation": "Basisinformationen",
+      "permissions": "Systemberechtigungen",
+      "groupAssignment": "Gruppen"
     },
     "baseInfoTab": {
       "heading": "Basisinformationen",
@@ -415,9 +498,17 @@
       },
       "securityArea": {
         "heading": "Sicherheitsbereich",
-        "description": "Rolle löschen",
-        "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
         "deleteButton": "Rolle löschen"
+      },
+      "deleteConfirmModal": {
+        "title": "Rolle wirklich löschen?",
+        "description": "Diese Aktion kann nicht rückgängig gemacht werden.",
+        "confirm": "Löschen"
+      },
+      "deleteErrorModal": {
+        "title": "Rolle kann nicht gelöscht werden",
+        "description": "Zuerst müssen alle Zuordnungen zu Gruppen und Geltungsbereichen entfernt werden.",
+        "close": "Schliessen"
       }
     },
     "permissionsTab": {
@@ -426,18 +517,56 @@
       "selectedPersmissions": "{count} ausgewählt",
       "roleTemplate": {
         "placeholder": "Rolle als Vorlage auswählen"
+      },
+      "categories": {
+        "TENANT_ADMINISTRATION": "Mandantenverwaltung",
+        "DATA": "Datenverwaltung"
+      },
+      "dataPermissions": {
+        "dataset": "Datensatz",
+        "datasetPayload": "Datensatz-Payload",
+        "datasource": "Datenquelle",
+        "datastructure": "Datenstruktur",
+        "read": "Lesen",
+        "create": "Erstellen",
+        "update": "Aktualisieren",
+        "delete": "Löschen",
+        "release": "Freigeben"
       }
     },
     "groupAssignmentTab": {
-      "heading": "Mitgliedschaften",
+      "heading": "Gruppen Zuweisungen",
       "addGroup": "Gruppen hinzufügen",
       "tableHeaders": {
         "name": "Name",
         "usersCount": "Anzahl User",
         "contact": "Ansprechpartner",
-        "description": "Beschreibung"
+        "description": "Beschreibung",
+        "scope": "Geltungsbereich"
       },
       "noGroupsAssigned": "Es sind noch keine Gruppen zugeordnet.",
+      "removeAssignment": "Zuweisung entfernen",
+      "removeModal": {
+        "title": "Gruppenzuweisung entfernen",
+        "description": "Möchten Sie die Gruppe \"{groupName}\" wirklich aus dieser Rolle entfernen? Diese Aktion kann nicht rückgängig gemacht werden.",
+        "confirm": "Entfernen"
+      },
+      "scopeTabs": {
+        "platformWide": "Plattformweit",
+        "dataset": "Datensatz",
+        "datasource": "Datenquelle",
+        "datastructure": "Datenstruktur"
+      },
+      "scopeLabels": {
+        "TENANT": "Plattformweit",
+        "DATASET": "Datensatz",
+        "DATASOURCE": "Datenquelle",
+        "DATASTRUCTURE": "Datenstruktur"
+      },
+      "infoBox": "Gruppen, die hier zugeordnet werden, erhalten den Typ Plattformweit (Berechtigungen auf alle Datenobjekte der Plattform)",
+      "scopeReadOnlyMessageDATASET": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz",
+      "scopeReadOnlyMessageDATASOURCE": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle",
+      "scopeReadOnlyMessageDATASTRUCTURE": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur",
       "modal": {
         "title": "Gruppe hinzufügen",
         "description": "zur Rolle {roleName}",

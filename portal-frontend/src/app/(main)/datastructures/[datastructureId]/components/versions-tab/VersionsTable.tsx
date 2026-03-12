@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { cn } from '@/lib/utils'
 import { DATASTRUCTURE_STATUS_TYPES, DatastructureVersionsListData } from '@/types/datastructures'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
@@ -43,14 +44,22 @@ export const VersionsTable = (props: VersionsTableProps) => {
     }),
     columnHelper.accessor('versionNumber', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.versionNumber')} />,
-      cell: ({ row }) => (
-        <LinkCell
-          href={onVersionClick ? undefined : `/datastructures/${datastructureId}/${row.original.id}`}
-          onClick={onVersionClick ? () => onVersionClick(row.original.id) : undefined}
-        >
-          {row.original.versionNumber}
-        </LinkCell>
-      ),
+      cell: ({ row }) =>
+        onVersionClick ? (
+          <button
+            onClick={() => onVersionClick(row.id)}
+            className={cn(
+              ' w-full h-full flex justify-between items-center gap-1.5 group/link hover:underline decoration-1.5 decoration-outline text-left cursor-pointer',
+            )}
+            type="button"
+          >
+            <LinkCell href="">{row.original.versionNumber}</LinkCell>
+          </button>
+        ) : (
+          <LinkCell href={`/datastructures/${datastructureId}/${row.original.id}`}>
+            {row.original.versionNumber}
+          </LinkCell>
+        ),
       meta: {
         style: {
           width: '10%',

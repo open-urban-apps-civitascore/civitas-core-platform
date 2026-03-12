@@ -7,7 +7,7 @@ logging:
 server:
   port: 8089
   servlet:
-    context-path: /v2
+    context-path: /v1
   # M5.5: Increase max header size for X-Allowed-Scope-Ids from OPA
   # When users have many dataspaces, the scope ID list can be large
   max-http-request-header-size: 32KB
@@ -101,7 +101,7 @@ management:
 
 springdoc:
   api-docs:
-    path: /v2/api-docs
+    path: /api-docs
     version: openapi-3-1
   swagger-ui:
     path: /swagger-ui.html

@@ -1,6 +1,6 @@
 package de.civitascore.portal.model.entity;
 
-import de.civitascore.portal.model.entity.base.NamedEntity;
+import de.civitascore.portal.model.entity.base.AssignableEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -29,7 +29,7 @@ import lombok.Setter;
     indexes = {@Index(name = "idx_group_contact", columnList = "contact_user_id")})
 @Getter
 @Setter
-public class Group extends NamedEntity {
+public class Group extends AssignableEntity {
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
@@ -54,8 +54,18 @@ public class Group extends NamedEntity {
   @Setter(AccessLevel.NONE) // Custom setter needed for orphanRemoval
   private Set<Group> childGroups = new HashSet<>();
 
-  @OneToMany(mappedBy = "group", fetch = FetchType.LAZY)
+  @OneToMany(
+      mappedBy = "group",
+      fetch = FetchType.LAZY,
+      cascade = CascadeType.ALL,
+      orphanRemoval = true)
+  @Setter(AccessLevel.NONE)
   private Set<Assignment> assignments = new HashSet<>();
+
+  @Override
+  protected void linkAssignment(Assignment assignment) {
+    assignment.setGroup(this);
+  }
 
   /**
    * Custom setter for childGroups to properly handle orphanRemoval. Hibernate requires that the

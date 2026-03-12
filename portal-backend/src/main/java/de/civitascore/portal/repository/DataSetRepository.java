@@ -26,4 +26,8 @@ public interface DataSetRepository extends NamedEntityRepository<DataSet, UUID> 
 
   boolean existsByPipelinesDataSourcesIdAndDataSetStatusIn(
       UUID dataSourceId, Collection<DataSetStatus> statuses);
+
+  @EntityGraph(attributePaths = {"owner", "pipelines", "pipelines.dataSources", "distributions"})
+  @Query("SELECT d FROM DataSet d WHERE d.id = :id")
+  Optional<DataSet> findByIdWithPipelineDataSources(@Param("id") UUID id);
 }

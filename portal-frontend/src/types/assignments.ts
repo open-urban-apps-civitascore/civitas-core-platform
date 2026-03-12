@@ -6,7 +6,12 @@ import { ItemSchema } from './common'
 import { RoleTypeEnum } from './roles'
 
 export const ASSIGNMENT_SCOPE_TYPES = {
+  TENANT: 'TENANT',
   DATASTRUCTURE: 'DATASTRUCTURE',
+  DATASOURCE: 'DATASOURCE',
+  DATASET: 'DATASET',
+  DATASPACE: 'DATASPACE',
+  CATALOG: 'CATALOG',
 } as const
 
 export const AssignmentScopeEnum = enumFromConst(ASSIGNMENT_SCOPE_TYPES)
@@ -29,8 +34,8 @@ export const AssignmentApiResponseSchema = z.object({
   modifiedAt: z.string(),
   group: ItemSchema,
   role: AssignmentRoleSchema,
-  scopeType: AssignmentScopeEnum,
-  scope: ItemSchema,
+  scopeType: AssignmentScopeEnum.nullable(),
+  scope: ItemSchema.nullable(),
 })
 
 export const AssignmentSchema = z.object({

@@ -8,7 +8,7 @@ const EditRolePage = () => {
   const params = useParams<{ roleId: string }>()
   const { roleId } = params
 
-  return <RoleDetails roleId={roleId} isEditMode={true} />
+  return <RoleDetails roleId={roleId} />
 }
 
 export default EditRolePage

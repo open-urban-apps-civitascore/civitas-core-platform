@@ -101,8 +101,32 @@ class FrostSagaHandlerTest {
         assertEquals("saga-001", result.sagaId());
         assertEquals("create-project", result.stepId());
         assertEquals("42", result.resultData().get("projectId"));
-        assertNotNull(result.resultData().get("baseUrl"));
+        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
+      }
+    }
+
+    @Test
+    @DisplayName("uses publicUrl in baseUrl when configured differently from serverUrl")
+    void shouldUsePublicUrlInBaseUrl() {
+      try (FrostSagaHandler handler = createHandlerWithPublicUrl("http://public-frost:80/v1.1")) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockResponse.getHeaderString("Location"))
+            .thenReturn("http://frost:8080/v1.1/Projects(42)");
+        when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "CREATE_PROJECT",
+                Map.of("datasetName", "Test Dataset", "description", "A test dataset"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(
+            "http://public-frost:80/v1.1/Projects(42)", result.resultData().get("baseUrl"));
       }
     }
 
@@ -192,9 +216,39 @@ class FrostSagaHandlerTest {
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("42", result.resultData().get("projectId"));
+        assertEquals("http://frost:8080/v1.1/Projects(42)", result.resultData().get("baseUrl"));
         assertEquals("42", result.compensationData().get("projectId"));
         assertEquals("Old Name", result.compensationData().get("previousName"));
         assertEquals("Old Description", result.compensationData().get("previousDescription"));
+      }
+    }
+
+    @Test
+    @DisplayName("uses publicUrl in baseUrl when configured differently from serverUrl")
+    void shouldUsePublicUrlInBaseUrl() {
+      try (FrostSagaHandler handler = createHandlerWithPublicUrl("http://public-frost:80/v1.1")) {
+        Response getResponse = mock(Response.class);
+        when(getResponse.getStatus()).thenReturn(200);
+        when(getResponse.readEntity(Map.class))
+            .thenReturn(Map.of("name", "Old Name", "description", "Old Description"));
+        when(mockBuilder.get()).thenReturn(getResponse);
+
+        Response patchResponse = mock(Response.class);
+        when(patchResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.method(eq("PATCH"), any(Entity.class))).thenReturn(patchResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "UPDATE_PROJECT",
+                Map.of(
+                    "projectId", "42", "datasetName", "Updated Dataset", "description", "Updated"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+        assertEquals(
+            "http://public-frost:80/v1.1/Projects(42)", result.resultData().get("baseUrl"));
       }
     }
   }
@@ -365,11 +419,17 @@ class FrostSagaHandlerTest {
   }
 
   private FrostSagaHandler createHandler() {
+    return createHandlerWithPublicUrl("http://frost:8080/v1.1");
+  }
+
+  private FrostSagaHandler createHandlerWithPublicUrl(String publicUrl) {
     FrostSagaHandler handler = new FrostSagaHandler();
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("frost.api.key")).thenReturn("test-api-key");
     when(mockConfig.getProperty("frost.url", "http://localhost:8080/v1.1"))
         .thenReturn("http://frost:8080/v1.1");
+    when(mockConfig.getProperty("frost.public.url", "http://frost:8080/v1.1"))
+        .thenReturn(publicUrl);
     when(mockConfig.getProperty("frost.api.key.header", "X-API-Key")).thenReturn("X-API-Key");
     handler.initialize(mockConfig);
 

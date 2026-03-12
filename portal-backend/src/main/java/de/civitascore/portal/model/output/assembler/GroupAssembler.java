@@ -28,11 +28,6 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
       output.setContactUser(userMapper.toSummary(entity.getContactUser()));
     }
 
-    // Map parentGroup
-    if (entity.getParentGroup() != null) {
-      output.setParentGroup(groupMapper.toSummary(entity.getParentGroup()));
-    }
-
     // Map members
     if (entity.getMembers() != null && !entity.getMembers().isEmpty()) {
       output.setMembers(
@@ -46,14 +41,6 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
               .map(assignmentAssembler::mapToBaseDto)
               .collect(Collectors.toList());
       output.setAssignments(assignments);
-    }
-
-    // Map childGroups
-    if (entity.getChildGroups() != null && !entity.getChildGroups().isEmpty()) {
-      output.setChildGroups(
-          entity.getChildGroups().stream()
-              .map(groupMapper::toSummary)
-              .collect(Collectors.toList()));
     }
 
     return output;

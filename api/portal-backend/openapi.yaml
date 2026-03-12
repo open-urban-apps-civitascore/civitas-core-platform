@@ -9,7 +9,7 @@ info:
     name: CIVITAS CORE Team
   version: 2.0.0
 servers:
-- url: http://localhost:8089/v2
+- url: http://localhost:8089/v1
   description: Local development
 tags:
 - name: Users
@@ -51,7 +51,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/UserOutputDTO'
     put:
@@ -75,7 +75,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/UserOutputDTO'
     delete:
@@ -113,7 +113,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/UserOutputDTO'
   /roles/{id}:
@@ -132,7 +132,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/RoleOutputDTO'
     put:
@@ -156,7 +156,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/RoleOutputDTO'
     delete:
@@ -194,7 +194,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/RoleOutputDTO'
   /groups/{id}:
@@ -213,7 +213,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/GroupOutputDTO'
     put:
@@ -237,7 +237,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/GroupOutputDTO'
     delete:
@@ -275,7 +275,37 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupOutputDTO'
+  /groups/{id}/assignments:
+    put:
+      tags:
+      - Groups
+      summary: Replace group assignments
+      description: Replaces all role assignments for the specified group. Existing
+        assignments are removed and replaced with the provided list.
+      operationId: replaceAssignments
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/AssignmentGroupInputDTO'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
               schema:
                 $ref: '#/components/schemas/GroupOutputDTO'
   /datastructures/{id}:
@@ -294,7 +324,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureOutputDTO'
     put:
@@ -318,7 +348,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureOutputDTO'
     delete:
@@ -356,7 +386,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureOutputDTO'
   /datastructures/{dataStructureId}/versions/{versionId}/published/meta:
@@ -392,7 +422,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureVersionOutputDTO'
   /datastructures/{dataStructureId}/versions/{id}:
@@ -417,7 +447,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureVersionOutputDTO'
     put:
@@ -447,7 +477,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureVersionOutputDTO'
     delete:
@@ -497,7 +527,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureVersionOutputDTO'
   /datastructures/{dataStructureId}/published/meta:
@@ -526,7 +556,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureOutputDTO'
   /datasources/{id}:
@@ -545,7 +575,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSourceOutputDTO'
     put:
@@ -569,7 +599,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSourceOutputDTO'
     delete:
@@ -607,7 +637,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSourceOutputDTO'
   /datasources/{id}/published/meta:
@@ -635,7 +665,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSourceOutputDTO'
   /datasets/{id}:
@@ -654,7 +684,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSetOutputDTO'
     put:
@@ -681,7 +711,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSetOutputDTO'
     delete:
@@ -719,7 +749,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSetOutputDTO'
   /datasets/{id}/published/meta:
@@ -748,7 +778,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSetOutputDTO'
   /datasets/{dataSetId}/pipelines/{id}:
@@ -773,7 +803,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PipelineOutputDTO'
     put:
@@ -803,7 +833,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PipelineOutputDTO'
     delete:
@@ -853,7 +883,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PipelineOutputDTO'
   /assignments/{id}:
@@ -872,7 +902,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/AssignmentOutputDTO'
     put:
@@ -899,7 +929,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/AssignmentOutputDTO'
       deprecated: true
@@ -941,7 +971,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/AssignmentOutputDTO'
       deprecated: true
@@ -1057,7 +1087,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PageUserOutputDTO'
     post:
@@ -1074,7 +1104,7 @@ paths:
         '201':
           description: Created
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/UserOutputDTO'
   /roles:
@@ -1161,6 +1191,16 @@ paths:
         schema:
           type: string
           example: Full access
+      - name: roleType
+        in: query
+        description: Filter by role type (exact match, comma-separated for multiple).
+        schema:
+          type: string
+          enum:
+            - SYSTEM
+            - DATA
+            - GOVERNANCE
+          example: SYSTEM
       - name: q
         in: query
         description: Search in name or description (partial match, case-insensitive).
@@ -1171,7 +1211,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PageRoleOutputDTO'
     post:
@@ -1188,7 +1228,7 @@ paths:
         '201':
           description: Created
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/RoleOutputDTO'
   /groups:
@@ -1297,7 +1337,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PageGroupOutputDTO'
     post:
@@ -1314,7 +1354,7 @@ paths:
         '201':
           description: Created
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/GroupOutputDTO'
   /datastructures:
@@ -1411,7 +1451,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PageDataStructureOutputDTO'
     post:
@@ -1428,7 +1468,7 @@ paths:
         '201':
           description: Created
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureOutputDTO'
   /datastructures/{dataStructureId}/versions:
@@ -1513,7 +1553,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PageDataStructureVersionOutputDTO'
     post:
@@ -1537,7 +1577,7 @@ paths:
         '201':
           description: Created
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureVersionOutputDTO'
   /datastructures/{dataStructureId}/versions/{versionId}/unpublish:
@@ -1566,7 +1606,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureVersionOutputDTO'
   /datastructures/{dataStructureId}/versions/{versionId}/publish:
@@ -1594,7 +1634,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureVersionOutputDTO'
   /datastructures/{dataStructureId}/unpublish:
@@ -1616,7 +1656,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureOutputDTO'
   /datastructures/{dataStructureId}/publish:
@@ -1638,7 +1678,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataStructureOutputDTO'
   /datasources:
@@ -1751,7 +1791,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PageDataSourceOutputDTO'
     post:
@@ -1768,7 +1808,7 @@ paths:
         '201':
           description: Created
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSourceOutputDTO'
   /datasources/{id}/unpublish:
@@ -1789,7 +1829,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSourceOutputDTO'
   /datasources/{id}/publish:
@@ -1811,7 +1851,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSourceOutputDTO'
   /datasets:
@@ -1908,7 +1948,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PageDataSetOutputDTO'
     post:
@@ -1925,7 +1965,7 @@ paths:
         '201':
           description: Created
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSetOutputDTO'
   /datasets/{id}/publish:
@@ -1948,7 +1988,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/DataSetOutputDTO'
   /datasets/{dataSetId}/pipelines:
@@ -2051,7 +2091,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PagePipelineOutputDTO'
     post:
@@ -2075,7 +2115,7 @@ paths:
         '201':
           description: Created
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PipelineOutputDTO'
   /assignments:
@@ -2178,7 +2218,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PageAssignmentOutputDTO'
     post:
@@ -2195,7 +2235,7 @@ paths:
         '201':
           description: Created
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/AssignmentOutputDTO'
   /users/me:
@@ -2209,19 +2249,19 @@ paths:
         '200':
           description: Successful retrieval of user profile
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PrincipalUserOutput'
         '401':
           description: If the user is not authenticated
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PrincipalUserOutput'
         '403':
           description: If the user is authenticated but does not have sufficient permissions
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PrincipalUserOutput'
   /permissions:
@@ -2320,7 +2360,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 type: array
                 items:
@@ -2341,7 +2381,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PermissionOutputDTO'
   /datastructures/{id}/assignments:
@@ -2362,7 +2402,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 type: array
                 items:
@@ -2385,7 +2425,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 type: array
                 items:
@@ -2408,7 +2448,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 type: array
                 items:
@@ -2431,7 +2471,7 @@ paths:
         '200':
           description: OK
           content:
-            '*/*':
+            application/json:
               schema:
                 $ref: '#/components/schemas/PageObject'
 components:
@@ -2665,6 +2705,26 @@ components:
           - GOVERNANCE
         readonly:
           type: boolean
+    AssignmentGroupInputDTO:
+      type: object
+      properties:
+        roleId:
+          type: string
+          format: uuid
+        scopeType:
+          type: string
+          enum:
+          - TENANT
+          - DATASPACE
+          - DATASET
+          - DATASOURCE
+          - DATASTRUCTURE
+          - CATALOG
+        scopeId:
+          type: string
+          format: uuid
+      required:
+      - roleId
     AssignmentScopedInputDTO:
       type: object
       properties:

@@ -37,7 +37,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   private final DataSourceRepository dataSourceRepository;
   private final DataSourceMapper dataSourceMapper;
   private final ConnectorHandlerRegistry connectorHandlerRegistry;
-  private final ScopedAssignmentBuilderService assignmentBuilderService;
+  private final AssignmentFactory assignmentFactory;
   private final DataStructureVersionService dataStructureVersionService;
   private final DataSetRepository dataSetRepository;
 
@@ -57,8 +57,8 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   }
 
   @Override
-  protected ScopedAssignmentBuilderService getAssignmentBuilderService() {
-    return assignmentBuilderService;
+  protected AssignmentFactory getAssignmentFactory() {
+    return assignmentFactory;
   }
 
   @Override
@@ -273,7 +273,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       Set<Assignment> assignments =
           input.getAssignments().stream()
               .distinct()
-              .map(dto -> getAssignmentBuilderService().build(dto))
+              .map(dto -> getAssignmentFactory().build(dto))
               .collect(Collectors.toSet());
       entity.setAssignments(assignments);
     }

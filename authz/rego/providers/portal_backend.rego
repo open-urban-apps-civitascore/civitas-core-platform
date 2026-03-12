@@ -2,7 +2,7 @@
 # Maps HTTP requests for the Portal Backend API.
 #
 # This provider uses the generic REST mapper library to handle
-# /v2/resource/{id} style paths used by the Portal Backend.
+# /v1/resource/{id} style paths used by the Portal Backend.
 #
 # Endpoint configuration is loaded from data.backends.portal_backend.endpoints
 
@@ -46,7 +46,7 @@ path_pattern := restmapper.match_pattern(input.request.path, endpoints)
 #   - DATASOURCE resources: datasources (TENANT scope inherits down)
 #   - DATASTRUCTURE resources: datastructures (TENANT scope inherits down)
 #
-# For resource endpoints (/v2/resource/{id}), the {id} IS the scopeId.
+# For resource endpoints (/v1/resource/{id}), the {id} IS the scopeId.
 # TENANT scope cascades to all resource endpoints (Q-005 resolved).
 # Dataspaces and catalogs are null-permission endpoints (excluded from V2 scope model, see #989).
 
@@ -65,13 +65,13 @@ resource_scope_type := {
 # Path parts for internal use (scope extraction, collection detection)
 path_parts := restmapper.parse_path(input.request.path)
 
-# Extract resource name from path (second segment: /v2/{resource}/...)
+# Extract resource name from path (second segment: /v1/{resource}/...)
 resource_name := path_parts[1] if {
 	count(path_parts) >= 2
 }
 
-# Extract resource ID from path (third segment: /v2/resource/{id})
-# Covers both direct resources (/v2/users/{id}) and sub-resources (/v2/datasets/{id}/publish)
+# Extract resource ID from path (third segment: /v1/resource/{id})
+# Covers both direct resources (/v1/users/{id}) and sub-resources (/v1/datasets/{id}/publish)
 # Only defined for resource endpoints, not collection endpoints
 resource_id := path_parts[2] if {
 	count(path_parts) >= 3
