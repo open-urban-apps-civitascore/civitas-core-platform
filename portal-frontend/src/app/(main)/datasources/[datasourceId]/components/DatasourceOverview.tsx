@@ -114,7 +114,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const {
     modelSessionManager,
     hasUserChanges: hasDatastructureBeenEdited,
-    resetToInitialState,
+    resetToInitialState: resetToInitialDatastructureState,
     resetFormAndSession,
     // saveDatastructureVersion,
   } = useDatastructureVersion({
@@ -127,7 +127,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   useEffect(() => {
     const isInitialVersion = selectedDatastructureId === initialDatastructureVersion?.id
     if (isInitialVersion) {
-      resetToInitialState()
+      resetToInitialDatastructureState()
       return
     } else {
       if (!datastructureVersion) resetFormAndSession(defaultDatastructureVersionFormData, null)
@@ -143,6 +143,11 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   // const shouldSaveDatastructureVersion =
   // hasDatastructureBeenEdited && selectedDatastructureId && selectedDatastructureVersionId
 
+  const resetToInitialState = () => {
+    resetToInitialDatastructureState()
+    setSelectedDatastructureId(initialDatastructure?.id || null)
+    setSelectedDatastructureVersionId(initialDatastructureVersion?.id || null)
+  }
   const handleSave = async () => {
     // TODO: use this function when implementing save datastructure version changes
     // if (shouldSaveDatastructureVersion) {
@@ -164,8 +169,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const handleDiscardAndExit = () => {
     setIsExitModalOpen(false)
-    datasourceForm.reset()
     updateMode(false)
+    resetToInitialState()
   }
 
   const handleSaveAndExit = async () => {

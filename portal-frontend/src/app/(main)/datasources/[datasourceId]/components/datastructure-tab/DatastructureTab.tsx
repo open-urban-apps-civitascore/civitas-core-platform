@@ -17,8 +17,14 @@ interface DatastructureTab {
   onSelectDatastructureVersion: (selection: RowSelectionState) => void
 }
 export const DatastructureTab = (props: DatastructureTab) => {
-  const { modelSessionManager, datasourceTitle, selectedVersionId, isDatasourceInUse, onSelectDatastructureVersion } =
-    props
+  const {
+    modelSessionManager,
+    datasourceTitle,
+    selectedVersionId,
+    isReadOnly,
+    isDatasourceInUse,
+    onSelectDatastructureVersion,
+  } = props
   const t = useTranslations('datasources.dataModel.placeholder')
   const [isImportDatastructureModalOpen, setIsImportDatastructureModalOpen] = useState(false)
 
@@ -61,7 +67,7 @@ export const DatastructureTab = (props: DatastructureTab) => {
         canExportXmi={false}
         canImportXmi={false}
         placeHolder={UmlCanvasPlaceholder}
-        onImportFromDatastructure={isDatasourceInUse ? undefined : handleImportFromDatastructure}
+        onImportFromDatastructure={!isDatasourceInUse && !isReadOnly ? handleImportFromDatastructure : undefined}
       />
       <DataModelImportModal
         datasourceTitle={datasourceTitle}

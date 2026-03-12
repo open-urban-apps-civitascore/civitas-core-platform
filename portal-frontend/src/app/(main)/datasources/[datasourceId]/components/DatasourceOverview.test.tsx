@@ -206,7 +206,7 @@ describe('DatasourceOverview', () => {
       expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument()
     })
 
-    it('discards changes and returns to view mode via modal', () => {
+    it('discards changes and returns to view mode via modal', async () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       mockForm.formState.isDirty = true
       renderComponent()
@@ -214,9 +214,10 @@ describe('DatasourceOverview', () => {
       fireEvent.click(screen.getByTestId('cancelButton'))
       fireEvent.click(screen.getByTestId('discardButton'))
 
-      expect(screen.getByTestId('editButton')).toBeInTheDocument()
-      expect(mockForm.reset).toHaveBeenCalled()
-      expect(mockReplace).toHaveBeenCalledWith('/datasources/test-id', { scroll: false })
+      await waitFor(() => {
+        expect(screen.getByTestId('editButton')).toBeInTheDocument()
+        expect(mockReplace).toHaveBeenCalledWith('/datasources/test-id', { scroll: false })
+      })
     })
 
     it('saves and returns to view mode via modal', async () => {
