@@ -2,11 +2,14 @@ package de.civitascore.portal.controller;
 
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.UserInputDTO;
+import de.civitascore.portal.model.output.MeAssignmentOutputDTO;
 import de.civitascore.portal.model.output.PrincipalUserOutput;
 import de.civitascore.portal.model.output.UserOutputDTO;
+import de.civitascore.portal.model.output.assembler.AssignmentAssembler;
 import de.civitascore.portal.model.output.assembler.UserAssembler;
 import de.civitascore.portal.repository.specification.UserSpec;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
+import de.civitascore.portal.service.AssignmentService;
 import de.civitascore.portal.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,6 +19,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.annotations.ParameterObject;
@@ -37,6 +41,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController extends BaseController<UserInputDTO, UserOutputDTO, User, UserSpec> {
   private final UserService userService;
   private final UserAssembler userAssembler;
+  private final AssignmentService assignmentService;
+  private final AssignmentAssembler assignmentAssembler;
 
   @Parameters({
     @Parameter(
@@ -77,7 +83,8 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
   @GetMapping("/me")
   @Operation(
       summary = "Get current user",
-      description = "Returns the profile information of the authenticated user")
+      description =
+          "Returns the profile information of the authenticated user including assignments")
   @ApiResponses(
       value = {
         @ApiResponse(responseCode = "200", description = "Successful retrieval of user profile"),
@@ -89,7 +96,15 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
   public ResponseEntity<PrincipalUserOutput> getCurrentUser(
       @AuthenticationPrincipal PrincipalUserDetails userPrincipal) {
     log.debug("UserController.getCurrentUser called by user: {}", userPrincipal.getUsername());
-    return ResponseEntity.ok(PrincipalUserOutput.fromPrincipal(userPrincipal));
+
+    List<MeAssignmentOutputDTO> assignments = List.of();
+    if (userPrincipal.getUserId() != null) {
+      assignments =
+          assignmentAssembler.toMeAssignments(
+              assignmentService.findAllByUserExternalId(userPrincipal.getUserId().toString()));
+    }
+
+    return ResponseEntity.ok(PrincipalUserOutput.fromPrincipal(userPrincipal, assignments));
   }
 
   @Override
