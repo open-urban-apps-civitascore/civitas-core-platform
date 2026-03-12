@@ -1,38 +1,23 @@
 'use client'
 
-import { RowSelectionState } from '@tanstack/react-table'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 import { SearchHeader } from '@/components/search-area/SearchArea'
-import { TableContainer } from '@/components/table-container/TableContainer'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Permission, RoleWithPermissions } from '@/types/permissions'
+import { Permission } from '@/types/permissions'
 import { ROLE_CATEGORIES } from '@/types/roles'
 
-import { PermissionsTable } from './PermissionsTable'
+import { PermissionsList } from './PermissionsList'
 
 interface SystemPermissionsTabProps {
   permissions: Permission[]
   isLoading: boolean
-  rowCount: number
 }
-
-const toRolesWithPermissions = (permissions: Permission[]): RoleWithPermissions[] =>
-  permissions.map(p => ({
-    name: p.name,
-    read: false,
-    create: false,
-    update: false,
-    delete: false,
-    release: false,
-  }))
 
 const KNOWN_CATEGORIES = [ROLE_CATEGORIES.DATA.toString(), ROLE_CATEGORIES.TENANTADMINISTRATION.toString()] as const
 
-export const SystemPermissionsTab = ({ permissions, isLoading, rowCount }: SystemPermissionsTabProps) => {
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-
-  const { setSortingParams, setPaginationParams, setSearchParam, pageIndex, pageSize, sorting, search, totalPages } =
+export const SystemPermissionsTab = ({ permissions, isLoading }: SystemPermissionsTabProps) => {
+  const { setSearchParam, search } =
     useQueryParams()
   const CATEGORY_OTHER = 'OTHER'
 
@@ -49,25 +34,10 @@ export const SystemPermissionsTab = ({ permissions, isLoading, rowCount }: Syste
       <SearchHeader searchString={search} onChangeSearchString={setSearchParam} />
 
       {[...KNOWN_CATEGORIES, CATEGORY_OTHER].map(category => {
-        const groupedPermissions = groups[category]
+        const groupedPermissions = groups[category] ?? []
         return (
-          <div key={category}>
-            <h2 className="text-lg font-semibold mb-4 mt-8">{category}</h2>
-            <TableContainer>
-              <PermissionsTable
-                permissions={toRolesWithPermissions(groupedPermissions ?? [])}
-                isLoading={isLoading}
-                rowCount={rowCount}
-                pageIndex={pageIndex}
-                pageSize={pageSize}
-                totalPages={totalPages}
-                sorting={sorting}
-                rowSelection={rowSelection}
-                setRowSelection={setRowSelection}
-                onSortingChange={setSortingParams}
-                onPaginationChange={setPaginationParams}
-              />
-            </TableContainer>
+          <div key={category} className="mt-8">
+            <PermissionsList header={category} items={groupedPermissions.map(p => p.name)} isLoading={isLoading} />
           </div>
         )
       })}

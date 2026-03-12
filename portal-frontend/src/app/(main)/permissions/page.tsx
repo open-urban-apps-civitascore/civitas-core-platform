@@ -70,7 +70,7 @@ const PermissionsPage = () => {
       />
       <PageBackground>
         {permissionType === ROLE_TYPES.SYSTEM ? (
-          <SystemPermissionsTab permissions={getSystemPermissions()} isLoading={isFetching} rowCount={rowCount} />
+          <SystemPermissionsTab permissions={getSystemPermissions()} isLoading={isFetching} />
         ) : (
           <DataPermissionsTab permissions={getDataPermissions()} isLoading={isFetching} rowCount={rowCount} />
         )}
