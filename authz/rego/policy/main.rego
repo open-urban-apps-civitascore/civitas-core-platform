@@ -154,11 +154,12 @@ has_tenant_scope if {
 }
 
 # Helper: check if a single permission exists with TENANT scope
+# Also matches unscoped SYSTEM role assignments (scopeType=null).
 tenant_has_permission(perm) if {
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
 	perm in assignment.permissions
-	assignment.scopeType == "TENANT"
+	permission_eval.is_unscoped_or_tenant(assignment)
 }
 
 # Collect specific scope IDs where user has ALL required permissions (AND semantics)
