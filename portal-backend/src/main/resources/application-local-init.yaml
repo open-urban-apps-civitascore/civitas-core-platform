@@ -18,6 +18,18 @@ local:
         roleName: 'Data Gatekeeper'
         scopeType: TENANT
         description: 'Local dev group — data governance + release approval'
+      - name: 'Local Data Architects'
+        roleName: 'Data Architect'
+        scopeType: TENANT
+        description: 'Local dev group — data ingestion + processing management'
+      - name: 'Local Data Stewards'
+        roleName: 'Data Steward'
+        scopeType: TENANT
+        description: 'Local dev group — domain data lifecycle management'
+      - name: 'Local Data Consumers'
+        roleName: 'Data Consumer'
+        scopeType: TENANT
+        description: 'Local dev group — read access to published data'
     users:
       - firstName: Developer
         lastName: User
