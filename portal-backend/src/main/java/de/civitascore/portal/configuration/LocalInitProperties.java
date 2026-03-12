@@ -44,6 +44,7 @@ public class LocalInitProperties {
     @NotBlank @Email private String email;
     private String externalId;
     private UserTitleType title = UserTitleType.OTHER;
+    private String password;
     private List<String> groups = new ArrayList<>();
   }
 }

@@ -748,22 +748,6 @@ if [ "$backend_option" = "1" ]; then
     echo
 fi
 
-# ---- Seed Dev Admin Data -------------------------------------------
-# Must run AFTER backend starts because PermissionRoleInitializer creates
-# the permissions table rows. The seed links DevAdmin role to those permissions.
-
-if [ "$authz_option" = "1" ]; then
-    echo "Seeding dev admin data (full authz mode)..."
-
-    SEED_SQL="$SCRIPT_DIR/apisix/seed-dev-admin.sql"
-    if [ -f "$SEED_SQL" ]; then
-        docker exec -i civitas-postgres-portal psql -U admin -d portal_backend -f /dev/stdin < "$SEED_SQL" 2>&1 | tail -5
-        echo "  Dev admin seeding complete"
-    else
-        echo "  WARNING: seed-dev-admin.sql not found"
-    fi
-    echo
-fi
 # Check if Keycloak client secret needs to be configured
 if [ -f "$FRONTEND_DIR/.env.local" ]; then
     CURRENT_SECRET=$(grep '^KEYCLOAK_CLIENT_SECRET=' "$FRONTEND_DIR/.env.local" | cut -d'=' -f2)

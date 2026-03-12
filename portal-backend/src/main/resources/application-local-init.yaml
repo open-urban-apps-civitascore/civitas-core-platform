@@ -1,20 +1,30 @@
 # Local development seed data — loaded automatically when the "local-init" Spring profile is active.
 # Requires the local Profile for the kafka topics sync to the config-adapter
 # On startup, these groups and users are created in the DB (if they don't exist yet)
-# The dev@civitas.local user is also pre-seeded in Keycloak via dev-environment/keycloak/realm-export.json
+# and synced to Keycloak via config-adapter (if no externalId is set)
 # Don't use in production
 
 local:
   init:
     groups:
-      - name: "Local Admins"
-        roleName: "Tenant Admin"
-        description: "Local development admin group"
+      - name: 'Local Tenant Admins'
+        roleName: 'Tenant Admin'
+        description: 'Local dev group — system/user management'
+      - name: 'Local Data Owners'
+        roleName: 'Data Owner'
+        scopeType: TENANT
+        description: 'Local dev group — full data CRUD + release'
+      - name: 'Local Data Gatekeepers'
+        roleName: 'Data Gatekeeper'
+        scopeType: TENANT
+        description: 'Local dev group — data governance + release approval'
     users:
       - firstName: Developer
         lastName: User
         email: dev@civitas.local
-        externalId: "00000000-0000-0000-0000-000000000001"
+        password: dev123
         title: OTHER
         groups:
-          - "Local Admins"
+          - 'Local Tenant Admins'
+          - 'Local Data Owners'
+          - 'Local Data Gatekeepers'

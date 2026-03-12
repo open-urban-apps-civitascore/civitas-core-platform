@@ -2,6 +2,7 @@ package de.civitascore.portal.service.initializer;
 
 import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.idm.UserConfig;
+import de.civitascore.configadapter.model.idm.UserConfig.CredentialConfig;
 import de.civitascore.portal.configuration.LocalInitProperties;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
@@ -13,6 +14,7 @@ import de.civitascore.portal.repository.RoleRepository;
 import de.civitascore.portal.repository.UserRepository;
 import de.civitascore.portal.service.ConfigEventPublisherService;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -173,12 +175,12 @@ public class LocalUserInitializer {
       log.info("Created local user '{}'", entry.getEmail());
 
       if (entry.getExternalId() == null) {
-        publishUserCreated(createdUser);
+        publishUserCreated(createdUser, entry.getPassword());
       }
     }
   }
 
-  private void publishUserCreated(User user) {
+  private void publishUserCreated(User user, String password) {
     UserConfig userConfig = new UserConfig();
     userConfig.setUsername(user.getEmail());
     userConfig.setEmail(user.getEmail());
@@ -186,6 +188,14 @@ public class LocalUserInitializer {
     userConfig.setLastName(user.getLastName());
     userConfig.setEnabled(true);
     userConfig.setEmailVerified(true);
+
+    if (password != null && !password.isBlank()) {
+      CredentialConfig credential = new CredentialConfig();
+      credential.setType("password");
+      credential.setValue(password);
+      credential.setTemporary(false);
+      userConfig.setCredentials(List.of(credential));
+    }
 
     try {
       ConfigResultEvent result =
