@@ -89,6 +89,13 @@ export const PermissionsTable = (props: PermissionsTableProps) => {
   })
 
   return (
-    <DataTable table={table} pageIndex={pageIndex} pageSize={pageSize} totalPages={totalPages} isLoading={isLoading} />
+    <DataTable
+      table={table}
+      pageIndex={pageIndex}
+      pageSize={pageSize}
+      totalPages={totalPages}
+      isLoading={isLoading}
+      isPaginationHidden={true}
+    />
   )
 }

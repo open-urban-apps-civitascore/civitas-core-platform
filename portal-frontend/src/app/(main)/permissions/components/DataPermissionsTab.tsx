@@ -4,7 +4,6 @@ import { RowSelectionState } from '@tanstack/react-table'
 import { useState } from 'react'
 
 import { SearchHeader } from '@/components/search-area/SearchArea'
-import { TableContainer } from '@/components/table-container/TableContainer'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Permission, RoleWithPermissions } from '@/types/permissions'
 
@@ -49,22 +48,20 @@ export const DataPermissionsTab = ({ permissions, isLoading, rowCount }: DataPer
   return (
     <>
       <SearchHeader searchString={search} onChangeSearchString={setSearchParam} />
-      <TableContainer>
-        <PermissionsTable
-          permissions={getRolesWithPermissions()}
-          shouldShowPermissionColumns
-          isLoading={isLoading}
-          rowCount={rowCount}
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          totalPages={totalPages}
-          sorting={sorting}
-          rowSelection={rowSelection}
-          setRowSelection={setRowSelection}
-          onSortingChange={setSortingParams}
-          onPaginationChange={setPaginationParams}
-        />
-      </TableContainer>
+      <PermissionsTable
+        permissions={getRolesWithPermissions()}
+        shouldShowPermissionColumns
+        isLoading={isLoading}
+        rowCount={rowCount}
+        pageIndex={pageIndex}
+        pageSize={pageSize}
+        totalPages={totalPages}
+        sorting={sorting}
+        rowSelection={rowSelection}
+        setRowSelection={setRowSelection}
+        onSortingChange={setSortingParams}
+        onPaginationChange={setPaginationParams}
+      />
     </>
   )
 }

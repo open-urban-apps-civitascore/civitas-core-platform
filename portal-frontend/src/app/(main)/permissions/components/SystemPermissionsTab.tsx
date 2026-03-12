@@ -17,8 +17,7 @@ interface SystemPermissionsTabProps {
 const KNOWN_CATEGORIES = [ROLE_CATEGORIES.DATA.toString(), ROLE_CATEGORIES.TENANTADMINISTRATION.toString()] as const
 
 export const SystemPermissionsTab = ({ permissions, isLoading }: SystemPermissionsTabProps) => {
-  const { setSearchParam, search } =
-    useQueryParams()
+  const { setSearchParam, search } = useQueryParams()
   const CATEGORY_OTHER = 'OTHER'
 
   const groups = useMemo(
