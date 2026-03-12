@@ -966,6 +966,138 @@ class DataSourceControllerIntegrationTest
   }
 
   @Nested
+  @DisplayName("Published Meta Update Tests")
+  class PublishedMetaTests {
+
+    @Test
+    @DisplayName("Should update name and description of AVAILABLE data source")
+    void shouldUpdateNameAndDescription() {
+      UUID id = createPublishableTestEntity();
+      performPublish(id);
+
+      Map<String, Object> metaUpdate =
+          Map.of("name", "updated-name", "description", "updated-desc");
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + id + "/published/meta",
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              metaUpdate,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getName()).isEqualTo("updated-name");
+      assertThat(response.getBody().getDescription()).isEqualTo("updated-desc");
+    }
+
+    @Test
+    @DisplayName("Should update configuration of AVAILABLE data source via published/meta")
+    void shouldUpdateConfiguration() {
+      UUID id = createPublishableTestEntity();
+      performPublish(id);
+
+      Map<String, Object> newConfig =
+          Map.of(
+              "urls", List.of("tcp://new-broker:1883"),
+              "topics", List.of("new/topic"),
+              "qos", 2);
+      Map<String, Object> metaUpdate = Map.of("name", "updated-name", "configuration", newConfig);
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + id + "/published/meta",
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              metaUpdate,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      Map<String, Object> config = response.getBody().getConfiguration();
+      assertThat(config.get("urls")).isEqualTo(List.of("tcp://new-broker:1883"));
+      assertThat(config.get("topics")).isEqualTo(List.of("new/topic"));
+      assertThat(config.get("qos")).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Should preserve masked password when updating configuration via published/meta")
+    void shouldPreserveMaskedPassword() {
+      UUID id = createPublishableSqlTestEntity();
+      performPublish(id);
+
+      Map<String, Object> newConfig =
+          new HashMap<>(
+              Map.of(
+                  "driver", "postgres",
+                  "dsn", "postgres://new-host:5432/db",
+                  "table", "measurements",
+                  "columns", List.of("id", "value", "timestamp"),
+                  "user", "admin",
+                  "password", ConnectorHandler.MASKED_VALUE));
+      Map<String, Object> metaUpdate = Map.of("name", "updated-sql", "configuration", newConfig);
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + id + "/published/meta",
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              metaUpdate,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      Map<String, Object> config = response.getBody().getConfiguration();
+      assertThat(config.get("dsn")).isEqualTo("postgres://new-host:5432/db");
+      assertThat(config.get("password")).isEqualTo(ConnectorHandler.MASKED_VALUE);
+    }
+
+    @Test
+    @DisplayName("Should not change configuration when not provided in published/meta update")
+    void shouldNotChangeConfigurationWhenNotProvided() {
+      UUID id = createPublishableTestEntity();
+      performPublish(id);
+
+      ResponseEntity<DataSourceOutputDTO> before =
+          exchange(
+              getEndpointPath() + "/" + id,
+              HttpMethod.GET,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+      Map<String, Object> originalConfig = before.getBody().getConfiguration();
+
+      Map<String, Object> metaUpdate = Map.of("name", "updated-name");
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + id + "/published/meta",
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              metaUpdate,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getConfiguration()).isEqualTo(originalConfig);
+    }
+
+    @Test
+    @DisplayName("Should reject published/meta update on DRAFT data source")
+    void shouldRejectUpdateOnDraftDataSource() {
+      UUID id = createPublishableTestEntity();
+
+      Map<String, Object> metaUpdate = Map.of("name", "updated-name");
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + id + "/published/meta",
+              HttpMethod.PUT,
+              new HttpEntity<>(metaUpdate, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @Nested
   @DisplayName("Unpublish DataSource Tests")
   class UnpublishTests {
 
