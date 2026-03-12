@@ -1,14 +1,17 @@
 package de.civitascore.portal.service;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching;
 import static com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
+import com.github.tomakehurst.wiremock.verification.LoggedRequest;
 import de.civitascore.portal.configuration.ModelAtlasConfig;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,8 +47,11 @@ class ModelRestClientRequestServiceTest {
 
     service.uploadModelString(xmlWithUmlauts, "http://example.com/model");
 
-    wireMock.verify(
-        postRequestedFor(urlPathMatching("/atlas/rest/testScope/schema/stages/testStage"))
-            .withRequestBody(containing("äöüÄÖÜß")));
+    List<LoggedRequest> requests =
+        wireMock.findAll(
+            postRequestedFor(urlPathMatching("/atlas/rest/testScope/schema/stages/testStage")));
+    assertThat(requests).hasSize(1);
+    String body = new String(requests.get(0).getBody(), StandardCharsets.UTF_8);
+    assertThat(body).contains("äöüÄÖÜß");
   }
 }
