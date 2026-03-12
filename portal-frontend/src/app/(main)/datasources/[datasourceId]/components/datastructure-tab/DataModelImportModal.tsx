@@ -101,39 +101,31 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
 
   const columns = [
     columnHelper.accessor('id', {
-      header: '',
-      cell: ({ row }) =>
-        row.depth > 0 ? (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={value => {
-              row.toggleSelected(!!value)
-              setFocus(row.id)
-            }}
-            aria-label={`Select datastructure ${row.original.name}`}
-            id={row.id}
-          />
-        ) : (
-          ''
-        ),
-      enableSorting: false,
-      enableHiding: false,
+      header: 'id',
+      cell: info => info.getValue(),
+      enableHiding: true,
     }),
     columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={tDatastructures('tableHeaders.name')} />,
-      cell: ({ row }: CellContext<DatastructuresListData, unknown>) => (
-        <ExpanderCell row={row} className="font-medium">
-          <LinkCell
-            href={
-              row.depth === 0
-                ? `datastructures/${row.original.id}`
-                : `datastructures/${row.parentId}/${row.original.id}`
-            }
-          >
+      cell: ({ row }: CellContext<DatastructuresListData, unknown>) =>
+        row.depth > 0 ? (
+          <div className="flex items-center pl-6 gap-3 font-medium">
+            <Checkbox
+              checked={row.getIsSelected()}
+              onCheckedChange={value => {
+                row.toggleSelected(!!value)
+                setFocus(row.id)
+              }}
+              aria-label={`Select datastructure ${row.original.name}`}
+              id={row.id}
+            />
+            <span>{row.original.name}</span>
+          </div>
+        ) : (
+          <ExpanderCell row={row} className="font-medium">
             {row.original.name}
-          </LinkCell>
-        </ExpanderCell>
-      ),
+          </ExpanderCell>
+        ),
       meta: {
         style: {
           minWidth: '200px',
@@ -202,6 +194,11 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
       pagination: { pageIndex, pageSize },
       sorting,
       rowSelection: selection,
+    },
+    initialState: {
+      columnVisibility: {
+        id: false,
+      },
     },
     manualPagination: true,
     manualSorting: true,
