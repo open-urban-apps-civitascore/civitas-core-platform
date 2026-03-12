@@ -55,6 +55,22 @@ vi.mock('../hooks/useDatasourceForm', () => ({
   }),
 }))
 
+vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
+  useGetDatastructureVersion: () => ({
+    data: undefined,
+  }),
+}))
+
+vi.mock('@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion', () => ({
+  defaultDatastructureVersionFormData: {},
+  useDatastructureVersion: () => ({
+    modelSessionManager: null,
+    hasUserChanges: false,
+    resetToInitialState: vi.fn(),
+    resetFormAndSession: vi.fn(),
+  }),
+}))
+
 vi.mock('./basic-info/BasicInfoTab', () => ({
   BasicInfoTab: ({ isReadOnly }: { isReadOnly: boolean }) => (
     <div data-testid="basicInfoTab" data-readonly={isReadOnly} />
@@ -125,6 +141,9 @@ const datasource = {
 }
 
 describe('DatasourceOverview', () => {
+  const renderComponent = () =>
+    render(<DatasourceOverview datasource={datasource} datastructure={null} datastructureVersion={null} />)
+
   beforeEach(() => {
     vi.clearAllMocks()
     mockSearchParams = new URLSearchParams()
@@ -133,13 +152,13 @@ describe('DatasourceOverview', () => {
 
   describe('View/Edit mode initialization', () => {
     it('starts in read-only mode when no mode param', () => {
-      render(<DatasourceOverview datasource={datasource} />)
+      renderComponent()
       expect(screen.getByTestId('editButton')).toBeInTheDocument()
     })
 
     it('starts in edit mode when mode=edit param is present', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
-      render(<DatasourceOverview datasource={datasource} />)
+      renderComponent()
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
     })
@@ -147,7 +166,7 @@ describe('DatasourceOverview', () => {
 
   describe('Mode transitions', () => {
     it('switches to edit mode and updates URL when edit button is clicked', () => {
-      render(<DatasourceOverview datasource={datasource} />)
+      renderComponent()
       fireEvent.click(screen.getByTestId('editButton'))
 
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
@@ -157,7 +176,7 @@ describe('DatasourceOverview', () => {
 
     it('preserves existing search params when entering edit mode', () => {
       mockSearchParams = new URLSearchParams('page=2&search=foo')
-      render(<DatasourceOverview datasource={datasource} />)
+      renderComponent()
       fireEvent.click(screen.getByTestId('editButton'))
 
       expect(mockReplace).toHaveBeenCalledWith(
@@ -168,7 +187,7 @@ describe('DatasourceOverview', () => {
 
     it('exits to view mode and removes mode param when form is clean', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
-      render(<DatasourceOverview datasource={datasource} />)
+      renderComponent()
 
       fireEvent.click(screen.getByTestId('cancelButton'))
 
@@ -180,7 +199,7 @@ describe('DatasourceOverview', () => {
     it('shows exit warning modal when form is dirty', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       mockForm.formState.isDirty = true
-      render(<DatasourceOverview datasource={datasource} />)
+      renderComponent()
 
       fireEvent.click(screen.getByTestId('cancelButton'))
 
@@ -190,7 +209,7 @@ describe('DatasourceOverview', () => {
     it('discards changes and returns to view mode via modal', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       mockForm.formState.isDirty = true
-      render(<DatasourceOverview datasource={datasource} />)
+      renderComponent()
 
       fireEvent.click(screen.getByTestId('cancelButton'))
       fireEvent.click(screen.getByTestId('discardButton'))
@@ -204,7 +223,7 @@ describe('DatasourceOverview', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       mockForm.formState.isDirty = true
       mockSubmitDatasource.mockImplementation((cb: () => void) => cb())
-      render(<DatasourceOverview datasource={datasource} />)
+      renderComponent()
 
       fireEvent.click(screen.getByTestId('cancelButton'))
       fireEvent.click(screen.getByTestId('confirmSaveButton'))
@@ -218,13 +237,13 @@ describe('DatasourceOverview', () => {
 
   describe('Read-only mode behavior', () => {
     it('passes isReadOnly to tab content', () => {
-      render(<DatasourceOverview datasource={datasource} />)
+      renderComponent()
       expect(screen.getByTestId('basicInfoTab')).toHaveAttribute('data-readonly', 'true')
     })
 
     it('passes isReadOnly=false to tab content in edit mode', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
-      render(<DatasourceOverview datasource={datasource} />)
+      renderComponent()
       expect(screen.getByTestId('basicInfoTab')).toHaveAttribute('data-readonly', 'false')
     })
   })

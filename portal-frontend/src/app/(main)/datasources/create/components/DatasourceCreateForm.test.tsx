@@ -7,7 +7,6 @@ import { DatasourceCreateForm } from './DatasourceCreateForm'
 
 const mockPush = vi.fn()
 const mockMutate = vi.fn()
-const mockHandleConflictErrors = vi.fn()
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -25,12 +24,6 @@ vi.mock('@/app/services/api/datasources/clientRequests', () => ({
   useCreateDatasource: () => ({
     mutate: mockMutate,
     isPending: false,
-  }),
-}))
-
-vi.mock('@/hooks/use-form-error', () => ({
-  useFormError: () => ({
-    handleConflictErrors: mockHandleConflictErrors,
   }),
 }))
 
@@ -96,7 +89,7 @@ describe('DatasourceCreateForm', () => {
     })
   })
 
-  test('calls the shared error handler when the request returns an error', async () => {
+  test('shows a name field error when the request returns a conflict error', async () => {
     mockMutate.mockImplementation((_data, options) => {
       options?.onError?.({
         response: {
@@ -111,17 +104,7 @@ describe('DatasourceCreateForm', () => {
     fireEvent.click(screen.getByTestId('submitButton'))
 
     await waitFor(() => {
-      expect(mockHandleConflictErrors).toHaveBeenCalledWith({
-        error: expect.objectContaining({
-          response: expect.objectContaining({
-            status: 409,
-          }),
-        }),
-        form: expect.any(Object),
-        fields: ['name'],
-        fallbackMessage: 'errors.creationError',
-        shouldShowToastOnConflictError: false,
-      })
+      expect(screen.getByTestId('nameFormMessage')).toHaveTextContent('common.errors.nameExists')
     })
   })
 })
