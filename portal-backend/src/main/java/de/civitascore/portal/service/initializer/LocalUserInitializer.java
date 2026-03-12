@@ -212,10 +212,15 @@ public class LocalUserInitializer {
             "Synced local user '{}' to Keycloak, externalId={}",
             user.getEmail(),
             result.resourceId());
-      } else {
+      } else if (result != null) {
         log.warn(
-            "Keycloak sync for local user '{}' returned no resourceId — externalId not set",
-            user.getEmail());
+            "Keycloak sync for local user '{}' failed: status={}, message={}, errorCode={}",
+            user.getEmail(),
+            result.status(),
+            result.message(),
+            result.errorCode());
+      } else {
+        log.warn("Keycloak sync for local user '{}' returned null result", user.getEmail());
       }
     } catch (TimeoutException e) {
       log.error("Timeout waiting for Keycloak sync for local user '{}'", user.getEmail());

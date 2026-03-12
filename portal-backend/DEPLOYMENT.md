@@ -207,13 +207,13 @@ Configured in `application-local-init.yaml` (`@ConfigurationProperties(prefix = 
 | `LOCAL_INIT_USERS_0_FIRSTNAME` | yes | `Tenant` | — |
 | `LOCAL_INIT_USERS_0_LASTNAME` | yes | `Admin` | — |
 | `LOCAL_INIT_USERS_0_EMAIL` | yes | `tenant-admin@civitas.local` | Also used as Keycloak username |
-| `LOCAL_INIT_USERS_0_EXTERNALID` | no | `00000000-...` | Keycloak user ID. When provided, the user is only created in the portal DB. When left empty, the user is automatically synced to Keycloak via config-adapter and the returned ID is persisted. |
+| `LOCAL_INIT_USERS_0_PASSWORD` | no | `dev123` | Initial Keycloak password, set during sync to Keycloak via config-adapter. |
 | `LOCAL_INIT_USERS_0_TITLE` | no | `OTHER` | `MR`, `MS`, or `OTHER` (default: `OTHER`) |
 | `LOCAL_INIT_USERS_0_GROUPS_0` | no | `Tenant Admins` | Group name to assign the user to. Increment index for multiple groups. |
 
 Increment the `_0_` index for additional entries (e.g. `LOCAL_INIT_GROUPS_1_NAME`, `LOCAL_INIT_USERS_1_EMAIL`).
 
-> **Note:** User passwords are not managed by the initializer. After users are synced to Keycloak, passwords must be set directly in the Keycloak Admin Console.
+> **Note:** Passwords are only set during initial Keycloak sync. The initializer does not update passwords for existing Keycloak users.
 
 ---
 
