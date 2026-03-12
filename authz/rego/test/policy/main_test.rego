@@ -114,6 +114,7 @@ mock_send_tenant_both_and_perms(_) := {"status_code": 200, "body": mock_http.use
 
 # --- Unscoped SYSTEM role mocks ---
 mock_send_unscoped_admin(_) := {"status_code": 200, "body": mock_http.user_with_unscoped_permissions(["USER_READ", "USER_CREATE", "USER_UPDATE", "USER_DELETE"])}
+mock_send_unscoped_dataset_read(_) := {"status_code": 200, "body": mock_http.user_with_unscoped_permissions(["DATASET_READ"])}
 mock_send_unscoped_and_data(_) := {"status_code": 200, "body": {
 	"userId": "test-user-123",
 	"externalId": "test-user-123",
@@ -744,6 +745,15 @@ test_mixed_unscoped_and_scoped_data_endpoint if {
 	result := authz.decision with http.send as mock_send_unscoped_and_data
 		with data.config as mock_http.mock_config
 		with input as portal_request("GET", "/v1/datasets")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+# Test: Unscoped SYSTEM role cascades to non-TENANT resource endpoints (same as TENANT inheritance)
+test_unscoped_system_role_cascades_to_dataset_resource if {
+	result := authz.decision with http.send as mock_send_unscoped_dataset_read
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets/some-dataset-id")
 	result.allow == true
 	result.reason == "permission_granted"
 }
