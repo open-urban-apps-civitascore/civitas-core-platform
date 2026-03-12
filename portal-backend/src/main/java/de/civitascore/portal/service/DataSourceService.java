@@ -269,6 +269,24 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       entity.setDescription(input.getDescription());
     }
 
+    if (input.getConfiguration() != null) {
+      ConnectorType type = entity.getConnectorType();
+      if (type == null) {
+        throw new InvalidInputException(
+            getEntityName(), id, "Cannot set configuration without a connector type");
+      }
+      ConnectorHandler handler = connectorHandlerRegistry.getHandlerOrThrow(type);
+
+      Map<String, Object> existingConfig = copyConfiguration(entity.getConfiguration());
+
+      Map<String, Object> normalized = handler.normalizeAndValidate(input.getConfiguration());
+      Map<String, Object> encrypted = handler.encryptSensitiveFields(normalized);
+      if (existingConfig != null) {
+        restoreMaskedValues(encrypted, existingConfig, handler, normalized);
+      }
+      entity.setConfiguration(encrypted);
+    }
+
     if (input.getAssignments() != null) {
       Set<Assignment> assignments =
           input.getAssignments().stream()

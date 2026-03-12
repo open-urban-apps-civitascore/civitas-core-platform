@@ -126,7 +126,8 @@ public class DataSourceController
   @Operation(
       summary = "Update metadata of a published data source",
       description =
-          "Updates only name, description, and assignments on a data source in AVAILABLE status.")
+          "Updates name, description, connector configuration, and assignments on a data source in"
+              + " AVAILABLE status.")
   public ResponseEntity<DataSourceOutputDTO> updatePublishedMeta(
       @PathVariable UUID id, @Valid @RequestBody DataSourceMetaInputDTO input) {
     DataSource updated = getService().updatePublishedMeta(id, input);

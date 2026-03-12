@@ -384,6 +384,112 @@ class DataSourceServiceTest {
       assertThat(result.getName()).isEqualTo("updated-name");
       assertThat(result.getDescription()).isEqualTo("original-desc");
     }
+
+    @Test
+    @DisplayName("Should update configuration of AVAILABLE data source")
+    void shouldUpdateConfigurationOfAvailableDataSource() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("mqtt-source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setConnectorType(ConnectorType.MQTT);
+      entity.setConfiguration(
+          new java.util.HashMap<>(
+              Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("old/topic"))));
+
+      Map<String, Object> newConfig =
+          new java.util.HashMap<>(
+              Map.of("urls", List.of("tcp://broker:1883"), "topics", List.of("new/topic")));
+
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
+      input.setName("mqtt-source");
+      input.setConfiguration(newConfig);
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.MQTT)).thenReturn(mqttHandler);
+      when(mqttHandler.normalizeAndValidate(any())).thenReturn(newConfig);
+      when(mqttHandler.encryptSensitiveFields(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(mqttHandler.getSensitiveFields()).thenReturn(Set.of());
+      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+
+      assertThat(result.getConfiguration()).containsEntry("topics", List.of("new/topic"));
+    }
+
+    @Test
+    @DisplayName("Should restore masked sensitive fields when updating configuration")
+    void shouldRestoreMaskedFieldsWhenUpdatingConfiguration() {
+      UUID id = UUID.randomUUID();
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("sql-source");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setConnectorType(ConnectorType.SQL);
+      entity.setConfiguration(
+          new java.util.HashMap<>(
+              Map.of("driver", "postgres", "dsn", "postgres://host/db", "password", "enc_secret")));
+
+      Map<String, Object> normalized =
+          new java.util.HashMap<>(
+              Map.of(
+                  "driver", "postgres",
+                  "dsn", "postgres://new-host/db",
+                  "password", ConnectorHandler.MASKED_VALUE));
+      Map<String, Object> encrypted =
+          new java.util.HashMap<>(
+              Map.of(
+                  "driver", "postgres",
+                  "dsn", "postgres://new-host/db",
+                  "password", "enc_garbage"));
+
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
+      input.setName("sql-source");
+      input.setConfiguration(
+          new java.util.HashMap<>(
+              Map.of(
+                  "driver", "postgres",
+                  "dsn", "postgres://new-host/db",
+                  "password", ConnectorHandler.MASKED_VALUE)));
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(connectorHandlerRegistry.getHandlerOrThrow(ConnectorType.SQL)).thenReturn(sqlHandler);
+      when(sqlHandler.normalizeAndValidate(any())).thenReturn(normalized);
+      when(sqlHandler.encryptSensitiveFields(any())).thenReturn(encrypted);
+      when(sqlHandler.getSensitiveFields()).thenReturn(Set.of("password"));
+      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+
+      assertThat(result.getConfiguration()).containsEntry("password", "enc_secret");
+      assertThat(result.getConfiguration()).containsEntry("dsn", "postgres://new-host/db");
+    }
+
+    @Test
+    @DisplayName("Should not update configuration when not provided")
+    void shouldNotUpdateConfigurationWhenNotProvided() {
+      UUID id = UUID.randomUUID();
+      Map<String, Object> originalConfig =
+          new java.util.HashMap<>(Map.of("urls", List.of("tcp://broker:1883")));
+      DataSource entity = new DataSource();
+      entity.setId(id);
+      entity.setName("old-name");
+      entity.setDataSourceStatus(DataSourceStatus.AVAILABLE);
+      entity.setConnectorType(ConnectorType.MQTT);
+      entity.setConfiguration(originalConfig);
+
+      DataSourceMetaInputDTO input = new DataSourceMetaInputDTO();
+      input.setName("new-name");
+      // configuration not set — should remain unchanged
+
+      when(dataSourceRepository.findById(id)).thenReturn(Optional.of(entity));
+      when(dataSourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+      DataSource result = dataSourceService.updatePublishedMeta(id, input);
+
+      assertThat(result.getConfiguration()).isEqualTo(originalConfig);
+    }
   }
 
   @Nested
