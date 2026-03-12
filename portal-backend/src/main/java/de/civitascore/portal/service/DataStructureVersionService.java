@@ -107,21 +107,16 @@ public class DataStructureVersionService
             "version", existingEntity.getId(), "Version cannot be null or blank");
       }
 
-      if (existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT) {
-        boolean inUse = dataSourceRepository.existsByDataStructureVersionId(existingEntity.getId());
-        if (inUse) {
-          // Version is in use: block all structural changes, allow only description and modelName
-          input.setModelAtlasUri(existingEntity.getModelAtlasUri());
-          input.setVersion(existingEntity.getVersion());
-          input.setStyles(
-              existingEntity.getStyles() != null
-                  ? new HashMap<>(existingEntity.getStyles())
-                  : new HashMap<>());
-          input.setModel(null);
-        } else {
-          // Version is not in use: allow full update including model, styles, version
-          validateModelForUpdate(input);
-        }
+      if (existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT
+          && dataSourceRepository.existsByDataStructureVersionId(existingEntity.getId())) {
+        // Version is in use: block all structural changes, allow only description and modelName
+        input.setModelAtlasUri(existingEntity.getModelAtlasUri());
+        input.setVersion(existingEntity.getVersion());
+        input.setStyles(
+            existingEntity.getStyles() != null
+                ? new HashMap<>(existingEntity.getStyles())
+                : new HashMap<>());
+        input.setModel(null);
       } else {
         validateModelForUpdate(input);
       }
