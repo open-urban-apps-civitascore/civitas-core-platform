@@ -70,7 +70,7 @@ export const VersionsTab = (props: VersionsTabProps) => {
 
   const CustomElement = (
     <Button data-testid="addVersionButton" onClick={() => handleNavigate(createVersionPath)}>
-      <Plus /> 
+      <Plus />
       {t('newVersion')}
     </Button>
   )
