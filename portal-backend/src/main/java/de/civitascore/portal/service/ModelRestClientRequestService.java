@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import de.civitascore.portal.configuration.ModelAtlasConfig;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.ExternalSystemTimeoutException;
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -88,7 +89,7 @@ public class ModelRestClientRequestService {
           .uri(getUploadEndpoint(nsUri))
           .contentType(UML)
           .accept(MediaType.APPLICATION_JSON)
-          .body(modelContent)
+          .body(modelContent.getBytes(StandardCharsets.UTF_8))
           .retrieve()
           .body(String.class);
     } catch (ResourceAccessException e) {
