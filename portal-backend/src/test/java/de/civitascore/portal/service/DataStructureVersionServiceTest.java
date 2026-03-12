@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -142,6 +143,46 @@ class DataStructureVersionServiceTest {
       dataStructureVersionService.deleteById(versionId);
 
       verify(dataStructureVersionRepository).deleteById(versionId);
+    }
+  }
+
+  @Nested
+  @DisplayName("Model upload with special characters")
+  class ModelUploadUmlautTests {
+
+    @Test
+    @DisplayName("Should pass German umlauts through to ModelService without corruption")
+    void shouldPreserveUmlautsOnCreate() {
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure dataStructure = new DataStructure();
+      dataStructure.setId(dataStructureId);
+      dataStructure.setDataStructureStatus(DataStructureStatus.DRAFT);
+
+      String modelWithUmlauts = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><model>äöüÄÖÜß</model>";
+      String nsUri = "http://example.com/model";
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setVersion("1.0.0");
+      input.setDataStructureId(dataStructureId);
+      input.setModel(modelWithUmlauts);
+      input.setModelAtlasUri(nsUri);
+
+      DataStructureVersion newEntity = new DataStructureVersion();
+      newEntity.setVersion("1.0.0");
+      newEntity.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      newEntity.setModelAtlasUri(nsUri);
+
+      when(dataStructureVersionMapper.toEntity(any())).thenReturn(newEntity);
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
+      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
+              dataStructureId, "1.0.0"))
+          .thenReturn(Set.of());
+      when(dataStructureVersionRepository.save(any())).thenReturn(newEntity);
+
+      dataStructureVersionService.create(input);
+
+      verify(modelService).uploadModelString(eq(modelWithUmlauts), eq(nsUri));
     }
   }
 
