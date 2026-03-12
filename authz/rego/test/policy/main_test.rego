@@ -112,6 +112,39 @@ mock_send_and_mixed_scopes(_) := {"status_code": 200, "body": mock_http.user_wit
 
 mock_send_tenant_both_and_perms(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["DATASET_UPDATE", "DATASET_RELEASE"], "TENANT", "tenant-1")}
 
+# --- Unscoped SYSTEM role mocks ---
+mock_send_unscoped_admin(_) := {"status_code": 200, "body": mock_http.user_with_unscoped_permissions(["USER_READ", "USER_CREATE", "USER_UPDATE", "USER_DELETE"])}
+mock_send_unscoped_and_data(_) := {"status_code": 200, "body": {
+	"userId": "test-user-123",
+	"externalId": "test-user-123",
+	"groups": [
+		{
+			"id": "group-sys",
+			"name": "System Group",
+			"assignments": [{
+				"roleId": "role-sys",
+				"roleName": "Tenant Admin",
+				"roleType": "SYSTEM",
+				"scopeType": null,
+				"scopeId": null,
+				"permissions": ["USER_READ", "USER_CREATE"],
+			}],
+		},
+		{
+			"id": "group-data",
+			"name": "Data Group",
+			"assignments": [{
+				"roleId": "role-data",
+				"roleName": "Data Owner",
+				"roleType": "DATA",
+				"scopeType": "TENANT",
+				"scopeId": null,
+				"permissions": ["DATASET_READ", "DATASET_CREATE"],
+			}],
+		},
+	],
+}}
+
 # =============================================================================
 # PERMISSION-BASED ACCESS TESTS
 # =============================================================================
@@ -661,6 +694,65 @@ test_tenant_and_permission_one_missing if {
 	result := authz.decision with http.send as mock_send_tenant_missing_one
 		with data.config as mock_http.mock_config
 		with input as portal_request("PUT", "/v1/datasets/abc/published/meta")
+	result.allow == false
+	result.reason == "permission_denied"
+}
+
+# =============================================================================
+# UNSCOPED SYSTEM ROLE TESTS
+# =============================================================================
+# SYSTEM roles have scopeType=null (unscoped) but grant tenant-wide access.
+# These tests verify that unscoped assignments are evaluated correctly.
+
+# Test: Unscoped SYSTEM role grants access to collection endpoints
+test_unscoped_system_role_collection if {
+	result := authz.decision with http.send as mock_send_unscoped_admin
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/users")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+# Test: Unscoped SYSTEM role grants access to resource endpoints
+test_unscoped_system_role_resource if {
+	result := authz.decision with http.send as mock_send_unscoped_admin
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/users/abc-123")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+# Test: Unscoped SYSTEM role generates wildcard scope header
+test_unscoped_system_role_scope_header if {
+	result := authz.decision with http.send as mock_send_unscoped_admin
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/users")
+	result.headers["X-Allowed-Scope-Ids"] == "*"
+}
+
+# Test: Mixed groups — unscoped SYSTEM + scoped DATA — both work
+# SYSTEM role handles /v1/users, DATA role handles /v1/datasets
+test_mixed_unscoped_and_scoped_system_endpoint if {
+	result := authz.decision with http.send as mock_send_unscoped_and_data
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/users")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+test_mixed_unscoped_and_scoped_data_endpoint if {
+	result := authz.decision with http.send as mock_send_unscoped_and_data
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets")
+	result.allow == true
+	result.reason == "permission_granted"
+}
+
+# Test: Unscoped SYSTEM role denied for permission it doesn't have
+test_unscoped_system_role_wrong_permission if {
+	result := authz.decision with http.send as mock_send_unscoped_admin
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/datasets")
 	result.allow == false
 	result.reason == "permission_denied"
 }
