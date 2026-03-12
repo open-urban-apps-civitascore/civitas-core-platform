@@ -110,5 +110,9 @@ export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
   },
 )
 
-export type DatasourceCreateData = { name: string }
+export const DatasourceCreateFormSchema = z.object({
+  name: z.string().trim().min(1, 'common.errors.nameRequired'),
+})
+
+export type DatasourceCreateData = z.infer<typeof DatasourceCreateFormSchema>
 export type DatasourceUpdateData = DatasourceFormDraft & WithId

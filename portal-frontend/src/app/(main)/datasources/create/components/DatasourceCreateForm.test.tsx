@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { AxiosError } from 'axios'
 import { vi } from 'vitest'
 
 import { DatasourceCreateForm } from './DatasourceCreateForm'
 
 const mockPush = vi.fn()
 const mockMutate = vi.fn()
+const mockHandleConflictErrors = vi.fn()
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -23,6 +25,12 @@ vi.mock('@/app/services/api/datasources/clientRequests', () => ({
   useCreateDatasource: () => ({
     mutate: mockMutate,
     isPending: false,
+  }),
+}))
+
+vi.mock('@/hooks/use-form-error', () => ({
+  useFormError: () => ({
+    handleConflictErrors: mockHandleConflictErrors,
   }),
 }))
 
@@ -85,6 +93,35 @@ describe('DatasourceCreateForm', () => {
         }),
         expect.any(Object),
       )
+    })
+  })
+
+  test('calls the shared error handler when the request returns an error', async () => {
+    mockMutate.mockImplementation((_data, options) => {
+      options?.onError?.({
+        response: {
+          status: 409,
+        },
+      } as AxiosError)
+    })
+
+    setup()
+    const nameInput = screen.getByRole('textbox')
+    fireEvent.change(nameInput, { target: { value: 'Test Datasource' } })
+    fireEvent.click(screen.getByTestId('submitButton'))
+
+    await waitFor(() => {
+      expect(mockHandleConflictErrors).toHaveBeenCalledWith({
+        error: expect.objectContaining({
+          response: expect.objectContaining({
+            status: 409,
+          }),
+        }),
+        form: expect.any(Object),
+        fields: ['name'],
+        fallbackMessage: 'errors.creationError',
+        shouldShowToastOnConflictError: false,
+      })
     })
   })
 })

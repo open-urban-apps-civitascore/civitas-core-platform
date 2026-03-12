@@ -50,7 +50,8 @@
       "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
       "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden. Überprüfen Sie Ihre Eingaben.",
       "statusChangeError": "Beim Ändern des Verfügbarkeitsstatus ist ein Fehler aufgetreten.",
-      "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten."
+      "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten.",
+      "nameExists": "Der Name ist bereits vergeben. Bitte wählen sie einen anderen Namen."
     },
     "items": {
       "data": "Daten",
@@ -475,7 +476,9 @@
     },
     "errors": {
       "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
-      "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)"
+      "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)",
+      "creationError": "Beim Anlegen der Datenquelle ist ein Felher aufgetreten.",
+      "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten"
     },
     "connection": {
       "active": "aktiv",

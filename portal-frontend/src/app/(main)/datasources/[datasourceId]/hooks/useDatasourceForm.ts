@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { AxiosError } from 'axios'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
@@ -21,6 +22,7 @@ import { getConnectorDefaults } from '@/utils/connectors'
 import { pickDirtyValues } from '@/utils/form'
 
 export const useDatasourceForm = (datasource: Datasource) => {
+  const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
 
   const defaultValues = useMemo(() => {
@@ -36,6 +38,13 @@ export const useDatasourceForm = (datasource: Datasource) => {
 
   const updateDatasource = useUpdateDatasource()
   const isLoading = updateDatasource.isPending
+
+  const handleRequestError = (error: unknown) => {
+    if ((error as AxiosError).response?.status === 409) {
+      form.setError('name', { type: 'manual', message: 'common.errors.nameExists' })
+      toast.error(tCommon('errors.nameExists'))
+    } else toast.error(t('errors.updateError'))
+  }
 
   const form = useForm<DatasourceFormDraft>({
     resolver: zodResolver(DatasourceFormDraftSchema),
@@ -142,7 +151,10 @@ export const useDatasourceForm = (datasource: Datasource) => {
       id: datasource.id,
     } as DatasourceUpdateData
 
-    updateDatasource.mutate(apiPayload, { onSuccess: () => onSuccess?.() })
+    updateDatasource.mutate(apiPayload, {
+      onSuccess: () => onSuccess?.(),
+      onError: (error: unknown) => handleRequestError(error),
+    })
   }
 
   return {
