@@ -56,6 +56,7 @@ export const DatasourceBaseFormSchema = z.object({
   id: z.string(),
   name: z.string().trim().min(1, 'common.errors.nameRequired'),
   description: z.string().trim().max(150, 'common.errors.descriptionMaxLength'),
+  dataSourceStatus: DatasourceStatusSchema,
   dataStructureVersionId: z.string().trim().min(1, 'datasources.errors.required').nullable(),
   assignments: AssignmentScopedInputSchema.array(),
 })
@@ -63,6 +64,10 @@ export const DatasourceBaseFormSchema = z.object({
 export type DatasourceBaseFormData = z.infer<typeof DatasourceBaseFormSchema>
 
 export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.partial()
+  .required({
+    id: true,
+    dataSourceStatus: true,
+  })
   .extend({
     connectorType: ConnectorTypeSchema.optional(),
     configuration: z.record(z.string(), z.unknown()).optional(),
@@ -78,6 +83,8 @@ export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.partial()
 export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.partial()
   .required({
     name: true,
+    id: true,
+    dataSourceStatus: true,
   })
   .extend({
     connectorType: ConnectorTypeSchema,
@@ -94,7 +101,7 @@ export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.partial()
 export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>
 
 export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
-  ({ id, name, description, dataStructureVersion, connectorType, configuration }) => {
+  ({ id, name, description, dataSourceStatus, dataStructureVersion, connectorType, configuration }) => {
     const connectorParsed =
       connectorType && configuration ? ConnectorApiToFormSchema.safeParse({ connectorType, configuration }) : null
     if (connectorParsed && !connectorParsed.success) {
@@ -104,6 +111,7 @@ export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
       id,
       name: name ?? '',
       description: description ?? '',
+      dataSourceStatus,
       dataStructureVersionId: dataStructureVersion?.id,
       ...(connectorParsed?.success ? connectorParsed.data : {}),
     } as DatasourceFormDraft

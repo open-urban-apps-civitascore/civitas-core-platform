@@ -20,6 +20,7 @@ const defaultFormValues: DatasourceBaseFormData = {
   id: '1',
   name: '',
   description: '',
+  dataSourceStatus: 'DRAFT',
   dataStructureVersionId: '',
   assignments: [],
 }

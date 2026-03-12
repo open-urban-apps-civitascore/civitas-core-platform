@@ -104,10 +104,12 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     form: datasourceForm,
     readyConnectorType,
     dataSourceStatus,
+    hasStatusChanged,
     handleStatusChange,
     canSetAvailable,
     completedTabs,
     submitDatasource,
+    resetToInitialState: resetDatasourceToInitialState,
     isLoading: isLoadingDatasource,
   } = useDatasourceForm(datasource)
 
@@ -144,6 +146,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   // hasDatastructureBeenEdited && selectedDatastructureId && selectedDatastructureVersionId
 
   const resetToInitialState = () => {
+    resetDatasourceToInitialState()
     resetToInitialDatastructureState()
     setSelectedDatastructureId(initialDatastructure?.id || null)
     setSelectedDatastructureVersionId(initialDatastructureVersion?.id || null)
@@ -159,10 +162,10 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const handleExit = () => {
-    if (datasourceForm.formState.isDirty) {
+    if (datasourceForm.formState.isDirty || hasDatastructureBeenEdited || hasStatusChanged) {
       setIsExitModalOpen(true)
     } else {
-      datasourceForm.reset()
+      resetToInitialState()
       updateMode(false)
     }
   }
@@ -197,7 +200,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const isConfirmButtonDisabled =
-    !(datasourceForm.formState.isDirty || hasDatastructureBeenEdited) ||
+    !(datasourceForm.formState.isDirty || hasDatastructureBeenEdited || hasStatusChanged) ||
     !!datasourceForm.formState.errors.name ||
     (dataSourceStatus !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(datasourceForm.formState.errors).length > 0) ||
     isLoadingDatasource

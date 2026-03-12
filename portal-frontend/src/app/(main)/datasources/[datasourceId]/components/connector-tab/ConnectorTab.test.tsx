@@ -80,8 +80,11 @@ vi.mock('./connectorSources', () => ({
 }))
 
 const defaultValues: DatasourceFormDraft = {
+  id: '1',
   name: '',
   description: '',
+  dataSourceStatus: 'DRAFT',
+  assignments: [],
   connectorType: 'MQTT',
   configuration: {
     urls: '',

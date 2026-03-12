@@ -2,7 +2,7 @@ import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
 import { useDeleteMutation } from '@/hooks/use-delete-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
-import { GetItemInput, GetListInput } from '@/types/common'
+import { GetItemInput, GetListInput, WithId } from '@/types/common'
 import { Datasource, DatasourceCreateData, DatasourceUpdateData } from '@/types/datasources'
 
 const key = 'datasources'
@@ -38,6 +38,31 @@ export const useUpdateDatasource = () =>
     key,
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while updating datasource',
+  })
+
+export const useUpdateDatasourcePublished = () =>
+  useUpdateMutation<Datasource, DatasourceUpdateData>({
+    method: 'PUT',
+    key,
+    endpoint: ({ id }) => `/datasources/${id}/published/meta`,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while updating datasource',
+  })
+
+export const usePublishDatasource = () =>
+  useCreateMutation<Datasource, WithId>({
+    key,
+    endpoint: ({ id }) => `/datasources/${id}/publish`,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while publishing datasource',
+  })
+
+export const useUnpublishDatasource = () =>
+  useCreateMutation<Datasource, WithId>({
+    key,
+    endpoint: ({ id }) => `/datasources/${id}/unpublish`,
+    headers: { 'x-api-request': 'true' },
+    errorMessage: 'An error occurred while publishing datasource',
   })
 
 export const useDeleteDatasource = () =>

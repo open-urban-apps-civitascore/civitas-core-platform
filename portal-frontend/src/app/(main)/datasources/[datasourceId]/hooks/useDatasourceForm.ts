@@ -5,7 +5,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
+import {
+  usePublishDatasource,
+  useUnpublishDatasource,
+  useUpdateDatasource,
+  useUpdateDatasourcePublished,
+} from '@/app/services/api/datasources/clientRequests'
 import { ConnectorFormToApiSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
   Datasource,
@@ -25,19 +30,27 @@ export const useDatasourceForm = (datasource: Datasource) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
 
-  const defaultValues = useMemo(() => {
-    const parsedDatasource = DatasourceApiToFormSchema.parse(datasource)
-
+  const mapDatasourceToFormValues = (source: Datasource) => {
+    const parsedDatasource = DatasourceApiToFormSchema.parse(source)
     return {
       ...parsedDatasource,
       dataStructureVersionId: parsedDatasource.dataStructureVersionId ?? null,
     }
+  }
+
+  const defaultValues = useMemo(() => {
+    return mapDatasourceToFormValues(datasource)
   }, [datasource])
 
-  const [dataSourceStatus, setDataSourceStatus] = useState<DatasourceStatusType>(datasource.dataSourceStatus)
-
   const updateDatasource = useUpdateDatasource()
-  const isLoading = updateDatasource.isPending
+  const updatePublishedDatasource = useUpdateDatasourcePublished()
+  const publishDatasource = usePublishDatasource()
+  const unpublishDatasource = useUnpublishDatasource()
+  const isLoading =
+    updateDatasource.isPending ||
+    updatePublishedDatasource.isPending ||
+    publishDatasource.isPending ||
+    unpublishDatasource.isPending
 
   const handleRequestError = (error: unknown) => {
     if ((error as AxiosError).response?.status === 409) {
@@ -58,6 +71,7 @@ export const useDatasourceForm = (datasource: Datasource) => {
   }, [datasource])
 
   const formValues = useWatch({ control: form.control })
+  const dataSourceStatus = form.watch('dataSourceStatus')
   const connectorTypeWatch = formValues.connectorType
   const nameWatch = formValues.name ?? ''
   const dataStructureVersionIdWatch = form.watch('dataStructureVersionId')
@@ -79,6 +93,7 @@ export const useDatasourceForm = (datasource: Datasource) => {
   }, [connectorTypeWatch, form])
 
   const isDraftMode = dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
+  const hasStatusChanged = dataSourceStatus !== datasource.dataSourceStatus
 
   // Zod v4 discriminatedUnion safeParse can throw on stale keys
   const canSetAvailable = useMemo(() => {
@@ -102,11 +117,11 @@ export const useDatasourceForm = (datasource: Datasource) => {
   // Revert to draft when required fields become empty
   useEffect(() => {
     if (dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
-      setDataSourceStatus(DATASOURCE_STATUS_TYPES.DRAFT)
+      form.setValue('dataSourceStatus', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSetAvailable, dataSourceStatus])
+  }, [canSetAvailable, dataSourceStatus, form])
 
   const completedTabs = useMemo((): DatasourceTab[] => {
     const completed: DatasourceTab[] = []
@@ -121,51 +136,102 @@ export const useDatasourceForm = (datasource: Datasource) => {
     return completed
   }, [nameWatch, formValues, dataStructureVersionIdWatch])
 
-  const handleStatusChange = (newStatus: DatasourceStatusType) => {
-    setDataSourceStatus(newStatus)
+  const handleStatusChange = (newStatus: DatasourceStatusType) =>
+    form.setValue('dataSourceStatus', newStatus, { shouldDirty: true })
+
+  const handleStatusUpdate = async (mutateAsync: (payload: { id: string }) => Promise<{ data: Datasource }>) => {
+    try {
+      const response = await mutateAsync({ id: datasource.id })
+      toast.success(tCommon('success.statusChangeSuccess'))
+      return response.data
+    } catch (error) {
+      toast.error(tCommon('errors.statusChangeError'))
+      throw error
+    }
+  }
+
+  const handleUpdateValues = async (values: DatasourceUpdateData) => {
+    try {
+      const response =
+        datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
+          ? await updatePublishedDatasource.mutateAsync({ ...values, name: nameWatch })
+          : await updateDatasource.mutateAsync(values)
+
+      toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.datasource') }))
+      return response.data
+    } catch (error) {
+      handleRequestError(error)
+      throw error
+    }
   }
 
   const submitDatasource = (onSuccess?: () => void) => {
-    const values = form.getValues()
-    const parsed = isDraftMode
-      ? DatasourceFormDraftSchema.safeParse(values)
-      : DatasourceFormAvailableSchema.safeParse(values)
-    if (!parsed.success) {
-      console.error(parsed.error)
-      toast.error('Form data invalid')
-      return
-    }
+    void (async () => {
+      const values = form.getValues()
+      const parsed = isDraftMode
+        ? DatasourceFormDraftSchema.safeParse(values)
+        : DatasourceFormAvailableSchema.safeParse(values)
+      if (!parsed.success) {
+        console.error(parsed.error)
+        toast.error(tCommon('errors.formInvalid'))
+        return
+      }
 
-    const dirtyFields = form.formState.dirtyFields
-    const dirtyValues = pickDirtyValues(parsed.data as Record<string, unknown>, dirtyFields)
+      const dirtyFields = form.formState.dirtyFields
+      const dirtyValues = pickDirtyValues(parsed.data as Record<string, unknown>, dirtyFields)
 
-    // Transform configuration to API format (needs full values for discriminated union)
-    const connectorParsed = ConnectorFormToApiSchema.safeParse(parsed.data)
-    const configuration = connectorParsed.success
-      ? connectorParsed.data.configuration
-      : (dirtyValues as Record<string, unknown>).configuration
+      // Transform configuration to API format (needs full values for discriminated union)
+      const connectorParsed = ConnectorFormToApiSchema.safeParse(parsed.data)
+      const configuration = connectorParsed.success
+        ? connectorParsed.data.configuration
+        : (dirtyValues as Record<string, unknown>).configuration
 
-    const apiPayload = {
-      ...dirtyValues,
-      ...(configuration ? { configuration } : {}),
-      id: datasource.id,
-    } as DatasourceUpdateData
+      const apiPayload = {
+        ...dirtyValues,
+        ...(dirtyFields.configuration ? { configuration } : {}),
+        id: datasource.id,
+      } as DatasourceUpdateData
 
-    updateDatasource.mutate(apiPayload, {
-      onSuccess: () => onSuccess?.(),
-      onError: (error: unknown) => handleRequestError(error),
-    })
+      const shouldUpdateValues = Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus')
+      const shouldPublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
+      const shouldUnpublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
+
+      try {
+        let datasourceResponse: Datasource | null = shouldUpdateValues ? await handleUpdateValues(apiPayload) : null
+
+        if (shouldPublish) {
+          datasourceResponse = await handleStatusUpdate(publishDatasource.mutateAsync)
+        }
+        if (shouldUnpublish) {
+          datasourceResponse = await handleStatusUpdate(unpublishDatasource.mutateAsync)
+        }
+
+        if (datasourceResponse) {
+          form.reset(mapDatasourceToFormValues(datasourceResponse))
+        }
+
+        onSuccess?.()
+      } catch (error) {
+        console.error('An error occurred while submitting datasource data.', (error as AxiosError).message)
+      }
+    })()
+  }
+
+  const resetToInitialState = () => {
+    form.reset(defaultValues)
   }
 
   return {
     form,
     readyConnectorType,
     dataSourceStatus,
+    hasStatusChanged,
     handleStatusChange,
     isDraftMode,
     canSetAvailable,
     completedTabs,
     submitDatasource,
+    resetToInitialState,
     isLoading,
   }
 }
