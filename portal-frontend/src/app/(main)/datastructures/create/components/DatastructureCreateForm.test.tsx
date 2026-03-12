@@ -1,11 +1,25 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 
 import { DatastructureCreateForm } from './DatastructureCreateForm'
 
 const mockPush = vi.fn()
-const mockMutate = vi.fn()
+const mockSaveDatastructure = vi.fn()
+
+const mockForm = {
+  formState: { isDirty: false, errors: {} },
+  control: {},
+  handleSubmit: vi.fn((callback: () => Promise<void> | void) => async (event?: Event) => {
+    event?.preventDefault?.()
+    return callback()
+  }),
+}
+
+const mockHookState = {
+  form: mockForm,
+  isLoading: false,
+  saveDatastructure: mockSaveDatastructure,
+}
 
 vi.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -19,25 +33,30 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('page=1'),
 }))
 
-vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
-  useCreateDatastructure: () => ({
-    mutate: mockMutate,
-    isPending: false,
-  }),
+vi.mock('../../[datastructureId]/hooks/useDatastructureCreation', () => ({
+  useDatastructureCreation: () => mockHookState,
 }))
 
-const setup = () => {
-  const client = new QueryClient()
-  return render(
-    <QueryClientProvider client={client}>
-      <DatastructureCreateForm />
-    </QueryClientProvider>,
-  )
-}
+vi.mock('@/components/ui/form', () => ({
+  Form: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}))
+
+vi.mock('@/components/form/fields/TextField', () => ({
+  TextField: ({ placeholder }: { placeholder: string }) => <input aria-label="name" placeholder={placeholder} />,
+}))
+
+vi.mock('@/components/loading-spinner/LoadingSpinner', () => ({
+  LoadingSpinner: () => <div data-testid="loadingSpinner" />,
+}))
+
+const setup = () => render(<DatastructureCreateForm />)
 
 describe('DatastructureCreateForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockForm.formState.isDirty = false
+    mockHookState.isLoading = false
+    mockHookState.saveDatastructure = mockSaveDatastructure
   })
 
   test('renders the form with correct elements', () => {
@@ -60,9 +79,10 @@ describe('DatastructureCreateForm', () => {
   })
 
   test('submit button is enabled after changing form values', () => {
+    mockForm.formState.isDirty = true
+
     setup()
-    const nameInput = screen.getByRole('textbox')
-    fireEvent.change(nameInput, { target: { value: 'Test Datastructure' } })
+
     expect(screen.getByTestId('submitButton')).toBeEnabled()
   })
 
@@ -73,40 +93,59 @@ describe('DatastructureCreateForm', () => {
   })
 
   test('calls createDatastructure mutation on form submission', async () => {
+    mockForm.formState.isDirty = true
+    mockSaveDatastructure.mockResolvedValue({ id: 'test-id' })
+
     setup()
-    const nameInput = screen.getByRole('textbox')
-    fireEvent.change(nameInput, { target: { value: 'Test Datastructure' } })
     fireEvent.click(screen.getByTestId('submitButton'))
 
     await waitFor(() => {
-      expect(mockMutate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Test Datastructure',
-          description: '',
-          createdFromDataSource: false,
-          dataStructureVersionIds: [],
-          assignments: [],
-        }),
-        expect.any(Object),
-      )
+      expect(mockSaveDatastructure).toHaveBeenCalledTimes(1)
     })
+    expect(mockPush).toHaveBeenCalledWith('/datastructures/test-id?mode=edit')
+  })
+
+  test('submits via saveDatastructure and navigates to edit mode when creation succeeds', async () => {
+    mockForm.formState.isDirty = true
+    mockSaveDatastructure.mockResolvedValue({ id: 'test-id' })
+
+    setup()
+    fireEvent.click(screen.getByTestId('submitButton'))
+
+    await waitFor(() => {
+      expect(mockSaveDatastructure).toHaveBeenCalledTimes(1)
+      expect(mockPush).toHaveBeenCalledWith('/datastructures/test-id?mode=edit')
+    })
+  })
+
+  test('does not navigate when saveDatastructure returns no response', async () => {
+    mockForm.formState.isDirty = true
+    mockSaveDatastructure.mockResolvedValue(undefined)
+
+    setup()
+    fireEvent.click(screen.getByTestId('submitButton'))
+
+    await waitFor(() => {
+      expect(mockSaveDatastructure).toHaveBeenCalledTimes(1)
+    })
+
+    expect(mockPush).not.toHaveBeenCalled()
   })
 })
 
 describe('DatastructureCreateForm loading state', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockForm.formState.isDirty = true
+    mockHookState.isLoading = true
   })
 
   test('shows loading spinner when form is submitting', () => {
-    vi.doMock('@/app/services/api/datastructures/clientRequests', () => ({
-      useCreateDatastructure: () => ({
-        mutate: mockMutate,
-        isPending: true,
-      }),
-    }))
+    setup()
 
-    // Note: This test would require re-importing the component after doMock
-    // For now, we verify the submit button is disabled during pending state
+    expect(screen.getByTestId('loadingSpinner')).toBeInTheDocument()
+    expect(screen.queryByPlaceholderText('form.namePlaceholder')).not.toBeInTheDocument()
+    expect(screen.getByTestId('submitButton')).toBeDisabled()
+    expect(screen.getByTestId('cancelButton')).toBeDisabled()
   })
 })

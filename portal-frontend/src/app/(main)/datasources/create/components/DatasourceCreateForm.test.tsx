@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { AxiosError } from 'axios'
 import { vi } from 'vitest'
 
 import { DatasourceCreateForm } from './DatasourceCreateForm'
@@ -85,6 +86,25 @@ describe('DatasourceCreateForm', () => {
         }),
         expect.any(Object),
       )
+    })
+  })
+
+  test('shows a name field error when the request returns a conflict error', async () => {
+    mockMutate.mockImplementation((_data, options) => {
+      options?.onError?.({
+        response: {
+          status: 409,
+        },
+      } as AxiosError)
+    })
+
+    setup()
+    const nameInput = screen.getByRole('textbox')
+    fireEvent.change(nameInput, { target: { value: 'Test Datasource' } })
+    fireEvent.click(screen.getByTestId('submitButton'))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('nameFormMessage')).toHaveTextContent('common.errors.nameExists')
     })
   })
 })

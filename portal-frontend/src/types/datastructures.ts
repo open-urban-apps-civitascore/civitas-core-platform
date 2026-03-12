@@ -59,6 +59,7 @@ export const DatastructureVersionSummaryApiResponseSchema = z.object({
   dataStructureVersionSource: DatastructureVersionSourceEnum,
   createdAt: z.string(),
   modifiedAt: z.string(),
+  dataStructureId: z.string(),
 })
 
 export const DatastructureVersionFormDraftSchema = z.object({

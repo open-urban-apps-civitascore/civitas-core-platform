@@ -1,12 +1,8 @@
 'use client'
 
-import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useForm } from 'react-hook-form'
-import { toast } from 'sonner'
 
-import { useCreateDatastructure } from '@/app/services/api/datastructures/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { TextField } from '@/components/form/fields/TextField'
@@ -17,11 +13,8 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
-import {
-  DatastructureCreateDataSchema,
-  DatastructureCreateFormData,
-  DatastructureCreateFormSchema,
-} from '@/types/datastructures'
+
+import { useDatastructureCreation } from '../../[datastructureId]/hooks/useDatastructureCreation'
 
 export const DatastructureCreateForm = () => {
   const t = useTranslations('datastructures')
@@ -30,38 +23,12 @@ export const DatastructureCreateForm = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const createDatastructure = useCreateDatastructure()
-  const isLoading = createDatastructure.isPending
+  const { form, isLoading, saveDatastructure } = useDatastructureCreation()
 
-  const form = useForm<DatastructureCreateFormData>({
-    resolver: zodResolver(DatastructureCreateFormSchema),
-    defaultValues: { name: '' },
-  })
-
-  const handleCreateDatastructure = async (formData: DatastructureCreateFormData) => {
-    const createDatastructureData = {
-      name: formData.name,
-      description: '',
-      createdFromDataSource: false,
-      dataStructureVersionIds: [],
-      assignments: [],
-    }
-    const parsed = DatastructureCreateDataSchema.safeParse(createDatastructureData)
-    if (!parsed.success) {
-      console.error(parsed.error)
-      toast.error(tCommon('errors.formInvalid'))
-      return
-    }
-
-    createDatastructure.mutate(parsed.data, {
-      onSuccess: ({ data }) => {
-        toast.success(t('messages.createSuccess'))
-        router.push(`/datastructures/${data.id}?mode=edit`)
-      },
-      onError: () => toast.error(tCommon('errors.unexpectedError')),
-    })
+  const handleCreateDatastructure = async () => {
+    const response = await saveDatastructure()
+    if (response) router.push(`/datastructures/${response?.id}?mode=edit`)
   }
-
   const handleCancel = () => {
     router.push(`/datastructures?${searchParams.toString()}`)
   }

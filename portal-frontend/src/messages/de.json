@@ -28,7 +28,8 @@
       "exit": "Beenden",
       "assignItem": "{item} hinzufügen",
       "assignTo": "zu {item}",
-      "back": "Zurück"
+      "back": "Zurück",
+      "import": "Importieren"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -49,7 +50,8 @@
       "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
       "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden. Überprüfen Sie Ihre Eingaben.",
       "statusChangeError": "Beim Ändern des Verfügbarkeitsstatus ist ein Fehler aufgetreten.",
-      "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten."
+      "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten.",
+      "nameExists": "Der Name ist bereits vergeben. Bitte wählen sie einen anderen Namen."
     },
     "items": {
       "data": "Daten",
@@ -80,7 +82,8 @@
     },
     "success": {
       "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert.",
-      "deletionSuccess": "{item} wurde erfolgreich gelöscht."
+      "deletionSuccess": "{item} wurde erfolgreich gelöscht.",
+      "creationSuccess": "{item} wurde erfolgreich angelegt."
     },
     "status": {
       "DRAFT": "Entwurf",
@@ -602,7 +605,9 @@
     },
     "errors": {
       "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
-      "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)"
+      "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)",
+      "creationError": "Beim Anlegen der Datenquelle ist ein Felher aufgetreten.",
+      "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten"
     },
     "connection": {
       "active": "aktiv",
@@ -641,6 +646,22 @@
       "type": "Typ",
       "connection": "Verbindung",
       "establishConnection": "Verbindung herstellen"
+    },
+    "dataModel": {
+      "placeholder": {
+        "title": "Keine Datenstruktur importiert",
+        "description1": "Importieren Sie eine existierende Datenstruktur aus der Plattform, um sie in dieser Datenquelle zu nutzen.",
+        "noDatastructures": "Noch keine Datenstrukturen vorhanden?",
+        "creationSteps": {
+          "step1": "Diese Datenquelle als Entwurf speichern",
+          "step2": "Eine Datenstruktur in <link>Datenstrukturen</link> erstellen",
+          "step3": "Wieder hierher zurückkommen und die Datenstruktur importieren"
+        }
+      },
+      "importModal": {
+        "title": "Datenmodell importieren",
+        "to": "in {name}"
+      }
     }
   },
   "datastructures": {
@@ -685,7 +706,8 @@
       "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Datenstruktur bereits verwendet wird."
     },
     "errors": {
-      "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten."
+      "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten.",
+      "creationError": "Beim Anlegen der Datenstruktur ist ein Felher aufgetreten."
     },
     "infoModal": {
       "title": "Datenstruktur kann nicht gelöscht werden",
@@ -866,6 +888,11 @@
     "closeTabModal": {
       "title": "Modell wirklich verwerfen?",
       "description": "Diese Aktion löscht das Modell. Sie kann nicht rückgängig gemacht werden."
+    },
+    "import": {
+      "title": "Importieren",
+      "fromPlatform": "aus der Plattform",
+      "fromFile": "aus Datei"
     }
   }
 }
