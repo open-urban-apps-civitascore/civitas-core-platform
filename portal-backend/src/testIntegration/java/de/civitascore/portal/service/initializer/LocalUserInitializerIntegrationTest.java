@@ -25,7 +25,6 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   private static final String TEST_SYNC_EMAIL = "init-sync@example.com";
   private static final String TEST_GROUP_NAME = "Init Test Admins";
   private static final String TEST_SCOPED_GROUP_NAME = "Init Test Architects";
-  private static final String TEST_EXTERNAL_ID = "00000000-0000-0000-0000-000000000002";
 
   @Autowired private LocalUserInitializer localUserInitializer;
   @Autowired private GroupRepository groupRepository;
@@ -67,8 +66,8 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   }
 
   @Test
-  @DisplayName("Should create user with pre-configured externalId")
-  void shouldCreateUserWithExternalId() {
+  @DisplayName("Should sync user to Keycloak and persist externalId automatically")
+  void shouldSyncUserAndSetExternalId() {
     localUserInitializer.initialize();
 
     Optional<User> user = userRepository.findByEmail(TEST_EMAIL);
@@ -76,7 +75,9 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
     assertThat(user.get().getFirstName()).isEqualTo("Init");
     assertThat(user.get().getLastName()).isEqualTo("TestUser");
     assertThat(user.get().getActive()).isTrue();
-    assertThat(user.get().getExternalId()).isEqualTo(TEST_EXTERNAL_ID);
+    assertThat(user.get().getExternalId()).isNotBlank();
+
+    assertThat(findKeycloakUserByEmail(TEST_EMAIL)).isNotNull();
 
     Group group = groupRepository.findByName(TEST_GROUP_NAME).orElseThrow();
     List<Group> groupsWithMembers = groupRepository.findAllByIdWithMembers(List.of(group.getId()));
