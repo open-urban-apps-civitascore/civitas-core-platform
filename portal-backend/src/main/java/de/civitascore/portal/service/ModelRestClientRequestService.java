@@ -18,8 +18,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class ModelRestClientRequestService {
 
-  private static final MediaType UML =
-      MediaType.parseMediaType("application/uml");
+  private static final MediaType UML = MediaType.parseMediaType("application/uml");
 
   private final ModelAtlasConfig modelAtlasConfig;
   private final RestClient.Builder restClientBuilder;
