@@ -96,9 +96,9 @@ public class DataStructureVersionController
 
   @PutMapping("/{versionId}/published/meta")
   @Operation(
-      summary = "Update metadata of a published data structure version",
+      summary = "Update a published data structure version",
       description =
-          "Updates only the metadata (version, modelName, styles) of a published data structure version (AVAILABLE status). Cannot modify modelAtlasUri or model. For DRAFT versions, use PUT /datastructures/{dataStructureId}/versions/{versionId} instead.")
+          "Updates a published data structure version (AVAILABLE status). If the version is not in use by any DataSource, all fields including model, modelAtlasUri, version, and styles can be updated. If the version is in use, only description and modelName can be changed. For DRAFT versions, use PUT /datastructures/{dataStructureId}/versions/{versionId} instead.")
   public ResponseEntity<DataStructureVersionOutputDTO> updatePublishedMeta(
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,

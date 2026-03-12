@@ -107,16 +107,23 @@ public class DataStructureVersionService
             "version", existingEntity.getId(), "Version cannot be null or blank");
       }
 
-      // Prevent changes to modelAtlasUri if status is not DRAFT
       if (existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT) {
-        input.setModelAtlasUri(existingEntity.getModelAtlasUri());
-        input.setVersion(existingEntity.getVersion());
-        input.setStyles(new HashMap<>(existingEntity.getStyles()));
-
-        // Also clear the model to prevent uploads for non-DRAFT versions
-        input.setModel(null);
+        boolean inUse = dataSourceRepository.existsByDataStructureVersionId(existingEntity.getId());
+        if (inUse) {
+          // Version is in use: block all structural changes, allow only description and modelName
+          input.setModelAtlasUri(existingEntity.getModelAtlasUri());
+          input.setVersion(existingEntity.getVersion());
+          input.setStyles(
+              existingEntity.getStyles() != null
+                  ? new HashMap<>(existingEntity.getStyles())
+                  : new HashMap<>());
+          input.setModel(null);
+        } else {
+          // Version is not in use: allow full update including model, styles, version
+          validateModelForUpdate(input);
+        }
       } else {
-        validateModelAndAtlasUri(input);
+        validateModelForUpdate(input);
       }
 
     } catch (InvalidInputException e) {
@@ -185,6 +192,18 @@ public class DataStructureVersionService
     }
   }
 
+  private void validateModelForUpdate(DataStructureVersionInputDTO input) {
+    boolean hasModel = StringUtils.isNotBlank(input.getModel());
+    boolean hasModelAtlasUri = StringUtils.isNotBlank(input.getModelAtlasUri());
+
+    if (hasModel && !hasModelAtlasUri) {
+      throw new InvalidInputException(
+          "DataStructureVersion",
+          "modelAtlasUri",
+          "modelAtlasUri cannot be null or blank if model is provided");
+    }
+  }
+
   /**
    * Override update to ensure it can only be called for DRAFT versions. For published versions, use
    * updatePublishedMeta instead.
@@ -205,13 +224,15 @@ public class DataStructureVersionService
   }
 
   /**
-   * Updates only the metadata (version, modelName, styles) of a published data structure version.
-   * Cannot modify modelAtlasUri or model.
+   * Updates a published data structure version. If the version is not in use by any DataSource, all
+   * fields (model, modelAtlasUri, version, styles, modelName, description) can be updated. If the
+   * version is in use, only description and modelName can be changed.
    *
    * @param id the version ID
    * @param input the update input
    * @return the updated version
    * @throws InvalidInputException if trying to update a DRAFT version
+   * @throws ResourceInUseException if trying to update restricted fields on an in-use version
    */
   @Transactional
   public DataStructureVersion updatePublishedMeta(UUID id, DataStructureVersionInputDTO input) {
