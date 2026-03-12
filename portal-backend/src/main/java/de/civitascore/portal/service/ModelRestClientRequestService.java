@@ -17,7 +17,10 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Service
 @RequiredArgsConstructor
 public class ModelRestClientRequestService {
-  private static final String UML_CONTENT_TYPE = "application/uml";
+
+  private static final MediaType UML_UTF8 =
+      MediaType.parseMediaType("application/uml;charset=UTF-8");
+
   private final ModelAtlasConfig modelAtlasConfig;
   private final RestClient.Builder restClientBuilder;
 
@@ -56,7 +59,7 @@ public class ModelRestClientRequestService {
       return restClient
           .post()
           .uri(getUploadEndpoint(nsUri))
-          .contentType(MediaType.parseMediaType(UML_CONTENT_TYPE))
+          .contentType(UML_UTF8)
           .accept(MediaType.APPLICATION_JSON)
           .body(modelFile.getResource())
           .retrieve()
@@ -84,7 +87,7 @@ public class ModelRestClientRequestService {
       return restClient
           .post()
           .uri(getUploadEndpoint(nsUri))
-          .contentType(MediaType.parseMediaType(UML_CONTENT_TYPE))
+          .contentType(UML_UTF8)
           .accept(MediaType.APPLICATION_JSON)
           .body(modelContent)
           .retrieve()

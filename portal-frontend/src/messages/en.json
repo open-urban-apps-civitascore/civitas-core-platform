@@ -89,6 +89,59 @@
     "english": "English",
     "selectLanguagePlaceholder": "Select language"
   },
+  "accessManagement": {
+    "title": "Access Management",
+    "subtitle": "Here, responsibilities and access rights are defined.",
+    "addAssignment": "Add Group",
+    "addRole": "Add Role",
+    "deleteGroup": "Remove Group",
+    "tableHeaders": {
+      "group": "Group",
+      "role": "Role",
+      "description": "Description",
+      "action": "Action"
+    },
+    "noDataPage": {
+      "title": "No groups and roles available",
+      "description": "No group has permissions."
+    },
+    "addGroupModal": {
+      "title": "Add Group",
+      "description": "Select a group to assign permissions.",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Description"
+      },
+      "noGroupsAvailable": "No groups available to add",
+      "selectAll": "Select all groups",
+      "selectGroup": "Select group",
+      "selectedGroups": "{number} selected"
+    },
+    "addRoleModal": {
+      "title": "Add Role",
+      "description": "To group {groupName}",
+      "tableHeaders": {
+        "name": "Name",
+        "description": "Description",
+        "roleType": "Type"
+      },
+      "noRolesAvailable": "No roles available to add",
+      "selectRole": "Select role",
+      "selectAll": "Select all roles",
+      "selectedRoles": "{number} selected",
+      "roleTypes": {
+        "default": "Default",
+        "custom": "Custom"
+      }
+    },
+    "infoBoxes": {
+      "firstBox": "Groups with platform-wide permissions on all data objects have access.",
+      "secondBox": "By removing your own group-role assignment, you may lose your permissions."
+    },
+    "messages": {
+      "updateSuccess": "Permissions have been successfully updated."
+    }
+  },
   "sidebar": {
     "home": "Home",
     "menu-item": "Menu Item",
@@ -168,7 +221,7 @@
         "dataFlow": {
           "title": "Data flow",
           "button": "Load and provide data",
-          "pipeline": "Pipeline",
+          "pipelines": "Pipeline",
           "sensorThingsAPI": "SensorThings API",
           "noDataFlow": "No data flow available yet."
         }
@@ -185,7 +238,8 @@
       "createSuccess": "Dataset has been successfully created.",
       "updateSuccess": "Dataset has been successfully updated.",
       "deleteSuccess": "Dataset has been successfully deleted.",
-      "deleteError": "An error occurred while deleting the dataset. Please try again."
+      "deleteError": "An error occurred while deleting the dataset. Please try again.",
+      "updateAccessManagementSuccess": "Access management has been successfully updated."
     },
     "warningModal": {
       "title": "Delete dataset?",
@@ -233,6 +287,38 @@
         "group": "Group",
         "assignment": "Assignment",
         "noRolesAssigned": "No {roleType} assigned"
+      }
+    },
+    "rolesTab": {
+      "segments": {
+        "platformWide": "Platform-wide",
+        "datasets": "Datasets",
+        "datasources": "Data Sources",
+        "datastructures": "Data Structures"
+      },
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "role": "Role",
+        "type": "Type",
+        "scope": "Scope"
+      },
+      "roleTypes": {
+        "SYSTEM": "System Role",
+        "DATA": "Data Role",
+        "GOVERNANCE": "Governance Role"
+      },
+      "types": {
+        "standard": "Standard",
+        "custom": "Custom"
+      },
+      "scopes": {
+        "platform": "Platform"
+      },
+      "scopedInfoBanner": {
+        "dataset": "Dataset-related assignments are made at the respective dataset.",
+        "datasource": "Datasource-related assignments are made at the respective datasource.",
+        "datastructure": "Datastructure-related assignments are made at the respective datastructure."
       }
     },
     "groupsTab": {
@@ -347,7 +433,6 @@
     "title": "Permissions",
     "systemPermissions": "System Permissions",
     "dataPermissions": "Daten Permissions",
-    "governancePermissions": "Governance Permissions",
     "tableHeaders": {
       "title": "Name",
       "category": "Category"
@@ -359,7 +444,6 @@
     "overView": "Overview:",
     "systemRoles": "System Roles",
     "dataRoles": "Data Roles",
-    "governanceRoles": "Governance Roles",
     "roles": "Individual Roles",
     "roleSets": "Role Sets",
     "tableHeaders": {
@@ -376,7 +460,7 @@
     "tabLabels": {
       "basicInformation": "Basic Information",
       "permissions": "Permissions",
-      "groupAssignment": "Group Assignments"
+      "groupAssignment": "Groups"
     },
     "baseInfoTab": {
       "heading": "Basic Information",
@@ -401,10 +485,20 @@
         }
       },
       "securityArea": {
-        "heading": "Sicherheitsbereich",
-        "description": "Rolle löschen",
-        "note": "Handlungsanweisung bzw. Beschreibung was passiert.",
-        "deleteButton": "Rolle löschen"
+        "heading": "Security Area",
+        "description": "Delete role",
+        "note": "Instructions or description of what happens.",
+        "deleteButton": "Delete role"
+      },
+      "deleteConfirmModal": {
+        "title": "Delete role?",
+        "description": "This action cannot be undone.",
+        "confirm": "Delete"
+      },
+      "deleteErrorModal": {
+        "title": "Role cannot be deleted",
+        "description": "All assignments to groups and scopes must be removed first.",
+        "close": "Close"
       }
     },
     "permissionsTab": {
@@ -413,6 +507,21 @@
       "selectedPersmissions": "{count} selected",
       "roleTemplate": {
         "placeholder": "Select Role as template"
+      },
+      "categories": {
+        "TENANT_ADMINISTRATION": "Tenant Management",
+        "DATA": "Data Management"
+      },
+      "dataPermissions": {
+        "dataset": "Dataset",
+        "datasetPayload": "Dataset Payload",
+        "datasource": "Datasource",
+        "datastructure": "Datastructure",
+        "read": "Read",
+        "create": "Create",
+        "update": "Update",
+        "delete": "Delete",
+        "release": "Release"
       }
     },
     "groupAssignmentTab": {
@@ -422,9 +531,32 @@
         "name": "Name",
         "usersCount": "Amount of Users",
         "contact": "Contact Person",
-        "description": "Description"
+        "description": "Description",
+        "scope": "Scope"
       },
       "noGroupsAssigned": "No groups assigned yet.",
+      "removeAssignment": "Remove assignment",
+      "removeModal": {
+        "title": "Remove Group Assignment",
+        "description": "Are you sure you want to remove the group \"{groupName}\" from this role? This action cannot be undone.",
+        "confirm": "Remove"
+      },
+      "scopeTabs": {
+        "platformWide": "Platform-wide",
+        "dataset": "Dataset",
+        "datasource": "Data Source",
+        "datastructure": "Data Structure"
+      },
+      "scopeLabels": {
+        "TENANT": "Platform-wide",
+        "DATASET": "Dataset",
+        "DATASOURCE": "Data Source",
+        "DATASTRUCTURE": "Data Structure"
+      },
+      "infoBox": "Groups that are assigned here, get the type 'platform-wide' (permissions to all data objects inside the platform)",
+      "scopeReadOnlyMessageDATASET": "Dataset-related assignments happen at the corresponding dataset",
+      "scopeReadOnlyMessageDATASOURCE": "Datasource-related assignments happen at the corresponding datasource",
+      "scopeReadOnlyMessageDATASTRUCTURE": "Datastructure-related assignments happen at the corresponding datastructure",
       "modal": {
         "title": "Add Group",
         "description": "to Role {roleName}",

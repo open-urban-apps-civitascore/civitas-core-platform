@@ -1,6 +1,7 @@
 package de.civitascore.portal.model.entity;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.base.BaseDataEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -18,6 +19,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import lombok.AccessLevel;
@@ -111,6 +113,28 @@ public class DataSet extends BaseDataEntity {
   @Column(name = "open_data_access", nullable = false)
   private Boolean openDataAccess = false;
 
+  @Column(name = "project_id")
+  private String projectId;
+
+  @Column(name = "frost_base_url", length = 500)
+  private String frostBaseUrl;
+
+  @Column(name = "route_id")
+  private String routeId;
+
+  @Column(name = "service_id")
+  private String serviceId;
+
+  @Column(name = "public_url", length = 500)
+  private String publicUrl;
+
+  @Column(name = "pipeline_ids", columnDefinition = "text[]")
+  private List<String> pipelineIds;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "pending_saga_type", length = 30)
+  private PendingSagaType pendingSagaType;
+
   @OneToMany(
       mappedBy = "dataset",
       fetch = FetchType.LAZY,
@@ -132,5 +156,14 @@ public class DataSet extends BaseDataEntity {
   public void setPipelines(Collection<Pipeline> newPipelines) {
     this.pipelines.clear();
     Optional.ofNullable(newPipelines).ifPresent(pipelines::addAll);
+  }
+
+  public void clearInfrastructureFields() {
+    this.projectId = null;
+    this.frostBaseUrl = null;
+    this.routeId = null;
+    this.serviceId = null;
+    this.publicUrl = null;
+    this.pipelineIds = null;
   }
 }

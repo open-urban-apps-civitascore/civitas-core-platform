@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.test.context.EmbeddedKafka;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.TestPropertySource;
 
 @EmbeddedKafka(
@@ -31,6 +32,7 @@ import org.springframework.test.context.TestPropertySource;
     })
 @TestPropertySource(properties = {"kafka.enabled=true"})
 @Slf4j
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class BaseEventPublishingIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @Autowired protected UserService userService;

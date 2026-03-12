@@ -2,5 +2,10 @@ package de.civitascore.portal.repository.specification;
 
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.repository.specification.base.NamedEntitySpec;
+import net.kaczmarzyk.spring.data.jpa.domain.In;
+import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
 
-public interface RoleSpec extends NamedEntitySpec<Role> {}
+@Spec(path = "roleType", params = "roleType", paramSeparator = ',', spec = In.class)
+interface RoleTypeSpec extends NamedEntitySpec<Role> {}
+
+public interface RoleSpec extends RoleTypeSpec {}

@@ -7,9 +7,10 @@ import { cn } from '@/lib/utils'
 interface LinkCellProps extends LinkProps {
   children: JSX.Element | string
   className?: string
+  target?: React.HTMLAttributeAnchorTarget
 }
 export const LinkCell = (props: LinkCellProps) => {
-  const { children, href, className, ...linkProps } = props
+  const { children, href, className, target, ...linkProps } = props
   return (
     <Link
       className={cn(
@@ -17,6 +18,7 @@ export const LinkCell = (props: LinkCellProps) => {
         className,
       )}
       href={href}
+      target={target}
       {...linkProps}
     >
       <div className="flex-1">{children}</div>

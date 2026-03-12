@@ -152,13 +152,13 @@ class ApisixAdapterProxyRewriteTest extends AbstractApisixAdapterTest {
     givenMockPutReturns(200, "{\"key\":\"routes/test-route-id\"}");
 
     RouteConfigValue routeConfig = new RouteConfigValue();
-    routeConfig.setUri("/api/v2/*");
-    routeConfig.setUpstreamId("backend-service-v2");
+    routeConfig.setUri("/api/v1/*");
+    routeConfig.setUpstreamId("backend-service-v1");
     RoutePlugins plugins = new RoutePlugins();
     ProxyRewritePlugin proxyRewrite = new ProxyRewritePlugin();
-    proxyRewrite.setRegexUri(List.of("^/api/v2/(.*)", "/$1"));
+    proxyRewrite.setRegexUri(List.of("^/api/v1/(.*)", "/$1"));
     RewriteHeaders headers = new RewriteHeaders();
-    headers.setSet(Map.of("X-API-Version", "v2"));
+    headers.setSet(Map.of("X-API-Version", "v1"));
     proxyRewrite.setHeaders(headers);
     plugins.setProxyRewrite(proxyRewrite);
     routeConfig.setPlugins(plugins);

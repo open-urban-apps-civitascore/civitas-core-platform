@@ -62,37 +62,37 @@ mock_send_and_missing_one(_) := {"status_code": 200, "body": dataset_user(["DATA
 
 # Test: Permission lookup from mappings - GET collection
 test_required_permissions_read_user if {
-	result := permission_eval.required_permissions with input as portal_request_no_auth("GET", "/v2/users")
+	result := permission_eval.required_permissions with input as portal_request_no_auth("GET", "/v1/users")
 	result == {"USER_READ"}
 }
 
 # Test: Permission lookup from mappings - POST collection
 test_required_permissions_create_dataset if {
-	result := permission_eval.required_permissions with input as portal_request_no_auth("POST", "/v2/datasets")
+	result := permission_eval.required_permissions with input as portal_request_no_auth("POST", "/v1/datasets")
 	result == {"DATASET_CREATE"}
 }
 
 # Test: Permission lookup from mappings - PUT resource
 test_required_permissions_update_datasource if {
-	result := permission_eval.required_permissions with input as portal_request_no_auth("PUT", "/v2/datasources/123")
+	result := permission_eval.required_permissions with input as portal_request_no_auth("PUT", "/v1/datasources/123")
 	result == {"DATASOURCE_UPDATE"}
 }
 
 # Test: Permission lookup from mappings - DELETE resource
 test_required_permissions_delete_group if {
-	result := permission_eval.required_permissions with input as portal_request_no_auth("DELETE", "/v2/groups/abc")
+	result := permission_eval.required_permissions with input as portal_request_no_auth("DELETE", "/v1/groups/abc")
 	result == {"GROUP_DELETE"}
 }
 
 # Test: Permission lookup from mappings - PATCH resource
 test_required_permissions_patch_role if {
-	result := permission_eval.required_permissions with input as portal_request_no_auth("PATCH", "/v2/roles/r1")
+	result := permission_eval.required_permissions with input as portal_request_no_auth("PATCH", "/v1/roles/r1")
 	result == {"ROLE_UPDATE"}
 }
 
 # Test: AND-permission array → multi-element set
 test_required_permissions_and_array if {
-	result := permission_eval.required_permissions with input as portal_request_no_auth("PUT", "/v2/datasets/abc/published/meta")
+	result := permission_eval.required_permissions with input as portal_request_no_auth("PUT", "/v1/datasets/abc/published/meta")
 	result == {"DATASET_UPDATE", "DATASET_RELEASE"}
 }
 
@@ -102,19 +102,19 @@ test_required_permissions_and_array if {
 
 # Test: /users/me has null permission (no permission required)
 test_users_me_null_permission if {
-	result := permission_eval.is_null_permission_endpoint with input as portal_request_no_auth("GET", "/v2/users/me")
+	result := permission_eval.is_null_permission_endpoint with input as portal_request_no_auth("GET", "/v1/users/me")
 	result == true
 }
 
 # Test: /users/me required_permissions is empty set
 test_users_me_no_required_permissions if {
-	result := permission_eval.required_permissions with input as portal_request_no_auth("GET", "/v2/users/me")
+	result := permission_eval.required_permissions with input as portal_request_no_auth("GET", "/v1/users/me")
 	count(result) == 0
 }
 
 # Test: Regular endpoint is not null-permission
 test_regular_endpoint_not_null_permission if {
-	result := permission_eval.is_null_permission_endpoint with input as portal_request_no_auth("GET", "/v2/users")
+	result := permission_eval.is_null_permission_endpoint with input as portal_request_no_auth("GET", "/v1/users")
 	result == false
 }
 
@@ -124,25 +124,25 @@ test_regular_endpoint_not_null_permission if {
 
 # Test: Endpoint with permission is known
 test_is_known_endpoint_with_permission if {
-	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("GET", "/v2/users")
+	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("GET", "/v1/users")
 	result == true
 }
 
 # Test: Null-permission endpoint is known
 test_is_known_endpoint_null_permission if {
-	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("GET", "/v2/users/me")
+	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("GET", "/v1/users/me")
 	result == true
 }
 
 # Test: Unknown endpoint is not known (fail-secure)
 test_is_known_endpoint_unknown if {
-	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("GET", "/v2/foobar")
+	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("GET", "/v1/foobar")
 	result == false
 }
 
 # Test: AND-permission endpoint is known
 test_is_known_endpoint_and_permission if {
-	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("PUT", "/v2/datasets/abc/published/meta")
+	result := permission_eval.is_known_endpoint with input as portal_request_no_auth("PUT", "/v1/datasets/abc/published/meta")
 	result == true
 }
 
@@ -154,7 +154,7 @@ test_is_known_endpoint_and_permission if {
 test_has_permission_matching if {
 	result := permission_eval.has_permission with http.send as mock_send_read_dataset
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasets")
+		with input as portal_request("GET", "/v1/datasets")
 	result == true
 }
 
@@ -162,7 +162,7 @@ test_has_permission_matching if {
 test_has_permission_not_matching if {
 	result := permission_eval.has_permission with http.send as mock_send_read_only
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v2/datasets/123")
+		with input as portal_request("DELETE", "/v1/datasets/123")
 	result == false
 }
 
@@ -170,7 +170,7 @@ test_has_permission_not_matching if {
 test_has_permission_empty if {
 	result := permission_eval.has_permission with http.send as mock_send_no_perms
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users")
+		with input as portal_request("GET", "/v1/users")
 	result == false
 }
 
@@ -178,7 +178,7 @@ test_has_permission_empty if {
 test_has_permission_multiple_groups if {
 	result := permission_eval.has_permission with http.send as mock_send_multiple_groups
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v2/datasets")
+		with input as portal_request("POST", "/v1/datasets")
 	result == true
 }
 
@@ -186,7 +186,7 @@ test_has_permission_multiple_groups if {
 test_users_me_allowed_authenticated if {
 	result := permission_eval.has_permission with http.send as mock_send_no_groups
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users/me")
+		with input as portal_request("GET", "/v1/users/me")
 	result == true
 }
 
@@ -194,7 +194,7 @@ test_users_me_allowed_authenticated if {
 test_has_permission_no_groups if {
 	result := permission_eval.has_permission with http.send as mock_send_no_groups
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users")
+		with input as portal_request("GET", "/v1/users")
 	result == false
 }
 
@@ -202,7 +202,7 @@ test_has_permission_no_groups if {
 test_has_permission_and_both_present if {
 	result := permission_eval.has_permission with http.send as mock_send_and_both
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/dataset-1/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/dataset-1/published/meta")
 	result == true
 }
 
@@ -210,7 +210,7 @@ test_has_permission_and_both_present if {
 test_has_permission_and_missing_one if {
 	result := permission_eval.has_permission with http.send as mock_send_and_missing_one
 		with data.config as mock_http.mock_config
-		with input as portal_request("PUT", "/v2/datasets/dataset-1/published/meta")
+		with input as portal_request("PUT", "/v1/datasets/dataset-1/published/meta")
 	result == false
 }
 
@@ -221,7 +221,7 @@ test_has_permission_and_missing_one if {
 test_all_user_permissions if {
 	result := permission_eval.all_user_permissions with http.send as mock_send_multi_role
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/users")
+		with input as portal_request("GET", "/v1/users")
 	result == {"USER_READ", "USER_CREATE", "DATASET_READ"}
 }
 
@@ -260,6 +260,6 @@ mock_send_tenant_dataset_read(_) := {"status_code": 200, "body": mock_http.user_
 test_user_has_permission_tenant_cascades_to_dataset if {
 	result := permission_eval.has_permission with http.send as mock_send_tenant_dataset_read
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v2/datasets/some-dataset-id")
+		with input as portal_request("GET", "/v1/datasets/some-dataset-id")
 	result == true
 }

@@ -26,6 +26,13 @@ const baseGroup: Group = {
   id: '1',
   name: 'Test Group',
   description: 'Description',
+  roles: [
+    {
+      id: 'r1',
+      name: 'Admin',
+      roleType: 'SYSTEM',
+    },
+  ],
   assignments: [baseAssignment],
   members: [
     { id: 'm1', name: 'User 1' },

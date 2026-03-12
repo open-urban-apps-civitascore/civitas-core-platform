@@ -1,11 +1,10 @@
 import { createColumnHelper, getCoreRowModel, useReactTable } from '@tanstack/react-table'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
-import { Role, ROLE_ORIGINS } from '@/types/roles'
+import { Role } from '@/types/roles'
 import { TableProps } from '@/types/table'
-import { formatDate } from '@/utils/formatDate'
 import { resolveUpdater } from '@/utils/table'
 
 interface RolesTableProps extends TableProps<Role> {
@@ -27,7 +26,6 @@ export const RolesTable = (props: RolesTableProps) => {
     onSortingChange,
   } = props
   const t = useTranslations('roles')
-  const locale = useLocale()
 
   const columnHelper = createColumnHelper<Role>()
 
@@ -59,46 +57,36 @@ export const RolesTable = (props: RolesTableProps) => {
         },
       },
     }),
-    columnHelper.accessor('groups', {
+    columnHelper.accessor('groupCount', {
       header: () => t('tableHeaders.groups'),
-      cell: info => info.getValue()?.length,
-      meta: {
-        style: {
-          width: '10%',
-        },
-      },
-    }),
-    columnHelper.accessor('users', {
-      header: () => t('tableHeaders.user'),
-      cell: info => info.getValue()?.length,
-      meta: {
-        style: {
-          width: '10%',
-        },
-      },
-    }),
-    columnHelper.accessor('lastUpdated', {
-      header: () => t('tableHeaders.lastUpdated'),
-      cell: info => formatDate(info.getValue(), locale),
-      meta: {
-        style: {
-          width: '12.5%',
-          textAlign: 'center',
-        },
-      },
-    }),
-    columnHelper.accessor('updatedBy', {
-      header: () => t('tableHeaders.updatedBy'),
       cell: info => info.getValue(),
       meta: {
         style: {
+          width: '10%',
+        },
+      },
+    }),
+    columnHelper.accessor('userCount', {
+      header: () => t('tableHeaders.user'),
+      cell: info => info.getValue(),
+      meta: {
+        style: {
+          width: '10%',
+        },
+      },
+    }),
+    columnHelper.accessor('modifiedBy', {
+      header: () => t('tableHeaders.updatedBy'),
+      cell: info => info.getValue()?.name ?? null,
+      meta: {
+        style: {
           width: '12.5%',
         },
       },
     }),
-    columnHelper.accessor('roleOrigin', {
+    columnHelper.accessor('readonly', {
       header: () => t('tableHeaders.roleOrigin'),
-      cell: info => (info.getValue() === ROLE_ORIGINS.DEFAULT ? t('defaultRole') : t('customRole')),
+      cell: info => (info.getValue() ? t('defaultRole') : t('customRole')),
       meta: {
         style: {
           width: '12.5%',

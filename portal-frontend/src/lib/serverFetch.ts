@@ -53,7 +53,12 @@ export const serverFetch = async <TResponse>({
 }: ServerFetchConfig): Promise<ServerFetchResponse<TResponse>> => {
   // Read the JWT token directly from the encrypted cookie
   const requestHeaders = await nextHeaders()
-  const forwardedProto = requestHeaders.get('x-forwarded-proto')
+
+  const forwardedProto =
+    requestHeaders.get('x-forwarded-scheme') ??
+    requestHeaders.get('x-scheme') ??
+    requestHeaders.get('x-forwarded-proto')
+
   const isSecure = forwardedProto === 'https'
 
   const token = await getToken({
@@ -79,7 +84,7 @@ export const serverFetch = async <TResponse>({
   const API_PORT = process.env.API_PORT
 
   const JSON_SERVER_URL = `${JSON_SERVER_HOST}:${JSON_SERVER_PORT}`
-  const API_URL = API_BASE_URL && API_PORT ? `${API_BASE_URL}:${API_PORT}/v2` : undefined
+  const API_URL = API_BASE_URL && API_PORT ? `${API_BASE_URL}:${API_PORT}/v1` : undefined
 
   // Choose base URL based on isApiBackend flag
   const baseUrl = isApiBackend ? API_URL : JSON_SERVER_URL
