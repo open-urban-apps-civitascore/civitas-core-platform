@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
 import { headers as nextHeaders } from 'next/headers'
+import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
 import { GetRequestLogContext, logger } from '@/lib/logger'
