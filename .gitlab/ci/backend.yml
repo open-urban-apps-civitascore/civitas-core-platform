@@ -276,7 +276,20 @@ api-test-backend:
         export COMPOSE_FILES="$COMPOSE_BASE"
       fi
     # Start full stack — blocks until all services are healthy
-    - docker compose -p api-test $COMPOSE_FILES up -d --build --wait --wait-timeout 600
+    - |
+      docker compose -p api-test $COMPOSE_FILES up -d --build --wait --wait-timeout 600 || {
+        echo "--- Container health status ---"
+        docker compose -p api-test $COMPOSE_FILES ps -a
+        echo "--- Unhealthy container logs ---"
+        for c in $(docker compose -p api-test $COMPOSE_FILES ps -a --format '{{.Name}}'); do
+          STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$c" 2>/dev/null)
+          if [ "$STATUS" != "healthy" ] && [ -n "$STATUS" ]; then
+            echo "=== $c ($STATUS) ==="
+            docker logs "$c" --tail 50 2>&1
+          fi
+        done
+        exit 1
+      }
     # Seed APISIX routes (services, plugin config, portal-backend route)
     - docker compose -p api-test $COMPOSE_FILES run --rm apisix-seed
     # Run Bruno API tests from a container on the same Compose network

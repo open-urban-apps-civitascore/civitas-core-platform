@@ -140,8 +140,8 @@ services:
       test: ["CMD", "curl", "-sf", "http://localhost:9080/apisix/status"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 10s
+      retries: 30
+      start_period: 30s
 
   # ── Authorization ────────────────────────────────────────
 
