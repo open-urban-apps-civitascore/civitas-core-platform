@@ -71,6 +71,7 @@ export const PageHeader = <TabValue extends string>(props: PageHeaderProps<TabVa
           onTabChange={segmentedControlBarProps.onTabChange}
           completedTabs={segmentedControlBarProps.completedTabs}
           disabledTabs={segmentedControlBarProps.disabledTabs}
+          tabsWithNoCompletionStatus={segmentedControlBarProps.tabsWithNoCompletionStatus}
           hasCompletionStatus={segmentedControlBarProps.hasCompletionStatus}
           className="mx-[var(--layout-padding)]"
         />

@@ -50,3 +50,5 @@ export const AssignmentScopedInputSchema = z.object({
   groupId: z.string().trim().min(1, 'common.errors.required'),
   roleId: z.string().trim().min(1, 'common.errors.required'),
 })
+
+export type AssignmentScopedInput = z.infer<typeof AssignmentScopedInputSchema>

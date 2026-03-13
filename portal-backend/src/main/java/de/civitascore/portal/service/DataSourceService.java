@@ -70,7 +70,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     } else {
       entity.setDataStructureVersion(null);
     }
-    return entity;
+    return super.postConvertToEntity(entity, input);
   }
 
   @Override

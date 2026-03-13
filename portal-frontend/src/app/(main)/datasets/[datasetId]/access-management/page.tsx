@@ -2,15 +2,15 @@ import { getDatasetAssignments } from '@/app/services/api/datasets/serverRequest
 import { getGroups } from '@/app/services/api/groups/serverRequests'
 import { getRoles } from '@/app/services/api/roles/serverRequests'
 import { ROLE_TYPES } from '@/types/roles'
-import { mapAssignmentApiResponseToTable } from '@/utils/assignmentMapper'
+import { mapAssignmentApiResponseToTable } from '@/utils/assignments'
 
 import { AssignmentsList } from './components/AssignmentsList'
 
-interface PageProps {
+interface AccessManagementPageProps {
   params: Promise<{ datasetId: string }>
 }
 
-const AccessManagementPage = async (props: PageProps) => {
+const AccessManagementPage = async (props: AccessManagementPageProps) => {
   const { params } = props
   const { datasetId } = await params
 

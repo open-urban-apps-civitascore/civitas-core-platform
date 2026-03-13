@@ -194,6 +194,7 @@ export const AccessManagementTable = ({
       isLoading={isLoading}
       pageSize={pagination.pageSize}
       pageIndex={pagination.pageIndex}
+      isPaginationHidden={assignments.length <= 10}
     />
   )
 }
