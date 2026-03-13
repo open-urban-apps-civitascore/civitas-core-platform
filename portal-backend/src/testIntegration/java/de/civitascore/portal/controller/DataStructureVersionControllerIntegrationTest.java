@@ -678,14 +678,15 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail upload when modelAtlasUri is provided but model is missing")
-    void shouldFailUploadWhenModelAtlasUriProvidedButNoModel() {
+    @DisplayName(
+        "Should allow update with modelAtlasUri but no model (keeps existing model at URI)")
+    void shouldAllowUpdateWhenModelAtlasUriProvidedButNoModel() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setVersion("1.1.0");
       input.setModelName("TestModel");
       input.setModelAtlasUri(TEST_NS_URI);
-      // No model
+      // No model — should be allowed, no upload happens
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
@@ -694,7 +695,12 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
               new HttpEntity<>(input, createAuthHeaders()),
               getOutputTypeReference());
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getModelAtlasUri())
+          .as("ModelAtlasUri should be updated")
+          .isEqualTo(TEST_NS_URI);
+      // No upload should have been attempted since model content was not provided
       verify(0, postRequestedFor(urlMatching("/atlas/rest/.*/schema/stages/.*")));
     }
 
@@ -1330,8 +1336,9 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should update metadata of published version successfully")
-    void shouldUpdatePublishedMetaSuccessfully() {
+    @DisplayName(
+        "Should allow full update (version, styles, modelAtlasUri) via published/meta when not in use")
+    void shouldAllowFullUpdateWhenNotInUse() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("1.1.0");
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
@@ -1357,32 +1364,23 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(output.getModelName())
           .as("Model name should be updated")
           .isEqualTo("UpdatedPublishedModel");
-
-      assertThat(output.getVersion()).as("Version should not be updated").isEqualTo("1.0.0");
-      assertThat(output.getStyles().get("color"))
-          .as("Styles should not be updated")
-          .isEqualTo("blue");
+      assertThat(output.getVersion()).as("Version should be updated").isEqualTo("1.1.0");
+      assertThat(output.getStyles().get("color")).as("Styles should be updated").isEqualTo("red");
       assertThat(output.getDataStructureVersionStatus())
           .as("Status should remain AVAILABLE")
           .isEqualTo(DataStructureVersionStatus.AVAILABLE);
-      assertThat(output.getModelAtlasUri())
-          .as("ModelAtlasUri should remain unchanged")
-          .isEqualTo("https://modelatlas.example.com/model1");
     }
 
     @Test
-    @DisplayName("Should protect modelAtlasUri when updating published meta")
-    void shouldProtectModelAtlasUriWhenUpdatingPublishedMeta() {
-      String originalModelAtlasUri =
-          dataStructureVersionRepository
-              .findById(publishedVersionId)
-              .orElseThrow()
-              .getModelAtlasUri();
-
+    @DisplayName("Should allow modelAtlasUri change via published/meta when not in use")
+    void shouldAllowModelAtlasUriChangeWhenNotInUse() {
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
-      input.setVersion("1.2.0");
-      input.setModelAtlasUri("https://modelatlas.example.com/SHOULD_NOT_CHANGE");
+      input.setVersion("1.0.0");
+      input.setModelAtlasUri("https://modelatlas.example.com/updated-model");
+      input.setModel(modelContent);
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+
+      stubModelUpload("https://modelatlas.example.com/updated-model");
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
@@ -1395,8 +1393,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       DataStructureVersionOutputDTO output = response.getBody();
       assertThat(output).isNotNull();
       assertThat(output.getModelAtlasUri())
-          .as("ModelAtlasUri should not change")
-          .isEqualTo(originalModelAtlasUri);
+          .as("ModelAtlasUri should be updated when not in use")
+          .isEqualTo("https://modelatlas.example.com/updated-model");
     }
 
     @Test
@@ -1463,6 +1461,36 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getStatusCode())
           .as("Should return UNAUTHORIZED status")
           .isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+  }
+
+  @Nested
+  @DisplayName("PATCH Tests")
+  class PatchTests {
+
+    @Test
+    @DisplayName("Should patch description without triggering model validation error")
+    void shouldPatchDescriptionWithoutModelValidationError() {
+      String patchBody = "{\"description\": \"Patched version description\"}";
+
+      HttpHeaders headers = createAuthHeaders();
+      headers.setContentType(MediaType.APPLICATION_JSON);
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.PATCH,
+              new HttpEntity<>(patchBody, headers),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDescription())
+          .as("Description should be updated")
+          .isEqualTo("Patched version description");
+      assertThat(response.getBody().getModelAtlasUri())
+          .as("ModelAtlasUri should remain unchanged")
+          .isEqualTo("https://modelatlas.example.com/model1");
     }
   }
 
@@ -1581,6 +1609,48 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getBody().isInUse())
           .as("inUse should be true when a DataSource references this version")
           .isTrue();
+    }
+
+    @Test
+    @DisplayName(
+        "Should protect modelAtlasUri and version via published/meta when version is in use")
+    void shouldProtectStructuralFieldsWhenInUse() {
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setVersion("2.0.0");
+      input.setModelAtlasUri("https://modelatlas.example.com/SHOULD_NOT_CHANGE");
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setModelName("UpdatedModelName");
+
+      Map<String, Object> newStyles = new HashMap<>();
+      newStyles.put("color", "green");
+      input.setStyles(newStyles);
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              "/datastructures/"
+                  + inUseDataStructureId
+                  + "/versions/"
+                  + inUseVersionId
+                  + "/published/meta",
+              HttpMethod.PUT,
+              new HttpEntity<>(input, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      DataStructureVersionOutputDTO output = response.getBody();
+      assertThat(output).isNotNull();
+      assertThat(output.getModelAtlasUri())
+          .as("ModelAtlasUri should be protected when in use")
+          .isEqualTo("http://modelatlas.example.com/models/inuse");
+      assertThat(output.getVersion())
+          .as("Version should be protected when in use")
+          .isEqualTo("1.0.0");
+      assertThat(output.getStyles().get("color"))
+          .as("Styles should be protected when in use")
+          .isNull();
+      assertThat(output.getModelName())
+          .as("ModelName should be updatable even when in use")
+          .isEqualTo("UpdatedModelName");
     }
 
     @Test

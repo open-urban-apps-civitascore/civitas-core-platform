@@ -73,6 +73,10 @@ public class AssignmentService extends BaseService<Assignment, AssignmentInputDT
     return postLoad(entity);
   }
 
+  public List<Assignment> findAllByUserExternalId(String externalId) {
+    return getRepository().findAllByUserExternalId(externalId);
+  }
+
   public List<Assignment> findAllByRoleId(UUID roleId) {
     return getRepository().findAllByRoleId(roleId);
   }

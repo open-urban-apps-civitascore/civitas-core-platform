@@ -1,0 +1,26 @@
+meta {
+  name: 10. Create Assignment
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/assignments
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "scopeType": "DATASET",
+    "scopeId": "{{sagaDataSetId}}",
+    "groupId": "{{sagaGroupId}}",
+    "roleId": "{{sagaRoleId}}"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaAssignmentId', res.body.id);
+  }
+}

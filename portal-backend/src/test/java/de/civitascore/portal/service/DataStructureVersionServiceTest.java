@@ -1,5 +1,6 @@
 package de.civitascore.portal.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -17,8 +18,11 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -143,6 +147,118 @@ class DataStructureVersionServiceTest {
       dataStructureVersionService.deleteById(versionId);
 
       verify(dataStructureVersionRepository).deleteById(versionId);
+    }
+  }
+
+  @Nested
+  @DisplayName("UpdatePublishedMeta inUse guard")
+  class UpdatePublishedMetaInUseTests {
+
+    @Test
+    @DisplayName("Should allow full update via updatePublishedMeta when version is not in use")
+    void shouldAllowFullUpdateWhenNotInUse() {
+      UUID versionId = UUID.randomUUID();
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure ds = new DataStructure();
+      ds.setId(dataStructureId);
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setVersion("1.0.0");
+      version.setModelAtlasUri("https://modelatlas.example.com/old");
+      version.setModelName("OldModel");
+      version.setStyles(new HashMap<>(Map.of("color", "blue")));
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructure(ds);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setDataStructureId(dataStructureId);
+      input.setVersion("2.0.0");
+      input.setModelAtlasUri("https://modelatlas.example.com/new");
+      input.setModel("<xml>new model</xml>");
+      input.setStyles(new HashMap<>(Map.of("color", "red")));
+
+      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+          .thenReturn(Optional.of(version));
+      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(false);
+      // Mock mapper does not update entity, so validateUniqueVersion sees the original "1.0.0"
+      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
+              dataStructureId, "1.0.0"))
+          .thenReturn(Set.of(version));
+      when(dataStructureVersionRepository.save(any())).thenReturn(version);
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
+
+      assertThatNoException()
+          .isThrownBy(() -> dataStructureVersionService.updatePublishedMeta(versionId, input));
+    }
+
+    @Test
+    @DisplayName(
+        "Should block model and structural changes via updatePublishedMeta when version is in use")
+    void shouldBlockStructuralChangesWhenInUse() {
+      UUID versionId = UUID.randomUUID();
+      UUID dataStructureId = UUID.randomUUID();
+      DataStructure ds = new DataStructure();
+      ds.setId(dataStructureId);
+      ds.setDataStructureStatus(DataStructureStatus.AVAILABLE);
+
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setVersion("1.0.0");
+      version.setModelAtlasUri("https://modelatlas.example.com/original");
+      version.setModelName("OldModel");
+      version.setStyles(new HashMap<>(Map.of("color", "blue")));
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.AVAILABLE);
+      version.setDataStructure(ds);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setDataStructureId(dataStructureId);
+      input.setVersion("2.0.0");
+      input.setModelAtlasUri("https://modelatlas.example.com/SHOULD_NOT_CHANGE");
+      input.setModel("<xml>should not upload</xml>");
+      input.setStyles(new HashMap<>(Map.of("color", "red")));
+      input.setModelName("UpdatedModelName");
+
+      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+          .thenReturn(Optional.of(version));
+      when(dataSourceRepository.existsByDataStructureVersionId(versionId)).thenReturn(true);
+      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
+              dataStructureId, "1.0.0"))
+          .thenReturn(Set.of(version));
+      when(dataStructureVersionRepository.save(any())).thenReturn(version);
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(ds);
+
+      dataStructureVersionService.updatePublishedMeta(versionId, input);
+
+      // After preProcessUpdateInput, in-use fields should be reverted
+      assertThat(input.getModelAtlasUri())
+          .as("ModelAtlasUri should be reverted to original")
+          .isEqualTo("https://modelatlas.example.com/original");
+      assertThat(input.getModel()).as("Model should be cleared").isNull();
+      assertThat(input.getVersion()).as("Version should be reverted").isEqualTo("1.0.0");
+      assertThat(input.getStyles().get("color")).as("Styles should be reverted").isEqualTo("blue");
+    }
+
+    @Test
+    @DisplayName("Should reject updatePublishedMeta for DRAFT version")
+    void shouldRejectUpdatePublishedMetaForDraftVersion() {
+      UUID versionId = UUID.randomUUID();
+      DataStructureVersion version = new DataStructureVersion();
+      version.setId(versionId);
+      version.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+
+      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+          .thenReturn(Optional.of(version));
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setVersion("1.0.0");
+
+      assertThatThrownBy(() -> dataStructureVersionService.updatePublishedMeta(versionId, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DRAFT");
     }
   }
 
@@ -310,6 +426,48 @@ class DataStructureVersionServiceTest {
       assertThatNoException().isThrownBy(() -> dataStructureVersionService.create(input));
       verify(dataStructureVersionRepository)
           .findAllByDataStructureIdAndVersion(dataStructureId, "3.0.0");
+    }
+
+    @Test
+    @DisplayName("Should allow update when modelAtlasUri is present but model is null (PATCH fix)")
+    void shouldAllowUpdateWithModelAtlasUriButNoModel() {
+      UUID dataStructureId = UUID.randomUUID();
+      UUID versionId = UUID.randomUUID();
+      DataStructure dataStructure = buildDataStructure(dataStructureId);
+
+      DataStructureVersion existingEntity = new DataStructureVersion();
+      existingEntity.setId(versionId);
+      existingEntity.setVersion("1.0.0");
+      existingEntity.setModelAtlasUri("https://modelatlas.example.com/model1");
+      existingEntity.setDataStructureVersionStatus(DataStructureVersionStatus.DRAFT);
+      existingEntity.setDataStructure(dataStructure);
+
+      DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
+      input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
+      input.setDataStructureId(dataStructureId);
+      input.setVersion("1.0.0");
+      input.setModelAtlasUri("https://modelatlas.example.com/model1");
+      // model is null — simulates a PATCH that only changes description
+
+      doAnswer(
+              invocation -> {
+                DataStructureVersion entity = invocation.getArgument(0);
+                DataStructureVersionInputDTO dto = invocation.getArgument(1);
+                entity.setVersion(dto.getVersion());
+                return null;
+              })
+          .when(dataStructureVersionMapper)
+          .updateEntity(any(), any());
+      when(dataStructureVersionRepository.findByIdWithRelations(versionId))
+          .thenReturn(Optional.of(existingEntity));
+      when(dataStructureVersionRepository.findAllByDataStructureIdAndVersion(
+              dataStructureId, "1.0.0"))
+          .thenReturn(Set.of(existingEntity));
+      when(dataStructureVersionRepository.save(any())).thenReturn(existingEntity);
+      when(dataStructureService.findByIdOrThrow(dataStructureId)).thenReturn(dataStructure);
+
+      assertThatNoException()
+          .isThrownBy(() -> dataStructureVersionService.update(versionId, input));
     }
 
     @Test

@@ -81,7 +81,7 @@ class FrostAdapterIntegrationTest {
   @SuppressWarnings("resource")
   @Container
   static GenericContainer<?> frost =
-      new GenericContainer<>(DockerImageName.parse("fraunhoferiosb/frost-server:latest"))
+      new GenericContainer<>(DockerImageName.parse("hylkevds/frost-http-projects:latest"))
           .withNetwork(network)
           .withExposedPorts(8080)
           .dependsOn(postgis)
@@ -94,6 +94,8 @@ class FrostAdapterIntegrationTest {
           .withEnv("persistence_db_username", "sensorthings")
           .withEnv("persistence_db_password", "ChangeMe")
           .withEnv("persistence_autoUpdateDatabase", "true")
+          .withEnv("plugins_modelLoader_securityPath", "")
+          .withEnv("plugins_modelLoader_securityFiles", "")
           .waitingFor(
               Wait.forHttp("/FROST-Server/v1.1/Things")
                   .forStatusCode(200)

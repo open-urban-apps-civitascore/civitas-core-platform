@@ -74,4 +74,21 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
   List<Assignment> findAllByScopeTypeAndDataStructureId(ScopeType scopeType, UUID dataStructureId);
 
   boolean existsByGroupAndRoleAndScopeTypeIsNull(Group group, Role role);
+
+  @EntityGraph(
+      attributePaths = {
+        "group",
+        "role",
+        "role.permissions",
+        "dataStructure",
+        "dataSource",
+        "dataset",
+        "dataSpace",
+        "catalog"
+      })
+  @Query(
+      "SELECT a FROM Assignment a"
+          + " WHERE a.group IN (SELECT ug FROM User u JOIN u.groups ug"
+          + " WHERE u.externalId = :externalId)")
+  List<Assignment> findAllByUserExternalId(@Param("externalId") String externalId);
 }

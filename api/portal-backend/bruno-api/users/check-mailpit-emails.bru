@@ -1,0 +1,38 @@
+meta {
+  name: Check Mailpit Emails
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{mailpitUrl}}/api/v1/messages
+  body: none
+  auth: none
+}
+
+vars:pre-request {
+  mailpitUrl: http://localhost:8025
+}
+
+script:post-response {
+  if (res.body && res.body.messages) {
+    bru.setVar('emailCount', res.body.messages.length);
+  }
+}
+
+tests {
+  test("should have received emails", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.messages).to.be.an('array');
+  });
+
+  test("should contain verification email for created user", function() {
+    const messages = res.body.messages;
+    expect(messages.length).to.be.greaterThan(0);
+
+    const userEmail = messages.find(m =>
+      m.To && m.To.some(to => to.Address === "john.doe@example.com")
+    );
+    expect(userEmail).to.not.be.undefined;
+  });
+}
