@@ -1,0 +1,8 @@
+{
+  "eClass": "http://eclipse.org/fennec/model/atlas/management/1.0.0#//ObjectMetadata",
+  "objectId": "dGVzdE9iamVjdElk",
+  "objectName": "TestModel",
+  "stage": "draft",
+  "scope": "default",
+  "registry": "schema"
+}

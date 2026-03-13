@@ -70,16 +70,15 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
   private static final String TEST_NS_URI = "http://test/test/myuml/1.0.0";
   private static final String TEST_MODEL_FILE_PATH = "mocks/models/Simple_model.xmi";
+  private static final String TEST_UPLOAD_METADATA_PATH =
+      "mocks/models/upload_metadata_response.json";
   private static final String TEST_SCOPE = "default";
   private static final String TEST_STAGE = "draft";
   private static final String MOCK_MODEL_RESPONSE = "<xml>mock model content</xml>";
-  private static final String MOCK_UPLOAD_METADATA =
-      "{\"eClass\":\"http://eclipse.org/fennec/model/atlas/management/1.0.0#//ObjectMetadata\","
-          + "\"objectId\":\"dGVzdE9iamVjdElk\",\"objectName\":\"TestModel\","
-          + "\"stage\":\"draft\",\"scope\":\"default\",\"registry\":\"schema\"}";
 
   private String modelContent;
   private byte[] modelContentBinary;
+  private String uploadMetadataResponse;
 
   private UUID dataStructureId;
   private UUID versionId1;
@@ -89,6 +88,10 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     ClassPathResource modelFile = new ClassPathResource(TEST_MODEL_FILE_PATH);
     modelContentBinary = modelFile.getContentAsByteArray();
     modelContent = new String(modelContentBinary, StandardCharsets.UTF_8);
+    uploadMetadataResponse =
+        new String(
+            new ClassPathResource(TEST_UPLOAD_METADATA_PATH).getContentAsByteArray(),
+            StandardCharsets.UTF_8);
 
     // Create parent data structure
     DataStructure dataStructure = new DataStructure();
@@ -170,7 +173,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
                 aResponse()
                     .withStatus(200)
                     .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .withBody(MOCK_UPLOAD_METADATA)));
+                    .withBody(uploadMetadataResponse)));
 
     return expectedPath;
   }
@@ -652,7 +655,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
                   aResponse()
                       .withStatus(200)
                       .withHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-                      .withBody(MOCK_UPLOAD_METADATA)));
+                      .withBody(uploadMetadataResponse)));
       stubModelDownload("https://modelatlas.example.com/model1-updated");
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();

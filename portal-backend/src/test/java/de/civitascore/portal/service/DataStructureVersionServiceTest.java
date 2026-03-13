@@ -275,14 +275,14 @@ class DataStructureVersionServiceTest {
       version.setModelAtlasUri("http://example.com/model/1.0.0");
 
       String expectedModel = "<?xml version=\"1.0\"?><model>content</model>";
-      when(modelService.downloadModel("http://example.com/model/1.0.0", "application/json"))
+      when(modelService.downloadModel("http://example.com/model/1.0.0", "application/xml"))
           .thenReturn(expectedModel);
 
       Optional<String> result =
           dataStructureVersionService.findModelForDataStructureVersion(version);
 
       assertThat(result).isPresent().contains(expectedModel);
-      verify(modelService).downloadModel("http://example.com/model/1.0.0", "application/json");
+      verify(modelService).downloadModel("http://example.com/model/1.0.0", "application/xml");
     }
 
     @Test
@@ -315,7 +315,7 @@ class DataStructureVersionServiceTest {
       DataStructureVersion version = new DataStructureVersion();
       version.setModelAtlasUri("http://example.com/model/1.0.0");
 
-      when(modelService.downloadModel("http://example.com/model/1.0.0", "application/json"))
+      when(modelService.downloadModel("http://example.com/model/1.0.0", "application/xml"))
           .thenThrow(new RuntimeException("Connection refused"));
 
       Optional<String> result =
