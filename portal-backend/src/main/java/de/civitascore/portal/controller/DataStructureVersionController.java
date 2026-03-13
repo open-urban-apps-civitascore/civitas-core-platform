@@ -85,15 +85,6 @@ public class DataStructureVersionController
 
   @Override
   @Operation(
-      operationId = "updateDataStructureVersion",
-      summary = "Replace a data structure version")
-  public ResponseEntity<DataStructureVersionOutputDTO> update(
-      @PathVariable UUID id, @Valid @RequestBody DataStructureVersionInputDTO input) {
-    return super.update(id, input);
-  }
-
-  @Override
-  @Operation(
       operationId = "patchDataStructureVersion",
       summary = "Partially update a data structure version")
   public ResponseEntity<DataStructureVersionOutputDTO> patch(
@@ -133,6 +124,9 @@ public class DataStructureVersionController
   }
 
   @Override
+  @Operation(
+      operationId = "updateDataStructureVersion",
+      summary = "Replace a data structure version")
   public ResponseEntity<DataStructureVersionOutputDTO> update(
       @PathVariable UUID id, @Valid @RequestBody DataStructureVersionInputDTO input) {
     DataStructureVersionInputDTO preProcessedInput = preProcessInput(input);
