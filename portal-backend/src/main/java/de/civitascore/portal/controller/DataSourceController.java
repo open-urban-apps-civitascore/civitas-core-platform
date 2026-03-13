@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
-import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
 import de.civitascore.portal.model.output.DataSourceOutputDTO;
 import de.civitascore.portal.model.output.assembler.DataSourceAssembler;
 import de.civitascore.portal.repository.specification.DataSourceSpec;
@@ -129,7 +128,7 @@ public class DataSourceController
           "Updates name, description, connector configuration, and assignments on a data source in"
               + " AVAILABLE status.")
   public ResponseEntity<DataSourceOutputDTO> updatePublishedMeta(
-      @PathVariable UUID id, @Valid @RequestBody DataSourceMetaInputDTO input) {
+      @PathVariable UUID id, @Valid @RequestBody DataSourceInputDTO input) {
     DataSource updated = getService().updatePublishedMeta(id, input);
     DataSourceOutputDTO output = dataSourceAssembler.toOutput(updated);
     return ResponseEntity.ok(output);

@@ -1095,6 +1095,96 @@ class DataSourceControllerIntegrationTest
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
+
+    @Test
+    @DisplayName("Should update name and description when in use")
+    void shouldUpdateNameAndDescriptionWhenInUse() {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
+
+      Map<String, Object> metaUpdate =
+          Map.of("name", "updated-name", "description", "updated-desc");
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSource.getId() + "/published/meta",
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              metaUpdate,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getName()).isEqualTo("updated-name");
+      assertThat(response.getBody().getDescription()).isEqualTo("updated-desc");
+    }
+
+    @Test
+    @DisplayName("Should reject configuration change when in use")
+    void shouldRejectConfigurationChangeWhenInUse() {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.AVAILABLE);
+
+      Map<String, Object> newConfig =
+          Map.of(
+              "urls", List.of("tcp://new-broker:1883"),
+              "topics", List.of("new/topic"),
+              "qos", 2);
+      Map<String, Object> metaUpdate = Map.of("name", "updated-name", "configuration", newConfig);
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + dataSource.getId() + "/published/meta",
+              HttpMethod.PUT,
+              new HttpEntity<>(metaUpdate, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should reject connector type change when in use")
+    void shouldRejectConnectorTypeChangeWhenInUse() {
+      DataSource dataSource = createAvailableDataSource();
+      linkDataSourceToDataSetViaStatus(dataSource, DataSetStatus.READY);
+
+      Map<String, Object> metaUpdate = Map.of("name", "updated-name", "connectorType", "SQL");
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + dataSource.getId() + "/published/meta",
+              HttpMethod.PUT,
+              new HttpEntity<>(metaUpdate, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Should allow full update when not in use")
+    void shouldAllowFullUpdateWhenNotInUse() {
+      UUID id = createPublishableTestEntity();
+      performPublish(id);
+
+      Map<String, Object> newConfig =
+          Map.of(
+              "urls", List.of("tcp://new-broker:1883"),
+              "topics", List.of("new/topic"),
+              "qos", 2);
+      Map<String, Object> fullUpdate = Map.of("name", "updated-name", "configuration", newConfig);
+
+      ResponseEntity<DataSourceOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + id + "/published/meta",
+              HttpMethod.PUT,
+              createAuthHeaders(),
+              fullUpdate,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody().getName()).isEqualTo("updated-name");
+      Map<String, Object> config = response.getBody().getConfiguration();
+      assertThat(config.get("urls")).isEqualTo(List.of("tcp://new-broker:1883"));
+    }
   }
 
   @Nested
