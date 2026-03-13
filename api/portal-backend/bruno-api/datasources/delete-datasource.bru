@@ -29,3 +29,19 @@ tests {
     expect(res.getStatus()).to.equal(204);
   });
 }
+
+docs {
+  **Precondition:** `dataSourceId` is set and not in published state.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue TC-SRC-02 for same `dataSourceId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect | Verified |
+  |---|---|---|
+  | Backend | DataSource record removed | ☐ |
+  | Config Adapter | — | ☐ |
+  | External System | — | ☐ |
+}

@@ -31,3 +31,19 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 }
+
+docs {
+  **Precondition:** `groupId` is set.
+
+  **Expected Response:** 200 OK, body reflects updated `description`; other fields unchanged.
+
+  **Post-condition:** Save `groupId` from `body.id`.
+
+  **System Impact:**
+
+  | Component | Effect |
+  |---|---|
+  | **Backend** | Group `description` updated; other fields unchanged |
+  | **Config Adapter** | Consumes `de.civitascore.idm.group.updated` Kafka event; forwards update to Keycloak |
+  | **Keycloak** | Group description updated |
+}

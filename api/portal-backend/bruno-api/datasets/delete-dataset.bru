@@ -27,3 +27,19 @@ tests {
     expect(res.getStatus()).to.equal(204);
   });
 }
+
+docs {
+  **Precondition:** `dataSetId` is set and not in released state.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue TC-DSET-02 for same `dataSetId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet record removed ☐ |
+  | Config Adapter | — ☐ |
+  | External System | — ☐ |
+}

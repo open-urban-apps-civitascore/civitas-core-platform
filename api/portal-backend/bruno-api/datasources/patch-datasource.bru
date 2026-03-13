@@ -33,3 +33,17 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 }
+
+docs {
+  **Precondition:** `dataSourceId` is set.
+
+  **Expected Response:** 200 OK, body reflects updated `description`; other fields unchanged.
+
+  **System Impact:**
+
+  | Layer | Effect | Verified |
+  |---|---|---|
+  | Backend | DataSource `description` updated; other fields unchanged | ☐ |
+  | Config Adapter | — | ☐ |
+  | External System | — | ☐ |
+}

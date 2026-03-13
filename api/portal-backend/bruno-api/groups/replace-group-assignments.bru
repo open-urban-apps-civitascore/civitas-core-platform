@@ -31,3 +31,17 @@ tests {
     expect(status === 200 || status === 400 || status === 404).to.be.true;
   });
 }
+
+docs {
+  **Precondition:** `groupId` is set.
+
+  **Expected Response:** 200 OK, body reflects replaced assignments for the group.
+
+  **System Impact:**
+
+  | Component | Effect |
+  |---|---|
+  | **Backend** | Group assignments replaced |
+  | **Config Adapter** | Consumes assignment-related Kafka event; forwards changes to Keycloak |
+  | **Keycloak** | Group role assignments updated |
+}

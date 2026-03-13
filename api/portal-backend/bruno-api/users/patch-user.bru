@@ -31,3 +31,19 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 }
+
+docs {
+  **Precondition:** `userId` is set.
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body reflects the updated `firstName`; other fields remain unchanged
+
+  **System Impact**
+
+  | System | Expected Change | Verified |
+  |---|---|---|
+  | Backend | User `firstName` updated in `portal_backend` DB; other fields unchanged | ☐ |
+  | Config Adapter | Consumes `de.civitascore.idm.user.updated` Kafka event; forwards update to Keycloak | ☐ |
+  | Keycloak | User firstName updated in `civitas-core` realm | ☐ |
+}

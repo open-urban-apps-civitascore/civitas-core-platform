@@ -40,3 +40,17 @@ tests {
     expect(res.body.roleType).to.be.a('string');
   });
 }
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`.
+
+  **Post-condition:** Save `roleId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | **Backend** | Role record created in `portal_backend` DB |
+  | **Config Adapter** | — |
+  | **External System** | — |
+}

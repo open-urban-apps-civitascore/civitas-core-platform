@@ -55,18 +55,20 @@ The three systems covered are:
 
 ---
 
-## Test Case Files
+## Bruno Collections
 
-| Resource | File | Operations |
+Test case documentation is embedded in each `.bru` file's `docs` block (visible in Bruno's **Docs** tab).
+
+| Collection | Folder | Operations |
 |---|---|---|
-| Auth | [authorities/AUTH.md](authorities/AUTH.md) | Get All Authorities |
-| Users | [users/USERS.md](users/USERS.md) | CRUD + My Profile |
-| Groups | [groups/GROUPS.md](groups/GROUPS.md) | CRUD + Replace Assignments |
-| Roles | [roles/ROLES.md](roles/ROLES.md) | CRUD |
-| Permissions | [permissions/PERMISSIONS.md](permissions/PERMISSIONS.md) | Read-only |
-| Assignments | [assignments/ASSIGNMENTS.md](assignments/ASSIGNMENTS.md) | Create / Create Scoped / Read / Delete |
-| DataSources | [datasources/DATASOURCES.md](datasources/DATASOURCES.md) | CRUD + Publish / Unpublish + Published Meta + Assignments |
-| DataSets | [datasets/DATASETS.md](datasets/DATASETS.md) | CRUD + Publish + Published Meta + Assignments |
-| Pipelines | [pipelines/PIPELINES.md](pipelines/PIPELINES.md) | CRUD (nested under DataSet) |
-| DataStructures | [datastructures/DATASTRUCTURES.md](datastructures/DATASTRUCTURES.md) | CRUD + Publish / Unpublish + Published Meta + Assignments |
-| DataStructure Versions | [datastructures/versions/DATASTRUCTURE-VERSIONS.md](datastructures/versions/DATASTRUCTURE-VERSIONS.md) | CRUD + Publish / Unpublish + Published Meta |
+| Authorities | `authorities/` | Get All Authorities |
+| Users | `users/` | CRUD + My Profile |
+| Groups | `groups/` | CRUD + Replace Assignments |
+| Roles | `roles/` | CRUD |
+| Permissions | `permissions/` | Read-only |
+| Assignments | `assignments/` | Create / Create Scoped / Read / Delete |
+| DataSources | `datasources/` | CRUD + Publish / Unpublish + Published Meta + Assignments |
+| DataSets | `datasets/` | CRUD + Publish + Published Meta + Assignments |
+| Pipelines | `pipelines/` | CRUD (nested under DataSet) |
+| DataStructures | `datastructures/` | CRUD + Publish / Unpublish + Published Meta + Assignments |
+| DataStructure Versions | `datastructures/versions/` | CRUD + Publish / Unpublish + Published Meta |
