@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { AssignmentApiResponseSchema } from './assignments'
+import { AssignmentApiResponseSchema, AssignmentScopeEnum } from './assignments'
 import { ItemSchema, WithId } from './common'
 
 export type GroupTab = 'info' | 'roles' | 'users'
@@ -33,6 +33,15 @@ export type UserGroupsListData = Pick<Group, 'id' | 'name' | 'description' | 'co
   membersCount: number
 }
 
+export const AssignmentFormDataSchema = z.object({
+  groupId: z.string(),
+  roleId: z.string(),
+  scopeType: AssignmentScopeEnum.nullable().optional(),
+  scopeId: z.string().nullable().optional(),
+})
+
+export type AssignmentFormData = z.infer<typeof AssignmentFormDataSchema>
+
 export const GroupApiDataSchema = z.object({
   id: z.string(),
   name: z.string().trim().min(2, {
@@ -54,6 +63,7 @@ export const GroupBaseFormDataSchema = z.object({
   description: z.string().trim(),
   contactUserId: z.string(),
   members: z.array(z.string()),
+  assignments: z.array(AssignmentFormDataSchema),
 })
 
 export type GroupBaseFormData = z.infer<typeof GroupBaseFormDataSchema>

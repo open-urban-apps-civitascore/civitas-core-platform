@@ -57,6 +57,7 @@
       "user": "User",
       "groups": "Gruppen",
       "group": "Gruppe",
+      "role": "Rolle",
       "roles": "Rollen",
       "datasets": "Datensätze",
       "dataspaces": "Datenräume",
@@ -361,7 +362,7 @@
       "description": "Beschreibung"
     },
     "detailsTabs": {
-      "info": "Informationen",
+      "info": "Basisinformationen",
       "roles": "Rollen",
       "users": "User",
       "subgroups": "Untergruppen"
@@ -373,11 +374,45 @@
       "contact": { "label": "Ansprechpartner", "placeholder": "Nach Name oder Email suchen" }
     },
     "roles": {
-      "groupInfo": "Gruppe Informationen",
-      "userNotFound": "Benutzer nicht gefunden",
-      "addRoleDialog": {
-        "title": "Rolle hinzufügen - {category}",
-        "description": "Wählen Sie eine Rolle aus den verfügbaren {category} aus, um sie dem Benutzer hinzuzufügen."
+      "scopeTabs": {
+        "platform": "Plattformweit",
+        "datasets": "Datensätze",
+        "datasources": "Datenquellen",
+        "datastructures": "Datenstruktur"
+      },
+      "scopePlatform": "Plattform",
+      "addRole": "Rolle hinzufügen",
+      "systemRole": "Systemrolle",
+      "dataRole": "Datenrolle",
+      "noRoles": "Keine Rollen",
+      "noRolesDescription": "Keine Rollen der Gruppe zugeordnet",
+      "removeRole": "Rolle wirklich entfernen?",
+      "removeRoleDescription": "Diese Aktion kann nicht rückgängig gemacht werden. Das Entfernen dieser Rolle wirkt sich auf die Zugriffsberechtigungen der Gruppe aus.",
+      "assignSystemRole": "Systemrolle hinzufügen",
+      "assignSystemRoleDescription": "zur Gruppe {groupName}",
+      "assignDataRole": "Datenrolle hinzufügen",
+      "assignDataRoleDescription": "zur Gruppe {groupName}",
+      "dataRolePlatformWarning": "Rollen, die hier zugeordnet werden, berechtigen die Gruppe Plattformweit (Berechtigungen auf alle Datenobjekte der Plattform).",
+      "scopedInfoBanner": {
+        "DATASET": "Datensatzbezogene Zuordnungen erfolgen am jeweiligen Datensatz.",
+        "DATASOURCE": "Datenquellenbezogene Zuordnungen erfolgen an der jeweiligen Datenquelle.",
+        "DATASTRUCTURE": "Datenstrukturbezogene Zuordnungen erfolgen an der jeweiligen Datenstruktur."
+      },
+      "columns": {
+        "name": "Name",
+        "description": "Beschreibung",
+        "object": "Objekt",
+        "type": "Typ",
+        "scope": "Geltungsbereich"
+      },
+      "objectLabels": {
+        "SYSTEM": "Systemrolle",
+        "DATA": "Datenrolle",
+        "GOVERNANCE": "Governance-Rolle"
+      },
+      "originLabels": {
+        "default": "Standard",
+        "custom": "Eigene"
       }
     },
     "users": {
@@ -395,7 +430,8 @@
       "createError": "Beim Anlegen der Gruppe ist ein Fehler aufgetreten",
       "updateError": "Beim Aktualisieren der Gruppe ist ein Fehler aufgetreten",
       "deleteError": "Beim Löschen der Gruppe ist ein Fehler aufgetreten",
-      "groupNameExists": "Der Gruppenname ist bereits vergeben. Bitte wählen sie einen anderen Namen."
+      "groupNameExists": "Der Gruppenname ist bereits vergeben. Bitte wählen sie einen anderen Namen.",
+      "assignmentSaveError": "Gruppe wurde erstellt, aber die Rollenzuweisungen konnten nicht gespeichert werden"
     },
     "warningModal": {
       "title": "Gruppe wirklich löschen?",

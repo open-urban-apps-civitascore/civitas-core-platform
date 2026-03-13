@@ -1,9 +1,13 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { AxiosError } from 'axios'
+
+import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { useCreateMutation } from '@/hooks/use-create-mutation'
 import { useDataQuery } from '@/hooks/use-data-query'
 import { useDeleteMutation } from '@/hooks/use-delete-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
 import { GetItemInput, GetListInput } from '@/types/common'
-import { CreateGroupData, Group, UpdateGroupData } from '@/types/groups'
+import { AssignmentFormData, CreateGroupData, Group, UpdateGroupData } from '@/types/groups'
 
 const key = 'groups'
 
@@ -55,3 +59,24 @@ export const useDeleteGroup = () =>
     headers: { 'x-api-request': 'true' },
     errorMessage: 'An error occurred while deleting the group.',
   })
+
+export const useReplaceGroupAssignments = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation<ApiServiceResponse<Group>, AxiosError, { groupId: string; assignments: AssignmentFormData[] }>({
+    mutationFn: ({ groupId, assignments }) =>
+      apiRequest<Group>({
+        method: 'PUT',
+        endpoint: `/groups/${groupId}/assignments`,
+        headers: { 'x-api-request': 'true' },
+        data: assignments,
+        errorMessage: 'An error occurred while updating group assignments.',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [key] })
+    },
+    onError: error => {
+      console.error('Failed to replace group assignments', error.message)
+    },
+  })
+}

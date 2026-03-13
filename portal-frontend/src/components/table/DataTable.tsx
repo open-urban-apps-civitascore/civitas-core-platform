@@ -28,6 +28,7 @@ export interface DataTableProps<T> extends ComponentProps<'table'> {
   totalPages: number
   isLoading?: boolean
   hasCard?: boolean
+  isPaginationHidden?: boolean
   testId?: string
   isRowClickable?: (row: Row<T>) => boolean
   onRowClick?: (row: Row<T>) => void
@@ -50,6 +51,7 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
     totalPages,
     isLoading,
     hasCard = true,
+    isPaginationHidden = false,
     onRowClick,
     isRowClickable = () => true,
     testId,
@@ -60,10 +62,20 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
 
   return (
     <div className="@container h-full w-full" data-testid={testId}>
-      <div className="h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]">
+      <div
+        className={cn(
+          'h-full',
+          !isPaginationHidden &&
+            '[--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]',
+        )}
+      >
         <ScrollArea
           data-testid="dataTableScrollArea"
-          className={cn('h-[calc(100%-var(--pagination-height))] w-full bg-white', hasCard && 'rounded-md border-1')}
+          className={cn(
+            isPaginationHidden ? 'h-full' : 'h-[calc(100%-var(--pagination-height))]',
+            'w-full bg-white',
+            hasCard && 'rounded-md border-1',
+          )}
         >
           <ShadCnTable aria-labelledby="subheading" tableContainerProps={{ className: '' }} {...tableProps}>
             <TableHeader>
@@ -117,13 +129,15 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
 
-        <TablePagination
-          className="h-[calc(var(--pagination-height))]"
-          pageIndex={pageIndex}
-          pageSize={pageSize}
-          totalPages={totalPages}
-          table={table}
-        />
+        {!isPaginationHidden && (
+          <TablePagination
+            className="h-[calc(var(--pagination-height))]"
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            totalPages={totalPages}
+            table={table}
+          />
+        )}
       </div>
     </div>
   )
