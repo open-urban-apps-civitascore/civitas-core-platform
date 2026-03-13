@@ -1,4 +1,4 @@
-import { auth } from '@/auth'
+import { getCurrentUser } from '@/app/services/api/users/serverRequests'
 import { AppHeader } from '@/components/appHeader/AppHeader'
 import { AppSidebar } from '@/components/appSidebar/AppSidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
@@ -9,14 +9,13 @@ interface MainLayoutProps {
 }
 
 const MainLayout = async (props: MainLayoutProps) => {
-  const session = await auth()
-  const user = session?.user
+  const currentUser = await getCurrentUser()
 
   const { children } = props
 
   return (
     <SidebarProvider>
-      <AppSidebar user={user} />
+      <AppSidebar currentUser={currentUser} />
       <SidebarInset className="h-svh  w-[calc(100%-var(--sidebar-width))] [--header-height:calc(--spacing(13))] [--layout-padding:calc(--spacing(6))] overflow-hidden">
         <AppHeader />
         <div className="h-[calc(100%-var(--header-height))] [--title-height:calc(--spacing(30))] [--page-padding:calc(--spacing(4))]">

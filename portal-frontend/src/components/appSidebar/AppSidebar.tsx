@@ -1,18 +1,16 @@
+import { CurrentUser } from '@/types/currentUser'
+
 import { Sidebar } from '../ui/sidebar'
 import { AppSidebarContent } from './components/AppSidebarContent'
 import { AppSidebarFooter } from './components/AppSidebarFooter'
 import { AppSidebarHeader } from './components/AppSidebarHeader'
 
 interface AppSidebarProps {
-  user?: {
-    name?: string | null
-    email?: string | null
-    image?: string | null
-  } | null
+  currentUser: CurrentUser
 }
 
 export const AppSidebar = async (props: AppSidebarProps) => {
-  const { user } = props
+  const { currentUser } = props
 
   return (
     <nav aria-label="Main navigation">
@@ -21,7 +19,7 @@ export const AppSidebar = async (props: AppSidebarProps) => {
 
         <AppSidebarContent />
 
-        <AppSidebarFooter user={user} />
+        <AppSidebarFooter currentUser={currentUser} />
       </Sidebar>
     </nav>
   )
