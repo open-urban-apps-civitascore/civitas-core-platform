@@ -15,8 +15,7 @@ import lombok.EqualsAndHashCode;
 public class DataSourceInputDTO extends BaseDataEntityInputDTO {
 
   @Schema(description = "Data source name (required)")
-  @NotBlank(message = "Name is required")
-  private String name;
+  @NotBlank(message = "Name is required") private String name;
 
   @Schema(description = "Data source description")
   private String description;
