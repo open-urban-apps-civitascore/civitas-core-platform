@@ -135,13 +135,11 @@ public class DataStructureVersionController
   @Override
   public ResponseEntity<DataStructureVersionOutputDTO> update(
       @PathVariable UUID id, @Valid @RequestBody DataStructureVersionInputDTO input) {
-    ResponseEntity<DataStructureVersionOutputDTO> response = super.update(id, input);
-    DataStructureVersionOutputDTO output = response.getBody();
-    if (output != null) {
-      DataStructureVersion entity = getService().findByIdOrThrow(output.getId());
-      enrichWithModel(output, entity);
-    }
-    return response;
+    DataStructureVersionInputDTO preProcessedInput = preProcessInput(input);
+    DataStructureVersion updated = getService().update(id, preProcessedInput);
+    DataStructureVersionOutputDTO output = getAssembler().toOutput(updated);
+    enrichWithModel(output, updated);
+    return ResponseEntity.ok(output);
   }
 
   @PutMapping("/{versionId}/published/meta")
