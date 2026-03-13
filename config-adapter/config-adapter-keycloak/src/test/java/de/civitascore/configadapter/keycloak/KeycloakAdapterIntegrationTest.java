@@ -38,6 +38,10 @@ import de.civitascore.configadapter.model.idm.RealmConfig;
 import de.civitascore.configadapter.model.idm.RoleConfig;
 import de.civitascore.configadapter.model.idm.UserConfig;
 import jakarta.ws.rs.core.Response;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -939,14 +943,9 @@ class KeycloakAdapterIntegrationTest {
         .pollInterval(1, SECONDS)
         .untilAsserted(
             () -> {
-              var httpClient = java.net.http.HttpClient.newHttpClient();
-              var request =
-                  java.net.http.HttpRequest.newBuilder()
-                      .uri(java.net.URI.create(mailpitUrl))
-                      .GET()
-                      .build();
-              var response =
-                  httpClient.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+              var httpClient = HttpClient.newHttpClient();
+              var request = HttpRequest.newBuilder().uri(URI.create(mailpitUrl)).GET().build();
+              var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
               assertTrue(
                   response.body().contains("emailuser@test.local"),
                   "Email should have been sent to emailuser@test.local");
