@@ -133,6 +133,7 @@ services:
       dockerfile_inline: |
         FROM apache/apisix:3.14.0-debian
         COPY config.yaml /usr/local/apisix/conf/config.yaml
+        RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
     depends_on:
       etcd:
         condition: service_healthy
