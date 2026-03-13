@@ -268,8 +268,9 @@ public class OpenApiConfig {
   }
 
   /**
-   * Adds global 401/403 responses to all operations and normalizes all ProblemDetail error
-   * responses to use {@code application/problem+json} (RFC 9457).
+   * Adds global 401/403/500 responses to all operations and normalizes all ProblemDetail error
+   * responses to use {@code application/problem+json} (RFC 9457). Other error codes (400, 404, 409)
+   * come from {@code @ApiResponse} annotations on controllers.
    */
   @Bean
   @Order(1)
@@ -298,41 +299,33 @@ public class OpenApiConfig {
                                       new ApiResponse()
                                           .description("Insufficient privileges")
                                           .content(newProblemContent()));
-
-                              // Normalize: any response using application/json with a
-                              // ProblemDetail schema should use application/problem+json
                               operation
                                   .getResponses()
-                                  .forEach(
-                                      (code, response) -> {
-                                        if (response.getContent() == null) return;
-                                        MediaType jsonMedia =
-                                            response.getContent().get(APPLICATION_JSON);
-                                        if (jsonMedia != null
-                                            && jsonMedia.getSchema() != null
-                                            && isProblemDetailRef(jsonMedia.getSchema())) {
-                                          response.getContent().remove(APPLICATION_JSON);
-                                          response
-                                              .getContent()
-                                              .addMediaType(APPLICATION_PROBLEM_JSON, jsonMedia);
-                                        }
-                                      });
+                                  .addApiResponse(
+                                      "500",
+                                      new ApiResponse()
+                                          .description("Internal server error")
+                                          .content(newProblemContent()));
+
+                              operation
+                                  .getResponses()
+                                  .values()
+                                  .forEach(this::normalizeProblemContentType);
                             }));
   }
 
   /**
-   * Extracts common error responses (401, 403, 502, 504) into {@code components/responses} and
-   * replaces inline occurrences with {@code $ref}s.
+   * Extracts common error responses (401, 403, 500) into {@code components/responses} and replaces
+   * inline occurrences with {@code $ref}s.
    */
   @Bean
   @Order(2)
   public OpenApiCustomizer sharedResponsesCustomizer() {
     Map<String, String> sharedResponses =
-        Map.of(
+        orderedMap(
             "401", "Unauthorized",
             "403", "Forbidden",
-            "502", "BadGateway",
-            "504", "GatewayTimeout");
+            "500", "InternalServerError");
 
     return openApi -> {
       // Capture the first inline occurrence of each code as the shared definition
@@ -443,8 +436,8 @@ public class OpenApiConfig {
 
   /**
    * Adds realistic ProblemDetail examples (RFC 9457) with actual {@code urn:civitas:error:*} type
-   * URNs to all error responses. Shared responses (401, 403, 502, 504) get examples on the
-   * component definition; inline responses (400, 404, 409, 500) get examples per-operation.
+   * URNs to all error responses. Shared responses (401, 403, 500) get examples on the component
+   * definition; inline responses (400, 404, 409) get examples per-operation.
    */
   @Bean
   @Order(3)
@@ -468,25 +461,21 @@ public class OpenApiConfig {
                     problemExample(
                         403, "ACCESS_DENIED", "Insufficient privileges", EXAMPLE_PATH))));
         addExamplesToResponse(
-            openApi.getComponents().getResponses().get("BadGateway"),
+            openApi.getComponents().getResponses().get("InternalServerError"),
             problemExamples(
                 orderedMap(
-                    "external_system_error",
+                    "data_integrity_error",
                     problemExample(
-                        502,
-                        "EXTERNAL_SYSTEM_ERROR",
-                        "External system rejected the request: Keycloak user creation failed",
-                        "/v1/users"))));
-        addExamplesToResponse(
-            openApi.getComponents().getResponses().get("GatewayTimeout"),
-            problemExamples(
-                orderedMap(
-                    "external_system_timeout",
+                        500,
+                        "DATA_INTEGRITY_ERROR",
+                        "A database constraint was violated",
+                        EXAMPLE_PATH),
+                    "persistence_error",
                     problemExample(
-                        504,
-                        "EXTERNAL_SYSTEM_TIMEOUT",
-                        "External system did not respond within 10 seconds",
-                        "/v1/users"))));
+                        500,
+                        "PERSISTENCE_ERROR",
+                        "An unexpected database error occurred",
+                        EXAMPLE_PATH))));
       }
 
       // Add examples to inline error responses
@@ -551,15 +540,6 @@ public class OpenApiConfig {
                   "foreign_key_violation",
                   problemExample(
                       409, "FOREIGN_KEY_VIOLATION", "Referenced entity does not exist", path)));
-      case "500" ->
-          problemExamples(
-              orderedMap(
-                  "data_integrity_error",
-                  problemExample(
-                      500, "DATA_INTEGRITY_ERROR", "A database constraint was violated", path),
-                  "persistence_error",
-                  problemExample(
-                      500, "PERSISTENCE_ERROR", "An unexpected database error occurred", path)));
       default -> null;
     };
   }
@@ -609,8 +589,18 @@ public class OpenApiConfig {
     return map;
   }
 
-  private boolean isProblemDetailRef(Schema<?> schema) {
-    String ref = schema.get$ref();
-    return ref != null && ref.endsWith("/ProblemDetail");
+  /**
+   * Replaces {@code application/json} with {@code application/problem+json} on ProblemDetail
+   * responses.
+   */
+  private void normalizeProblemContentType(ApiResponse response) {
+    if (response.getContent() == null) return;
+    MediaType jsonMedia = response.getContent().get(APPLICATION_JSON);
+    if (jsonMedia == null || jsonMedia.getSchema() == null) return;
+    String ref = jsonMedia.getSchema().get$ref();
+    if (ref != null && ref.endsWith("/ProblemDetail")) {
+      response.getContent().remove(APPLICATION_JSON);
+      response.getContent().addMediaType(APPLICATION_PROBLEM_JSON, jsonMedia);
+    }
   }
 }
