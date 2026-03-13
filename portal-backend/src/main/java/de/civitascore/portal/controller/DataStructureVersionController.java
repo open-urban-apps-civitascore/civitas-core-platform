@@ -68,7 +68,7 @@ public class DataStructureVersionController
     DataStructureVersionOutputDTO output = response.getBody();
     if (output != null) {
       DataStructureVersion created = getService().findByIdOrThrow(output.getId());
-      getService().findModelForDataStructureVersion(created).ifPresent(output::setModel);
+      enrichWithModel(output, created);
     }
     return response;
   }
@@ -79,7 +79,7 @@ public class DataStructureVersionController
   public ResponseEntity<DataStructureVersionOutputDTO> getById(@PathVariable UUID id) {
     DataStructureVersion entity = getService().findByIdOrThrow(id);
     DataStructureVersionOutputDTO output = getAssembler().toOutput(entity);
-    getService().findModelForDataStructureVersion(entity).ifPresent(output::setModel);
+    enrichWithModel(output, entity);
     return ResponseEntity.ok(output);
   }
 
@@ -132,6 +132,18 @@ public class DataStructureVersionController
     return super.preProcessInput(input);
   }
 
+  @Override
+  public ResponseEntity<DataStructureVersionOutputDTO> update(
+      @PathVariable UUID id, @Valid @RequestBody DataStructureVersionInputDTO input) {
+    ResponseEntity<DataStructureVersionOutputDTO> response = super.update(id, input);
+    DataStructureVersionOutputDTO output = response.getBody();
+    if (output != null) {
+      DataStructureVersion entity = getService().findByIdOrThrow(output.getId());
+      enrichWithModel(output, entity);
+    }
+    return response;
+  }
+
   @PutMapping("/{versionId}/published/meta")
   @Operation(
       operationId = "updateDataStructureVersionPublishedMeta",
@@ -150,6 +162,7 @@ public class DataStructureVersionController
     DataStructureVersion updated =
         dataStructureVersionService.updatePublishedMeta(versionId, preProcessedInput);
     DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(updated);
+    enrichWithModel(output, updated);
     return ResponseEntity.ok(output);
   }
 
@@ -164,6 +177,7 @@ public class DataStructureVersionController
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     DataStructureVersion published = dataStructureVersionService.publish(versionId);
     DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(published);
+    enrichWithModel(output, published);
     return ResponseEntity.ok(output);
   }
 
@@ -179,6 +193,11 @@ public class DataStructureVersionController
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     DataStructureVersion unpublished = dataStructureVersionService.unpublish(versionId);
     DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(unpublished);
+    enrichWithModel(output, unpublished);
     return ResponseEntity.ok(output);
+  }
+
+  private void enrichWithModel(DataStructureVersionOutputDTO output, DataStructureVersion entity) {
+    getService().findModelForDataStructureVersion(entity).ifPresent(output::setModel);
   }
 }
