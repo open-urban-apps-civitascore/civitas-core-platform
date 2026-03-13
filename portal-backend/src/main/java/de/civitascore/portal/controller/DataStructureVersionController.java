@@ -98,7 +98,15 @@ public class DataStructureVersionController
       summary = "Partially update a data structure version")
   public ResponseEntity<DataStructureVersionOutputDTO> patch(
       @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
-    return super.patch(id, updates);
+    ResponseEntity<DataStructureVersionOutputDTO> response = super.patch(id, updates);
+    DataStructureVersionOutputDTO output = response.getBody();
+    if (output != null && !updates.has("model")) {
+      DataStructureVersion entity = getService().findByIdOrThrow(output.getId());
+      dataStructureVersionService
+          .findModelForDataStructureVersion(entity)
+          .ifPresent(output::setModel);
+    }
+    return response;
   }
 
   @Override
@@ -107,18 +115,6 @@ public class DataStructureVersionController
       summary = "Delete a data structure version")
   public void delete(@PathVariable UUID id) {
     super.delete(id);
-  }
-
-  @Override
-  protected DataStructureVersionInputDTO patchInput(
-      DataStructureVersionInputDTO currentDto, DataStructureVersion current, JsonNode updates)
-      throws IOException {
-    if (!updates.has("model")) {
-      dataStructureVersionService
-          .findModelForDataStructureVersion(current)
-          .ifPresent(currentDto::setModel);
-    }
-    return super.patchInput(currentDto, current, updates);
   }
 
   @Override

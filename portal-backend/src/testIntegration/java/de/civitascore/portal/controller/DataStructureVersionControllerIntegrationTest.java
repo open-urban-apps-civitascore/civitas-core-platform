@@ -835,7 +835,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName("Should patch description without requiring model")
     void shouldPatchDescriptionWithoutRequiringModel() {
-      // Stub model download so the patchInput() override can load the existing model
+      // Stub model download so the patch() override can load the existing model for the response
       stubModelDownload("https://modelatlas.example.com/model1");
 
       Map<String, Object> patchMap = new HashMap<>();
@@ -860,7 +860,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
           .as("ModelAtlasUri should remain unchanged")
           .isEqualTo("https://modelatlas.example.com/model1");
 
-      // Verify model was downloaded from Model Atlas (loaded by patchInput override)
+      // Verify model was downloaded from Model Atlas (loaded by patch() override for response)
       verify(
           getRequestedFor(
               urlEqualTo(
