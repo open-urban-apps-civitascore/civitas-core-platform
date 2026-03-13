@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AxiosError } from 'axios'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -19,9 +19,9 @@ import {
   DatasourceFormAvailableSchema,
   DatasourceFormDraft,
   DatasourceFormDraftSchema,
+  DatasourcePatchData,
   DatasourceStatusType,
   DatasourceTab,
-  DatasourceUpdateData,
 } from '@/types/datasources'
 import { getConnectorDefaults } from '@/utils/connectors'
 import { pickDirtyValues } from '@/utils/form'
@@ -41,6 +41,10 @@ export const useDatasourceForm = (datasource: Datasource) => {
   const defaultValues = useMemo(() => {
     return mapDatasourceToFormValues(datasource)
   }, [datasource])
+
+  const [selectedConnectorType, setSelectedConnectorType] = useState<ConnectorType | undefined>(
+    defaultValues.connectorType,
+  )
 
   const updateDatasource = useUpdateDatasource()
   const updatePublishedDatasource = useUpdateDatasourcePublished()
@@ -71,26 +75,25 @@ export const useDatasourceForm = (datasource: Datasource) => {
   }, [datasource])
 
   const formValues = useWatch({ control: form.control })
+  const nameWatch = form.watch('name')
+  const connectorTypeWatch = form.watch('connectorType')
   const dataSourceStatus = form.watch('dataSourceStatus')
-  const connectorTypeWatch = formValues.connectorType
-  const nameWatch = formValues.name ?? ''
   const dataStructureVersionIdWatch = form.watch('dataStructureVersionId')
 
-  // Reset configuration on connector type change; readyConnectorType gates field rendering
+  // Reset configuration on connector type change; setSelectedConnectorType gates field rendering
   // to avoid flashes while form.reset() applies the new defaults.
-  const prevConnectorType = useRef<ConnectorType | undefined>(connectorTypeWatch)
-  const [readyConnectorType, setReadyConnectorType] = useState<ConnectorType | undefined>(connectorTypeWatch)
   useEffect(() => {
-    if (connectorTypeWatch && prevConnectorType.current !== connectorTypeWatch) {
-      prevConnectorType.current = connectorTypeWatch
-      const defaults = getConnectorDefaults(connectorTypeWatch)
-      form.reset(
-        { ...form.getValues(), connectorType: connectorTypeWatch, configuration: defaults },
-        { keepDirty: true, keepTouched: true },
-      )
-      setReadyConnectorType(connectorTypeWatch)
-    }
-  }, [connectorTypeWatch, form])
+    const configDefaults = connectorTypeWatch ? getConnectorDefaults(connectorTypeWatch) : {}
+    const isInitialConnectorType = defaultValues.connectorType === connectorTypeWatch
+    form.setValue('connectorType', connectorTypeWatch, {
+      shouldDirty: !isInitialConnectorType,
+    })
+    form.setValue('configuration', configDefaults, {
+      shouldDirty: !isInitialConnectorType,
+    })
+    setSelectedConnectorType(connectorTypeWatch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectorTypeWatch])
 
   const isDraftMode = dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
   const hasStatusChanged = dataSourceStatus !== datasource.dataSourceStatus
@@ -150,7 +153,7 @@ export const useDatasourceForm = (datasource: Datasource) => {
     }
   }
 
-  const handleUpdateValues = async (values: DatasourceUpdateData) => {
+  const handleUpdateValues = async (values: DatasourcePatchData) => {
     try {
       const response =
         datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
@@ -190,7 +193,7 @@ export const useDatasourceForm = (datasource: Datasource) => {
         ...dirtyValues,
         ...(dirtyFields.configuration ? { configuration } : {}),
         id: datasource.id,
-      } as DatasourceUpdateData
+      } as DatasourcePatchData
 
       const shouldUpdateValues = Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus')
       const shouldPublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
@@ -223,8 +226,8 @@ export const useDatasourceForm = (datasource: Datasource) => {
 
   return {
     form,
-    readyConnectorType,
     dataSourceStatus,
+    selectedConnectorType,
     hasStatusChanged,
     handleStatusChange,
     isDraftMode,

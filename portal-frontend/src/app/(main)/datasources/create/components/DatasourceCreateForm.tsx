@@ -18,7 +18,7 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
-import { DatasourceCreateData, DatasourceCreateFormSchema, DatasourceFormDraft } from '@/types/datasources'
+import { DatasourceCreateData, DatasourceCreateFormSchema } from '@/types/datasources'
 
 export const DatasourceCreateForm = () => {
   const t = useTranslations('datasources')
@@ -43,7 +43,7 @@ export const DatasourceCreateForm = () => {
     },
   })
 
-  const handleCreateDatasource = async (formData: DatasourceFormDraft) => {
+  const handleCreateDatasource = (formData: DatasourceCreateData) => {
     createDatasource.mutate(
       { name: formData.name! },
       {

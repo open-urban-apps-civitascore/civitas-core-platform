@@ -644,6 +644,7 @@
       "title1": "Konnektor",
       "title2": "Konfiguration",
       "type": "Typ",
+      "typePlaceholder": "Konnektortyp auswählen",
       "connection": "Verbindung",
       "establishConnection": "Verbindung herstellen"
     },

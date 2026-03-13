@@ -102,8 +102,8 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const {
     form: datasourceForm,
-    readyConnectorType,
     dataSourceStatus,
+    selectedConnectorType,
     hasStatusChanged,
     handleStatusChange,
     canSetAvailable,
@@ -210,7 +210,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       case 'basicInfo':
         return <BasicInfoTab form={datasourceForm} isReadOnly={isReadOnly} />
       case 'connector':
-        return <ConnectorTab form={datasourceForm} readyConnectorType={readyConnectorType} isReadOnly={isReadOnly} />
+        return <ConnectorTab form={datasourceForm} connectorType={selectedConnectorType} isReadOnly={isReadOnly} />
       case 'dataStructure':
         return (
           <DatastructureTab

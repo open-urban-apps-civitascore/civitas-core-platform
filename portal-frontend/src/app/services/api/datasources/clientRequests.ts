@@ -3,7 +3,7 @@ import { useDataQuery } from '@/hooks/use-data-query'
 import { useDeleteMutation } from '@/hooks/use-delete-mutation'
 import { useUpdateMutation } from '@/hooks/use-update-mutation'
 import { GetItemInput, GetListInput, WithId } from '@/types/common'
-import { Datasource, DatasourceCreateData, DatasourceUpdateData } from '@/types/datasources'
+import { Datasource, DatasourceCreateData, DatasourcePatchData, DatasourcePutData } from '@/types/datasources'
 
 const key = 'datasources'
 
@@ -33,7 +33,7 @@ export const useCreateDatasource = () =>
   })
 
 export const useUpdateDatasource = () =>
-  useUpdateMutation<Datasource, DatasourceUpdateData>({
+  useUpdateMutation<Datasource, DatasourcePatchData>({
     method: 'PATCH',
     key,
     headers: { 'x-api-request': 'true' },
@@ -41,7 +41,7 @@ export const useUpdateDatasource = () =>
   })
 
 export const useUpdateDatasourcePublished = () =>
-  useUpdateMutation<Datasource, DatasourceUpdateData>({
+  useUpdateMutation<Datasource, DatasourcePutData>({
     method: 'PUT',
     key,
     endpoint: ({ id }) => `/datasources/${id}/published/meta`,

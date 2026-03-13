@@ -10,7 +10,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       label: { label: 'Brokers', labelHint: 'commaSeparated' },
       rows: 3,
       placeholder: 'tcp://localhost:1883',
-      defaultValue: undefined,
+      defaultValue: '',
       required: true,
     },
     {
@@ -18,7 +18,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       type: 'input',
       label: { label: 'User', labelHint: null },
       placeholder: '',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -26,7 +26,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       type: 'input',
       label: { label: 'Password', labelHint: null },
       placeholder: '',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -34,7 +34,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       type: 'input',
       label: { label: 'Topics', labelHint: 'commaSeparated' },
       placeholder: 'foo/bar, sensors/#',
-      defaultValue: undefined,
+      defaultValue: '',
       required: true,
     },
     {
@@ -42,7 +42,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       type: 'input',
       label: { label: 'Client ID', labelHint: null },
       placeholder: 'optional',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -59,7 +59,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       expert: true,
       label: { label: 'Connect Timeout', labelHint: null },
       placeholder: '3s',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -68,7 +68,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       expert: true,
       label: { label: 'Keepalive', labelHint: null },
       placeholder: '30s',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -106,7 +106,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       type: 'input',
       label: { label: 'DSN', labelHint: null },
       placeholder: 'Driver-spezifischer Connection String',
-      defaultValue: undefined,
+      defaultValue: '',
       required: true,
     },
     {
@@ -114,7 +114,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       type: 'input',
       label: { label: 'User', labelHint: null },
       placeholder: '',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -122,7 +122,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       type: 'input',
       label: { label: 'Password', labelHint: null },
       placeholder: '',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -130,7 +130,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       type: 'input',
       label: { label: 'Table', labelHint: null },
       placeholder: 'table',
-      defaultValue: undefined,
+      defaultValue: '',
       required: true,
     },
     {
@@ -147,7 +147,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       type: 'input',
       label: { label: 'WHERE', labelHint: null },
       placeholder: 'col = ? AND id > ?',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -156,7 +156,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       expert: true,
       label: { label: 'Prefix SQL', labelHint: null },
       placeholder: 'optional',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -165,7 +165,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       expert: true,
       label: { label: 'Suffix SQL', labelHint: null },
       placeholder: 'optional',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -174,7 +174,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       expert: true,
       label: { label: 'Init SQL Statement', labelHint: null },
       rows: 4,
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -183,7 +183,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       expert: true,
       label: { label: 'Max Idle Time', labelHint: null },
       placeholder: 'e.g. 5m',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
@@ -192,7 +192,7 @@ export const CONNECTOR_INPUTS: Record<ConnectorType, ConnectorField[]> = {
       expert: true,
       label: { label: 'Max Life Time', labelHint: null },
       placeholder: 'e.g. 1h',
-      defaultValue: undefined,
+      defaultValue: '',
       required: false,
     },
     {
