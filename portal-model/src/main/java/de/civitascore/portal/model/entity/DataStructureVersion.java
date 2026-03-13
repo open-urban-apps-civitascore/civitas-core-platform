@@ -43,6 +43,9 @@ public class DataStructureVersion extends BaseEntity {
   @Column(name = "model_name")
   private String modelName;
 
+  @Column(name = "external_id")
+  private String externalId;
+
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "styles", columnDefinition = "jsonb")
   private Map<String, Object> styles;

@@ -30,6 +30,8 @@ public class DataStructureVersionOutputDTO extends BaseOutputDTO {
 
   private String modelName;
 
+  private String externalId;
+
   private Map<String, Object> styles;
 
   @Schema(description = "Data model definition (JSON schema)")
