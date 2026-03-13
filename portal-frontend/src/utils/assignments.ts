@@ -1,5 +1,5 @@
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
-import { Assignment, CreateAssignmentData } from '@/types/assignments'
+import { Assignment, AssignmentScopedInput } from '@/types/assignments'
 import { Group } from '@/types/groups'
 
 export const mapAssignmentApiResponseToTable = (
@@ -46,12 +46,12 @@ export const mapAssignmentApiResponseToTable = (
   return Array.from(groupMap.values())
 }
 
-export const mapGroupRoleAssignmentsToCreateData = (
+export const mapGroupRoleAssignmentsToApiPayload = (
   groupRoleAssignments: GroupRoleAssignmentTable[],
-): CreateAssignmentData[] => {
-  const assignments: CreateAssignmentData[] = []
+): AssignmentScopedInput[] => {
+  const assignments: AssignmentScopedInput[] = []
 
-  groupRoleAssignments.forEach(groupRoleAssignment => {
+  groupRoleAssignments?.forEach(groupRoleAssignment => {
     groupRoleAssignment.assignedRoles.forEach(assignedRole => {
       assignments.push({
         groupId: groupRoleAssignment.groupId,
@@ -61,4 +61,16 @@ export const mapGroupRoleAssignmentsToCreateData = (
   })
 
   return assignments
+}
+
+export const toAssignmentSet = (groups: GroupRoleAssignmentTable[]): Set<string> =>
+  new Set(groups.flatMap(g => g.assignedRoles.map(r => `${g.groupId}::${r.roleId}`)))
+
+export const hasAssignmentChanges = (
+  current: GroupRoleAssignmentTable[],
+  initial: GroupRoleAssignmentTable[],
+): boolean => {
+  const currentSet = toAssignmentSet(current)
+  const initialSet = toAssignmentSet(initial)
+  return currentSet.size !== initialSet.size || [...currentSet].some(item => !initialSet.has(item))
 }

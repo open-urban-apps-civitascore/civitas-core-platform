@@ -1,4 +1,5 @@
 import { serverFetch } from '@/lib/serverFetch'
+import { Assignment } from '@/types/assignments'
 import { Datasource } from '@/types/datasources'
 
 /**
@@ -34,5 +35,18 @@ export const getDatasource = async (id: string) => {
   } catch (error) {
     console.error(`An error occurred while fetching datasource ${id}.`, error)
     throw new Error('An error occurred while fetching datasource.')
+  }
+}
+
+export const getDatasourceAssignments = async (datasourceId: string) => {
+  try {
+    return await serverFetch<Assignment[]>({
+      endpoint: `/datasources/${datasourceId}/assignments`,
+      method: 'GET',
+      isApiBackend: true,
+    })
+  } catch (error) {
+    console.error(`An error occurred while fetching assignments for datasource ${datasourceId}.`, error)
+    throw new Error('An error occurred while fetching datasource assignments.')
   }
 }

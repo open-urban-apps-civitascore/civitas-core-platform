@@ -153,7 +153,8 @@
       "secondBox": "Durch das Entfernen der eigenen Gruppen-Rollen-Zuordnung können die eigenen Berechtigungen verloren gehen."
     },
     "messages": {
-      "updateSuccess": "Berechtigungen wurden erfolgreich aktualisiert."
+      "updateSuccess": "Berechtigungen wurden erfolgreich aktualisiert.",
+      "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     }
   },
   "sidebar": {
@@ -638,7 +639,8 @@
     },
     "errors": {
       "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
-      "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)"
+      "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)",
+      "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
     "connection": {
       "active": "aktiv",
@@ -668,7 +670,7 @@
       "basicInfo": "Basisinformationen",
       "connector": "Konnektor",
       "dataStructure": "Datenstruktur",
-      "accessPermissions": "Zugriffsberechtigungen",
+      "accessManagement": "Zugriffsberechtigungen",
       "dataspaces": "Datenräume"
     },
     "connectorTab": {
@@ -677,6 +679,11 @@
       "type": "Typ",
       "connection": "Verbindung",
       "establishConnection": "Verbindung herstellen"
+    },
+    "accessManagementTab": {
+      "infoBoxes": {
+        "firstBox": "Gruppen, die plattformweite Berechtigungen an allen Datenobjekten besitzen, haben Zugriff auf diese Datenquelle."
+      }
     }
   },
   "datastructures": {

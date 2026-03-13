@@ -154,7 +154,8 @@
       "secondBox": "By removing your own group-role assignment, you may lose your permissions."
     },
     "messages": {
-      "updateSuccess": "Permissions have been successfully updated."
+      "updateSuccess": "Permissions have been successfully updated.",
+      "groupsWithoutRoles": "Groups without assigned roles have not been saved."
     }
   },
   "sidebar": {
@@ -646,7 +647,8 @@
     },
     "errors": {
       "invalidDsn": "Enter a valid URI (e.g. postgres://host:5432/db)",
-      "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)"
+      "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)",
+      "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
     },
     "connection": {
       "active": "active",
@@ -671,7 +673,7 @@
       "basicInfo": "Base Information",
       "connector": "Connector",
       "dataStructure": "Data Structure",
-      "accessPermissions": "Access Permissions",
+      "accessManagement": "Access Management",
       "dataspaces": "Data Spaces"
     },
     "form": {
@@ -690,6 +692,11 @@
       "type": "Type",
       "connection": "Connection",
       "establishConnection": "Establish Connection"
+    },
+    "accessManagementTab": {
+      "infoBoxes": {
+        "firstBox": "Groups that have platform-wide permissions on all data objects have access to this data source."
+      }
     }
   },
   "datastructures": {
