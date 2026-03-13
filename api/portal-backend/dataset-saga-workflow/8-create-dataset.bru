@@ -1,0 +1,25 @@
+meta {
+  name: 8. Create DataSet
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Saga Test DataSet",
+    "description": "Dataset for end-to-end saga workflow test",
+    "openDataAccess": false
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaDataSetId', res.body.id);
+  }
+}
