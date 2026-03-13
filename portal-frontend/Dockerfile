@@ -15,6 +15,9 @@ COPY package.json ./package.json
 COPY .next ./.next
 COPY public ./public
 
+# Remove npm (unused at runtime) to eliminate bundled vulnerable deps (tar, glob, diff)
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 # Create cache directory for Next.js image optimization
 RUN mkdir -p .next/cache/images
 
