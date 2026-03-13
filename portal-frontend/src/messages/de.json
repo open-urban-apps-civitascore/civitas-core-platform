@@ -606,7 +606,7 @@
     "errors": {
       "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
       "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)",
-      "creationError": "Beim Anlegen der Datenquelle ist ein Felher aufgetreten.",
+      "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten"
     },
     "connection": {
@@ -707,7 +707,7 @@
     },
     "errors": {
       "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten.",
-      "creationError": "Beim Anlegen der Datenstruktur ist ein Felher aufgetreten."
+      "creationError": "Beim Anlegen der Datenstruktur ist ein Fehler aufgetreten."
     },
     "infoModal": {
       "title": "Datenstruktur kann nicht gelöscht werden",

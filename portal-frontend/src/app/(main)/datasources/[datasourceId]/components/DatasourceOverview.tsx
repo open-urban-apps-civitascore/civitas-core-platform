@@ -21,6 +21,7 @@ import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
 import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
 import { Datastructure, DatastructureVersion } from '@/types/datastructures'
+import { getSelectedDatastructureVersion } from '@/utils/datasources'
 import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'
@@ -187,11 +188,15 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const handleSelectDatastructureVersion = (selection: RowSelectionState) => {
-    const [selectedDatastructureId, selectedVersionId] = Object.keys(selection)[0]?.split('/') || [null, null]
-    setSelectedDatastructureId(selectedDatastructureId)
-    setSelectedDatastructureVersionId(selectedVersionId)
-    datasourceForm.setValue('dataStructureVersionId', selectedVersionId, {
-      shouldDirty: true,
+    const { datastructureId, versionId } = getSelectedDatastructureVersion(selection)
+    const hasSelectionChanged =
+      datastructureId !== selectedDatastructureId || versionId !== selectedDatastructureVersionId
+
+    setSelectedDatastructureId(datastructureId)
+    setSelectedDatastructureVersionId(versionId)
+
+    datasourceForm.setValue('dataStructureVersionId', versionId, {
+      shouldDirty: hasSelectionChanged,
       shouldValidate: true,
     })
   }

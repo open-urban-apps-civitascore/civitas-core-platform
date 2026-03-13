@@ -55,7 +55,7 @@ export const useGetDatastructureVersion = ({
     key: `datastructures/${datastructureId}/versions`,
     isEnabled,
     headers: { 'x-api-request': 'true' },
-    errorMessage: 'An error occurred while fetching groups.',
+    errorMessage: 'An error occurred while fetching datastructure versions.',
   })
 
 export const useCreateDatastructureVersion = () =>
@@ -64,41 +64,17 @@ export const useCreateDatastructureVersion = () =>
     errorMessage: 'An error occurred while creating datastructure version',
   })
 
-// export const useCreateDatastructureVersion = (datastructureId: string) =>
-//   useCreateMutation<DatastructureVersion, DatastructureVersionCreateData>({
-//     key: `datastructures/${datastructureId}/versions`,
-//     headers: { 'x-api-request': 'true' },
-//     errorMessage: 'An error occurred while creating datastructure version',
-//   })
-
 export const useUpdateDatastructureVersion = () =>
   useDatastructureVersionMutation<DatastructureVersion, DatastructureVersionPatchData>({
     method: 'PATCH',
     errorMessage: 'An error occurred while updating datastructure version',
   })
 
-// export const useUpdateDatastructureVersion = (datastructureId: string) =>
-//   useUpdateMutation<DatastructureVersion, DatastructureVersionPatchData>({
-//     method: 'PATCH',
-//     key: `datastructures/${datastructureId}/versions`,
-//     headers: { 'x-api-request': 'true' },
-//     errorMessage: 'An error occurred while updating datastructure version',
-//   })
-
 export const useUpdateDatastructureVersionPublished = () =>
   useDatastructureVersionMutation<DatastructureVersion, DatastructureVersionPutData>({
     method: 'PUT',
     errorMessage: 'An error occurred while updating datastructure version',
   })
-
-// export const useUpdateDatastructureVersionPublished = (datastructureId: string) =>
-//   useUpdateMutation<DatastructureVersion, DatastructureVersionPutData>({
-//     method: 'PUT',
-//     key: `datastructures/${datastructureId}/versions`,
-//     endpoint: (data: WithId) => `/datastructures/${datastructureId}/versions/${data.id}/published/meta`,
-//     headers: { 'x-api-request': 'true' },
-//     errorMessage: 'An error occurred while updating datastructure version',
-//   })
 
 export const useStatusUpdateDatastructureVersion = () =>
   useDatastructureVersionMutation<DatastructureVersion, undefined>({
@@ -119,11 +95,3 @@ export const useUnpublishDatastructureVersion = () =>
     method: 'POST',
     errorMessage: 'An error occurred while publishing datastructure version',
   })
-
-// export const useUnpublishDatastructureVersion = (datastructureId: string) =>
-//   useCreateMutation<DatastructureVersion, WithId>({
-//     key: `datastructures/${datastructureId}/versions`,
-//     endpoint: (data: WithId) => `/datastructures/${datastructureId}/versions/${data.id}/unpublish`,
-//     headers: { 'x-api-request': 'true' },
-//     errorMessage: 'An error occurred while publishing datastructure version',
-//   })
