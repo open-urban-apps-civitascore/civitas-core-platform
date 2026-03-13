@@ -560,13 +560,13 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should fail to fetch all versions for a data structure")
-    void shouldFailToRetrieveAllVersions() {
+    @DisplayName("Should retrieve all versions for a data structure")
+    void shouldRetrieveAllVersions() {
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpoint(), HttpMethod.GET, new HttpEntity<>(createAuthHeaders()), String.class);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
     }
   }
 
@@ -819,6 +819,93 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(unchanged.getVersion())
           .as("Version string of versionId1 must not have changed")
           .isEqualTo("1.0.0");
+    }
+  }
+
+  @Nested
+  @DisplayName("Patch DataStructureVersion Tests")
+  class PatchDataStructureVersionTests {
+
+    @Test
+    @DisplayName("Should patch description without requiring model")
+    void shouldPatchDescriptionWithoutRequiringModel() {
+      // Stub model download so the patchInput() override can load the existing model
+      stubModelDownload("https://modelatlas.example.com/model1");
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Patched version description");
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.PATCH,
+              new HttpEntity<>(patchMap, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("PATCH with only description should return OK")
+          .isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+
+      DataStructureVersionOutputDTO output = response.getBody();
+      assertThat(output.getDescription()).isEqualTo("Patched version description");
+      assertThat(output.getVersion()).as("Version should remain unchanged").isEqualTo("1.0.0");
+      assertThat(output.getModelAtlasUri())
+          .as("ModelAtlasUri should remain unchanged")
+          .isEqualTo("https://modelatlas.example.com/model1");
+
+      // Verify model was downloaded from Model Atlas (loaded by patchInput override)
+      verify(
+          getRequestedFor(
+              urlEqualTo(
+                  String.format(
+                      "/atlas/rest/%s/schema/stages/%s/content?nsUri=%s",
+                      TEST_SCOPE, TEST_STAGE, "https://modelatlas.example.com/model1"))));
+    }
+
+    @Test
+    @DisplayName("Should patch with model and modelAtlasUri")
+    void shouldPatchWithModelAndModelAtlasUri() {
+      stubModelDownload("https://modelatlas.example.com/model1-patched");
+      String expectedUploadPath = stubModelUpload("https://modelatlas.example.com/model1-patched");
+
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("modelAtlasUri", "https://modelatlas.example.com/model1-patched");
+      patchMap.put("model", modelContent);
+
+      ResponseEntity<DataStructureVersionOutputDTO> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + versionId1,
+              HttpMethod.PATCH,
+              new HttpEntity<>(patchMap, createAuthHeaders()),
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode())
+          .as("PATCH with model should return OK")
+          .isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getModelAtlasUri())
+          .isEqualTo("https://modelatlas.example.com/model1-patched");
+
+      verify(postRequestedFor(urlEqualTo(expectedUploadPath)));
+    }
+
+    @Test
+    @DisplayName("Should return 404 when patching non-existent version")
+    void shouldReturn404WhenPatchingNonExistent() {
+      Map<String, Object> patchMap = new HashMap<>();
+      patchMap.put("description", "Patched description");
+
+      ResponseEntity<String> response =
+          restTemplate.exchange(
+              getEndpoint() + "/" + UUID.randomUUID(),
+              HttpMethod.PATCH,
+              new HttpEntity<>(patchMap, createAuthHeaders()),
+              String.class);
+
+      assertThat(response.getStatusCode())
+          .as("Should return NOT_FOUND status")
+          .isEqualTo(HttpStatus.NOT_FOUND);
     }
   }
 

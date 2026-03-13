@@ -1,0 +1,33 @@
+meta {
+  name: 4. Create DataSet
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/datasets
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Saga Test DataSet",
+    "description": "Dataset for end-to-end saga workflow test",
+    "openDataAccess": false
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaDataSetId', res.body.id);
+  }
+}
+
+tests {
+  test("DataSet created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}

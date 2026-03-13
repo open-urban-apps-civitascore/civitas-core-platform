@@ -1,13 +1,17 @@
 meta {
   name: Get All Data Sources
   type: http
-  seq: 1
+  seq: 2
 }
 
 get {
   url: {{baseUrl}}/datasources
   body: none
   auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
 }
 
 params:query {
@@ -19,4 +23,13 @@ params:query {
   ~q: sensor
   ~dataSourceStatus: DRAFT
   ~connectorType: MQTT
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns paginated list", function() {
+    expect(res.body.content).to.be.an('array');
+  });
 }

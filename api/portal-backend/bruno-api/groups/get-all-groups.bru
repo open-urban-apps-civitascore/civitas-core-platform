@@ -1,7 +1,7 @@
 meta {
   name: Get All Groups
   type: http
-  seq: 1
+  seq: 2
 }
 
 get {
@@ -19,4 +19,13 @@ params:query {
   ~contactUserId: user-123
   ~parentGroupId: group-456
   ~q: team
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns paginated list", function() {
+    expect(res.body.content).to.be.an('array');
+  });
 }

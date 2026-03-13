@@ -1,0 +1,38 @@
+meta {
+  name: 9. Verify DataSet (after saga)
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.publicUrl) {
+    bru.setVar('sagaPublicUrl', res.body.publicUrl);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Status is AVAILABLE or READY", function() {
+    const s = res.body.dataSetStatus;
+    expect(s === 'AVAILABLE' || s === 'READY').to.be.true;
+  });
+
+  test("Saga completed or still pending", function() {
+    // Saga may not have finished yet in fast runs
+    const pst = res.body.pendingSagaType;
+    expect(pst === null || pst === 'CREATE').to.be.true;
+  });
+}

@@ -223,6 +223,78 @@ saga-e2e-test-backend:
     reports:
       junit: portal-backend/target/failsafe-reports/TEST-*.xml
 
+# Bruno API smoke tests — spins up a real backend stack (PostgreSQL, Keycloak,
+# Kafka, Portal Backend) via Docker Compose and runs the full Bruno CLI test
+# collection against it. Validates the HTTP API contract from the outside,
+# complementing the Maven-based unit and integration tests.
+# Auto-runs on main/develop, manual on MRs.
+api-test-backend:
+  image: docker:27
+  stage: build # runs after build jobs provide JAR artifacts
+  needs:
+    - job: build-backend
+      artifacts: true
+    - job: build-config-adapter
+      artifacts: true
+      optional: true
+    - job: build-authz
+      artifacts: true
+      optional: true
+  rules:
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "develop"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - portal-backend/**/*
+        - config-adapter/**/*
+        - authz/**/*
+        - api/portal-backend/bruno-api/**/*
+        - dev-environment/ci/**/*
+        - dev-environment/apisix/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/backend.yml
+      when: manual
+      allow_failure: true
+  services:
+    - name: docker:27-dind
+      command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+  script:
+    - export COMPOSE_BASE="-f dev-environment/ci/docker-compose.api-test.yml"
+    - export COMPOSE_BUILD="-f dev-environment/ci/docker-compose.api-test.build.yml"
+    # Check if source JARs are available (from build-config-adapter / build-authz jobs)
+    - |
+      if ls config-adapter/config-adapter-application/target/*.jar >/dev/null 2>&1 && \
+         ls authz/repository/target/*.jar >/dev/null 2>&1; then
+        echo "Source JARs found — building config-adapter and authz-repository from source"
+        export COMPOSE_FILES="$COMPOSE_BASE $COMPOSE_BUILD"
+      else
+        echo "Source JARs not available — pulling pre-built images from registry"
+        echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+        export COMPOSE_FILES="$COMPOSE_BASE"
+      fi
+    # Start full stack — blocks until all services are healthy
+    - docker compose -p api-test $COMPOSE_FILES up -d --build --wait --wait-timeout 600
+    # Seed APISIX routes (services, plugin config, portal-backend route)
+    - docker compose -p api-test $COMPOSE_FILES run --rm apisix-seed
+    # Run Bruno API tests from a container on the same Compose network
+    - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
+    - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
+    - docker exec bruno-runner sh -c "npm install -g @usebruno/cli 2>/dev/null && cd /tests && npx @usebruno/cli run --env ci 2>&1 | tee /tests/bruno-output.txt"
+    - docker cp bruno-runner:/tests/bruno-output.txt bruno-results.txt || true
+  after_script:
+    - docker rm -f bruno-runner 2>/dev/null || true
+    - docker compose -p api-test -f dev-environment/ci/docker-compose.api-test.yml down -v 2>/dev/null || true
+  artifacts:
+    when: always
+    paths:
+      - bruno-results.txt
+    expire_in: 30 days
+
 report-test-backend:
   extends: .only-backend-changes
   image: maven:3.9-eclipse-temurin-21

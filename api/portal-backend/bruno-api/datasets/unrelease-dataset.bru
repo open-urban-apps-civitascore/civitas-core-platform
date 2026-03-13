@@ -1,0 +1,23 @@
+meta {
+  name: Unrelease Dataset
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/unrelease
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+tests {
+  test("Unreleased or precondition not met", function() {
+    const status = res.getStatus();
+    // 202=delete saga triggered, 400=not in AVAILABLE state
+    expect(status === 202 || status === 400).to.be.true;
+  });
+}

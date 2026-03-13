@@ -1,0 +1,58 @@
+meta {
+  name: 5. Create Pipeline
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sagaDataSetId}}
+}
+
+body:json {
+  {
+    "name": "Saga Test Pipeline",
+    "description": "Pipeline for saga workflow test",
+    "dataSourceIds": ["{{sagaDataSourceId}}"],
+    "apis": ["/v1.1/Things"],
+    "persistences": [],
+    "styles": {},
+    "model": {
+      "input": {
+        "generate": {
+          "interval": "1s",
+          "count": 1,
+          "mapping": "root = {\"name\": \"Test Sensor\", \"description\": \"test\"}"
+        }
+      },
+      "output": {
+        "http_client": {
+          "url": "${FROST_BASE}/Things",
+          "verb": "POST",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        }
+      }
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaPipelineId', res.body.id);
+  }
+}
+
+tests {
+  test("Pipeline created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}

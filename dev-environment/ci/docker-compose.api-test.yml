@@ -1,0 +1,346 @@
+# ============================================================
+# CIVITAS CORE Platform — CI: Bruno API Test Stack
+# ============================================================
+# Full, self-contained stack for running Bruno API tests
+# in GitLab CI (Docker-in-Docker). No external network needed.
+#
+# Includes the complete APISIX gateway chain:
+#   APISIX → openid-connect → OPA → proxy-rewrite → FROST
+#
+# Usage (from project root):
+#   docker compose -p api-test -f dev-environment/ci/docker-compose.api-test.yml up -d --wait --wait-timeout 600
+#   docker compose -p api-test -f dev-environment/ci/docker-compose.api-test.yml run --rm apisix-seed
+#   <run Bruno tests>
+# ============================================================
+
+services:
+  # ── Databases ──────────────────────────────────────────────
+
+  postgres-portal:
+    image: postgres:18.1-alpine
+    environment:
+      POSTGRES_DB: portal_backend
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_HOST_AUTH_METHOD: md5
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d portal_backend"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-keycloak:
+    image: postgres:18.1-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-frost:
+    image: postgis/postgis:16-3.4-alpine
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: sensorthings
+      POSTGRES_USER: sensorthings
+      POSTGRES_PASSWORD: frost-ci-password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d sensorthings -U sensorthings"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  # ── Identity ───────────────────────────────────────────────
+
+  keycloak:
+    build:
+      context: ../keycloak
+      dockerfile_inline: |
+        FROM quay.io/keycloak/keycloak:latest
+        COPY realm-export.json /opt/keycloak/data/import/realm-export.json
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KC_HTTP_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME: http://keycloak:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    depends_on:
+      postgres-keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+
+  # ── Messaging ──────────────────────────────────────────────
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── API Gateway ──────────────────────────────────────────
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.16
+    environment:
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_DATA_DIR: /etcd-data
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  apisix:
+    build:
+      context: ../apisix/apisix_conf
+      dockerfile_inline: |
+        FROM apache/apisix:3.14.0-debian
+        COPY config.yaml /usr/local/apisix/conf/config.yaml
+    depends_on:
+      etcd:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9080/apisix/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── Authorization ────────────────────────────────────────
+
+  authz-repository:
+    # Default: pull from registry. Override with docker-compose.api-test.build.yml
+    # to build from source when JAR artifacts are available.
+    image: ${CI_REGISTRY_IMAGE}/authz-repo-service:${IMAGE_TAG:-develop}
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
+      DATABASE_USERNAME: admin
+      DATABASE_PASSWORD: admin
+      SERVER_PORT: 8091
+    depends_on:
+      postgres-portal:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  opa:
+    build:
+      # Build context = authz/rego so we can COPY policy files
+      # (bind mounts don't work in DinD)
+      context: ../../authz/rego
+      dockerfile_inline: |
+        FROM alpine:3 AS prep
+        COPY policy /staging/policies
+        COPY lib /staging/helpers
+        COPY providers /staging/providers
+        COPY data/backends-allowall /staging/data/backends
+        RUN mkdir -p /staging/data/config && \
+            printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","authz_cache_duration_seconds":0}\n' \
+            > /staging/data/config/config.json
+        FROM openpolicyagent/opa:1.14.0-static
+        COPY --from=prep /staging/policies /policies
+        COPY --from=prep /staging/helpers /helpers
+        COPY --from=prep /staging/providers /providers
+        COPY --from=prep /staging/data /data
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=info"
+      - "--log-format=json"
+      - "--set=decision_logs.console=true"
+      - "/policies"
+      - "/helpers"
+      - "/providers"
+      - "/data"
+    depends_on:
+      authz-repository:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "-f", "pretty", "true"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ── FROST SensorThings API ──────────────────────────────
+
+  frost:
+    image: hylkevds/frost-http-projects:latest
+    platform: linux/amd64
+    hostname: civitas-frost
+    environment:
+      - serviceRootUrl=http://apisix:9080/FROST-Server/
+      - plugins_modelLoader_enable=true
+      - plugins_multiDatastream_enable=false
+      - plugins_actuation_enable=false
+      - http_cors_enable=true
+      - http_cors_allowed_origins=*
+      - persistence_db_driver=org.postgresql.Driver
+      - persistence_db_url=jdbc:postgresql://postgres-frost:5432/sensorthings
+      - persistence_db_username=sensorthings
+      - persistence_db_password=frost-ci-password
+      - persistence_autoUpdateDatabase=true
+      - plugins_modelLoader_securityPath=
+    depends_on:
+      postgres-frost:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/FROST-Server/v1.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── Data Pipelines ──────────────────────────────────────
+
+  redpanda-connect:
+    image: redpandadata/connect:4
+    command: ["streams"]
+    environment:
+      FROST_BASE: http://civitas-frost:8080/FROST-Server/v1.1
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:4195/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Application ──────────────────────────────────────────
+
+  portal-backend:
+    build:
+      context: ../../portal-backend
+      dockerfile: Dockerfile
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KEYCLOAK_AUTH_SERVER_URL: http://keycloak:8080
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080
+      KEYCLOAK_REALM: civitas-core
+      KEYCLOAK_TARGET_REALM: civitas-core
+      APP_URL: http://portal-backend:8089
+      SERVER_PORT: 8089
+      SPRING_PROFILES_ACTIVE: local,postgres,local-init
+    depends_on:
+      postgres-portal:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/v1/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  config-adapter:
+    # Default: pull from registry. Override with docker-compose.api-test.build.yml
+    # to build from source when JAR artifacts are available.
+    image: ${CI_REGISTRY_IMAGE}/config-adapter:${IMAGE_TAG:-develop}
+    environment:
+      HEALTHCHECK_PORT: 8088
+      ADAPTERS: keycloak,apisix,frost,redpanda
+      EVENTHANDLER_NAME: kafka
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_GROUP_ID: config-adapter-group
+      KAFKA_RETRY_MAX_ATTEMPTS: 3
+      KAFKA_RETRY_INITIAL_BACKOFF_MS: 1000
+      KAFKA_DLQ_TOPIC: de.civitascore.idm.dlq
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: master
+      KEYCLOAK_USERNAME: admin
+      KEYCLOAK_PASSWORD: admin
+      KEYCLOAK_CLIENT_ID: admin-cli
+      KEYCLOAK_TOPICS: de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted,de.civitascore.idm.group.created,de.civitascore.idm.group.updated,de.civitascore.idm.group.deleted
+      APISIX_ADMIN_URL: http://apisix:9180
+      APISIX_ADMIN_KEY: edd1c9f034335f136f87ad84b625c8f1
+      APISIX_GATEWAY_URL: http://apisix:9080
+      APISIX_PLUGIN_CONFIG_ID: "1"
+      APISIX_SERVICE_ID: svc-frost-server
+      APISIX_TOPICS: de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
+      FROST_URL: http://civitas-frost:8080/FROST-Server/v1.1
+      FROST_PUBLIC_URL: http://civitas-frost:8080/FROST-Server/v1.1
+      FROST_API_KEY: dev-frost-api-key
+      FROST_API_KEY_HEADER: X-API-Key
+      FROST_TOPICS: de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
+      REDPANDA_URL: http://redpanda-connect:4195
+      REDPANDA_TOPICS: de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
+    depends_on:
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health/ready"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ── APISIX Route Seeding (one-shot, run via: docker compose run --rm apisix-seed)
+  apisix-seed:
+    profiles: [seed]
+    build:
+      context: ../apisix
+      dockerfile_inline: |
+        FROM alpine:3
+        RUN apk add --no-cache curl bash
+        COPY seed-routes.sh /seed-routes.sh
+        RUN chmod +x /seed-routes.sh
+    entrypoint: ["bash", "/seed-routes.sh", "--allowall"]
+    environment:
+      APISIX_ADMIN_URL: http://apisix:9180
+      APISIX_ADMIN_KEY: edd1c9f034335f136f87ad84b625c8f1
+
+networks:
+  default:
+    name: api-test-net

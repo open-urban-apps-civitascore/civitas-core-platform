@@ -1,7 +1,7 @@
 meta {
   name: Get All Users
   type: http
-  seq: 1
+  seq: 2
 }
 
 get {
@@ -20,4 +20,13 @@ params:query {
   ~active: true
   ~externalId: ext-123
   ~q: john
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns paginated list", function() {
+    expect(res.body.content).to.be.an('array');
+  });
 }

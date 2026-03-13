@@ -73,6 +73,11 @@ services:
       SERVER_PORT: 8088
       PORT: 8088
       KEYCLOAK_URL: http://keycloak:8080
+      APISIX_ADMIN_URL: http://apisix:9180
+      APISIX_ADMIN_KEY: edd1c9f034335f136f87ad84b625c8f1
+      APISIX_GATEWAY_URL: http://apisix:9080
+      APISIX_PLUGIN_CONFIG_ID: "1"
+      APISIX_SERVICE_ID: svc-frost-server
     depends_on:
       kafka:
         condition: service_healthy

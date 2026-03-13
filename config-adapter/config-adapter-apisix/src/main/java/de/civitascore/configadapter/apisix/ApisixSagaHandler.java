@@ -17,6 +17,7 @@ import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import org.owasp.encoder.Encode;
@@ -40,13 +41,16 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
 
   private static final String ADAPTER_NAME = "apisix";
   private static final String ADMIN_URL_DEFAULT = "http://localhost:9180";
+  private static final String GATEWAY_URL_DEFAULT = "http://localhost:9080";
   private static final String ROUTES_PATH = "/apisix/admin/routes/";
   private static final String UPSTREAMS_PATH = "/apisix/admin/upstreams/";
   private static final String X_API_KEY = "X-API-KEY";
 
   private String adminApiUrl;
   private String adminApiKey;
+  private String gatewayUrl;
   private String pluginConfigId;
+  private String serviceId;
 
   /** No-arg constructor for ServiceLoader discovery. Call {@link #initialize} before use. */
   public ApisixSagaHandler() {
@@ -57,7 +61,9 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
   protected void doInitialize(AdapterConfig config) {
     this.adminApiUrl = getProperty("admin.url", ADMIN_URL_DEFAULT);
     this.adminApiKey = getProperty("admin.key");
+    this.gatewayUrl = getProperty("gateway.url", GATEWAY_URL_DEFAULT);
     this.pluginConfigId = getProperty("plugin.config.id");
+    this.serviceId = getProperty("service.id");
 
     if (adminApiKey == null || adminApiKey.isBlank()) {
       throw new IllegalArgumentException("The APISIX admin key cannot be null or blank.");
@@ -86,15 +92,24 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     String upstreamUrl = requireString(command, "upstreamUrl");
     Object openDataAccess = command.payload().getOrDefault("openDataAccess", false);
 
+    // Parse upstream URL into host:port and path components
+    // e.g. "http://civitas-frost:8080/FROST-Server/v1.1/Projects(1)"
+    //   → node = "civitas-frost:8080", path = "/FROST-Server/v1.1/Projects(1)"
+    URI upstream = URI.create(upstreamUrl);
+    String upstreamNode =
+        upstream.getPort() > 0 ? upstream.getHost() + ":" + upstream.getPort() : upstream.getHost();
+    String upstreamPath = upstream.getPath() != null ? upstream.getPath() : "/";
+    String scheme = upstream.getScheme() != null ? upstream.getScheme() : "http";
+
     // 1. Create upstream (PUT with deterministic ID)
-    Map<String, Object> upstreamBody = buildUpstreamBody(upstreamUrl);
+    Map<String, Object> upstreamBody = buildUpstreamBody(upstreamNode, scheme);
     putResource(UPSTREAMS_PATH + datasetId, upstreamBody, "CREATE upstream");
 
     // 2. Create route (PUT with deterministic ID)
-    Map<String, Object> routeBody = buildRouteBody(datasetId, openDataAccess);
+    Map<String, Object> routeBody = buildRouteBody(datasetId, openDataAccess, upstreamPath);
     putResource(ROUTES_PATH + datasetId, routeBody, "CREATE route");
 
-    String publicUrl = adminApiUrl + "/datasets/" + datasetId;
+    String publicUrl = gatewayUrl + "/datasets/" + datasetId;
     Map<String, Object> resultData =
         Map.of("routeId", datasetId, "serviceId", datasetId, "publicUrl", publicUrl);
     Map<String, Object> compensationData = Map.of("routeId", datasetId, "serviceId", datasetId);
@@ -116,8 +131,8 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     // Read current route state before updating (needed for compensation)
     boolean previousOpenDataAccess = readCurrentOpenDataAccess(routeId);
 
-    Map<String, Object> routeBody = buildRouteBody(serviceId, openDataAccess);
-    putResource(ROUTES_PATH + routeId, routeBody, "UPDATE route");
+    Map<String, Object> routeBody = buildRouteBody(serviceId, openDataAccess, null);
+    patchResource(ROUTES_PATH + routeId, routeBody, "UPDATE route");
 
     Map<String, Object> resultData = Map.of("routeId", routeId, "serviceId", serviceId);
     Map<String, Object> compensationData =
@@ -160,8 +175,8 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     String serviceId = requireString(command, "serviceId");
     Object previousOpenDataAccess = command.payload().getOrDefault("previousOpenDataAccess", false);
 
-    Map<String, Object> routeBody = buildRouteBody(serviceId, previousOpenDataAccess);
-    putResource(ROUTES_PATH + routeId, routeBody, "RESTORE route");
+    Map<String, Object> routeBody = buildRouteBody(serviceId, previousOpenDataAccess, null);
+    patchResource(ROUTES_PATH + routeId, routeBody, "RESTORE route");
 
     log.info(
         "APISIX route restored: routeId={}, saga={}",
@@ -223,22 +238,58 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
     }
   }
 
+  private void patchResource(String path, Map<String, Object> body, String operationDesc) {
+    try (Response response =
+        client()
+            .target(adminApiUrl)
+            .path(path)
+            .request(MediaType.APPLICATION_JSON)
+            .header(X_API_KEY, adminApiKey)
+            .method("PATCH", Entity.json(body))) {
+      checkResponse(response, operationDesc);
+    }
+  }
+
   // ─── Body builders ───────────────────────────────────────────────────────────
 
-  private Map<String, Object> buildUpstreamBody(String upstreamUrl) {
-    var body = new HashMap<String, Object>();
+  private Map<String, Object> buildUpstreamBody(String node, String scheme) {
+    Map<String, Object> body = new HashMap<>();
     body.put("type", "roundrobin");
-    body.put("nodes", Map.of(upstreamUrl, 1));
+    body.put("scheme", scheme);
+    body.put("nodes", Map.of(node, 1));
     return body;
   }
 
-  private Map<String, Object> buildRouteBody(String upstreamId, Object openDataAccess) {
-    var body = new HashMap<String, Object>();
-    body.put("uri", "/datasets/" + upstreamId + "/*");
-    body.put("upstream_id", upstreamId);
-    body.put("status", 1);
+  /**
+   * Builds a route body. When {@code upstreamPath} is non-null (CREATE), includes uris +
+   * proxy-rewrite plugin for path rewriting. When null (UPDATE/RESTORE), only sets auth-related
+   * fields — used with PATCH to preserve existing route/plugin configuration.
+   */
+  private Map<String, Object> buildRouteBody(
+      String upstreamId, Object openDataAccess, String upstreamPath) {
+    Map<String, Object> body = new HashMap<>();
 
-    // If not open data, attach the shared auth plugin config
+    if (upstreamPath != null) {
+      // Full route creation: set URIs, upstream, proxy-rewrite
+      body.put("uris", new String[] {"/datasets/" + upstreamId, "/datasets/" + upstreamId + "/*"});
+      body.put("upstream_id", upstreamId);
+      if (serviceId != null) {
+        body.put("service_id", serviceId);
+      }
+      body.put("status", 1);
+
+      // Rewrite gateway path to upstream FROST path
+      // e.g. /datasets/{id}/Things → /FROST-Server/v1.1/Projects(1)/Things
+      Map<String, Object> plugins = new HashMap<>();
+      plugins.put(
+          "proxy-rewrite",
+          Map.of(
+              "regex_uri",
+              new String[] {"^/datasets/" + upstreamId + "(/.*)?$", upstreamPath + "$1"}));
+      body.put("plugins", plugins);
+    }
+
+    // Auth: attach shared plugin config for non-open-data, or omit for open data
     boolean isOpenData = Boolean.TRUE.equals(openDataAccess);
     if (!isOpenData && pluginConfigId != null) {
       body.put("plugin_config_id", pluginConfigId);

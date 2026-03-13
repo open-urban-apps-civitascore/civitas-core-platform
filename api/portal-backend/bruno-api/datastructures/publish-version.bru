@@ -1,7 +1,7 @@
 meta {
   name: Publish Data Structure Version
   type: http
-  seq: 17
+  seq: 12
 }
 
 post {
@@ -13,4 +13,10 @@ post {
 params:path {
   dataStructureId: {{dataStructureId}}
   versionId: {{dataStructureVersionId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
 }

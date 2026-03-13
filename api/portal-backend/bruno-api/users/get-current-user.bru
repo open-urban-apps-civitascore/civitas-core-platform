@@ -1,11 +1,20 @@
 meta {
   name: Get Current User
   type: http
-  seq: 3
+  seq: 4
 }
 
 get {
   url: {{baseUrl}}/users/me
   body: none
   auth: inherit
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Has username", function() {
+    expect(res.body.username).to.be.a('string');
+  });
 }

@@ -1,0 +1,19 @@
+meta {
+  name: Teardown - Delete Role
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/roles/{{roleId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Role deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=invalid ID
+    expect(status === 204 || status === 404 || status === 400).to.be.true;
+  });
+}

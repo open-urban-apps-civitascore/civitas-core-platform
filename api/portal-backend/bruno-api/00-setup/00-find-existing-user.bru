@@ -1,0 +1,27 @@
+meta {
+  name: Setup - Find Existing User
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/users?search=api.testuser
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(u => u.email === 'api.testuser@example.com');
+    if (match) {
+      bru.setVar('userId', match.id);
+      bru.setVar('setupUserId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

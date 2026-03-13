@@ -1,7 +1,7 @@
 meta {
   name: Get All Data Structure Versions
   type: http
-  seq: 11
+  seq: 8
 }
 
 get {
@@ -18,4 +18,13 @@ params:query {
   ~page: 0
   ~size: 20
   ~sort: createdAt,DESC
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns paginated list", function() {
+    expect(res.body.content).to.be.an('array');
+  });
 }

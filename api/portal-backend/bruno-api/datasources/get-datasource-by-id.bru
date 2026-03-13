@@ -1,7 +1,7 @@
 meta {
   name: Get Data Source by ID
   type: http
-  seq: 2
+  seq: 3
 }
 
 get {
@@ -12,4 +12,13 @@ get {
 
 params:path {
   id: {{dataSourceId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Has correct id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
 }

@@ -1,0 +1,27 @@
+meta {
+  name: Setup - Find Existing Group
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/groups?search=API Test Group
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(g => g.name === 'API Test Group');
+    if (match) {
+      bru.setVar('groupId', match.id);
+      bru.setVar('setupGroupId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

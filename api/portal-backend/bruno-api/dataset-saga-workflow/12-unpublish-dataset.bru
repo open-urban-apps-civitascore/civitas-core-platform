@@ -1,0 +1,23 @@
+meta {
+  name: 12. Unpublish DataSet
+  type: http
+  seq: 21
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/unpublish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+tests {
+  test("Unpublished or already draft", function() {
+    const status = res.getStatus();
+    // 200=unpublished, 400=pending saga or already DRAFT
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}

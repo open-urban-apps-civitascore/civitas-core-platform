@@ -1,7 +1,7 @@
 meta {
   name: Create User
   type: http
-  seq: 4
+  seq: 1
 }
 
 post {
@@ -27,4 +27,22 @@ script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('userId', res.body.id);
   }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has firstName", function() {
+    expect(res.body.firstName).to.be.a('string');
+  });
+  test("Has lastName", function() {
+    expect(res.body.lastName).to.be.a('string');
+  });
+  test("Has email", function() {
+    expect(res.body.email).to.be.a('string');
+  });
 }
