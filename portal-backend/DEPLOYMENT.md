@@ -19,7 +19,7 @@
    - [Security Permit Paths](#27-security-permit-paths)
 3. [Local Development Only](#3-local-development-only)
    - [Local Defaults](#31-local-defaults)
-   - [Seed Data Profile (local-init)](#32-seed-data-profile-local-init)
+   - [Seed Data Profile (init)](#32-seed-data-profile-init)
 4. [Spring Profiles](#4-spring-profiles)
 5. [docker-compose Example](#5-docker-compose-example)
 
@@ -185,33 +185,33 @@ Set by `application-local.yaml` and `application-postgres.yaml`. Override via en
 
 ---
 
-### 3.2 Seed Data Profile (local-init)
+### 3.2 Seed Data Profile (init)
 
-Activate with `SPRING_PROFILES_ACTIVE=local,postgres,local-init`. Seeds groups and users on startup. Requires `kafka.enabled=true` for Keycloak sync. **Never use in production.**
+Activate with `SPRING_PROFILES_ACTIVE=postgres,init` (add `local` for local development). Seeds groups and users on startup. Requires `kafka.enabled=true` for Keycloak sync.
 
-Configured in `application-local-init.yaml` (`@ConfigurationProperties(prefix = "local.init")`).
+Configured via `@ConfigurationProperties(prefix = "init")`. Local defaults are in `application-local.yaml`; production values are provided via ConfigMaps/environment variables.
 
-**Groups** (`local.init.groups[]`):
-
-| Env Var | Required | Example | Description |
-|---|---|---|---|
-| `LOCAL_INIT_GROUPS_0_NAME` | yes | `Tenant Admins` | Group name |
-| `LOCAL_INIT_GROUPS_0_ROLENAME` | no | `Tenant Admin` | Role assigned to the group. Valid values: `Tenant Admin`, `Data Architect`, `Data Consumer`, `Data Steward`, `Data Owner`, `Data Gatekeeper` |
-| `LOCAL_INIT_GROUPS_0_SCOPETYPE` | no | `TENANT` | Assignment scope. Required for DATA/GOVERNANCE roles. Not needed for SYSTEM roles (e.g. Tenant Admin). Values: `TENANT`, `DATASET`, `DATASOURCE`, `DATASTRUCTURE` |
-| `LOCAL_INIT_GROUPS_0_DESCRIPTION` | no | `Local admin group` | Group description |
-
-**Users** (`local.init.users[]`):
+**Groups** (`init.groups[]`):
 
 | Env Var | Required | Example | Description |
 |---|---|---|---|
-| `LOCAL_INIT_USERS_0_FIRSTNAME` | yes | `Tenant` | — |
-| `LOCAL_INIT_USERS_0_LASTNAME` | yes | `Admin` | — |
-| `LOCAL_INIT_USERS_0_EMAIL` | yes | `tenant-admin@civitas.local` | Also used as Keycloak username |
-| `LOCAL_INIT_USERS_0_PASSWORD` | no | `dev123` | Initial Keycloak password, set during sync to Keycloak via config-adapter. |
-| `LOCAL_INIT_USERS_0_TITLE` | no | `OTHER` | `MR`, `MS`, or `OTHER` (default: `OTHER`) |
-| `LOCAL_INIT_USERS_0_GROUPS_0` | no | `Tenant Admins` | Group name to assign the user to. Increment index for multiple groups. |
+| `INIT_GROUPS_0_NAME` | yes | `Tenant Admins` | Group name |
+| `INIT_GROUPS_0_ROLENAME` | no | `Tenant Admin` | Role assigned to the group. Valid values: `Tenant Admin`, `Data Architect`, `Data Consumer`, `Data Steward`, `Data Owner`, `Data Gatekeeper` |
+| `INIT_GROUPS_0_SCOPETYPE` | no | `TENANT` | Assignment scope. Required for DATA/GOVERNANCE roles. Not needed for SYSTEM roles (e.g. Tenant Admin). Values: `TENANT`, `DATASET`, `DATASOURCE`, `DATASTRUCTURE` |
+| `INIT_GROUPS_0_DESCRIPTION` | no | `Admin group` | Group description |
 
-Increment the `_0_` index for additional entries (e.g. `LOCAL_INIT_GROUPS_1_NAME`, `LOCAL_INIT_USERS_1_EMAIL`).
+**Users** (`init.users[]`):
+
+| Env Var | Required | Example | Description |
+|---|---|---|---|
+| `INIT_USERS_0_FIRSTNAME` | yes | `Tenant` | — |
+| `INIT_USERS_0_LASTNAME` | yes | `Admin` | — |
+| `INIT_USERS_0_EMAIL` | yes | `tenant-admin@civitas.local` | Also used as Keycloak username |
+| `INIT_USERS_0_PASSWORD` | no | `dev123` | Initial Keycloak password, set during sync to Keycloak via config-adapter. |
+| `INIT_USERS_0_TITLE` | no | `OTHER` | `MR`, `MS`, or `OTHER` (default: `OTHER`) |
+| `INIT_USERS_0_GROUPS_0` | no | `Tenant Admins` | Group name to assign the user to. Increment index for multiple groups. |
+
+Increment the `_0_` index for additional entries (e.g. `INIT_GROUPS_1_NAME`, `INIT_USERS_1_EMAIL`).
 
 > **Note:** Passwords are only set during initial Keycloak sync. The initializer does not update passwords for existing Keycloak users.
 
@@ -223,7 +223,7 @@ Increment the `_0_` index for additional entries (e.g. `LOCAL_INIT_GROUPS_1_NAME
 |---|---|
 | `local` | Local development defaults |
 | `postgres` | PostgreSQL datasource — required for all environments |
-| `local-init` | Seed data on startup — local only |
+| `init` | Seed groups and users on startup |
 | `debug` | Verbose SQL/Flyway logging |
 
 > Production: `SPRING_PROFILES_ACTIVE=postgres`

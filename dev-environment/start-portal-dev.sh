@@ -694,7 +694,7 @@ export SPRING_DATASOURCE_USERNAME=admin
 export SPRING_DATASOURCE_PASSWORD=admin
 export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable"
 export MODEL_ATLAS_BASE_URL=http://localhost:8086
-mvn clean spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION
+mvn clean spring-boot:run -Dspring-boot.run.profiles=local,init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION
 exec bash
 SCRIPT_EOF
     chmod +x /tmp/start-portal-backend.sh
@@ -714,7 +714,7 @@ else
     echo "Then start in your IDE:"
     echo "  Project: portal-backend"
     echo "  Main class: de.civitascore.portal.PortalBackendApplication"
-    echo "  Profiles: local,local-init,postgres"
+    echo "  Profiles: local,init,postgres"
     echo
     echo "Environment variables to set in IDE:"
     echo "  SPRING_DATASOURCE_USERNAME=admin"
@@ -727,7 +727,7 @@ fi
 cd "$SCRIPT_DIR"
 
 # ---- Wait for Backend Health (both authz modes) ---------------------
-# LocalUserInitializer must complete before OPA's is_authenticated check
+# UserInitializer must complete before OPA's is_authenticated check
 # can find the dev user. Without this wait, requests get 403 in allow-all mode.
 
 if [ "$backend_option" = "1" ]; then

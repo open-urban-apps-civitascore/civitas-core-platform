@@ -3,7 +3,7 @@ package de.civitascore.portal.service.initializer;
 import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.idm.UserConfig;
 import de.civitascore.configadapter.model.idm.UserConfig.CredentialConfig;
-import de.civitascore.portal.configuration.LocalInitProperties;
+import de.civitascore.portal.configuration.InitProperties;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
@@ -28,11 +28,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
-@Profile("local-init")
+@Profile("init")
 @Slf4j
-public class LocalUserInitializer {
+public class UserInitializer {
 
-  private final LocalInitProperties properties;
+  private final InitProperties properties;
   private final UserRepository userRepository;
   private final GroupRepository groupRepository;
   private final RoleRepository roleRepository;
@@ -45,8 +45,8 @@ public class LocalUserInitializer {
   @Value("${event.config-adapter-timeout-seconds:10}")
   private int configAdapterTimeoutSeconds;
 
-  public LocalUserInitializer(
-      LocalInitProperties properties,
+  public UserInitializer(
+      InitProperties properties,
       UserRepository userRepository,
       GroupRepository groupRepository,
       RoleRepository roleRepository,
@@ -64,22 +64,22 @@ public class LocalUserInitializer {
   @Transactional
   public void initialize() {
     if (properties.getGroups().isEmpty() && properties.getUsers().isEmpty()) {
-      log.debug("No local users or groups configured — skipping local init");
+      log.debug("No users or groups configured — skipping init");
       return;
     }
 
-    log.info("Starting local user and group initialization");
+    log.info("Starting user and group initialization");
 
     Map<String, Group> groupsByName = initializeGroups();
     initializeUsers(groupsByName);
 
-    log.info("Local user and group initialization completed");
+    log.info("User and group initialization completed");
   }
 
   private Map<String, Group> initializeGroups() {
     Map<String, Group> groupsByName = new HashMap<>();
 
-    for (LocalInitProperties.GroupEntry entry : properties.getGroups()) {
+    for (InitProperties.GroupEntry entry : properties.getGroups()) {
       Group group =
           groupRepository
               .findByName(entry.getName())
@@ -89,7 +89,7 @@ public class LocalUserInitializer {
                     newGroup.setName(entry.getName());
                     newGroup.setDescription(entry.getDescription());
                     Group saved = groupRepository.save(newGroup);
-                    log.info("Created local group '{}'", entry.getName());
+                    log.info("Created group '{}'", entry.getName());
                     return saved;
                   });
 
@@ -132,15 +132,15 @@ public class LocalUserInitializer {
             },
             () ->
                 log.warn(
-                    "Role '{}' not found for local group '{}' — skipping assignment",
+                    "Role '{}' not found for group '{}' — skipping assignment",
                     roleName,
                     group.getName()));
   }
 
   private void initializeUsers(Map<String, Group> groupsByName) {
-    for (LocalInitProperties.UserEntry entry : properties.getUsers()) {
+    for (InitProperties.UserEntry entry : properties.getUsers()) {
       if (userRepository.findByEmail(entry.getEmail()).isPresent()) {
-        log.debug("Local user '{}' already exists — skipping", entry.getEmail());
+        log.debug("User '{}' already exists — skipping", entry.getEmail());
         continue;
       }
 
@@ -166,13 +166,13 @@ public class LocalUserInitializer {
                   createdUser.addGroup(group);
                 } else {
                   log.warn(
-                      "Group '{}' not found for local user '{}' — skipping group assignment",
+                      "Group '{}' not found for user '{}' — skipping group assignment",
                       groupName,
                       entry.getEmail());
                 }
               });
 
-      log.info("Created local user '{}'", entry.getEmail());
+      log.info("Created user '{}'", entry.getEmail());
 
       if (entry.getExternalId() == null) {
         publishUserCreated(createdUser, entry.getPassword());
@@ -209,26 +209,24 @@ public class LocalUserInitializer {
         user.setExternalId(result.resourceId());
         userRepository.save(user);
         log.info(
-            "Synced local user '{}' to Keycloak, externalId={}",
-            user.getEmail(),
-            result.resourceId());
+            "Synced user '{}' to Keycloak, externalId={}", user.getEmail(), result.resourceId());
       } else if (result != null) {
         log.warn(
-            "Keycloak sync for local user '{}' failed: status={}, message={}, errorCode={}",
+            "Keycloak sync for user '{}' failed: status={}, message={}, errorCode={}",
             user.getEmail(),
             result.status(),
             result.message(),
             result.errorCode());
       } else {
-        log.warn("Keycloak sync for local user '{}' returned null result", user.getEmail());
+        log.warn("Keycloak sync for user '{}' returned null result", user.getEmail());
       }
     } catch (TimeoutException e) {
-      log.error("Timeout waiting for Keycloak sync for local user '{}'", user.getEmail());
+      log.error("Timeout waiting for Keycloak sync for user '{}'", user.getEmail());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      log.error("Interrupted while waiting for Keycloak sync for local user '{}'", user.getEmail());
+      log.error("Interrupted while waiting for Keycloak sync for user '{}'", user.getEmail());
     } catch (Exception e) {
-      log.error("Failed to sync local user '{}' to Keycloak", user.getEmail(), e);
+      log.error("Failed to sync user '{}' to Keycloak", user.getEmail(), e);
     }
   }
 }

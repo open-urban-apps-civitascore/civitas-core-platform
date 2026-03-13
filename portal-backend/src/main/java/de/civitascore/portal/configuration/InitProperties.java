@@ -16,13 +16,13 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.validation.annotation.Validated;
 
 @Configuration
-@ConfigurationProperties(prefix = "local.init")
-@Profile("local-init")
+@ConfigurationProperties(prefix = "init")
+@Profile("init")
 @Validated
 @Getter
 @Setter
 @NoArgsConstructor
-public class LocalInitProperties {
+public class InitProperties {
 
   private @Valid List<GroupEntry> groups = new ArrayList<>();
   private @Valid List<UserEntry> users = new ArrayList<>();

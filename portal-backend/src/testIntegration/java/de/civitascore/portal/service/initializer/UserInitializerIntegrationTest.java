@@ -17,16 +17,16 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.ActiveProfiles;
 
-@ActiveProfiles({"test-integration", "local-init", "local-init-test"})
-@DisplayName("LocalUserInitializer Integration Tests")
-class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest {
+@ActiveProfiles({"test-integration", "init", "init-test"})
+@DisplayName("UserInitializer Integration Tests")
+class UserInitializerIntegrationTest extends BaseEventPublishingIntegrationTest {
 
   private static final String TEST_EMAIL = "init-test@example.com";
   private static final String TEST_SYNC_EMAIL = "init-sync@example.com";
   private static final String TEST_GROUP_NAME = "Init Test Admins";
   private static final String TEST_SCOPED_GROUP_NAME = "Init Test Architects";
 
-  @Autowired private LocalUserInitializer localUserInitializer;
+  @Autowired private UserInitializer userInitializer;
   @Autowired private GroupRepository groupRepository;
   @Autowired private AssignmentRepository assignmentRepository;
 
@@ -39,7 +39,7 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   @Test
   @DisplayName("Should create group with Tenant Admin assignment")
   void shouldCreateGroupWithRoleAssignment() {
-    localUserInitializer.initialize();
+    userInitializer.initialize();
 
     Group group = groupRepository.findByName(TEST_GROUP_NAME).orElseThrow();
     assertThat(group.getName()).isEqualTo(TEST_GROUP_NAME);
@@ -54,7 +54,7 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   @Test
   @DisplayName("Should create group with scoped Data Architect assignment")
   void shouldCreateGroupWithScopedAssignment() {
-    localUserInitializer.initialize();
+    userInitializer.initialize();
 
     Group group = groupRepository.findByName(TEST_SCOPED_GROUP_NAME).orElseThrow();
     assertThat(group.getDescription()).isEqualTo("Init test data architect group");
@@ -68,7 +68,7 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   @Test
   @DisplayName("Should sync user to Keycloak and persist externalId automatically")
   void shouldSyncUserAndSetExternalId() {
-    localUserInitializer.initialize();
+    userInitializer.initialize();
 
     Optional<User> user = userRepository.findByEmail(TEST_EMAIL);
     assertThat(user).isPresent();
@@ -89,7 +89,7 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   @Test
   @DisplayName("Should sync user without externalId to Keycloak and persist externalId")
   void shouldSyncUserWithoutExternalIdToKeycloak() {
-    localUserInitializer.initialize();
+    userInitializer.initialize();
 
     Optional<User> user = userRepository.findByEmail(TEST_SYNC_EMAIL);
     assertThat(user).isPresent();
@@ -104,8 +104,8 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   @Test
   @DisplayName("Should not duplicate groups, users or assignments when called twice")
   void shouldBeIdempotent() {
-    localUserInitializer.initialize();
-    localUserInitializer.initialize();
+    userInitializer.initialize();
+    userInitializer.initialize();
 
     assertThat(groupRepository.count()).isEqualTo(2);
     assertThat(userRepository.count()).isEqualTo(2);
@@ -115,7 +115,7 @@ class LocalUserInitializerIntegrationTest extends BaseEventPublishingIntegration
   @Test
   @DisplayName("Should create all configured groups, users and assignments")
   void shouldCreateConfiguredGroupsAndUsers() {
-    localUserInitializer.initialize();
+    userInitializer.initialize();
 
     assertThat(groupRepository.count()).isEqualTo(2);
     assertThat(userRepository.count()).isEqualTo(2);

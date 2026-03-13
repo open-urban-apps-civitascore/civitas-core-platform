@@ -67,3 +67,42 @@ model-atlas:
   baseUrl: "http://localhost:8086"
   scope: civitas
   stage: draft
+
+# Seed data for local development — activated by the "init" Spring profile.
+# On startup, these groups and users are created in the DB (if they don't exist yet)
+# and synced to Keycloak via config-adapter (if no externalId is set).
+init:
+  groups:
+    - name: 'Local Tenant Admins'
+      roleName: 'Tenant Admin'
+      description: 'Local dev group — system/user management'
+    - name: 'Local Data Owners'
+      roleName: 'Data Owner'
+      scopeType: TENANT
+      description: 'Local dev group — full data CRUD + release'
+    - name: 'Local Data Gatekeepers'
+      roleName: 'Data Gatekeeper'
+      scopeType: TENANT
+      description: 'Local dev group — data governance + release approval'
+    - name: 'Local Data Architects'
+      roleName: 'Data Architect'
+      scopeType: TENANT
+      description: 'Local dev group — data ingestion + processing management'
+    - name: 'Local Data Stewards'
+      roleName: 'Data Steward'
+      scopeType: TENANT
+      description: 'Local dev group — domain data lifecycle management'
+    - name: 'Local Data Consumers'
+      roleName: 'Data Consumer'
+      scopeType: TENANT
+      description: 'Local dev group — read access to published data'
+  users:
+    - firstName: Developer
+      lastName: User
+      email: dev@civitas.local
+      password: dev123
+      title: OTHER
+      groups:
+        - 'Local Tenant Admins'
+        - 'Local Data Owners'
+        - 'Local Data Gatekeepers'
