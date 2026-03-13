@@ -126,7 +126,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   // sets the active session with the new selected version's diagram or null if no version is selected
   useEffect(() => {
-    const isInitialVersion = selectedDatastructureId === initialDatastructureVersion?.id
+    const isInitialVersion = selectedDatastructureVersionId === initialDatastructureVersion?.id
     if (isInitialVersion) {
       resetToInitialDatastructureState()
       return
@@ -146,6 +146,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const resetToInitialState = () => {
     resetToInitialDatastructureState()
+    datasourceForm.reset()
     setSelectedDatastructureId(initialDatastructure?.id || null)
     setSelectedDatastructureVersionId(initialDatastructureVersion?.id || null)
   }

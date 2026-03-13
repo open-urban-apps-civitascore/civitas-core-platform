@@ -49,8 +49,7 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
   const { getApiRequestParams } = useQueryParams()
 
   useEffect(() => {
-    if (!open) return
-    setSelection(selectedVersion ? { [selectedVersion]: true } : {})
+    setSelection(open && selectedVersion ? { [selectedVersion]: true } : {})
   }, [open, selectedVersion])
 
   const { data: datastructuresData, isFetching: isFetchingDatasources } = useGetDatastructures({
@@ -70,12 +69,6 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
 
   const rowCount = filteredDatastructures?.length || 0
   const totalPages = Math.ceil(rowCount / pageSize)
-
-  useEffect(() => {
-    if (!open) {
-      setSelection({})
-    }
-  }, [open])
 
   useEffect(() => {
     if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
