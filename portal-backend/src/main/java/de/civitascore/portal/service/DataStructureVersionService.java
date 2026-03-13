@@ -72,7 +72,7 @@ public class DataStructureVersionService
     if (StringUtils.isNotBlank(entity.getModelAtlasUri())) {
       try {
         String modelContent =
-            modelService.downloadModel(entity.getModelAtlasUri(), "application/json");
+            modelService.downloadModel(entity.getModelAtlasUri(), "application/xml");
         return Optional.ofNullable(modelContent);
       } catch (Exception e) {
         // error has already been logged in ModelRestClientRequestService, so just return empty here
