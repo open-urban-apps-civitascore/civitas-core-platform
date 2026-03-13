@@ -24,10 +24,14 @@ const getQueryClient = () => {
     return browserQueryClient
   }
 }
-
 const QueryProvider = ({ children }: { children: React.ReactNode }) => {
   // Avoid useState when initializing the query client if there is no suspense boundary
   const queryClient = getQueryClient()
+
+  if (typeof globalThis !== 'undefined') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(globalThis as any).__TANSTACK_QUERY_CLIENT__ = queryClient
+  }
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 }

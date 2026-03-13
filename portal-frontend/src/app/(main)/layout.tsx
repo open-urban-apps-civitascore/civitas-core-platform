@@ -1,6 +1,6 @@
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query'
+import { redirect } from 'next/navigation'
 
-import { signOut } from '@/auth'
 import { AppHeader } from '@/components/appHeader/AppHeader'
 import { AppSidebar } from '@/components/appSidebar/AppSidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
@@ -18,8 +18,7 @@ const MainLayout = async (props: MainLayoutProps) => {
   try {
     currentUser = await getCurrentUser()
   } catch {
-    await signOut({ redirectTo: '/login' })
-    return null
+    redirect('/login')
   }
 
   const queryClient = new QueryClient()
