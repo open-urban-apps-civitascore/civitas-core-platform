@@ -1,3 +1,5 @@
+# DEV/TEST ONLY — this config uses the default APISIX admin key.
+# Do NOT use these values in production.
 apisix:
   node_listen:
     - 9080

@@ -1,0 +1,15 @@
+meta {
+  name: Release Dataset
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/release
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}

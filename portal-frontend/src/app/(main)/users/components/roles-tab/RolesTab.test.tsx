@@ -2,14 +2,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { AssignmentSummary } from '@/app/services/api/assignments/clientRequests'
 import messages from '@/messages/de.json'
+import { type Assignment } from '@/types/assignments'
 
 import { RolesTab } from './RolesTab'
 
-const mockAssignments: AssignmentSummary[] = [
+const mockAssignments: Assignment[] = [
   {
     id: 'a1',
+    createdAt: '2024-01-01T00:00:00Z',
+    modifiedAt: '2024-01-01T00:00:00Z',
     group: { id: 'g1', name: 'Group 1' },
     role: { id: 'r1', name: 'Admin Role', roleType: 'SYSTEM', description: 'Admin desc', readonly: true },
     scopeType: 'TENANT',
@@ -66,8 +68,8 @@ describe('RolesTab', () => {
   it('passes correct request params for platformWide segment', () => {
     renderRolesTab()
     expect(mockUseGetAssignments).toHaveBeenCalled()
-    const lastCall = mockUseGetAssignments.mock.calls.at(-1)[0]
-    const params: URLSearchParams = lastCall.params
+    const lastCall = mockUseGetAssignments.mock.calls.at(-1)!
+    const params: URLSearchParams = lastCall[0].params
     expect(params.get('userId')).toBe('user-1')
     expect(params.get('scopeType')).toBe('TENANT')
     expect(params.get('roleType')).toBe('SYSTEM')
@@ -77,8 +79,8 @@ describe('RolesTab', () => {
     renderRolesTab()
     fireEvent.click(screen.getByRole('tab', { name: 'Datensätze' }))
 
-    const lastCall = mockUseGetAssignments.mock.calls.at(-1)[0]
-    const params: URLSearchParams = lastCall.params
+    const lastCall = mockUseGetAssignments.mock.calls.at(-1)!
+    const params: URLSearchParams = lastCall[0].params
     expect(params.get('scopeType')).toBe('DATASET')
     expect(params.has('roleType')).toBe(false)
   })
@@ -89,8 +91,8 @@ describe('RolesTab', () => {
     fireEvent.change(searchInput, { target: { value: 'admin' } })
 
     await waitFor(() => {
-      const lastCall = mockUseGetAssignments.mock.calls.at(-1)[0]
-      const params: URLSearchParams = lastCall.params
+      const lastCall = mockUseGetAssignments.mock.calls.at(-1)!
+      const params: URLSearchParams = lastCall[0].params
       expect(params.get('q')).toBe('admin')
     })
   })
@@ -99,8 +101,8 @@ describe('RolesTab', () => {
     renderRolesTab()
     fireEvent.click(screen.getByRole('tab', { name: 'Datenquellen' }))
 
-    const lastCall = mockUseGetAssignments.mock.calls.at(-1)[0]
-    const params: URLSearchParams = lastCall.params
+    const lastCall = mockUseGetAssignments.mock.calls.at(-1)!
+    const params: URLSearchParams = lastCall[0].params
     expect(params.get('page')).toBe('0')
   })
 

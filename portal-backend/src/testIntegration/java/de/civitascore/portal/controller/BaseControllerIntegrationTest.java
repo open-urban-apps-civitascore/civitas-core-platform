@@ -23,6 +23,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -94,9 +95,51 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
       HttpHeaders headers,
       Object body,
       ParameterizedTypeReference<T> type) {
-    HttpEntity<?> request =
-        (body == null) ? new HttpEntity<>(headers) : new HttpEntity<>(body, headers);
-    return restTemplate.exchange(path, method, request, type);
+    return exchangeRaw(
+        restTemplate.exchange(path, method, toHttpEntity(headers, body), String.class), type);
+  }
+
+  protected <T> ResponseEntity<T> exchange(
+      URI uri, HttpMethod method, HttpHeaders headers, ParameterizedTypeReference<T> type) {
+    return exchangeRaw(
+        restTemplate.exchange(uri, method, new HttpEntity<>(headers), String.class), type);
+  }
+
+  private <T> ResponseEntity<T> exchangeRaw(
+      ResponseEntity<String> raw, ParameterizedTypeReference<T> type) {
+    if (raw.getStatusCode().is2xxSuccessful() && raw.getBody() != null) {
+      try {
+        T parsed =
+            objectMapper.readValue(raw.getBody(), objectMapper.constructType(type.getType()));
+        return ResponseEntity.status(raw.getStatusCode()).headers(raw.getHeaders()).body(parsed);
+      } catch (Exception e) {
+        throw new IllegalStateException("Failed to deserialize response body", e);
+      }
+    }
+    return ResponseEntity.status(raw.getStatusCode()).headers(raw.getHeaders()).build();
+  }
+
+  /**
+   * Exchanges a request and returns the error response as a ProblemDetail. Use this for tests that
+   * need to inspect error response bodies (type URN, detail message, custom properties).
+   */
+  protected ResponseEntity<ProblemDetail> exchangeForProblem(
+      String path, HttpMethod method, HttpHeaders headers, Object body) {
+    HttpEntity<?> request = toHttpEntity(headers, body);
+    ResponseEntity<String> raw = restTemplate.exchange(path, method, request, String.class);
+    if (raw.getBody() != null) {
+      try {
+        ProblemDetail parsed = objectMapper.readValue(raw.getBody(), ProblemDetail.class);
+        return ResponseEntity.status(raw.getStatusCode()).headers(raw.getHeaders()).body(parsed);
+      } catch (Exception e) {
+        throw new IllegalStateException("Failed to deserialize ProblemDetail response", e);
+      }
+    }
+    return ResponseEntity.status(raw.getStatusCode()).headers(raw.getHeaders()).build();
+  }
+
+  private HttpEntity<?> toHttpEntity(HttpHeaders headers, Object body) {
+    return (body == null) ? new HttpEntity<>(headers) : new HttpEntity<>(body, headers);
   }
 
   protected ResponseEntity<O> performCreate(I input) {
@@ -115,8 +158,7 @@ public abstract class BaseControllerIntegrationTest<I extends BaseInputDTO, O ex
 
   protected ResponseEntity<RestPage<O>> performGetAll(Map<String, ?> queryParams) {
     URI uri = buildUri(getEndpointPath(), queryParams);
-    HttpEntity<Void> request = new HttpEntity<>(createAuthHeaders());
-    return restTemplate.exchange(uri, HttpMethod.GET, request, getPageTypeReference());
+    return exchange(uri, HttpMethod.GET, createAuthHeaders(), getPageTypeReference());
   }
 
   protected ResponseEntity<O> performUpdate(UUID id, I input) {

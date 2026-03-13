@@ -1,6 +1,8 @@
-# APISIX Configuration for M5 AuthZ Integration
-# Enables OPA plugin for authorization decisions
-# M5.5: Adds proxy buffer size for scope ID headers
+# APISIX Configuration — Traditional Mode
+#
+# Traditional mode with etcd enables the Admin API so the config-adapter
+# can dynamically create/delete routes during dataset saga orchestration.
+# Static routes are seeded via seed-routes.sh after startup.
 
 apisix:
   node_listen:
@@ -11,18 +13,28 @@ apisix:
     listen:
       - port: 9443
 
-# M5.5: Increase buffer sizes for large X-Allowed-Scope-Ids headers
-# When users have access to many dataspaces, the scope ID list can be large.
-# Default is 4k which may be insufficient for 100+ scope IDs.
+# Increase buffer sizes for large X-Allowed-Scope-Ids headers
+# When users have access to many datasets, the scope ID list can be large.
 nginx_config:
   http:
     proxy_buffer_size: 32k
     proxy_buffers: 4 32k
 
 deployment:
-  role: data_plane
-  role_data_plane:
-    config_provider: yaml
+  role: traditional
+  admin:
+    admin_key:
+      - name: admin
+        key: edd1c9f034335f136f87ad84b625c8f1
+        role: admin
+    admin_listen:
+      port: 9180
+    allow_admin:
+      - 0.0.0.0/0
+  etcd:
+    host:
+      - "http://etcd:2379"
+    prefix: "/apisix"
 
 # Enabled plugins
 plugins:

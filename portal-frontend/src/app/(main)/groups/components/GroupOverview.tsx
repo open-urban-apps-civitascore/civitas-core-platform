@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { FieldErrors, useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { useCreateGroup, useUpdateGroup } from '@/app/services/api/groups/clientRequests'
+import { useCreateGroup, useReplaceGroupAssignments, useUpdateGroup } from '@/app/services/api/groups/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Group, GroupBaseFormData, GroupBaseFormDataSchema, GroupTab } from '@/types/groups'
+import { Role } from '@/types/roles'
 import { mapGroupApiToFormData, mapGroupFormToApiData } from '@/utils/groups'
 
 import { BaseInfoTab } from './base-info-tab/BaseInfoTab'
@@ -52,6 +53,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   const mode = params.get('mode')
   const [initialGroupData, setInitialGroupData] = useState(groupData)
   const [isNavigating, setIsNavigating] = useState(false)
+  const [pendingRoles, setPendingRoles] = useState<Role[]>([])
 
   const { subTabValue, setSubTabValueParam } = useQueryParams()
 
@@ -66,8 +68,9 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   const router = useRouter()
   const createGroup = useCreateGroup()
   const updateGroup = useUpdateGroup()
+  const replaceAssignments = useReplaceGroupAssignments()
 
-  const isLoading = createGroup.isPending || updateGroup.isPending || isNavigating
+  const isLoading = createGroup.isPending || updateGroup.isPending || replaceAssignments.isPending || isNavigating
 
   const form = useForm<GroupBaseFormData>({
     resolver: zodResolver(GroupBaseFormDataSchema),
@@ -78,6 +81,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
 
   useEffect(() => {
     form.reset(mapGroupApiToFormData(initialGroupData))
+    setPendingRoles([])
   }, [initialGroupData, form])
 
   const handleValidationErrors = (errors: FieldErrors<GroupBaseFormData>) => {
@@ -97,9 +101,30 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     const { id, ...createGroupData } = mapGroupFormToApiData(formData)
     createGroup.mutate(createGroupData, {
       onSuccess: ({ data }) => {
-        toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
-        setIsNavigating(true)
-        router.push(`/groups/${data.id}?mode=edit`)
+        const navigateToGroup = () => {
+          setIsNavigating(true)
+          router.push(`/groups/${data.id}?mode=edit`)
+        }
+
+        if (formData.assignments.length > 0) {
+          replaceAssignments.mutate(
+            { groupId: data.id, assignments: formData.assignments },
+            {
+              onSuccess: () => {
+                toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
+                navigateToGroup()
+              },
+              onError: (error: unknown) => {
+                toast.error(t('errors.assignmentSaveError'))
+                console.error('Failed to save assignments', error)
+                navigateToGroup()
+              },
+            },
+          )
+        } else {
+          toast.success(tCommon('messages.createSuccess', { item: tCommon('items.group') }))
+          navigateToGroup()
+        }
       },
       onError: (error: unknown) => handleGroupRequestError(error, 'errors.createError'),
     })
@@ -108,9 +133,22 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   const handleUpdateGroup = (formData: GroupBaseFormData) => {
     updateGroup.mutate(mapGroupFormToApiData(formData), {
       onSuccess: ({ data }) => {
-        toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.group') }))
-        setInitialGroupData(data)
-        setIsExitModalOpen(false)
+        replaceAssignments.mutate(
+          { groupId: data.id, assignments: formData.assignments },
+          {
+            onSuccess: ({ data: assignmentData }) => {
+              toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.group') }))
+              setInitialGroupData(assignmentData)
+              setPendingRoles([])
+              setIsExitModalOpen(false)
+            },
+            onError: (error: unknown) => {
+              toast.error(t('errors.updateError'))
+              setInitialGroupData(data)
+              console.error('Failed to save assignments', error)
+            },
+          },
+        )
       },
       onError: (error: unknown) => handleGroupRequestError(error, 'errors.updateError'),
     })
@@ -124,7 +162,6 @@ export const GroupOverview = (props: GroupDetailsProps) => {
 
   const handleExitAndSafe = () => {
     form.handleSubmit(handleSave)()
-    setIsReadOnly(false)
   }
 
   const handleExitButtonClick = () => {
@@ -137,7 +174,15 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   const renderTabContent = () => {
     switch (subTabValue) {
       case tabValues.roles.value:
-        return <RolesTab groupData={initialGroupData} />
+        return (
+          <RolesTab
+            form={form}
+            groupData={initialGroupData}
+            isReadOnly={isReadOnly}
+            pendingRoles={pendingRoles}
+            setPendingRoles={setPendingRoles}
+          />
+        )
       case tabValues.users.value:
         return (
           <UsersTab

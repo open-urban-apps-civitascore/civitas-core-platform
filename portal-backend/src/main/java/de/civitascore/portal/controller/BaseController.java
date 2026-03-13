@@ -9,10 +9,13 @@ import de.civitascore.portal.model.output.assembler.BaseAssembler;
 import de.civitascore.portal.repository.specification.base.BaseSpec;
 import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.util.InvalidInputException;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
@@ -31,6 +34,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -48,7 +52,7 @@ import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @Validated
-@RequestMapping
+@RequestMapping(produces = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
 @FieldDefaults(level = lombok.AccessLevel.PROTECTED)
 public abstract class BaseController<
     I extends BaseInputDTO, O extends BaseOutputDTO, E extends BaseEntity, S extends BaseSpec<E>> {
@@ -60,6 +64,11 @@ public abstract class BaseController<
   @Autowired protected ObjectMapper objectMapper;
   @Autowired protected Validator validator;
 
+  @Operation(
+      summary = "List all {entities}",
+      description =
+          "Returns a paginated, filterable list of {entities}. Supports sorting and specification-based filtering.")
+  @ApiResponse(responseCode = "200", description = "Page of {entities} returned successfully")
   @Parameters({
     @Parameter(
         name = "id",
@@ -103,6 +112,14 @@ public abstract class BaseController<
     return ResponseEntity.ok(outputs);
   }
 
+  @Operation(
+      summary = "Get {entity} by ID",
+      description = "Returns a single {entity} identified by its UUID.")
+  @ApiResponse(responseCode = "200", description = "{Entity} returned successfully")
+  @ApiResponse(
+      responseCode = "404",
+      description = "{Entity} not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @GetMapping("/{id}")
   public ResponseEntity<O> getById(@PathVariable UUID id) {
     E entity = getService().findByIdOrThrow(id);
@@ -110,6 +127,19 @@ public abstract class BaseController<
     return ResponseEntity.ok(output);
   }
 
+  @Operation(
+      summary = "Create a new {entity}",
+      description =
+          "Creates a new {entity} and returns it with a Location header pointing to the new {entity} URI.")
+  @ApiResponse(responseCode = "201", description = "{Entity} created successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "Invalid input",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (e.g. unique constraint violation)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public ResponseEntity<O> create(@Valid @RequestBody I input) {
@@ -125,6 +155,22 @@ public abstract class BaseController<
     return ResponseEntity.created(location).body(output);
   }
 
+  @Operation(
+      summary = "Replace a {entity}",
+      description = "Fully replaces an existing {entity} with the provided input.")
+  @ApiResponse(responseCode = "200", description = "{Entity} updated successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "Invalid input",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "{Entity} not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (e.g. unique constraint violation)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @PutMapping("/{id}")
   public ResponseEntity<O> update(@PathVariable UUID id, @Valid @RequestBody I input) {
     I preProcessedInput = preProcessInput(input);
@@ -133,6 +179,23 @@ public abstract class BaseController<
     return ResponseEntity.ok(output);
   }
 
+  @Operation(
+      summary = "Partially update a {entity}",
+      description =
+          "Applies a partial JSON update to an existing {entity}. Only provided fields are modified.")
+  @ApiResponse(responseCode = "200", description = "{Entity} patched successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "Invalid input",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "{Entity} not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (e.g. unique constraint violation)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @PatchMapping("/{id}")
   public ResponseEntity<O> patch(@PathVariable UUID id, @RequestBody JsonNode updates)
       throws IOException {
@@ -156,6 +219,18 @@ public abstract class BaseController<
     return ResponseEntity.ok(output);
   }
 
+  @Operation(
+      summary = "Delete a {entity}",
+      description = "Permanently deletes a {entity} by its UUID.")
+  @ApiResponse(responseCode = "204", description = "{Entity} deleted successfully")
+  @ApiResponse(
+      responseCode = "404",
+      description = "{Entity} not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict ({entity} still in use)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   @DeleteMapping("/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void delete(@PathVariable UUID id) {

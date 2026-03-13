@@ -375,6 +375,7 @@ echo "  - Keycloak"
 echo "  - APISIX + etcd"
 echo "  - OPA + AuthZ Repository"
 echo "  - FROST Server"
+echo "  - Redpanda Connect"
 echo "  - Model Atlas + Apicurio Registry"
 echo
 
@@ -427,8 +428,9 @@ if [ "$authz_option" = "2" ]; then
     echo "  Configuring ALLOW-ALL mode (wildcard scope, null-permission data)"
     bash "$SCRIPT_DIR/../authz/rego/generate-allowall.sh"
     export OPA_DATA_DIR="../../authz/rego/data/backends-allowall"
-    export APISIX_CONFIG="./apisix_conf/apisix-allowall.yaml"
+    SEED_ROUTES_ALLOWALL="--allowall"
 else
+    SEED_ROUTES_ALLOWALL=""
     echo "  Configuring FULL AUTHZ mode (enforce permissions)"
 fi
 
@@ -468,6 +470,14 @@ else
     echo "           Portal development works fine without it."
 fi
 
+cd "$SCRIPT_DIR/redpanda-connect"
+if $DOCKER_COMPOSE up -d 2>&1; then
+    echo "  Redpanda Connect started"
+else
+    echo "  WARNING: Redpanda Connect failed to start"
+    echo "           Dataset saga pipeline deployment will not work."
+fi
+
 cd "$SCRIPT_DIR/modelatlas"
 $DOCKER_COMPOSE up -d
 echo "  Model Atlas + Apicurio Registry started"
@@ -480,15 +490,16 @@ echo
 
 # ---- Setup APISIX Routes ------------------------------------------
 
-echo "Setting up APISIX routes..."
+echo "Seeding APISIX routes..."
 
-# Wait a moment for APISIX to be fully ready
-sleep 5
-
-if [ -x "$SCRIPT_DIR/frost/setup-apisix-route.sh" ]; then
-    "$SCRIPT_DIR/frost/setup-apisix-route.sh" >/dev/null 2>&1 && \
-        echo "  FROST route configured" || \
-        echo "  WARNING: Could not configure FROST route (run manually: frost/setup-apisix-route.sh)"
+if [ -x "$SCRIPT_DIR/apisix/seed-routes.sh" ]; then
+    if "$SCRIPT_DIR/apisix/seed-routes.sh" $SEED_ROUTES_ALLOWALL; then
+        echo "  APISIX routes seeded successfully"
+    else
+        echo "  WARNING: Could not seed APISIX routes (run manually: apisix/seed-routes.sh $SEED_ROUTES_ALLOWALL)"
+    fi
+else
+    echo "  WARNING: apisix/seed-routes.sh not found"
 fi
 
 echo
@@ -601,7 +612,7 @@ if [ "$config_adapter_option" = "1" ]; then
 #!/bin/bash
 # Config Adapter environment variables (from application.properties)
 export HEALTHCHECK_PORT=8088
-export ADAPTERS=keycloak,apisix,frost
+export ADAPTERS=keycloak,apisix,frost,redpanda
 export EVENTHANDLER_NAME=kafka
 export KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 export KAFKA_GROUP_ID=config-adapter-group
@@ -616,11 +627,15 @@ export KEYCLOAK_CLIENT_ID=admin-cli
 export KEYCLOAK_TOPICS=de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted,de.civitascore.idm.group.created,de.civitascore.idm.group.updated,de.civitascore.idm.group.deleted
 export APISIX_ADMIN_URL=http://localhost:9180
 export APISIX_ADMIN_KEY=edd1c9f034335f136f87ad84b625c8f1
+export APISIX_GATEWAY_URL=http://localhost:9080
 export APISIX_TOPICS=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
-export FROST_URL=http://localhost:9080/FROST-Server/v1.1
+export FROST_URL=http://localhost:8085/FROST-Server/v1.1
+export FROST_PUBLIC_URL=http://civitas-frost:8080/FROST-Server/v1.1
 export FROST_API_KEY=dev-frost-api-key
 export FROST_API_KEY_HEADER=X-API-Key
 export FROST_TOPICS=de.civitascore.data.thing.created,de.civitascore.data.thing.updated,de.civitascore.data.thing.deleted,de.civitascore.data.location.created,de.civitascore.data.location.updated,de.civitascore.data.location.deleted,de.civitascore.data.sensor.created,de.civitascore.data.sensor.updated,de.civitascore.data.sensor.deleted,de.civitascore.data.observedproperty.created,de.civitascore.data.observedproperty.updated,de.civitascore.data.observedproperty.deleted,de.civitascore.data.datastream.created,de.civitascore.data.datastream.updated,de.civitascore.data.datastream.deleted
+export REDPANDA_URL=http://localhost:4195
+export REDPANDA_TOPICS=de.civitascore.data.pipeline.created,de.civitascore.data.pipeline.updated,de.civitascore.data.pipeline.deleted
 
 java -jar "$CONFIG_ADAPTER_JAR"
 exec bash
@@ -654,8 +669,12 @@ else
     echo "  KEYCLOAK_PASSWORD=admin"
     echo "  KEYCLOAK_CLIENT_ID=admin-cli"
     echo "  APISIX_ADMIN_URL=http://localhost:9180"
-    echo "  FROST_URL=http://localhost:9080/FROST-Server/v1.1"
+    echo "  APISIX_ADMIN_KEY=edd1c9f034335f136f87ad84b625c8f1"
+    echo "  APISIX_GATEWAY_URL=http://localhost:9080"
+    echo "  FROST_URL=http://localhost:8085/FROST-Server/v1.1"
+    echo "  FROST_PUBLIC_URL=http://civitas-frost:8080/FROST-Server/v1.1"
     echo "  FROST_API_KEY=dev-frost-api-key"
+    echo "  REDPANDA_URL=http://localhost:4195"
     echo
 fi
 
@@ -894,8 +913,11 @@ echo "  Portal Backend:   http://localhost:8089"
 echo "  Config Adapter:   http://localhost:8088"
 echo "  Keycloak Admin:   http://localhost:8080 (admin/admin)"
 echo "  Kafka UI:         http://localhost:8090"
-echo "  FROST Server:     http://localhost:1883"
+echo "  FROST Server:     http://localhost:8085/FROST-Server/v1.1 (HTTP)"
+echo "  FROST MQTT:       mqtt://localhost:1883"
 echo "  APISIX Gateway:   http://localhost:9080"
+echo "  APISIX Admin API: http://localhost:9180"
+echo "  Redpanda Connect: http://localhost:4195"
 echo "  OPA:              http://localhost:8181"
 echo "  AuthZ Repository: http://localhost:8091"
 echo "  Model Atlas:      http://localhost:8086"
@@ -930,6 +952,7 @@ echo "  cd dev-environment/postgres && docker compose down"
 echo "  cd dev-environment/kafka && docker compose down"
 echo "  cd dev-environment/keycloak && docker compose down"
 echo "  cd dev-environment/apisix && docker compose down"
-echo "  cd dev-environment/modelatlas && docker compose down"
 echo "  cd dev-environment/frost && docker compose down"
+echo "  cd dev-environment/redpanda-connect && docker compose down"
+echo "  cd dev-environment/modelatlas && docker compose down"
 echo

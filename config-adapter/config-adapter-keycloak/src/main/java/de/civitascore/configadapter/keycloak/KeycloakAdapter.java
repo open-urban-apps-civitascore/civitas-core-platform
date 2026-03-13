@@ -440,9 +440,35 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         (realmResource, userRep) -> {
           try (Response response = realmResource.users().create(userRep)) {
             validateResponse(KeycloakOperation.USER_CREATION, 201, response);
-            return CreatedResponseUtil.getCreatedId(response);
+            String userId = CreatedResponseUtil.getCreatedId(response);
+            sendActionsEmail(realmResource, userId, userRep.getRequiredActions());
+            return userId;
           }
         });
+  }
+
+  /**
+   * Sends an actions email to a newly created user if required actions are configured. The email
+   * contains a link for the user to complete actions like email verification and password setup.
+   * Failures are logged as warnings but do not abort user creation (SMTP may not be configured).
+   */
+  private void sendActionsEmail(
+      RealmResource realmResource, String userId, List<String> requiredActions) {
+    if (requiredActions == null || requiredActions.isEmpty()) {
+      return;
+    }
+    try {
+      realmResource.users().get(userId).executeActionsEmail(requiredActions);
+      logger.info(
+          "Sent actions email to user {} for actions: {}",
+          Encode.forJava(maskId(userId)),
+          Encode.forJava(String.valueOf(requiredActions)));
+    } catch (Exception e) {
+      logger.warn(
+          "Failed to send actions email for user {}: {}",
+          Encode.forJava(maskId(userId)),
+          Encode.forJava(String.valueOf(e.getMessage())));
+    }
   }
 
   private void updateUser(String realm, String userId, ConfigEvent event)

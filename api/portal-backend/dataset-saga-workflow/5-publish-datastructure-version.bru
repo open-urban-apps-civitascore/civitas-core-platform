@@ -1,0 +1,16 @@
+meta {
+  name: 5. Publish DataStructure Version
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/publish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{sagaDataStructureId}}
+  versionId: {{sagaDataStructureVersionId}}
+}

@@ -87,6 +87,7 @@ public class GroupController
 
   @PutMapping("/{groupId}/assignments")
   @Operation(
+      operationId = "replaceGroupAssignments",
       summary = "Replace group assignments",
       description = "Replaces all role assignments for a group using diff-based semantics.")
   public ResponseEntity<GroupOutputDTO> replaceAssignments(

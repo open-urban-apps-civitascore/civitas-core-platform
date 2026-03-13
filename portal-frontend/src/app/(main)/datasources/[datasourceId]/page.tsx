@@ -1,8 +1,10 @@
 import { getTranslations } from 'next-intl/server'
 
-import { getDatasource } from '@/app/services/api/datasources/serverRequests'
+import { getDatasource, getDatasourceAssignments } from '@/app/services/api/datasources/serverRequests'
 import { getDatastructure } from '@/app/services/api/datastructures/serverRequests'
 import { getDatastructureVersion } from '@/app/services/api/datastructures/versions/serverRequests'
+import { getGroups } from '@/app/services/api/groups/serverRequests'
+import { getRoles } from '@/app/services/api/roles/serverRequests'
 import { DatasourceApiResponseSchema } from '@/types/datasources'
 import {
   Datastructure,
@@ -10,6 +12,8 @@ import {
   DatastructureVersion,
   DatastructureVersionApiResponseSchema,
 } from '@/types/datastructures'
+import { ROLE_TYPES } from '@/types/roles'
+import { mapAssignmentApiResponseToTable } from '@/utils/assignments'
 
 import { DatasourceOverview } from './components/DatasourceOverview'
 
@@ -22,8 +26,12 @@ const DatasourceDetailsPage = async ({ params }: Props) => {
   const t = await getTranslations('common')
   let datastructure: Datastructure | null = null
   let datastructureVersion: DatastructureVersion | null = null
-
-  const datasourceResponse = await getDatasource(datasourceId)
+  const [datasourceResponse, assignmentsResponse, groupsResponse, rolesResponse] = await Promise.all([
+    getDatasource(datasourceId),
+    getDatasourceAssignments(datasourceId),
+    getGroups(),
+    getRoles(),
+  ])
   const parsedDatasource = DatasourceApiResponseSchema.safeParse(datasourceResponse.data)
   if (!parsedDatasource.success) {
     console.error(t('errors.loadingError'), parsedDatasource)
@@ -51,11 +59,19 @@ const DatasourceDetailsPage = async ({ params }: Props) => {
     }
     datastructureVersion = parsedVersion.data
   }
+
+  console.log('assignmentsResponse', assignmentsResponse)
+  const groups = groupsResponse.data ?? []
+  const roles = (rolesResponse.data ?? []).filter(role => role.roleType === ROLE_TYPES.DATA)
+  const initialAssignments = mapAssignmentApiResponseToTable(assignmentsResponse.data, groups)
   return (
     <DatasourceOverview
       datasource={parsedDatasource.data}
       datastructure={datastructure}
       datastructureVersion={datastructureVersion}
+      initialAssignments={initialAssignments}
+      groups={groups}
+      roles={roles}
     />
   )
 }

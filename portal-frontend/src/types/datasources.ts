@@ -2,12 +2,12 @@ import z from 'zod'
 
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
-import { AssignmentScopedInputSchema } from './assignments'
+import { AssignmentScopedInput } from './assignments'
 import { STATUS_TYPES, WithId } from './common'
 import { ConnectorApiToFormSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
 import { DatastructureVersionSummaryApiResponseSchema } from './datastructures'
 
-export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'accessPermissions'
+export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'accessManagement'
 
 export const DATASOURCE_STATUS_TYPES = {
   DRAFT: 'DRAFT',
@@ -57,7 +57,6 @@ export const DatasourceBaseFormSchema = z.object({
   name: z.string().trim().min(1, 'common.errors.nameRequired'),
   description: z.string().trim().max(150, 'common.errors.descriptionMaxLength'),
   dataStructureVersionId: z.string().trim().min(1, 'datasources.errors.required').nullable(),
-  assignments: AssignmentScopedInputSchema.array(),
 })
 
 export type DatasourceBaseFormData = z.infer<typeof DatasourceBaseFormSchema>
@@ -115,4 +114,4 @@ export const DatasourceCreateFormSchema = z.object({
 })
 
 export type DatasourceCreateData = z.infer<typeof DatasourceCreateFormSchema>
-export type DatasourceUpdateData = DatasourceFormDraft & WithId
+export type DatasourceUpdateData = DatasourceFormDraft & WithId & { assignments?: AssignmentScopedInput[] }

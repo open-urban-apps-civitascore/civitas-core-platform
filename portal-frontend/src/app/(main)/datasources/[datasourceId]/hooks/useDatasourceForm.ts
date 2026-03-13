@@ -6,6 +6,7 @@ import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
 import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
+import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { ConnectorFormToApiSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
   Datasource,
@@ -18,10 +19,15 @@ import {
   DatasourceTab,
   DatasourceUpdateData,
 } from '@/types/datasources'
+import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { getConnectorDefaults } from '@/utils/connectors'
 import { pickDirtyValues } from '@/utils/form'
 
-export const useDatasourceForm = (datasource: Datasource) => {
+export const useDatasourceForm = (
+  datasource: Datasource,
+  assignedGroups: GroupRoleAssignmentTable[],
+  initialAssignments: GroupRoleAssignmentTable[],
+) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
 
@@ -145,14 +151,24 @@ export const useDatasourceForm = (datasource: Datasource) => {
       ? connectorParsed.data.configuration
       : (dirtyValues as Record<string, unknown>).configuration
 
+    const areAssignmentsInvalid = assignedGroups.some(group => group.assignedRoles.length === 0)
+    const assignmentsPayload = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
+    const areAssignmentsDirty = hasAssignmentChanges(assignedGroups, initialAssignments)
+
     const apiPayload = {
       ...dirtyValues,
       ...(configuration ? { configuration } : {}),
+      ...(areAssignmentsDirty ? { assignments: assignmentsPayload } : {}),
       id: datasource.id,
     } as DatasourceUpdateData
 
     updateDatasource.mutate(apiPayload, {
-      onSuccess: () => onSuccess?.(),
+      onSuccess: () => {
+        if (areAssignmentsInvalid) {
+          toast.error(t('errors.groupsWithoutRoles'))
+        }
+        onSuccess?.()
+      },
       onError: (error: unknown) => handleRequestError(error),
     })
   }

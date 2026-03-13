@@ -12,7 +12,6 @@ import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
-import de.civitascore.portal.model.input.DataSourceMetaInputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
@@ -71,7 +70,7 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     } else {
       entity.setDataStructureVersion(null);
     }
-    return entity;
+    return super.postConvertToEntity(entity, input);
   }
 
   @Override
@@ -254,12 +253,20 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
   }
 
   @Transactional
-  public DataSource updatePublishedMeta(UUID id, DataSourceMetaInputDTO input) {
+  public DataSource updatePublishedMeta(UUID id, DataSourceInputDTO input) {
     DataSource entity = findByIdOrThrow(id);
 
     if (entity.getDataSourceStatus() != DataSourceStatus.AVAILABLE) {
       throw new InvalidInputException(
           getEntityName(), id, "Only data sources in AVAILABLE status can have metadata updated");
+    }
+
+    boolean inUse =
+        dataSetRepository.existsByPipelinesDataSourcesIdAndDataSetStatusIn(
+            id, List.of(DataSetStatus.READY, DataSetStatus.AVAILABLE));
+
+    if (inUse) {
+      validateInUseConstraints(input, entity);
     }
 
     if (input.getName() != null) {
@@ -268,7 +275,6 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
     if (input.getDescription() != null) {
       entity.setDescription(input.getDescription());
     }
-
     if (input.getAssignments() != null) {
       Set<Assignment> assignments =
           input.getAssignments().stream()
@@ -278,7 +284,64 @@ public class DataSourceService extends BaseDataEntityService<DataSource, DataSou
       entity.setAssignments(assignments);
     }
 
+    if (!inUse) {
+      applyTechnicalFields(input, entity);
+    }
+
     return save(entity);
+  }
+
+  private void validateInUseConstraints(DataSourceInputDTO input, DataSource entity) {
+    if (input.getConnectorType() != null && input.getConnectorType() != entity.getConnectorType()) {
+      throw new InvalidInputException(
+          getEntityName(),
+          entity.getId(),
+          "Cannot change connector type of a data source that is in use");
+    }
+    if (input.getConfiguration() != null) {
+      throw new InvalidInputException(
+          getEntityName(),
+          entity.getId(),
+          "Cannot change configuration of a data source that is in use");
+    }
+    UUID existingDsvId =
+        entity.getDataStructureVersion() != null ? entity.getDataStructureVersion().getId() : null;
+    if (input.getDataStructureVersionId() != null
+        && !input.getDataStructureVersionId().equals(existingDsvId)) {
+      throw new InvalidInputException(
+          getEntityName(),
+          entity.getId(),
+          "Cannot change data structure version of a data source that is in use");
+    }
+  }
+
+  private void applyTechnicalFields(DataSourceInputDTO input, DataSource entity) {
+    if (input.getConnectorType() != null) {
+      entity.setConnectorType(input.getConnectorType());
+    }
+    if (input.getDataStructureVersionId() != null) {
+      DataStructureVersion dsv =
+          dataStructureVersionService.findByIdOrThrow(input.getDataStructureVersionId());
+      validateDataStructureVersionLinkable(dsv);
+      entity.setDataStructureVersion(dsv);
+    }
+    if (input.getConfiguration() != null) {
+      ConnectorType type = entity.getConnectorType();
+      if (type == null) {
+        throw new InvalidInputException(
+            getEntityName(), entity.getId(), "Cannot set configuration without a connector type");
+      }
+      ConnectorHandler handler = connectorHandlerRegistry.getHandlerOrThrow(type);
+
+      Map<String, Object> existingConfig = copyConfiguration(entity.getConfiguration());
+
+      Map<String, Object> normalized = handler.normalizeAndValidate(input.getConfiguration());
+      Map<String, Object> encrypted = handler.encryptSensitiveFields(normalized);
+      if (existingConfig != null) {
+        restoreMaskedValues(encrypted, existingConfig, handler, normalized);
+      }
+      entity.setConfiguration(encrypted);
+    }
   }
 
   @Override

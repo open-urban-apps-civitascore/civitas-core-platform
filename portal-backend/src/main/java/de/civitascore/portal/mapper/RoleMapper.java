@@ -22,7 +22,6 @@ public interface RoleMapper extends DtoMapper<RoleInputDTO, RoleOutputDTO, Role>
   Role toEntity(RoleInputDTO input);
 
   @Mapping(target = "permissions", ignore = true)
-  @Mapping(target = "modifiedBy", ignore = true)
   @Override
   RoleOutputDTO toOutput(Role entity);
 

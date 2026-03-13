@@ -5,9 +5,15 @@ import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.mapper.RoleMapper;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.Permission;
 import de.civitascore.portal.model.entity.base.NamedEntity;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
+import de.civitascore.portal.model.output.MeAssignmentOutputDTO;
 import de.civitascore.portal.model.output.summary.DataEntitySummaryDTO;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeSet;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -38,6 +44,42 @@ public class AssignmentAssembler implements BaseAssembler<Assignment, Assignment
     output.setScope(resolveScopeSummary(entity));
 
     return output;
+  }
+
+  /**
+   * Aggregates assignments by (scopeType, scopeId), merging permission names from all roles that
+   * share the same scope. This deduplicates permissions and produces a compact representation.
+   */
+  public List<MeAssignmentOutputDTO> toMeAssignments(List<Assignment> assignments) {
+    // Key: "scopeType:scopeId" → aggregated DTO
+    Map<String, MeAssignmentOutputDTO> grouped = new LinkedHashMap<>();
+
+    for (Assignment assignment : assignments) {
+      ScopeType scopeType = assignment.getScopeType();
+      NamedEntity scopeEntity = assignment.getScope();
+      UUID scopeId = scopeEntity != null ? scopeEntity.getId() : null;
+
+      String key = scopeType + ":" + scopeId;
+
+      MeAssignmentOutputDTO dto =
+          grouped.computeIfAbsent(
+              key,
+              k -> {
+                MeAssignmentOutputDTO d = new MeAssignmentOutputDTO();
+                d.setScopeType(scopeType);
+                d.setScopeId(scopeId);
+                d.setPermissions(new TreeSet<>());
+                return d;
+              });
+
+      if (assignment.getRole() != null && assignment.getRole().getPermissions() != null) {
+        for (Permission permission : assignment.getRole().getPermissions()) {
+          dto.getPermissions().add(permission.getName());
+        }
+      }
+    }
+
+    return List.copyOf(grouped.values());
   }
 
   private DataEntitySummaryDTO resolveScopeSummary(Assignment entity) {

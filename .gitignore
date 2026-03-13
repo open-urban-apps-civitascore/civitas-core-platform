@@ -27,3 +27,5 @@ api/**/node_modules/
 /.claude
 /docs/claude
 /.playwright-mcp
+
+.github/**
