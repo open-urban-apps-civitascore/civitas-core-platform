@@ -5,6 +5,7 @@ import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.output.summary.DistributionSummaryDTO;
 import de.civitascore.portal.model.output.summary.PipelineSummaryDTO;
 import de.civitascore.portal.model.output.summary.UserSummaryDTO;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -13,26 +14,40 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class DataSetOutputDTO extends BaseOutputDTO {
 
+  @Schema(example = "traffic-count-2025")
   private String identifier;
+
+  @Schema(example = "Traffic Count 2025")
   private String name;
+
+  @Schema(example = "Hourly vehicle counts at major intersections")
   private String description;
 
+  @Schema(example = "DRAFT")
   private DataSetStatus dataSetStatus;
+
+  @Schema(example = "1.0.0")
   private String version;
 
   private List<PipelineSummaryDTO> pipelines;
+
   private List<DistributionSummaryDTO> distributions;
 
+  @Schema(description = "Whether this dataset is publicly accessible")
   private Boolean openDataAccess;
 
   private UserSummaryDTO createdBy;
 
-  /** The public APISIX-fronted URL for this dataset, populated after a successful CREATE saga. */
+  @Schema(
+      description =
+          "Public APISIX-fronted URL for this dataset, populated after a successful release saga",
+      accessMode = Schema.AccessMode.READ_ONLY,
+      example = "https://api.core.civitasconnect.digital/datasets/traffic-count-2025")
   private String publicUrl;
 
-  /**
-   * The type of saga currently in progress, or {@code null} when no saga is running. Clients can
-   * use this to display a provisioning/teardown indicator in the UI.
-   */
+  @Schema(
+      description =
+          "Type of saga currently in progress (CREATE, UPDATE, DELETE), or null when idle",
+      accessMode = Schema.AccessMode.READ_ONLY)
   private PendingSagaType pendingSagaType;
 }

@@ -1,5 +1,6 @@
 package de.civitascore.portal.model.input;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -13,5 +14,6 @@ public class DataSetInputDTO extends BaseDataEntityInputDTO {
 
   private String description;
 
+  @Schema(description = "Whether this dataset is publicly accessible, defaults to false")
   private Boolean openDataAccess = false;
 }

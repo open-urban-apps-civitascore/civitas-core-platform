@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl'
 import { usePatchDataset } from '@/app/services/api/datasets/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { GenericAssignmentsList } from '@/components/access-management/GenericAssignmentsList'
-import { CreateAssignmentData } from '@/types/assignments'
+import { AssignmentScopedInput } from '@/types/assignments'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
 
@@ -22,7 +22,7 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
 
   const { mutateAsync: patchDataset } = usePatchDataset()
 
-  const handlePatchEntity = async (id: string, assignments: CreateAssignmentData[]) => {
+  const handlePatchEntity = async (id: string, assignments: AssignmentScopedInput[]) => {
     await patchDataset({
       id,
       assignments,
@@ -39,6 +39,7 @@ export const AssignmentsList = (props: AssignmentsListProps) => {
       title={t('title')}
       subtitle={t('subtitle')}
       testId="accessManagement"
+      hasSecondBox
     />
   )
 }

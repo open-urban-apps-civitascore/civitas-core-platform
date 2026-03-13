@@ -37,7 +37,7 @@ const RootLayout = async ({ children }: RootLayoutProps) => {
   return (
     <html lang="en">
       <body className={`${ibmPlexSans.variable}  ${ibmPlexMono.variable} antialiased`}>
-        <SessionProvider refetchInterval={240}>
+        <SessionProvider>
           <SessionManager />
           <NextIntlClientProvider locale={locale}>
             <QueryProvider>{children}</QueryProvider>

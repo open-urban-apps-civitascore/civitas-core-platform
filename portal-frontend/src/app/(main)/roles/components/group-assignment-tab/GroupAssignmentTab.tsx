@@ -6,14 +6,13 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 
-import { AssignmentSummary } from '@/app/services/api/assignments/clientRequests'
 import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
-import { ASSIGNMENT_SCOPE_TYPES, AssignmentScope } from '@/types/assignments'
+import { type Assignment, ASSIGNMENT_SCOPE_TYPES, type AssignmentScope } from '@/types/assignments'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
 
@@ -26,7 +25,7 @@ interface GroupAssignmentTabProps {
   onGroupAssignmentUpdate: (newGroupIds: string[]) => void
   roleName: Role['name']
   isEditMode: boolean
-  assignments: AssignmentSummary[]
+  assignments: Assignment[]
 }
 
 const SCOPE_TABS: Tab<AssignmentScope>[] = [

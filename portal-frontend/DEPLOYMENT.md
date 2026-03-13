@@ -12,6 +12,7 @@
    - [Server](#21-server)
    - [Logging](#22-logging)
    - [Tenant Branding](#23-tenant-branding)
+   - [Session](#24-session)
 3. [Local Development Only](#3-local-development-only)
    - [JSON Server (Mock Backend)](#31-json-server-mock-backend)
    - [E2E Test Configuration](#32-e2e-test-configuration)
@@ -76,6 +77,14 @@
 | Env Var | Default | Description |
 |---|---|---|
 | `NEXT_PUBLIC_TENANT_NAME` | `Mandanten-Name` | Tenant display name shown in the sidebar header. **Build-time only** — must be set when `pnpm build` runs (see [section 4](#4-build-time-vs-runtime-variables)). |
+
+---
+
+### 2.4 Session
+
+| Env Var | Default | Description |
+|---|---|---|
+| `NEXT_PUBLIC_SESSION_IDLE_TIMEOUT_SECONDS` | `3300` (55 min) | Idle timeout in seconds. After this period of inactivity the user is automatically logged out. Must be **less than** the Keycloak `ssoSessionIdleTimeout` to ensure the frontend expires the session before Keycloak does. **Build-time only** — must be set when `pnpm build` runs (see [section 4](#4-build-time-vs-runtime-variables)). |
 
 ---
 
@@ -146,4 +155,4 @@ environment:
   PORT: "80"
 ```
 
-> `NEXT_PUBLIC_TENANT_NAME` is not listed here because it must be set at **build time**, not at container runtime. Pass it as a build arg or set it in the CI pipeline before running `pnpm build`.
+> `NEXT_PUBLIC_TENANT_NAME` and `NEXT_PUBLIC_SESSION_IDLE_TIMEOUT_SECONDS` are not listed here because they must be set at **build time**, not at container runtime. Pass them as build args or set them in the CI pipeline before running `pnpm build`.

@@ -28,6 +28,7 @@ const mockGroups: Group[] = [
     roles: null,
     members: null,
     contactUser: null,
+    assignments: null,
     createdAt: '2024-01-01',
     modifiedAt: '2024-01-01',
   },
@@ -59,150 +60,244 @@ const mockAssignments: GroupRoleAssignmentTable[] = [
 ]
 
 describe('GenericAssignmentsList', () => {
-  const defaultProps = {
-    entityId: 'test-entity-1',
-    initialAssignments: mockAssignments,
-    groups: mockGroups,
-    roles: mockRoles,
-    onPatchEntity: vi.fn().mockResolvedValue(undefined),
-    title: 'Zugriffsberechtigungen',
-    subtitle: 'Hier werden Zuständigkeiten und Zugriffsrechte definiert.',
-  }
+  describe('uncontrolled mode', () => {
+    const defaultProps = {
+      entityId: 'test-entity-1',
+      initialAssignments: mockAssignments,
+      groups: mockGroups,
+      roles: mockRoles,
+      onPatchEntity: vi.fn().mockResolvedValue(undefined),
+      title: 'Zugriffsberechtigungen',
+      subtitle: 'Hier werden Zuständigkeiten und Zugriffsrechte definiert.',
+      hasSecondBox: true,
+    }
 
-  it('renders in read-only mode by default', () => {
-    render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <GenericAssignmentsList {...defaultProps} />
-      </NextIntlClientProvider>,
-    )
+    it('renders in read-only mode by default', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} />
+        </NextIntlClientProvider>,
+      )
 
-    expect(screen.getByText('Zugriffsberechtigungen')).toBeInTheDocument()
-    expect(screen.getByText('Hier werden Zuständigkeiten und Zugriffsrechte definiert.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /bearbeiten/i })).toBeInTheDocument()
-  })
-
-  it('displays assignments table', () => {
-    render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <GenericAssignmentsList {...defaultProps} />
-      </NextIntlClientProvider>,
-    )
-
-    expect(screen.getByText('Admin Group')).toBeInTheDocument()
-    expect(screen.getByText('Admin')).toBeInTheDocument()
-  })
-
-  it('shows no data page when there are no assignments', () => {
-    render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <GenericAssignmentsList {...defaultProps} initialAssignments={[]} />
-      </NextIntlClientProvider>,
-    )
-
-    expect(screen.getByText('Keine Gruppen und Rollen vorhanden')).toBeInTheDocument()
-    expect(screen.getByText('Keine Gruppe besitzt Berechtigungen.')).toBeInTheDocument()
-  })
-
-  it('switches to edit mode when edit button is clicked', async () => {
-    render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <GenericAssignmentsList {...defaultProps} />
-      </NextIntlClientProvider>,
-    )
-
-    const editButton = screen.getByRole('button', { name: /bearbeiten/i })
-    fireEvent.click(editButton)
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /speichern/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /beenden/i })).toBeInTheDocument()
+      expect(screen.getByText('Zugriffsberechtigungen')).toBeInTheDocument()
+      expect(screen.getByText('Hier werden Zuständigkeiten und Zugriffsrechte definiert.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /bearbeiten/i })).toBeInTheDocument()
     })
-  })
 
-  it('shows add assignment button in edit mode', async () => {
-    render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <GenericAssignmentsList {...defaultProps} />
-      </NextIntlClientProvider>,
-    )
+    it('displays assignments table', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} />
+        </NextIntlClientProvider>,
+      )
 
-    const editButton = screen.getByRole('button', { name: /bearbeiten/i })
-    fireEvent.click(editButton)
-
-    await waitFor(() => {
-      expect(screen.getByText(/gruppe hinzufügen/i)).toBeInTheDocument()
+      expect(screen.getByText('Admin Group')).toBeInTheDocument()
+      expect(screen.getByText('Admin')).toBeInTheDocument()
     })
-  })
 
-  it('disables submit button when no changes have been made', async () => {
-    render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <GenericAssignmentsList {...defaultProps} />
-      </NextIntlClientProvider>,
-    )
+    it('shows no data page when there are no assignments', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} initialAssignments={[]} />
+        </NextIntlClientProvider>,
+      )
 
-    const editButton = screen.getByRole('button', { name: /bearbeiten/i })
-    fireEvent.click(editButton)
-
-    await waitFor(() => {
-      const submitButton = screen.getByRole('button', { name: /speichern/i })
-      expect(submitButton).toBeDisabled()
+      expect(screen.getByText('Keine Gruppen und Rollen vorhanden')).toBeInTheDocument()
+      expect(screen.getByText('Keine Gruppe besitzt Berechtigungen.')).toBeInTheDocument()
     })
-  })
 
-  it('shows first info box in read-only mode', () => {
-    render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <GenericAssignmentsList {...defaultProps} />
-      </NextIntlClientProvider>,
-    )
+    it('switches to edit mode when edit button is clicked', async () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} />
+        </NextIntlClientProvider>,
+      )
 
-    expect(
-      screen.getByText(/gruppen, die plattformweite berechtigungen an allen datenobjekten besitzen, haben zugriff/i),
-    ).toBeInTheDocument()
-    expect(screen.queryByText(/durch das entfernen der eigenen gruppen-rollen-zuordnung/i)).not.toBeInTheDocument()
-  })
+      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
+      fireEvent.click(editButton)
 
-  it('shows both info boxes in edit mode', async () => {
-    render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <GenericAssignmentsList {...defaultProps} />
-      </NextIntlClientProvider>,
-    )
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /speichern/i })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /beenden/i })).toBeInTheDocument()
+      })
+    })
 
-    const editButton = screen.getByRole('button', { name: /bearbeiten/i })
-    fireEvent.click(editButton)
+    it('shows add assignment button in edit mode', async () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} />
+        </NextIntlClientProvider>,
+      )
 
-    await waitFor(() => {
+      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
+      fireEvent.click(editButton)
+
+      await waitFor(() => {
+        expect(screen.getByText(/gruppe hinzufügen/i)).toBeInTheDocument()
+      })
+    })
+
+    it('disables submit button when no changes have been made', async () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} />
+        </NextIntlClientProvider>,
+      )
+
+      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
+      fireEvent.click(editButton)
+
+      await waitFor(() => {
+        const submitButton = screen.getByRole('button', { name: /speichern/i })
+        expect(submitButton).toBeDisabled()
+      })
+    })
+
+    it('shows first info box in read-only mode', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} />
+        </NextIntlClientProvider>,
+      )
+
       expect(
         screen.getByText(/gruppen, die plattformweite berechtigungen an allen datenobjekten besitzen, haben zugriff/i),
       ).toBeInTheDocument()
-      expect(screen.getByText(/durch das entfernen der eigenen gruppen-rollen-zuordnung/i)).toBeInTheDocument()
+      expect(screen.queryByText(/durch das entfernen der eigenen gruppen-rollen-zuordnung/i)).not.toBeInTheDocument()
+    })
+
+    it('shows both info boxes in edit mode', async () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} />
+        </NextIntlClientProvider>,
+      )
+
+      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
+      fireEvent.click(editButton)
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(
+            /gruppen, die plattformweite berechtigungen an allen datenobjekten besitzen, haben zugriff/i,
+          ),
+        ).toBeInTheDocument()
+        expect(screen.getByText(/durch das entfernen der eigenen gruppen-rollen-zuordnung/i)).toBeInTheDocument()
+      })
+    })
+
+    it('disables submit button when groups without roles exist', async () => {
+      const assignmentsWithoutRoles: GroupRoleAssignmentTable[] = [
+        {
+          groupId: '2',
+          groupName: 'Empty Group',
+          groupDescription: 'No roles',
+          assignedRoles: [],
+        },
+      ]
+
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} initialAssignments={assignmentsWithoutRoles} />
+        </NextIntlClientProvider>,
+      )
+
+      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
+      fireEvent.click(editButton)
+
+      await waitFor(() => {
+        const submitButton = screen.getByRole('button', { name: /speichern/i })
+        expect(submitButton).toBeDisabled()
+      })
+    })
+
+    it('does not call onPatchEntity when submit button is disabled', async () => {
+      const onPatchEntity = vi.fn().mockResolvedValue(undefined)
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...defaultProps} onPatchEntity={onPatchEntity} initialAssignments={[]} />
+        </NextIntlClientProvider>,
+      )
+
+      const editButton = screen.getByRole('button', { name: /bearbeiten/i })
+      fireEvent.click(editButton)
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /speichern/i })).toBeDisabled()
+      })
+      expect(onPatchEntity).not.toHaveBeenCalled()
     })
   })
 
-  it('disables submit button when groups without roles exist', async () => {
-    const assignmentsWithoutRoles: GroupRoleAssignmentTable[] = [
-      {
-        groupId: '2',
-        groupName: 'Empty Group',
-        groupDescription: 'No roles',
-        assignedRoles: [],
-      },
-    ]
+  describe('controlled mode', () => {
+    const controlledProps = {
+      assignedGroups: mockAssignments,
+      onAssignedGroupsChange: vi.fn(),
+      groups: mockGroups,
+      roles: mockRoles,
+    }
 
-    render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <GenericAssignmentsList {...defaultProps} initialAssignments={assignmentsWithoutRoles} />
-      </NextIntlClientProvider>,
-    )
+    it('renders without title and subtitle', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledProps} />
+        </NextIntlClientProvider>,
+      )
 
-    const editButton = screen.getByRole('button', { name: /bearbeiten/i })
-    fireEvent.click(editButton)
+      expect(screen.queryByText('Zugriffsberechtigungen')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /bearbeiten/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /speichern/i })).not.toBeInTheDocument()
+    })
 
-    await waitFor(() => {
-      const submitButton = screen.getByRole('button', { name: /speichern/i })
-      expect(submitButton).toBeDisabled()
+    it('renders assignments from assignedGroups prop', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledProps} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.getByText('Admin Group')).toBeInTheDocument()
+      expect(screen.getByText('Admin')).toBeInTheDocument()
+    })
+
+    it('shows add-group button when isReadOnly is false', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledProps} isReadOnly={false} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.getByText(/gruppe hinzufügen/i)).toBeInTheDocument()
+    })
+
+    it('hides add-group button when isReadOnly is true', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledProps} isReadOnly={true} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.queryByText(/gruppe hinzufügen/i)).not.toBeInTheDocument()
+    })
+
+    it('defaults to edit mode (isReadOnly=false) when isReadOnly is not passed', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledProps} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.getByText(/gruppe hinzufügen/i)).toBeInTheDocument()
+    })
+
+    it('shows no data page when assignedGroups is empty', () => {
+      render(
+        <NextIntlClientProvider locale="de" messages={messages}>
+          <GenericAssignmentsList {...controlledProps} assignedGroups={[]} />
+        </NextIntlClientProvider>,
+      )
+
+      expect(screen.getByText('Keine Gruppen und Rollen vorhanden')).toBeInTheDocument()
     })
   })
 })

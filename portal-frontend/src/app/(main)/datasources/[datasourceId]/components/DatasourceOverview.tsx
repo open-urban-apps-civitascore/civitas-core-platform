@@ -2,8 +2,9 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -13,31 +14,40 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Form } from '@/components/ui/form'
 import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
+import { Group } from '@/types/groups'
+import { Role } from '@/types/roles'
+import { hasAssignmentChanges } from '@/utils/assignments'
 
 import { useDatasourceForm } from '../hooks/useDatasourceForm'
+import { AccessManagementTab } from './access-management/AccessManagementTab'
 import { BasicInfoTab } from './basic-info/BasicInfoTab'
 import { ConnectorTab } from './connector-tab/ConnectorTab'
 
 interface DatasourceOverviewProps {
   datasource: Datasource
+  initialAssignments: GroupRoleAssignmentTable[]
+  groups: Group[]
+  roles: Role[]
 }
 
 const tabs: Tab<DatasourceTab>[] = [
   { value: 'basicInfo', label: 'datasources.tabs.basicInfo' },
   { value: 'connector', label: 'datasources.tabs.connector' },
   { value: 'dataStructure', label: 'datasources.tabs.dataStructure' },
-  { value: 'accessPermissions', label: 'datasources.tabs.accessPermissions' },
+  { value: 'accessManagement', label: 'datasources.tabs.accessManagement' },
 ]
 
-const disabledTabs: DatasourceTab[] = ['dataStructure', 'accessPermissions']
+const disabledTabs: DatasourceTab[] = ['dataStructure']
 
-export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
+export const DatasourceOverview = (props: DatasourceOverviewProps) => {
+  const { datasource, initialAssignments, groups, roles } = props
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const [isReadOnly, setIsReadOnly] = useState(searchParams.get('mode') !== 'edit')
+  const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
 
   useEffect(() => {
     setIsReadOnly(searchParams.get('mode') !== 'edit')
@@ -67,31 +77,43 @@ export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
     completedTabs,
     submitDatasource,
     isLoading,
-  } = useDatasourceForm(datasource)
+  } = useDatasourceForm(datasource, assignedGroups, initialAssignments)
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+
+  const areAssignmentsDirty = useMemo(
+    () => hasAssignmentChanges(assignedGroups, initialAssignments),
+    [assignedGroups, initialAssignments],
+  )
+
   const handleSave = () => {
-    submitDatasource(() => router.refresh())
+    submitDatasource(() => {
+      setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
+      router.refresh()
+    })
   }
 
   const handleExit = () => {
-    if (form.formState.isDirty) {
+    if (form.formState.isDirty || areAssignmentsDirty) {
       setIsExitModalOpen(true)
     } else {
       form.reset()
       updateMode(false)
+      setAssignedGroups(initialAssignments)
     }
   }
 
   const handleDiscardAndExit = () => {
     setIsExitModalOpen(false)
     form.reset()
+    setAssignedGroups(initialAssignments)
     updateMode(false)
   }
 
   const handleSaveAndExit = () => {
     submitDatasource(() => {
+      setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
       setIsExitModalOpen(false)
       updateMode(false)
     })
@@ -103,8 +125,17 @@ export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
         return <BasicInfoTab form={form} isReadOnly={isReadOnly} />
       case 'connector':
         return <ConnectorTab form={form} readyConnectorType={readyConnectorType} isReadOnly={isReadOnly} />
+      case 'accessManagement':
+        return (
+          <AccessManagementTab
+            assignedGroups={assignedGroups}
+            onAssignedGroupsChange={setAssignedGroups}
+            groups={groups}
+            roles={roles}
+            isReadOnly={isReadOnly}
+          />
+        )
       case 'dataStructure':
-      case 'accessPermissions':
       default:
         return null
     }
@@ -120,6 +151,7 @@ export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
           onTabChange: setSelectedTab,
           completedTabs,
           disabledTabs,
+          tabsWithNoCompletionStatus: ['accessManagement'], // Access Management tab has no required fields, so it should not show completion status
           hasCompletionStatus: true,
         }}
         customElement={
@@ -131,7 +163,7 @@ export const DatasourceOverview = ({ datasource }: DatasourceOverviewProps) => {
             confirmButtonType="button"
             onConfirmClick={handleSave}
             isConfirmButtonDisabled={
-              !form.formState.isDirty ||
+              (!form.formState.isDirty && !areAssignmentsDirty) ||
               !!form.formState.errors.name ||
               (dataSourceStatus !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
               isLoading

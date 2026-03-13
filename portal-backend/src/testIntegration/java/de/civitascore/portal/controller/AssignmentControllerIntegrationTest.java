@@ -55,6 +55,12 @@ class AssignmentControllerIntegrationTest
   @Override
   protected void performAdditionalCleanup() {
     assignmentRepository.deleteAll();
+    dataSetRepository.deleteAll();
+    dataSpaceRepository.deleteAll();
+    catalogRepository.deleteAll();
+    groupRepository.deleteAll();
+    roleRepository.deleteAll();
+    userRepository.deleteAll();
   }
 
   @Override

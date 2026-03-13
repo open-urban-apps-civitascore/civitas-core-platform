@@ -3,15 +3,15 @@
 import { createColumnHelper, getCoreRowModel, useReactTable } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
 
-import { AssignmentSummary } from '@/app/services/api/assignments/clientRequests'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { type Assignment } from '@/types/assignments'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
-interface RolesAssignmentTableProps extends TableProps<AssignmentSummary> {
-  assignments: AssignmentSummary[]
+interface RolesAssignmentTableProps extends TableProps<Assignment> {
+  assignments: Assignment[]
   isPlatformWide: boolean
 }
 
@@ -31,7 +31,7 @@ export const RolesAssignmentTable = (props: RolesAssignmentTableProps) => {
 
   const t = useTranslations('users.rolesTab')
 
-  const columnHelper = createColumnHelper<AssignmentSummary>()
+  const columnHelper = createColumnHelper<Assignment>()
 
   const columns = [
     columnHelper.accessor(row => row.role.name, {
