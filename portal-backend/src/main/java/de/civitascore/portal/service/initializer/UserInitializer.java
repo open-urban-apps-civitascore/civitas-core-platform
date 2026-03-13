@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +39,7 @@ public class UserInitializer {
   private final RoleRepository roleRepository;
   private final AssignmentRepository assignmentRepository;
   private final ConfigEventPublisherService configEventPublisher;
+  private final Environment environment;
 
   @Value("${keycloak.target-realm}")
   private String targetRealm;
@@ -51,13 +53,15 @@ public class UserInitializer {
       GroupRepository groupRepository,
       RoleRepository roleRepository,
       AssignmentRepository assignmentRepository,
-      ConfigEventPublisherService configEventPublisher) {
+      ConfigEventPublisherService configEventPublisher,
+      Environment environment) {
     this.properties = properties;
     this.userRepository = userRepository;
     this.groupRepository = groupRepository;
     this.roleRepository = roleRepository;
     this.assignmentRepository = assignmentRepository;
     this.configEventPublisher = configEventPublisher;
+    this.environment = environment;
   }
 
   @EventListener(ApplicationReadyEvent.class)
@@ -189,7 +193,7 @@ public class UserInitializer {
     userConfig.setEnabled(true);
     userConfig.setEmailVerified(true);
 
-    if (password != null && !password.isBlank()) {
+    if (password != null && !password.isBlank() && environment.matchesProfiles("local")) {
       CredentialConfig credential = new CredentialConfig();
       credential.setType("password");
       credential.setValue(password);
