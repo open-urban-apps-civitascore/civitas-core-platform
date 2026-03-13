@@ -38,6 +38,4 @@ public class DataStructureVersionInputDTO extends BaseInputDTO {
   // The dataStructureId is required for the service layer to associate the version with the correct
   // data structure, but it should not be provided by the client in the input DTO.
   private UUID dataStructureId;
-
-  @JsonIgnore private String previousModelAtlasUri;
 }

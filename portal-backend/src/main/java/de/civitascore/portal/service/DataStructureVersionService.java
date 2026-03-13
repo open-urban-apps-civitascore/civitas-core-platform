@@ -116,8 +116,6 @@ public class DataStructureVersionService
             "version", existingEntity.getId(), "Version cannot be null or blank");
       }
 
-      input.setPreviousModelAtlasUri(existingEntity.getModelAtlasUri());
-
       if (existingEntity.getDataStructureVersionStatus() != DataStructureVersionStatus.DRAFT
           && dataSourceRepository.existsByDataStructureVersionId(existingEntity.getId())) {
         // Version is in use: block all structural changes, allow only description and modelName
@@ -130,6 +128,11 @@ public class DataStructureVersionService
         input.setModel(null);
       } else {
         validateModelForUpdate(input);
+      }
+
+      if (StringUtils.isNotBlank(input.getModel())
+          && StringUtils.isNotBlank(input.getModelAtlasUri())) {
+        deleteOldModelIfUriChanged(existingEntity.getModelAtlasUri(), input);
       }
 
     } catch (InvalidInputException e) {
@@ -152,7 +155,6 @@ public class DataStructureVersionService
       DataStructureVersion entity, DataStructureVersionInputDTO input) {
     if (StringUtils.isNotBlank(input.getModel())
         && StringUtils.isNotBlank(input.getModelAtlasUri())) {
-      deleteOldModelIfUriChanged(input);
       try {
         String response =
             modelService.uploadModelString(input.getModel(), input.getModelAtlasUri());
@@ -181,8 +183,7 @@ public class DataStructureVersionService
     }
   }
 
-  private void deleteOldModelIfUriChanged(DataStructureVersionInputDTO input) {
-    String oldUri = input.getPreviousModelAtlasUri();
+  private void deleteOldModelIfUriChanged(String oldUri, DataStructureVersionInputDTO input) {
     String newUri = input.getModelAtlasUri();
     if (StringUtils.isNotBlank(oldUri) && !Objects.equals(oldUri, newUri)) {
       try {
