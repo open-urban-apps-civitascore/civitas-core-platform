@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { useForm } from 'react-hook-form'
-import { fireEvent } from 'storybook/test'
 import { describe, expect, it, vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
@@ -21,7 +20,7 @@ vi.mock('./connectorSources', () => ({
         type: 'input',
         placeholder: 'mqtt://localhost',
         required: true,
-        label: { label: 'URLs', labelHint: 'info.hint' },
+        label: { label: 'URLs', labelHint: 'hint' },
       },
       {
         key: 'tls',
@@ -84,6 +83,7 @@ const defaultValues: DatasourceFormDraft = {
   name: '',
   description: '',
   dataSourceStatus: 'DRAFT',
+  dataStructureVersionId: null,
   assignments: [],
   connectorType: 'MQTT',
   configuration: {
@@ -107,7 +107,7 @@ const renderConnectorTab = (values?: Partial<DatasourceFormDraft>, isReadOnly = 
 
     return (
       <Form {...form}>
-        <ConnectorTab form={form} readyConnectorType={merged.connectorType} isReadOnly={isReadOnly} />
+        <ConnectorTab form={form} connectorType={merged.connectorType} isReadOnly={isReadOnly} />
       </Form>
     )
   }
@@ -124,6 +124,8 @@ describe('ConnectorTab (integration)', () => {
     renderConnectorTab()
 
     const select = screen.getByTestId('connectorTypeSelectTrigger')
+    expect(screen.getByText('title1')).toBeInTheDocument()
+    expect(screen.getByText('title2')).toBeInTheDocument()
     expect(screen.getByLabelText('type')).toBeInTheDocument()
     expect(screen.getByText('MQTT')).toBeInTheDocument()
     fireEvent.click(select)
@@ -134,19 +136,47 @@ describe('ConnectorTab (integration)', () => {
   it('does not render config when no connector type selected', async () => {
     renderConnectorTab({ connectorType: undefined, configuration: undefined })
 
+    expect(screen.getByText('title1')).toBeInTheDocument()
     expect(screen.getByLabelText('type')).toBeInTheDocument()
     expect(screen.queryByText('MQTT')).not.toBeInTheDocument()
     expect(screen.queryByText('SQL')).not.toBeInTheDocument()
     expect(screen.queryByText('title2')).not.toBeInTheDocument()
   })
 
-  it('renders dynamic fields from config', () => {
+  it('renders dynamic fields from config with their field metadata', async () => {
     renderConnectorTab()
 
     expect(screen.getByLabelText(/URLs/)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('mqtt://localhost')).toBeInTheDocument()
     expect(screen.getByRole('checkbox')).toBeInTheDocument()
-    expect(screen.getByLabelText(/QoS/)).toBeInTheDocument()
+    const qosSelect = screen.getByLabelText(/QoS/)
+    expect(qosSelect).toBeInTheDocument()
     expect(screen.getByLabelText('Client ID')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('client id')).toBeInTheDocument()
+
+    fireEvent.click(qosSelect)
+    await screen.findByText('1')
+    expect(screen.getByText('1')).toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
+  })
+
+  it('renders fields for a non-default connector type', () => {
+    renderConnectorTab({
+      connectorType: 'SQL',
+      configuration: {
+        dsn: '',
+        table: '',
+        columns: '',
+        init_files: '',
+      },
+    })
+
+    expect(screen.getByText('title2')).toBeInTheDocument()
+    expect(screen.getByLabelText(/DSN/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Table/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Columns/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Init Files/)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/URLs/)).not.toBeInTheDocument()
   })
 
   it('renders label hint when present', () => {
