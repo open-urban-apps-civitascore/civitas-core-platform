@@ -1,0 +1,15 @@
+meta {
+  name: 17. Cleanup - Delete DataSet
+  type: http
+  seq: 17
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}

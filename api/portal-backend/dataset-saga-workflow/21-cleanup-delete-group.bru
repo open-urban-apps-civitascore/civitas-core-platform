@@ -1,0 +1,15 @@
+meta {
+  name: 21. Cleanup - Delete Group
+  type: http
+  seq: 21
+}
+
+delete {
+  url: {{baseUrl}}/groups/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaGroupId}}
+}

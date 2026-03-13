@@ -18,7 +18,9 @@ server:
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable
+    url: jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable
+    username: ${POSTGRES_USER:admin}
+    password: ${POSTGRES_PASSWORD:admin}
   jpa:
     hibernate:
       ddl-auto: validate
