@@ -21,3 +21,19 @@ tests {
     expect(status === 204 || status === 404 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Saga step 14 of 18** — Delete the scoped assignment (cleanup).
+
+  Removes the DATASET-scoped assignment created in step 6. This should be done before deleting the dataset to avoid dangling references.
+
+  **Expected Response:** 204 No Content. 404 if already deleted. 400 if the ID is invalid (not set on first run).
+
+  **System Impact:**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Assignment record removed from `portal_backend` DB |
+  | Config Adapter | AuthZ Repository notified to invalidate its authorization data cache |
+  | AuthZ Repository (OPA) | Scoped role-group binding removed from OPA policy data |
+}

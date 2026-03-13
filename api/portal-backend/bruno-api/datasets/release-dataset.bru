@@ -21,3 +21,35 @@ tests {
     expect(status === 202 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Precondition:** `dataSetId` is set; dataset is in `READY` state.
+
+  Transitions the dataset from READY to AVAILABLE and triggers the **DATASET_CREATE** saga.
+  The saga orchestrator provisions infrastructure asynchronously:
+
+  1. **FROST Server** — creates a Project
+  2. **APISIX Gateway** — creates upstream + route for the dataset
+  3. **Redpanda Connect** — deploys data pipelines (if any)
+
+  On success, infrastructure references (projectId, routeId, serviceId, publicUrl, pipelineIds) are stored.
+  On failure, compensation runs in reverse order and the dataset reverts to READY.
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body reflects dataset with status `AVAILABLE`
+
+  **Kafka Events**
+  - Produces: `de.civitascore.dataset.saga.trigger` (sagaType: `DATASET_CREATE`)
+  - Consumes: `de.civitascore.saga.result` (type: `SAGA_COMPLETED` or `SAGA_FAILED`)
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSet status → `AVAILABLE`; `pendingSagaType` set to `CREATE` until saga completes |
+  | Config Adapter (Orchestrator) | Receives saga trigger; orchestrates FROST → APISIX → Redpanda steps |
+  | FROST Server | New Project created; verify at FROST API `/Projects` |
+  | APISIX Gateway | Route + upstream created; verify at `http://localhost:9180` (Admin API) |
+  | Redpanda Connect | Data pipelines deployed (if configured) |
+}

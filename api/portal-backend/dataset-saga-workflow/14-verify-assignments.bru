@@ -13,3 +13,15 @@ get {
 params:path {
   id: {{sagaDataSetId}}
 }
+
+docs {
+  ## Verify Assignments
+
+  **Precondition:** `sagaDataSetId` is set; assignment was created in step 10.
+
+  Retrieves the assignments for the dataset to verify the scoped assignment is present.
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body contains at least one assignment with `scopeType: DATASET` and `scopeId` matching `sagaDataSetId`
+}

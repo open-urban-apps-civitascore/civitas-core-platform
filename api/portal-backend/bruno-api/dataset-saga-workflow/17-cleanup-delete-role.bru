@@ -21,3 +21,19 @@ tests {
     expect(status === 204 || status === 404 || status === 400 || status === 409).to.be.true;
   });
 }
+
+docs {
+  **Saga step 17 of 18** — Delete the DATA role (cleanup).
+
+  Removes the DATA role created in step 3. The assignment must have been deleted first (step 14); a 409 is returned if active assignments still reference this role.
+
+  **Expected Response:** 204 No Content. 404 if already deleted. 409 if active assignments still exist (delete assignment first).
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DATA role record removed from `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

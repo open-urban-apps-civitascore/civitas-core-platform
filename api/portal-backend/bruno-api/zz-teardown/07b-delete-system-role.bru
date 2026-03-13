@@ -17,3 +17,15 @@ tests {
     expect(status === 204 || status === 404 || status === 400 || status === 409).to.be.true;
   });
 }
+
+docs {
+  **Expected Response:** 204 No Content. 409 if the role still has active assignments (delete those first).
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | SYSTEM role record removed from `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

@@ -13,3 +13,21 @@ post {
 params:path {
   id: {{sagaDataSetId}}
 }
+
+docs {
+  ## Unpublish DataSet (READY → DRAFT)
+
+  **Precondition:** `sagaDataSetId` is set; dataset is in `READY` state (after unrelease).
+
+  Reverts the dataset to DRAFT status. Auto-generated distributions are removed.
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body reflects dataset with status `DRAFT`
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSet status → `DRAFT`; distributions removed |
+}

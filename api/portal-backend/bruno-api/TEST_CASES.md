@@ -46,7 +46,6 @@ The columns are:
 |---|---|
 | System | The component where a change is expected |
 | Expected Change | What should have changed after the request |
-| Verified | Checkbox — tick after manual confirmation |
 
 The three systems covered are:
 - **Backend** — portal-backend service, persists to PostgreSQL (`portal_backend` DB)
@@ -62,13 +61,13 @@ Test case documentation is embedded in each `.bru` file's `docs` block (visible 
 | Collection | Folder | Operations |
 |---|---|---|
 | Authorities | `authorities/` | Get All Authorities |
-| Users | `users/` | CRUD + My Profile |
+| Users | `users/` | CRUD + My Profile + Check Mailpit Emails |
 | Groups | `groups/` | CRUD + Replace Assignments |
 | Roles | `roles/` | CRUD |
 | Permissions | `permissions/` | Read-only |
 | Assignments | `assignments/` | Create / Create Scoped / Read / Delete |
 | DataSources | `datasources/` | CRUD + Publish / Unpublish + Published Meta + Assignments |
-| DataSets | `datasets/` | CRUD + Publish + Published Meta + Assignments |
+| DataSets | `datasets/` | CRUD + Publish / Unpublish + Release / Unrelease + Published Meta + Assignments |
 | Pipelines | `pipelines/` | CRUD (nested under DataSet) |
 | DataStructures | `datastructures/` | CRUD + Publish / Unpublish + Published Meta + Assignments |
 | DataStructure Versions | `datastructures/versions/` | CRUD + Publish / Unpublish + Published Meta |

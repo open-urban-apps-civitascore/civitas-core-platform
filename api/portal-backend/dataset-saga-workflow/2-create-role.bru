@@ -26,3 +26,20 @@ script:post-response {
   }
 }
 
+docs {
+  ## Setup – Create Role (DATA)
+
+  Creates a DATA role to be used for the scoped assignment later in the workflow.
+
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id`
+
+  **Post-condition:** Saves `sagaRoleId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Role record created in `portal_backend` DB |
+}

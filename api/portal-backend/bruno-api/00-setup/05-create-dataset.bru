@@ -33,3 +33,17 @@ tests {
     expect(status === 201 || status === 409).to.be.true;
   });
 }
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`. 409 if the dataset already existed (idempotent setup).
+
+  **Post-condition:** Save `dataSetId` and `setupDataSetId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}
