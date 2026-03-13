@@ -47,12 +47,21 @@ kafka:
 security:
   permit-paths:
     - /api-docs/**
+    - /api-docs.yaml
     - /swagger-ui/**
     - /swagger-ui.html
     - /swagger-resources/**
     - /webjars/**
     - /actuator/health/**
     - /actuator/info
+
+springdoc:
+  swagger-ui:
+    oauth:
+      client-id: portal-frontend
+      use-pkce-with-authorization-code-grant: true
+      # Dev-only secret for local Swagger UI OAuth — never use in deployed environments
+      client-secret: dev-only-portal-frontend-secret
 
 model-atlas:
   baseUrl: "http://localhost:8086"

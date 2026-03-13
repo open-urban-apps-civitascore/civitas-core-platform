@@ -17,7 +17,6 @@ import io.swagger.v3.oas.annotations.Parameters;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -82,17 +81,11 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
 
   @GetMapping("/me")
   @Operation(
+      operationId = "getCurrentUser",
       summary = "Get current user",
       description =
           "Returns the profile information of the authenticated user including assignments")
-  @ApiResponses(
-      value = {
-        @ApiResponse(responseCode = "200", description = "Successful retrieval of user profile"),
-        @ApiResponse(responseCode = "401", description = "If the user is not authenticated"),
-        @ApiResponse(
-            responseCode = "403",
-            description = "If the user is authenticated but does not have sufficient permissions")
-      })
+  @ApiResponse(responseCode = "200", description = "User profile returned successfully")
   public ResponseEntity<PrincipalUserOutput> getCurrentUser(
       @AuthenticationPrincipal PrincipalUserDetails userPrincipal) {
     log.debug("UserController.getCurrentUser called by user: {}", userPrincipal.getUsername());

@@ -97,10 +97,7 @@ public class AssignmentController
 
   @PutMapping("/{id}")
   @Override
-  @Operation(
-      summary = "Update assignment (Not Supported)",
-      description = "This operation is not supported. Assignments cannot be updated once created.",
-      deprecated = true)
+  @Operation(hidden = true)
   public ResponseEntity<AssignmentOutputDTO> update(
       @PathVariable UUID id, @RequestBody AssignmentInputDTO input) {
     throw new UnsupportedOperationException("Assignment updates are not supported.");
@@ -108,10 +105,7 @@ public class AssignmentController
 
   @PatchMapping("/{id}")
   @Override
-  @Operation(
-      summary = "Patch assignment (Not Supported)",
-      description = "This operation is not supported. Assignments cannot be patched once created.",
-      deprecated = true)
+  @Operation(hidden = true)
   public ResponseEntity<AssignmentOutputDTO> patch(
       @PathVariable UUID id, @RequestBody JsonNode updates) {
     throw new UnsupportedOperationException("Assignment patches are not supported.");

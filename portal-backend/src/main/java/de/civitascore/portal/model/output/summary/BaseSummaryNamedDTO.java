@@ -7,5 +7,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 @Data
 public abstract class BaseSummaryNamedDTO extends BaseSummaryDTO implements Serializable {
+
   private String name;
 }

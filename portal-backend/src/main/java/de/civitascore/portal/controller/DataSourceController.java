@@ -101,6 +101,7 @@ public class DataSourceController
 
   @PostMapping("/{id}/publish")
   @Operation(
+      operationId = "publishDataSource",
       summary = "Publish a data source",
       description =
           "Validates the connector configuration and transitions the data source from DRAFT to"
@@ -113,6 +114,7 @@ public class DataSourceController
 
   @PostMapping("/{id}/unpublish")
   @Operation(
+      operationId = "unpublishDataSource",
       summary = "Unpublish a data source",
       description = "Transitions the data source from AVAILABLE back to DRAFT status.")
   public ResponseEntity<DataSourceOutputDTO> unpublish(@PathVariable UUID id) {
@@ -123,6 +125,7 @@ public class DataSourceController
 
   @PutMapping("/{id}/published/meta")
   @Operation(
+      operationId = "updateDataSourcePublishedMeta",
       summary = "Update metadata of a published data source",
       description =
           "Updates name, description, connector configuration, and assignments on a data source in"
