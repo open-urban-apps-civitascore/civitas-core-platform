@@ -254,8 +254,6 @@ api-test-backend:
         - dev-environment/apisix/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
-      when: manual
-      allow_failure: true
   services:
     - name: docker:27-dind
       command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']

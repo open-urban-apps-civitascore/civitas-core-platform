@@ -174,7 +174,10 @@ services:
         COPY policy /staging/policies
         COPY lib /staging/helpers
         COPY providers /staging/providers
-        COPY data/backends-allowall /staging/data/backends
+        COPY data/backends /staging/data/backends
+        # Null out all permission values for allow-all mode (CI only)
+        RUN find /staging/data/backends -name '*.json' \
+            -exec sed -i 's/: *"[A-Z][A-Z_]*"/: null/g; s/: *\[.*\]/: null/g' {} +
         RUN mkdir -p /staging/data/config && \
             printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","authz_cache_duration_seconds":0}\n' \
             > /staging/data/config/config.json
