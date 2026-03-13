@@ -1399,10 +1399,11 @@ paths:
       tags:
       - Data Structure Versions
       summary: Update metadata of a published data structure version
-      description: "Updates only the metadata (version, modelName, styles) of a published\
-        \ data structure version (AVAILABLE status). Cannot modify modelAtlasUri or\
-        \ model. For DRAFT versions, use PUT /datastructures/{dataStructureId}/versions/{versionId}\
-        \ instead."
+      description: "Updates a published data structure version (AVAILABLE status).\
+        \ If the version is not in use by any DataSource, all fields including model,\
+        \ modelAtlasUri, version, and styles can be updated. If the version is in\
+        \ use, only description and modelName can be changed. For DRAFT versions,\
+        \ use PUT /datastructures/{dataStructureId}/versions/{versionId} instead."
       operationId: updateDataStructureVersionPublishedMeta
       parameters:
       - name: dataStructureId
@@ -4912,7 +4913,8 @@ paths:
       tags:
       - Users
       summary: Get current user
-      description: Returns the profile information of the authenticated user
+      description: Returns the profile information of the authenticated user including
+        assignments
       operationId: getCurrentUser
       responses:
         "200":
@@ -5542,8 +5544,6 @@ components:
           type: boolean
           description: "Whether this role can be modified, defaults to false"
           example: false
-        modifiedBy:
-          $ref: "#/components/schemas/UserSummaryDTO"
         groupCount:
           type: integer
           format: int64
@@ -5556,17 +5556,6 @@ components:
           description: Number of users with this role (via group assignments)
           example: 12
           readOnly: true
-    UserSummaryDTO:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          description: Unique identifier (UUID)
-          example: 550e8400-e29b-41d4-a716-446655440000
-          readOnly: true
-        name:
-          type: string
     GroupInputDTO:
       type: object
       properties:
@@ -5699,6 +5688,17 @@ components:
         readonly:
           type: boolean
           description: Whether this role can be modified
+    UserSummaryDTO:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier (UUID)
+          example: 550e8400-e29b-41d4-a716-446655440000
+          readOnly: true
+        name:
+          type: string
     AssignmentGroupInputDTO:
       type: object
       properties:
@@ -6375,13 +6375,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageableObject:
@@ -6411,6 +6411,35 @@ components:
           type: boolean
         unsorted:
           type: boolean
+    MeAssignmentOutputDTO:
+      type: object
+      description: Assignment summary for the authenticated user's /me endpoint
+      properties:
+        scopeType:
+          type: string
+          description: Type of scope this assignment applies to
+          enum:
+          - TENANT
+          - DATASTRUCTURE
+          - DATASOURCE
+          - DATASET
+          - DATASPACE
+          - CATALOG
+          example: DATASET
+        scopeId:
+          type: string
+          format: uuid
+          description: ID of the scoped entity (null for TENANT scope)
+          example: 550e8400-e29b-41d4-a716-446655440000
+        permissions:
+          type: array
+          description: Effective permissions granted by this assignment
+          example:
+          - DATASET_READ
+          - DATASET_CREATE
+          items:
+            type: string
+          uniqueItems: true
     PrincipalUserOutput:
       type: object
       properties:
@@ -6438,14 +6467,11 @@ components:
           type: string
           description: User's last name
           example: Doe
-        roles:
+        assignments:
           type: array
-          description: User's roles
-          example:
-          - USER
-          - ADMIN
+          description: "User's assignments with role, permissions, scope and group"
           items:
-            type: string
+            $ref: "#/components/schemas/MeAssignmentOutputDTO"
     PageRoleOutputDTO:
       type: object
       properties:
@@ -6469,13 +6495,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     Sort:
@@ -6550,13 +6576,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataStructureOutputDTO:
@@ -6582,13 +6608,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataSourceOutputDTO:
@@ -6614,13 +6640,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageDataSetOutputDTO:
@@ -6646,13 +6672,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PagePipelineOutputDTO:
@@ -6678,13 +6704,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     Pageable:
@@ -6724,13 +6750,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PageAssignmentOutputDTO:
@@ -6756,13 +6782,13 @@ components:
           format: int32
         sort:
           $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
         first:
           type: boolean
         last:
           type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
         empty:
           type: boolean
     PatchUserInputDTO:
