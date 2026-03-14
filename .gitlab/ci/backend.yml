@@ -94,6 +94,8 @@ test-backend:
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: test
   needs:
+    - job: build-backend
+      artifacts: true
     - job: setup-version
       artifacts: true
     - job: setup-version-portal-model
@@ -115,7 +117,7 @@ test-backend:
     - cd portal-backend
   script:
     # Run tests using published portal-model from GitLab Maven repository
-    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
+    - mvn $MAVEN_CLI_OPTS org.jacoco:jacoco-maven-plugin:prepare-agent surefire:test jacoco:report -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
   artifacts:
     when: always
     expire_in: 1 month
@@ -132,6 +134,8 @@ integration-test-backend:
   image: maven:3.9-eclipse-temurin-21
   stage: test
   needs:
+    - job: build-backend
+      artifacts: true
     - job: setup-version
       artifacts: true
     - job: setup-version-portal-model
@@ -159,7 +163,7 @@ integration-test-backend:
     - cd portal-backend
   script:
     # Run integration tests only, skipping unit tests. Saga-tagged tests are excluded via pom.xml (run in saga-e2e-test-backend)
-    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent-integration verify jacoco:report-integration -DskipUnitTests=true -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION
+    - mvn $MAVEN_CLI_OPTS org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION
   artifacts:
     when: always
     expire_in: 1 month
@@ -177,6 +181,8 @@ saga-e2e-test-backend:
   image: maven:3.9-eclipse-temurin-21
   stage: test
   needs:
+    - job: build-backend
+      artifacts: true
     - job: setup-version
       artifacts: true
     - job: setup-version-portal-model
@@ -214,7 +220,7 @@ saga-e2e-test-backend:
     - rm -rf $CI_PROJECT_DIR/.m2/repository/de/civitas-core  # Force fresh download of config-adapter JARs
     - cd portal-backend
   script:
-    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent-integration verify jacoco:report-integration -DskipUnitTests=true -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION -Psaga -Dfailsafe.rerunFailingTestsCount=1
+    - mvn $MAVEN_CLI_OPTS org.jacoco:jacoco-maven-plugin:prepare-agent-integration failsafe:integration-test failsafe:verify jacoco:report-integration -Dspotless.skip=true -s ci_settings.xml -Dportal-model.version=$PORTAL_MODEL_VERSION -Psaga -Dfailsafe.rerunFailingTestsCount=1
   artifacts:
     when: always
     expire_in: 1 month
@@ -230,7 +236,7 @@ saga-e2e-test-backend:
 # Auto-runs on main/develop, manual on MRs.
 api-test-backend:
   image: docker:27
-  stage: build # runs after build jobs provide JAR artifacts
+  stage: test # runs after build jobs provide JAR artifacts
   needs:
     - job: build-backend
       artifacts: true
@@ -311,9 +317,10 @@ report-test-backend:
   image: maven:3.9-eclipse-temurin-21
   stage: test
   dependencies:
+    - build-backend
     - test-backend
     - integration-test-backend
-  needs: ['test-backend', 'integration-test-backend']
+  needs: ['build-backend', 'test-backend', 'integration-test-backend']
   before_script:
     - cd portal-backend
   script:
@@ -341,8 +348,6 @@ build-backend:
       artifacts: true
     - lint-backend
     - dependency-prune-backend
-    - test-backend
-    - integration-test-backend
     - job: publish-config-adapter
       optional: true
     - job: publish-portal-model
@@ -365,17 +370,20 @@ build-backend:
   artifacts:
     when: on_success
     paths:
-      - portal-backend/target/*.jar
+      - portal-backend/target/
     expire_in: 1 month
 
 build-backend-image:
   extends: .only-backend-changes
   image: docker:27
-  stage: build
+  stage: publish
   needs:
     - job: setup-version
       artifacts: true
     - job: build-backend
+      artifacts: true
+    - job: test-backend
+    - job: integration-test-backend
   services:
     - name: docker:27-dind
       command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']

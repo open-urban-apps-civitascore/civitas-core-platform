@@ -144,7 +144,7 @@ build-frontend:
 build-frontend-image:
   extends: .only-frontend-changes
   image: docker:27-dind
-  stage: build
+  stage: publish
   needs:
     - job: setup-version
       artifacts: true
