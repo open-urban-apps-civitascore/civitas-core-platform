@@ -36,7 +36,6 @@ import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,59 +46,15 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.glassfish.jersey.client.HttpUrlConnectorProvider;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.Network;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Integration test for FrostAdapter using Testcontainers with a real FROST-Server and PostGIS
  * database. Tests standard FROST entity CRUD operations: Things, Locations, and Sensors.
  */
-@Testcontainers
-class FrostAdapterIntegrationTest {
-
-  static Network network = Network.newNetwork();
-
-  @SuppressWarnings("resource")
-  @Container
-  static GenericContainer<?> postgis =
-      new GenericContainer<>(DockerImageName.parse("postgis/postgis:16-3.4-alpine"))
-          .withNetwork(network)
-          .withNetworkAliases("database")
-          .withEnv("POSTGRES_DB", "sensorthings")
-          .withEnv("POSTGRES_USER", "sensorthings")
-          .withEnv("POSTGRES_PASSWORD", "ChangeMe")
-          .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*", 2));
-
-  @SuppressWarnings("resource")
-  @Container
-  static GenericContainer<?> frost =
-      new GenericContainer<>(DockerImageName.parse("hylkevds/frost-http-projects:latest"))
-          .withNetwork(network)
-          .withExposedPorts(8080)
-          .dependsOn(postgis)
-          .withEnv("serviceRootUrl", "http://localhost:8080/FROST-Server/")
-          .withEnv("plugins_modelLoader_enable", "true")
-          .withEnv("plugins_multiDatastream_enable", "false")
-          .withEnv("plugins_actuation_enable", "false")
-          .withEnv("persistence_db_driver", "org.postgresql.Driver")
-          .withEnv("persistence_db_url", "jdbc:postgresql://database:5432/sensorthings")
-          .withEnv("persistence_db_username", "sensorthings")
-          .withEnv("persistence_db_password", "ChangeMe")
-          .withEnv("persistence_autoUpdateDatabase", "true")
-          .withEnv("plugins_modelLoader_securityPath", "")
-          .withEnv("plugins_modelLoader_securityFiles", "")
-          .waitingFor(
-              Wait.forHttp("/FROST-Server/v1.1/Things")
-                  .forStatusCode(200)
-                  .withStartupTimeout(Duration.ofMinutes(2)));
+class FrostAdapterIntegrationTest extends AbstractFrostIntegrationTest {
 
   private FrostAdapter adapter;
   private TestEventPublisher eventPublisher;
@@ -107,15 +62,10 @@ class FrostAdapterIntegrationTest {
   private Client httpClient;
   private ObjectMapper objectMapper;
 
-  @AfterAll
-  static void tearDownContainers() {
-    network.close();
-  }
-
   @BeforeEach
   void setUp() {
     frostBaseUrl =
-        "http://" + frost.getHost() + ":" + frost.getMappedPort(8080) + "/FROST-Server/v1.1";
+        "http://" + FROST.getHost() + ":" + FROST.getMappedPort(8080) + "/FROST-Server/v1.1";
     httpClient = ClientBuilder.newClient();
     objectMapper = new ObjectMapper();
 

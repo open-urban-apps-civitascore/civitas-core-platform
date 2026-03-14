@@ -1136,6 +1136,24 @@ mvn verify
 
 Integration tests use Testcontainers for Kafka and Keycloak.
 
+### Parallel Test Execution
+
+Run tests with two parallel module threads for faster execution (~30% faster):
+
+```bash
+mvn test -T 2
+```
+
+This works because the module tests are independent and Testcontainers uses random ports.
+
+### Building the Fat JAR
+
+Adapter plugins (APISIX, FROST, RedPanda, Examples) are only included in the fat JAR via the `dist` profile:
+
+```bash
+mvn package -Pdist
+```
+
 ## Development
 
 ### Project Structure

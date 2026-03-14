@@ -155,7 +155,7 @@ test-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - mvn $MAVEN_CLI_OPTS jacoco:prepare-agent surefire:test jacoco:report -Drevision=$CONFIG_ADAPTER_VERSION
+    - mvn $MAVEN_CLI_OPTS jacoco:prepare-agent surefire:test jacoco:report -Drevision=$CONFIG_ADAPTER_VERSION -T 2
     # Aggregate coverage from all modules
     - |
       awk -F, \
@@ -196,7 +196,7 @@ build-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - mvn package -DskipTests -Drevision=$CONFIG_ADAPTER_VERSION
+    - mvn package -DskipTests -Drevision=$CONFIG_ADAPTER_VERSION -Pdist
   artifacts:
     when: on_success
     paths:
