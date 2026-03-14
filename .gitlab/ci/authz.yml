@@ -80,7 +80,7 @@ bundle-authz-rego:
     - .opa-common
   stage: build
   needs:
-    - job: test-authz
+    - job: check-authz-rego
       optional: true
     - job: setup-version
       optional: true
@@ -266,6 +266,8 @@ build-opa-image:
       artifacts: true
     - job: bundle-authz-rego
       artifacts: true
+    - job: test-authz
+    - job: test-authz-rego
   services:
     - docker:27-dind
   variables:
@@ -305,6 +307,7 @@ build-authz-image:
       artifacts: true
     - job: build-authz
       artifacts: true
+    - job: test-authz
   services:
     - docker:27-dind
   variables:
