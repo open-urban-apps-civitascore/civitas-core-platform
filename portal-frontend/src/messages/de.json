@@ -484,8 +484,14 @@
   },
   "permissions": {
     "title": "Übersicht: {permissionType}",
-    "systemPermissions": "Systemberechtigungen",
-    "dataPermissions": "Datenberechtigungen",
+    "systemPermissions": {
+      "title": "Systemberechtigungen",
+      "description": "Systemberechtigungen steuern den Zugriff auf systemweite Funktionen der Plattform.\nSie werden zu Systemrollen zusammengefasst und Gruppen zugeordnet."
+    },
+    "dataPermissions": {
+      "title": "Datenberechtigungen",
+      "description": "Datenberechtigungen steuern den Zugriff auf Datenobjekte der Plattform.\nSie werden zu Datenrollen zusammengefasst und Gruppen innerhalb eines bestimmten Geltungsbereichs zugeordnet."
+    },
     "tableHeaders": {
       "name": "Objekt",
       "category": "Kategorie",

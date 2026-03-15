@@ -491,8 +491,14 @@
   },
   "permissions": {
     "title": "Overview: {permissionType}",
-    "systemPermissions": "System Permissions",
-    "dataPermissions": "Data Permissions",
+    "systemPermissions": {
+      "title": "System Permissions",
+      "description": "System permissions control access to system-wide functions on the platform.\nThey are grouped into system roles and assigned to groups."
+    },
+    "dataPermissions": {
+      "title": "Data Permissions",
+      "description": "Data permissions control access to data objects on the platform.\nThey are grouped into data roles and assigned to groups within a specific scope."
+    },
     "tableHeaders": {
       "name": "Object",
       "category": "Category",

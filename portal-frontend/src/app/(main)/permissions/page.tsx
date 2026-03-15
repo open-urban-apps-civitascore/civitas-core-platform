@@ -13,15 +13,24 @@ import { ROLE_TYPES } from '@/types/roles'
 import { DataPermissionsTab } from './components/DataPermissionsTab'
 import { SystemPermissionsTab } from './components/SystemPermissionsTab'
 
-const tabsValues = {
-  systemPermissions: { value: ROLE_TYPES.SYSTEM, label: 'permissions.systemPermissions' },
-  dataPermissions: { value: ROLE_TYPES.DATA, label: 'permissions.dataPermissions' },
-}
-
 export const DEFAULT_TAB = ROLE_TYPES.SYSTEM
 
 const PermissionsPage = () => {
   const t = useTranslations()
+
+  const tabsValues = {
+    systemPermissions: {
+      value: ROLE_TYPES.SYSTEM,
+      label: t('permissions.systemPermissions.title'),
+      description: t('permissions.systemPermissions.description'),
+    },
+    dataPermissions: {
+      value: ROLE_TYPES.DATA,
+      label: t('permissions.dataPermissions.title'),
+      description: t('permissions.dataPermissions.description'),
+    },
+  }
+
   const tabs = [tabsValues.systemPermissions, tabsValues.dataPermissions]
 
   const { setTabValueParam, setTotalPages, getApiRequestParamsByUrl, pageSize, tabValue } = useQueryParams()
@@ -50,18 +59,22 @@ const PermissionsPage = () => {
   }
 
   const getTitle = () => {
-    const label = tabs.find(tab => tab.value === permissionType)?.label
-    const labelTranslation = label ? t(label) : ''
-    return t('permissions.title', { permissionType: labelTranslation })
+    const label = tabs.find(tab => tab.value === permissionType)?.label || ''
+    return t('permissions.title', { permissionType: label })
+  }
+
+  const getDescription = () => {
+    return tabs.find(tab => tab.value === permissionType)?.description || ''
   }
 
   return (
-    <PageContainer headerType="withPrimaryTabs">
+    <PageContainer headerType="withBothTabsRows">
       <PageHeader
         title={getTitle()}
-        segmentedControlBarProps={{
+        subtitle={getDescription()}
+        tabsSectionProps={{
           tabs,
-          onTabChange: type => {
+          onClick: (type: string) => {
             setPermissionsType(type)
             setTabValueParam(type)
           },
