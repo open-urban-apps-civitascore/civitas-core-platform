@@ -69,11 +69,10 @@ public class DataStructureVersionService
     return postLoad(entity);
   }
 
-  public Optional<String> findModelForDataStructureVersion(DataStructureVersion entity) {
-    if (StringUtils.isNotBlank(entity.getModelAtlasUri())) {
+  public Optional<String> findModelByAtlasUri(String modelAtlasUri) {
+    if (StringUtils.isNotBlank(modelAtlasUri)) {
       try {
-        String modelContent =
-            modelService.downloadModel(entity.getModelAtlasUri(), "application/xml");
+        String modelContent = modelService.downloadModel(modelAtlasUri, "application/xml");
         return Optional.ofNullable(modelContent);
       } catch (Exception e) {
         // error has already been logged in ModelRestClientRequestService, so just return empty here

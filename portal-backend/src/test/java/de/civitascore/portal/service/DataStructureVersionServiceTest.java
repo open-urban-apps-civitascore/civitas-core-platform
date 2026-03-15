@@ -268,21 +268,18 @@ class DataStructureVersionServiceTest {
   }
 
   @Nested
-  @DisplayName("findModelForDataStructureVersion")
-  class FindModelForDataStructureVersionTests {
+  @DisplayName("findModelByAtlasUri")
+  class FindModelByAtlasUriTests {
 
     @Test
     @DisplayName("Should return model content when modelAtlasUri is present and download succeeds")
     void shouldReturnModelWhenUriPresentAndDownloadSucceeds() {
-      DataStructureVersion version = new DataStructureVersion();
-      version.setModelAtlasUri("http://example.com/model/1.0.0");
-
       String expectedModel = "<?xml version=\"1.0\"?><model>content</model>";
       when(modelService.downloadModel("http://example.com/model/1.0.0", "application/xml"))
           .thenReturn(expectedModel);
 
       Optional<String> result =
-          dataStructureVersionService.findModelForDataStructureVersion(version);
+          dataStructureVersionService.findModelByAtlasUri("http://example.com/model/1.0.0");
 
       assertThat(result).isPresent().contains(expectedModel);
       verify(modelService).downloadModel("http://example.com/model/1.0.0", "application/xml");
@@ -291,11 +288,7 @@ class DataStructureVersionServiceTest {
     @Test
     @DisplayName("Should return empty when modelAtlasUri is blank")
     void shouldReturnEmptyWhenUriIsBlank() {
-      DataStructureVersion version = new DataStructureVersion();
-      version.setModelAtlasUri("  ");
-
-      Optional<String> result =
-          dataStructureVersionService.findModelForDataStructureVersion(version);
+      Optional<String> result = dataStructureVersionService.findModelByAtlasUri("  ");
 
       assertThat(result).isEmpty();
     }
@@ -303,11 +296,7 @@ class DataStructureVersionServiceTest {
     @Test
     @DisplayName("Should return empty when modelAtlasUri is null")
     void shouldReturnEmptyWhenUriIsNull() {
-      DataStructureVersion version = new DataStructureVersion();
-      version.setModelAtlasUri(null);
-
-      Optional<String> result =
-          dataStructureVersionService.findModelForDataStructureVersion(version);
+      Optional<String> result = dataStructureVersionService.findModelByAtlasUri(null);
 
       assertThat(result).isEmpty();
     }
@@ -315,14 +304,11 @@ class DataStructureVersionServiceTest {
     @Test
     @DisplayName("Should return empty when download fails")
     void shouldReturnEmptyWhenDownloadFails() {
-      DataStructureVersion version = new DataStructureVersion();
-      version.setModelAtlasUri("http://example.com/model/1.0.0");
-
       when(modelService.downloadModel("http://example.com/model/1.0.0", "application/xml"))
           .thenThrow(new RuntimeException("Connection refused"));
 
       Optional<String> result =
-          dataStructureVersionService.findModelForDataStructureVersion(version);
+          dataStructureVersionService.findModelByAtlasUri("http://example.com/model/1.0.0");
 
       assertThat(result).isEmpty();
     }
