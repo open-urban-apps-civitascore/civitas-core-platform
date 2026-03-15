@@ -78,8 +78,7 @@ public class DataStructureVersionController
     ResponseEntity<DataStructureVersionOutputDTO> response = super.create(input);
     DataStructureVersionOutputDTO output = response.getBody();
     if (output != null) {
-      DataStructureVersion created = getService().findByIdOrThrow(output.getId());
-      enrichWithModel(output, created);
+      enrichWithModel(output, getService().findByIdOrThrow(output.getId()));
     }
     return response;
   }
@@ -106,11 +105,8 @@ public class DataStructureVersionController
       @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
     ResponseEntity<DataStructureVersionOutputDTO> response = super.patch(id, updates);
     DataStructureVersionOutputDTO output = response.getBody();
-    if (output != null && !updates.has("model")) {
-      DataStructureVersion entity = getService().findByIdOrThrow(output.getId());
-      dataStructureVersionService
-          .findModelForDataStructureVersion(entity)
-          .ifPresent(output::setModel);
+    if (output != null) {
+      enrichWithModel(output, getService().findByIdOrThrow(output.getId()));
     }
     return response;
   }

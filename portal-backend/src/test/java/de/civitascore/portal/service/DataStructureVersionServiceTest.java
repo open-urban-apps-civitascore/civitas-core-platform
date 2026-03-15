@@ -11,6 +11,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionSource;
@@ -45,6 +47,7 @@ class DataStructureVersionServiceTest {
   @Mock private DataStructureService dataStructureService;
   @Mock private ModelService modelService;
   @Mock private DataSourceRepository dataSourceRepository;
+  @Mock private ObjectMapper objectMapper;
 
   @InjectMocks private DataStructureVersionService dataStructureVersionService;
 
@@ -735,7 +738,7 @@ class DataStructureVersionServiceTest {
 
     @Test
     @DisplayName("Should parse and save externalId from upload response")
-    void shouldParseExternalIdFromUploadResponse() {
+    void shouldParseExternalIdFromUploadResponse() throws Exception {
       UUID versionId = UUID.randomUUID();
       UUID dataStructureId = UUID.randomUUID();
       DataStructure ds = new DataStructure();
@@ -768,6 +771,10 @@ class DataStructureVersionServiceTest {
       when(modelService.uploadModelString(
               "<xml>model</xml>", "https://modelatlas.example.com/model1"))
           .thenReturn(uploadResponse);
+
+      ObjectMapper realMapper = new ObjectMapper();
+      JsonNode rootNode = realMapper.readTree(uploadResponse);
+      when(objectMapper.readTree(uploadResponse)).thenReturn(rootNode);
 
       dataStructureVersionService.update(versionId, input);
 

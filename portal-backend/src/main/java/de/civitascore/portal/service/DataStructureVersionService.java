@@ -40,6 +40,7 @@ public class DataStructureVersionService
   private final ModelService modelService;
 
   private final DataStructureVersionMapper dataStructureVersionMapper;
+  private final ObjectMapper objectMapper;
 
   @Override
   protected DataStructureVersionRepository getRepository() {
@@ -197,9 +198,12 @@ public class DataStructureVersionService
     }
   }
 
+  // externalId is non-critical metadata — modelAtlasUri is the authoritative reference for
+  // fetching models. If parsing fails, the model is already uploaded and accessible via
+  // modelAtlasUri; only the internal Atlas object reference is missing. This will become
+  // relevant once direct Model Atlas PUT calls replace the current upload workaround.
   private void parseAndSetExternalId(DataStructureVersion entity, String uploadResponse) {
     try {
-      ObjectMapper objectMapper = new ObjectMapper();
       JsonNode root = objectMapper.readTree(uploadResponse);
       JsonNode objectIdNode = root.get(MODEL_ATLAS_OBJECT_ID_FIELD);
       if (objectIdNode != null && !objectIdNode.isNull()) {
