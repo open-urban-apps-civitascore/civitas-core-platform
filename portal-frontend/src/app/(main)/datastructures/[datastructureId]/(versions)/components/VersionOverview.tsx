@@ -1,22 +1,26 @@
 'use client'
 
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useWatch } from 'react-hook-form'
 
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
+import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
+import { QUERY_PARAMS } from '@/const/searchParams'
 import { useQueryParams } from '@/hooks/use-query-params'
 import {
+  Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
-  DatastructureStatusTypes,
   DatastructureVersion,
+  DatastructureVersionFormAvailableSchema,
   DatastructureVersionTab,
 } from '@/types/datastructures'
 
@@ -39,52 +43,89 @@ const DEFAULT_TAB = tabs[0]
 
 interface VersionOverviewProps {
   title: string
-  datastructureId: string
+  datastructure: Datastructure
   version: DatastructureVersion | null
   isCreateMode: boolean
   testId: string
-  otherVersions: { id: string; version: string; dataStructureVersionStatus: DatastructureStatusTypes }[]
-  isDatastructureAvailable: boolean
 }
 
 export const VersionOverview = (props: VersionOverviewProps) => {
-  const { title, datastructureId, version, isCreateMode, testId, otherVersions, isDatastructureAvailable } = props
-
+  const { title, version, datastructure, isCreateMode, testId } = props
+  const datastructureId = datastructure.id
   const params = useSearchParams()
   const mode = params.get('mode')
+  const t = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
+  const router = useRouter()
   const { setSubTabValueParam, subTabValue } = useQueryParams()
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
+  const [canSetAvailable, setCanSetAvailable] = useState(true)
+
+  const isInUse = version?.inUse || false
+
+  const otherVersions = !version
+    ? datastructure.dataStructureVersions
+    : datastructure.dataStructureVersions?.flatMap(datastructureVersion =>
+        datastructureVersion.id !== version.id ? datastructureVersion : [],
+      )
+
+  const isDatastructureAvailable = datastructure.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
+  const isLastAvailableVersionInAvailableDatastructure =
+    isDatastructureAvailable &&
+    !otherVersions.some(
+      otherVersion => otherVersion.dataStructureVersionStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE,
+    )
+
+  const redirectAfterVersionCreation = (createResponse: DatastructureVersion) =>
+    router.push(
+      `/datastructures/${datastructureId}/${createResponse.id}?mode=edit&${QUERY_PARAMS.subTabValue}=${subTabValue}`,
+    )
 
   const {
-    canSetAvailable,
-    canSetDraft,
-    completedTabs,
     form,
-    isConfirmButtonDisabled,
-    isInUse,
     isLoading,
     modelSessionManager,
     resetToInitialState,
     saveDatastructureVersion,
-    statusHint,
-    statusWatch,
-    versionAlreadyExistsError,
     handleStatusChange,
     handleSubmitValidationErrors,
+    hasUserChanges,
   } = useDatastructureVersion({
-    datastructureId,
     version,
     isCreateMode,
-    otherVersions,
-    isDatastructureAvailable,
-    subTabValue,
+    datastructureId: datastructure.id,
+    onCreateVersion: redirectAfterVersionCreation,
+    canSetAvailable,
   })
 
+  const formValues = useWatch({ control: form.control })
+  const descriptionWatch = form.watch('description')
+  const versionWatch = form.watch('version')
+  const modelUriWatch = form.watch('modelAtlasUri')
+  const modelNameWatch = form.watch('modelName')
+  const sourceWatch = form.watch('dataStructureVersionSource')
+
+  const statusWatch = form.watch('dataStructureVersionStatus')
+  const nodesWatch = form.watch('nodes')
+
+  const completedTabs = useMemo((): DatastructureVersionTab[] => {
+    const completed: DatastructureVersionTab[] = []
+    if (versionWatch.length > 0 && descriptionWatch.length > 0 && sourceWatch) completed.push('versionInfo')
+    if (nodesWatch.length > 0 && modelUriWatch && modelNameWatch) completed.push('structure')
+    return completed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formValues])
+
+  const canSetDraft = !isInUse && !isLastAvailableVersionInAvailableDatastructure
+
+  useEffect(() => {
+    setCanSetAvailable(DatastructureVersionFormAvailableSchema.safeParse(formValues).success)
+  }, [formValues])
+
   const handleSave = form.handleSubmit(async () => {
-    const isSaved = await saveDatastructureVersion()
+    const isSaved = await saveDatastructureVersion(datastructure.id)
     if (isSaved) {
       setIsExitModalOpen(false)
     }
@@ -100,6 +141,23 @@ export const VersionOverview = (props: VersionOverviewProps) => {
     if (form.formState.isDirty) setIsExitModalOpen(true)
     else handleExit()
   }
+
+  const versionAlreadyExistsError = useMemo(() => {
+    const versionExists = otherVersions.find(otherVersion => otherVersion.version === versionWatch.trim())
+    if (versionExists) {
+      return t('errors.versionAlreadyExists')
+    }
+    return undefined
+  }, [otherVersions, versionWatch, t])
+
+  const statusHint = useMemo(() => {
+    if (isInUse) return t('messages.isInUseStatusHint')
+    if (isLastAvailableVersionInAvailableDatastructure) return t('messages.isLastAvailableVersion')
+    return undefined
+  }, [isInUse, isLastAvailableVersionInAvailableDatastructure, t])
+
+  const isConfirmButtonDisabled =
+    !hasUserChanges || !!form.formState.errors.version || !!versionAlreadyExistsError || isLoading
 
   const ActionButtonsAndStatusSwitch = (
     <div className="flex gap-6">
@@ -157,7 +215,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         }}
         customElement={isReadOnly ? EditButton : ActionButtonsAndStatusSwitch}
       />
-      {isLoading ? <LoadingSpinner className="h-full" /> : renderTabContent()}
+      <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
+        {isLoading ? <LoadingSpinner className="h-full" /> : renderTabContent()}
+      </PageBackground>
 
       <ExitWarningModal
         open={isExitModalOpen}

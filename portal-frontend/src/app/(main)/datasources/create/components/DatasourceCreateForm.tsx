@@ -1,9 +1,11 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
 
 import { useCreateDatasource } from '@/app/services/api/datasources/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
@@ -16,7 +18,7 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
-import { DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
+import { DatasourceCreateData, DatasourceCreateFormSchema, DatasourceFormDraft } from '@/types/datasources'
 
 export const DatasourceCreateForm = () => {
   const t = useTranslations('datasources')
@@ -28,8 +30,14 @@ export const DatasourceCreateForm = () => {
   const createDatasource = useCreateDatasource()
   const isLoading = createDatasource.isPending
 
-  const form = useForm<DatasourceFormDraft>({
-    resolver: zodResolver(DatasourceFormDraftSchema),
+  const handleRequestError = (error: unknown) => {
+    if ((error as AxiosError).response?.status === 409) {
+      form.setError('name', { type: 'manual', message: 'common.errors.nameExists' })
+    } else toast.error(t('errors.creationError'))
+  }
+
+  const form = useForm<DatasourceCreateData>({
+    resolver: zodResolver(DatasourceCreateFormSchema),
     defaultValues: {
       name: '',
     },
@@ -40,8 +48,10 @@ export const DatasourceCreateForm = () => {
       { name: formData.name! },
       {
         onSuccess: ({ data }) => {
+          toast.success(tCommon('messages.createSuccess', { item: tCommon('items.datasource') }))
           router.push(`/datasources/${data.id}`)
         },
+        onError: (error: unknown) => handleRequestError(error),
       },
     )
   }

@@ -1,9 +1,11 @@
 'use client'
 
-import { FileDown, FileUp, Loader2, Save } from 'lucide-react'
+import { FileDown, Loader2, Save } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useCallback, useRef } from 'react'
 
 import { useCreateModel } from '@/app/services/api/models/clientRequests'
+import { BasicDropdownMenu } from '@/components/dropdown-menu/BasicDropdownMenu'
 import { Button } from '@/components/ui/button'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
@@ -18,6 +20,7 @@ interface ToolbarProps {
   sessionName?: string
   canExportXmi: boolean
   canImportXmi: boolean
+  onImportFromDatastructure?: () => void
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -26,11 +29,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   sessionName,
   canExportXmi,
   canImportXmi,
+  onImportFromDatastructure,
 }) => {
   const { diagram, dispatch } = useActiveDiagram()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const createModel = useCreateModel()
   const isSaving = createModel.isPending
+  const t = useTranslations('umlModeler.import')
 
   const handleSave = useCallback(() => {
     if (isSaving) return
@@ -113,11 +118,28 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </Button>
         )}
 
-        {canImportXmi && (
-          <Button variant="ghost" size="sm" onClick={handleImportClick} className="h-8 px-2" title="Import XMI file">
-            <FileUp className="h-4 w-4" />
-            <span className="ml-1 text-xs">Import</span>
-          </Button>
+        {(canImportXmi || onImportFromDatastructure) && (
+          <BasicDropdownMenu
+            title={t('title')}
+            menuItems={[
+              ...(canImportXmi
+                ? [
+                    {
+                      label: t('fromFile'),
+                      onClick: () => handleImportClick(),
+                    },
+                  ]
+                : []),
+              ...(onImportFromDatastructure
+                ? [
+                    {
+                      label: t('fromPlatform'),
+                      onClick: () => onImportFromDatastructure(),
+                    },
+                  ]
+                : []),
+            ]}
+          />
         )}
 
         {canExportXmi && (

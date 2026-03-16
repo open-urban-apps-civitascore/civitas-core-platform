@@ -1,4 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { AxiosError } from 'axios'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
@@ -27,15 +28,29 @@ export const useDatasourceForm = (
   assignedGroups: GroupRoleAssignmentTable[],
   initialAssignments: GroupRoleAssignmentTable[],
 ) => {
-  const tCommon = useTranslations('common')
   const t = useTranslations('datasources')
+  const tCommon = useTranslations('common')
 
-  const defaultValues = useMemo(() => DatasourceApiToFormSchema.parse(datasource), [datasource])
+  const defaultValues = useMemo(() => {
+    const parsedDatasource = DatasourceApiToFormSchema.parse(datasource)
+
+    return {
+      ...parsedDatasource,
+      dataStructureVersionId: parsedDatasource.dataStructureVersionId ?? null,
+    }
+  }, [datasource])
 
   const [dataSourceStatus, setDataSourceStatus] = useState<DatasourceStatusType>(datasource.dataSourceStatus)
 
   const updateDatasource = useUpdateDatasource()
   const isLoading = updateDatasource.isPending
+
+  const handleRequestError = (error: unknown) => {
+    if ((error as AxiosError).response?.status === 409) {
+      form.setError('name', { type: 'manual', message: 'common.errors.nameExists' })
+      toast.error(tCommon('errors.nameExists'))
+    } else toast.error(t('errors.updateError'))
+  }
 
   const form = useForm<DatasourceFormDraft>({
     resolver: zodResolver(DatasourceFormDraftSchema),
@@ -51,6 +66,7 @@ export const useDatasourceForm = (
   const formValues = useWatch({ control: form.control })
   const connectorTypeWatch = formValues.connectorType
   const nameWatch = formValues.name ?? ''
+  const dataStructureVersionIdWatch = form.watch('dataStructureVersionId')
 
   // Reset configuration on connector type change; readyConnectorType gates field rendering
   // to avoid flashes while form.reset() applies the new defaults.
@@ -107,8 +123,9 @@ export const useDatasourceForm = (
     } catch {
       // Zod v4: safeParse throws on stale keys
     }
+    if (dataStructureVersionIdWatch) completed.push('dataStructure')
     return completed
-  }, [nameWatch, formValues])
+  }, [nameWatch, formValues, dataStructureVersionIdWatch])
 
   const handleStatusChange = (newStatus: DatasourceStatusType) => {
     setDataSourceStatus(newStatus)
@@ -152,6 +169,7 @@ export const useDatasourceForm = (
         }
         onSuccess?.()
       },
+      onError: (error: unknown) => handleRequestError(error),
     })
   }
 

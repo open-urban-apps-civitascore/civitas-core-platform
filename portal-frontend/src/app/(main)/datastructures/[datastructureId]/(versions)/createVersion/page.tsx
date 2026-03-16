@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server'
 
 import { getDatastructure } from '@/app/services/api/datastructures/serverRequests'
-import { DATASTRUCTURE_STATUS_TYPES, DatastructureApiResponseSchema } from '@/types/datastructures'
+import { DatastructureApiResponseSchema } from '@/types/datastructures'
 
 import { VersionOverview } from '../components/VersionOverview'
 
@@ -23,15 +23,9 @@ const CreateDatastructureVersionPage = async ({ params }: CreateDatastructureVer
 
   return (
     <VersionOverview
-      otherVersions={parsedDatastructure.data.dataStructureVersions?.map(version => ({
-        id: version.id,
-        version: version.version,
-        dataStructureVersionStatus: version.dataStructureVersionStatus,
-      }))}
-      isDatastructureAvailable={parsedDatastructure.data.dataStructureStatus === DATASTRUCTURE_STATUS_TYPES.AVAILABLE}
       testId="createDatastructureVersionOverview"
       version={null}
-      datastructureId={datastructureId}
+      datastructure={parsedDatastructure.data}
       title={t('newVersion')}
       isCreateMode
     />
