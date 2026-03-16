@@ -876,9 +876,12 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       stubModelDownload("https://modelatlas.example.com/model1-patched");
       String expectedUploadPath = stubModelUpload("https://modelatlas.example.com/model1-patched");
 
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("modelAtlasUri", "https://modelatlas.example.com/model1-patched");
-      patchMap.put("model", modelContent);
+      Map<String, Object> patchMap =
+          Map.of(
+              "modelAtlasUri",
+              "https://modelatlas.example.com/model1-patched",
+              "model",
+              modelContent);
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
@@ -1621,9 +1624,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
       input.setModelName("UpdatedModelName");
 
-      Map<String, Object> newStyles = new HashMap<>();
-      newStyles.put("color", "green");
-      input.setStyles(newStyles);
+      input.setStyles(Collections.singletonMap("color", "green"));
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(

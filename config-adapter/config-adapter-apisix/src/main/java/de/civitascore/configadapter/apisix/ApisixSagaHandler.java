@@ -280,13 +280,13 @@ public class ApisixSagaHandler extends AbstractSagaCommandHandler {
 
       // Rewrite gateway path to upstream FROST path
       // e.g. /datasets/{id}/Things → /FROST-Server/v1.1/Projects(1)/Things
-      Map<String, Object> plugins = new HashMap<>();
-      plugins.put(
-          "proxy-rewrite",
+      body.put(
+          "plugins",
           Map.of(
-              "regex_uri",
-              new String[] {"^/datasets/" + upstreamId + "(/.*)?$", upstreamPath + "$1"}));
-      body.put("plugins", plugins);
+              "proxy-rewrite",
+              Map.of(
+                  "regex_uri",
+                  new String[] {"^/datasets/" + upstreamId + "(/.*)?$", upstreamPath + "$1"})));
     }
 
     // Auth: attach shared plugin config for non-open-data, or omit for open data

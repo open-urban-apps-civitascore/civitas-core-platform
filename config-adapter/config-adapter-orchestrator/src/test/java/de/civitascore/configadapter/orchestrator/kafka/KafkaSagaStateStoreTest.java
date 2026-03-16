@@ -116,7 +116,7 @@ class KafkaSagaStateStoreTest {
           ArgumentCaptor.forClass(ProducerRecord.class);
       // save + remove = 2 calls
       verify(producer, org.mockito.Mockito.times(2)).send(captor.capture());
-      ProducerRecord<String, byte[]> tombstone = captor.getAllValues().get(1);
+      ProducerRecord<String, byte[]> tombstone = captor.getValue();
       assertEquals("saga-1", tombstone.key());
       assertFalse(store.findById("saga-1").isPresent());
     }
