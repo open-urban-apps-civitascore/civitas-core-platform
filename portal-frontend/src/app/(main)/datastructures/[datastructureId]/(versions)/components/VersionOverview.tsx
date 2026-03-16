@@ -138,7 +138,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   }
 
   const handleExitButtonClick = () => {
-    if (form.formState.isDirty) setIsExitModalOpen(true)
+    if (hasUserChanges) setIsExitModalOpen(true)
     else handleExit()
   }
 
