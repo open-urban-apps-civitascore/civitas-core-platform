@@ -21,7 +21,6 @@ export const mapDatastructureApiToFormData = (datastructure: Datastructure): Dat
   description: datastructure.description ?? '',
   dataStructureStatus: datastructure.dataStructureStatus ?? DATASTRUCTURE_STATUS_TYPES.DRAFT,
   dataStructureVersionIds: datastructure.dataStructureVersions.map(version => version.id),
-  assignments: datastructure.assignments || [],
 })
 
 export const mapDatastructuresApiToListData = (datastructures: Datastructure[]): DatastructuresListData[] => {

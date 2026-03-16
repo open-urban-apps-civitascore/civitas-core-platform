@@ -173,7 +173,7 @@ export const GenericAssignmentsList = (props: GenericAssignmentsListProps) => {
       }
       toast.success(t('messages.updateSuccess'))
       if (areAssignmentsInvalid) {
-        toast.error(t('messages.groupsWithoutRoles'))
+        toast.warning(t('messages.groupsWithoutRoles'))
       }
       setIsExitModalOpen(false)
       setIsReadOnlyInternal(true)

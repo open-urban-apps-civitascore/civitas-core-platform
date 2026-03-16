@@ -3,7 +3,7 @@
 import { RowSelectionState } from '@tanstack/react-table'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import {
   defaultDatastructureVersionFormData,
@@ -24,7 +24,6 @@ import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType, DatasourceTa
 import { Datastructure, DatastructureVersion } from '@/types/datastructures'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
-import { hasAssignmentChanges } from '@/utils/assignments'
 import { getSelectedDatastructureVersion } from '@/utils/datasources'
 import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
 
@@ -115,6 +114,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   )
 
   const {
+    areAssignmentsDirty,
     form: datasourceForm,
     readyConnectorType,
     dataSourceStatus,
@@ -152,11 +152,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
-
-  const areAssignmentsDirty = useMemo(
-    () => hasAssignmentChanges(assignedGroups, initialAssignments),
-    [assignedGroups, initialAssignments],
-  )
 
   const resetToInitialState = () => {
     resetToInitialDatastructureState()
