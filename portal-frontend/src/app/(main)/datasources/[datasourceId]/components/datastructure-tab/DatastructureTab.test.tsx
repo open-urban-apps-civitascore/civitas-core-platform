@@ -1,0 +1,78 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+
+import { DatastructureTab } from './DatastructureTab'
+
+vi.mock('next-intl', () => ({
+  useTranslations: () =>
+    Object.assign((key: string) => key, {
+      rich: (key: string) => key,
+    }),
+}))
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/',
+}))
+
+vi.mock('@/hooks/use-query-params', () => ({
+  useQueryParams: () => ({
+    getApiRequestParams: vi.fn().mockReturnValue(new URLSearchParams()),
+  }),
+}))
+
+vi.mock('@/app/services/api/datastructures/clientRequests', () => ({
+  useGetDatastructures: () => ({ data: undefined, isFetching: false }),
+}))
+
+const defaultProps = {
+  datasourceTitle: 'Test Datasource',
+  selectedVersionId: null,
+  isReadOnly: false,
+  isDatasourceInUse: false,
+  modelSessionManager: null as never,
+  onSelectDatastructureVersion: vi.fn(),
+}
+
+const renderComponent = (props = defaultProps) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <DatastructureTab {...props} />
+    </QueryClientProvider>,
+  )
+}
+
+describe('DatastructureTab', () => {
+  it('renders UmlModeler', () => {
+    renderComponent()
+    expect(screen.getByTestId('umlModeler')).toBeInTheDocument()
+  })
+
+  it('shows placeholder when no datastructure version is selected', () => {
+    renderComponent()
+    expect(screen.getByText('noDatastructures')).toBeInTheDocument()
+    expect(screen.getByText('creationSteps.step1')).toBeInTheDocument()
+    expect(screen.getByText('creationSteps.step2')).toBeInTheDocument()
+    expect(screen.getByText('creationSteps.step3')).toBeInTheDocument()
+  })
+
+  it('does not show import modal initially', () => {
+    renderComponent()
+    expect(screen.queryByTestId('dataModelImportModal')).not.toBeInTheDocument()
+  })
+
+  it('opens import modal when clicking import from platform', () => {
+    renderComponent()
+
+    const trigger = screen.getByLabelText('Open menu')
+    fireEvent.pointerDown(trigger, { button: 0, pointerType: 'mouse' })
+    fireEvent.click(screen.getByText('fromPlatform'))
+
+    expect(screen.getByTestId('dataModelImportModal')).toBeInTheDocument()
+  })
+})
