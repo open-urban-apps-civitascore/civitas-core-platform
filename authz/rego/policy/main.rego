@@ -106,9 +106,8 @@ evaluate_request := result if {
 	}
 }
 
-# 5. Unscoped access granted (SYSTEM roles)
-# SYSTEM roles operate on TENANT-scoped resources (users, groups, roles)
-# which don't use scope filtering, so no header is needed.
+# 5. Unscoped access granted (assignments with scopeType=null)
+# Unscoped assignments have no scope to filter on, so no header is needed.
 evaluate_request := result if {
 	permission_eval.is_known_endpoint
 	not permission_eval.is_null_permission_endpoint
@@ -151,7 +150,7 @@ evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
 # Header values:
 #   - "*"              : User has TENANT scope for all required permissions (collection-level wildcard)
 #   - "id1,id2,..."    : Comma-separated UUIDs for specific scope access
-#   - ""               : Unscoped access (SYSTEM roles) — rule 5 omits the header entirely
+#   - ""               : Unscoped access (scopeType=null) — rule 5 omits the header entirely
 #
 # Note: For resource endpoints, backend uses existing scope enforcement (M5.1).
 # This header enables efficient filtering for collection queries.
