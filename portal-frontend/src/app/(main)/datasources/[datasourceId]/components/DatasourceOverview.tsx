@@ -153,26 +153,15 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const [selectedTab, setSelectedTab] = useState<DatasourceTab>('basicInfo')
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
-  
-    const areAssignmentsDirty = useMemo(
-      () => hasAssignmentChanges(assignedGroups, initialAssignments),
-      [assignedGroups, initialAssignments],
-    )
-
-  useEffect(() => {
-    console.log('assignedGroups', assignedGroups)
-  }, [assignedGroups])
-  useEffect(() => {
-    console.log('initialAssignments', initialAssignments)
-  }, [initialAssignments])
-  useEffect(() => {
-    console.log('areAssignmentsDirty', areAssignmentsDirty)
-  }, [areAssignmentsDirty])
-
+  const areAssignmentsDirty = useMemo(
+    () => hasAssignmentChanges(assignedGroups, initialAssignments),
+    [assignedGroups, initialAssignments],
+  )
 
   const resetToInitialState = () => {
     resetToInitialDatastructureState()
     datasourceForm.reset()
+    setAssignedGroups(initialAssignments)
     setSelectedDatastructureId(initialDatastructure?.id || null)
     setSelectedDatastructureVersionId(initialDatastructureVersion?.id || null)
   }
@@ -188,7 +177,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     })
   }
   const handleExit = () => {
-    if (datasourceForm.formState.isDirty) {
+    if (datasourceForm.formState.isDirty || areAssignmentsDirty) {
       setIsExitModalOpen(true)
     } else {
       datasourceForm.reset()
@@ -199,7 +188,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
 
   const handleDiscardAndExit = () => {
     setIsExitModalOpen(false)
-    setAssignedGroups(initialAssignments)
     updateMode(false)
     resetToInitialState()
   }

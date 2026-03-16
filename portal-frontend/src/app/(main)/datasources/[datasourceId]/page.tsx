@@ -60,7 +60,6 @@ const DatasourceDetailsPage = async ({ params }: Props) => {
     datastructureVersion = parsedVersion.data
   }
 
-  console.log('assignmentsResponse', assignmentsResponse)
   const groups = groupsResponse.data ?? []
   const roles = (rolesResponse.data ?? []).filter(role => role.roleType === ROLE_TYPES.DATA)
   const initialAssignments = mapAssignmentApiResponseToTable(assignmentsResponse.data, groups)
