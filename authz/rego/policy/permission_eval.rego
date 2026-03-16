@@ -155,14 +155,22 @@ has_permission if {
 # endpoints per ADM spec. DATASPACE → child resource inheritance is deferred
 # (dataspaces not implemented in v2.0).
 
-# For collection endpoints with unscoped or TENANT-scoped assignments: always allowed
-# (covers both SYSTEM roles with null scopeType and DATA/GOVERNANCE roles with TENANT scope)
+# For collection endpoints with TENANT-scoped assignments (DATA/GOVERNANCE roles)
 user_has_permission(permission) if {
 	resource_mapping.is_collection_endpoint
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
 	permission in assignment.permissions
-	is_unscoped_or_tenant(assignment)
+	is_tenant_scoped(assignment)
+}
+
+# For collection endpoints with unscoped assignments (SYSTEM roles)
+user_has_permission(permission) if {
+	resource_mapping.is_collection_endpoint
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	is_unscoped(assignment)
 }
 
 # For collection endpoints with matching scope type: allowed
@@ -176,14 +184,25 @@ user_has_permission(permission) if {
 }
 
 # For resource endpoints with TENANT-scoped resources (users, groups, roles, etc.):
-# User must have an unscoped or TENANT-scoped assignment with the required permission
+# User must have a TENANT-scoped assignment with the required permission
 user_has_permission(permission) if {
 	resource_mapping.is_resource_endpoint
 	resource_mapping.expected_scope_type == "TENANT"
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
 	permission in assignment.permissions
-	is_unscoped_or_tenant(assignment)
+	is_tenant_scoped(assignment)
+}
+
+# For resource endpoints with TENANT-scoped resources:
+# User must have an unscoped assignment (SYSTEM role) with the required permission
+user_has_permission(permission) if {
+	resource_mapping.is_resource_endpoint
+	resource_mapping.expected_scope_type == "TENANT"
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	is_unscoped(assignment)
 }
 
 # For resource endpoints with DATASPACE/DATASET resources:
@@ -198,7 +217,7 @@ user_has_permission(permission) if {
 	assignment.scopeId == resource_mapping.resource_id
 }
 
-# SCOPE INHERITANCE: Unscoped and TENANT-scoped assignments cascade to all resource
+# SCOPE INHERITANCE: TENANT-scoped assignments cascade to all resource
 # endpoints (ADM spec), regardless of the resource's expected scope type.
 # No upward inheritance — narrow scopes cannot access broader resources.
 user_has_permission(permission) if {
@@ -207,22 +226,35 @@ user_has_permission(permission) if {
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
 	permission in assignment.permissions
-	is_unscoped_or_tenant(assignment)
+	is_tenant_scoped(assignment)
+}
+
+# SCOPE INHERITANCE: Unscoped assignments (SYSTEM roles) cascade to all resource
+# endpoints (ADM spec), regardless of the resource's expected scope type.
+user_has_permission(permission) if {
+	resource_mapping.is_resource_endpoint
+	resource_mapping.expected_scope_type != "TENANT"
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	is_unscoped(assignment)
 }
 
 # =============================================================================
-# SCOPE CLASSIFICATION HELPER
+# SCOPE CLASSIFICATION HELPERS
 # =============================================================================
 # Assignments are either scoped (DATA/GOVERNANCE roles with scopeType like
 # TENANT, DATASET, etc.) or unscoped (SYSTEM roles with scopeType=null).
 # For permission and scope evaluation, unscoped assignments grant the same
 # tenant-wide access as scopeType=TENANT.
 
-is_unscoped_or_tenant(assignment) if {
+# TENANT-scoped: DATA/GOVERNANCE roles with explicit tenant-wide scope
+is_tenant_scoped(assignment) if {
 	assignment.scopeType == "TENANT"
 }
 
-is_unscoped_or_tenant(assignment) if {
+# Unscoped: SYSTEM roles with no scope (scopeType=null)
+is_unscoped(assignment) if {
 	assignment.scopeType == null
 }
 

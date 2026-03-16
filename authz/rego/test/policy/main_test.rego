@@ -723,12 +723,14 @@ test_unscoped_system_role_resource if {
 	result.reason == "permission_granted"
 }
 
-# Test: Unscoped SYSTEM role generates wildcard scope header
-test_unscoped_system_role_scope_header if {
+# Test: Unscoped SYSTEM role does not produce a scope header
+# SYSTEM roles operate on TENANT-scoped resources (users, groups, roles) which
+# don't use scope filtering, so no header is set.
+test_unscoped_system_role_no_scope_header if {
 	result := authz.decision with http.send as mock_send_unscoped_admin
 		with data.config as mock_http.mock_config
 		with input as portal_request("GET", "/v1/users")
-	result.headers["X-Allowed-Scope-Ids"] == "*"
+	not result.headers
 }
 
 # Test: Mixed groups — unscoped SYSTEM + scoped DATA — both work
@@ -739,6 +741,14 @@ test_mixed_unscoped_and_scoped_system_endpoint if {
 		with input as portal_request("GET", "/v1/users")
 	result.allow == true
 	result.reason == "permission_granted"
+}
+
+# Test: Mixed user accessing unscoped endpoint omits scope header
+test_mixed_unscoped_and_scoped_system_endpoint_no_header if {
+	result := authz.decision with http.send as mock_send_unscoped_and_data
+		with data.config as mock_http.mock_config
+		with input as portal_request("GET", "/v1/users")
+	not result.headers
 }
 
 test_mixed_unscoped_and_scoped_data_endpoint if {
