@@ -64,7 +64,7 @@ export const mapGroupRoleAssignmentsToApiPayload = (
 }
 
 export const toAssignmentSet = (groups: GroupRoleAssignmentTable[]): Set<string> =>
-  new Set(groups.flatMap(g => g.assignedRoles.map(r => `${g.groupId}::${r.roleId}`)))
+  new Set(groups?.flatMap(g => g.assignedRoles.map(r => `${g.groupId}::${r.roleId}`)))
 
 export const hasAssignmentChanges = (
   current: GroupRoleAssignmentTable[],

@@ -1,4 +1,5 @@
 import { serverFetch } from '@/lib/serverFetch'
+import { Assignment } from '@/types/assignments'
 import { Datastructure } from '@/types/datastructures'
 
 /**
@@ -31,5 +32,18 @@ export const getDatastructure = async (id: string) => {
   } catch (error) {
     console.error(`An error occurred while fetching datastructure ${id}.`, error)
     throw new Error('An error occurred while fetching datastructure.')
+  }
+}
+
+export const getDatastructureAssignments = async (datastructureId: string) => {
+  try {
+    return await serverFetch<Assignment[]>({
+      endpoint: `/datastructures/${datastructureId}/assignments`,
+      method: 'GET',
+      isApiBackend: true,
+    })
+  } catch (error) {
+    console.error(`An error occurred while fetching assignments for datastructure ${datastructureId}.`, error)
+    throw new Error('An error occurred while fetching datastructure assignments.')
   }
 }

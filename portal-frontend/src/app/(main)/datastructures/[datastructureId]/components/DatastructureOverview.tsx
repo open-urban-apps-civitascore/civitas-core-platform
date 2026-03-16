@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
+import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -14,9 +15,12 @@ import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureTab } from '@/types/datastructures'
+import { Group } from '@/types/groups'
+import { Role } from '@/types/roles'
 import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
 
 import { useDatastructure } from '../hooks/useDatastructure'
+import { AccessManagementTab } from './access-management-tab/AccessManagementTab'
 import { BasicInfoTab } from './basic-info-tab/BasicInfoTab'
 import { VersionsTab } from './versions-tab/VersionsTab'
 
@@ -30,25 +34,29 @@ export const tabs: Tab<DatastructureTab>[] = [
     label: 'datastructures.tabs.versions',
   },
   {
-    value: 'accessPermissions',
-    label: 'datastructures.tabs.accessPermissions',
+    value: 'accessManagement',
+    label: 'datastructures.tabs.accessManagement',
   },
 ]
 
-const disabledTabs: DatastructureTab[] = ['accessPermissions']
-
 interface DatastructureOverviewProps {
   datastructure: Datastructure
+  initialAssignments: GroupRoleAssignmentTable[]
+  groups: Group[]
+  roles: Role[]
 }
 
 export const DatastructureOverview = (props: DatastructureOverviewProps) => {
-  const { datastructure } = props
+  const { datastructure, initialAssignments, groups, roles } = props
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(true)
+  const [assignedGroups, setAssignedGroups] = useState<GroupRoleAssignmentTable[]>(initialAssignments)
+
   const {
+    areAssignmentsDirty,
     canSetAvailable,
     canSetDraft,
     completedTabs,
@@ -62,12 +70,13 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     setSelectedTab,
     statusHint,
     statusWatch,
-  } = useDatastructure({ datastructure })
+  } = useDatastructure({ datastructure, assignedGroups, initialAssignments })
 
   const handleSave = async () => {
     const isSaved = await saveDatastructure()
     if (isSaved) {
       setIsExitModalOpen(false)
+      setAssignedGroups(prev => prev.filter(g => g.assignedRoles.length > 0))
     }
   }
 
@@ -75,10 +84,11 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
     resetToInitialState()
     setIsReadOnly(true)
     setIsExitModalOpen(false)
+    setAssignedGroups(initialAssignments)
   }
 
   const handleExitButtonClick = () => {
-    if (form.formState.isDirty) setIsExitModalOpen(true)
+    if (form.formState.isDirty || areAssignmentsDirty) setIsExitModalOpen(true)
     else handleExit()
   }
 
@@ -127,6 +137,16 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
             onSave={saveDatastructure}
           />
         )
+      case 'accessManagement':
+        return (
+          <AccessManagementTab
+            assignedGroups={assignedGroups}
+            onAssignedGroupsChange={setAssignedGroups}
+            groups={groups}
+            roles={roles}
+            isReadOnly={isReadOnly}
+          />
+        )
       default:
         return null
     }
@@ -141,7 +161,7 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
           selectedTab: selectedTab,
           onTabChange: setSelectedTab,
           completedTabs,
-          disabledTabs,
+          tabsWithNoCompletionStatus: ['accessManagement'],
           hasCompletionStatus: true,
         }}
         customElement={isReadOnly ? EditButton : ActionButtonsAndStatusSwitch}

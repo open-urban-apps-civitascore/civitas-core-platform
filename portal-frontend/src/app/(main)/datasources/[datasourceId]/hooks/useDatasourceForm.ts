@@ -127,6 +127,11 @@ export const useDatasourceForm = (
     return completed
   }, [nameWatch, formValues, dataStructureVersionIdWatch])
 
+  const areAssignmentsDirty = useMemo(
+    () => hasAssignmentChanges(assignedGroups, initialAssignments),
+    [assignedGroups, initialAssignments],
+  )
+
   const handleStatusChange = (newStatus: DatasourceStatusType) => {
     setDataSourceStatus(newStatus)
   }
@@ -153,7 +158,6 @@ export const useDatasourceForm = (
 
     const areAssignmentsInvalid = assignedGroups.some(group => group.assignedRoles.length === 0)
     const assignmentsPayload = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
-    const areAssignmentsDirty = hasAssignmentChanges(assignedGroups, initialAssignments)
 
     const apiPayload = {
       ...dirtyValues,
@@ -165,7 +169,7 @@ export const useDatasourceForm = (
     updateDatasource.mutate(apiPayload, {
       onSuccess: () => {
         if (areAssignmentsInvalid) {
-          toast.error(t('errors.groupsWithoutRoles'))
+          toast.warning(t('errors.groupsWithoutRoles'))
         }
         onSuccess?.()
       },
@@ -174,6 +178,7 @@ export const useDatasourceForm = (
   }
 
   return {
+    areAssignmentsDirty,
     form,
     readyConnectorType,
     dataSourceStatus,
