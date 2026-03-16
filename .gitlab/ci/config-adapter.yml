@@ -200,7 +200,9 @@ build-config-adapter:
   artifacts:
     when: on_success
     paths:
-      - config-adapter/config-adapter-application/target/*.jar
+      - config-adapter/*/target/classes/
+      - config-adapter/*/target/test-classes/
+      - config-adapter/*/target/*.jar
     expire_in: 1 month
 
 # Publish config-adapter artifacts to GitLab Maven repository
