@@ -370,7 +370,7 @@ build-backend:
   artifacts:
     when: on_success
     paths:
-      - portal-backend/target/
+      - portal-backend/target/*.jar
     expire_in: 1 month
 
 build-backend-image:

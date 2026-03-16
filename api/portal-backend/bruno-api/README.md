@@ -63,7 +63,6 @@ bruno-api/
 ├── datasets/                    # DataSet CRUD + lifecycle
 ├── datasources/                 # DataSource CRUD + lifecycle
 ├── datastructures/              # DataStructure + Version CRUD + lifecycle
-│   └── versions/                # DataStructureVersion sub-resources
 ├── groups/                      # Group CRUD
 ├── permissions/                 # Permission read endpoints
 ├── pipelines/                   # Pipeline CRUD

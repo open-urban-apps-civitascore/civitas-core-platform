@@ -150,7 +150,7 @@ class ApisixSagaHandlerTest {
             ArgumentCaptor.forClass(Entity.class);
         verify(mockBuilder, times(2)).put(entityCaptor.capture());
         @SuppressWarnings("unchecked")
-        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
+        Map<String, Object> routeBody = entityCaptor.getValue().getEntity();
         assertEquals("svc-frost-server", routeBody.get("service_id"));
       }
     }
@@ -182,7 +182,7 @@ class ApisixSagaHandlerTest {
             ArgumentCaptor.forClass(Entity.class);
         verify(mockBuilder, times(2)).put(entityCaptor.capture());
         @SuppressWarnings("unchecked")
-        Map<String, Object> routeBody = entityCaptor.getAllValues().get(1).getEntity();
+        Map<String, Object> routeBody = entityCaptor.getValue().getEntity();
         assertFalse(routeBody.containsKey("service_id"));
       }
     }

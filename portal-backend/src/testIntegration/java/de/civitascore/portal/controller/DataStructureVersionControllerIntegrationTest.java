@@ -29,6 +29,7 @@ import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -838,8 +839,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       // Stub model download so the patch() override can load the existing model for the response
       stubModelDownload("https://modelatlas.example.com/model1");
 
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("description", "Patched version description");
+      Map<String, Object> patchMap =
+          Collections.singletonMap("description", "Patched version description");
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
@@ -899,8 +900,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName("Should return 404 when patching non-existent version")
     void shouldReturn404WhenPatchingNonExistent() {
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("description", "Patched description");
+      Map<String, Object> patchMap = Collections.singletonMap("description", "Patched description");
 
       ResponseEntity<String> response =
           restTemplate.exchange(

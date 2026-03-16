@@ -579,7 +579,7 @@ echo
 if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
     echo "Building Config Adapter (version: $DEV_VERSION)..."
     cd "$SCRIPT_DIR/../config-adapter"
-    if ! mvn clean install -DskipTests -Drevision=$DEV_VERSION; then
+    if ! mvn clean install -DskipTests -Drevision=$DEV_VERSION -Pdist; then
         echo "ERROR: Config Adapter build failed"
         exit 1
     fi
