@@ -82,6 +82,7 @@ export const useDatasourceForm = (
 
   const formValues = useWatch({ control: form.control })
   const nameWatch = form.watch('name')
+  const descriptionWatch = form.watch('description')
   const connectorTypeWatch = form.watch('connectorType')
   const dataSourceStatus = form.watch('dataSourceStatus')
   const dataStructureVersionIdWatch = form.watch('dataStructureVersionId')
@@ -91,12 +92,17 @@ export const useDatasourceForm = (
   useEffect(() => {
     const configDefaults = connectorTypeWatch ? getConnectorDefaults(connectorTypeWatch) : {}
     const isInitialConnectorType = defaultValues.connectorType === connectorTypeWatch
-    form.setValue('connectorType', connectorTypeWatch, {
-      shouldDirty: !isInitialConnectorType,
-    })
-    form.setValue('configuration', configDefaults, {
-      shouldDirty: !isInitialConnectorType,
-    })
+    if (isInitialConnectorType) {
+      form.resetField('connectorType')
+      form.resetField('configuration')
+    } else {
+      form.setValue('connectorType', connectorTypeWatch, {
+        shouldDirty: true,
+      })
+      form.setValue('configuration', isInitialConnectorType ? defaultValues.configuration : configDefaults, {
+        shouldDirty: true,
+      })
+    }
     setSelectedConnectorType(connectorTypeWatch)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectorTypeWatch])
@@ -134,7 +140,7 @@ export const useDatasourceForm = (
 
   const completedTabs = useMemo((): DatasourceTab[] => {
     const completed: DatasourceTab[] = []
-    if (nameWatch.length > 0) completed.push('basicInfo')
+    if (nameWatch.length > 0 && descriptionWatch.length > 0) completed.push('basicInfo')
     try {
       const { connectorType, configuration } = formValues
       if (ConnectorStrictSchema.safeParse({ connectorType, configuration }).success) completed.push('connector')
@@ -143,7 +149,7 @@ export const useDatasourceForm = (
     }
     if (dataStructureVersionIdWatch) completed.push('dataStructure')
     return completed
-  }, [nameWatch, formValues, dataStructureVersionIdWatch])
+  }, [nameWatch, descriptionWatch, formValues, dataStructureVersionIdWatch])
 
   const handleStatusChange = (newStatus: DatasourceStatusType) =>
     form.setValue('dataSourceStatus', newStatus, { shouldDirty: true })
