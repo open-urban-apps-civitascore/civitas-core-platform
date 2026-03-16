@@ -55,7 +55,7 @@ allow if {
 # Mutual exclusivity is guaranteed by these conditions:
 #   - Rules 1,2 require is_null_permission_endpoint; rules 3-6 require NOT
 #   - Rules 1 vs 2: is_authenticated vs not is_authenticated
-#   - Rules 4 vs 5: allowed_scope_ids_header != "" vs == ""
+#   - Rules 4 vs 5: not is_unscoped_only vs is_unscoped_only
 #   - Rules 4,5 vs 6: has_permission vs not has_permission
 #   - Rules 3 vs 4,5,6: not has_user_context vs has_user_context
 #   - Rule 7: backend == "unknown" (rules 3,8 require backend != "unknown";
@@ -97,7 +97,7 @@ evaluate_request := result if {
 	not permission_eval.is_null_permission_endpoint
 	has_user_context
 	permission_eval.has_permission
-	allowed_scope_ids_header != ""
+	not is_unscoped_only
 	result := {
 		"allow": true,
 		"reason": "permission_granted",
@@ -113,7 +113,7 @@ evaluate_request := result if {
 	not permission_eval.is_null_permission_endpoint
 	has_user_context
 	permission_eval.has_permission
-	allowed_scope_ids_header == ""
+	is_unscoped_only
 	result := {
 		"allow": true,
 		"reason": "permission_granted",
@@ -150,7 +150,7 @@ evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
 # Header values:
 #   - "*"              : User has TENANT scope for all required permissions (collection-level wildcard)
 #   - "id1,id2,..."    : Comma-separated UUIDs for specific scope access
-#   - ""               : Unscoped access (scopeType=null) — rule 5 omits the header entirely
+#   - (no header)      : Unscoped access (scopeType=null) — rule 5 omits the header entirely
 #
 # Note: For resource endpoints, backend uses existing scope enforcement (M5.1).
 # This header enables efficient filtering for collection queries.
@@ -176,6 +176,14 @@ has_tenant_scoped_permission(perm) if {
 	some assignment in group.assignments
 	perm in assignment.permissions
 	permission_eval.is_tenant_scoped(assignment)
+}
+
+# User has permission but no scoped assignments — no scope header needed.
+# If has_permission is true (required by rule 5) and there's no tenant scope
+# and no specific scope IDs, the permission must come from an unscoped assignment.
+is_unscoped_only if {
+	not has_tenant_scope
+	count(specific_scope_ids) == 0
 }
 
 # Collect specific scope IDs where user has ALL required permissions (AND semantics)
