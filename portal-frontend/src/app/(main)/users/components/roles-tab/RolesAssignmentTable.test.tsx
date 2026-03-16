@@ -2,14 +2,16 @@ import { render, screen, within } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
-import { AssignmentSummary } from '@/app/services/api/assignments/clientRequests'
 import messages from '@/messages/de.json'
+import { type Assignment } from '@/types/assignments'
 
 import { RolesAssignmentTable } from './RolesAssignmentTable'
 
-const mockAssignments: AssignmentSummary[] = [
+const mockAssignments: Assignment[] = [
   {
     id: 'a1',
+    createdAt: '2024-01-01T00:00:00Z',
+    modifiedAt: '2024-01-01T00:00:00Z',
     group: { id: 'g1', name: 'Group 1' },
     role: { id: 'r1', name: 'Admin Role', roleType: 'SYSTEM', description: 'Admin description', readonly: true },
     scopeType: 'TENANT',
@@ -17,6 +19,8 @@ const mockAssignments: AssignmentSummary[] = [
   },
   {
     id: 'a2',
+    createdAt: '2024-01-01T00:00:00Z',
+    modifiedAt: '2024-01-01T00:00:00Z',
     group: { id: 'g2', name: 'Group 2' },
     role: { id: 'r2', name: 'Data Editor', roleType: 'DATA', description: '', readonly: false },
     scopeType: 'DATASET',

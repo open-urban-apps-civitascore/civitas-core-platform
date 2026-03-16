@@ -49,8 +49,7 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
   const { getApiRequestParams } = useQueryParams()
 
   useEffect(() => {
-    if (!open) return
-    setSelection(selectedVersion ? { [selectedVersion]: true } : {})
+    setSelection(open && selectedVersion ? { [selectedVersion]: true } : {})
   }, [open, selectedVersion])
 
   const { data: datastructuresData, isFetching: isFetchingDatasources } = useGetDatastructures({
@@ -70,12 +69,6 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
 
   const rowCount = filteredDatastructures?.length || 0
   const totalPages = Math.ceil(rowCount / pageSize)
-
-  useEffect(() => {
-    if (!open) {
-      setSelection({})
-    }
-  }, [open])
 
   useEffect(() => {
     if (isPageIndexHigherThanTotalPages(pageIndex, totalPages)) {
@@ -225,7 +218,10 @@ export const DataModelImportModal = (props: DataModelImportModalProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="block sm:max-w-[95%] sm:w-[95%] md:max-w-[1061px] h-[80%] max-h-[743px]  [--title-height:64px] [--button-height:60px]">
+      <DialogContent
+        data-testid="dataModelImportModal"
+        className="block sm:max-w-[95%] sm:w-[95%] md:max-w-[1061px] h-[80%] max-h-[743px]  [--title-height:64px] [--button-height:60px]"
+      >
         <DialogHeader>
           <DialogTitle>{t('title')}</DialogTitle>
           <DialogDescription>{t('to', { name: datasourceTitle })}</DialogDescription>

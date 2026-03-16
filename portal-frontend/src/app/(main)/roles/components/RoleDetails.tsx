@@ -233,7 +233,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         }),
       ),
     )
-    await Promise.all(assignmentsToRemove.map(a => deleteAssignment(a.id)))
+    await Promise.all(assignmentsToRemove.map(a => deleteAssignment.mutateAsync(a.id)))
     await refetchAssignments()
   }
 

@@ -2,12 +2,12 @@ import z from 'zod'
 
 import { CONNECTOR_TYPES } from '@/const/connectors'
 
-import { AssignmentScopedInputSchema } from './assignments'
+import { AssignmentScopedInput } from './assignments'
 import { STATUS_TYPES, WithId } from './common'
 import { ConnectorApiToFormSchema, ConnectorLooseSchema, ConnectorStrictSchema } from './connectors'
 import { DatastructureVersionSummaryApiResponseSchema } from './datastructures'
 
-export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'accessPermissions'
+export type DatasourceTab = 'basicInfo' | 'connector' | 'dataStructure' | 'accessManagement'
 
 export const DATASOURCE_STATUS_TYPES = {
   DRAFT: 'DRAFT',
@@ -60,7 +60,6 @@ export const DatasourceBaseFormSchema = z.object({
   connectorType: ConnectorTypeSchema.optional(),
   configuration: z.record(z.string(), z.unknown()).optional(),
   dataStructureVersionId: z.string().trim().min(1, 'datasources.errors.required').nullable(),
-  assignments: AssignmentScopedInputSchema.array(),
 })
 
 export type DatasourceBaseFormData = z.infer<typeof DatasourceBaseFormSchema>
@@ -100,7 +99,6 @@ export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
       dataSourceStatus,
       dataStructureVersionId: dataStructureVersion?.id,
       ...(connectorParsed?.success ? connectorParsed.data : {}),
-      assignments: [],
     } as DatasourceFormDraft
   },
 )
@@ -110,5 +108,5 @@ export const DatasourceCreateFormSchema = z.object({
 })
 
 export type DatasourceCreateData = z.infer<typeof DatasourceCreateFormSchema>
-export type DatasourcePatchData = Partial<DatasourceFormDraft> & WithId
-export type DatasourcePutData = Partial<DatasourceFormDraft> & WithId & { name: string }
+export type DatasourcePatchData = Partial<DatasourceFormDraft> & WithId & { assignments?: AssignmentScopedInput[] }
+export type DatasourcePutData = Partial<DatasourceFormDraft> & WithId & { name: string } & { assignments?: AssignmentScopedInput[] }

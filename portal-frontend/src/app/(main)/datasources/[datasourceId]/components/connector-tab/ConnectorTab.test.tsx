@@ -84,7 +84,6 @@ const defaultValues: DatasourceFormDraft = {
   description: '',
   dataSourceStatus: 'DRAFT',
   dataStructureVersionId: null,
-  assignments: [],
   connectorType: 'MQTT',
   configuration: {
     urls: '',

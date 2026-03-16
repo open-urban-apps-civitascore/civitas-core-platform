@@ -11,6 +11,7 @@ import {
   useUpdateDatasource,
   useUpdateDatasourcePublished,
 } from '@/app/services/api/datasources/clientRequests'
+import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { ConnectorFormToApiSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
   Datasource,
@@ -23,10 +24,15 @@ import {
   DatasourceStatusType,
   DatasourceTab,
 } from '@/types/datasources'
+import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { getConnectorDefaults } from '@/utils/connectors'
 import { pickDirtyValues } from '@/utils/form'
 
-export const useDatasourceForm = (datasource: Datasource) => {
+export const useDatasourceForm = (
+  datasource: Datasource,
+  assignedGroups: GroupRoleAssignmentTable[],
+  initialAssignments: GroupRoleAssignmentTable[],
+) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
 
@@ -154,6 +160,8 @@ export const useDatasourceForm = (datasource: Datasource) => {
   }
 
   const handleUpdateValues = async (values: DatasourcePatchData) => {
+    const hasInvalidAssignments = assignedGroups.some(group => group.assignedRoles.length === 0)
+
     try {
       const response =
         datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
@@ -161,6 +169,9 @@ export const useDatasourceForm = (datasource: Datasource) => {
           : await updateDatasource.mutateAsync(values)
 
       toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.datasource') }))
+      if (hasInvalidAssignments) {
+        toast.error(t('errors.groupsWithoutRoles'))
+      }
       return response.data
     } catch (error) {
       handleRequestError(error)
@@ -189,13 +200,17 @@ export const useDatasourceForm = (datasource: Datasource) => {
         ? connectorParsed.data.configuration
         : (dirtyValues as Record<string, unknown>).configuration
 
+      const assignmentsPayload = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
+      const areAssignmentsDirty = hasAssignmentChanges(assignedGroups, initialAssignments)
+
       const apiPayload = {
         ...dirtyValues,
         ...(dirtyFields.configuration ? { configuration } : {}),
+        ...(areAssignmentsDirty ? { assignments: assignmentsPayload } : {}),
         id: datasource.id,
       } as DatasourcePatchData
 
-      const shouldUpdateValues = Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus')
+      const shouldUpdateValues = Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus') || areAssignmentsDirty
       const shouldPublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
       const shouldUnpublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
 

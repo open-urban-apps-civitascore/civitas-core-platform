@@ -60,6 +60,7 @@
       "user": "User",
       "groups": "Groups",
       "group": "Group",
+      "role": "Role",
       "roles": "Roles",
       "datasets": "Datasets",
       "dataspaces": "Dataspaces",
@@ -156,7 +157,8 @@
       "secondBox": "By removing your own group-role assignment, you may lose your permissions."
     },
     "messages": {
-      "updateSuccess": "Permissions have been successfully updated."
+      "updateSuccess": "Permissions have been successfully updated.",
+      "groupsWithoutRoles": "Groups without assigned roles have not been saved."
     }
   },
   "sidebar": {
@@ -367,7 +369,7 @@
       "description": "Description"
     },
     "detailsTabs": {
-      "info": "Information",
+      "info": "Base Information",
       "roles": "Roles",
       "users": "Users",
       "subgroups": "Subgroups"
@@ -379,11 +381,45 @@
       "contact": { "label": "Contact Person", "placeholder": "Search by name or email" }
     },
     "roles": {
-      "groupInfo": "Group Information",
-      "userNotFound": "User not found",
-      "addRoleDialog": {
-        "title": "Add Role - {category}",
-        "description": "Select a role to add to the user from the available {category} roles."
+      "scopeTabs": {
+        "platform": "Platform-wide",
+        "datasets": "Datasets",
+        "datasources": "Datasources",
+        "datastructures": "Datastructures"
+      },
+      "scopePlatform": "Platform",
+      "addRole": "Add role",
+      "systemRole": "System role",
+      "dataRole": "Data role",
+      "noRoles": "No Roles",
+      "noRolesDescription": "No roles assigned to the group",
+      "removeRole": "Really remove role?",
+      "removeRoleDescription": "This action cannot be undone. Removing this role will affect the group's access permissions.",
+      "assignSystemRole": "Add system role",
+      "assignSystemRoleDescription": "to group {groupName}",
+      "assignDataRole": "Add data role",
+      "assignDataRoleDescription": "to group {groupName}",
+      "dataRolePlatformWarning": "Roles assigned here authorize the group platform-wide (permissions on all data objects of the platform).",
+      "scopedInfoBanner": {
+        "DATASET": "Dataset-related assignments are made at the respective dataset.",
+        "DATASOURCE": "Datasource-related assignments are made at the respective datasource.",
+        "DATASTRUCTURE": "Datastructure-related assignments are made at the respective datastructure."
+      },
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "object": "Object",
+        "type": "Type",
+        "scope": "Scope"
+      },
+      "objectLabels": {
+        "SYSTEM": "System role",
+        "DATA": "Data role",
+        "GOVERNANCE": "Governance role"
+      },
+      "originLabels": {
+        "default": "Standard",
+        "custom": "Custom"
       }
     },
     "users": {
@@ -405,7 +441,8 @@
       "createError": "An error occurred while creating the group",
       "updateError": "An error occurred while updating the group",
       "deleteError": "An error occurred while deleting the group",
-      "groupNameExists": "The group name is already in use. Please, chose another name."
+      "groupNameExists": "The group name is already in use. Please, chose another name.",
+      "assignmentSaveError": "Group was created, but role assignments could not be saved"
     },
     "warningModal": {
       "title": "Delete the group?",
@@ -615,7 +652,8 @@
       "invalidDsn": "Enter a valid URI (e.g. postgres://host:5432/db)",
       "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)",
       "creationError": "An error occurred while creating the data source.",
-      "updateError": "An error occurred while updating the data source."
+      "updateError": "An error occurred while updating the data source.",
+      "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
     },
     "connection": {
       "active": "active",
@@ -640,7 +678,7 @@
       "basicInfo": "Base Information",
       "connector": "Connector",
       "dataStructure": "Data Structure",
-      "accessPermissions": "Access Permissions",
+      "accessManagement": "Access Management",
       "dataspaces": "Data Spaces"
     },
     "form": {
@@ -675,6 +713,11 @@
       "importModal": {
         "title": "Import Data Model",
         "to": "into {name}"
+      }
+    },
+    "accessManagementTab": {
+      "infoBoxes": {
+        "firstBox": "Groups that have platform-wide permissions on all data objects have access to this data source."
       }
     }
   },

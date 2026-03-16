@@ -89,6 +89,7 @@ public class DataSetController
 
   @PutMapping("/{id}/published/meta")
   @Operation(
+      operationId = "updateDataSetPublishedMeta",
       summary = "Update metadata of a published dataset",
       description =
           "Updates only the metadata (name, description) of a published dataset (READY or AVAILABLE status). Cannot modify persistenceId or pipelines. For DRAFT datasets, use PUT /datasets/{id} instead.")
@@ -107,6 +108,7 @@ public class DataSetController
 
   @PostMapping("/{id}/publish")
   @Operation(
+      operationId = "publishDataSet",
       summary = "Publish a dataset",
       description =
           "Publishes a dataset by generating distributions from pipeline APIs and setting status to READY. Requires at least one pipeline to be present in the dataset.")
@@ -118,6 +120,7 @@ public class DataSetController
 
   @PostMapping("/{id}/unpublish")
   @Operation(
+      operationId = "unpublishDataSet",
       summary = "Unpublish a dataset",
       description =
           "Unpublishes a dataset by removing auto-generated distributions and reverting status from READY to DRAFT.")
@@ -129,6 +132,7 @@ public class DataSetController
 
   @PostMapping("/{id}/release")
   @Operation(
+      operationId = "releaseDataSet",
       summary = "Release a dataset",
       description =
           "Releases a dataset by transitioning it from READY to AVAILABLE and triggering infrastructure provisioning via saga.")
@@ -140,6 +144,7 @@ public class DataSetController
 
   @PostMapping("/{id}/unrelease")
   @Operation(
+      operationId = "unreleaseDataSet",
       summary = "Unrelease a dataset",
       description =
           "Unreleases a dataset by triggering infrastructure teardown via saga. The dataset transitions from AVAILABLE to READY after the saga completes.")

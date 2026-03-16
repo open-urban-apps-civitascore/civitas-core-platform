@@ -1,0 +1,27 @@
+meta {
+  name: 3. Create DataStructure
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/datastructures
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Sensor Data Structure",
+    "description": "Data structure for sensor readings",
+    "createdFromDataSource": false,
+    "dataStructureVersionIds": [],
+    "assignments": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaDataStructureId', res.body.id);
+  }
+}

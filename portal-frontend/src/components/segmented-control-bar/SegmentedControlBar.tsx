@@ -13,6 +13,7 @@ export interface SegmentedControlBarProps<TabValue extends string> {
   onTabChange: (tab: TabValue) => void
   completedTabs?: TabValue[]
   disabledTabs?: TabValue[]
+  tabsWithNoCompletionStatus?: TabValue[]
   hasCompletionStatus?: boolean
   className?: string
   testId?: string
@@ -25,6 +26,7 @@ export const SegmentedControlBar = <TabValue extends string>(props: SegmentedCon
     onTabChange,
     completedTabs = [],
     disabledTabs = [],
+    tabsWithNoCompletionStatus = [],
     hasCompletionStatus = false,
     className,
     testId,
@@ -55,6 +57,7 @@ export const SegmentedControlBar = <TabValue extends string>(props: SegmentedCon
         const isSelected = selectedTab === tab.value
         const isCompleted = completedTabs.includes(tab.value)
         const isDisabled = disabledTabs.includes(tab.value)
+        const hasNoCompletionStatus = tabsWithNoCompletionStatus.includes(tab.value)
 
         return (
           <button
@@ -70,7 +73,7 @@ export const SegmentedControlBar = <TabValue extends string>(props: SegmentedCon
               isDisabled && 'opacity-50 cursor-not-allowed',
             )}
           >
-            {getCompletionStatusIcon(isCompleted)}
+            {!hasNoCompletionStatus && getCompletionStatusIcon(isCompleted)}
             <span>{getTabLabel(tab.label)}</span>
           </button>
         )

@@ -11,6 +11,10 @@ server:
   # M5.5: Increase max header size for X-Allowed-Scope-Ids from OPA
   # When users have many dataspaces, the scope ID list can be large
   max-http-request-header-size: 32KB
+  error:
+    include-stacktrace: never
+    include-message: never
+    include-exception: false
 
 spring:
   application:
@@ -27,6 +31,10 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
+
+  mvc:
+    problemdetails:
+      enabled: true
 
   data:
     web:
@@ -100,13 +108,14 @@ management:
         enabled: true
 
 springdoc:
+  default-produces-media-type: application/json
+  override-with-generic-response: false
   api-docs:
     path: /api-docs
     version: openapi-3-1
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
-
 
 # Security: paths permitted without authentication
 security:

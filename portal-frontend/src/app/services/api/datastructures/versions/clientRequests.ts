@@ -55,7 +55,7 @@ export const useGetDatastructureVersion = ({
     key: `datastructures/${datastructureId}/versions`,
     isEnabled,
     headers: { 'x-api-request': 'true' },
-    errorMessage: 'An error occurred while fetching groups.',
+    errorMessage: 'An error occurred while fetching datastructure versions.',
   })
 
 export const useCreateDatastructureVersion = () =>

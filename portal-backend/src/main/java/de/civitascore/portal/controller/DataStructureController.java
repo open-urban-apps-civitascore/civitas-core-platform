@@ -83,6 +83,7 @@ public class DataStructureController
 
   @PutMapping("/{dataStructureId}/published/meta")
   @Operation(
+      operationId = "updateDataStructurePublishedMeta",
       summary = "Update metadata of a published data structure",
       description =
           "Updates only the metadata (name, description) of a published data structure (AVAILABLE status). Cannot modify status or createdFromDataSource. For DRAFT data structures, use PUT /datastructures/{dataStructureId} instead.")
@@ -95,6 +96,7 @@ public class DataStructureController
 
   @PostMapping("/{dataStructureId}/publish")
   @Operation(
+      operationId = "publishDataStructure",
       summary = "Publish a data structure",
       description =
           "Publishes a data structure by setting status to AVAILABLE. Requires at least one published DataStructureVersion.")
@@ -107,6 +109,7 @@ public class DataStructureController
 
   @PostMapping("/{dataStructureId}/unpublish")
   @Operation(
+      operationId = "unpublishDataStructure",
       summary = "Unpublish a data structure",
       description = "Unpublishes a data structure by setting status back to DRAFT. Always allowed.")
   public ResponseEntity<DataStructureOutputDTO> unpublishDataStructure(

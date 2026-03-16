@@ -13,9 +13,17 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DataSourceOutputDTO extends BaseOutputDTO {
+
+  @Schema(example = "Traffic Sensor MQTT")
   private String name;
+
+  @Schema(example = "Real-time traffic sensor data via MQTT broker")
   private String description;
+
+  @Schema(example = "ACTIVE")
   private DataSourceStatus dataSourceStatus;
+
+  @Schema(description = "Type of connector (e.g. MQTT, SQL)", example = "MQTT")
   private ConnectorType connectorType;
 
   @Schema(
@@ -24,5 +32,9 @@ public class DataSourceOutputDTO extends BaseOutputDTO {
   private Map<String, Object> configuration;
 
   private DataStructureVersionSummaryDTO dataStructureVersion;
+
+  @Schema(
+      description = "Whether this data source is currently referenced by a pipeline",
+      accessMode = Schema.AccessMode.READ_ONLY)
   private boolean inUse;
 }

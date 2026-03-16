@@ -85,6 +85,18 @@ vi.mock('./connector-tab/ConnectorTab', () => ({
   ),
 }))
 
+vi.mock('./access-management/AccessManagementTab', () => ({
+  AccessManagementTab: ({ isReadOnly }: { isReadOnly: boolean }) => (
+    <div data-testid="accessManagementTab" data-readonly={isReadOnly} />
+  ),
+}))
+
+vi.mock('./datastructure-tab/DatastructureTab', () => ({
+  DatastructureTab: ({ isReadOnly }: { isReadOnly: boolean }) => (
+    <div data-testid="datastructureTab" data-readonly={isReadOnly} />
+  ),
+}))
+
 vi.mock('@/components/ui/form', () => ({
   Form: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
@@ -94,7 +106,33 @@ vi.mock('@/components/page-container/PageContainer', () => ({
 }))
 
 vi.mock('@/components/page-header/PageHeader', () => ({
-  PageHeader: ({ customElement }: { customElement: React.ReactNode }) => <div>{customElement}</div>,
+  PageHeader: ({
+    customElement,
+    segmentedControlBarProps,
+  }: {
+    customElement: React.ReactNode
+    segmentedControlBarProps?: {
+      tabs: { value: string; label: string }[]
+      onTabChange: (tab: string) => void
+    }
+  }) => (
+    <div>
+      {customElement}
+      {segmentedControlBarProps && (
+        <div data-testid="segmentedControlBar">
+          {segmentedControlBarProps.tabs.map(tab => (
+            <button
+              key={tab.value}
+              data-testid={`tab-${tab.value}`}
+              onClick={() => segmentedControlBarProps.onTabChange(tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  ),
 }))
 
 vi.mock('@/components/page-background/PageBackground', () => ({
@@ -142,10 +180,16 @@ const datasource = {
   inUse: false,
 }
 
-describe('DatasourceOverview', () => {
-  const renderComponent = () =>
-    render(<DatasourceOverview datasource={datasource} datastructure={null} datastructureVersion={null} />)
+const defaultProps = {
+  datasource,
+  datastructure: null,
+  datastructureVersion: null,
+  initialAssignments: [],
+  groups: [],
+  roles: [],
+}
 
+describe('DatasourceOverview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockSearchParams = new URLSearchParams()
@@ -154,13 +198,13 @@ describe('DatasourceOverview', () => {
 
   describe('View/Edit mode initialization', () => {
     it('starts in read-only mode when no mode param', () => {
-      renderComponent()
+      render(<DatasourceOverview {...defaultProps} />)
       expect(screen.getByTestId('editButton')).toBeInTheDocument()
     })
 
     it('starts in edit mode when mode=edit param is present', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
-      renderComponent()
+      render(<DatasourceOverview {...defaultProps} />)
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
       expect(screen.getByTestId('cancelButton')).toBeInTheDocument()
     })
@@ -168,7 +212,7 @@ describe('DatasourceOverview', () => {
 
   describe('Mode transitions', () => {
     it('switches to edit mode and updates URL when edit button is clicked', () => {
-      renderComponent()
+      render(<DatasourceOverview {...defaultProps} />)
       fireEvent.click(screen.getByTestId('editButton'))
 
       expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
@@ -178,7 +222,7 @@ describe('DatasourceOverview', () => {
 
     it('preserves existing search params when entering edit mode', () => {
       mockSearchParams = new URLSearchParams('page=2&search=foo')
-      renderComponent()
+      render(<DatasourceOverview {...defaultProps} />)
       fireEvent.click(screen.getByTestId('editButton'))
 
       expect(mockReplace).toHaveBeenCalledWith(
@@ -189,7 +233,7 @@ describe('DatasourceOverview', () => {
 
     it('exits to view mode and removes mode param when form is clean', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
-      renderComponent()
+      render(<DatasourceOverview {...defaultProps} />)
 
       fireEvent.click(screen.getByTestId('cancelButton'))
 
@@ -200,7 +244,7 @@ describe('DatasourceOverview', () => {
     it('shows exit warning modal when form is dirty', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       mockForm.formState.isDirty = true
-      renderComponent()
+      render(<DatasourceOverview {...defaultProps} />)
 
       fireEvent.click(screen.getByTestId('cancelButton'))
 
@@ -210,7 +254,7 @@ describe('DatasourceOverview', () => {
     it('discards changes and returns to view mode via modal', async () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       mockForm.formState.isDirty = true
-      renderComponent()
+      render(<DatasourceOverview {...defaultProps} />)
 
       fireEvent.click(screen.getByTestId('cancelButton'))
       fireEvent.click(screen.getByTestId('discardButton'))
@@ -225,7 +269,7 @@ describe('DatasourceOverview', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       mockForm.formState.isDirty = true
       mockSubmitDatasource.mockImplementation((cb: () => void) => cb())
-      renderComponent()
+      render(<DatasourceOverview {...defaultProps} />)
 
       fireEvent.click(screen.getByTestId('cancelButton'))
       fireEvent.click(screen.getByTestId('confirmSaveButton'))
@@ -237,15 +281,55 @@ describe('DatasourceOverview', () => {
     })
   })
 
+  describe('Tab switching', () => {
+    it('shows basicInfo tab by default', () => {
+      render(<DatasourceOverview {...defaultProps} />)
+      expect(screen.getByTestId('basicInfoTab')).toBeInTheDocument()
+      expect(screen.queryByTestId('datastructureTab')).not.toBeInTheDocument()
+    })
+
+    it('switches to dataStructure tab when clicked', () => {
+      render(<DatasourceOverview {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('tab-dataStructure'))
+
+      expect(screen.getByTestId('datastructureTab')).toBeInTheDocument()
+      expect(screen.queryByTestId('basicInfoTab')).not.toBeInTheDocument()
+    })
+
+    it('switches to connector tab when clicked', () => {
+      render(<DatasourceOverview {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('tab-connector'))
+
+      expect(screen.getByTestId('connectorTab')).toBeInTheDocument()
+      expect(screen.queryByTestId('basicInfoTab')).not.toBeInTheDocument()
+    })
+
+    it('switches to accessManagement tab when clicked', () => {
+      render(<DatasourceOverview {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('tab-accessManagement'))
+
+      expect(screen.getByTestId('accessManagementTab')).toBeInTheDocument()
+      expect(screen.queryByTestId('basicInfoTab')).not.toBeInTheDocument()
+    })
+
+    it('passes isReadOnly to dataStructure tab', () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      render(<DatasourceOverview {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('tab-dataStructure'))
+
+      expect(screen.getByTestId('datastructureTab')).toHaveAttribute('data-readonly', 'false')
+    })
+  })
+
   describe('Read-only mode behavior', () => {
     it('passes isReadOnly to tab content', () => {
-      renderComponent()
+      render(<DatasourceOverview {...defaultProps} />)
       expect(screen.getByTestId('basicInfoTab')).toHaveAttribute('data-readonly', 'true')
     })
 
     it('passes isReadOnly=false to tab content in edit mode', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
-      renderComponent()
+      render(<DatasourceOverview {...defaultProps} />)
       expect(screen.getByTestId('basicInfoTab')).toHaveAttribute('data-readonly', 'false')
     })
   })

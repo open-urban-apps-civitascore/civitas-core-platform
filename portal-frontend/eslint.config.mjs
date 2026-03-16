@@ -256,7 +256,7 @@ const eslintConfig = [
       'import/no-extraneous-dependencies': [
         'error',
         {
-          devDependencies: ['**/*.test.ts', '**/*.test.tsx', '**/*.config.js', '**/*.config.ts', '**/*.stories.*'],
+          devDependencies: ['**/*.test.ts', '**/*.test.tsx', '**/*.config.js', '**/*.config.ts', '**/*.stories.*', 'e2e/**', 'playwright/**'],
         },
       ],
     },

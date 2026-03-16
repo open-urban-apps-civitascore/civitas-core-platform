@@ -8,6 +8,7 @@ The Keycloak adapter integrates with Keycloak's Admin REST API to manage identit
 
 **Key Features:**
 - ✅ Full CRUD operations for Users, Realms, Clients, Roles, and Groups
+- ✅ Automatic email verification and password setup for new users
 - ✅ Role synchronization (realm roles and client roles)
 - ✅ Composite roles support
 - ✅ Group hierarchy (subgroups) support
@@ -419,6 +420,32 @@ Groups can be created as children of existing groups using `parentId`:
 ```
 
 If `parentId` is null or empty, the group is created at the top level.
+
+### Email Verification for New Users
+
+When a user is created with `requiredActions`, the adapter sends an actions email via Keycloak after user creation. The user receives an email with a link to complete the required actions (e.g., verify email address and set a password).
+
+**User creation event with required actions:**
+```json
+{
+  "username": "john.doe",
+  "email": "john.doe@example.com",
+  "enabled": true,
+  "requiredActions": ["VERIFY_EMAIL", "UPDATE_PASSWORD"]
+}
+```
+
+**Flow:**
+1. User is created in Keycloak with required actions stored
+2. Roles are synchronized (realm + client roles)
+3. `executeActionsEmail()` is called — Keycloak sends an email with an action link
+4. User clicks the link → verifies email → sets password
+
+**Prerequisites:**
+- SMTP must be configured in the Keycloak realm (`smtpServer` in realm settings)
+- If SMTP is not configured, user creation still succeeds but the email is not sent (warning logged)
+
+**Local development:** Mailpit is available in the dev-environment (`docker-compose -f dev-environment/keycloak/docker-compose.yml up -d`). Emails can be inspected at `http://localhost:8025`.
 
 ### PII Masking
 

@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URI;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,13 +21,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.jwt.JwtException;
 
 @ExtendWith(MockitoExtension.class)
 class SecurityExceptionHandlerTest {
+
+  private static final String TEST_URI = "/v1/datasets";
 
   @InjectMocks private SecurityExceptionHandler SUT;
 
@@ -38,6 +42,7 @@ class SecurityExceptionHandlerTest {
   void setUp() {
     request = mock(HttpServletRequest.class);
     response = mock(HttpServletResponse.class);
+    when(request.getRequestURI()).thenReturn(TEST_URI);
   }
 
   @Test
@@ -54,16 +59,19 @@ class SecurityExceptionHandlerTest {
     SUT.commence(request, response, authException);
 
     // then
-    verify(response).setContentType("application/json");
-    verify(response).setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    verify(response).setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+    verify(response).setStatus(HttpStatus.UNAUTHORIZED.value());
 
     printWriter.flush();
     Map<String, Object> responseMap =
         objectMapper.readValue(stringWriter.toString(), new TypeReference<>() {});
 
-    assertThat(responseMap).containsEntry("error", "UNAUTHORIZED");
-    assertThat(responseMap).containsEntry("message", "Authentication required");
-    assertThat(responseMap).containsKey("timestamp");
+    assertThat(responseMap)
+        .containsEntry("type", "urn:civitas:error:UNAUTHORIZED")
+        .containsEntry("detail", "Authentication required")
+        .containsEntry("title", "Unauthorized")
+        .containsEntry("status", HttpStatus.UNAUTHORIZED.value())
+        .containsEntry("instance", TEST_URI);
   }
 
   @Test
@@ -79,16 +87,19 @@ class SecurityExceptionHandlerTest {
     SUT.handle(request, response, accessDeniedException);
 
     // then
-    verify(response).setContentType("application/json");
-    verify(response).setStatus(HttpServletResponse.SC_FORBIDDEN);
+    verify(response).setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+    verify(response).setStatus(HttpStatus.FORBIDDEN.value());
 
     printWriter.flush();
     Map<String, Object> responseMap =
         objectMapper.readValue(stringWriter.toString(), new TypeReference<>() {});
 
-    assertThat(responseMap).containsEntry("error", "ACCESS_DENIED");
-    assertThat(responseMap).containsEntry("message", "Insufficient privileges");
-    assertThat(responseMap).containsKey("timestamp");
+    assertThat(responseMap)
+        .containsEntry("type", "urn:civitas:error:ACCESS_DENIED")
+        .containsEntry("detail", "Insufficient privileges")
+        .containsEntry("title", "Forbidden")
+        .containsEntry("status", HttpStatus.FORBIDDEN.value())
+        .containsEntry("instance", TEST_URI);
   }
 
   @Test
@@ -98,14 +109,13 @@ class SecurityExceptionHandlerTest {
     JwtException jwtException = new JwtException("Token expired");
 
     // when
-    ResponseEntity<Map<String, Object>> response = SUT.handleJwtException(jwtException);
+    ProblemDetail problemDetail = SUT.handleJwtException(jwtException, request);
 
     // then
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    assertThat(response.getBody()).isNotNull();
-    assertThat(response.getBody()).containsEntry("error", "INVALID_TOKEN");
-    assertThat(response.getBody()).containsEntry("message", "JWT validation failed");
-    assertThat(response.getBody()).containsKey("timestamp");
+    assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
+    assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INVALID_TOKEN");
+    assertThat(problemDetail.getDetail()).isEqualTo("JWT validation failed");
+    assertThat(problemDetail.getTitle()).isEqualTo("Unauthorized");
   }
 
   @Test
@@ -115,12 +125,12 @@ class SecurityExceptionHandlerTest {
     JwtException jwtException = new JwtException(null);
 
     // when
-    ResponseEntity<Map<String, Object>> response = SUT.handleJwtException(jwtException);
+    ProblemDetail problemDetail = SUT.handleJwtException(jwtException, request);
 
     // then
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    assertThat(response.getBody()).isNotNull();
-    assertThat(response.getBody()).containsEntry("error", "INVALID_TOKEN");
-    assertThat(response.getBody()).containsEntry("message", "JWT validation failed");
+    assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED.value());
+    assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INVALID_TOKEN");
+    assertThat(problemDetail.getDetail()).isEqualTo("JWT validation failed");
+    assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
   }
 }

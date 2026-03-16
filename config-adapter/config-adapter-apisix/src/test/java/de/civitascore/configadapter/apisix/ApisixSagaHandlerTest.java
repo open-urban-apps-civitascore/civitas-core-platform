@@ -28,6 +28,8 @@ import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -72,14 +74,20 @@ class ApisixSagaHandlerTest {
             createCommand(
                 "EXECUTE_STEP",
                 "CREATE_ROUTE",
-                Map.of("datasetId", "ds-001", "upstreamUrl", "frost:8080", "openDataAccess", true));
+                Map.of(
+                    "datasetId",
+                    "ds-001",
+                    "upstreamUrl",
+                    "http://frost:8080/FROST-Server/v1.1/Projects(1)",
+                    "openDataAccess",
+                    true));
 
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
         assertEquals("ds-001", result.resultData().get("routeId"));
         assertEquals("ds-001", result.resultData().get("serviceId"));
-        assertNotNull(result.resultData().get("publicUrl"));
+        assertEquals("http://gateway:9080/datasets/ds-001", result.resultData().get("publicUrl"));
         assertEquals("ds-001", result.compensationData().get("routeId"));
         assertEquals("ds-001", result.compensationData().get("serviceId"));
       }
@@ -98,7 +106,12 @@ class ApisixSagaHandlerTest {
                 "EXECUTE_STEP",
                 "CREATE_ROUTE",
                 Map.of(
-                    "datasetId", "ds-001", "upstreamUrl", "frost:8080", "openDataAccess", false));
+                    "datasetId",
+                    "ds-001",
+                    "upstreamUrl",
+                    "http://frost:8080/FROST-Server/v1.1/Projects(1)",
+                    "openDataAccess",
+                    false));
 
         SagaCommandResult result = handler.handle(command);
 
@@ -119,7 +132,11 @@ class ApisixSagaHandlerTest {
             createCommand(
                 "EXECUTE_STEP",
                 "CREATE_ROUTE",
-                Map.of("datasetId", "ds-001", "upstreamUrl", "frost:8080"));
+                Map.of(
+                    "datasetId",
+                    "ds-001",
+                    "upstreamUrl",
+                    "http://frost:8080/FROST-Server/v1.1/Projects(1)"));
 
         SagaCommandResult result = handler.handle(command);
 
@@ -139,11 +156,76 @@ class ApisixSagaHandlerTest {
             createCommand(
                 "EXECUTE_STEP",
                 "CREATE_ROUTE",
-                Map.of("datasetId", "ds-001", "upstreamUrl", "frost:8080"));
+                Map.of(
+                    "datasetId",
+                    "ds-001",
+                    "upstreamUrl",
+                    "http://frost:8080/FROST-Server/v1.1/Projects(1)"));
 
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_FAILED", result.type());
+      }
+    }
+
+    @Test
+    @DisplayName("returns failure for invalid upstream URL")
+    void shouldReturnFailureForInvalidUpstreamUrl() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "CREATE_ROUTE",
+                Map.of("datasetId", "ds-001", "upstreamUrl", "://not a valid uri"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_FAILED", result.type());
+        assertNotNull(result.error());
+      }
+    }
+
+    @Test
+    @DisplayName("handles upstream URL without port")
+    void shouldHandleUpstreamUrlWithoutPort() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "CREATE_ROUTE",
+                Map.of(
+                    "datasetId",
+                    "ds-001",
+                    "upstreamUrl",
+                    "http://frost/FROST-Server/v1.1/Projects(1)"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
+      }
+    }
+
+    @Test
+    @DisplayName("handles upstream URL without path")
+    void shouldHandleUpstreamUrlWithoutPath() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "CREATE_ROUTE",
+                Map.of("datasetId", "ds-001", "upstreamUrl", "http://frost:8080"));
+
+        SagaCommandResult result = handler.handle(command);
+
+        assertEquals("STEP_COMPLETED", result.type());
       }
     }
   }
@@ -168,10 +250,10 @@ class ApisixSagaHandlerTest {
                         "plugin_config_id", "auth-plugin-1")));
         when(mockBuilder.get()).thenReturn(getResponse);
 
-        // Mock PUT for the update
-        Response putResponse = mock(Response.class);
-        when(putResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(putResponse);
+        // Mock PATCH for the update
+        Response patchResponse = mock(Response.class);
+        when(patchResponse.getStatus()).thenReturn(200);
+        when(mockBuilder.method(any(String.class), any(Entity.class))).thenReturn(patchResponse);
 
         SagaCommandMessage command =
             createCommand(
@@ -264,7 +346,7 @@ class ApisixSagaHandlerTest {
       try (ApisixSagaHandler handler = createHandlerWithPluginConfig("auth-plugin-1")) {
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(200);
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+        when(mockBuilder.method(any(String.class), any(Entity.class))).thenReturn(mockResponse);
 
         SagaCommandMessage command =
             createCommand(
@@ -289,7 +371,7 @@ class ApisixSagaHandlerTest {
         Response mockResponse = mock(Response.class);
         when(mockResponse.getStatus()).thenReturn(500);
         when(mockResponse.readEntity(String.class)).thenReturn("Internal Server Error");
-        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+        when(mockBuilder.method(any(String.class), any(Entity.class))).thenReturn(mockResponse);
 
         SagaCommandMessage command =
             createCommand(
@@ -311,7 +393,7 @@ class ApisixSagaHandlerTest {
     @DisplayName("returns COMPENSATION_FAILED on network error")
     void shouldReturnCompensationFailureOnNetworkError() {
       try (ApisixSagaHandler handler = createHandler()) {
-        when(mockBuilder.put(any(Entity.class)))
+        when(mockBuilder.method(any(String.class), any(Entity.class)))
             .thenThrow(new ProcessingException("Connection refused"));
 
         SagaCommandMessage command =
@@ -360,6 +442,84 @@ class ApisixSagaHandlerTest {
     }
   }
 
+  @Nested
+  @DisplayName("Proxy-rewrite regex pattern")
+  class ProxyRewriteRegex {
+
+    /**
+     * Evaluates the regex pattern used in buildCreateRouteBody: {@code ^/datasets/{id}(/.*)?$} →
+     * {@code {upstreamPath}$1}
+     */
+    private String applyRewrite(String datasetId, String upstreamPath, String requestPath) {
+      String regex = "^/datasets/" + datasetId + "(/.*)?$";
+      String replacement = upstreamPath + "$1";
+      Matcher matcher = Pattern.compile(regex).matcher(requestPath);
+      if (!matcher.matches()) {
+        return null;
+      }
+      return matcher.replaceFirst(replacement);
+    }
+
+    @Test
+    @DisplayName("rewrites sub-path to upstream path")
+    void shouldRewriteSubPath() {
+      String result =
+          applyRewrite("ds-001", "/FROST-Server/v1.1/Projects(1)", "/datasets/ds-001/Things");
+      assertEquals("/FROST-Server/v1.1/Projects(1)/Things", result);
+    }
+
+    @Test
+    @DisplayName("rewrites nested sub-path")
+    void shouldRewriteNestedSubPath() {
+      String result =
+          applyRewrite(
+              "ds-001",
+              "/FROST-Server/v1.1/Projects(1)",
+              "/datasets/ds-001/Things(42)/Datastreams");
+      assertEquals("/FROST-Server/v1.1/Projects(1)/Things(42)/Datastreams", result);
+    }
+
+    @Test
+    @DisplayName("rewrites base path without trailing slash")
+    void shouldRewriteBasePathWithoutTrailingSlash() {
+      String result = applyRewrite("ds-001", "/FROST-Server/v1.1/Projects(1)", "/datasets/ds-001");
+      assertEquals("/FROST-Server/v1.1/Projects(1)", result);
+    }
+
+    @Test
+    @DisplayName("rewrites base path with trailing slash")
+    void shouldRewriteBasePathWithTrailingSlash() {
+      String result = applyRewrite("ds-001", "/FROST-Server/v1.1/Projects(1)", "/datasets/ds-001/");
+      assertEquals("/FROST-Server/v1.1/Projects(1)/", result);
+    }
+
+    @Test
+    @DisplayName("does not match different dataset ID")
+    void shouldNotMatchDifferentDatasetId() {
+      String result =
+          applyRewrite("ds-001", "/FROST-Server/v1.1/Projects(1)", "/datasets/ds-002/Things");
+      assertNull(result);
+    }
+
+    @Test
+    @DisplayName("does not match unrelated path")
+    void shouldNotMatchUnrelatedPath() {
+      String result = applyRewrite("ds-001", "/FROST-Server/v1.1/Projects(1)", "/api/v1/users");
+      assertNull(result);
+    }
+
+    @Test
+    @DisplayName("rewrites with query string in path")
+    void shouldRewriteWithQueryString() {
+      String result =
+          applyRewrite(
+              "ds-001",
+              "/FROST-Server/v1.1/Projects(1)",
+              "/datasets/ds-001/Things?$top=10&$skip=0");
+      assertEquals("/FROST-Server/v1.1/Projects(1)/Things?$top=10&$skip=0", result);
+    }
+  }
+
   private ApisixSagaHandler createHandler() {
     return createHandlerWithPluginConfig(null);
   }
@@ -370,6 +530,8 @@ class ApisixSagaHandlerTest {
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("test-admin-key");
     when(mockConfig.getProperty("apisix.admin.url", "http://localhost:9180"))
         .thenReturn("http://apisix:9180");
+    when(mockConfig.getProperty("apisix.gateway.url", "http://localhost:9080"))
+        .thenReturn("http://gateway:9080");
     when(mockConfig.getProperty("apisix.plugin.config.id")).thenReturn(pluginConfig);
     handler.initialize(mockConfig);
 
@@ -382,6 +544,7 @@ class ApisixSagaHandlerTest {
     when(mockTarget.path(any(String.class))).thenReturn(mockPathTarget);
     when(mockPathTarget.request(MediaType.APPLICATION_JSON)).thenReturn(mockBuilder);
     when(mockBuilder.header(any(String.class), any())).thenReturn(mockBuilder);
+    when(mockBuilder.method(any(String.class), any(Entity.class))).thenReturn(mock(Response.class));
 
     handler.setTestClient(mockClient);
     return handler;

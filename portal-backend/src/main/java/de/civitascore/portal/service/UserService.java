@@ -104,6 +104,11 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
     userConfig.setEnabled(true); // Default to enabled
     userConfig.setEmailVerified(false); // Default to not verified
 
+    // Require email verification and password setup for new users
+    if (entity.getExternalId() == null || entity.getExternalId().isBlank()) {
+      userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
+    }
+
     // Map groups
     if (entity.getGroups() != null && !entity.getGroups().isEmpty()) {
       List<String> groups = entity.getGroups().stream().map(Group::getName).toList();
