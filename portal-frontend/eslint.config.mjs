@@ -107,9 +107,10 @@ const eslintConfig = [
           },
         },
         // Props: camelCase, except when containing React components, then PascalCase
+        // UPPER_CASE allowed for const-object enums (e.g. PERMISSION_NAMES)
         {
           selector: 'property',
-          format: ['camelCase', 'PascalCase'],
+          format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
         },
         // Booleans (variables) start with prefix is/has/should/can
         {
