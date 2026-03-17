@@ -484,6 +484,7 @@
   },
   "permissions": {
     "title": "Übersicht: {permissionType}",
+    "infoBox": "Die Berechtigungen sind vordefiniert und hier nicht bearbeitbar.",
     "systemPermissions": {
       "title": "Systemberechtigungen",
       "description": "Systemberechtigungen steuern den Zugriff auf systemweite Funktionen der Plattform.\nSie werden zu Systemrollen zusammengefasst und Gruppen zugeordnet.",

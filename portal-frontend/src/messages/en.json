@@ -491,6 +491,7 @@
   },
   "permissions": {
     "title": "Overview: {permissionType}",
+    "infoBox": "Permissions are predefined and cannot be edited here.",
     "systemPermissions": {
       "title": "System Permissions",
       "description": "System permissions control access to system-wide functions on the platform.\nThey are grouped into system roles and assigned to groups.",

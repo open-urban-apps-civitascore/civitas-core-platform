@@ -7,6 +7,7 @@ import { useGetPermissions } from '@/app/services/api/permissions/clientRequests
 import { PageBackground } from '@/components/page-background/PageBackground'
 import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
+import { InfoBox } from '@/components/text-box/TextBox'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { ROLE_TYPES } from '@/types/roles'
 
@@ -49,13 +50,11 @@ const PermissionsPage = () => {
   const permissions = permissionsData?.data && !isFetching ? permissionsData.data : []
 
   const getSystemPermissions = () => {
-    const systemPermissions = permissions.filter(permission => permission.permissionType === ROLE_TYPES.SYSTEM)
-    return systemPermissions
+    return permissions.filter(permission => permission.permissionType === ROLE_TYPES.SYSTEM)
   }
 
   const getDataPermissions = () => {
-    const dataPermissions = permissions.filter(permission => permission.permissionType === ROLE_TYPES.DATA)
-    return dataPermissions
+    return permissions.filter(permission => permission.permissionType === ROLE_TYPES.DATA)
   }
 
   const getTitle = () => {
@@ -87,6 +86,10 @@ const PermissionsPage = () => {
         ) : (
           <DataPermissionsTab permissions={getDataPermissions()} isLoading={isFetching} rowCount={rowCount} />
         )}
+
+        <div className="mt-4">
+          <InfoBox text={t('permissions.infoBox')} />
+        </div>
       </PageBackground>
     </PageContainer>
   )
