@@ -1,0 +1,19 @@
+meta {
+  name: Teardown - Delete DataStructure
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/datastructures/{{dataStructureId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("DataStructure deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=not in DRAFT state
+    expect(status === 204 || status === 404 || status === 400).to.be.true;
+  });
+}

@@ -1,7 +1,7 @@
 meta {
   name: Update Data Structure Version
   type: http
-  seq: 14
+  seq: 10
 }
 
 put {
@@ -33,4 +33,10 @@ script:post-response {
     bru.setVar('scopeType', 'DATASTRUCTURE');
     bru.setVar('scopeId', bru.getVar('dataStructureId'));
   }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
 }

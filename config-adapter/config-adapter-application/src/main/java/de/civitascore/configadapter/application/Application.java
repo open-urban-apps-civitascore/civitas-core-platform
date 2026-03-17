@@ -285,13 +285,18 @@ public class Application {
           topics.size(),
           Encode.forJava(String.valueOf(topics)));
 
-      configurePublisher(config, adapter, handlerNames.publisherName());
-
       EventConsumer consumer = createConsumer(config, handlerNames.consumerName(), adapter);
       if (isNull(consumer)) {
         throw new FatalAdapterException(
             AdapterErrorCode.CONFIGURATION_ERROR,
             "Event consumer '" + handlerNames.consumerName() + "' not found via ServiceLoader");
+      }
+
+      // When using a combined handler (consumer == publisher type), the consumer's initialize()
+      // already configured publishing. Only create a separate publisher when the names differ
+      // to avoid duplicate KafkaConsumer instances subscribing to the same topics.
+      if (!Objects.equals(handlerNames.consumerName(), handlerNames.publisherName())) {
+        configurePublisher(config, adapter, handlerNames.publisherName());
       }
 
       logger.info("Successfully created consumer for adapter: {}", Encode.forJava(adapterName));

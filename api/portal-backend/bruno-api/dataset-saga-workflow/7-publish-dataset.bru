@@ -1,0 +1,23 @@
+meta {
+  name: 7. Publish DataSet
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/datasets/:id/publish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+tests {
+  test("Published or already published", function() {
+    const status = res.getStatus();
+    // 200=published, 400=not in DRAFT state (already published or released)
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}

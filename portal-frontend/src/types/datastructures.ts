@@ -3,7 +3,7 @@ import z from 'zod'
 import { UMLDiagram, UMLEdge, UMLNode } from '@/components/uml-modeler/types/diagram'
 import { enumFromConst } from '@/utils/common'
 
-import { AssignmentSchema } from './assignments'
+import { AssignmentSchema, AssignmentScopedInput } from './assignments'
 import { ItemSchema, STATUS_TYPES, WithId } from './common'
 
 export const DATASTRUCTURE_STATUS_TYPES = {
@@ -15,7 +15,7 @@ export const DatastructureStatusEnum = enumFromConst(DATASTRUCTURE_STATUS_TYPES)
 
 export type DatastructureStatusTypes = (typeof DATASTRUCTURE_STATUS_TYPES)[keyof typeof DATASTRUCTURE_STATUS_TYPES]
 
-export type DatastructureTab = 'basicInfo' | 'versions' | 'accessPermissions'
+export type DatastructureTab = 'basicInfo' | 'versions' | 'accessManagement'
 
 export type DatastructureVersionTab = 'structure' | 'versionInfo'
 
@@ -140,7 +140,6 @@ export const DatastructureFormDraftSchema = z.object({
   description: z.string().trim(),
   dataStructureStatus: DatastructureStatusEnum,
   dataStructureVersionIds: z.array(z.string()),
-  assignments: z.array(AssignmentSchema),
 })
 
 export const DatastructureFormAvailableSchema = DatastructureFormDraftSchema.extend({
@@ -165,7 +164,10 @@ export const DatastructureCreateDataSchema = z.object({
 export type DatastructureCreateFormData = z.infer<typeof DatastructureCreateFormSchema>
 export type DatastructureCreateData = z.infer<typeof DatastructureCreateDataSchema>
 
-export type DatastructurePutData = DatastructureFormDraft & { createdFromDataSource: boolean }
+export type DatastructurePutData = DatastructureFormDraft & {
+  createdFromDataSource: boolean
+  assignments?: AssignmentScopedInput[]
+}
 export type DatastructurePatchData = Partial<DatastructureCreateData> & WithId
 
 // DATASTRUCTURE LIST DATA

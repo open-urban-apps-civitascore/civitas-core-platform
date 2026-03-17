@@ -1,0 +1,32 @@
+meta {
+  name: 0d. Find Existing Saga DataSet
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/datasets?search=Saga Test DataSet
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(d => d.name === 'Saga Test DataSet');
+    if (match) {
+      bru.setVar('sagaDataSetId', match.id);
+      bru.setVar('sagaDataSetStatus', match.dataSetStatus);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    // Always 200 — search returns empty page if entity doesn't exist
+    expect(res.getStatus()).to.equal(200);
+  });
+}

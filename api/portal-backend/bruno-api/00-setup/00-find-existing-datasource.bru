@@ -1,0 +1,33 @@
+meta {
+  name: Setup - Find Existing DataSource
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/datasources?search=API Test DataSource
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(d => d.name === 'API Test DataSource');
+    if (match) {
+      bru.setVar('dataSourceId', match.id);
+      bru.setVar('setupDataSourceId', match.id);
+      bru.setVar('scopeType', 'DATASOURCE');
+      bru.setVar('scopeId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

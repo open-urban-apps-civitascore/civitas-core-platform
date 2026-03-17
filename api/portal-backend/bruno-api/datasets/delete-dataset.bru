@@ -1,7 +1,7 @@
 meta {
   name: Delete Dataset
   type: http
-  seq: 6
+  seq: 13
 }
 
 delete {
@@ -12,4 +12,18 @@ delete {
 
 params:path {
   id: {{dataSetId}}
+}
+
+script:post-response {
+  // Restore setup dataset ID so pipelines folder can use it
+  const setupId = bru.getVar('setupDataSetId');
+  if (setupId) {
+    bru.setVar('dataSetId', setupId);
+  }
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
 }

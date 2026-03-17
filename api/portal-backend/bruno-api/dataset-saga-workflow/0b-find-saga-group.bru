@@ -1,0 +1,27 @@
+meta {
+  name: 0b. Find Existing Saga Group
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/groups?search=Saga Test Group
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(g => g.name === 'Saga Test Group');
+    if (match) {
+      bru.setVar('sagaGroupId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    // Always 200 — search returns empty page if entity doesn't exist
+    expect(res.getStatus()).to.equal(200);
+  });
+}

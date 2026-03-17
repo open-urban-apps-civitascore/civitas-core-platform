@@ -15,6 +15,7 @@ import {
   useUpdateDatastructurePublished,
 } from '@/app/services/api/datastructures/clientRequests'
 import { ApiServiceResponse } from '@/app/services/api/request/apiRequest'
+import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { STATUS_TYPES, WithId } from '@/types/common'
 import {
   Datastructure,
@@ -25,6 +26,7 @@ import {
   DatastructureStatusTypes,
   DatastructureTab,
 } from '@/types/datastructures'
+import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { containsNonStatusField, mapDatastructureApiToFormData } from '@/utils/datastructures'
 import { pickDirtyValues } from '@/utils/form'
 
@@ -32,9 +34,11 @@ import { tabs } from '../components/DatastructureOverview'
 
 interface UseDatastructureProps {
   datastructure: Datastructure
+  assignedGroups: GroupRoleAssignmentTable[]
+  initialAssignments: GroupRoleAssignmentTable[]
 }
 
-export const useDatastructure = ({ datastructure }: UseDatastructureProps) => {
+export const useDatastructure = ({ datastructure, assignedGroups, initialAssignments }: UseDatastructureProps) => {
   const router = useRouter()
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
@@ -83,6 +87,11 @@ export const useDatastructure = ({ datastructure }: UseDatastructureProps) => {
     [formValues, hasAvailableVersion],
   )
 
+  const areAssignmentsDirty = useMemo(
+    () => hasAssignmentChanges(assignedGroups, initialAssignments),
+    [assignedGroups, initialAssignments],
+  )
+
   useEffect(() => {
     if (isDraftMode) {
       form.clearErrors()
@@ -129,14 +138,27 @@ export const useDatastructure = ({ datastructure }: UseDatastructureProps) => {
 
   const handleUpdateValues = async (values: DatastructureFormDraft) => {
     try {
+      const areAssignmentsInvalid = assignedGroups.some(group => group.assignedRoles.length === 0)
+      const assignmentsPayload = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
+
+      const assignmentsPatch = areAssignmentsDirty ? { assignments: assignmentsPayload } : {}
+
       let response: { data: Datastructure }
       if (datastructure.dataStructureStatus === STATUS_TYPES.AVAILABLE)
         response = await updatePublishedDatastructure.mutateAsync({
           ...values,
           createdFromDataSource: datastructure.createdFromDataSource,
+          ...assignmentsPatch,
         })
-      else response = await updateDatastructure.mutateAsync(values)
+      else
+        response = await updateDatastructure.mutateAsync({
+          ...values,
+          ...assignmentsPatch,
+        })
       toast.success(t('messages.updateSuccess'))
+      if (areAssignmentsInvalid) {
+        toast.warning(t('errors.groupsWithoutRoles'))
+      }
       return response.data
     } catch (error) {
       toast.error(tCommon('errors.updateError', { item: tCommon('items.datastructure') }))
@@ -148,7 +170,7 @@ export const useDatastructure = ({ datastructure }: UseDatastructureProps) => {
     const dirtyFields = form.formState.dirtyFields
 
     const fieldsToUpdate = pickDirtyValues(parsedValues, dirtyFields)
-    const shouldUpdateValue = containsNonStatusField(fieldsToUpdate)
+    const shouldUpdateValue = containsNonStatusField(fieldsToUpdate) || areAssignmentsDirty
     const shouldPublish = !!dirtyFields.dataStructureStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.AVAILABLE
     const shouldUnpublish = !!dirtyFields.dataStructureStatus && statusWatch === DATASTRUCTURE_STATUS_TYPES.DRAFT
 
@@ -194,14 +216,15 @@ export const useDatastructure = ({ datastructure }: UseDatastructureProps) => {
 
   const isConfirmButtonDisabled = useMemo(
     () =>
-      !form.formState.isDirty ||
+      (!form.formState.isDirty && !areAssignmentsDirty) ||
       !!form.formState.errors.name ||
       (statusWatch !== DATASTRUCTURE_STATUS_TYPES.DRAFT && Object.keys(form.formState.errors).length > 0) ||
       isLoading,
-    [form.formState.errors, form.formState.isDirty, isLoading, statusWatch],
+    [areAssignmentsDirty, form.formState.errors, form.formState.isDirty, isLoading, statusWatch],
   )
 
   return {
+    areAssignmentsDirty,
     canSetAvailable,
     canSetDraft,
     completedTabs,

@@ -51,7 +51,24 @@ curl -sf -X PUT "$ADMIN_URL/apisix/admin/services/svc-portal-backend" \
     }
   }' > /dev/null && echo " OK" || echo " FAILED"
 
-# 2. Create plugin config
+# 2. Create service: frost-server
+# Dummy upstream is required so APISIX resolves the service object and passes
+# it to plugins (OPA uses input.service.name to identify the backend).
+# Dynamic routes bring their own upstream_id; this upstream is never actually hit.
+echo "Creating service: svc-frost-server..."
+curl -sf -X PUT "$ADMIN_URL/apisix/admin/services/svc-frost-server" \
+  -H "X-API-KEY: $ADMIN_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "frost-server",
+    "desc": "FROST Server (SensorThings API) - metadata for OPA backend identification",
+    "upstream": {
+      "type": "roundrobin",
+      "nodes": { "127.0.0.1:1": 1 }
+    }
+  }' > /dev/null && echo " OK" || echo " FAILED"
+
+# 3. Create plugin config
 if [ "$MODE" = "allowall" ]; then
   echo "Creating plugin config: allow-all (wildcard scope)..."
   PROXY_REWRITE='{
@@ -100,7 +117,7 @@ curl -sf -X PUT "$ADMIN_URL/apisix/admin/plugin_configs/1" \
     }
   }" > /dev/null && echo " OK" || echo " FAILED"
 
-# 3. Create route: portal-backend API
+# 4. Create route: portal-backend API
 echo "Creating route: portal-backend-api (/v1/*)..."
 curl -sf -X PUT "$ADMIN_URL/apisix/admin/routes/portal-backend-api" \
   -H "X-API-KEY: $ADMIN_KEY" \

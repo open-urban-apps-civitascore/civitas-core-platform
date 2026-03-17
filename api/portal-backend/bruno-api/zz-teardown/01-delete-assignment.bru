@@ -1,0 +1,19 @@
+meta {
+  name: Teardown - Delete Assignment
+  type: http
+  seq: 1
+}
+
+delete {
+  url: {{baseUrl}}/assignments/{{assignmentId}}
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("Assignment deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=invalid ID
+    expect(status === 204 || status === 404 || status === 400).to.be.true;
+  });
+}

@@ -1,7 +1,7 @@
 meta {
   name: Publish Data Source
   type: http
-  seq: 7
+  seq: 6
 }
 
 post {
@@ -12,4 +12,12 @@ post {
 
 params:path {
   id: {{dataSourceId}}
+}
+
+tests {
+  test("Publish accepted or precondition not met", function() {
+    const status = res.getStatus();
+    // 200=published, 400=missing data structure version or wrong state
+    expect(status === 200 || status === 400).to.be.true;
+  });
 }

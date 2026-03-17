@@ -1,0 +1,23 @@
+meta {
+  name: 16. Cleanup - Delete DataSource
+  type: http
+  seq: 25
+}
+
+delete {
+  url: {{baseUrl}}/datasources/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSourceId}}
+}
+
+tests {
+  test("DataSource deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=wrong state, 409=has linked pipelines
+    expect(status === 204 || status === 404 || status === 400 || status === 409).to.be.true;
+  });
+}

@@ -1,0 +1,24 @@
+meta {
+  name: 15. Cleanup - Delete Pipeline
+  type: http
+  seq: 24
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sagaDataSetId}}
+  id: {{sagaPipelineId}}
+}
+
+tests {
+  test("Pipeline deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=invalid ID (unset var on first run)
+    expect(status === 204 || status === 404 || status === 400).to.be.true;
+  });
+}

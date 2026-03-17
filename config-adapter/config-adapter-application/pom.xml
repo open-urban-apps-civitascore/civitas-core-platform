@@ -36,30 +36,6 @@
 
         <dependency>
             <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-apisix</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-frost</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-examples</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>de.civitas-core</groupId>
-            <artifactId>config-adapter-redpanda</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>de.civitas-core</groupId>
             <artifactId>config-adapter-configuration</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -211,4 +187,39 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Profile for building the distribution fat JAR with all adapter plugins.
+             Adapter modules are discovered via ServiceLoader at runtime and are not
+             needed for compilation or testing. -->
+        <profile>
+            <id>dist</id>
+            <dependencies>
+                <dependency>
+                    <groupId>de.civitas-core</groupId>
+                    <artifactId>config-adapter-apisix</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>de.civitas-core</groupId>
+                    <artifactId>config-adapter-frost</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>de.civitas-core</groupId>
+                    <artifactId>config-adapter-examples</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+                <dependency>
+                    <groupId>de.civitas-core</groupId>
+                    <artifactId>config-adapter-redpanda</artifactId>
+                    <version>${project.version}</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 </project>

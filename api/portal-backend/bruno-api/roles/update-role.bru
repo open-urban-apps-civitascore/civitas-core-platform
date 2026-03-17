@@ -29,3 +29,9 @@ script:post-response {
     bru.setVar('roleId', res.body.id);
   }
 }
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

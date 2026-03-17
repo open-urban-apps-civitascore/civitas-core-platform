@@ -50,27 +50,15 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.kafka.ConfluentKafkaContainer;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Integration test for KafkaEventHandler using Testcontainers. Tests the full flow: Kafka ->
  * Handler -> Adapter -> Publisher -> Kafka
  */
-@Testcontainers
-class KafkaEventHandlerIntegrationTest {
-
-  @SuppressWarnings("resource")
-  @Container
-  static ConfluentKafkaContainer kafka =
-      new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.3"))
-          .withReuse(false);
+class KafkaEventHandlerIntegrationTest extends AbstractKafkaIntegrationTest {
 
   private KafkaEventHandler handler;
   private TestAdapter testAdapter;
@@ -84,7 +72,7 @@ class KafkaEventHandlerIntegrationTest {
 
     // Create test configuration
     Map<String, Object> props = new HashMap<>();
-    props.put("kafka.bootstrap.servers", kafka.getBootstrapServers());
+    props.put("kafka.bootstrap.servers", KAFKA.getBootstrapServers());
     props.put("kafka.group.id", "test-group-" + UUID.randomUUID());
     props.put("kafka.auto.offset.reset", "earliest");
     config = new AppConfig(new MapConfiguration(props));
@@ -94,7 +82,7 @@ class KafkaEventHandlerIntegrationTest {
 
     // Create test producer
     Properties producerProps = new Properties();
-    producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
+    producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
     producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     producerProps.put(
         ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CloudEventSerializer.class.getName());
@@ -110,11 +98,6 @@ class KafkaEventHandlerIntegrationTest {
     if (testProducer != null) {
       testProducer.close();
     }
-  }
-
-  @AfterAll
-  static void afterAll() {
-    kafka.close();
   }
 
   @Test

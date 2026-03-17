@@ -151,6 +151,11 @@ export const useDatasourceForm = (
     return completed
   }, [nameWatch, descriptionWatch, formValues, dataStructureVersionIdWatch])
 
+  const areAssignmentsDirty = useMemo(
+    () => hasAssignmentChanges(assignedGroups, initialAssignments),
+    [assignedGroups, initialAssignments],
+  )
+
   const handleStatusChange = (newStatus: DatasourceStatusType) =>
     form.setValue('dataSourceStatus', newStatus, { shouldDirty: true })
 
@@ -246,6 +251,7 @@ export const useDatasourceForm = (
   }
 
   return {
+    areAssignmentsDirty,
     form,
     dataSourceStatus,
     selectedConnectorType,

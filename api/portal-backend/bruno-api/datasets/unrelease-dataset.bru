@@ -1,7 +1,7 @@
 meta {
   name: Unrelease Dataset
   type: http
-  seq: 10
+  seq: 11
 }
 
 post {
@@ -12,4 +12,12 @@ post {
 
 params:path {
   id: {{dataSetId}}
+}
+
+tests {
+  test("Unreleased or precondition not met", function() {
+    const status = res.getStatus();
+    // 202=delete saga triggered, 400=not in AVAILABLE state
+    expect(status === 202 || status === 400).to.be.true;
+  });
 }

@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 
+import { MeAssignment, PermissionName } from '@/types/currentUser'
+
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible'
 import {
   SidebarContent,
@@ -17,15 +19,38 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '../../ui/sidebar'
-import { appSidebarNavSections } from '../appSidebarItems'
+import { appSidebarNavSections, NavItem } from '../appSidebarItems'
 
-export const AppSidebarContent = () => {
+interface AppSidebarContentProps {
+  assignments: MeAssignment[]
+}
+
+export const AppSidebarContent = ({ assignments }: AppSidebarContentProps) => {
   const tNav = useTranslations('sidebar')
   const pathname = usePathname()
 
+  const userPermissions = new Set<PermissionName>(assignments.flatMap(a => a.permissions))
+
+  const isVisible = (item: NavItem) => !item.requiredPermission || userPermissions.has(item.requiredPermission)
+
+  const visibleSections = appSidebarNavSections
+    .map(section => ({
+      ...section,
+      items: section.items
+        .map(item => ({
+          ...item,
+          items: item.items?.filter(isVisible),
+        }))
+        .filter(item => {
+          if (item.items) return item.items.length > 0
+          return isVisible(item)
+        }),
+    }))
+    .filter(section => section.items.length > 0)
+
   return (
     <SidebarContent>
-      {appSidebarNavSections.map(section => (
+      {visibleSections.map(section => (
         <SidebarGroup key={section.title}>
           <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden text-base-sidebar-foreground text-sm font-medium font-['IBM_Plex_Sans'] leading-5 line-clamp-1">
             {tNav(section.title)}

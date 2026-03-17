@@ -1,7 +1,7 @@
 meta {
   name: Unpublish Data Structure
   type: http
-  seq: 8
+  seq: 17
 }
 
 post {
@@ -12,4 +12,12 @@ post {
 
 params:path {
   dataStructureId: {{dataStructureId}}
+}
+
+tests {
+  test("Unpublish accepted or not published", function() {
+    const status = res.getStatus();
+    // 200=unpublished, 400=not in published state
+    expect(status === 200 || status === 400).to.be.true;
+  });
 }

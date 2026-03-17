@@ -1,0 +1,39 @@
+meta {
+  name: Setup - Create User
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/users
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "title": "MR",
+    "firstName": "API",
+    "lastName": "Testuser",
+    "email": "api.testuser@example.com",
+    "phone": "+0000000000",
+    "externalId": "ext-api-test",
+    "active": true,
+    "groupIds": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('userId', res.body.id);
+    bru.setVar('setupUserId', res.body.id);
+  }
+}
+
+tests {
+  test("User created", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}

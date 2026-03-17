@@ -29,7 +29,6 @@ import de.civitascore.configadapter.model.apisix.plugins.ProxyRewritePlugin;
 import de.civitascore.configadapter.model.apisix.plugins.ResponseRewritePlugin;
 import de.civitascore.configadapter.model.apisix.plugins.RewriteHeaders;
 import de.civitascore.configadapter.model.apisix.plugins.RoutePlugins;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -62,10 +61,8 @@ class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
     String routeId = "test-route-update";
     String upstreamId = createDefaultUpstream("for-route-update");
 
-    Map<String, Object> initialRouteConfig = new HashMap<>();
-    initialRouteConfig.put("uri", "/api/v1/initial/*");
-    initialRouteConfig.put("methods", List.of("GET"));
-    initialRouteConfig.put("upstream_id", upstreamId);
+    Map<String, Object> initialRouteConfig =
+        Map.of("uri", "/api/v1/initial/*", "methods", List.of("GET"), "upstream_id", upstreamId);
     createRouteDirectly(routeId, initialRouteConfig);
 
     RouteConfigValue updatedRouteConfig = new RouteConfigValue();
@@ -106,9 +103,8 @@ class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
     String routeId = "test-route-delete";
     String upstreamId = createDefaultUpstream("for-route-delete");
 
-    Map<String, Object> routeConfig = new HashMap<>();
-    routeConfig.put("uri", "/api/v1/to-delete/*");
-    routeConfig.put("upstream_id", upstreamId);
+    Map<String, Object> routeConfig =
+        Map.of("uri", "/api/v1/to-delete/*", "upstream_id", upstreamId);
     createRouteDirectly(routeId, routeConfig);
 
     JsonNode route = getRouteFromApisix(routeId);

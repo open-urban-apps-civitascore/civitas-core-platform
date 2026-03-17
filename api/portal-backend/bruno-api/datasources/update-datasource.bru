@@ -44,3 +44,9 @@ script:post-response {
     bru.setVar('scopeId', res.body.id);
   }
 }
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

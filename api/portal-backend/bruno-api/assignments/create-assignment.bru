@@ -1,7 +1,7 @@
 meta {
   name: Create Assignment
   type: http
-  seq: 3
+  seq: 1
 }
 
 post {
@@ -13,9 +13,7 @@ post {
 body:json {
   {
     "groupId": "{{groupId}}",
-    "roleId": "{{roleId}}",
-    "scopeType": "{{scopeType}}",
-    "scopeId": "{{scopeId}}"
+    "roleId": "{{systemRoleId}}"
   }
 }
 
@@ -23,4 +21,12 @@ script:post-response {
   if (res.body && res.body.id) {
     bru.setVar('assignmentId', res.body.id);
   }
+}
+
+tests {
+  test("Assignment created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=duplicate assignment
+    expect(status === 201 || status === 409).to.be.true;
+  });
 }

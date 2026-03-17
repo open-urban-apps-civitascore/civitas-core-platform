@@ -1,0 +1,32 @@
+meta {
+  name: Setup - Find Existing Roles
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/roles?search=API Test
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const dataRole = res.body.content.find(r => r.name === 'API Test Data Role');
+    if (dataRole) {
+      bru.setVar('roleId', dataRole.id);
+      bru.setVar('setupRoleId', dataRole.id);
+    }
+    const systemRole = res.body.content.find(r => r.name === 'API Test System Role');
+    if (systemRole) {
+      bru.setVar('systemRoleId', systemRole.id);
+      bru.setVar('setupSystemRoleId', systemRole.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

@@ -1,0 +1,23 @@
+meta {
+  name: 13. Cleanup - Delete DataSet
+  type: http
+  seq: 22
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+tests {
+  test("DataSet deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=not in DRAFT state (pending saga)
+    expect(status === 204 || status === 404 || status === 400).to.be.true;
+  });
+}

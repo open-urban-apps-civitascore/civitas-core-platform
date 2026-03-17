@@ -314,7 +314,8 @@ export const useDatastructureVersion = ({
     dirtyFields.description ||
     dirtyFields.dataStructureVersionSource ||
     dirtyFields.dataStructureVersionStatus
-  const hasModelChanges = activeSession?.isDirty || activeSessionId !== initialSession.id
+  const hasModelChanges =
+    activeSession?.isDirty === true || (initialSession?.id && activeSessionId !== initialSession?.id)
   const hasUserChanges = hasMetadataChanges || hasModelChanges
 
   return {

@@ -749,7 +749,7 @@
     },
     "tabs": {
       "basicInfo": "Base Information",
-      "accessPermissions": "Access Permissions",
+      "accessManagement": "Access Management",
       "versions": "Versions"
     },
     "edit": {
@@ -765,7 +765,8 @@
     },
     "errors": {
       "deletionError": "An error occurred while deleting the datastructure.",
-      "creationError": "An error occurred while creating the datastructure."
+      "creationError": "An error occurred while creating the datastructure.",
+      "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
     },
     "infoModal": {
       "title": "Datenstructure can not be deleted",
@@ -774,6 +775,11 @@
     "unsavedChangesModal": {
       "title": "Unsaved Changes",
       "description": "This action will take you to another page and your unsaved changes will be lost. Do you want to save them first?"
+    },
+    "accessManagementTab": {
+      "infoBoxes": {
+        "firstBox": "Via the groups-roles-assignments, permissions are assigned to this data structure to allow the usage in datasets and datasources."
+      }
     }
   },
   "datastructureVersion": {

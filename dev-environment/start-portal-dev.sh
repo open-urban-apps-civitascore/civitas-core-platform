@@ -579,7 +579,7 @@ echo
 if [ "$config_adapter_option" = "1" ] || [ "$backend_option" = "1" ]; then
     echo "Building Config Adapter (version: $DEV_VERSION)..."
     cd "$SCRIPT_DIR/../config-adapter"
-    if ! mvn clean install -DskipTests -Drevision=$DEV_VERSION; then
+    if ! mvn clean install -DskipTests -Drevision=$DEV_VERSION -Pdist; then
         echo "ERROR: Config Adapter build failed"
         exit 1
     fi
@@ -628,6 +628,8 @@ export KEYCLOAK_TOPICS=de.civitascore.idm.user.created,de.civitascore.idm.user.u
 export APISIX_ADMIN_URL=http://localhost:9180
 export APISIX_ADMIN_KEY=edd1c9f034335f136f87ad84b625c8f1
 export APISIX_GATEWAY_URL=http://localhost:9080
+export APISIX_PLUGIN_CONFIG_ID=1
+export APISIX_SERVICE_ID=svc-frost-server
 export APISIX_TOPICS=de.civitascore.api.backend.created,de.civitascore.api.backend.updated,de.civitascore.api.backend.deleted
 export FROST_URL=http://localhost:8085/FROST-Server/v1.1
 export FROST_PUBLIC_URL=http://civitas-frost:8080/FROST-Server/v1.1

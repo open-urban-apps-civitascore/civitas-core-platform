@@ -56,14 +56,9 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.kafka.ConfluentKafkaContainer;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * Integration tests for Kafka event handler retry and DLQ functionality. Tests:
@@ -75,14 +70,7 @@ import org.testcontainers.utility.DockerImageName;
  *   <li>DLQ message format (no stack traces, safe messages)
  * </ul>
  */
-@Testcontainers
-class KafkaEventHandlerRetryIntegrationTest {
-
-  @SuppressWarnings("resource")
-  @Container
-  static ConfluentKafkaContainer kafka =
-      new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.3"))
-          .withReuse(false);
+class KafkaEventHandlerRetryIntegrationTest extends AbstractKafkaIntegrationTest {
 
   private KafkaEventHandler handler;
   private RetryTestAdapter testAdapter;
@@ -101,7 +89,7 @@ class KafkaEventHandlerRetryIntegrationTest {
 
     // Create test configuration with retry settings
     Map<String, Object> props = new HashMap<>();
-    props.put("kafka.bootstrap.servers", kafka.getBootstrapServers());
+    props.put("kafka.bootstrap.servers", KAFKA.getBootstrapServers());
     props.put("kafka.group.id", "test-group-" + UUID.randomUUID());
     props.put("kafka.auto.offset.reset", "earliest");
     props.put("kafka.retry.max.attempts", "3");
@@ -114,7 +102,7 @@ class KafkaEventHandlerRetryIntegrationTest {
 
     // Create test producer
     Properties producerProps = new Properties();
-    producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
+    producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
     producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     producerProps.put(
         ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CloudEventSerializer.class.getName());
@@ -122,7 +110,7 @@ class KafkaEventHandlerRetryIntegrationTest {
 
     // Create DLQ consumer
     Properties dlqConsumerProps = new Properties();
-    dlqConsumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
+    dlqConsumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
     dlqConsumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "dlq-test-group-" + UUID.randomUUID());
     dlqConsumerProps.put(
         ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
@@ -144,11 +132,6 @@ class KafkaEventHandlerRetryIntegrationTest {
     if (dlqConsumer != null) {
       dlqConsumer.close();
     }
-  }
-
-  @AfterAll
-  static void afterAll() {
-    kafka.close();
   }
 
   @Test

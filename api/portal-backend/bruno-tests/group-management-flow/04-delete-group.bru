@@ -16,6 +16,6 @@ auth:bearer {
 
 tests {
   test("should delete group", function() {
-    expect(res.status).to.be.oneOf([200, 204]);
+    expect(res.getStatus()).to.equal(204);
   });
 }

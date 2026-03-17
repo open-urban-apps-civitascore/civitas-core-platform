@@ -23,3 +23,11 @@ body:json {
     }
   ]
 }
+
+tests {
+  test("Assignments replaced or scope unavailable", function() {
+    const status = res.getStatus();
+    // 200=replaced, 400=invalid scope reference, 404=group already deleted
+    expect(status === 200 || status === 400 || status === 404).to.be.true;
+  });
+}

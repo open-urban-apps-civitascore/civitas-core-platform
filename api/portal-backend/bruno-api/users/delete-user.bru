@@ -13,3 +13,16 @@ delete {
 params:path {
   id: {{userId}}
 }
+
+script:post-response {
+  const setupId = bru.getVar('setupUserId');
+  if (setupId) {
+    bru.setVar('userId', setupId);
+  }
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

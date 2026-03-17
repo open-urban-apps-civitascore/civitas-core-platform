@@ -735,7 +735,7 @@
     },
     "tabs": {
       "basicInfo": "Basisinformationen",
-      "accessPermissions": "Zugriffsberechtigungen",
+      "accessManagement": "Zugriffsberechtigungen",
       "versions": "Versionen"
     },
     "edit": {
@@ -751,7 +751,8 @@
     },
     "errors": {
       "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten.",
-      "creationError": "Beim Anlegen der Datenstruktur ist ein Fehler aufgetreten."
+      "creationError": "Beim Anlegen der Datenstruktur ist ein Fehler aufgetreten.",
+      "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
     "infoModal": {
       "title": "Datenstruktur kann nicht gelöscht werden",
@@ -760,6 +761,11 @@
     "unsavedChangesModal": {
       "title": "Ungespeicherte Änderungen",
       "description": "Diese Aktion führt zu einer anderen Seite und Ihre ungespeicherten Änderungen gehen verloren. Möchten Sie sie zuerst speichern?"
+    },
+    "accessManagementTab": {
+      "infoBoxes": {
+        "firstBox": "Gruppen, die plattformweite Berechtigungen an allen Datenobjekten besitzen, haben Zugriff auf diese Datenstruktur."
+      }
     }
   },
   "datastructureVersions": {

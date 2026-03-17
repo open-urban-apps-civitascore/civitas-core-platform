@@ -1,0 +1,35 @@
+meta {
+  name: 2. Create Group
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/groups
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Saga Test Group",
+    "description": "Group for saga workflow test",
+    "contactUserId": null,
+    "parentGroupId": null,
+    "memberIds": []
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('sagaGroupId', res.body.id);
+  }
+}
+
+tests {
+  test("Group created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=already exists from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+}

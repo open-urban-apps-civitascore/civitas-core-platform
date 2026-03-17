@@ -14,3 +14,14 @@ params:query {
   ~page: 0
   ~size: 20
 }
+
+docs {
+  Note: This endpoint returns 403 via APISIX gateway (OPA policy missing for /v1/authorities).
+  Use the local-direct environment (port 8089) to test this endpoint.
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

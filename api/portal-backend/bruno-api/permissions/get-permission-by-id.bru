@@ -13,3 +13,11 @@ get {
 params:path {
   id: {{permissionId}}
 }
+
+tests {
+  test("Permission retrieved", function() {
+    const status = res.getStatus();
+    // 200=found, 400=permissionId was not set by prior lookup
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}

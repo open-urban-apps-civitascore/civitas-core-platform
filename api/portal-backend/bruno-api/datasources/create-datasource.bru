@@ -1,7 +1,7 @@
 meta {
   name: Create Data Source
   type: http
-  seq: 3
+  seq: 1
 }
 
 post {
@@ -39,4 +39,19 @@ script:post-response {
     bru.setVar('scopeType', 'DATASOURCE');
     bru.setVar('scopeId', res.body.id);
   }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has name", function() {
+    expect(res.body.name).to.be.a('string');
+  });
+  test("Has connectorType", function() {
+    expect(res.body.connectorType).to.be.a('string');
+  });
 }

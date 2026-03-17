@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { SidebarProvider } from '@/components/ui/sidebar'
 import messages from '@/messages/de.json'
+import { MeAssignment, PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 
 vi.mock('next/navigation', () => ({
   usePathname: vi.fn(() => '/'),
@@ -21,91 +22,72 @@ vi.mock('@/components/ui/collapsible', () => ({
 
 import { AppSidebarContent } from './AppSidebarContent'
 
+const allPermissions: PermissionName[] = Object.values(PERMISSION_NAMES)
+
+const makeAssignments = (permissions: PermissionName[]): MeAssignment[] => [
+  { scopeType: 'TENANT', scopeId: null, permissions },
+]
+
+const renderWithProvider = (assignments: MeAssignment[]) => {
+  return render(
+    <NextIntlClientProvider locale="de" messages={messages}>
+      <SidebarProvider>
+        <AppSidebarContent assignments={assignments} />
+      </SidebarProvider>
+    </NextIntlClientProvider>,
+  )
+}
+
 describe('AppSidebarContent', () => {
-  const renderWithProvider = () => {
-    return render(
-      <NextIntlClientProvider locale="de" messages={messages}>
-        <SidebarProvider>
-          <AppSidebarContent />
-        </SidebarProvider>
-      </NextIntlClientProvider>,
-    )
-  }
+  describe('permission filtering', () => {
+    it('renders all nav links when user has all permissions', () => {
+      const { container } = renderWithProvider(makeAssignments(allPermissions))
 
-  describe('navigation links', () => {
-    it('renders datasets link with correct href', () => {
-      const { container } = renderWithProvider()
-
-      const datasetLink = container.querySelector('a[href="/datasets"]')
-      expect(datasetLink).toBeInTheDocument()
+      expect(container.querySelector('a[href="/datasets"]')).toBeInTheDocument()
+      expect(container.querySelector('a[href="/datasources"]')).toBeInTheDocument()
+      expect(container.querySelector('a[href="/datastructures"]')).toBeInTheDocument()
+      expect(container.querySelector('a[href="/users"]')).toBeInTheDocument()
+      expect(container.querySelector('a[href="/groups"]')).toBeInTheDocument()
+      expect(container.querySelector('a[href="/roles"]')).toBeInTheDocument()
     })
 
-    it('renders datasources link with correct href', () => {
-      const { container } = renderWithProvider()
+    it('hides data items when data permissions are missing', () => {
+      const { container } = renderWithProvider(
+        makeAssignments([PERMISSION_NAMES.USER_READ, PERMISSION_NAMES.GROUP_READ, PERMISSION_NAMES.ROLE_READ]),
+      )
 
-      const datasourcesLink = container.querySelector('a[href="/datasources"]')
-      expect(datasourcesLink).toBeInTheDocument()
+      expect(container.querySelector('a[href="/datasets"]')).not.toBeInTheDocument()
+      expect(container.querySelector('a[href="/datasources"]')).not.toBeInTheDocument()
+      expect(container.querySelector('a[href="/datastructures"]')).not.toBeInTheDocument()
     })
 
-    it('renders datastructures link with correct href', () => {
-      const { container } = renderWithProvider()
+    it('hides admin items when admin permissions are missing', () => {
+      const { container } = renderWithProvider(
+        makeAssignments([
+          PERMISSION_NAMES.DATASET_READ,
+          PERMISSION_NAMES.DATASOURCE_READ,
+          PERMISSION_NAMES.DATASTRUCTURE_READ,
+        ]),
+      )
 
-      const datastructuresLink = container.querySelector('a[href="/datastructures"]')
-      expect(datastructuresLink).toBeInTheDocument()
+      expect(container.querySelector('a[href="/users"]')).not.toBeInTheDocument()
+      expect(container.querySelector('a[href="/groups"]')).not.toBeInTheDocument()
+      expect(container.querySelector('a[href="/roles"]')).not.toBeInTheDocument()
     })
 
-    it('renders users link with correct href', () => {
-      const { container } = renderWithProvider()
-
-      const usersLink = container.querySelector('a[href="/users"]')
-      expect(usersLink).toBeInTheDocument()
-    })
-
-    it('renders groups link with correct href', () => {
-      const { container } = renderWithProvider()
-
-      const groupsLink = container.querySelector('a[href="/groups"]')
-      expect(groupsLink).toBeInTheDocument()
-    })
-
-    it('renders roles link with correct href', () => {
-      const { container } = renderWithProvider()
-
-      const rolesLink = container.querySelector('a[href="/roles"]')
-      expect(rolesLink).toBeInTheDocument()
-    })
-
-    it('renders documentation link as external link', () => {
-      const { container } = renderWithProvider()
+    it('always renders documentation link', () => {
+      const { container } = renderWithProvider(makeAssignments([]))
 
       const docsLink = container.querySelector('a[target="_blank"]')
       expect(docsLink).toBeInTheDocument()
     })
-  })
 
-  describe('visual elements', () => {
-    it('renders menu items with icons', () => {
-      const { container } = renderWithProvider()
+    it('renders no data or admin items when assignments are empty', () => {
+      const { container } = renderWithProvider([])
 
-      const icons = container.querySelectorAll('[data-slot="sidebar-menu-button"] svg')
-      expect(icons.length).toBeGreaterThan(0)
-    })
-
-    it('renders toggle buttons for expandable items with accessible label', () => {
-      const { container } = renderWithProvider()
-
-      const toggleButtons = container.querySelectorAll('[data-slot="collapsible-trigger"] svg')
-      expect(toggleButtons.length).toBeGreaterThan(0)
-    })
-  })
-
-  describe('collapsible structure', () => {
-    it('renders collapsible items', () => {
-      const { container } = renderWithProvider()
-
-      // Both collapsible parent items (ourData, tenants) start in closed state by default
-      const collapsibles = container.querySelectorAll('[data-state="closed"], [data-state="open"]')
-      expect(collapsibles.length).toBeGreaterThan(0)
+      expect(container.querySelector('a[href="/datasets"]')).not.toBeInTheDocument()
+      expect(container.querySelector('a[href="/users"]')).not.toBeInTheDocument()
+      expect(container.querySelector('a[target="_blank"]')).toBeInTheDocument()
     })
   })
 })

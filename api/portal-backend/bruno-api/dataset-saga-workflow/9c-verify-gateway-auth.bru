@@ -1,0 +1,17 @@
+meta {
+  name: 9c. Verify Gateway Auth (unauthenticated)
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{apisixGatewayUrl}}/datasets/{{sagaDataSetId}}
+  body: none
+  auth: none
+}
+
+tests {
+  test("Unauthenticated request rejected by openid-connect", function() {
+    expect(res.getStatus()).to.equal(401);
+  });
+}

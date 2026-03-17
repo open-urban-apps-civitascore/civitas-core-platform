@@ -13,3 +13,16 @@ delete {
 params:path {
   id: {{roleId}}
 }
+
+script:post-response {
+  const setupId = bru.getVar('setupRoleId');
+  if (setupId) {
+    bru.setVar('roleId', setupId);
+  }
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

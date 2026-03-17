@@ -18,3 +18,12 @@ params:query {
   ~category: TENANT_ADMINISTRATION
   ~source: INTERNAL
 }
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Returns array of permissions", function() {
+    expect(res.body).to.be.an('array');
+  });
+}

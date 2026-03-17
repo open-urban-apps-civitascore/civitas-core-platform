@@ -80,7 +80,7 @@ bundle-authz-rego:
     - .opa-common
   stage: build
   needs:
-    - job: test-authz
+    - job: check-authz-rego
       optional: true
     - job: setup-version
       optional: true
@@ -188,6 +188,8 @@ test-authz:
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: test
   needs:
+    - job: build-authz
+      artifacts: true
     - job: setup-version
       artifacts: true
     - job: setup-version-portal-model
@@ -206,7 +208,7 @@ test-authz:
   script:
     - cd authz/repository
     # Run tests using published portal-model from GitLab Maven repository
-    - mvn $MAVEN_CLI_OPTS clean org.jacoco:jacoco-maven-plugin:prepare-agent test jacoco:report -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
+    - mvn $MAVEN_CLI_OPTS org.jacoco:jacoco-maven-plugin:prepare-agent surefire:test jacoco:report -Dportal-model.version=$PORTAL_MODEL_VERSION -s ci_settings.xml
     # To print coverage, picked up by coverage regex
     - cat target/site/jacoco/index.html| grep -o '<tfoot>.*</tfoot>'
   coverage: '/Total.*?([0-9]{1,3})%/'
@@ -233,7 +235,6 @@ build-authz:
       artifacts: true
     - lint-authz
     - dependency-prune-authz
-    - test-authz
     - job: publish-portal-model
       optional: true
   variables:
@@ -253,18 +254,20 @@ build-authz:
   artifacts:
     when: on_success
     paths:
-      - authz/repository/target/*.jar
+      - authz/repository/target/
     expire_in: 1 month
 
 build-opa-image:
   extends: .only-authz-changes
   image: docker:27-dind
-  stage: build
+  stage: publish
   needs:
     - job: setup-version
       artifacts: true
     - job: bundle-authz-rego
       artifacts: true
+    - job: test-authz
+    - job: test-authz-rego
   services:
     - docker:27-dind
   variables:
@@ -298,12 +301,13 @@ build-opa-image:
 build-authz-image:
   extends: .only-authz-changes
   image: docker:27-dind
-  stage: build
+  stage: publish
   needs:
     - job: setup-version
       artifacts: true
     - job: build-authz
       artifacts: true
+    - job: test-authz
   services:
     - docker:27-dind
   variables:
