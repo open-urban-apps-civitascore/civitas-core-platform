@@ -130,11 +130,6 @@ public class DataStructureVersionService
         validateModelForUpdate(input);
       }
 
-      if (StringUtils.isNotBlank(input.getModel())
-          && StringUtils.isNotBlank(input.getModelAtlasUri())) {
-        deleteOldModelIfUriChanged(existingEntity.getModelAtlasUri(), input);
-      }
-
     } catch (InvalidInputException e) {
       throw e;
     } catch (Exception e) {
@@ -277,7 +272,10 @@ public class DataStructureVersionService
       throw new InvalidInputException(
           "dataStructureVersionStatus", id, "Cannot update non-DRAFT DataStructureVersion.");
     }
-    return super.update(id, input);
+    String oldModelAtlasUri = existingEntity.getModelAtlasUri();
+    DataStructureVersion result = super.update(id, input);
+    deleteOldModelIfUriChanged(oldModelAtlasUri, input);
+    return result;
   }
 
   /**
@@ -301,7 +299,10 @@ public class DataStructureVersionService
           "Cannot use updatePublishedMeta for DRAFT DataStructureVersion.");
     }
 
-    return super.update(id, input);
+    String oldModelAtlasUri = existingEntity.getModelAtlasUri();
+    DataStructureVersion result = super.update(id, input);
+    deleteOldModelIfUriChanged(oldModelAtlasUri, input);
+    return result;
   }
 
   /**
