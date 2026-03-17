@@ -259,7 +259,12 @@
       "updateSuccess": "Dataset has been successfully updated.",
       "deleteSuccess": "Dataset has been successfully deleted.",
       "deleteError": "An error occurred while deleting the dataset. Please try again.",
-      "updateAccessManagementSuccess": "Access management has been successfully updated."
+      "updateAccessManagementSuccess": "Access management has been successfully updated.",
+      "publishSuccess": "Dataset has been successfully published.",
+      "unpublishSuccess": "Dataset has been successfully unpublished.",
+      "releaseSuccess": "Dataset has been successfully released.",
+      "unreleaseSuccess": "Dataset has been successfully unreleased.",
+      "transitionError": "An error occurred while changing the dataset status. Please try again."
     },
     "warningModal": {
       "title": "Delete dataset?",

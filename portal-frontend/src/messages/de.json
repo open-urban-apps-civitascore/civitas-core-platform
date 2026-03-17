@@ -257,7 +257,12 @@
       "createSuccess": "Datensatz wurde erfolgreich angelegt.",
       "updateSuccess": "Datensatz wurde erfolgreich aktualisiert.",
       "deleteSuccess": "Datensatz wurde erfolgreich gelöscht.",
-      "deleteError": "Fehler beim Löschen des Datensatzes. Bitte versuche es erneut."
+      "deleteError": "Fehler beim Löschen des Datensatzes. Bitte versuche es erneut.",
+      "publishSuccess": "Der Datensatz wurde erfolgreich veröffentlicht.",
+      "unpublishSuccess": "Der Datensatz wurde erfolgreich zurückgezogen.",
+      "releaseSuccess": "Der Datensatz wurde erfolgreich freigegeben.",
+      "unreleaseSuccess": "Die Freigabe des Datensatzes wurde erfolgreich aufgehoben.",
+      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut."
     },
     "warningModal": {
       "title": "Datensatz löschen?",
