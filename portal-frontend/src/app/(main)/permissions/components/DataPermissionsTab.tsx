@@ -3,7 +3,6 @@
 import { RowSelectionState } from '@tanstack/react-table'
 import { useState } from 'react'
 
-import { SearchHeader } from '@/components/search-area/SearchArea'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Permission, RoleWithPermissions } from '@/types/permissions'
 
@@ -18,7 +17,7 @@ interface DataPermissionsTabProps {
 export const DataPermissionsTab = ({ permissions, isLoading, rowCount }: DataPermissionsTabProps) => {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
-  const { setSortingParams, setPaginationParams, setSearchParam, pageIndex, pageSize, sorting, search, totalPages } =
+  const { setSortingParams, setPaginationParams, pageIndex, pageSize, sorting, totalPages } =
     useQueryParams()
 
   const getRolesWithPermissions = (): RoleWithPermissions[] => {
@@ -46,22 +45,19 @@ export const DataPermissionsTab = ({ permissions, isLoading, rowCount }: DataPer
   }
 
   return (
-    <>
-      <SearchHeader searchString={search} onChangeSearchString={setSearchParam} />
-      <PermissionsTable
-        permissions={getRolesWithPermissions()}
-        shouldShowPermissionColumns
-        isLoading={isLoading}
-        rowCount={rowCount}
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        totalPages={totalPages}
-        sorting={sorting}
-        rowSelection={rowSelection}
-        setRowSelection={setRowSelection}
-        onSortingChange={setSortingParams}
-        onPaginationChange={setPaginationParams}
-      />
-    </>
+    <PermissionsTable
+      permissions={getRolesWithPermissions()}
+      shouldShowPermissionColumns
+      isLoading={isLoading}
+      rowCount={rowCount}
+      pageIndex={pageIndex}
+      pageSize={pageSize}
+      totalPages={totalPages}
+      sorting={sorting}
+      rowSelection={rowSelection}
+      setRowSelection={setRowSelection}
+      onSortingChange={setSortingParams}
+      onPaginationChange={setPaginationParams}
+    />
   )
 }

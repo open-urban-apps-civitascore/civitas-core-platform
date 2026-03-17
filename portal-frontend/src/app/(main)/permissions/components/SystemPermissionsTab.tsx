@@ -40,10 +40,10 @@ export const SystemPermissionsTab = ({ permissions, isLoading }: SystemPermissio
     <>
       <SearchHeader searchString={search} onChangeSearchString={setSearchParam} />
 
-      {[...KNOWN_CATEGORIES, CATEGORY_OTHER].map(category => {
+      {[...KNOWN_CATEGORIES, CATEGORY_OTHER].map((category, index) => {
         const groupedPermissions = groups[category] ?? []
         return (
-          <div key={category} className="mt-8">
+          <div key={category} className={`mt-${index === 0 ? 0 : 4}`}>
             <PermissionsList
               header={getCategoryLabel(category)}
               items={groupedPermissions.map(p => p.name)}
