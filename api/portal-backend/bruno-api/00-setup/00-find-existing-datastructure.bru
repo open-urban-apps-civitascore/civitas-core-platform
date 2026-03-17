@@ -1,0 +1,31 @@
+meta {
+  name: Setup - Find Existing DataStructure
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/datastructures?search=API Test DataStructure
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(d => d.name === 'API Test DataStructure');
+    if (match) {
+      bru.setVar('dataStructureId', match.id);
+      bru.setVar('setupDataStructureId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

@@ -1,0 +1,32 @@
+meta {
+  name: 0e. Find Existing Saga Pipeline
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{sagaDataSetId}}
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(p => p.name === 'Saga Test Pipeline');
+    if (match) {
+      bru.setVar('sagaPipelineId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded or no dataset yet", function() {
+    const status = res.getStatus();
+    // 200=found, 400/404=dataset doesn't exist yet (first run)
+    expect(status === 200 || status === 400 || status === 404).to.be.true;
+  });
+}

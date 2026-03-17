@@ -20,25 +20,28 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * Base class for RedPanda Connect integration tests. Provides a shared Testcontainer, HTTP client,
- * and pipeline assertion helpers.
+ * Base class for RedPanda Connect integration tests. Uses the singleton container pattern so the
+ * container starts only once per JVM. Provides a shared HTTP client and pipeline assertion helpers.
  */
-@Testcontainers
+@SuppressWarnings("resource")
 abstract class AbstractRedpandaIntegrationTest {
 
   protected static final int CONNECT_PORT = 4195;
 
-  @Container
   static final GenericContainer<?> redpandaConnect =
       new GenericContainer<>(DockerImageName.parse("redpandadata/connect"))
           .withCommand("streams")
           .withExposedPorts(CONNECT_PORT)
           .waitingFor(Wait.forHttp("/ready").forPort(CONNECT_PORT).forStatusCode(200));
+
+  static {
+    redpandaConnect.start();
+
+    Runtime.getRuntime().addShutdownHook(new Thread(redpandaConnect::stop));
+  }
 
   protected static String baseUrl;
   protected static Client httpClient;

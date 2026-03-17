@@ -1,7 +1,7 @@
 meta {
   name: Unpublish Data Source
   type: http
-  seq: 8
+  seq: 7
 }
 
 post {
@@ -12,4 +12,12 @@ post {
 
 params:path {
   id: {{dataSourceId}}
+}
+
+tests {
+  test("Unpublish accepted or not published", function() {
+    const status = res.getStatus();
+    // 200=unpublished, 400=not in published state
+    expect(status === 200 || status === 400).to.be.true;
+  });
 }

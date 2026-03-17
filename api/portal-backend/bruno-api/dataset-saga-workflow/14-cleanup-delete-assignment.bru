@@ -1,0 +1,23 @@
+meta {
+  name: 14. Cleanup - Delete Assignment
+  type: http
+  seq: 23
+}
+
+delete {
+  url: {{baseUrl}}/assignments/:id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaAssignmentId}}
+}
+
+tests {
+  test("Assignment deleted or already gone", function() {
+    const status = res.getStatus();
+    // 204=deleted, 404=already gone, 400=invalid ID
+    expect(status === 204 || status === 404 || status === 400).to.be.true;
+  });
+}

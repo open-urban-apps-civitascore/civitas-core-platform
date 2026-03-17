@@ -1,7 +1,7 @@
 meta {
   name: Update Published Data Structure Meta
   type: http
-  seq: 9
+  seq: 18
 }
 
 put {
@@ -19,4 +19,12 @@ body:json {
     "name": "Updated Name",
     "description": "Updated description for published data structure"
   }
+}
+
+tests {
+  test("Updated or not published", function() {
+    const status = res.getStatus();
+    // 200=updated, 400=data structure not in published state
+    expect(status === 200 || status === 400).to.be.true;
+  });
 }

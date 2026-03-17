@@ -11,6 +11,9 @@ mvn clean install
 # Unit tests only (*Test.java, via surefire)
 mvn test
 
+# Parallel test execution (2 modules at once, ~30% faster)
+mvn test -T 2
+
 # Unit + integration tests (*IT.java, requires Docker for Testcontainers)
 mvn verify
 
@@ -29,8 +32,8 @@ mvn spotless:apply
 # Check formatting (runs automatically during verify)
 mvn spotless:check
 
-# Build fat JAR
-mvn package -pl config-adapter-application
+# Build fat JAR (with all adapter plugins)
+mvn package -Pdist -pl config-adapter-application
 ```
 
 ## Architecture

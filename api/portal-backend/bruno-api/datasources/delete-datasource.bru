@@ -1,7 +1,7 @@
 meta {
   name: Delete Data Source
   type: http
-  seq: 6
+  seq: 10
 }
 
 delete {
@@ -12,4 +12,20 @@ delete {
 
 params:path {
   id: {{dataSourceId}}
+}
+
+script:post-response {
+  // Restore setup variables so later folders can use them
+  const setupId = bru.getVar('setupDataSourceId');
+  if (setupId) {
+    bru.setVar('dataSourceId', setupId);
+    bru.setVar('scopeType', 'DATASOURCE');
+    bru.setVar('scopeId', setupId);
+  }
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
 }

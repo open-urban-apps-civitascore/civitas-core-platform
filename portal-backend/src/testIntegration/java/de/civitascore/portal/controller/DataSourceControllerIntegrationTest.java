@@ -22,6 +22,7 @@ import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.service.connector.ConnectorHandler;
 import de.civitascore.portal.util.RestPage;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -358,8 +359,8 @@ class DataSourceControllerIntegrationTest
     void shouldPartiallyUpdateWithPatch() {
       UUID id = createTestEntity();
 
-      Map<String, Object> patchMap = new HashMap<>();
-      patchMap.put("description", "Updated description via PATCH");
+      Map<String, Object> patchMap =
+          Collections.singletonMap("description", "Updated description via PATCH");
 
       ResponseEntity<DataSourceOutputDTO> response = performPatch(id, patchMap);
 

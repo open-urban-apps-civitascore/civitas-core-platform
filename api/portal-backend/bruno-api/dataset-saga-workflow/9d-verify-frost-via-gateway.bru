@@ -1,0 +1,25 @@
+meta {
+  name: 9d. Verify FROST via APISIX Gateway
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{apisixGatewayUrl}}/datasets/{{sagaDataSetId}}
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+tests {
+  test("FROST reachable via APISIX gateway", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is valid JSON", function() {
+    expect(res.body).to.be.an('object');
+  });
+}

@@ -14,3 +14,9 @@ params:path {
   dataSetId: {{dataSetId}}
   id: {{pipelineId}}
 }
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

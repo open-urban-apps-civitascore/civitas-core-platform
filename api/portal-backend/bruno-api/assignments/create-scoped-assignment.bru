@@ -1,0 +1,44 @@
+meta {
+  name: Create Scoped Assignment
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/assignments
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "groupId": "{{groupId}}",
+    "roleId": "{{roleId}}",
+    "scopeType": "{{scopeType}}",
+    "scopeId": "{{scopeId}}"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('assignmentId', res.body.id);
+  }
+}
+
+tests {
+  test("Scoped Assignment created or already exists", function() {
+    const status = res.getStatus();
+    // 201=created, 409=duplicate assignment from previous run
+    expect(status === 201 || status === 409).to.be.true;
+  });
+  test("Has id", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.id).to.be.a('string');
+    }
+  });
+  test("Has scopeType", function() {
+    if (res.getStatus() === 201) {
+      expect(res.body.scopeType).to.be.a('string');
+    }
+  });
+}

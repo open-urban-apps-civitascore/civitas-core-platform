@@ -1,7 +1,7 @@
 meta {
   name: Get Pipeline by ID
   type: http
-  seq: 2
+  seq: 3
 }
 
 get {
@@ -13,4 +13,13 @@ get {
 params:path {
   dataSetId: {{dataSetId}}
   id: {{pipelineId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Has correct id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
 }

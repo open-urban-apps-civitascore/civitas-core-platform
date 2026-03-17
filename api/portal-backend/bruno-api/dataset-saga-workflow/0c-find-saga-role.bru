@@ -1,0 +1,27 @@
+meta {
+  name: 0c. Find Existing Saga Role
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/roles?search=Saga Test Data Role
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(r => r.name === 'Saga Test Data Role');
+    if (match) {
+      bru.setVar('sagaRoleId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    // Always 200 — search returns empty page if entity doesn't exist
+    expect(res.getStatus()).to.equal(200);
+  });
+}

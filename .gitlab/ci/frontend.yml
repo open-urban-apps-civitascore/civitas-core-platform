@@ -117,7 +117,7 @@ build-frontend:
   extends: .only-frontend-changes
   image: node:22
   stage: build
-  needs: ['lint-frontend', 'dependency-prune-frontend', 'test-frontend']
+  needs: ['lint-frontend', 'dependency-prune-frontend']
   variables:
     NODE_ENV: production
     PNPM_STORE_DIR: $CI_PROJECT_DIR/portal-frontend/.pnpm-store
@@ -144,11 +144,12 @@ build-frontend:
 build-frontend-image:
   extends: .only-frontend-changes
   image: docker:27-dind
-  stage: build
+  stage: publish
   needs:
     - job: setup-version
       artifacts: true
     - job: build-frontend
+    - job: test-frontend
   services:
     - name: docker:27-dind
       command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']

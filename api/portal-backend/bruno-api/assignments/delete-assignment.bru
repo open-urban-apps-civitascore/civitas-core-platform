@@ -1,7 +1,7 @@
 meta {
   name: Delete Assignment
   type: http
-  seq: 4
+  seq: 5
 }
 
 delete {
@@ -12,4 +12,10 @@ delete {
 
 params:path {
   id: {{assignmentId}}
+}
+
+tests {
+  test("Status code is 204", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
 }

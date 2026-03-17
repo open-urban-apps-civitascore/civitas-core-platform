@@ -1,7 +1,7 @@
 meta {
   name: Create Data Structure Version
   type: http
-  seq: 13
+  seq: 7
 }
 
 post {
@@ -32,4 +32,19 @@ script:post-response {
     bru.setVar('scopeType', 'DATASTRUCTURE');
     bru.setVar('scopeId', bru.getVar('dataStructureId'));
   }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("Has id", function() {
+    expect(res.body.id).to.be.a('string');
+  });
+  test("Has version", function() {
+    expect(res.body.version).to.be.a('string');
+  });
+  test("Has dataStructureVersionStatus", function() {
+    expect(res.body.dataStructureVersionStatus).to.be.a('string');
+  });
 }

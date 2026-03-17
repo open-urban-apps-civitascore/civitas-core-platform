@@ -10,11 +10,14 @@
 package de.civitascore.configadapter.apisix;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
@@ -33,6 +36,7 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class ApisixSagaHandlerTest {
 
@@ -116,6 +120,70 @@ class ApisixSagaHandlerTest {
         SagaCommandResult result = handler.handle(command);
 
         assertEquals("STEP_COMPLETED", result.type());
+      }
+    }
+
+    @Test
+    @DisplayName("includes service_id in route body when configured")
+    void shouldIncludeServiceIdInRouteBody() {
+      try (ApisixSagaHandler handler = createHandler()) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "CREATE_ROUTE",
+                Map.of(
+                    "datasetId",
+                    "ds-001",
+                    "upstreamUrl",
+                    "http://frost:8080/FROST-Server/v1.1/Projects(1)",
+                    "openDataAccess",
+                    true));
+
+        handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
+            ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(2)).put(entityCaptor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> routeBody = entityCaptor.getValue().getEntity();
+        assertEquals("svc-frost-server", routeBody.get("service_id"));
+      }
+    }
+
+    @Test
+    @DisplayName("omits service_id from route body when not configured")
+    void shouldOmitServiceIdWhenNotConfigured() {
+      try (ApisixSagaHandler handler = createHandlerWithConfig(null, null)) {
+        Response mockResponse = mock(Response.class);
+        when(mockResponse.getStatus()).thenReturn(201);
+        when(mockBuilder.put(any(Entity.class))).thenReturn(mockResponse);
+
+        SagaCommandMessage command =
+            createCommand(
+                "EXECUTE_STEP",
+                "CREATE_ROUTE",
+                Map.of(
+                    "datasetId",
+                    "ds-001",
+                    "upstreamUrl",
+                    "http://frost:8080/FROST-Server/v1.1/Projects(1)",
+                    "openDataAccess",
+                    true));
+
+        handler.handle(command);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Entity<Map<String, Object>>> entityCaptor =
+            ArgumentCaptor.forClass(Entity.class);
+        verify(mockBuilder, times(2)).put(entityCaptor.capture());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> routeBody = entityCaptor.getValue().getEntity();
+        assertFalse(routeBody.containsKey("service_id"));
       }
     }
 
@@ -521,10 +589,14 @@ class ApisixSagaHandlerTest {
   }
 
   private ApisixSagaHandler createHandler() {
-    return createHandlerWithPluginConfig(null);
+    return createHandlerWithConfig(null, "svc-frost-server");
   }
 
   private ApisixSagaHandler createHandlerWithPluginConfig(String pluginConfig) {
+    return createHandlerWithConfig(pluginConfig, "svc-frost-server");
+  }
+
+  private ApisixSagaHandler createHandlerWithConfig(String pluginConfig, String serviceId) {
     ApisixSagaHandler handler = new ApisixSagaHandler();
     AdapterConfig mockConfig = mock(AdapterConfig.class);
     when(mockConfig.getProperty("apisix.admin.key")).thenReturn("test-admin-key");
@@ -533,6 +605,7 @@ class ApisixSagaHandlerTest {
     when(mockConfig.getProperty("apisix.gateway.url", "http://localhost:9080"))
         .thenReturn("http://gateway:9080");
     when(mockConfig.getProperty("apisix.plugin.config.id")).thenReturn(pluginConfig);
+    when(mockConfig.getProperty("apisix.service.id")).thenReturn(serviceId);
     handler.initialize(mockConfig);
 
     Client mockClient = mock(Client.class);

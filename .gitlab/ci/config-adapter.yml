@@ -131,9 +131,11 @@ dependency-prune-config-adapter:
 test-config-adapter:
   extends: .only-config-adapter-changes
   image: maven:3.9-eclipse-temurin-21
-  stage: test-package
+  stage: build-package
   needs:
     - job: setup-version-config-adapter
+    - job: build-config-adapter
+      artifacts: true
   services:
     - name: docker:27-dind
       alias: docker
@@ -153,7 +155,7 @@ test-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - mvn $MAVEN_CLI_OPTS clean test -Drevision=$CONFIG_ADAPTER_VERSION
+    - mvn $MAVEN_CLI_OPTS jacoco:prepare-agent surefire:test jacoco:report -Drevision=$CONFIG_ADAPTER_VERSION -T 2
     # Aggregate coverage from all modules
     - |
       awk -F, \
@@ -183,7 +185,6 @@ build-config-adapter:
     - job: setup-version-config-adapter
     - job: lint-config-adapter
     - job: dependency-prune-config-adapter
-    - job: test-config-adapter
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -195,24 +196,53 @@ build-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - mvn package -DskipTests -Drevision=$CONFIG_ADAPTER_VERSION
+    - mvn package -DskipTests -Drevision=$CONFIG_ADAPTER_VERSION -Pdist
   artifacts:
     when: on_success
     paths:
-      - config-adapter/config-adapter-application/target/*.jar
+      - config-adapter/*/target/classes/
+      - config-adapter/*/target/test-classes/
+      - config-adapter/*/target/*.jar
     expire_in: 1 month
 
 # Publish config-adapter artifacts to GitLab Maven repository
 # This makes the artifacts available to portal-backend and other projects
 # Runs in QA stage so backend tests can use the published artifacts
 publish-config-adapter:
-  extends: .only-config-adapter-changes
+  extends: .only-config-adapter-changes # overridden by rules: below, kept for documentation
   image: maven:3.9-eclipse-temurin-21-alpine
   stage: deploy-package
-  needs:
-    - job: setup-version-config-adapter
-    - job: build-config-adapter
-      optional: true
+  rules:
+    # Same conditions as .only-config-adapter-changes, but with per-rule needs:
+    # Tags/main/develop: publish only after tests pass
+    - if: $CI_COMMIT_TAG
+      needs:
+        - job: setup-version-config-adapter
+        - job: build-config-adapter
+          optional: true
+        - job: test-config-adapter
+    - if: $CI_COMMIT_BRANCH == "main"
+      needs:
+        - job: setup-version-config-adapter
+        - job: build-config-adapter
+          optional: true
+        - job: test-config-adapter
+    - if: $CI_COMMIT_BRANCH == "develop"
+      needs:
+        - job: setup-version-config-adapter
+        - job: build-config-adapter
+          optional: true
+        - job: test-config-adapter
+    # MR: publish immediately after build (test runs in parallel)
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - config-adapter/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/config-adapter.yml
+      needs:
+        - job: setup-version-config-adapter
+        - job: build-config-adapter
+          optional: true
   variables:
     MAVEN_OPTS: '-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository'
   cache:
@@ -234,11 +264,12 @@ publish-config-adapter:
 build-config-adapter-image:
   extends: .only-config-adapter-changes
   image: docker:27-dind
-  stage: build
+  stage: publish
   needs:
     - job: setup-version-config-adapter
     - job: publish-config-adapter
     - job: build-config-adapter
+    - job: test-config-adapter
   services:
     - name: docker:27-dind
       command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']

@@ -1,0 +1,26 @@
+meta {
+  name: 10. Verify DataSet Assignments
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/datasets/:id/assignments
+  body: none
+  auth: inherit
+}
+
+params:path {
+  id: {{sagaDataSetId}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Has at least one assignment", function() {
+    // Assignments endpoint returns a flat array, not paginated
+    expect(res.body).to.be.an('array').that.has.length.greaterThan(0);
+  });
+}
