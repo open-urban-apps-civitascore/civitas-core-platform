@@ -35,10 +35,10 @@ export const DataSourcePanel: React.FC<DataSourcePanelProps> = ({ data, onUpdate
 
   const selectedEntity = data.entityId !== undefined ? getEntityById(data.entityId) : undefined
 
-  const handleEntityChange = (entity: { id: string | number; name: string } | undefined) => {
+  const handleEntityChange = (entity: { id: string; name: string } | undefined) => {
     if (entity) {
       onUpdate({
-        entityId: typeof entity.id === 'string' ? parseInt(entity.id, 10) : entity.id,
+        entityId: entity.id,
         entityName: entity.name,
         configured: true,
       })

@@ -51,13 +51,10 @@ const buildDataSourceInput = (node: PipelineNode): object | null => {
   if (!isDataSourceNodeData(node.data)) return null
 
   const data = node.data as DataSourceNodeData
-  const connectorType = data.entityMetadata?.connector ?? 'generate'
   const entityId = data.entityId
 
   return {
-    [connectorType]: {
-      label: '${' + `datasource_${entityId}` + '}',
-    },
+    label: '${' + `${entityId}` + '}',
   }
 }
 
