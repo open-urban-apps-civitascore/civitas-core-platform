@@ -33,9 +33,9 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
   // 2. Extract entity data by node type
 
   // DataSources: numeric entity IDs from configured DataSource nodes
-  const dataSources: number[] = pipeline.nodes
+  const dataSourceIds: string[] = pipeline.nodes
     .filter(n => isDataSourceNodeData(n.data) && n.data.entityId != null)
-    .map(n => (n.data as DataSourceNodeData).entityId as number)
+    .map(n => (n.data as DataSourceNodeData).entityId as string)
 
   // APIs: unique apiPath strings from ApiRequest/ApiResponse nodes
   const apis: string[] = [
@@ -53,7 +53,7 @@ export const buildPipelinePayload = (pipeline: Pipeline): PipelinePayload => {
     name: pipeline.name,
     description: pipeline.description || '-',
     styles: styles,
-    dataSources,
+    dataSourceIds,
     apis,
     persistences,
     model: model || {},

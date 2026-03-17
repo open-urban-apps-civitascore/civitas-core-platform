@@ -922,7 +922,12 @@
       "validateBeforeSave": "Klicke auf Validieren vor dem Speichern",
       "validate": "Validieren",
       "save": "Speichern",
-      "saving": "Speichert..."
+      "saving": "Speichert...",
+      "loading": "Pipelines werden geladen...",
+      "pipelineSettings": "Pipeline-Einstellungen",
+      "deletePipeline": "Pipeline löschen",
+      "deleteConfirmTitle": "Pipeline löschen?",
+      "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
     },
     "tabs": {
       "closeTab": "Tab schließen",

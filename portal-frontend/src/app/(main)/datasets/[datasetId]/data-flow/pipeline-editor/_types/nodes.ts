@@ -78,7 +78,7 @@ export interface EntityNodeData extends BasePipelineNodeData {
  */
 export interface DataSourceNodeData extends BasePipelineNodeData {
   entityType: typeof ENTITY_TYPES.Datasource
-  entityId?: number
+  entityId?: string
   entityName?: string
   entityMetadata?: {
     connector?: string

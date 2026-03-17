@@ -20,7 +20,7 @@ import type { Datasource } from '@/types/datasources'
  *
  */
 export interface SelectableEntity {
-  id: string | number
+  id: string
   name: string
   metadata?: Record<string, unknown>
 }

@@ -114,7 +114,7 @@ export interface PipelinePayload {
   description: string
   /** JSON-stringified PipelineStylesPayload — backend stores as opaque string */
   styles: PipelineStylesPayload
-  dataSources: number[] // IDs extracted from DataSource nodes
+  dataSourceIds: string[] // IDs extracted from DataSource nodes
   apis: string[] // endpoint paths from ApiRequest/ApiResponse nodes
   persistences: number[] // persistence config IDs (Long[] in backend)
   model: object // Pipeline graph serialized in RedPandaConnect syntax
