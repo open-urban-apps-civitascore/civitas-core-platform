@@ -208,6 +208,10 @@ if [ "$PORT_CONFLICT" = true ]; then
     exit 1
 fi
 echo -e "  Ports: ${GREEN}OK${NC}"
+
+# Ensure civitas-network exists (included compose files expect it as external)
+docker network create civitas-network 2>/dev/null || true
+echo -e "  Network: ${GREEN}OK${NC}"
 echo ""
 
 # =============================================================================
@@ -264,7 +268,7 @@ wait_for_healthy postgres-keycloak 30 1 || exit 1
 # Step 2: Flyway migrations
 echo "  Running Flyway migrations..."
 FLYWAY_MIGRATIONS="$PROJECT_ROOT/portal-backend/src/main/resources/db/migration"
-if docker run --rm --network authz-e2e-network \
+if docker run --rm --network civitas-network \
     -v "$FLYWAY_MIGRATIONS:/flyway/sql:ro" \
     flyway/flyway:11-alpine \
     -url=jdbc:postgresql://postgres-portal:5432/portal_backend \
@@ -277,12 +281,12 @@ else
     exit 1
 fi
 
-# Step 3: Seed permissions and roles
-echo "  Seeding permissions and roles..."
-if docker exec -i civitas-postgres-portal psql -U admin -d portal_backend < "$SCRIPT_DIR/seed-authz-data.sql" > /dev/null 2>&1; then
-    echo -e "  Seed data: ${GREEN}OK${NC}"
+# Step 3: Seed authz test roles (before backend, so UserInitializer can find them)
+echo "  Seeding authz test roles..."
+if docker exec -i civitas-postgres-portal psql -U admin -d portal_backend < "$SCRIPT_DIR/seed-authz-roles.sql" > /dev/null 2>&1; then
+    echo -e "  Roles: ${GREEN}OK${NC}"
 else
-    echo -e "  Seed data: ${RED}FAILED${NC}"
+    echo -e "  Roles: ${RED}FAILED${NC}"
     exit 1
 fi
 
@@ -307,7 +311,19 @@ echo "  Starting portal-backend..."
 dc up -d portal-backend
 wait_for_url "Backend health" "http://localhost:8089/v1/actuator/health" 60 2 || exit 1
 
-# Step 6: Verify UserInitializer completed (users synced to Keycloak)
+# Step 6: Seed role-permission mappings
+# Must run AFTER backend start because PermissionRoleInitializer creates
+# the standard permissions (USER_READ, DATASET_READ, etc.) at startup.
+# The seed links the authz test roles to those permissions.
+echo "  Seeding role-permission mappings..."
+if docker exec -i civitas-postgres-portal psql -U admin -d portal_backend < "$SCRIPT_DIR/seed-authz-role-permissions.sql" > /dev/null 2>&1; then
+    echo -e "  Role-permissions: ${GREEN}OK${NC}"
+else
+    echo -e "  Role-permissions: ${RED}FAILED${NC}"
+    exit 1
+fi
+
+# Step 7: Verify UserInitializer completed (users synced to Keycloak)
 echo "  Verifying user sync to Keycloak..."
 SYNC_OK=true
 for email in "$ADMIN_EMAIL" "$READER_EMAIL" "$NONE_EMAIL"; do
