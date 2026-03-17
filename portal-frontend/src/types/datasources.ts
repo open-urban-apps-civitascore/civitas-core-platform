@@ -56,44 +56,38 @@ export const DatasourceBaseFormSchema = z.object({
   id: z.string(),
   name: z.string().trim().min(1, 'common.errors.nameRequired'),
   description: z.string().trim().max(150, 'common.errors.descriptionMaxLength'),
+  dataSourceStatus: DatasourceStatusSchema,
+  connectorType: ConnectorTypeSchema.optional(),
+  configuration: z.record(z.string(), z.unknown()).optional(),
   dataStructureVersionId: z.string().trim().min(1, 'datasources.errors.required').nullable(),
 })
 
 export type DatasourceBaseFormData = z.infer<typeof DatasourceBaseFormSchema>
 
-export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.partial()
-  .extend({
-    connectorType: ConnectorTypeSchema.optional(),
-    configuration: z.record(z.string(), z.unknown()).optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (!data.connectorType || !data.configuration) return
-    const result = ConnectorLooseSchema.safeParse(data)
-    if (!result.success) {
-      result.error.issues.forEach(issue => ctx.addIssue({ ...issue }))
-    }
-  })
+export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.superRefine((data, ctx) => {
+  if (!data.connectorType || !data.configuration) return
+  const result = ConnectorLooseSchema.safeParse(data)
+  if (!result.success) {
+    result.error.issues.forEach(issue => ctx.addIssue({ ...issue }))
+  }
+})
 
-export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.partial()
-  .required({
-    name: true,
-  })
-  .extend({
-    connectorType: ConnectorTypeSchema,
-    configuration: z.record(z.string(), z.unknown()),
-    dataStructureVersionId: z.string().trim().min(1, 'datasources.errors.required'),
-  })
-  .superRefine((data, ctx) => {
-    const result = ConnectorStrictSchema.safeParse(data)
-    if (!result.success) {
-      result.error.issues.forEach(issue => ctx.addIssue({ ...issue }))
-    }
-  })
+export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
+  description: z.string().trim().min(1, 'common.errors.required').max(150, 'common.errors.descriptionMaxLength'),
+  connectorType: ConnectorTypeSchema,
+  configuration: z.record(z.string(), z.unknown()),
+  dataStructureVersionId: z.string().trim().min(1, 'datasources.errors.required'),
+}).superRefine((data, ctx) => {
+  const result = ConnectorStrictSchema.safeParse(data)
+  if (!result.success) {
+    result.error.issues.forEach(issue => ctx.addIssue({ ...issue }))
+  }
+})
 
 export type DatasourceFormDraft = z.input<typeof DatasourceFormDraftSchema>
 
 export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
-  ({ id, name, description, dataStructureVersion, connectorType, configuration }) => {
+  ({ id, name, description, dataSourceStatus, dataStructureVersion, connectorType, configuration }) => {
     const connectorParsed =
       connectorType && configuration ? ConnectorApiToFormSchema.safeParse({ connectorType, configuration }) : null
     if (connectorParsed && !connectorParsed.success) {
@@ -103,6 +97,7 @@ export const DatasourceApiToFormSchema = DatasourceApiResponseSchema.transform(
       id,
       name: name ?? '',
       description: description ?? '',
+      dataSourceStatus,
       dataStructureVersionId: dataStructureVersion?.id,
       ...(connectorParsed?.success ? connectorParsed.data : {}),
     } as DatasourceFormDraft
@@ -114,4 +109,6 @@ export const DatasourceCreateFormSchema = z.object({
 })
 
 export type DatasourceCreateData = z.infer<typeof DatasourceCreateFormSchema>
-export type DatasourceUpdateData = DatasourceFormDraft & WithId & { assignments?: AssignmentScopedInput[] }
+export type DatasourcePatchData = Partial<DatasourceFormDraft> & WithId & { assignments?: AssignmentScopedInput[] }
+export type DatasourcePutData = Partial<DatasourceFormDraft> &
+  WithId & { name: string } & { assignments?: AssignmentScopedInput[] }

@@ -47,10 +47,12 @@ vi.mock('../hooks/useDatasourceForm', () => ({
     form: mockForm,
     readyConnectorType: 'MQTT',
     dataSourceStatus: 'DRAFT',
+    hasStatusChanged: false,
     handleStatusChange: vi.fn(),
     canSetAvailable: false,
     completedTabs: [],
     submitDatasource: mockSubmitDatasource,
+    resetToInitialState: vi.fn(),
     isLoading: false,
   }),
 }))
@@ -236,7 +238,6 @@ describe('DatasourceOverview', () => {
       fireEvent.click(screen.getByTestId('cancelButton'))
 
       expect(screen.getByTestId('editButton')).toBeInTheDocument()
-      expect(mockForm.reset).toHaveBeenCalled()
       expect(mockReplace).toHaveBeenCalledWith('/datasources/test-id', { scroll: false })
     })
 

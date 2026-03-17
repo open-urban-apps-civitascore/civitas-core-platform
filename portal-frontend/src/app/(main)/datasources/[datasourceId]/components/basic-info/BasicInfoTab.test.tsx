@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { vi } from 'vitest'
 
 import { Form } from '@/components/ui/form'
-import { DatasourceBaseFormData, DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
+import { DatasourceFormDraft, DatasourceFormDraftSchema } from '@/types/datasources'
 
 import { BasicInfoTab } from './BasicInfoTab'
 
@@ -16,18 +16,18 @@ vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => false,
 }))
 
-const defaultFormValues: DatasourceBaseFormData = {
+const defaultFormValues: DatasourceFormDraft = {
   id: '1',
   name: '',
   description: '',
+  dataSourceStatus: 'DRAFT',
   dataStructureVersionId: '',
-  assignments: [],
 }
 
 interface WrapperProps {
   isReadOnly?: boolean
   isDraftMode?: boolean
-  initialValues?: Partial<DatasourceBaseFormData>
+  initialValues?: Partial<DatasourceFormDraft>
 }
 
 const TestWrapper = ({ isReadOnly = false, initialValues = {} }: WrapperProps) => {
@@ -140,11 +140,11 @@ describe('BasicInfoTab', () => {
       expect(nameAsterisk).toBeInTheDocument()
     })
 
-    test('description does not have required asterisk', () => {
+    test('description required asterisk is visible', () => {
       setup()
       const descriptionLabel = screen.getByText('form.description')
       const asterisk = descriptionLabel.parentElement?.querySelector('.text-red-500')
-      expect(asterisk).not.toBeInTheDocument()
+      expect(asterisk).toBeInTheDocument()
     })
   })
 

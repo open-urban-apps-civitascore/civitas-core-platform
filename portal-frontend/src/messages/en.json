@@ -695,6 +695,7 @@
       "title1": "Connector",
       "title2": "Configuration",
       "type": "Type",
+      "typePlaceholder": "Select connector type",
       "connection": "Connection",
       "establishConnection": "Establish Connection"
     },

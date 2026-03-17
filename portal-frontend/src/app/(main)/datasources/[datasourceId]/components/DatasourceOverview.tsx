@@ -116,12 +116,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const {
     areAssignmentsDirty,
     form: datasourceForm,
-    readyConnectorType,
     dataSourceStatus,
+    selectedConnectorType,
+    hasStatusChanged,
     handleStatusChange,
     canSetAvailable,
     completedTabs,
     submitDatasource,
+    resetToInitialState: resetDatasourceToInitialState,
     isLoading: isLoadingDatasource,
   } = useDatasourceForm(datasource, assignedGroups, initialAssignments)
 
@@ -154,6 +156,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   const resetToInitialState = () => {
+    resetDatasourceToInitialState()
     resetToInitialDatastructureState()
     datasourceForm.reset()
     setAssignedGroups(initialAssignments)
@@ -172,10 +175,10 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     })
   }
   const handleExit = () => {
-    if (datasourceForm.formState.isDirty || areAssignmentsDirty) {
+    if (datasourceForm.formState.isDirty || areAssignmentsDirty || hasDatastructureBeenEdited || hasStatusChanged) {
       setIsExitModalOpen(true)
     } else {
-      datasourceForm.reset()
+      resetToInitialState()
       updateMode(false)
       setAssignedGroups(initialAssignments)
     }
@@ -216,7 +219,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   }
 
   const isConfirmButtonDisabled =
-    !(datasourceForm.formState.isDirty || hasDatastructureBeenEdited || areAssignmentsDirty) ||
+    !(datasourceForm.formState.isDirty || hasDatastructureBeenEdited || areAssignmentsDirty || hasStatusChanged) ||
     !!datasourceForm.formState.errors.name ||
     (dataSourceStatus !== DATASOURCE_STATUS_TYPES.DRAFT && Object.keys(datasourceForm.formState.errors).length > 0) ||
     isLoadingDatasource
@@ -226,7 +229,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       case 'basicInfo':
         return <BasicInfoTab form={datasourceForm} isReadOnly={isReadOnly} />
       case 'connector':
-        return <ConnectorTab form={datasourceForm} readyConnectorType={readyConnectorType} isReadOnly={isReadOnly} />
+        return <ConnectorTab form={datasourceForm} connectorType={selectedConnectorType} isReadOnly={isReadOnly} />
       case 'dataStructure':
         return (
           <DatastructureTab
