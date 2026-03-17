@@ -1,14 +1,14 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 import { SearchHeader } from '@/components/search-area/SearchArea'
-import { useQueryParams } from '@/hooks/use-query-params'
 import { cn } from '@/lib/utils'
 import { Permission } from '@/types/permissions'
 import { ROLE_CATEGORIES } from '@/types/roles'
 
+import { translatePermissionName } from '../utils/translatePermissionName'
 import { PermissionsList } from './PermissionsList'
 
 interface SystemPermissionsTabProps {
@@ -21,15 +21,23 @@ const KNOWN_CATEGORIES = [ROLE_CATEGORIES.DATA.toString(), ROLE_CATEGORIES.TENAN
 export const SystemPermissionsTab = ({ permissions, isLoading }: SystemPermissionsTabProps) => {
   const t = useTranslations()
 
-  const { setSearchParam, search } = useQueryParams()
+  const [search, setSearch] = useState('')
   const CATEGORY_OTHER = 'OTHER'
+
+  const filteredPermissions = useMemo(() => {
+    const translated = permissions.map(p => ({
+      ...p,
+      translatedName: translatePermissionName(p.name, t),
+    }))
+    return search ? translated.filter(p => p.translatedName.toLowerCase().includes(search.toLowerCase())) : translated
+  }, [permissions, search, t])
 
   const groups = useMemo(
     () =>
-      Object.groupBy(permissions, permission =>
+      Object.groupBy(filteredPermissions, permission =>
         KNOWN_CATEGORIES.includes(permission.category) ? permission.category : CATEGORY_OTHER,
       ),
-    [permissions],
+    [filteredPermissions],
   )
 
   const getCategoryLabel = (category: string) => {
@@ -39,7 +47,7 @@ export const SystemPermissionsTab = ({ permissions, isLoading }: SystemPermissio
 
   return (
     <>
-      <SearchHeader searchString={search} onChangeSearchString={setSearchParam} />
+      <SearchHeader searchString={search} onChangeSearchString={setSearch} />
 
       {[...KNOWN_CATEGORIES, CATEGORY_OTHER].map((category, index) => {
         const groupedPermissions = groups[category] ?? []
@@ -47,7 +55,7 @@ export const SystemPermissionsTab = ({ permissions, isLoading }: SystemPermissio
           <div key={category} className={cn(index === 0 ? 'mt-0' : 'mt-4')}>
             <PermissionsList
               header={getCategoryLabel(category)}
-              items={groupedPermissions.map(p => p.name)}
+              items={groupedPermissions.map(p => p.translatedName)}
               isLoading={isLoading}
             />
           </div>

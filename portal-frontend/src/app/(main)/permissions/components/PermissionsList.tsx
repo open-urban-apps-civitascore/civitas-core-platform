@@ -22,26 +22,6 @@ const LoadingSkeleton = () => (
 export const PermissionsList = ({ header, items, isLoading }: PermissionsListProps) => {
   const t = useTranslations()
 
-  const translateItem = (item: string): string => {
-    const lastUnderscoreIndex = item.lastIndexOf('_')
-    if (lastUnderscoreIndex === -1) return item
-
-    const permission = item.substring(0, lastUnderscoreIndex)
-    const action = item.substring(lastUnderscoreIndex + 1).toLowerCase()
-
-    const permissionKey = `permissions.values.${permission}` as const
-    const actionKey = `permissions.actions.${action}` as const
-
-    if (!t.has(permissionKey) || !t.has(actionKey)) {
-      return item
-    }
-
-    return t('permissions.systemPermissions.entry', {
-      permission: t(permissionKey),
-      action: t(actionKey),
-    })
-  }
-
   if (isLoading) {
     return <LoadingSkeleton />
   }
@@ -58,7 +38,7 @@ export const PermissionsList = ({ header, items, isLoading }: PermissionsListPro
           {items.length > 0 ? (
             items.map(item => (
               <TableRow key={item}>
-                <TableCell className="px-3 h-12">{translateItem(item)}</TableCell>
+                <TableCell className="px-3 h-12">{item}</TableCell>
               </TableRow>
             ))
           ) : (
