@@ -106,8 +106,8 @@ public class DataSetSagaResultListener {
     log.info(
         "Saga failed for dataset {}: step={}, error={}, compensated={}",
         datasetId,
-        result.failedStep(),
-        result.error(),
+        Encode.forJava(result.failedStep()),
+        Encode.forJava(result.error()),
         result.compensated());
 
     dataSetService.handleSagaFailed(

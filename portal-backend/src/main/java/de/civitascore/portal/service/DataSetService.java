@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -361,23 +362,23 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       log.warn(
           "Saga CREATE failed for dataset {}: step={}, error={}, compensated={}. Reverted to READY",
           datasetId,
-          failedStep,
-          error,
+          Encode.forJava(failedStep),
+          Encode.forJava(error),
           compensated);
     } else if (pendingType == PendingSagaType.UPDATE) {
       log.warn(
           "Saga UPDATE failed for dataset {}: step={}, error={}, compensated={}. Staying AVAILABLE",
           datasetId,
-          failedStep,
-          error,
+          Encode.forJava(failedStep),
+          Encode.forJava(error),
           compensated);
     } else if (pendingType == PendingSagaType.DELETE) {
       log.warn(
           "Saga DELETE failed for dataset {}: step={}, error={}, compensated={}. "
               + "Staying AVAILABLE — stale resources may exist",
           datasetId,
-          failedStep,
-          error,
+          Encode.forJava(failedStep),
+          Encode.forJava(error),
           compensated);
     }
 
