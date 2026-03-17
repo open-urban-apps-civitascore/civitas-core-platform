@@ -224,7 +224,7 @@ if [ "$SKIP_BUILD" = false ]; then
     }
 
     echo "  Building config-adapter..."
-    (cd "$PROJECT_ROOT/config-adapter" && mvn clean package -DskipTests -Drevision="$DEV_VERSION" -q) || {
+    (cd "$PROJECT_ROOT/config-adapter" && mvn clean install -DskipTests -Drevision="$DEV_VERSION" -q) || {
         echo -e "  ${RED}config-adapter build failed${NC}"; exit 1;
     }
 
