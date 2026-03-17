@@ -36,6 +36,7 @@ import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
 import { PermissionsTab } from './permissions-tab/PermissionsTab'
+import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 
 const subTabValues: Record<RoleTab, Tab<RoleTab>> = {
   basicInformation: {
@@ -83,6 +84,8 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const tBaseInfo = useTranslations('roles.baseInfoTab')
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [isDeleteErrorOpen, setIsDeleteErrorOpen] = useState(false)
+  const [selectedGroupAssignmentIds, setSelectedGroupAssignmentIds] = useState<string[]>([])
+  const [unselectedGroupAssignmentIds, setUnselectedGroupAssignmentIds] = useState<string[]>([])
 
   const deleteRole = useDeleteRole()
   const isRoleQueryEnabled = !!roleId && !deleteRole.isPending && !deleteRole.isSuccess
@@ -96,7 +99,15 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     isEnabled: !!roleId,
   })
 
-  const assignedGroupIds = (assignmentsData?.data ?? []).map(a => a.group.id)
+  const initialAssignedGroupIds = (assignmentsData?.data ?? []).map(a => a.group.id)
+
+  useEffect(() => {
+    setSelectedGroupAssignmentIds(
+      (assignmentsData?.data ?? []).flatMap(a =>
+        a.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT || a.scopeType === null ? a.group.id : [],
+      ),
+    )
+  }, [assignmentsData])
 
   const createAssignment = useCreateAssignment()
   const deleteAssignment = useDeleteAssignment()
@@ -215,7 +226,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   }, [isAnyDirty, handleExit])
 
   // Group assignment (immediate - not part of unified save)
-  const handleGroupAssignmentUpdate = async (newGroupIds: string[]): Promise<void> => {
+  const handleSaveGroupAssignment = async (newGroupIds: string[]): Promise<void> => {
     if (!roleId) return
 
     const existingAssignments = assignmentsData?.data ?? []
@@ -237,6 +248,10 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     await refetchAssignments()
   }
 
+  const handleGroupAssignmentUpdate = (newGroupIds: string[]) => {
+    setSelectedGroupAssignmentIds(newGroupIds)
+  }
+
   // Tab configuration
   const disabledTabs = !roleId ? ['permissions', 'groupAssignment'] : undefined
 
@@ -256,14 +271,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const roleType = roleId ? initialRole?.roleType : tabValue || DEFAULT_TAB
   const badgeTitle = roleType ? tRoles(`${roleType.toLowerCase()}Roles`).slice(0, -1) : undefined
 
-  // Header custom elements
-  const EditButton = (
-    <Button data-testid="editButton" type="button" onClick={() => setIsReadOnly(false)}>
-      {tCommon('actions.edit')}
-    </Button>
-  )
-
-  const ActionButtonsElement = (
+  const SaveAndExitButtons = (
     <ActionButtons
       confirmButtonType="button"
       onCancelClick={handleExitButtonClick}
@@ -272,18 +280,16 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       isCancelButtonDisabled={isLoading}
       cancelButtonTitle={tCommon('actions.exit')}
       hasCard={false}
+      className="px-6 py-0"
       wrapperClassname="w-auto"
     />
   )
 
-  const isGroupAssignmentTab = subTabValue === subTabValues.groupAssignment.value
-
-  const getCustomElement = () => {
-    if (isDefaultRole || isGroupAssignmentTab) return undefined
-    if (!roleId) return ActionButtonsElement
-    if (isReadOnly) return EditButton
-    return ActionButtonsElement
-  }
+  const EditButton = (
+    <Button data-testid="editButton" type="button" onClick={() => setIsReadOnly(false)}>
+      {tCommon('actions.edit')}
+    </Button>
+  )
 
   return (
     <PageContainer headerType="withSubTabsOrSubtitle">
@@ -296,7 +302,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
           onTabChange: newSubTab => setSubTabValueParam(newSubTab),
           disabledTabs,
         }}
-        customElement={getCustomElement()}
+        customElement={isReadOnly ? EditButton : SaveAndExitButtons}
       />
 
       <PageBackground className="overflow-auto" hasBackground={!isReadOnly}>
@@ -321,7 +327,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
         {subTabValue === subTabValues.groupAssignment.value && (
           <GroupAssignmentTab
-            assignedGroupIds={assignedGroupIds}
+            assignedGroupIds={selectedGroupAssignmentIds}
             onGroupAssignmentUpdate={handleGroupAssignmentUpdate}
             roleName={initialRole?.name || ''}
             isEditMode={!isReadOnly && !isDefaultRole}

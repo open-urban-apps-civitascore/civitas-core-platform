@@ -71,12 +71,9 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
 
   // Filter assignments by selected scope
   const scopeFilteredGroupIds = useMemo(() => {
-    return assignments
-      .filter(
-        a => a.scopeType === selectedScope || (selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT && a.scopeType == null),
-      )
-      .map(a => a.group.id)
-  }, [assignments, selectedScope])
+    if (selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT) return assignedGroupIds
+    return assignments.filter(a => a.scopeType === selectedScope).map(a => a.group.id)
+  }, [assignments, selectedScope, assignedGroupIds])
 
   const groups = useMemo(() => {
     if (!groupsData?.data) {
