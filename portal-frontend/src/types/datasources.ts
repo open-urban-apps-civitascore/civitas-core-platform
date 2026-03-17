@@ -73,6 +73,7 @@ export const DatasourceFormDraftSchema = DatasourceBaseFormSchema.superRefine((d
 })
 
 export const DatasourceFormAvailableSchema = DatasourceBaseFormSchema.extend({
+  description: z.string().trim().min(1, 'common.errors.required').max(150, 'common.errors.descriptionMaxLength'),
   connectorType: ConnectorTypeSchema,
   configuration: z.record(z.string(), z.unknown()),
   dataStructureVersionId: z.string().trim().min(1, 'datasources.errors.required'),
