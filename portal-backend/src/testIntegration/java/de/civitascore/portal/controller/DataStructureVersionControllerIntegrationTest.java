@@ -577,13 +577,15 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should retrieve all versions for a data structure")
-    void shouldRetrieveAllVersions() {
+    @DisplayName("Should return 405 for getAll (endpoint disabled)")
+    void shouldRejectGetAll() {
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpoint(), HttpMethod.GET, new HttpEntity<>(createAuthHeaders()), String.class);
 
-      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getStatusCode())
+          .as("Should return METHOD_NOT_ALLOWED status")
+          .isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
     }
   }
 

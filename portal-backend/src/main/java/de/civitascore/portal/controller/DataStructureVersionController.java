@@ -15,12 +15,14 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,6 +32,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.MethodNotAllowedException;
 
 @RestController
 @RequestMapping("/datastructures/{dataStructureId}/versions")
@@ -49,7 +52,7 @@ public class DataStructureVersionController
   @Operation(hidden = true)
   public ResponseEntity<Page<DataStructureVersionOutputDTO>> getAll(
       @ParameterObject DataStructureVersionSpec spec, @ParameterObject Pageable pageable) {
-    return super.getAll(spec, pageable);
+    throw new MethodNotAllowedException(HttpMethod.GET, Collections.emptySet());
   }
 
   @Override
