@@ -6,6 +6,7 @@ import de.civitascore.portal.util.ExternalSystemTimeoutException;
 import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -32,6 +33,14 @@ public class ModelRestClientRequestService {
     return UriComponentsBuilder.fromPath("/{scope}/schema/stages/{stage}")
         .queryParam("nsUri", nsUri)
         .queryParam("overwrite", true)
+        .buildAndExpand(modelAtlasConfig.getScope(), modelAtlasConfig.getStage())
+        .encode()
+        .toUriString();
+  }
+
+  private String getDeleteEndpoint(String nsUri) {
+    return UriComponentsBuilder.fromPath("/{scope}/schema/stages/{stage}")
+        .queryParam("nsUri", nsUri)
         .buildAndExpand(modelAtlasConfig.getScope(), modelAtlasConfig.getStage())
         .encode()
         .toUriString();
@@ -65,10 +74,10 @@ public class ModelRestClientRequestService {
           .retrieve()
           .body(String.class);
     } catch (ResourceAccessException e) {
-      log.error("Timeout uploading model file to Model Atlas: nsUri={}", nsUri, e);
+      log.error("Timeout uploading model file to Model Atlas: nsUri={}", Encode.forJava(nsUri), e);
       throw new ExternalSystemTimeoutException("Model Atlas did not respond in time", e);
     } catch (RestClientException e) {
-      log.error("Failed to upload model file to Model Atlas: nsUri={}", nsUri, e);
+      log.error("Failed to upload model file to Model Atlas: nsUri={}", Encode.forJava(nsUri), e);
       throw new ExternalSystemRejectionException("Failed to upload model file to Model Atlas", e);
     }
   }
@@ -93,11 +102,31 @@ public class ModelRestClientRequestService {
           .retrieve()
           .body(String.class);
     } catch (ResourceAccessException e) {
-      log.error("Timeout uploading model string to Model Atlas: nsUri={}", nsUri, e);
+      log.error(
+          "Timeout uploading model string to Model Atlas: nsUri={}", Encode.forJava(nsUri), e);
       throw new ExternalSystemTimeoutException("Model Atlas did not respond in time", e);
     } catch (RestClientException e) {
-      log.error("Failed to upload model string to Model Atlas: nsUri={}", nsUri, e);
+      log.error("Failed to upload model string to Model Atlas: nsUri={}", Encode.forJava(nsUri), e);
       throw new ExternalSystemRejectionException("Failed to upload model string to Model Atlas", e);
+    }
+  }
+
+  /**
+   * Delete a model from the external Model Atlas service.
+   *
+   * @param nsUri the namespace URI of the model to delete
+   */
+  public void deleteModel(String nsUri) {
+    try {
+      RestClient restClient = restClientBuilder.baseUrl(getBaseUrl()).build();
+
+      restClient.delete().uri(getDeleteEndpoint(nsUri)).retrieve().toBodilessEntity();
+    } catch (ResourceAccessException e) {
+      log.error("Timeout deleting model from Model Atlas: nsUri={}", nsUri, e);
+      throw new ExternalSystemTimeoutException("Model Atlas did not respond in time", e);
+    } catch (RestClientException e) {
+      log.error("Failed to delete model from Model Atlas: nsUri={}", nsUri, e);
+      throw new ExternalSystemRejectionException("Failed to delete model from Model Atlas", e);
     }
   }
 
@@ -119,10 +148,12 @@ public class ModelRestClientRequestService {
           .retrieve()
           .body(String.class);
     } catch (ResourceAccessException e) {
-      log.error("Timeout downloading model file from Model Atlas: nsUri={}", nsUri, e);
+      log.error(
+          "Timeout downloading model file from Model Atlas: nsUri={}", Encode.forJava(nsUri), e);
       throw new ExternalSystemTimeoutException("Model Atlas did not respond in time", e);
     } catch (RestClientException e) {
-      log.error("Failed to download model file from Model Atlas: nsUri={}", nsUri, e);
+      log.error(
+          "Failed to download model file from Model Atlas: nsUri={}", Encode.forJava(nsUri), e);
       throw new ExternalSystemRejectionException(
           "Failed to download model file from Model Atlas", e);
     }

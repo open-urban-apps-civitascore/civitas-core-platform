@@ -2,6 +2,8 @@ package de.civitascore.portal.controller;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.binaryEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.delete;
+import static com.github.tomakehurst.wiremock.client.WireMock.deleteRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
@@ -68,12 +70,15 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
 
   private static final String TEST_NS_URI = "http://test/test/myuml/1.0.0";
   private static final String TEST_MODEL_FILE_PATH = "mocks/models/Simple_model.xmi";
+  private static final String TEST_UPLOAD_METADATA_PATH =
+      "mocks/models/upload_metadata_response.json";
   private static final String TEST_SCOPE = "default";
   private static final String TEST_STAGE = "draft";
   private static final String MOCK_MODEL_RESPONSE = "<xml>mock model content</xml>";
 
   private String modelContent;
   private byte[] modelContentBinary;
+  private String uploadMetadataResponse;
 
   private UUID dataStructureId;
   private UUID versionId1;
@@ -83,6 +88,10 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     ClassPathResource modelFile = new ClassPathResource(TEST_MODEL_FILE_PATH);
     modelContentBinary = modelFile.getContentAsByteArray();
     modelContent = new String(modelContentBinary, StandardCharsets.UTF_8);
+    uploadMetadataResponse =
+        new String(
+            new ClassPathResource(TEST_UPLOAD_METADATA_PATH).getContentAsByteArray(),
+            StandardCharsets.UTF_8);
 
     // Create parent data structure
     DataStructure dataStructure = new DataStructure();
@@ -163,10 +172,17 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
             .willReturn(
                 aResponse()
                     .withStatus(200)
-                    .withHeader(HttpHeaders.CONTENT_TYPE, "application/uml")
-                    .withBody(MOCK_MODEL_RESPONSE)));
+                    .withHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .withBody(uploadMetadataResponse)));
 
     return expectedPath;
+  }
+
+  private String stubModelDelete(String nsUri) {
+    String deletePath =
+        String.format("/atlas/rest/%s/schema/stages/%s?nsUri=%s", TEST_SCOPE, TEST_STAGE, nsUri);
+    stubFor(delete(urlEqualTo(deletePath)).willReturn(aResponse().withStatus(200)));
+    return deletePath;
   }
 
   private HttpHeaders createAuthHeaders() {
@@ -561,13 +577,15 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should retrieve all versions for a data structure")
-    void shouldRetrieveAllVersions() {
+    @DisplayName("Should return 405 for getAll (endpoint disabled)")
+    void shouldRejectGetAll() {
       ResponseEntity<String> response =
           restTemplate.exchange(
               getEndpoint(), HttpMethod.GET, new HttpEntity<>(createAuthHeaders()), String.class);
 
-      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getStatusCode())
+          .as("Should return METHOD_NOT_ALLOWED status")
+          .isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
     }
   }
 
@@ -578,6 +596,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName("Should update data structure version successfully")
     void shouldUpdateDataStructureVersionSuccessfully() {
+      stubModelDelete("https://modelatlas.example.com/model1");
       stubModelDownload("https://modelatlas.example.com/model1-updated");
       String expectedUploadPath = stubModelUpload("https://modelatlas.example.com/model1-updated");
 
@@ -624,6 +643,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName("Should upload model to Model Atlas when model is provided")
     void shouldUploadModelWhenProvided() {
+      stubModelDelete("https://modelatlas.example.com/model1");
+
       String expectedPath =
           String.format(
               "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
@@ -636,7 +657,7 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
                   aResponse()
                       .withStatus(200)
                       .withHeader(HttpHeaders.CONTENT_TYPE, "application/json")
-                      .withBody("{\"result\": \"ok\"}")));
+                      .withBody(uploadMetadataResponse)));
       stubModelDownload("https://modelatlas.example.com/model1-updated");
 
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
@@ -708,6 +729,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     @Test
     @DisplayName("Should return 502 and roll back update when Model Atlas upload fails")
     void shouldRollBackUpdateWhenModelAtlasUploadFails() {
+      stubModelDelete("https://modelatlas.example.com/model1");
+
       String expectedPath =
           String.format(
               "/atlas/rest/%s/schema/stages/%s?nsUri=%s&overwrite=true",
@@ -923,8 +946,10 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
   class DeleteDataStructureVersionTests {
 
     @Test
-    @DisplayName("Should delete data structure version successfully")
+    @DisplayName("Should delete data structure version and model from Atlas successfully")
     void shouldDeleteDataStructureVersionSuccessfully() {
+      String expectedDeletePath = stubModelDelete("https://modelatlas.example.com/model1");
+
       ResponseEntity<Void> response =
           restTemplate.exchange(
               getEndpoint() + "/" + versionId1,
@@ -935,6 +960,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(response.getStatusCode())
           .as("Should return NO_CONTENT status")
           .isEqualTo(HttpStatus.NO_CONTENT);
+
+      verify(deleteRequestedFor(urlEqualTo(expectedDeletePath)));
 
       ResponseEntity<String> getResponse =
           restTemplate.exchange(
@@ -1375,15 +1402,18 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
     }
 
     @Test
-    @DisplayName("Should allow modelAtlasUri change via published/meta when not in use")
+    @DisplayName(
+        "Should delete old model and upload new one when modelAtlasUri changes via published/meta")
     void shouldAllowModelAtlasUriChangeWhenNotInUse() {
+      String expectedDeletePath = stubModelDelete("https://modelatlas.example.com/model1");
+      stubModelUpload("https://modelatlas.example.com/updated-model");
+      stubModelDownload("https://modelatlas.example.com/updated-model");
+
       DataStructureVersionInputDTO input = new DataStructureVersionInputDTO();
       input.setVersion("1.0.0");
       input.setModelAtlasUri("https://modelatlas.example.com/updated-model");
       input.setModel(modelContent);
       input.setDataStructureVersionSource(DataStructureVersionSource.OWN);
-
-      stubModelUpload("https://modelatlas.example.com/updated-model");
 
       ResponseEntity<DataStructureVersionOutputDTO> response =
           restTemplate.exchange(
@@ -1398,6 +1428,8 @@ class DataStructureVersionControllerIntegrationTest extends BaseKeycloakIntegrat
       assertThat(output.getModelAtlasUri())
           .as("ModelAtlasUri should be updated when not in use")
           .isEqualTo("https://modelatlas.example.com/updated-model");
+
+      verify(deleteRequestedFor(urlEqualTo(expectedDeletePath)));
     }
 
     @Test

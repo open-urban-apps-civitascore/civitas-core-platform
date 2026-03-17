@@ -1,5 +1,5 @@
 meta {
-  name: Get All Data Structure Versions
+  name: Get All Data Structure Versions (disabled)
   type: http
   seq: 8
 }
@@ -21,10 +21,7 @@ params:query {
 }
 
 tests {
-  test("Status code is 200", function() {
-    expect(res.getStatus()).to.equal(200);
-  });
-  test("Returns paginated list", function() {
-    expect(res.body.content).to.be.an('array');
+  test("Status code is 405 (endpoint disabled)", function() {
+    expect(res.getStatus()).to.equal(405);
   });
 }
