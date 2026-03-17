@@ -5,6 +5,7 @@ import { useMemo } from 'react'
 
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { cn } from '@/lib/utils'
 import { Permission } from '@/types/permissions'
 import { ROLE_CATEGORIES } from '@/types/roles'
 
@@ -43,7 +44,7 @@ export const SystemPermissionsTab = ({ permissions, isLoading }: SystemPermissio
       {[...KNOWN_CATEGORIES, CATEGORY_OTHER].map((category, index) => {
         const groupedPermissions = groups[category] ?? []
         return (
-          <div key={category} className={`mt-${index === 0 ? 0 : 4}`}>
+          <div key={category} className={cn(index === 0 ? 'mt-0' : 'mt-4')}>
             <PermissionsList
               header={getCategoryLabel(category)}
               items={groupedPermissions.map(p => p.name)}
