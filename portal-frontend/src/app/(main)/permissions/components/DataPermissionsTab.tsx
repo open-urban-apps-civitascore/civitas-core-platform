@@ -2,7 +2,7 @@
 
 import { RowSelectionState } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Permission, RoleWithPermissions } from '@/types/permissions'
@@ -22,7 +22,7 @@ export const DataPermissionsTab = ({ permissions, isLoading, rowCount }: DataPer
 
   const { setSortingParams, setPaginationParams, pageIndex, pageSize, sorting, totalPages } = useQueryParams()
 
-  const getRolesWithPermissions = (): RoleWithPermissions[] => {
+  const rolesWithPermissions: RoleWithPermissions[] = useMemo(() => {
     const groupedByEntity = new Map<string, Set<string>>()
 
     for (const permission of permissions) {
@@ -44,11 +44,11 @@ export const DataPermissionsTab = ({ permissions, isLoading, rowCount }: DataPer
       delete: actions.has('delete'),
       release: actions.has('release'),
     }))
-  }
+  }, [permissions, t])
 
   return (
     <PermissionsTable
-      permissions={getRolesWithPermissions()}
+      permissions={rolesWithPermissions}
       shouldShowPermissionColumns
       isLoading={isLoading}
       rowCount={rowCount}
