@@ -516,6 +516,10 @@
     "tableHeaders": {
       "name": "Object"
     },
+    "accessible": {
+      "granted": "Granted",
+      "notGranted": "Not granted"
+    },
     "values": {
         "ASSIGNMENT": "Assignment",
         "DATASET": "Dataset",

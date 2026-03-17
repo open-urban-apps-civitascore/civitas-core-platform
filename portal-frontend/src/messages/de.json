@@ -509,6 +509,10 @@
     "tableHeaders": {
       "name": "Objekt"
     },
+    "accessible": {
+      "granted": "Gewährt",
+      "notGranted": "Nicht gewährt"
+    },
     "values": {
         "ASSIGNMENT": "Zuweisung",
         "DATASET": "Datensatz",

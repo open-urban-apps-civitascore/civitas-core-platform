@@ -1,4 +1,5 @@
 import { CellContext, ColumnDef, createColumnHelper, getCoreRowModel, useReactTable } from '@tanstack/react-table'
+import { Check } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
@@ -45,8 +46,17 @@ export const PermissionsTable = (props: PermissionsTableProps) => {
     }),
   ]
 
-  const permissionCellFunction = (info: CellContext<RoleWithPermissions, boolean>): string =>
-    info.getValue() ? '✓' : ''
+  const permissionCellFunction = (info: CellContext<RoleWithPermissions, boolean>) => {
+    const isGranted = info.getValue()
+    const columnName = info.column.columnDef.header as string
+    const label = `${columnName}: ${isGranted ? t('accessible.granted') : t('accessible.notGranted')}`
+
+    return (
+      <span role="img" aria-label={label}>
+        {isGranted && <Check className="h-4 w-4" />}
+      </span>
+    )
+  }
   const permissionColumns: ColumnDef<RoleWithPermissions, boolean>[] = [
     columnHelper.accessor('read', {
       header: t('actions.read'),
