@@ -15,6 +15,7 @@ import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.Distribution;
+import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -69,6 +70,83 @@ class DataSetServiceTest {
     ds.setPublicUrl("https://example.com");
     ds.setPipelineIds(List.of("pipe-1"));
     return ds;
+  }
+
+  private DataSet draftDataSet(UUID id) {
+    DataSet ds = new DataSet();
+    ds.setId(id);
+    ds.setName("test-dataset");
+    ds.setDescription("test description");
+    ds.setDataSetStatus(DataSetStatus.DRAFT);
+    ds.setPipelines(new HashSet<>());
+    ds.setDistributions(new HashSet<>());
+    return ds;
+  }
+
+  @Nested
+  @DisplayName("publish()")
+  class PublishTests {
+
+    @Test
+    @DisplayName("publishes dataset with feed-in pipeline (has datasources)")
+    void publishesWithDatasources() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+      Pipeline p = new Pipeline();
+      p.setDataSources(new HashSet<>(List.of(new de.civitascore.portal.model.entity.DataSource())));
+      ds.getPipelines().add(p);
+
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      DataSet result = createService().publish(id);
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+    }
+
+    @Test
+    @DisplayName("publishes dataset with provide pipeline (has APIs, no datasources)")
+    void publishesWithApisOnly() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+      Pipeline p = new Pipeline();
+      p.setApis(List.of("/v1.1/Things"));
+      ds.getPipelines().add(p);
+
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      when(distributionService.createFromApiUrlAndDataSet(any(), any()))
+          .thenReturn(new Distribution());
+
+      DataSet result = createService().publish(id);
+      assertThat(result.getDataSetStatus()).isEqualTo(DataSetStatus.READY);
+    }
+
+    @Test
+    @DisplayName("rejects pipeline with neither datasources nor APIs")
+    void rejectsEmptyPipeline() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+      ds.getPipelines().add(new Pipeline());
+
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().publish(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("DataSources or APIs");
+    }
+
+    @Test
+    @DisplayName("rejects dataset without pipelines")
+    void rejectsNoPipelines() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = draftDataSet(id);
+
+      when(dataSetRepository.findByIdWithRelations(id)).thenReturn(Optional.of(ds));
+
+      assertThatThrownBy(() -> createService().publish(id))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("Pipeline");
+    }
   }
 
   @Nested

@@ -56,6 +56,9 @@ public class DistributionService extends BaseService<Distribution, DistributionI
     if (resourcePath.isEmpty()) {
       resourcePath = "/";
     }
+    if (!resourcePath.startsWith("/")) {
+      resourcePath = "/" + resourcePath;
+    }
     distribution.setAccessUrl(resourcePath);
     distribution.setApiType("SensorThings");
     distribution.setFormat("application/json");
