@@ -1,6 +1,7 @@
 'use client'
 
 import { RowSelectionState } from '@tanstack/react-table'
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 
 import { useQueryParams } from '@/hooks/use-query-params'
@@ -15,10 +16,11 @@ interface DataPermissionsTabProps {
 }
 
 export const DataPermissionsTab = ({ permissions, isLoading, rowCount }: DataPermissionsTabProps) => {
+  const t = useTranslations('permissions')
+
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
-  const { setSortingParams, setPaginationParams, pageIndex, pageSize, sorting, totalPages } =
-    useQueryParams()
+  const { setSortingParams, setPaginationParams, pageIndex, pageSize, sorting, totalPages } = useQueryParams()
 
   const getRolesWithPermissions = (): RoleWithPermissions[] => {
     const groupedByEntity = new Map<string, Set<string>>()
@@ -35,7 +37,7 @@ export const DataPermissionsTab = ({ permissions, isLoading, rowCount }: DataPer
     }
 
     return Array.from(groupedByEntity.entries()).map(([name, actions]) => ({
-      name,
+      name: t(`values.${name}`, { defaultValue: name }),
       read: actions.has('read'),
       create: actions.has('create'),
       update: actions.has('update'),

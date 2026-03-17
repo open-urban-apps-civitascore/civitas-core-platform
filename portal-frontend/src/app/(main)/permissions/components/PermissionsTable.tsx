@@ -49,23 +49,23 @@ export const PermissionsTable = (props: PermissionsTableProps) => {
     info.getValue() ? '✓' : ''
   const permissionColumns: ColumnDef<RoleWithPermissions, boolean>[] = [
     columnHelper.accessor('read', {
-      header: t('tableHeaders.read'),
+      header: t('actions.read'),
       cell: permissionCellFunction,
     }),
     columnHelper.accessor('create', {
-      header: t('tableHeaders.create'),
+      header: t('actions.create'),
       cell: permissionCellFunction,
     }),
     columnHelper.accessor('update', {
-      header: t('tableHeaders.update'),
+      header: t('actions.update'),
       cell: permissionCellFunction,
     }),
     columnHelper.accessor('delete', {
-      header: t('tableHeaders.delete'),
+      header: t('actions.delete'),
       cell: permissionCellFunction,
     }),
     columnHelper.accessor('release', {
-      header: t('tableHeaders.release'),
+      header: t('actions.release'),
       cell: permissionCellFunction,
     }),
   ]

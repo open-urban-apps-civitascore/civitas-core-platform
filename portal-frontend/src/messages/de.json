@@ -497,15 +497,22 @@
       "title": "Datenberechtigungen",
       "description": "Datenberechtigungen steuern den Zugriff auf Datenobjekte der Plattform.\nSie werden zu Datenrollen zusammengefasst und Gruppen innerhalb eines bestimmten Geltungsbereichs zugeordnet."
     },
+    "actions": {
+      "read": "Lesen",
+      "create": "Erstellen",
+      "update": "Aktualisieren",
+      "delete": "Löschen",
+      "release": "Freigeben"
+    },
     "tableHeaders": {
-      "name": "Objekt",
-      "category": "Kategorie",
-      "read": "Read",
-      "create": "Create",
-      "update": "Update",
-      "delete": "Delete",
-      "release": "Release"
-    }
+      "name": "Objekt"
+    },
+    "values": {
+        "DATASET": "Datensatz",
+        "DATASET_PAYLOAD": "Datensatz-Payload",
+        "DATASOURCE": "Datenquelle",
+        "DATASTRUCTURE": "Datenstruktur"
+      }
   },
   "roles": {
     "title": "Rollen",
