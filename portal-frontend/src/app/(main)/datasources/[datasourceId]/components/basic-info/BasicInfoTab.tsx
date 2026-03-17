@@ -56,6 +56,7 @@ export const BasicInfoTab = (props: BasicInfoTabProps) => {
             hasCharacterCount
             disabled={isReadOnly}
             className="min-h-[100px] resize-none"
+            required
           />
         </DetailsFieldContainer>
       </div>

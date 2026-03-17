@@ -62,7 +62,7 @@ export const useUnpublishDatasource = () =>
     key,
     endpoint: ({ id }) => `/datasources/${id}/unpublish`,
     headers: { 'x-api-request': 'true' },
-    errorMessage: 'An error occurred while publishing datasource',
+    errorMessage: 'An error occurred while unpublishing datasource',
   })
 
 export const useDeleteDatasource = () =>

@@ -99,7 +99,7 @@ export const useDatasourceForm = (
       form.setValue('connectorType', connectorTypeWatch, {
         shouldDirty: true,
       })
-      form.setValue('configuration', isInitialConnectorType ? defaultValues.configuration : configDefaults, {
+      form.setValue('configuration', configDefaults, {
         shouldDirty: true,
       })
     }
@@ -120,9 +120,14 @@ export const useDatasourceForm = (
   }, [formValues])
 
   // Revalidate on mode or connector type change
+  // Keep name errors for showing name required error after automatic switch to draft mode when removing name
   useEffect(() => {
     if (isDraftMode) {
+      const nameError = form.formState.errors.name
       form.clearErrors()
+      if (nameError) {
+        form.setError('name', nameError)
+      }
     } else {
       void form.trigger()
     }
