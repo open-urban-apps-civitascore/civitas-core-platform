@@ -498,7 +498,8 @@
         "TENANT_ADMINISTRATION": "Tenant Administration",
         "DATA": "Data Management",
         "OTHER": "Other"
-      }
+      },
+      "entry": "{action} {permission}"
     },
     "dataPermissions": {
       "title": "Data Permissions",
@@ -515,10 +516,15 @@
       "name": "Object"
     },
     "values": {
+        "ASSIGNMENT": "Assignment",
         "DATASET": "Dataset",
         "DATASET_PAYLOAD": "Dataset Payload",
         "DATASOURCE": "Datasource",
-        "DATASTRUCTURE": "Datastructure"
+        "DATASTRUCTURE": "Datastructure",
+        "GROUP": "Group",
+        "PERMISSION": "Permission",
+        "ROLE": "Role",
+        "USER": "User"
       }
   },
   "roles": {

@@ -491,7 +491,8 @@
         "TENANT_ADMINISTRATION": "Mandanten-Management",
         "DATA": "Unsere Daten",
         "OTHER": "Sonstiges"
-      }
+      },
+      "entry": "{permission} {action}"
     },
     "dataPermissions": {
       "title": "Datenberechtigungen",
@@ -508,10 +509,15 @@
       "name": "Objekt"
     },
     "values": {
+        "ASSIGNMENT": "Zuweisung",
         "DATASET": "Datensatz",
         "DATASET_PAYLOAD": "Datensatz-Payload",
         "DATASOURCE": "Datenquelle",
-        "DATASTRUCTURE": "Datenstruktur"
+        "DATASTRUCTURE": "Datenstruktur",
+        "GROUP": "Gruppe",
+        "PERMISSION": "Berechtigung",
+        "ROLE": "Rolle",
+        "USER": "Benutzer"
       }
   },
   "roles": {
