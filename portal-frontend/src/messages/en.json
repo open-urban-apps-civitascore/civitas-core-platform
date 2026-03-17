@@ -493,7 +493,12 @@
     "title": "Overview: {permissionType}",
     "systemPermissions": {
       "title": "System Permissions",
-      "description": "System permissions control access to system-wide functions on the platform.\nThey are grouped into system roles and assigned to groups."
+      "description": "System permissions control access to system-wide functions on the platform.\nThey are grouped into system roles and assigned to groups.",
+      "categories": {
+        "TENANT_ADMINISTRATION": "Tenant Administration",
+        "DATA": "Data Management",
+        "OTHER": "Other"
+      }
     },
     "dataPermissions": {
       "title": "Data Permissions",

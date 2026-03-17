@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useMemo } from 'react'
 
 import { SearchHeader } from '@/components/search-area/SearchArea'
@@ -17,6 +18,8 @@ interface SystemPermissionsTabProps {
 const KNOWN_CATEGORIES = [ROLE_CATEGORIES.DATA.toString(), ROLE_CATEGORIES.TENANTADMINISTRATION.toString()] as const
 
 export const SystemPermissionsTab = ({ permissions, isLoading }: SystemPermissionsTabProps) => {
+  const t = useTranslations()
+
   const { setSearchParam, search } = useQueryParams()
   const CATEGORY_OTHER = 'OTHER'
 
@@ -28,6 +31,11 @@ export const SystemPermissionsTab = ({ permissions, isLoading }: SystemPermissio
     [permissions],
   )
 
+  const getCategoryLabel = (category: string) => {
+    const translationKey = `permissions.systemPermissions.categories.${category}`
+    return t.has(translationKey) ? t(translationKey) : category
+  }
+
   return (
     <>
       <SearchHeader searchString={search} onChangeSearchString={setSearchParam} />
@@ -36,7 +44,11 @@ export const SystemPermissionsTab = ({ permissions, isLoading }: SystemPermissio
         const groupedPermissions = groups[category] ?? []
         return (
           <div key={category} className="mt-8">
-            <PermissionsList header={category} items={groupedPermissions.map(p => p.name)} isLoading={isLoading} />
+            <PermissionsList
+              header={getCategoryLabel(category)}
+              items={groupedPermissions.map(p => p.name)}
+              isLoading={isLoading}
+            />
           </div>
         )
       })}
