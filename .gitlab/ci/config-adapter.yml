@@ -155,7 +155,7 @@ test-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - mvn $MAVEN_CLI_OPTS jacoco:prepare-agent surefire:test jacoco:report -Drevision=$CONFIG_ADAPTER_VERSION -T 2
+    - mvn $MAVEN_CLI_OPTS test -Drevision=$CONFIG_ADAPTER_VERSION -T 2
     # Aggregate coverage from all modules
     - |
       awk -F, \
