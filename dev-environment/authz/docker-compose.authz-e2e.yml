@@ -1,0 +1,353 @@
+# AuthZ E2E Integration Test Stack
+#
+# Self-contained stack for running authz integration tests.
+# Starts all required services, seeds test data, and provides
+# the portal-backend with e2e user configuration via env vars.
+#
+# Usage:
+#   docker compose -f docker-compose.authz-e2e.yml up -d
+#   docker compose -f docker-compose.authz-e2e.yml down -v
+
+services:
+  # ============================================================
+  # DATABASES
+  # ============================================================
+
+  postgres-portal:
+    image: postgres:18.1-alpine
+    container_name: civitas-postgres-portal
+    environment:
+      POSTGRES_DB: portal_backend
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_HOST_AUTH_METHOD: md5
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+    ports:
+      - "5432:5432"
+    networks:
+      - authz-e2e-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d portal_backend"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-keycloak:
+    image: postgres:18.1-alpine
+    container_name: civitas-postgres-keycloak
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    ports:
+      - "5433:5432"
+    networks:
+      - authz-e2e-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ============================================================
+  # KEYCLOAK
+  # ============================================================
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: civitas-keycloak
+    command: start-dev --import-realm
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KC_HTTP_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_LOG_LEVEL: info
+      KC_HOSTNAME: ${KC_HOSTNAME:-http://localhost:8080}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    depends_on:
+      postgres-keycloak:
+        condition: service_healthy
+    networks:
+      - authz-e2e-network
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+
+  # ============================================================
+  # KAFKA
+  # ============================================================
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    hostname: zookeeper
+    container_name: civitas-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - authz-e2e-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    hostname: kafka
+    container_name: civitas-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    networks:
+      - authz-e2e-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================
+  # CONFIG ADAPTER (Kafka -> Keycloak user sync)
+  # ============================================================
+
+  config-adapter:
+    build:
+      context: ../../config-adapter
+      dockerfile: Dockerfile
+    container_name: civitas-config-adapter
+    ports:
+      - "8088:8088"
+    environment:
+      HEALTHCHECK_PORT: 8088
+      PORT: 8088
+      ADAPTERS: keycloak
+      EVENTHANDLER_NAME: kafka
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_GROUP_ID: config-adapter-group
+      KAFKA_RETRY_MAX_ATTEMPTS: 3
+      KAFKA_RETRY_INITIAL_BACKOFF_MS: 1000
+      KAFKA_DLQ_TOPIC: de.civitascore.idm.dlq
+      KEYCLOAK_URL: http://civitas-keycloak:8080
+      KEYCLOAK_REALM: master
+      KEYCLOAK_USERNAME: admin
+      KEYCLOAK_PASSWORD: admin
+      KEYCLOAK_CLIENT_ID: admin-cli
+      KEYCLOAK_TARGET_REALM: civitas-core
+      KEYCLOAK_TOPICS: de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted
+    depends_on:
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - authz-e2e-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ============================================================
+  # APISIX GATEWAY
+  # ============================================================
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: civitas-etcd
+    environment:
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_DATA_DIR=/etcd-data
+    networks:
+      - authz-e2e-network
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  apisix:
+    image: apache/apisix:3.14.0-debian
+    container_name: civitas-apisix
+    volumes:
+      - ../apisix/apisix_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+    ports:
+      - "9080:9080"
+      - "9180:9180"
+    depends_on:
+      etcd:
+        condition: service_healthy
+    networks:
+      - authz-e2e-network
+
+  # ============================================================
+  # AUTHZ (OPA + Repository)
+  # ============================================================
+
+  authz-repository:
+    build:
+      context: ../../authz/repository
+      dockerfile: Dockerfile
+    container_name: civitas-authz-repository
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
+      DATABASE_USERNAME: admin
+      DATABASE_PASSWORD: admin
+      SERVER_PORT: 8091
+    ports:
+      - "8091:8091"
+    depends_on:
+      postgres-portal:
+        condition: service_healthy
+    networks:
+      - authz-e2e-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8091/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  opa:
+    image: openpolicyagent/opa:1.14.0-static
+    container_name: civitas-opa
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=info"
+      - "--log-format=json"
+      - "--set=decision_logs.console=true"
+      - "/policies"
+      - "/helpers"
+      - "/providers"
+      - "/data"
+    volumes:
+      - ../../authz/rego/policy:/policies:ro
+      - ../../authz/rego/lib:/helpers:ro
+      - ../../authz/rego/providers:/providers:ro
+      - ../../authz/rego/data/backends:/data/backends:ro
+      - ../apisix/opa-config:/data/config:ro
+    ports:
+      - "8181:8181"
+    depends_on:
+      authz-repository:
+        condition: service_healthy
+    networks:
+      - authz-e2e-network
+    healthcheck:
+      test: ["CMD", "/opa", "eval", "-f", "pretty", "true"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ============================================================
+  # PORTAL BACKEND (with e2e user init config)
+  # ============================================================
+
+  portal-backend:
+    build:
+      context: ../../portal-backend
+      dockerfile: Dockerfile
+    container_name: civitas-portal-backend
+    ports:
+      - "8089:8089"
+    environment:
+      # Spring profiles
+      SPRING_PROFILES_ACTIVE: local,postgres,init
+      # Database (Docker-internal, overrides application-local.yaml localhost)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend?sslmode=disable
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      # Kafka (Docker-internal)
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      # Keycloak
+      # AUTH_SERVER_URL uses Docker-internal hostname for JWK resolution (backchannel)
+      KEYCLOAK_AUTH_SERVER_URL: http://civitas-keycloak:8080
+      # ISSUER_URI must match KC_HOSTNAME so JWT iss claim validation passes
+      KEYCLOAK_ISSUER_URI: http://localhost:8080
+      KEYCLOAK_REALM: civitas-core
+      KEYCLOAK_TARGET_REALM: civitas-core
+      # App config
+      APP_URL: http://localhost:8089
+      SERVER_PORT: 8089
+      # Increase timeout for config-adapter sync in containerized stack
+      EVENT_CONFIG_ADAPTER_TIMEOUT_SECONDS: 30
+      # ---- E2E Test Groups ----
+      INIT_GROUPS_0_NAME: AuthzAdminGroup
+      INIT_GROUPS_0_ROLENAME: AuthzDataArchitect
+      INIT_GROUPS_0_SCOPETYPE: TENANT
+      INIT_GROUPS_0_DESCRIPTION: Group with full permissions for authz e2e testing
+      INIT_GROUPS_1_NAME: AuthzReaderGroup
+      INIT_GROUPS_1_ROLENAME: AuthzDataConsumer
+      INIT_GROUPS_1_SCOPETYPE: TENANT
+      INIT_GROUPS_1_DESCRIPTION: Group with read-only permissions for authz e2e testing
+      INIT_GROUPS_2_NAME: AuthzNoPermsGroup
+      INIT_GROUPS_2_ROLENAME: AuthzNoPerms
+      INIT_GROUPS_2_SCOPETYPE: TENANT
+      INIT_GROUPS_2_DESCRIPTION: Group with no permissions for authz e2e testing
+      # ---- E2E Test Users ----
+      INIT_USERS_0_FIRSTNAME: Authz
+      INIT_USERS_0_LASTNAME: Admin
+      INIT_USERS_0_EMAIL: authz.admin@e2e.civitas.dev
+      INIT_USERS_0_PASSWORD: test123
+      INIT_USERS_0_GROUPS_0: AuthzAdminGroup
+      INIT_USERS_1_FIRSTNAME: Authz
+      INIT_USERS_1_LASTNAME: Reader
+      INIT_USERS_1_EMAIL: authz.reader@e2e.civitas.dev
+      INIT_USERS_1_PASSWORD: test123
+      INIT_USERS_1_GROUPS_0: AuthzReaderGroup
+      INIT_USERS_2_FIRSTNAME: Authz
+      INIT_USERS_2_LASTNAME: NoPerms
+      INIT_USERS_2_EMAIL: authz.none@e2e.civitas.dev
+      INIT_USERS_2_PASSWORD: test123
+      INIT_USERS_2_GROUPS_0: AuthzNoPermsGroup
+    depends_on:
+      postgres-portal:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      config-adapter:
+        condition: service_healthy
+    networks:
+      - authz-e2e-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/v1/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  authz-e2e-network:
+    name: authz-e2e-network
+    driver: bridge
