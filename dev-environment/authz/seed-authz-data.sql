@@ -1,10 +1,7 @@
--- M5: Seed data for AuthZ integration testing
--- Creates test users, permissions, roles, groups, and assignments
---
--- Test Users:
---   - authz.admin: Full permissions (DataArchitect role)
---   - authz.reader: Read-only permissions (DataConsumer role)
---   - authz.none: No permissions (NoPerms role)
+-- Seed data for AuthZ integration testing
+-- Creates test permissions, roles, and role-permission mappings.
+-- Users, groups, and assignments are created by the portal-backend
+-- via UserInitializer (configured through environment variables).
 --
 -- Usage:
 --   psql -h localhost -U admin -d portal_backend -f seed-authz-data.sql
@@ -148,63 +145,10 @@ ON CONFLICT DO NOTHING;
 -- NoPerms gets NO permissions (empty role)
 
 -- =============================================================================
--- USERS
--- =============================================================================
--- external_id values are pinned UUIDs matching realm-export.json (e2e00000-...-{1,2,3})
--- No manual sync needed — Keycloak imports these users with deterministic IDs.
-
-INSERT INTO users (id, external_id, first_name, last_name, email, active, created_at)
-VALUES
-    ('30000000-0000-0000-0000-000000000001', 'e2e00000-0000-0000-0000-000000000001', 'Authz', 'Admin', 'authz.admin@e2e.civitas.dev', true, NOW()),
-    ('30000000-0000-0000-0000-000000000002', 'e2e00000-0000-0000-0000-000000000002', 'Authz', 'Reader', 'authz.reader@e2e.civitas.dev', true, NOW()),
-    ('30000000-0000-0000-0000-000000000003', 'e2e00000-0000-0000-0000-000000000003', 'Authz', 'NoPerms', 'authz.none@e2e.civitas.dev', true, NOW())
-ON CONFLICT (email) DO UPDATE SET
-    external_id = EXCLUDED.external_id,
-    first_name = EXCLUDED.first_name,
-    last_name = EXCLUDED.last_name,
-    active = EXCLUDED.active;
-
--- =============================================================================
--- GROUPS
--- =============================================================================
-
-INSERT INTO groups (id, name, description, created_at)
-VALUES
-    ('40000000-0000-0000-0000-000000000001', 'AuthzAdminGroup', 'Group with full permissions', NOW()),
-    ('40000000-0000-0000-0000-000000000002', 'AuthzReaderGroup', 'Group with read-only permissions', NOW()),
-    ('40000000-0000-0000-0000-000000000003', 'AuthzNoPermsGroup', 'Group with no permissions', NOW())
-ON CONFLICT (name) DO NOTHING;
-
--- =============================================================================
--- GROUP MEMBERS
--- =============================================================================
-
-INSERT INTO group_members (group_id, user_id)
-VALUES
-    ('40000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001'),  -- Admin user in Admin group
-    ('40000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000002'),  -- Reader user in Reader group
-    ('40000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000003')   -- NoPerms user in NoPerms group
-ON CONFLICT DO NOTHING;
-
--- =============================================================================
--- ASSIGNMENTS
--- =============================================================================
--- Assign roles to groups at TENANT scope (platform-wide access)
-
-INSERT INTO assignments (id, group_id, role_id, scope_type, created_at)
-VALUES
-    ('50000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001', 'TENANT', NOW()),  -- Admin group -> DataArchitect
-    ('50000000-0000-0000-0000-000000000002', '40000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000002', 'TENANT', NOW()),  -- Reader group -> DataConsumer
-    ('50000000-0000-0000-0000-000000000003', '40000000-0000-0000-0000-000000000003', '20000000-0000-0000-0000-000000000003', 'TENANT', NOW())   -- NoPerms group -> NoPerms role
-ON CONFLICT ON CONSTRAINT uk_assignment_group_role_scope DO NOTHING;
-
--- =============================================================================
 -- VERIFICATION QUERIES
 -- =============================================================================
 
 -- Verify data was inserted correctly
-SELECT 'Permissions count:' AS info, COUNT(*) AS count FROM permissions WHERE name LIKE '%_USER' OR name LIKE 'DATASET_%' OR name LIKE 'DATASOURCE_%';
+SELECT 'Permissions count:' AS info, COUNT(*) AS count FROM permissions WHERE id LIKE '10000000%';
 SELECT 'Roles count:' AS info, COUNT(*) AS count FROM roles WHERE name LIKE 'Authz%';
-SELECT 'Users count:' AS info, COUNT(*) AS count FROM users WHERE email LIKE 'authz.%';
-SELECT 'Groups count:' AS info, COUNT(*) AS count FROM groups WHERE name LIKE 'Authz%';
-SELECT 'Assignments count:' AS info, COUNT(*) AS count FROM assignments WHERE group_id IN (SELECT id FROM groups WHERE name LIKE 'Authz%');
+SELECT 'Role-permissions count:' AS info, COUNT(*) AS count FROM role_permissions WHERE role_id IN (SELECT id FROM roles WHERE name LIKE 'Authz%');
