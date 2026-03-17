@@ -5,7 +5,8 @@ interface BaseTextBoxProps {
   icon?: LucideIcon
 }
 
-export const BaseTextBox = ({ text, icon }: BaseTextBoxProps) => {
+export const BaseTextBox = (props: BaseTextBoxProps) => {
+  const { text, icon } = props
   const Icon = icon
   return (
     <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">

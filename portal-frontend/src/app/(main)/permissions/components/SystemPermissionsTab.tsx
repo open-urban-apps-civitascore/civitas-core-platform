@@ -18,7 +18,8 @@ interface SystemPermissionsTabProps {
 
 const KNOWN_CATEGORIES = [ROLE_CATEGORIES.DATA.toString(), ROLE_CATEGORIES.TENANTADMINISTRATION.toString()] as const
 
-export const SystemPermissionsTab = ({ permissions, isLoading }: SystemPermissionsTabProps) => {
+export const SystemPermissionsTab = (props: SystemPermissionsTabProps) => {
+  const { permissions, isLoading } = props
   const t = useTranslations()
 
   const [search, setSearch] = useState('')

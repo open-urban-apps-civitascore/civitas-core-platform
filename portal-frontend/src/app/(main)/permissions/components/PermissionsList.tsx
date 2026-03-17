@@ -19,7 +19,8 @@ const LoadingSkeleton = () => (
   </div>
 )
 
-export const PermissionsList = ({ header, items, isLoading }: PermissionsListProps) => {
+export const PermissionsList = (props: PermissionsListProps) => {
+  const { header, items, isLoading } = props
   const t = useTranslations()
 
   if (isLoading) {
