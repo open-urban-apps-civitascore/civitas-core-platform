@@ -48,7 +48,7 @@ public class ModelService {
     log.debug(
         "Processing model file download for nsUri: {} with accept header: {}",
         Encode.forJava(nsUri),
-        acceptHeader);
+        Encode.forJava(acceptHeader));
     return modelRestClientRequestService.downloadModelFile(nsUri, acceptHeader);
   }
 }

@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -61,7 +62,10 @@ public class CustomJwtAuthenticationConverter
     try {
       return UUID.fromString(subClaim);
     } catch (IllegalArgumentException e) {
-      log.warn("Invalid UUID format in sub claim: '{}'. Error: {}", subClaim, e.getMessage());
+      log.warn(
+          "Invalid UUID format in sub claim: '{}'. Error: {}",
+          Encode.forJava(subClaim),
+          e.getMessage());
       return null;
     }
   }
