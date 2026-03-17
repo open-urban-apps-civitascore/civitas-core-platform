@@ -21,6 +21,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -88,7 +89,9 @@ public class UserController extends BaseController<UserInputDTO, UserOutputDTO, 
   @ApiResponse(responseCode = "200", description = "User profile returned successfully")
   public ResponseEntity<PrincipalUserOutput> getCurrentUser(
       @AuthenticationPrincipal PrincipalUserDetails userPrincipal) {
-    log.debug("UserController.getCurrentUser called by user: {}", userPrincipal.getUsername());
+    log.debug(
+        "UserController.getCurrentUser called by user: {}",
+        Encode.forJava(userPrincipal.getUsername()));
 
     List<MeAssignmentOutputDTO> assignments = List.of();
     if (userPrincipal.getUserId() != null) {
