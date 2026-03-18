@@ -31,7 +31,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { Assignment, ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { FormRole, Role, roleSchema, RoleTab } from '@/types/roles'
 
 import { DEFAULT_TAB } from '../page'
@@ -93,6 +93,9 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const isGroupTab = subTabValue === subTabValues.groupAssignment.value
 
+  const isPlatformwideAssignment = (assignment: Assignment) =>
+    assignment.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT || assignment.scopeType === null
+
   const {
     data: roleData,
     isFetching: isLoadingRole,
@@ -101,17 +104,23 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   // Fetch existing assignments for this role
   const assignmentsParams = new URLSearchParams(`roleId=${roleId}`)
-  const { data: assignmentsData, refetch: refetchAssignments } = useGetAssignments({
+  const {
+    data: assignmentsData,
+    refetch: refetchAssignments,
+    isFetching: isLoadingAssignments,
+  } = useGetAssignments({
     params: assignmentsParams,
     isEnabled: !!roleId,
   })
 
-  const initallyAssignedGroupsIds = useMemo(
-    () =>
-      (assignmentsData?.data ?? []).flatMap(a =>
-        a.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT || a.scopeType === null ? a.group.id : [],
-      ),
+  const initialPlatformAssignments = useMemo(
+    () => (assignmentsData?.data ?? []).filter(assignment => isPlatformwideAssignment(assignment)),
     [assignmentsData?.data],
+  )
+
+  const initallyAssignedGroupsIds = useMemo(
+    () => initialPlatformAssignments.map(assignment => assignment.group.id),
+    [initialPlatformAssignments],
   )
 
   useEffect(() => {
@@ -128,6 +137,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const isLoading =
     isLoadingRole ||
+    isLoadingAssignments ||
     createRole.isPending ||
     updateRole.isPending ||
     deleteRole.isPending ||
@@ -157,13 +167,14 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   )
 
   const areAssignmentsDirty = useMemo(
-    () =>
-      !assignmentsData?.data
+    () => {
+      return !initialPlatformAssignments
         ? false
         : !(
-            (assignmentsData?.data.length || 0) === selectedGroupIds.length &&
-            assignmentsData?.data.every(assignment => selectedGroupIds.includes(assignment.group.id))
-          ),
+            (initialPlatformAssignments.length || 0) === selectedGroupIds.length &&
+            initialPlatformAssignments.every(assignment => selectedGroupIds.includes(assignment.group.id))
+          )
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedGroupIds],
   )
@@ -233,13 +244,8 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const saveGroupAssignment = async (roleId: string): Promise<void> => {
     try {
-      const existingAssignments = assignmentsData?.data ?? []
-      const currentGroupIds = existingAssignments.flatMap(a =>
-        a.scopeType === null || a.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT ? a.group.id : [],
-      )
-
-      const groupIdsToAdd = selectedGroupIds.filter(id => !currentGroupIds.includes(id))
-      const assignmentsToRemove = existingAssignments.filter(a => !selectedGroupIds.includes(a.group.id))
+      const groupIdsToAdd = selectedGroupIds.filter(id => !initallyAssignedGroupsIds.includes(id))
+      const assignmentsToRemove = initialPlatformAssignments.filter(a => !selectedGroupIds.includes(a.group.id))
 
       await Promise.all(
         groupIdsToAdd.map(groupId =>
@@ -251,8 +257,8 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         ),
       )
       await Promise.all(assignmentsToRemove.map(a => deleteAssignment.mutateAsync(a.id)))
-      toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.assignments') }))
       await refetchAssignments()
+      toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.assignments') }))
     } catch (error) {
       console.error('An error occurred while groups assignment')
       toast.error(tCommon('errors.updateError', { item: tCommon('items.assignments') }))
