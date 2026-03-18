@@ -75,6 +75,8 @@ public interface AssignmentRepository extends BaseRepository<Assignment, UUID> {
 
   boolean existsByGroupAndRoleAndScopeTypeIsNull(Group group, Role role);
 
+  boolean existsByGroupAndRoleAndScopeType(Group group, Role role, ScopeType scopeType);
+
   @EntityGraph(
       attributePaths = {
         "group",

@@ -1,0 +1,182 @@
+# AuthZ E2E Integration Test Stack
+#
+# Self-contained stack for running authz integration tests.
+# Reuses existing service definitions where possible; only redefines
+# services that need e2e-specific overrides (APISIX without extra_hosts,
+# portal-backend with e2e user env vars, config-adapter keycloak-only).
+#
+# Requires: docker network create civitas-network
+#
+# Usage:
+#   docker compose -f docker-compose.authz-e2e.yml up -d
+#   docker compose -f docker-compose.authz-e2e.yml down -v
+
+include:
+  - path: ../postgres/docker-compose.yml
+  - path: ../keycloak/docker-compose.yml
+  - path: ../kafka/docker-compose.yml
+  - path: ../apisix/docker-compose.authz.yml
+
+services:
+  # ============================================================
+  # APISIX GATEWAY (redefined: no extra_hosts, no restart policy)
+  # ============================================================
+  # The original apisix/docker-compose.yml uses extra_hosts to map
+  # portal-backend to host-gateway (for IDE mode). In e2e, the backend
+  # runs in Docker, so we need Docker DNS resolution instead.
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: civitas-etcd
+    environment:
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_DATA_DIR=/etcd-data
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  apisix:
+    image: apache/apisix:3.14.0-debian
+    container_name: civitas-apisix
+    volumes:
+      - ../apisix/apisix_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+    ports:
+      - "9080:9080"
+      - "9180:9180"
+    depends_on:
+      etcd:
+        condition: service_healthy
+    networks:
+      - civitas-network
+
+  # ============================================================
+  # CONFIG ADAPTER (keycloak adapter only)
+  # ============================================================
+
+  config-adapter:
+    build:
+      context: ../../config-adapter
+      dockerfile: Dockerfile
+    container_name: civitas-config-adapter
+    ports:
+      - "8088:8088"
+    environment:
+      HEALTHCHECK_PORT: 8088
+      PORT: 8088
+      ADAPTERS: keycloak
+      EVENTHANDLER_NAME: kafka
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_GROUP_ID: config-adapter-group
+      KAFKA_RETRY_MAX_ATTEMPTS: 3
+      KAFKA_RETRY_INITIAL_BACKOFF_MS: 1000
+      KAFKA_DLQ_TOPIC: de.civitascore.idm.dlq
+      KEYCLOAK_URL: http://civitas-keycloak:8080
+      KEYCLOAK_REALM: master
+      KEYCLOAK_USERNAME: admin
+      KEYCLOAK_PASSWORD: admin
+      KEYCLOAK_CLIENT_ID: admin-cli
+      KEYCLOAK_TARGET_REALM: civitas-core
+      KEYCLOAK_TOPICS: de.civitascore.idm.user.created,de.civitascore.idm.user.updated,de.civitascore.idm.user.deleted
+    depends_on:
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ============================================================
+  # PORTAL BACKEND (with e2e user init config)
+  # ============================================================
+
+  portal-backend:
+    build:
+      context: ../../portal-backend
+      dockerfile: Dockerfile
+    container_name: civitas-portal-backend
+    ports:
+      - "8089:8089"
+    environment:
+      # Spring profiles
+      SPRING_PROFILES_ACTIVE: local,postgres,init
+      # Database
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend?sslmode=disable
+      SPRING_DATASOURCE_USERNAME: admin
+      SPRING_DATASOURCE_PASSWORD: admin
+      # Kafka
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      # Keycloak
+      KEYCLOAK_AUTH_SERVER_URL: http://civitas-keycloak:8080
+      KEYCLOAK_ISSUER_URI: http://localhost:8080
+      KEYCLOAK_REALM: civitas-core
+      KEYCLOAK_TARGET_REALM: civitas-core
+      # App config
+      APP_URL: http://localhost:8089
+      SERVER_PORT: 8089
+      EVENT_CONFIG_ADAPTER_TIMEOUT_SECONDS: 30
+      # ---- E2E Test Groups ----
+      INIT_GROUPS_0_NAME: AuthzAdminGroup
+      INIT_GROUPS_0_ROLENAME: AuthzDataArchitect
+      INIT_GROUPS_0_SCOPETYPE: TENANT
+      INIT_GROUPS_0_DESCRIPTION: Group with full permissions for authz e2e testing
+      INIT_GROUPS_1_NAME: AuthzReaderGroup
+      INIT_GROUPS_1_ROLENAME: AuthzDataConsumer
+      INIT_GROUPS_1_SCOPETYPE: TENANT
+      INIT_GROUPS_1_DESCRIPTION: Group with read-only permissions for authz e2e testing
+      INIT_GROUPS_2_NAME: AuthzNoPermsGroup
+      INIT_GROUPS_2_ROLENAME: AuthzNoPerms
+      INIT_GROUPS_2_SCOPETYPE: TENANT
+      INIT_GROUPS_2_DESCRIPTION: Group with no permissions for authz e2e testing
+      # ---- E2E Test Users ----
+      INIT_USERS_0_FIRSTNAME: Authz
+      INIT_USERS_0_LASTNAME: Admin
+      INIT_USERS_0_EMAIL: authz.admin@e2e.civitas.dev
+      INIT_USERS_0_PASSWORD: test123
+      INIT_USERS_0_GROUPS_0: AuthzAdminGroup
+      INIT_USERS_1_FIRSTNAME: Authz
+      INIT_USERS_1_LASTNAME: Reader
+      INIT_USERS_1_EMAIL: authz.reader@e2e.civitas.dev
+      INIT_USERS_1_PASSWORD: test123
+      INIT_USERS_1_GROUPS_0: AuthzReaderGroup
+      INIT_USERS_2_FIRSTNAME: Authz
+      INIT_USERS_2_LASTNAME: NoPerms
+      INIT_USERS_2_EMAIL: authz.none@e2e.civitas.dev
+      INIT_USERS_2_PASSWORD: test123
+      INIT_USERS_2_GROUPS_0: AuthzNoPermsGroup
+    depends_on:
+      postgres-portal:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      config-adapter:
+        condition: service_healthy
+    networks:
+      - civitas-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8089/v1/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  civitas-network:
+    name: civitas-network
+    external: true

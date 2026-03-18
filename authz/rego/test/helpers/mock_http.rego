@@ -98,6 +98,25 @@ user_with_grouped_permissions(assignment_list) := {
 	],
 }
 
+# User with specific permissions via an unscoped SYSTEM role assignment (scopeType=null).
+# Mirrors how AuthZ Repository returns SYSTEM role assignments.
+user_with_unscoped_permissions(perms) := {
+	"userId": "test-user-123",
+	"externalId": "test-user-123",
+	"groups": [{
+		"id": "group-1",
+		"name": "System Group",
+		"assignments": [{
+			"roleId": "role-sys",
+			"roleName": "SystemRole",
+			"roleType": "SYSTEM",
+			"scopeType": null,
+			"scopeId": null,
+			"permissions": perms,
+		}],
+	}],
+}
+
 # User with no permissions (empty groups)
 user_no_permissions := {
 	"userId": "test-user-no-perms",
