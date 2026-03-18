@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { JSX, useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { toast } from 'sonner'
 
 import {
   useCreateAssignment,
@@ -36,7 +37,7 @@ import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
 import { PermissionsTab } from './permissions-tab/PermissionsTab'
-import PageEditControls from '@/components/page-edit-controls/PageEditControls'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 
 const subTabValues: Record<RoleTab, Tab<RoleTab>> = {
   basicInformation: {
@@ -85,14 +86,13 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [isDeleteErrorOpen, setIsDeleteErrorOpen] = useState(false)
   const [selectedGroupAssignmentIds, setSelectedGroupAssignmentIds] = useState<string[]>([])
-  const [unselectedGroupAssignmentIds, setUnselectedGroupAssignmentIds] = useState<string[]>([])
 
   const deleteRole = useDeleteRole()
   const isRoleQueryEnabled = !!roleId && !deleteRole.isPending && !deleteRole.isSuccess
 
   const isGroupTab = subTabValue === subTabValues.groupAssignment.value
 
-  const { data: roleData, isFetching: isLoadingRole } = useGetRole({ id: roleId || '', isEnabled: isRoleQueryEnabled })
+  const { data: roleData, isFetching: isLoadingRole, refetch: refreshRole } = useGetRole({ id: roleId || '', isEnabled: isRoleQueryEnabled })
 
   // Fetch existing assignments for this role
   const assignmentsParams = new URLSearchParams(`roleId=${roleId}`)
@@ -117,7 +117,13 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const createRole = useCreateRole()
   const updateRole = useUpdateRole()
 
-  const isLoading = isLoadingRole || createRole.isPending || updateRole.isPending || deleteRole.isPending
+  const isLoading =
+    isLoadingRole ||
+    createRole.isPending ||
+    updateRole.isPending ||
+    deleteRole.isPending ||
+    createAssignment.isPending ||
+    deleteAssignment.isPending
 
   const form = useForm<FormRole>({
     resolver: zodResolver(roleSchema),
@@ -140,7 +146,6 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const isDefaultRole = initialRole?.readonly === true
 
-  // Track dirty state for permissions
   const initialPermissionIds = useMemo(
     () => (initialRole?.permissions ?? []).map(p => p.id),
     [initialRole?.permissions],
@@ -154,10 +159,9 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
             (assignmentsData?.data.length || 0) === selectedGroupAssignmentIds.length &&
             assignmentsData?.data.every(assignment => selectedGroupAssignmentIds.includes(assignment.group.id))
           ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedGroupAssignmentIds],
   )
-
-  useEffect(() => {
 
   const arePermissionsDirty = useMemo(() => {
     const initialSet = new Set(initialPermissionIds)
@@ -166,7 +170,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     return Array.from(initialSet).some(id => !pendingSet.has(id))
   }, [pendingPermissionIds, initialPermissionIds])
 
-  const isAnyDirty = form.formState.isDirty || arePermissionsDirty
+  const isAnyDirty = form.formState.isDirty || arePermissionsDirty || areAssignmentsDirty
 
   const handleDeleteRole = () => {
     setIsDeleteConfirmOpen(false)
@@ -178,48 +182,98 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     })
   }
 
-  // Unified save handler
-  const handleSave = useCallback(() => {
+  const createNewRole = () => {
     const formValues = form.getValues()
 
-    if (roleId && initialRole) {
-      if (!isDefaultRole)
-        updateRole.mutate(
-          {
-            id: roleId,
-            name: formValues.name,
-            description: formValues.description,
-            roleType: initialRole.roleType,
-            permissionIds: pendingPermissionIds,
-            readonly: formValues.readonly,
-          },
-          {
-            onSuccess: () => {
-              setIsReadOnly(true)
-              setIsExitModalOpen(false)
-              router.refresh()
-            },
-          },
-        )
-      handleSaveGroupAssignment()
-    } else {
-      createRole.mutate(
-        {
-          name: formValues.name,
-          description: formValues.description,
-          roleType: (tabValue as Role['roleType']) || DEFAULT_TAB,
-          readonly: formValues.readonly,
+    createRole.mutate(
+      {
+        name: formValues.name,
+        description: formValues.description,
+        roleType: (tabValue as Role['roleType']) || DEFAULT_TAB,
+        readonly: formValues.readonly,
+      },
+      {
+        onSuccess: ({ data }) => {
+          toast.success(tCommon('success.createSuccess', { item: tCommon('items.role') }))
+          router.push(`/roles/${data.id}?tab=${tabValue}`)
         },
-        {
-          onSuccess: ({ data }) => {
-            router.push(`/roles/${data.id}?tab=${tabValue}`)
-          },
+        onError: error => {
+          console.error('An error occurred while creating the role', error)
+          toast.error(tRoles('errors.createError'))
         },
-      )
-    }
-  }, [roleId, initialRole, form, pendingPermissionIds, updateRole, createRole, tabValue, router])
+      },
+    )
+  }
 
-  // Exit edit mode
+  const updateRoleValues = async (roleId: string) => {
+    const formValues = form.getValues()
+
+    try {
+      await updateRole.mutateAsync({
+        id: roleId,
+        name: formValues.name,
+        description: formValues.description,
+        roleType: initialRole.roleType,
+        permissionIds: pendingPermissionIds,
+        readonly: formValues.readonly,
+      })
+      refreshRole()
+      toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.role') }))
+    } catch (error) {
+      console.error('An error occurred while updating the role values.', error)
+      toast.error(tCommon('errors.updateError', { item: tCommon('items.role') }))
+      throw error
+    }
+  }
+
+  const saveGroupAssignment = async (roleId: string): Promise<void> => {
+    try {
+      const existingAssignments = assignmentsData?.data ?? []
+      const currentGroupIds = existingAssignments.flatMap(a =>
+        a.scopeType === null || a.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT ? a.group.id : [],
+      )
+
+      const groupIdsToAdd = selectedGroupAssignmentIds.filter(id => !currentGroupIds.includes(id))
+      const assignmentsToRemove = existingAssignments.filter(a => !selectedGroupAssignmentIds.includes(a.group.id))
+
+      await Promise.all(
+        groupIdsToAdd.map(groupId =>
+          createAssignment.mutateAsync({
+            groupId,
+            roleId,
+            ...(initialRole.roleType !== 'SYSTEM' && { scopeType: ASSIGNMENT_SCOPE_TYPES.TENANT }),
+          }),
+        ),
+      )
+      await Promise.all(assignmentsToRemove.map(a => deleteAssignment.mutateAsync(a.id)))
+      toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.assignments') }))
+      await refetchAssignments()
+    } catch (error) {
+      console.error('An error occurred while groups assignment')
+      toast.error(tCommon('errors.updateError', { item: tCommon('items.assignments') }))
+      throw error
+    }
+  }
+
+  // Unified save handler
+  const handleSave = async () => {
+    const isCreateMode = !(roleId && initialRole)
+
+    if (isCreateMode) {
+      createNewRole()
+    } else {
+      const isFormDirty = form.formState.isDirty
+      try {
+        // values of default roles must not be edited but their assignments can be updated
+        if (!isDefaultRole && isFormDirty) await updateRoleValues(roleId)
+        await saveGroupAssignment(roleId)
+        setIsExitModalOpen(false)
+      } catch (error) {
+        console.error('An error occurred while updating the role')
+      }
+    }
+  }
+
   const handleExit = useCallback(() => {
     if (!roleId) {
       router.push('/roles')
@@ -239,31 +293,6 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     if (isAnyDirty) setIsExitModalOpen(true)
     else handleExit()
   }, [isAnyDirty, handleExit])
-
-  // Group assignment (immediate - not part of unified save)
-  const handleSaveGroupAssignment = async (): Promise<void> => {
-    if (!roleId) return
-
-    const existingAssignments = assignmentsData?.data ?? []
-    const currentGroupIds = existingAssignments.flatMap(a =>
-      a.scopeType === null || a.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT ? a.group.id : [],
-    )
-
-    const groupIdsToAdd = selectedGroupAssignmentIds.filter(id => !currentGroupIds.includes(id))
-    const assignmentsToRemove = existingAssignments.filter(a => !selectedGroupAssignmentIds.includes(a.group.id))
-
-    await Promise.all(
-      groupIdsToAdd.map(groupId =>
-        createAssignment.mutateAsync({
-          groupId,
-          roleId,
-          ...(initialRole.roleType !== 'SYSTEM' && { scopeType: ASSIGNMENT_SCOPE_TYPES.TENANT }),
-        }),
-      ),
-    )
-    await Promise.all(assignmentsToRemove.map(a => deleteAssignment.mutateAsync(a.id)))
-    await refetchAssignments()
-  }
 
   const handleGroupAssignmentUpdate = (newGroupIds: string[]) => {
     setSelectedGroupAssignmentIds(newGroupIds)
@@ -329,33 +358,37 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       />
 
       <PageBackground className="overflow-auto" hasBackground={!isReadOnly}>
-        {subTabValue === subTabValues.basicInformation.value && (
-          <BaseInfoTab
-            form={form}
-            isDefaultRole={isDefaultRole}
-            isReadOnly={isReadOnly || isDefaultRole}
-            deleteRole={roleId ? () => setIsDeleteConfirmOpen(true) : undefined}
-          />
-        )}
-
-        {subTabValue === subTabValues.permissions.value && (
-          <PermissionsTab
-            pendingPermissionIds={pendingPermissionIds}
-            onPendingPermissionIdsChange={setPendingPermissionIds}
-            isReadOnly={isReadOnly || isDefaultRole}
-            currentRoleId={roleId}
-            roleType={(roleType as Role['roleType']) || DEFAULT_TAB}
-          />
-        )}
-
-        {subTabValue === subTabValues.groupAssignment.value && (
-          <GroupAssignmentTab
-            selectedGroupIds={selectedGroupAssignmentIds}
-            onGroupAssignmentUpdate={handleGroupAssignmentUpdate}
-            roleName={initialRole?.name || ''}
-            isReadOnly={isReadOnly}
-            initialAssignments={assignmentsData?.data ?? []}
-          />
+        {isLoading ? (
+          <LoadingSpinner className='h-full'/>
+        ) : (
+          <>
+            {subTabValue === subTabValues.basicInformation.value && (
+              <BaseInfoTab
+                form={form}
+                isDefaultRole={isDefaultRole}
+                isReadOnly={isReadOnly || isDefaultRole}
+                deleteRole={roleId ? () => setIsDeleteConfirmOpen(true) : undefined}
+              />
+            )}
+            {subTabValue === subTabValues.permissions.value && (
+              <PermissionsTab
+                pendingPermissionIds={pendingPermissionIds}
+                onPendingPermissionIdsChange={setPendingPermissionIds}
+                isReadOnly={isReadOnly || isDefaultRole}
+                currentRoleId={roleId}
+                roleType={(roleType as Role['roleType']) || DEFAULT_TAB}
+              />
+            )}
+            {subTabValue === subTabValues.groupAssignment.value && (
+              <GroupAssignmentTab
+                selectedGroupIds={selectedGroupAssignmentIds}
+                onGroupAssignmentUpdate={handleGroupAssignmentUpdate}
+                roleName={initialRole?.name || ''}
+                isReadOnly={isReadOnly}
+                initialAssignments={assignmentsData?.data ?? []}
+              />
+            )}
+          </>
         )}
       </PageBackground>
 

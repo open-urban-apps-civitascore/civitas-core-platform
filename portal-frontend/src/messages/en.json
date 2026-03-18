@@ -69,7 +69,8 @@
       "datasource": "Datasource",
       "datastructures": "Datastructures",
       "datastructure": "Datastructure",
-      "datastructureVersion": "Version"
+      "datastructureVersion": "Version",
+      "assignments": "Assignments"
     },
     "messages": {
       "updateSuccess": "{item} has been successfully updated",
@@ -626,6 +627,9 @@
           "description": "Description"
         }
       }
+    },
+    "errors": {
+      "createError":"An error occurred while creating the role"
     }
   },
   "datasources": {
