@@ -57,6 +57,7 @@ const subTabValues: Record<RoleTab, Tab<RoleTab>> = {
 const defaultRole: Role = {
   id: '',
   name: '',
+  description: '',
   roleType: DEFAULT_TAB,
   permissions: [],
   readonly: false,
@@ -92,7 +93,11 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const isGroupTab = subTabValue === subTabValues.groupAssignment.value
 
-  const { data: roleData, isFetching: isLoadingRole, refetch: refreshRole } = useGetRole({ id: roleId || '', isEnabled: isRoleQueryEnabled })
+  const {
+    data: roleData,
+    isFetching: isLoadingRole,
+    refetch: refreshRole,
+  } = useGetRole({ id: roleId || '', isEnabled: isRoleQueryEnabled })
 
   // Fetch existing assignments for this role
   const assignmentsParams = new URLSearchParams(`roleId=${roleId}`)
@@ -125,21 +130,17 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     createAssignment.isPending ||
     deleteAssignment.isPending
 
+  const mapRoleApiToFormData = (role: Role): FormRole => ({ ...role, description: role.description || '' })
+
   const form = useForm<FormRole>({
     resolver: zodResolver(roleSchema),
-    defaultValues: {
-      name: initialRole.name,
-      description: initialRole.description,
-      readonly: initialRole.readonly,
-    },
+    defaultValues: mapRoleApiToFormData(initialRole),
   })
 
   // Initialize form and permissions from role data
   useEffect(() => {
     if (initialRole) {
-      form.setValue('name', initialRole.name)
-      form.setValue('description', initialRole.description || '')
-      form.setValue('readonly', initialRole.readonly)
+      form.reset(mapRoleApiToFormData(initialRole))
       setPendingPermissionIds((initialRole.permissions ?? []).map(p => p.id))
     }
   }, [initialRole, form])
@@ -262,11 +263,11 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     if (isCreateMode) {
       createNewRole()
     } else {
-      const isFormDirty = form.formState.isDirty
+      const shouldUpdateValues = form.formState.isDirty || arePermissionsDirty
       try {
         // values of default roles must not be edited but their assignments can be updated
-        if (!isDefaultRole && isFormDirty) await updateRoleValues(roleId)
-        await saveGroupAssignment(roleId)
+        if (!isDefaultRole && shouldUpdateValues) await updateRoleValues(roleId)
+        if (areAssignmentsDirty) await saveGroupAssignment(roleId)
         setIsExitModalOpen(false)
       } catch (error) {
         console.error('An error occurred while updating the role')
@@ -359,7 +360,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
       <PageBackground className="overflow-auto" hasBackground={!isReadOnly}>
         {isLoading ? (
-          <LoadingSpinner className='h-full'/>
+          <LoadingSpinner className="h-full" />
         ) : (
           <>
             {subTabValue === subTabValues.basicInformation.value && (
