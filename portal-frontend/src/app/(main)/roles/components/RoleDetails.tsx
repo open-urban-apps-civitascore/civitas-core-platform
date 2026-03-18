@@ -99,8 +99,6 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     isEnabled: !!roleId,
   })
 
-  const initialAssignedGroupIds = (assignmentsData?.data ?? []).map(a => a.group.id)
-
   useEffect(() => {
     setSelectedGroupAssignmentIds(
       (assignmentsData?.data ?? []).flatMap(a =>
@@ -146,6 +144,15 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     [initialRole?.permissions],
   )
 
+  const areAssignmentsDirty = !assignmentsData?.data
+    ? false
+    : !(
+        assignmentsData?.data.length === selectedGroupAssignmentIds.length &&
+        assignmentsData?.data.every(assignment => selectedGroupAssignmentIds.includes(assignment.id))
+      )
+
+  useEffect(() => {
+  }, [areAssignmentsDirty])
   const arePermissionsDirty = useMemo(() => {
     const initialSet = new Set(initialPermissionIds)
     const pendingSet = new Set(pendingPermissionIds)
@@ -187,6 +194,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
           },
         },
       )
+      handleSaveGroupAssignment()
     } else {
       createRole.mutate(
         {
@@ -226,14 +234,14 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   }, [isAnyDirty, handleExit])
 
   // Group assignment (immediate - not part of unified save)
-  const handleSaveGroupAssignment = async (newGroupIds: string[]): Promise<void> => {
+  const handleSaveGroupAssignment = async (): Promise<void> => {
     if (!roleId) return
 
     const existingAssignments = assignmentsData?.data ?? []
     const currentGroupIds = existingAssignments.map(a => a.group.id)
 
-    const groupIdsToAdd = newGroupIds.filter(id => !currentGroupIds.includes(id))
-    const assignmentsToRemove = existingAssignments.filter(a => !newGroupIds.includes(a.group.id))
+    const groupIdsToAdd = selectedGroupAssignmentIds.filter(id => !currentGroupIds.includes(id))
+    const assignmentsToRemove = existingAssignments.filter(a => !selectedGroupAssignmentIds.includes(a.group.id))
 
     await Promise.all(
       groupIdsToAdd.map(groupId =>
@@ -276,7 +284,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       confirmButtonType="button"
       onCancelClick={handleExitButtonClick}
       onConfirmClick={handleSave}
-      isConfirmButtonDisabled={!isAnyDirty || isLoading}
+      isConfirmButtonDisabled={(!isAnyDirty && !areAssignmentsDirty) || isLoading}
       isCancelButtonDisabled={isLoading}
       cancelButtonTitle={tCommon('actions.exit')}
       hasCard={false}
@@ -327,11 +335,11 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
         {subTabValue === subTabValues.groupAssignment.value && (
           <GroupAssignmentTab
-            assignedGroupIds={selectedGroupAssignmentIds}
+            selectedGroupIds={selectedGroupAssignmentIds}
             onGroupAssignmentUpdate={handleGroupAssignmentUpdate}
             roleName={initialRole?.name || ''}
-            isEditMode={!isReadOnly && !isDefaultRole}
-            assignments={assignmentsData?.data ?? []}
+            isReadOnly={isReadOnly || isDefaultRole}
+            initialAssignments={assignmentsData?.data ?? []}
           />
         )}
       </PageBackground>

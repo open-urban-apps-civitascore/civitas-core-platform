@@ -21,11 +21,11 @@ import { GroupTable, GroupTableRow } from './GroupTable'
 import { RemoveGroupAssignmentModal } from './RemoveGroupAssignmentModal'
 
 interface GroupAssignmentTabProps {
-  assignedGroupIds: Group['id'][]
+  selectedGroupIds: Group['id'][]
   onGroupAssignmentUpdate: (newGroupIds: string[]) => void
   roleName: Role['name']
-  isEditMode: boolean
-  assignments: Assignment[]
+  isReadOnly: boolean
+  initialAssignments: Assignment[]
 }
 
 const SCOPE_TABS: Tab<AssignmentScope>[] = [
@@ -39,7 +39,7 @@ const getGroupSelection = (groupIds: Group['id'][]) =>
   groupIds.reduce((acc, groupId) => ({ ...acc, [groupId]: true }), {})
 
 export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
-  const { assignedGroupIds, onGroupAssignmentUpdate, roleName, isEditMode, assignments } = props
+  const { selectedGroupIds, onGroupAssignmentUpdate, roleName, isReadOnly, initialAssignments } = props
   const t = useTranslations('roles.groupAssignmentTab')
   const router = useRouter()
   const [searchInput, setSearchInput] = useState<string>('')
@@ -48,14 +48,14 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'title', desc: false }])
   const [totalPages, setTotalPages] = useState<number>(1)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [groupSelection, setGroupSelection] = useState<RowSelectionState>(getGroupSelection(assignedGroupIds))
-  const originalGroupSelection = getGroupSelection(assignedGroupIds)
+  const [groupSelection, setGroupSelection] = useState<RowSelectionState>(getGroupSelection(selectedGroupIds))
+  const originalGroupSelection = getGroupSelection(selectedGroupIds)
   const [selectedScope, setSelectedScope] = useState<AssignmentScope>(ASSIGNMENT_SCOPE_TYPES.TENANT)
   const [groupToRemove, setGroupToRemove] = useState<GroupTableRow | null>(null)
 
   useEffect(() => {
-    setGroupSelection(getGroupSelection(assignedGroupIds))
-  }, [assignedGroupIds])
+    setGroupSelection(getGroupSelection(selectedGroupIds))
+  }, [selectedGroupIds])
 
   const requestParams = new URLSearchParams(`size=${pageSize}&page=${pageIndex}`)
   const { data: groupsData, isFetching } = useGetGroups({ params: requestParams })
@@ -63,17 +63,17 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   // Build a map from group ID to scopeType from assignments
   const groupScopeMap = useMemo(() => {
     const map: Record<string, AssignmentScope | null> = {}
-    assignments.forEach(a => {
+    initialAssignments.forEach(a => {
       map[a.group.id] = a.scopeType
     })
     return map
-  }, [assignments])
+  }, [initialAssignments])
 
   // Filter assignments by selected scope
   const scopeFilteredGroupIds = useMemo(() => {
-    if (selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT) return assignedGroupIds
-    return assignments.filter(a => a.scopeType === selectedScope).map(a => a.group.id)
-  }, [assignments, selectedScope, assignedGroupIds])
+    if (selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT) return selectedGroupIds
+    return initialAssignments.filter(a => a.scopeType === selectedScope).map(a => a.group.id)
+  }, [initialAssignments, selectedScope, selectedGroupIds])
 
   const groups = useMemo(() => {
     if (!groupsData?.data) {
@@ -119,17 +119,17 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   }
 
   const handleRemoveGroup = (group: GroupTableRow) => {
-    const newGroupIds = assignedGroupIds.filter(id => id !== group.id)
+    const newGroupIds = selectedGroupIds.filter(id => id !== group.id)
     onGroupAssignmentUpdate(newGroupIds)
     setGroupToRemove(null)
   }
 
   const isTenantScope = selectedScope === ASSIGNMENT_SCOPE_TYPES.TENANT
-  const canEdit = isEditMode && isTenantScope
+  const canEdit = !isReadOnly && isTenantScope
 
   const haveGroupsBeenTouched =
-    Object.keys(groupSelection).every(key => assignedGroupIds.includes(key)) === false ||
-    assignedGroupIds.every(id => Object.keys(groupSelection).includes(id)) === false
+    Object.keys(groupSelection).every(key => selectedGroupIds.includes(key)) === false ||
+    selectedGroupIds.every(id => Object.keys(groupSelection).includes(id)) === false
 
   if (isFetching) {
     return <LoadingSpinner />
@@ -163,7 +163,11 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
           )}
         </div>
 
-        <SearchHeader searchString={searchInput} onChangeSearchString={setSearchInput} customElement={addGroupButton} />
+        <SearchHeader
+          searchString={searchInput}
+          onChangeSearchString={setSearchInput}
+          customElement={isReadOnly ? undefined : addGroupButton}
+        />
 
         <NoDataPage title={t('noGroupsAssigned')} />
 
@@ -202,7 +206,11 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         )}
       </div>
 
-      <SearchHeader searchString={searchInput} onChangeSearchString={setSearchInput} customElement={addGroupButton} />
+      <SearchHeader
+        searchString={searchInput}
+        onChangeSearchString={setSearchInput}
+        customElement={isReadOnly ? undefined : addGroupButton}
+      />
       <GroupTable
         groups={filteredGroups}
         isLoading={isFetching}
