@@ -240,6 +240,7 @@ api-test-backend:
   needs:
     - job: build-backend
       artifacts: true
+      optional: true
     - job: build-config-adapter
       artifacts: true
       optional: true
