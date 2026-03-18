@@ -271,12 +271,6 @@ services:
     depends_on:
       apicurio-registry:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/atlas/system/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 30s
 
   # ── Data Pipelines ──────────────────────────────────────
 
