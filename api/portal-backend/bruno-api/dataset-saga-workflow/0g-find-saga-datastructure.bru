@@ -1,0 +1,31 @@
+meta {
+  name: 0g. Find Existing Saga DataStructure
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/datastructures?name=Saga Sensor Data Structure
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(d => d.name === 'Saga Sensor Data Structure');
+    if (match) {
+      bru.setVar('sagaDataStructureId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    // Always 200 — search returns empty page if entity doesn't exist
+    expect(res.getStatus()).to.equal(200);
+  });
+}

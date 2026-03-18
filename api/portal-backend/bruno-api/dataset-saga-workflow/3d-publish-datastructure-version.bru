@@ -1,0 +1,24 @@
+meta {
+  name: 3d. Publish DataStructure Version
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/versions/:versionId/publish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{sagaDataStructureId}}
+  versionId: {{sagaDataStructureVersionId}}
+}
+
+tests {
+  test("Published or already published", function() {
+    const status = res.getStatus();
+    // 200=published, 400=not in DRAFT state (already published)
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}

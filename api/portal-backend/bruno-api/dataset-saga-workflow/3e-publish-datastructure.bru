@@ -1,23 +1,23 @@
 meta {
-  name: 7. Publish DataSet
+  name: 3e. Publish DataStructure
   type: http
-  seq: 18
+  seq: 14
 }
 
 post {
-  url: {{baseUrl}}/datasets/:id/publish
+  url: {{baseUrl}}/datastructures/:dataStructureId/publish
   body: none
   auth: inherit
 }
 
 params:path {
-  id: {{sagaDataSetId}}
+  dataStructureId: {{sagaDataStructureId}}
 }
 
 tests {
   test("Published or already published", function() {
     const status = res.getStatus();
-    // 200=published, 400=not in DRAFT state (already published or released)
+    // 200=published, 400=not in DRAFT state (already published)
     expect(status === 200 || status === 400).to.be.true;
   });
 }
