@@ -191,7 +191,10 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const handleDeleteRole = () => {
     setIsDeleteConfirmOpen(false)
     deleteRole.mutate(roleId || '', {
-      onSuccess: () => router.push('/roles'),
+      onSuccess: () => {
+        toast.success(tCommon('success.deletionSuccess', { item: tCommon('items.role') }))
+        router.push('/roles')
+      },
       onError: () => {
         setIsDeleteErrorOpen(true)
       },
@@ -210,7 +213,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       },
       {
         onSuccess: ({ data }) => {
-          toast.success(tCommon('success.createSuccess', { item: tCommon('items.role') }))
+          toast.success(tCommon('success.creationSuccess', { item: tCommon('items.role') }))
           router.push(`/roles/${data.id}?tab=${tabValue}`)
         },
         onError: error => {
