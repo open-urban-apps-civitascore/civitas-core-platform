@@ -29,6 +29,9 @@ public class KafkaEventConfig {
   @Value("${spring.kafka.producer.properties.linger.ms:10}")
   private int lingerMs;
 
+  @Value("${spring.kafka.producer.properties.compression.type:snappy}")
+  private String compressionType;
+
   @Value("${spring.kafka.producer.buffer-memory:33554432}")
   private long bufferMemory;
 
@@ -50,7 +53,7 @@ public class KafkaEventConfig {
     props.put(ProducerConfig.RETRIES_CONFIG, Integer.MAX_VALUE);
 
     // Performance - Compression reduces network bandwidth
-    props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
+    props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, compressionType);
     props.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
     props.put(ProducerConfig.LINGER_MS_CONFIG, lingerMs);
 
