@@ -13,3 +13,18 @@ delete {
 params:path {
   id: {{sagaDataSetId}}
 }
+
+docs {
+  ## Cleanup – Delete DataSet
+
+  **Precondition:** `sagaDataSetId` is set; dataset is not in `AVAILABLE` state (unpublished in step 16).
+
+  **Expected Response**
+  - Status: `204 No Content`
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSet record removed from `portal_backend` DB |
+}

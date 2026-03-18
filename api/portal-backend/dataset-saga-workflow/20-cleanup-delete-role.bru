@@ -13,3 +13,18 @@ delete {
 params:path {
   id: {{sagaRoleId}}
 }
+
+docs {
+  ## Cleanup – Delete Role
+
+  **Precondition:** `sagaRoleId` is set.
+
+  **Expected Response**
+  - Status: `204 No Content`
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Role record removed from `portal_backend` DB |
+}

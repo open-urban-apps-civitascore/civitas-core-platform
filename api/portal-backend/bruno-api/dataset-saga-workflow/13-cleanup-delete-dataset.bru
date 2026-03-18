@@ -21,3 +21,19 @@ tests {
     expect(status === 204 || status === 404 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Saga step 13 of 18** — Delete the dataset (final cleanup).
+
+  Removes the dataset record. Must be in `DRAFT` state; a 400 is returned if a saga is still pending. Pipelines and assignments should be deleted first (steps 14-15) as they reference this record.
+
+  **Expected Response:** 204 No Content. 400 if not in `DRAFT` state (wait for pending saga). 404 if already deleted.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSet record removed from `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

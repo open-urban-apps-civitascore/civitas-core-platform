@@ -36,3 +36,13 @@ tests {
     expect(pst === null || pst === 'CREATE').to.be.true;
   });
 }
+
+docs {
+  **Saga step 9 of 18** — Poll dataset status after releasing.
+
+  Fetches the dataset to verify the DATASET_CREATE saga has completed. The saga runs asynchronously so the dataset may still show `pendingSagaType=CREATE` if polled immediately. Once the saga finishes, `pendingSagaType` becomes `null` and `publicUrl` is populated.
+
+  **Expected Response:** 200 OK. `dataSetStatus` is `AVAILABLE` (saga complete) or `READY` (saga failed with compensation). `pendingSagaType` is `null` (done) or `CREATE` (still running).
+
+  **Post-condition:** If saga completed, saves `sagaPublicUrl` from `body.publicUrl` for downstream gateway verification (step 9d).
+}

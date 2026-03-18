@@ -21,3 +21,19 @@ tests {
     expect(status === 200 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Precondition:** `dataSetId` is set; dataset is in `READY` state.
+
+  Reverts the dataset to DRAFT status. Auto-generated distributions are removed.
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body reflects dataset with status `DRAFT`
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSet status → `DRAFT`; distributions removed |
+}

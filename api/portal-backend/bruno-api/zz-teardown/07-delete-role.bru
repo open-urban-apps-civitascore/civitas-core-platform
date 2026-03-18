@@ -17,3 +17,15 @@ tests {
     expect(status === 204 || status === 404 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Expected Response:** 204 No Content.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DATA role record removed from `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

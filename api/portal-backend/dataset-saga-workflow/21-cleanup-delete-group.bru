@@ -13,3 +13,20 @@ delete {
 params:path {
   id: {{sagaGroupId}}
 }
+
+docs {
+  ## Cleanup – Delete Group
+
+  **Precondition:** `sagaGroupId` is set.
+
+  **Expected Response**
+  - Status: `204 No Content`
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Group record removed from `portal_backend` DB |
+  | Config Adapter | Consumes `de.civitascore.idm.group.deleted` Kafka event; forwards deletion to Keycloak |
+  | Keycloak | Group removed from `civitas-core` realm |
+}

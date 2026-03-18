@@ -37,3 +37,17 @@ tests {
     expect(status === 200 || status === 400 || status === 502).to.be.true;
   });
 }
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set.
+
+  **Expected Response:** 200 OK, body reflects updated `description`; other fields unchanged.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Version `description` updated; other fields unchanged |
+  | Config Adapter | -- |
+  | External System | -- |
+}

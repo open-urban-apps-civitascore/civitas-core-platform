@@ -1,7 +1,7 @@
 meta {
   name: Check Mailpit Emails
   type: http
-  seq: 5
+  seq: 8
 }
 
 get {
@@ -18,6 +18,16 @@ script:post-response {
   if (res.body && res.body.messages) {
     bru.setVar('emailCount', res.body.messages.length);
   }
+}
+
+docs {
+  Checks the Mailpit inbox for emails triggered by user creation.
+
+  **Precondition:** A user with email `john.doe@example.com` was created (TC-USER-04).
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body contains `messages` array with at least one email addressed to `john.doe@example.com`
 }
 
 tests {

@@ -30,3 +30,11 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 }
+
+docs {
+  **Purpose:** Checks whether "API Test Data Role" and "API Test System Role" from a previous run already exist. If found, saves the IDs so the creation steps (02, 02b) can be skipped and teardown targets the correct records.
+
+  **Expected Response:** 200 OK, body is a paginated list (may be empty if this is the first run).
+
+  **Post-condition:** If matches are found, saves `roleId` / `setupRoleId` and `systemRoleId` / `setupSystemRoleId` from `body.content[].id`.
+}

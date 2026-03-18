@@ -13,3 +13,18 @@ delete {
 params:path {
   id: {{sagaDataSourceId}}
 }
+
+docs {
+  ## Cleanup – Delete DataSource
+
+  **Precondition:** `sagaDataSourceId` is set.
+
+  **Expected Response**
+  - Status: `204 No Content`
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSource record removed from `portal_backend` DB |
+}

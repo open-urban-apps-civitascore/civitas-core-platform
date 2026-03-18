@@ -22,3 +22,11 @@ tests {
     expect(res.body.id).to.be.a('string');
   });
 }
+
+docs {
+  **Precondition:** `userId` is set (from TC-USER-04).
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body contains the user with matching `id`
+}

@@ -32,3 +32,21 @@ tests {
     expect(status === 201 || status === 409).to.be.true;
   });
 }
+
+docs {
+  **Saga step 6 of 18** — Prerequisites: create supporting resources before triggering the saga.
+
+  Creates a scoped assignment linking the group (`sagaGroupId`) to the DATA role (`sagaRoleId`) within the scope of the dataset (`sagaDataSetId`). This grants the group access to the dataset once it becomes AVAILABLE.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if the assignment already existed (idempotent).
+
+  **Post-condition:** Save `sagaAssignmentId` from `body.id`.
+
+  **System Impact:**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Assignment record created in `portal_backend` DB with `scopeType=DATASET` |
+  | Config Adapter | AuthZ Repository notified to refresh its authorization data cache |
+  | AuthZ Repository (OPA) | Scoped role-group binding becomes visible in OPA policy data |
+}

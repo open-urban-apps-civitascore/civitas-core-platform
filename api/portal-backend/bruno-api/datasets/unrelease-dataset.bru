@@ -21,3 +21,34 @@ tests {
     expect(status === 202 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Precondition:** `dataSetId` is set; dataset is in `AVAILABLE` state; no saga is in-flight.
+
+  Triggers the **DATASET_DELETE** saga to tear down infrastructure in reverse order:
+
+  1. **Redpanda Connect** — deletes data pipelines (best-effort)
+  2. **APISIX Gateway** — deletes route + upstream (best-effort)
+  3. **FROST Server** — deletes project (best-effort)
+
+  The DELETE saga is best-effort (no compensation) — it continues even if individual steps fail.
+  On completion, infrastructure fields are cleared and the dataset reverts to READY.
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body reflects dataset transitioning back to `READY`
+
+  **Kafka Events**
+  - Produces: `de.civitascore.dataset.saga.trigger` (sagaType: `DATASET_DELETE`)
+  - Consumes: `de.civitascore.saga.result`
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSet status → `READY`; infrastructure fields cleared; `pendingSagaType` set to `DELETE` until saga completes |
+  | Config Adapter (Orchestrator) | Receives saga trigger; orchestrates Redpanda → APISIX → FROST deletion |
+  | FROST Server | Project deleted; verify project no longer exists at FROST API |
+  | APISIX Gateway | Route + upstream removed; verify at `http://localhost:9180` |
+  | Redpanda Connect | Data pipelines removed |
+}

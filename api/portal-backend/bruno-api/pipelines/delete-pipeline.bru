@@ -20,3 +20,19 @@ tests {
     expect(res.getStatus()).to.equal(204);
   });
 }
+
+docs {
+  **Precondition:** `dataSetId` and `pipelineId` are set.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue TC-PIPE-02 for same `pipelineId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Pipeline record removed |
+  | Config Adapter | -- |
+  | External System | -- |
+}
