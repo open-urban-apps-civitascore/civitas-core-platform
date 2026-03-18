@@ -301,7 +301,15 @@ api-test-backend:
     # Run Bruno API tests from a container on the same Compose network
     - docker run -d --name bruno-runner --network api-test-net node:22-alpine sleep infinity
     - docker cp api/portal-backend/bruno-api/. bruno-runner:/tests/
-    - docker exec bruno-runner sh -c "npm install -g @usebruno/cli 2>/dev/null && cd /tests && npx @usebruno/cli run --env ci 2>&1 | tee /tests/bruno-output.txt"
+    - |
+      docker exec bruno-runner sh -c '
+        npm install -g @usebruno/cli 2>/dev/null
+        cd /tests
+        npx @usebruno/cli run --env ci > /tests/bruno-output.txt 2>&1
+        RESULT=$?
+        cat /tests/bruno-output.txt
+        exit $RESULT
+      '
     - docker cp bruno-runner:/tests/bruno-output.txt bruno-results.txt || true
   after_script:
     - docker rm -f bruno-runner 2>/dev/null || true
