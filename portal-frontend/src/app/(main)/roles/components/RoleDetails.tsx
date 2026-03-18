@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Assignment, ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
-import { FormRole, Role, roleSchema, RoleTab } from '@/types/roles'
+import { FormRole, Role, ROLE_TYPES, roleSchema, RoleTab } from '@/types/roles'
 
 import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
@@ -396,6 +396,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
                 selectedGroupIds={selectedGroupIds}
                 onGroupAssignmentUpdate={handleGroupAssignmentUpdate}
                 roleName={initialRole?.name || ''}
+                isSystemRole={initialRole.roleType === ROLE_TYPES.SYSTEM}
                 isReadOnly={isReadOnly}
                 initialAssignments={assignmentsData?.data ?? []}
               />

@@ -26,6 +26,7 @@ interface GroupAssignmentTabProps {
   roleName: Role['name']
   isReadOnly: boolean
   initialAssignments: Assignment[]
+  isSystemRole: boolean
 }
 
 const SCOPE_TABS: Tab<AssignmentScope>[] = [
@@ -39,7 +40,7 @@ const getGroupSelection = (groupIds: Group['id'][]) =>
   groupIds.reduce((acc, groupId) => ({ ...acc, [groupId]: true }), {})
 
 export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
-  const { selectedGroupIds, onGroupAssignmentUpdate, roleName, isReadOnly, initialAssignments } = props
+  const { selectedGroupIds, onGroupAssignmentUpdate, roleName, isReadOnly, initialAssignments, isSystemRole } = props
   const t = useTranslations('roles.groupAssignmentTab')
   const router = useRouter()
   const [searchInput, setSearchInput] = useState<string>('')
@@ -53,6 +54,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const [selectedScope, setSelectedScope] = useState<AssignmentScope>(ASSIGNMENT_SCOPE_TYPES.TENANT)
   const [groupToRemove, setGroupToRemove] = useState<GroupTableRow | null>(null)
 
+  console.log('is system role', isSystemRole)
   useEffect(() => {
     setGroupSelection(getGroupSelection(selectedGroupIds))
   }, [selectedGroupIds])
@@ -144,23 +146,24 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   if (!isFetching && scopeFilteredGroupIds.length === 0 && filteredGroups.length === 0) {
     return (
       <div className="flex flex-col gap-4 h-full">
-        <div className="flex items-center justify-between gap-4">
-          <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />
-
-          {!isTenantScope && (
-            <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
-              <TriangleAlert className="h-4 w-4 shrink-0" />
-              <span>{t(`scopeReadOnlyMessage${selectedScope}`)}</span>
-            </div>
-          )}
-
-          {isTenantScope && (
-            <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
-              <Info className="h-4 w-4 shrink-0" />
-              <span>{t('infoBox')}</span>
-            </div>
-          )}
-        </div>
+        {!isSystemRole && (
+          <div className="flex items-center justify-between gap-4">
+            (
+            <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />)
+            {!isTenantScope && (
+              <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
+                <TriangleAlert className="h-4 w-4 shrink-0" />
+                <span>{t(`scopeReadOnlyMessage${selectedScope}`)}</span>
+              </div>
+            )}
+            {isTenantScope && (
+              <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
+                <Info className="h-4 w-4 shrink-0" />
+                <span>{t('infoBox')}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <SearchHeader
           searchString={searchInput}
@@ -188,22 +191,24 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
-        <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />
+      {!isSystemRole && (
+        <div className="flex items-center justify-between gap-4">
+          <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />
 
-        {!isTenantScope && (
-          <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
-            <TriangleAlert className="h-4 w-4 shrink-0" />
-            <span>{t(`scopeReadOnlyMessage${selectedScope}`)}</span>
-          </div>
-        )}
-        {isTenantScope && (
-          <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
-            <Info className="h-4 w-4 shrink-0" />
-            <span>{t('infoBox')}</span>
-          </div>
-        )}
-      </div>
+          {!isTenantScope && (
+            <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
+              <TriangleAlert className="h-4 w-4 shrink-0" />
+              <span>{t(`scopeReadOnlyMessage${selectedScope}`)}</span>
+            </div>
+          )}
+          {isTenantScope && (
+            <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
+              <Info className="h-4 w-4 shrink-0" />
+              <span>{t('infoBox')}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <SearchHeader
         searchString={searchInput}
@@ -224,7 +229,6 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         isEditMode={canEdit}
         onRemoveGroup={canEdit ? group => setGroupToRemove(group) : undefined}
       />
-
       {isTenantScope && (
         <GroupAssignmentModal
           open={isModalOpen}
@@ -237,7 +241,6 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
           roleName={roleName}
         />
       )}
-
       {groupToRemove && (
         <RemoveGroupAssignmentModal
           isOpen={!!groupToRemove}
