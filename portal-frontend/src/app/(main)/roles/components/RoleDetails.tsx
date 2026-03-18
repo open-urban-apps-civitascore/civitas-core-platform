@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { JSX, useCallback, useEffect, useMemo, useState } from 'react'
+import { JSX, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 
@@ -14,6 +14,7 @@ import {
 } from '@/app/services/api/assignments/clientRequests'
 import { useCreateRole, useDeleteRole, useGetRole, useUpdateRole } from '@/app/services/api/roles/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
+import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { PageBackground } from '@/components/page-background/PageBackground'
@@ -37,7 +38,6 @@ import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
 import { PermissionsTab } from './permissions-tab/PermissionsTab'
-import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 
 const subTabValues: Record<RoleTab, Tab<RoleTab>> = {
   basicInformation: {
@@ -86,7 +86,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const tBaseInfo = useTranslations('roles.baseInfoTab')
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [isDeleteErrorOpen, setIsDeleteErrorOpen] = useState(false)
-  const [selectedGroupAssignmentIds, setSelectedGroupAssignmentIds] = useState<string[]>([])
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
 
   const deleteRole = useDeleteRole()
   const isRoleQueryEnabled = !!roleId && !deleteRole.isPending && !deleteRole.isSuccess
@@ -106,13 +106,17 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     isEnabled: !!roleId,
   })
 
-  useEffect(() => {
-    setSelectedGroupAssignmentIds(
+  const initallyAssignedGroupsIds = useMemo(
+    () =>
       (assignmentsData?.data ?? []).flatMap(a =>
         a.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT || a.scopeType === null ? a.group.id : [],
       ),
-    )
-  }, [assignmentsData])
+    [assignmentsData?.data],
+  )
+
+  useEffect(() => {
+    setSelectedGroupIds(initallyAssignedGroupsIds)
+  }, [initallyAssignedGroupsIds])
 
   const createAssignment = useCreateAssignment()
   const deleteAssignment = useDeleteAssignment()
@@ -157,11 +161,11 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       !assignmentsData?.data
         ? false
         : !(
-            (assignmentsData?.data.length || 0) === selectedGroupAssignmentIds.length &&
-            assignmentsData?.data.every(assignment => selectedGroupAssignmentIds.includes(assignment.group.id))
+            (assignmentsData?.data.length || 0) === selectedGroupIds.length &&
+            assignmentsData?.data.every(assignment => selectedGroupIds.includes(assignment.group.id))
           ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedGroupAssignmentIds],
+    [selectedGroupIds],
   )
 
   const arePermissionsDirty = useMemo(() => {
@@ -234,8 +238,8 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         a.scopeType === null || a.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT ? a.group.id : [],
       )
 
-      const groupIdsToAdd = selectedGroupAssignmentIds.filter(id => !currentGroupIds.includes(id))
-      const assignmentsToRemove = existingAssignments.filter(a => !selectedGroupAssignmentIds.includes(a.group.id))
+      const groupIdsToAdd = selectedGroupIds.filter(id => !currentGroupIds.includes(id))
+      const assignmentsToRemove = existingAssignments.filter(a => !selectedGroupIds.includes(a.group.id))
 
       await Promise.all(
         groupIdsToAdd.map(groupId =>
@@ -269,34 +273,32 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         if (!isDefaultRole && shouldUpdateValues) await updateRoleValues(roleId)
         if (areAssignmentsDirty) await saveGroupAssignment(roleId)
         setIsExitModalOpen(false)
+        // eslint-disable-next-line unused-imports/no-unused-vars
       } catch (error) {
         console.error('An error occurred while updating the role')
       }
     }
   }
 
-  const handleExit = useCallback(() => {
+  const handleExit = () => {
     if (!roleId) {
       router.push('/roles')
       return
     }
-    form.reset({
-      name: initialRole.name,
-      description: initialRole.description || '',
-      readonly: initialRole.readonly,
-    })
+    form.reset(mapRoleApiToFormData(initialRole))
     setPendingPermissionIds(initialPermissionIds)
+    setSelectedGroupIds(initallyAssignedGroupsIds)
     setIsReadOnly(true)
     setIsExitModalOpen(false)
-  }, [form, initialRole, initialPermissionIds, roleId, router])
+  }
 
-  const handleExitButtonClick = useCallback(() => {
+  const handleExitButtonClick = () => {
     if (isAnyDirty) setIsExitModalOpen(true)
     else handleExit()
-  }, [isAnyDirty, handleExit])
+  }
 
   const handleGroupAssignmentUpdate = (newGroupIds: string[]) => {
-    setSelectedGroupAssignmentIds(newGroupIds)
+    setSelectedGroupIds(newGroupIds)
   }
 
   // Tab configuration
@@ -382,7 +384,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
             )}
             {subTabValue === subTabValues.groupAssignment.value && (
               <GroupAssignmentTab
-                selectedGroupIds={selectedGroupAssignmentIds}
+                selectedGroupIds={selectedGroupIds}
                 onGroupAssignmentUpdate={handleGroupAssignmentUpdate}
                 roleName={initialRole?.name || ''}
                 isReadOnly={isReadOnly}
