@@ -2,10 +2,29 @@ import { render, screen, within } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
+import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
 import { type Assignment } from '@/types/assignments'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 
 import { RolesAssignmentTable } from './RolesAssignmentTable'
+
+vi.mock('@/app/services/api/users/clientRequests', () => ({
+  useGetCurrentUser: vi.fn(),
+}))
+
+const mockCurrentUserWithPermissions = () => {
+  vi.mocked(useGetCurrentUser).mockReturnValue({
+    data: {
+      username: 'test',
+      email: 'test@test.com',
+      title: 'MR' as const,
+      firstName: 'Test',
+      lastName: 'User',
+      assignments: [{ scopeType: 'TENANT', scopeId: null, permissions: [PERMISSION_NAMES.ROLE_READ] }],
+    },
+  } as unknown as ReturnType<typeof useGetCurrentUser>)
+}
 
 const mockAssignments: Assignment[] = [
   {
@@ -49,6 +68,10 @@ const renderTable = (props = {}) =>
   )
 
 describe('RolesAssignmentTable', () => {
+  beforeEach(() => {
+    mockCurrentUserWithPermissions()
+  })
+
   it('renders the table', () => {
     renderTable()
     expect(screen.getByRole('table')).toBeDefined()

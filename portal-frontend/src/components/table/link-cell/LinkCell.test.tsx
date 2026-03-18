@@ -25,4 +25,23 @@ describe('LinkCell', () => {
     )
     expect(screen.getByTestId('custom-child')).toBeInTheDocument()
   })
+
+  it('renders plain text when isDisabled is true', () => {
+    render(
+      <LinkCell href="/test" isDisabled>
+        Disabled Link
+      </LinkCell>,
+    )
+    expect(screen.queryByRole('link', { name: 'Disabled Link' })).not.toBeInTheDocument()
+    expect(screen.getByText('Disabled Link')).toBeInTheDocument()
+  })
+
+  it('renders a link when isDisabled is false', () => {
+    render(
+      <LinkCell href="/test" isDisabled={false}>
+        Enabled Link
+      </LinkCell>,
+    )
+    expect(screen.getByRole('link', { name: /Enabled Link/ })).toHaveAttribute('href', '/test')
+  })
 })
