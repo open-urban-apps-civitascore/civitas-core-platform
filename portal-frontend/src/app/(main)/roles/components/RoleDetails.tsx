@@ -151,8 +151,6 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         assignmentsData?.data.every(assignment => selectedGroupAssignmentIds.includes(assignment.id))
       )
 
-  useEffect(() => {
-  }, [areAssignmentsDirty])
   const arePermissionsDirty = useMemo(() => {
     const initialSet = new Set(initialPermissionIds)
     const pendingSet = new Set(pendingPermissionIds)
@@ -177,23 +175,24 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     const formValues = form.getValues()
 
     if (roleId && initialRole) {
-      updateRole.mutate(
-        {
-          id: roleId,
-          name: formValues.name,
-          description: formValues.description,
-          roleType: initialRole.roleType,
-          permissionIds: pendingPermissionIds,
-          readonly: formValues.readonly,
-        },
-        {
-          onSuccess: () => {
-            setIsReadOnly(true)
-            setIsExitModalOpen(false)
-            router.refresh()
+      if (!isDefaultRole)
+        updateRole.mutate(
+          {
+            id: roleId,
+            name: formValues.name,
+            description: formValues.description,
+            roleType: initialRole.roleType,
+            permissionIds: pendingPermissionIds,
+            readonly: formValues.readonly,
           },
-        },
-      )
+          {
+            onSuccess: () => {
+              setIsReadOnly(true)
+              setIsExitModalOpen(false)
+              router.refresh()
+            },
+          },
+        )
       handleSaveGroupAssignment()
     } else {
       createRole.mutate(
@@ -238,7 +237,9 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     if (!roleId) return
 
     const existingAssignments = assignmentsData?.data ?? []
-    const currentGroupIds = existingAssignments.map(a => a.group.id)
+    const currentGroupIds = existingAssignments.flatMap(a =>
+      a.scopeType === null || a.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT ? a.group.id : [],
+    )
 
     const groupIdsToAdd = selectedGroupAssignmentIds.filter(id => !currentGroupIds.includes(id))
     const assignmentsToRemove = existingAssignments.filter(a => !selectedGroupAssignmentIds.includes(a.group.id))
@@ -338,7 +339,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
             selectedGroupIds={selectedGroupAssignmentIds}
             onGroupAssignmentUpdate={handleGroupAssignmentUpdate}
             roleName={initialRole?.name || ''}
-            isReadOnly={isReadOnly || isDefaultRole}
+            isReadOnly={isReadOnly}
             initialAssignments={assignmentsData?.data ?? []}
           />
         )}
