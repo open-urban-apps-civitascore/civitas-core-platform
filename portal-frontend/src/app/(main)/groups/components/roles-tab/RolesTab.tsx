@@ -17,7 +17,9 @@ import { TableContainer } from '@/components/table-container/TableContainer'
 import { AlertBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { usePermissions } from '@/hooks/use-permissions'
 import { Assignment } from '@/types/assignments'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { AssignmentFormData, Group, GroupBaseFormData } from '@/types/groups'
 import { Role, ROLE_TYPES } from '@/types/roles'
 
@@ -46,6 +48,7 @@ export const RolesTab = (props: RolesTabProps) => {
   const { form, groupData, isReadOnly, pendingRoles, setPendingRoles } = props
   const t = useTranslations('groups')
   const tCommon = useTranslations('common')
+  const { hasPermission } = usePermissions()
 
   const [activeScopeTab, setActiveScopeTab] = useState<ScopeTab>('platform')
   const [searchString, setSearchString] = useState('')
@@ -160,7 +163,11 @@ export const RolesTab = (props: RolesTabProps) => {
       columnHelper.accessor('role.name', {
         id: 'name',
         header: ({ column }) => <SortableTableHeader column={column} title={t('roles.columns.name')} />,
-        cell: ({ row }) => <LinkCell href={`/roles/${row.original.role.id}`}>{row.original.role.name}</LinkCell>,
+        cell: ({ row }) => (
+          <LinkCell href={`/roles/${row.original.role.id}`} isDisabled={!hasPermission(PERMISSION_NAMES.ROLE_READ)}>
+            {row.original.role.name}
+          </LinkCell>
+        ),
         meta: {
           style: {
             width: '20%',
@@ -225,7 +232,7 @@ export const RolesTab = (props: RolesTabProps) => {
           ]
         : []),
     ],
-    [isReadOnly, isPlatformTab, t, tCommon],
+    [isReadOnly, isPlatformTab, t, tCommon, hasPermission],
   )
 
   const table = useReactTable({

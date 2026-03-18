@@ -18,7 +18,8 @@ import { resolveUpdater } from '@/utils/table'
 
 interface GroupsTableProps extends TableProps<Group> {
   groups: Group[]
-  onDeleteGroupClick: (groupId: string) => void
+  onDeleteGroupClick?: (groupId: string) => void
+  isLinkDisabled?: boolean
 }
 
 export const GroupsTable = (props: GroupsTableProps) => {
@@ -34,6 +35,7 @@ export const GroupsTable = (props: GroupsTableProps) => {
     onSortingChange,
     onDeleteGroupClick,
     isLoading,
+    isLinkDisabled,
   } = props
   const t = useTranslations('groups')
   const tCommon = useTranslations('common')
@@ -47,7 +49,11 @@ export const GroupsTable = (props: GroupsTableProps) => {
     }),
     columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('list.title')} />,
-      cell: ({ row }) => <LinkCell href={`/groups/${row.id}`}>{row.original.name}</LinkCell>,
+      cell: ({ row }) => (
+        <LinkCell href={`/groups/${row.id}`} isDisabled={isLinkDisabled}>
+          {row.original.name}
+        </LinkCell>
+      ),
       meta: {
         style: {
           minWidth: '150px',
@@ -76,24 +82,28 @@ export const GroupsTable = (props: GroupsTableProps) => {
         },
       },
     }),
-    {
-      id: 'actions',
-      cell: ({ row }: { row: Row<Group> }) => (
-        <TableDropdownMenu
-          menuItems={[
-            {
-              label: tCommon('actions.removeItem', { item: tCommon('items.group') }),
-              onClick: () => onDeleteGroupClick(row.id),
+    ...(onDeleteGroupClick
+      ? [
+          {
+            id: 'actions',
+            cell: ({ row }: { row: Row<Group> }) => (
+              <TableDropdownMenu
+                menuItems={[
+                  {
+                    label: tCommon('actions.removeItem', { item: tCommon('items.group') }),
+                    onClick: () => onDeleteGroupClick(row.id),
+                  },
+                ]}
+              />
+            ),
+            meta: {
+              style: {
+                width: '50px',
+              },
             },
-          ]}
-        />
-      ),
-      meta: {
-        style: {
-          width: '50px',
-        },
-      },
-    },
+          },
+        ]
+      : []),
   ]
 
   const table = useReactTable({

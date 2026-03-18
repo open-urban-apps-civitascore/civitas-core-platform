@@ -10,6 +10,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface UsersTableProps extends TableProps<ListUser> {
   users: ListUser[]
+  isLinkDisabled?: boolean
 }
 
 const UsersTable = (props: UsersTableProps) => {
@@ -23,6 +24,7 @@ const UsersTable = (props: UsersTableProps) => {
     rowSelection,
     onPaginationChange,
     onSortingChange,
+    isLinkDisabled,
   } = props
   const t = useTranslations('users')
   const columnHelper = createColumnHelper<ListUser>()
@@ -37,7 +39,11 @@ const UsersTable = (props: UsersTableProps) => {
     }),
     columnHelper.accessor('fullName', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('info.displayName')} />,
-      cell: ({ row }) => <LinkCell href={`/users/${row.id}?${params.toString()}`}>{row.original.fullName}</LinkCell>,
+      cell: ({ row }) => (
+        <LinkCell href={`/users/${row.id}?${params.toString()}`} isDisabled={isLinkDisabled}>
+          {row.original.fullName}
+        </LinkCell>
+      ),
       meta: {
         style: {
           width: '27%',

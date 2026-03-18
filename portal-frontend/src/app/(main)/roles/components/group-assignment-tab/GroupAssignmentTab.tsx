@@ -150,7 +150,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     return <LoadingSpinner />
   }
 
-  const addGroupButton = isTenantScope ? (
+  const addGroupButton = canEdit ? (
     <Button onClick={() => setIsModalOpen(true)}>
       <Plus /> {t('addGroup')}
     </Button>

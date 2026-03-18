@@ -13,7 +13,9 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Role, ROLE_TYPES, RoleType } from '@/types/roles'
 
 import { RolesTable } from './components/RolesTable'
@@ -23,6 +25,7 @@ export const DEFAULT_TAB: RoleType = ROLE_TYPES.SYSTEM
 const RolesPage = () => {
   const t = useTranslations('roles')
   const router = useRouter()
+  const { hasPermission } = usePermissions()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const tabsValues = {
@@ -65,9 +68,13 @@ const RolesPage = () => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, setTotalPages, pageSize])
 
-  const handleRowClick = (row: Row<Role>) => {
-    router.push(`/roles/${row.original.id}?tab=${selectedRoleType}`)
-  }
+  const canReadRole = hasPermission(PERMISSION_NAMES.ROLE_READ)
+
+  const handleRowClick = canReadRole
+    ? (row: Row<Role>) => {
+        router.push(`/roles/${row.original.id}?tab=${selectedRoleType}`)
+      }
+    : undefined
 
   return (
     <PageContainer headerType="withPrimaryTabs">
@@ -87,9 +94,11 @@ const RolesPage = () => {
           searchString={search}
           onChangeSearchString={setSearchParam}
           customElement={
-            <Button onClick={() => router.push(`/roles/create/?tab=${selectedRoleType}`)}>
-              <Plus /> {t('newRole')}
-            </Button>
+            hasPermission(PERMISSION_NAMES.ROLE_CREATE) ? (
+              <Button onClick={() => router.push(`/roles/create/?tab=${selectedRoleType}`)}>
+                <Plus /> {t('newRole')}
+              </Button>
+            ) : undefined
           }
         />
         <TableContainer>
@@ -106,6 +115,8 @@ const RolesPage = () => {
             setRowSelection={setRowSelection}
             onSortingChange={setSortingParams}
             onPaginationChange={setPaginationParams}
+            isLinkDisabled={!canReadRole}
+            selectedRoleType={selectedRoleType}
           />
         </TableContainer>
       </PageBackground>
