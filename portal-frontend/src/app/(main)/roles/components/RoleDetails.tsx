@@ -90,6 +90,8 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const deleteRole = useDeleteRole()
   const isRoleQueryEnabled = !!roleId && !deleteRole.isPending && !deleteRole.isSuccess
 
+  const isGroupTab = subTabValue === subTabValues.groupAssignment.value
+
   const { data: roleData, isFetching: isLoadingRole } = useGetRole({ id: roleId || '', isEnabled: isRoleQueryEnabled })
 
   // Fetch existing assignments for this role
@@ -144,12 +146,18 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     [initialRole?.permissions],
   )
 
-  const areAssignmentsDirty = !assignmentsData?.data
-    ? false
-    : !(
-        assignmentsData?.data.length === selectedGroupAssignmentIds.length &&
-        assignmentsData?.data.every(assignment => selectedGroupAssignmentIds.includes(assignment.id))
-      )
+  const areAssignmentsDirty = useMemo(
+    () =>
+      !assignmentsData?.data
+        ? false
+        : !(
+            (assignmentsData?.data.length || 0) === selectedGroupAssignmentIds.length &&
+            assignmentsData?.data.every(assignment => selectedGroupAssignmentIds.includes(assignment.group.id))
+          ),
+    [selectedGroupAssignmentIds],
+  )
+
+  useEffect(() => {
 
   const arePermissionsDirty = useMemo(() => {
     const initialSet = new Set(initialPermissionIds)
@@ -300,6 +308,12 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     </Button>
   )
 
+  const getButtons = () => {
+    if (isDefaultRole && !isGroupTab) return undefined
+    if (isReadOnly) return EditButton
+    else return SaveAndExitButtons
+  }
+
   return (
     <PageContainer headerType="withSubTabsOrSubtitle">
       <PageHeader
@@ -311,7 +325,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
           onTabChange: newSubTab => setSubTabValueParam(newSubTab),
           disabledTabs,
         }}
-        customElement={isReadOnly ? EditButton : SaveAndExitButtons}
+        customElement={getButtons()}
       />
 
       <PageBackground className="overflow-auto" hasBackground={!isReadOnly}>

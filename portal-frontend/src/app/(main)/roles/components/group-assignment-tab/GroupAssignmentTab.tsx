@@ -57,8 +57,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     setGroupSelection(getGroupSelection(selectedGroupIds))
   }, [selectedGroupIds])
 
-  const requestParams = new URLSearchParams(`size=${pageSize}&page=${pageIndex}`)
-  const { data: groupsData, isFetching } = useGetGroups({ params: requestParams })
+  const { data: groupsData, isFetching } = useGetGroups()
 
   // Build a map from group ID to scopeType from assignments
   const groupScopeMap = useMemo(() => {
