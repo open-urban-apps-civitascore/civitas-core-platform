@@ -61,20 +61,19 @@ export const DataTable = <T,>(props: DataTableProps<T>) => {
   const t = useTranslations('common')
 
   return (
-    <div className="@container h-full w-full" data-testid={testId}>
+    <div className={cn('@container w-full', !isPaginationHidden && 'h-full')} data-testid={testId}>
       <div
         className={cn(
-          'h-full',
           !isPaginationHidden &&
-            '[--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]',
+            'h-full [--pagination-height:calc(--spacing(18))] @max-md:[--pagination-height:calc(--spacing(28))]  [--pagination-padding:calc(--spacing(4))]',
         )}
       >
         <ScrollArea
           data-testid="dataTableScrollArea"
           className={cn(
-            isPaginationHidden ? 'h-full' : 'h-[calc(100%-var(--pagination-height))]',
             'w-full bg-white',
             hasCard && 'rounded-md border-1',
+            !isPaginationHidden && 'h-[calc(100%-var(--pagination-height))]',
           )}
         >
           <ShadCnTable aria-labelledby="subheading" tableContainerProps={{ className: '' }} {...tableProps}>
