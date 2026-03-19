@@ -317,7 +317,7 @@ services:
       KEYCLOAK_TARGET_REALM: civitas-core
       APP_URL: http://portal-backend:8089
       SERVER_PORT: 8089
-      SPRING_PROFILES_ACTIVE: local,postgres,local-init
+      SPRING_PROFILES_ACTIVE: local,postgres,init
       MODEL_ATLAS_BASE_URL: http://model-atlas:8080
       SPRING_KAFKA_PRODUCER_PROPERTIES_COMPRESSION_TYPE: lz4
     depends_on:
