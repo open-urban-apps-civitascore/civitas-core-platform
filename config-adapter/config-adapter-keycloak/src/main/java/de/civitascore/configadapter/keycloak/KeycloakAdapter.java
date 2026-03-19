@@ -439,12 +439,45 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         AdapterErrorCode.KEYCLOAK_USER_ERROR,
         (realmResource, userRep) -> {
           try (Response response = realmResource.users().create(userRep)) {
+            if (response.getStatus() == 409) {
+              // User already exists (e.g., pre-seeded via realm import) — return existing ID
+              String existingId = findExistingUserId(realmResource, userRep);
+              logger.info(
+                  "User '{}' already exists in Keycloak (ID: {}), returning existing ID",
+                  Encode.forJava(userRep.getEmail()),
+                  Encode.forJava(maskId(existingId)));
+              return existingId;
+            }
             validateResponse(KeycloakOperation.USER_CREATION, 201, response);
             String userId = CreatedResponseUtil.getCreatedId(response);
             sendActionsEmail(realmResource, userId, userRep.getRequiredActions());
             return userId;
           }
         });
+  }
+
+  /**
+   * Finds an existing Keycloak user by email or username. Used when user creation returns 409
+   * (conflict) to retrieve the existing user's ID for idempotent operation.
+   */
+  private String findExistingUserId(RealmResource realmResource, UserRepresentation userRep)
+      throws KeycloakOperationException {
+    if (userRep.getEmail() != null) {
+      List<UserRepresentation> users =
+          realmResource.users().searchByEmail(userRep.getEmail(), true);
+      if (!users.isEmpty()) {
+        return users.getFirst().getId();
+      }
+    }
+    if (userRep.getUsername() != null) {
+      List<UserRepresentation> users =
+          realmResource.users().searchByUsername(userRep.getUsername(), true);
+      if (!users.isEmpty()) {
+        return users.getFirst().getId();
+      }
+    }
+    throw new KeycloakOperationException(
+        "User creation returned 409 but user not found by email or username");
   }
 
   /**

@@ -266,6 +266,44 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
+  void shouldReturnExistingUserIdWhenUserAlreadyExists()
+      throws FatalAdapterException, RetryableAdapterException {
+    // Given - create test realm and pre-existing user
+    createRealm("user-idempotent-realm");
+
+    UserRepresentation existingUser = new UserRepresentation();
+    existingUser.setUsername("existing-user");
+    existingUser.setEmail("existing@example.com");
+    existingUser.setEnabled(true);
+    String existingUserId;
+    try (Response response =
+        keycloakClient.realm("user-idempotent-realm").users().create(existingUser)) {
+      assertEquals(201, response.getStatus());
+      existingUserId = CreatedResponseUtil.getCreatedId(response);
+    }
+
+    // Create same user via adapter (should hit 409)
+    UserConfig userConfig = new UserConfig();
+    userConfig.setUsername("existing-user");
+    userConfig.setEmail("existing@example.com");
+    userConfig.setFirstName("Existing");
+    userConfig.setLastName("User");
+    userConfig.setEnabled(true);
+
+    ConfigEvent event =
+        createConfigEvent("user-idempotent-realm", "user", Operation.CREATE, userConfig);
+
+    // When
+    adapter.processConfigEvent(Topics.USER_CREATED.toString(), event);
+
+    // Then - should succeed with existing user's ID
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+    assertEquals(existingUserId, resultEvent.resourceId());
+  }
+
+  @Test
   void shouldCreateClient() throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm first
     createRealm("client-realm");
