@@ -29,3 +29,11 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 }
+
+docs {
+  **Purpose:** Checks whether an "API Test DataStructure" from a previous run already exists. If found, saves the ID so the creation step (04) can be skipped and teardown targets the correct record.
+
+  **Expected Response:** 200 OK, body is a paginated list (may be empty if this is the first run).
+
+  **Post-condition:** If a match is found, saves `dataStructureId` and `setupDataStructureId` from `body.content[].id`.
+}

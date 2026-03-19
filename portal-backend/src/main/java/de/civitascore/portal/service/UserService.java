@@ -109,12 +109,6 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
       userConfig.setRequiredActions(List.of("VERIFY_EMAIL", "UPDATE_PASSWORD"));
     }
 
-    // Map groups
-    if (entity.getGroups() != null && !entity.getGroups().isEmpty()) {
-      List<String> groups = entity.getGroups().stream().map(Group::getName).toList();
-      userConfig.setGroups(groups);
-    }
-
     return userConfig;
   }
 

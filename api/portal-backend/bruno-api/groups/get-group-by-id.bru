@@ -34,3 +34,11 @@ tests {
     expect(res.body.id).to.be.a('string');
   });
 }
+
+docs {
+  **Precondition:** `groupId` is set.
+
+  **Expected Response:** 200 OK, body contains group with matching `id`.
+
+  **Post-condition:** Save `groupAssignments` from `body.assignments`.
+}

@@ -34,3 +34,17 @@ tests {
     expect(status === 201 || status === 409).to.be.true;
   });
 }
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`. 409 if the group already existed (idempotent setup).
+
+  **Post-condition:** Save `groupId` and `setupGroupId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Group record created in `portal_backend` DB |
+  | Config Adapter | Produces `de.civitascore.idm.group.created` Kafka event; forwards creation to Keycloak |
+  | Keycloak | Group added to `civitas-core` realm |
+}

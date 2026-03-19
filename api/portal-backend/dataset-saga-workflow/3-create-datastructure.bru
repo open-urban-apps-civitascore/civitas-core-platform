@@ -25,3 +25,21 @@ script:post-response {
     bru.setVar('sagaDataStructureId', res.body.id);
   }
 }
+
+docs {
+  ## Setup – Create DataStructure
+
+  Creates a data structure that will hold the version with the UML model.
+
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id`
+
+  **Post-condition:** Saves `sagaDataStructureId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataStructure record created in `portal_backend` DB |
+}

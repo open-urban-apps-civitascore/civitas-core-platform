@@ -27,3 +27,11 @@ tests {
     expect(res.body).to.be.an('array');
   });
 }
+
+docs {
+  **Expected Response**
+  - Status: `200 OK`
+  - Body is an array of permission objects (not paginated)
+
+  **Post-condition:** If the array is non-empty, save the first `id` as `permissionId`.
+}

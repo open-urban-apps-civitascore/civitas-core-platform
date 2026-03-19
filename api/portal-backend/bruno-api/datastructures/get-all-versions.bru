@@ -25,3 +25,9 @@ tests {
     expect(res.getStatus()).to.equal(405);
   });
 }
+
+docs {
+  **Precondition:** `dataStructureId` is set.
+
+  **Expected Response:** 200 OK, body contains a paginated list of versions for the given DataStructure.
+}

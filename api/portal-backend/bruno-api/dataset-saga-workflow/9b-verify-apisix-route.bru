@@ -56,3 +56,18 @@ tests {
     expect(route.plugin_config_id).to.equal('1');
   });
 }
+
+docs {
+  **Saga step 9b of 18** — Verify APISIX route provisioned by the saga.
+
+  Queries the APISIX Admin API directly to confirm the saga created a route for the dataset. The pre-request script polls for up to 30 seconds (15 × 2 s intervals) to accommodate async saga completion.
+
+  The route must:
+  - include the `sagaDataSetId` in its URI pattern
+  - reference an upstream (pointing to the FROST server)
+  - have `plugin_config_id=1` confirming the OpenID-Connect auth plugin is applied
+
+  **Precondition:** `sagaDataSetId` is set; APISIX Admin API reachable at `apisixAdminUrl`.
+
+  **Expected Response:** 200 OK from APISIX Admin API with the route object.
+}

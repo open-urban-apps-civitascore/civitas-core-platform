@@ -21,3 +21,17 @@ tests {
     expect(status === 200 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Precondition:** `dataStructureId` is set and in published state.
+
+  **Expected Response:** 200 OK, body reflects data structure returned to draft state.
+
+  **System Impact:**
+
+  | Layer | Impact | Status |
+  |---|---|---|
+  | Backend | DataStructure status reverted to draft | --- |
+  | Config Adapter | --- | --- |
+  | Model Atlas | DataStructure schema no longer publicly available | --- |
+}

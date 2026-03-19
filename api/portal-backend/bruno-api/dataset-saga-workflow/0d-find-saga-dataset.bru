@@ -30,3 +30,11 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 }
+
+docs {
+  **Purpose:** Idempotency guard — checks whether the "Saga Test DataSet" from a previous saga run already exists. If found, `sagaDataSetId` and `sagaDataSetStatus` are populated so step 4 can be skipped and steps 11-13 target the correct record.
+
+  **Expected Response:** 200 OK, body is a paginated list (may be empty on a fresh run).
+
+  **Post-condition:** If a match is found, saves `sagaDataSetId` from `body.content[].id` and `sagaDataSetStatus` from `body.content[].dataSetStatus`.
+}

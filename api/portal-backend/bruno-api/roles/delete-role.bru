@@ -26,3 +26,19 @@ tests {
     expect(res.getStatus()).to.equal(204);
   });
 }
+
+docs {
+  **Precondition:** `roleId` is set.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue TC-ROLE-02 for same `roleId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | **Backend** | Role record removed from `portal_backend` DB |
+  | **Config Adapter** | — |
+  | **External System** | — |
+}

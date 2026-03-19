@@ -16,3 +16,12 @@ export type PermissionItem = {
   value: Permission['id']
   category: PermissionCategory
 }
+
+export type RoleWithPermissions = {
+  name: string
+  read: boolean
+  create: boolean
+  update: boolean
+  delete: boolean
+  release: boolean
+}

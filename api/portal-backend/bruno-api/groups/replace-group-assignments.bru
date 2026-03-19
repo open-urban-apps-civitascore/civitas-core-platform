@@ -1,7 +1,7 @@
 meta {
   name: Replace Group Assignments
   type: http
-  seq: 6
+  seq: 7
 }
 
 put {
@@ -30,4 +30,18 @@ tests {
     // 200=replaced, 400=invalid scope reference, 404=group already deleted
     expect(status === 200 || status === 400 || status === 404).to.be.true;
   });
+}
+
+docs {
+  **Precondition:** `groupId` is set.
+
+  **Expected Response:** 200 OK, body reflects replaced assignments for the group.
+
+  **System Impact:**
+
+  | Component | Effect |
+  |---|---|
+  | **Backend** | Group assignments replaced |
+  | **Config Adapter** | Consumes assignment-related Kafka event; forwards changes to Keycloak |
+  | **Keycloak** | Group role assignments updated |
 }

@@ -37,3 +37,17 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 }
+
+docs {
+  **Precondition:** `dataStructureId` is set.
+
+  **Expected Response:** 200 OK, body reflects updated values.
+
+  **System Impact:**
+
+  | Layer | Impact | Status |
+  |---|---|---|
+  | Backend | DataStructure record updated in `portal_backend` DB | --- |
+  | Config Adapter | --- | --- |
+  | External System | --- | --- |
+}
