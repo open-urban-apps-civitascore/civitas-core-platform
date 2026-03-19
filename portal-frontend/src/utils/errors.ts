@@ -12,5 +12,6 @@ export const isNameConflictError = (error: AxiosError) => {
   const isConflictError = error.status === 409
   if (!error.response) return false
   const apiError = error.response.data as ApiError
-  return isConflictError && apiError.detail.includes('with name') && apiError.detail.includes('already exists')
+  const errorDetail = apiError.detail || ''
+  return isConflictError && errorDetail.includes('with name') && errorDetail.includes('already exists')
 }
