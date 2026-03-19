@@ -1,6 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { AxiosError } from 'axios'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { JSX, useEffect, useMemo, useState } from 'react'
@@ -30,10 +31,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useError } from '@/hooks/use-error'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { FormRole, Role, ROLE_TYPES, roleSchema, RoleTab } from '@/types/roles'
 import { isPlatformwideAssignment } from '@/utils/assignments'
+import { isNameConflictError } from '@/utils/errors'
 
 import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
@@ -79,6 +82,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const tCommon = useTranslations('common')
   const router = useRouter()
   const { setSubTabValueParam, subTabValue, tabValue } = useQueryParams()
+  const { handleNameError } = useError()
 
   const [isReadOnly, setIsReadOnly] = useState(!!roleId)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -149,6 +153,11 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     defaultValues: mapRoleApiToFormData(initialRole),
   })
 
+  const handleRoleRequestError = (error: AxiosError, defaultMessage: string) => {
+    if (isNameConflictError(error as AxiosError)) handleNameError(form, form.getValues('name'))
+    else toast.error(defaultMessage)
+  }
+
   // Initialize form and permissions from role data
   useEffect(() => {
     if (initialRole) {
@@ -215,8 +224,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
           router.push(`/roles/${data.id}?tab=${tabValue}`)
         },
         onError: error => {
-          console.error('An error occurred while creating the role', error)
-          toast.error(tRoles('errors.createError'))
+          handleRoleRequestError(error as AxiosError, tRoles('errors.createError'))
         },
       },
     )
@@ -237,8 +245,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       refreshRole()
       toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.role') }))
     } catch (error) {
-      console.error('An error occurred while updating the role values.', error)
-      toast.error(tCommon('errors.updateError', { item: tCommon('items.role') }))
+      handleRoleRequestError(error as AxiosError, tRoles('errors.updateError'))
       throw error
     }
   }
@@ -259,7 +266,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       )
       await Promise.all(assignmentsToRemove.map(a => deleteAssignment.mutateAsync(a.id)))
       await refetchAssignments()
-      toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.assignments') }))
+      toast.success(tRoles('success.assignmentSuccess'))
     } catch (error) {
       console.error('An error occurred while groups assignment')
       toast.error(tCommon('errors.updateError', { item: tCommon('items.assignments') }))
