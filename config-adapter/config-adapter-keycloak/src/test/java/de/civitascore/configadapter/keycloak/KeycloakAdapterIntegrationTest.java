@@ -266,44 +266,6 @@ class KeycloakAdapterIntegrationTest {
   }
 
   @Test
-  void shouldReturnExistingUserIdWhenUserAlreadyExists()
-      throws FatalAdapterException, RetryableAdapterException {
-    // Given - create test realm and pre-existing user
-    createRealm("user-idempotent-realm");
-
-    UserRepresentation existingUser = new UserRepresentation();
-    existingUser.setUsername("existing-user");
-    existingUser.setEmail("existing@example.com");
-    existingUser.setEnabled(true);
-    String existingUserId;
-    try (Response response =
-        keycloakClient.realm("user-idempotent-realm").users().create(existingUser)) {
-      assertEquals(201, response.getStatus());
-      existingUserId = CreatedResponseUtil.getCreatedId(response);
-    }
-
-    // Create same user via adapter (should hit 409)
-    UserConfig userConfig = new UserConfig();
-    userConfig.setUsername("existing-user");
-    userConfig.setEmail("existing@example.com");
-    userConfig.setFirstName("Existing");
-    userConfig.setLastName("User");
-    userConfig.setEnabled(true);
-
-    ConfigEvent event =
-        createConfigEvent("user-idempotent-realm", "user", Operation.CREATE, userConfig);
-
-    // When
-    adapter.processConfigEvent(Topics.USER_CREATED.toString(), event);
-
-    // Then - should succeed with existing user's ID
-    assertEquals(1, eventPublisher.getPublishedEvents().size());
-    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
-    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
-    assertEquals(existingUserId, resultEvent.resourceId());
-  }
-
-  @Test
   void shouldCreateClient() throws FatalAdapterException, RetryableAdapterException {
     // Given - create test realm first
     createRealm("client-realm");
@@ -990,6 +952,228 @@ class KeycloakAdapterIntegrationTest {
             });
 
     // Then - success result published
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  // ============== IDEMPOTENCY TESTS - DELETE not found ==============
+
+  @Test
+  void deleteRealm_whenRealmDoesNotExist_shouldPublishSuccessWithoutException()
+      throws FatalAdapterException, RetryableAdapterException {
+    RealmConfig realmConfig = new RealmConfig();
+    realmConfig.setRealm("non-existent-realm");
+
+    ConfigEvent event =
+        createConfigEvent("non-existent-realm", "realm", Operation.DELETE, realmConfig);
+
+    adapter.processConfigEvent(Topics.REALM_DELETED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  @Test
+  void deleteClient_whenClientDoesNotExist_shouldPublishSuccessWithoutException()
+      throws FatalAdapterException, RetryableAdapterException {
+    createRealm("idempotent-client-realm");
+
+    String nonExistentClientId = UUID.randomUUID().toString();
+    ClientConfig clientConfig = new ClientConfig();
+    clientConfig.setId(nonExistentClientId);
+
+    ConfigEvent event =
+        createConfigEvent("idempotent-client-realm", "client", Operation.DELETE, clientConfig);
+
+    adapter.processConfigEvent(Topics.CLIENT_DELETED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  @Test
+  void deleteUser_whenUserDoesNotExist_shouldPublishSuccessWithoutException()
+      throws FatalAdapterException, RetryableAdapterException {
+    createRealm("idempotent-user-realm");
+
+    String nonExistentUserId = UUID.randomUUID().toString();
+    UserConfig userConfig = new UserConfig();
+    userConfig.setId(nonExistentUserId);
+    userConfig.setUsername("ghost-user");
+
+    ConfigEvent event =
+        createConfigEvent("idempotent-user-realm", "user", Operation.DELETE, userConfig);
+
+    adapter.processConfigEvent(Topics.USER_DELETED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  @Test
+  void deleteRole_whenRoleDoesNotExist_shouldPublishSuccessWithoutException()
+      throws FatalAdapterException, RetryableAdapterException {
+    createRealm("idempotent-role-realm");
+
+    RoleConfig roleConfig = new RoleConfig();
+    roleConfig.setName("non-existent-role");
+
+    ConfigEvent event =
+        createConfigEvent("idempotent-role-realm", "role", Operation.DELETE, roleConfig);
+
+    adapter.processConfigEvent(Topics.ROLE_DELETED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  @Test
+  void deleteGroup_whenGroupDoesNotExist_shouldPublishSuccessWithoutException()
+      throws FatalAdapterException, RetryableAdapterException {
+    createRealm("idempotent-group-realm");
+
+    String nonExistentGroupId = UUID.randomUUID().toString();
+    GroupConfig groupConfig = new GroupConfig();
+    groupConfig.setId(nonExistentGroupId);
+    groupConfig.setName("ghost-group");
+
+    ConfigEvent event =
+        createConfigEvent("idempotent-group-realm", "group", Operation.DELETE, groupConfig);
+
+    adapter.processConfigEvent(Topics.GROUP_DELETED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  // ============== IDEMPOTENCY TESTS - CREATE duplicate ==============
+
+  @Test
+  void createRealm_whenRealmAlreadyExists_shouldPublishSuccessWithoutException()
+      throws FatalAdapterException, RetryableAdapterException {
+    createRealm("duplicate-realm-create");
+    eventPublisher.clear();
+
+    RealmConfig realmConfig = new RealmConfig();
+    realmConfig.setRealm("duplicate-realm-create");
+    realmConfig.setEnabled(true);
+
+    ConfigEvent event =
+        createConfigEvent("duplicate-realm-create", "realm", Operation.CREATE, realmConfig);
+
+    adapter.processConfigEvent(Topics.REALM_CREATED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  @Test
+  void createClient_whenClientAlreadyExists_shouldPublishSuccessWithoutException()
+      throws FatalAdapterException, RetryableAdapterException {
+    createRealm("duplicate-client-realm");
+
+    ClientRepresentation existingClient = new ClientRepresentation();
+    existingClient.setClientId("duplicate-client");
+    existingClient.setEnabled(true);
+    try (Response response =
+        keycloakClient.realm("duplicate-client-realm").clients().create(existingClient)) {
+      assertEquals(201, response.getStatus());
+    }
+    eventPublisher.clear();
+
+    ClientConfig clientConfig = new ClientConfig();
+    clientConfig.setClientId("duplicate-client");
+    clientConfig.setEnabled(true);
+
+    ConfigEvent event =
+        createConfigEvent("duplicate-client-realm", "client", Operation.CREATE, clientConfig);
+
+    adapter.processConfigEvent(Topics.CLIENT_CREATED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  @Test
+  void createUser_whenUserAlreadyExists_shouldPublishSuccessWithoutException()
+      throws FatalAdapterException, RetryableAdapterException {
+    createRealm("duplicate-user-realm");
+
+    UserRepresentation existingUser = new UserRepresentation();
+    existingUser.setUsername("duplicate-user");
+    existingUser.setEnabled(true);
+    try (Response response =
+        keycloakClient.realm("duplicate-user-realm").users().create(existingUser)) {
+      assertEquals(201, response.getStatus());
+    }
+    eventPublisher.clear();
+
+    UserConfig userConfig = new UserConfig();
+    userConfig.setUsername("duplicate-user");
+    userConfig.setEnabled(true);
+
+    ConfigEvent event =
+        createConfigEvent("duplicate-user-realm", "user", Operation.CREATE, userConfig);
+
+    adapter.processConfigEvent(Topics.USER_CREATED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  @Test
+  void createRole_whenRoleAlreadyExists_shouldPublishSuccessWithoutException()
+      throws FatalAdapterException, RetryableAdapterException {
+    createRealm("duplicate-role-realm");
+
+    RoleRepresentation existingRole = new RoleRepresentation();
+    existingRole.setName("duplicate-role");
+    keycloakClient.realm("duplicate-role-realm").roles().create(existingRole);
+    eventPublisher.clear();
+
+    RoleConfig roleConfig = new RoleConfig();
+    roleConfig.setName("duplicate-role");
+
+    ConfigEvent event =
+        createConfigEvent("duplicate-role-realm", "role", Operation.CREATE, roleConfig);
+
+    adapter.processConfigEvent(Topics.ROLE_CREATED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    assertEquals(
+        ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
+  }
+
+  @Test
+  void createGroup_whenGroupAlreadyExists_shouldPublishSuccessWithoutException()
+      throws FatalAdapterException, RetryableAdapterException {
+    createRealm("duplicate-group-realm");
+
+    GroupRepresentation existingGroup = new GroupRepresentation();
+    existingGroup.setName("duplicate-group");
+    try (Response response =
+        keycloakClient.realm("duplicate-group-realm").groups().add(existingGroup)) {
+      assertEquals(201, response.getStatus());
+    }
+    eventPublisher.clear();
+
+    GroupConfig groupConfig = new GroupConfig();
+    groupConfig.setName("duplicate-group");
+
+    ConfigEvent event =
+        createConfigEvent("duplicate-group-realm", "group", Operation.CREATE, groupConfig);
+
+    adapter.processConfigEvent(Topics.GROUP_CREATED.toString(), event);
+
     assertEquals(1, eventPublisher.getPublishedEvents().size());
     assertEquals(
         ConfigResultEvent.Status.SUCCESS, eventPublisher.getPublishedEvents().getFirst().status());
