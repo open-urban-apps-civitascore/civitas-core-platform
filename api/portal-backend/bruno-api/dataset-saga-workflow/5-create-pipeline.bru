@@ -56,3 +56,21 @@ tests {
     expect(status === 201 || status === 409).to.be.true;
   });
 }
+
+docs {
+  **Saga step 5 of 18** — Prerequisites: create supporting resources before triggering the saga.
+
+  Creates a Redpanda Connect pipeline ("Saga Test Pipeline") attached to the dataset. The pipeline consumes from the MQTT datasource (`sagaDataSourceId`) and posts to FROST. When the dataset is released, the saga deploys this pipeline to Redpanda Connect.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if the pipeline already existed (idempotent).
+
+  **Post-condition:** Save `sagaPipelineId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Pipeline record created in `portal_backend` DB linked to the dataset |
+  | Config Adapter | — |
+  | Redpanda Connect | Pipeline is deployed only after the DATASET_CREATE saga runs (step 8) |
+}

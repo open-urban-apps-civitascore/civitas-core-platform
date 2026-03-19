@@ -51,3 +51,23 @@ tests {
     }
   });
 }
+
+docs {
+  ## Setup – Create DataStructure Version
+
+  **Precondition:** `sagaDataStructureId` is set (from step 3).
+
+  Creates a version with a UML model for the data structure.
+
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id`
+
+  **Post-condition:** Saves `sagaDataStructureVersionId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Version record created in `portal_backend` DB, linked to the DataStructure |
+}

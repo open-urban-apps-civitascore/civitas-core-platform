@@ -45,3 +45,21 @@ tests {
     }
   });
 }
+
+docs {
+  **Saga step 3b of 18** — Prerequisites: datasource (step 1), group (step 2), role (step 3).
+
+  Creates the DataStructure "Saga Sensor Data Structure" that defines the schema for sensor readings. The DataStructure must be published (steps 3d/3e) before it can be referenced by a dataset.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if the DataStructure already exists (idempotent).
+
+  **Post-condition:** Save `sagaDataStructureId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataStructure record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

@@ -33,3 +33,21 @@ tests {
     expect(status === 201 || status === 409).to.be.true;
   });
 }
+
+docs {
+  **Saga step 2 of 18** — Prerequisites: create supporting resources before triggering the saga.
+
+  Creates the group ("Saga Test Group") that will be assigned access to the dataset via a scoped assignment in step 6.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if the group already existed (idempotent).
+
+  **Post-condition:** Save `sagaGroupId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Group record created in `portal_backend` DB |
+  | Config Adapter | Produces `de.civitascore.idm.group.created` Kafka event; forwards creation to Keycloak |
+  | Keycloak | Group added to `civitas-core` realm |
+}

@@ -30,3 +30,17 @@ tests {
     expect(status === 200 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Precondition:** `dataSetId` is set and in published state.
+
+  **Expected Response:** 200 OK, published metadata is updated.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Published DataSet name/description updated |
+  | Config Adapter | — |
+  | External System | — |
+}

@@ -28,7 +28,8 @@
       "exit": "Beenden",
       "assignItem": "{item} hinzufügen",
       "assignTo": "zu {item}",
-      "back": "Zurück"
+      "back": "Zurück",
+      "import": "Importieren"
     },
     "errors": {
       "invalidPhone": "Ungültige Telefonnummer",
@@ -49,7 +50,8 @@
       "descriptionMaxLength": "Beschreibung darf maximal 150 Zeichen lang sein",
       "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden. Überprüfen Sie Ihre Eingaben.",
       "statusChangeError": "Beim Ändern des Verfügbarkeitsstatus ist ein Fehler aufgetreten.",
-      "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten."
+      "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten.",
+      "nameExists": "Der Name ist bereits vergeben. Bitte wählen sie einen anderen Namen."
     },
     "items": {
       "data": "Daten",
@@ -81,7 +83,8 @@
     },
     "success": {
       "statusChangeSuccess": "Der Verfügbarkeitsstatus wurde erfolgreich aktualisiert.",
-      "deletionSuccess": "{item} wurde erfolgreich gelöscht."
+      "deletionSuccess": "{item} wurde erfolgreich gelöscht.",
+      "creationSuccess": "{item} wurde erfolgreich angelegt."
     },
     "status": {
       "DRAFT": "Entwurf",
@@ -254,7 +257,12 @@
       "createSuccess": "Datensatz wurde erfolgreich angelegt.",
       "updateSuccess": "Datensatz wurde erfolgreich aktualisiert.",
       "deleteSuccess": "Datensatz wurde erfolgreich gelöscht.",
-      "deleteError": "Fehler beim Löschen des Datensatzes. Bitte versuche es erneut."
+      "deleteError": "Fehler beim Löschen des Datensatzes. Bitte versuche es erneut.",
+      "publishSuccess": "Der Datensatz wurde erfolgreich veröffentlicht.",
+      "unpublishSuccess": "Der Datensatz wurde erfolgreich zurückgezogen.",
+      "releaseSuccess": "Der Datensatz wurde erfolgreich freigegeben.",
+      "unreleaseSuccess": "Die Freigabe des Datensatzes wurde erfolgreich aufgehoben.",
+      "transitionError": "Beim Ändern des Datensatzstatus ist ein Fehler aufgetreten. Bitte versuche es erneut."
     },
     "warningModal": {
       "title": "Datensatz löschen?",
@@ -475,13 +483,47 @@
     }
   },
   "permissions": {
-    "title": "Berechtigungen",
-    "systemPermissions": "Systemberechtigungen",
-    "dataPermissions": "Datenberechtigungen",
+    "title": "Übersicht: {permissionType}",
+    "infoBox": "Die Berechtigungen sind vordefiniert und hier nicht bearbeitbar.",
+    "systemPermissions": {
+      "title": "Systemberechtigungen",
+      "description": "Systemberechtigungen steuern den Zugriff auf systemweite Funktionen der Plattform.\nSie werden zu Systemrollen zusammengefasst und Gruppen zugeordnet.",
+      "categories": {
+        "TENANT_ADMINISTRATION": "Mandanten-Management",
+        "DATA": "Unsere Daten",
+        "OTHER": "Sonstiges"
+      },
+      "entry": "{permission} {action}"
+    },
+    "dataPermissions": {
+      "title": "Datenberechtigungen",
+      "description": "Datenberechtigungen steuern den Zugriff auf Datenobjekte der Plattform.\nSie werden zu Datenrollen zusammengefasst und Gruppen innerhalb eines bestimmten Geltungsbereichs zugeordnet."
+    },
+    "actions": {
+      "read": "Lesen",
+      "create": "Erstellen",
+      "update": "Aktualisieren",
+      "delete": "Löschen",
+      "release": "Freigeben"
+    },
     "tableHeaders": {
-      "title": "Name",
-      "category": "Kategorie"
-    }
+      "name": "Objekt"
+    },
+    "accessible": {
+      "granted": "Gewährt",
+      "notGranted": "Nicht gewährt"
+    },
+    "values": {
+        "ASSIGNMENT": "Zuweisung",
+        "DATASET": "Datensatz",
+        "DATASET_PAYLOAD": "Datensatz-Payload",
+        "DATASOURCE": "Datenquelle",
+        "DATASTRUCTURE": "Datenstruktur",
+        "GROUP": "Gruppe",
+        "PERMISSION": "Berechtigung",
+        "ROLE": "Rolle",
+        "USER": "Benutzer"
+      }
   },
   "roles": {
     "title": "Rollen",
@@ -640,6 +682,8 @@
     "errors": {
       "invalidDsn": "Geben Sie eine gültige URI ein (z. B. postgres://host:5432/db)",
       "invalidBrokerUrl": "Geben Sie eine gültige Broker-URL ein (z. B. tcp://broker:1883)",
+      "creationError": "Beim Anlegen der Datenquelle ist ein Fehler aufgetreten.",
+      "updateError": "Beim Aktualisieren der Datenquelle ist ein Fehler aufgetreten",
       "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
     "connection": {
@@ -677,8 +721,25 @@
       "title1": "Konnektor",
       "title2": "Konfiguration",
       "type": "Typ",
+      "typePlaceholder": "Konnektortyp auswählen",
       "connection": "Verbindung",
       "establishConnection": "Verbindung herstellen"
+    },
+    "dataModel": {
+      "placeholder": {
+        "title": "Keine Datenstruktur importiert",
+        "description1": "Importieren Sie eine existierende Datenstruktur aus der Plattform, um sie in dieser Datenquelle zu nutzen.",
+        "noDatastructures": "Noch keine Datenstrukturen vorhanden?",
+        "creationSteps": {
+          "step1": "Diese Datenquelle als Entwurf speichern",
+          "step2": "Eine Datenstruktur in <link>Datenstrukturen</link> erstellen",
+          "step3": "Wieder hierher zurückkommen und die Datenstruktur importieren"
+        }
+      },
+      "importModal": {
+        "title": "Datenmodell importieren",
+        "to": "in {name}"
+      }
     },
     "accessManagementTab": {
       "infoBoxes": {
@@ -713,7 +774,7 @@
     },
     "tabs": {
       "basicInfo": "Basisinformationen",
-      "accessPermissions": "Zugriffsberechtigungen",
+      "accessManagement": "Zugriffsberechtigungen",
       "versions": "Versionen"
     },
     "edit": {
@@ -728,7 +789,9 @@
       "isInUseStatusHint": "Kann nicht auf Entwurf gesetzt werden, da diese Datenstruktur bereits verwendet wird."
     },
     "errors": {
-      "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten."
+      "deletionError": "Beim Löschen der Datenstruktur ist ein Fehler aufgetreten.",
+      "creationError": "Beim Anlegen der Datenstruktur ist ein Fehler aufgetreten.",
+      "groupsWithoutRoles": "Gruppen ohne zugewiesene Rollen wurden nicht gespeichert."
     },
     "infoModal": {
       "title": "Datenstruktur kann nicht gelöscht werden",
@@ -737,6 +800,11 @@
     "unsavedChangesModal": {
       "title": "Ungespeicherte Änderungen",
       "description": "Diese Aktion führt zu einer anderen Seite und Ihre ungespeicherten Änderungen gehen verloren. Möchten Sie sie zuerst speichern?"
+    },
+    "accessManagementTab": {
+      "infoBoxes": {
+        "firstBox": "Gruppen, die plattformweite Berechtigungen an allen Datenobjekten besitzen, haben Zugriff auf diese Datenstruktur."
+      }
     }
   },
   "datastructureVersions": {
@@ -893,7 +961,12 @@
       "validateBeforeSave": "Klicke auf Validieren vor dem Speichern",
       "validate": "Validieren",
       "save": "Speichern",
-      "saving": "Speichert..."
+      "saving": "Speichert...",
+      "loading": "Pipelines werden geladen...",
+      "pipelineSettings": "Pipeline-Einstellungen",
+      "deletePipeline": "Pipeline löschen",
+      "deleteConfirmTitle": "Pipeline löschen?",
+      "deleteConfirmDescription": "Sind Sie sicher, dass Sie diese Pipeline löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
     },
     "tabs": {
       "closeTab": "Tab schließen",
@@ -909,6 +982,11 @@
     "closeTabModal": {
       "title": "Modell wirklich verwerfen?",
       "description": "Diese Aktion löscht das Modell. Sie kann nicht rückgängig gemacht werden."
+    },
+    "import": {
+      "title": "Importieren",
+      "fromPlatform": "aus der Plattform",
+      "fromFile": "aus Datei"
     }
   }
 }

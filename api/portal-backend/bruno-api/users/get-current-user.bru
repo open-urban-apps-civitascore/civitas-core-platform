@@ -18,3 +18,9 @@ tests {
     expect(res.body.username).to.be.a('string');
   });
 }
+
+docs {
+  **Expected Response**
+  - Status: `200 OK`
+  - Body contains `email` (non-empty)
+}

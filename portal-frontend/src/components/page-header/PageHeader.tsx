@@ -60,7 +60,7 @@ export const PageHeader = <TabValue extends string>(props: PageHeaderProps<TabVa
               )}
             </div>
           )}
-          {subtitle && <p className="mt-6 text-muted-foreground">{subtitle}</p>}
+          {subtitle && <p className="mt-6 text-muted-foreground whitespace-pre-line">{subtitle}</p>}
         </div>
         <div className="pr-[var(--layout-padding)]">{customElement}</div>
       </div>

@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.owasp.encoder.Encode;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -72,7 +73,7 @@ public class AllowedScopesFilter extends OncePerRequestFilter {
     try {
       return UUID.fromString(value);
     } catch (IllegalArgumentException e) {
-      log.warn("Invalid UUID in {}: {}", HEADER_NAME, value);
+      log.warn("Invalid UUID in {}: {}", HEADER_NAME, Encode.forJava(value));
       return null;
     }
   }

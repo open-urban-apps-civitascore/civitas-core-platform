@@ -1,10 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { AxiosError } from 'axios'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { toast } from 'sonner'
 
-import { useUpdateDatasource } from '@/app/services/api/datasources/clientRequests'
+import {
+  usePublishDatasource,
+  useUnpublishDatasource,
+  useUpdateDatasource,
+  useUpdateDatasourcePublished,
+} from '@/app/services/api/datasources/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { ConnectorFormToApiSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
@@ -14,9 +20,9 @@ import {
   DatasourceFormAvailableSchema,
   DatasourceFormDraft,
   DatasourceFormDraftSchema,
+  DatasourcePatchData,
   DatasourceStatusType,
   DatasourceTab,
-  DatasourceUpdateData,
 } from '@/types/datasources'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { getConnectorDefaults } from '@/utils/connectors'
@@ -27,15 +33,41 @@ export const useDatasourceForm = (
   assignedGroups: GroupRoleAssignmentTable[],
   initialAssignments: GroupRoleAssignmentTable[],
 ) => {
-  const tCommon = useTranslations('common')
   const t = useTranslations('datasources')
+  const tCommon = useTranslations('common')
 
-  const defaultValues = useMemo(() => DatasourceApiToFormSchema.parse(datasource), [datasource])
+  const mapDatasourceToFormValues = (source: Datasource) => {
+    const parsedDatasource = DatasourceApiToFormSchema.parse(source)
+    return {
+      ...parsedDatasource,
+      dataStructureVersionId: parsedDatasource.dataStructureVersionId ?? null,
+    }
+  }
 
-  const [dataSourceStatus, setDataSourceStatus] = useState<DatasourceStatusType>(datasource.dataSourceStatus)
+  const defaultValues = useMemo(() => {
+    return mapDatasourceToFormValues(datasource)
+  }, [datasource])
+
+  const [selectedConnectorType, setSelectedConnectorType] = useState<ConnectorType | undefined>(
+    defaultValues.connectorType,
+  )
 
   const updateDatasource = useUpdateDatasource()
-  const isLoading = updateDatasource.isPending
+  const updatePublishedDatasource = useUpdateDatasourcePublished()
+  const publishDatasource = usePublishDatasource()
+  const unpublishDatasource = useUnpublishDatasource()
+  const isLoading =
+    updateDatasource.isPending ||
+    updatePublishedDatasource.isPending ||
+    publishDatasource.isPending ||
+    unpublishDatasource.isPending
+
+  const handleRequestError = (error: unknown) => {
+    if ((error as AxiosError).response?.status === 409) {
+      form.setError('name', { type: 'manual', message: 'common.errors.nameExists' })
+      toast.error(tCommon('errors.nameExists'))
+    } else toast.error(t('errors.updateError'))
+  }
 
   const form = useForm<DatasourceFormDraft>({
     resolver: zodResolver(DatasourceFormDraftSchema),
@@ -49,26 +81,34 @@ export const useDatasourceForm = (
   }, [datasource])
 
   const formValues = useWatch({ control: form.control })
-  const connectorTypeWatch = formValues.connectorType
-  const nameWatch = formValues.name ?? ''
+  const nameWatch = form.watch('name')
+  const descriptionWatch = form.watch('description')
+  const connectorTypeWatch = form.watch('connectorType')
+  const dataSourceStatus = form.watch('dataSourceStatus')
+  const dataStructureVersionIdWatch = form.watch('dataStructureVersionId')
 
-  // Reset configuration on connector type change; readyConnectorType gates field rendering
+  // Reset configuration on connector type change; setSelectedConnectorType gates field rendering
   // to avoid flashes while form.reset() applies the new defaults.
-  const prevConnectorType = useRef<ConnectorType | undefined>(connectorTypeWatch)
-  const [readyConnectorType, setReadyConnectorType] = useState<ConnectorType | undefined>(connectorTypeWatch)
   useEffect(() => {
-    if (connectorTypeWatch && prevConnectorType.current !== connectorTypeWatch) {
-      prevConnectorType.current = connectorTypeWatch
-      const defaults = getConnectorDefaults(connectorTypeWatch)
-      form.reset(
-        { ...form.getValues(), connectorType: connectorTypeWatch, configuration: defaults },
-        { keepDirty: true, keepTouched: true },
-      )
-      setReadyConnectorType(connectorTypeWatch)
+    const configDefaults = connectorTypeWatch ? getConnectorDefaults(connectorTypeWatch) : {}
+    const isInitialConnectorType = defaultValues.connectorType === connectorTypeWatch
+    if (isInitialConnectorType) {
+      form.resetField('connectorType')
+      form.resetField('configuration')
+    } else {
+      form.setValue('connectorType', connectorTypeWatch, {
+        shouldDirty: true,
+      })
+      form.setValue('configuration', configDefaults, {
+        shouldDirty: true,
+      })
     }
-  }, [connectorTypeWatch, form])
+    setSelectedConnectorType(connectorTypeWatch)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectorTypeWatch])
 
   const isDraftMode = dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
+  const hasStatusChanged = dataSourceStatus !== datasource.dataSourceStatus
 
   // Zod v4 discriminatedUnion safeParse can throw on stale keys
   const canSetAvailable = useMemo(() => {
@@ -80,9 +120,14 @@ export const useDatasourceForm = (
   }, [formValues])
 
   // Revalidate on mode or connector type change
+  // Keep name errors for showing name required error after automatic switch to draft mode when removing name
   useEffect(() => {
     if (isDraftMode) {
+      const nameError = form.formState.errors.name
       form.clearErrors()
+      if (nameError) {
+        form.setError('name', nameError)
+      }
     } else {
       void form.trigger()
     }
@@ -92,78 +137,136 @@ export const useDatasourceForm = (
   // Revert to draft when required fields become empty
   useEffect(() => {
     if (dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE && !canSetAvailable) {
-      setDataSourceStatus(DATASOURCE_STATUS_TYPES.DRAFT)
+      form.setValue('dataSourceStatus', DATASOURCE_STATUS_TYPES.DRAFT, { shouldDirty: true })
       toast.info(tCommon('info.switchMode'))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSetAvailable, dataSourceStatus])
+  }, [canSetAvailable, dataSourceStatus, form])
 
   const completedTabs = useMemo((): DatasourceTab[] => {
     const completed: DatasourceTab[] = []
-    if (nameWatch.length > 0) completed.push('basicInfo')
+    if (nameWatch.length > 0 && descriptionWatch.length > 0) completed.push('basicInfo')
     try {
       const { connectorType, configuration } = formValues
       if (ConnectorStrictSchema.safeParse({ connectorType, configuration }).success) completed.push('connector')
     } catch {
       // Zod v4: safeParse throws on stale keys
     }
+    if (dataStructureVersionIdWatch) completed.push('dataStructure')
     return completed
-  }, [nameWatch, formValues])
+  }, [nameWatch, descriptionWatch, formValues, dataStructureVersionIdWatch])
 
-  const handleStatusChange = (newStatus: DatasourceStatusType) => {
-    setDataSourceStatus(newStatus)
+  const areAssignmentsDirty = useMemo(
+    () => hasAssignmentChanges(assignedGroups, initialAssignments),
+    [assignedGroups, initialAssignments],
+  )
+
+  const handleStatusChange = (newStatus: DatasourceStatusType) =>
+    form.setValue('dataSourceStatus', newStatus, { shouldDirty: true })
+
+  const handleStatusUpdate = async (mutateAsync: (payload: { id: string }) => Promise<{ data: Datasource }>) => {
+    try {
+      const response = await mutateAsync({ id: datasource.id })
+      toast.success(tCommon('success.statusChangeSuccess'))
+      return response.data
+    } catch (error) {
+      toast.error(tCommon('errors.statusChangeError'))
+      throw error
+    }
+  }
+
+  const handleUpdateValues = async (values: DatasourcePatchData) => {
+    const hasInvalidAssignments = assignedGroups.some(group => group.assignedRoles.length === 0)
+
+    try {
+      const response =
+        datasource.dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
+          ? await updatePublishedDatasource.mutateAsync({ ...values, name: nameWatch })
+          : await updateDatasource.mutateAsync(values)
+
+      toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.datasource') }))
+      if (hasInvalidAssignments) {
+        toast.error(t('errors.groupsWithoutRoles'))
+      }
+      return response.data
+    } catch (error) {
+      handleRequestError(error)
+      throw error
+    }
   }
 
   const submitDatasource = (onSuccess?: () => void) => {
-    const values = form.getValues()
-    const parsed = isDraftMode
-      ? DatasourceFormDraftSchema.safeParse(values)
-      : DatasourceFormAvailableSchema.safeParse(values)
-    if (!parsed.success) {
-      console.error(parsed.error)
-      toast.error('Form data invalid')
-      return
-    }
+    void (async () => {
+      const values = form.getValues()
+      const parsed = isDraftMode
+        ? DatasourceFormDraftSchema.safeParse(values)
+        : DatasourceFormAvailableSchema.safeParse(values)
+      if (!parsed.success) {
+        console.error(parsed.error)
+        toast.error(tCommon('errors.formInvalid'))
+        return
+      }
 
-    const dirtyFields = form.formState.dirtyFields
-    const dirtyValues = pickDirtyValues(parsed.data as Record<string, unknown>, dirtyFields)
+      const dirtyFields = form.formState.dirtyFields
+      const dirtyValues = pickDirtyValues(parsed.data as Record<string, unknown>, dirtyFields)
 
-    // Transform configuration to API format (needs full values for discriminated union)
-    const connectorParsed = ConnectorFormToApiSchema.safeParse(parsed.data)
-    const configuration = connectorParsed.success
-      ? connectorParsed.data.configuration
-      : (dirtyValues as Record<string, unknown>).configuration
+      // Transform configuration to API format (needs full values for discriminated union)
+      const connectorParsed = ConnectorFormToApiSchema.safeParse(parsed.data)
+      const configuration = connectorParsed.success
+        ? connectorParsed.data.configuration
+        : (dirtyValues as Record<string, unknown>).configuration
 
-    const areAssignmentsInvalid = assignedGroups.some(group => group.assignedRoles.length === 0)
-    const assignmentsPayload = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
-    const areAssignmentsDirty = hasAssignmentChanges(assignedGroups, initialAssignments)
+      const assignmentsPayload = mapGroupRoleAssignmentsToApiPayload(assignedGroups)
+      const areAssignmentsDirty = hasAssignmentChanges(assignedGroups, initialAssignments)
 
-    const apiPayload = {
-      ...dirtyValues,
-      ...(configuration ? { configuration } : {}),
-      ...(areAssignmentsDirty ? { assignments: assignmentsPayload } : {}),
-      id: datasource.id,
-    } as DatasourceUpdateData
+      const apiPayload = {
+        ...dirtyValues,
+        ...(dirtyFields.configuration ? { configuration } : {}),
+        ...(areAssignmentsDirty ? { assignments: assignmentsPayload } : {}),
+        id: datasource.id,
+      } as DatasourcePatchData
 
-    updateDatasource.mutate(apiPayload, {
-      onSuccess: () => {
-        if (areAssignmentsInvalid) {
-          toast.error(t('errors.groupsWithoutRoles'))
+      const shouldUpdateValues = Object.keys(dirtyValues).some(key => key !== 'dataSourceStatus') || areAssignmentsDirty
+      const shouldPublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.AVAILABLE
+      const shouldUnpublish = hasStatusChanged && dataSourceStatus === DATASOURCE_STATUS_TYPES.DRAFT
+
+      try {
+        let datasourceResponse: Datasource | null = shouldUpdateValues ? await handleUpdateValues(apiPayload) : null
+
+        if (shouldPublish) {
+          datasourceResponse = await handleStatusUpdate(publishDatasource.mutateAsync)
         }
+        if (shouldUnpublish) {
+          datasourceResponse = await handleStatusUpdate(unpublishDatasource.mutateAsync)
+        }
+
+        if (datasourceResponse) {
+          form.reset(mapDatasourceToFormValues(datasourceResponse))
+        }
+
         onSuccess?.()
-      },
-    })
+      } catch (error) {
+        console.error('An error occurred while submitting datasource data.', (error as AxiosError).message)
+      }
+    })()
+  }
+
+  const resetToInitialState = () => {
+    form.reset(defaultValues)
   }
 
   return {
+    areAssignmentsDirty,
     form,
-    readyConnectorType,
     dataSourceStatus,
+    selectedConnectorType,
+    hasStatusChanged,
     handleStatusChange,
     isDraftMode,
     canSetAvailable,
     completedTabs,
     submitDatasource,
+    resetToInitialState,
     isLoading,
   }
 }

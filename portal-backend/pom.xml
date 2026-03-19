@@ -476,7 +476,8 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire.version}</version>
                 <configuration>
-                    <skipTests>${skipUnitTests}</skipTests>
+                    <skipTests>${skipTests}</skipTests>
+                    <skip>${skipUnitTests}</skip>
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>

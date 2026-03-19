@@ -20,3 +20,19 @@ tests {
     expect(res.getStatus()).to.equal(204);
   });
 }
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is not in published state.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue TC-DSTV-02 for same `dataStructureVersionId` and confirm 404.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Version record removed |
+  | Config Adapter | -- |
+  | External System | -- |
+}

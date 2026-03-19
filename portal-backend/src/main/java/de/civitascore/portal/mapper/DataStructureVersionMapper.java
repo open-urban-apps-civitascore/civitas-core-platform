@@ -20,6 +20,7 @@ public interface DataStructureVersionMapper
         DataStructureVersionInputDTO, DataStructureVersionOutputDTO, DataStructureVersion> {
 
   @Mapping(target = "dataStructure", ignore = true)
+  @Mapping(target = "externalId", ignore = true)
   @Override
   DataStructureVersion toEntity(DataStructureVersionInputDTO input);
 
@@ -35,6 +36,7 @@ public interface DataStructureVersionMapper
   @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.SET_TO_NULL)
   @Mapping(target = "dataStructure", ignore = true)
   @Mapping(target = "dataStructureVersionStatus", ignore = true)
+  @Mapping(target = "externalId", ignore = true)
   @Override
   void updateEntity(@MappingTarget DataStructureVersion entity, DataStructureVersionInputDTO input);
 }

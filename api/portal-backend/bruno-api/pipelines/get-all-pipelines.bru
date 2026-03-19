@@ -31,3 +31,9 @@ tests {
     expect(res.body.content).to.be.an('array');
   });
 }
+
+docs {
+  **Precondition:** `dataSetId` is set.
+
+  **Expected Response:** 200 OK, paginated list of pipeline objects belonging to the data set.
+}

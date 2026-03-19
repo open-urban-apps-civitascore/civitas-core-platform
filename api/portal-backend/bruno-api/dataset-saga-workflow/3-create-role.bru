@@ -33,3 +33,21 @@ tests {
     expect(status === 201 || status === 409).to.be.true;
   });
 }
+
+docs {
+  **Saga step 3 of 18** — Prerequisites: create supporting resources before triggering the saga.
+
+  Creates the DATA role ("Saga Test Data Role") that will be bound to the group via a scoped assignment in step 6. DATA roles can be scoped to a specific dataset.
+
+  **Expected Response:** 201 Created, body contains `id`. 409 if the role already existed (idempotent).
+
+  **Post-condition:** Save `sagaRoleId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DATA role record created in `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

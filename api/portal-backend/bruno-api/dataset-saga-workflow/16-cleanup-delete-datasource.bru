@@ -21,3 +21,19 @@ tests {
     expect(status === 204 || status === 404 || status === 400 || status === 409).to.be.true;
   });
 }
+
+docs {
+  **Saga step 16 of 18** — Delete the datasource (cleanup).
+
+  Removes the MQTT datasource created in step 1. The pipeline must have been deleted first (step 15); a 409 is returned if linked pipelines still exist.
+
+  **Expected Response:** 204 No Content. 404 if already deleted. 409 if linked pipelines still exist (delete pipeline first). 400 if wrong state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource record removed from `portal_backend` DB |
+  | Config Adapter | — |
+  | External System | — |
+}

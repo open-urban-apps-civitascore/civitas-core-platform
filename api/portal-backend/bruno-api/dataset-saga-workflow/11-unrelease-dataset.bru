@@ -21,3 +21,33 @@ tests {
     expect(status === 202 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Saga step 11 of 18** — Trigger the DATASET_DELETE saga (cleanup phase).
+
+  Transitions the dataset from `AVAILABLE` back to `READY` and triggers the **DATASET_DELETE** saga asynchronously. The saga de-provisions infrastructure in reverse order:
+
+  1. **Redpanda Connect** — removes deployed pipelines
+  2. **APISIX Gateway** — removes route + upstream
+  3. **FROST Server** — removes the Project
+
+  On completion, the dataset reverts to `READY` state and `pendingSagaType` becomes `null`.
+
+  **Precondition:** `sagaDataSetId` is set; dataset is in `AVAILABLE` state.
+
+  **Expected Response:** 202 Accepted (saga triggered). 400 if the dataset is not in `AVAILABLE` state.
+
+  **Kafka Events**
+  - Produces: `de.civitascore.dataset.saga.trigger` (sagaType: `DATASET_DELETE`)
+  - Consumes: `de.civitascore.saga.result` (type: `SAGA_COMPLETED` or `SAGA_FAILED`)
+
+  **System Impact:**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSet status → `READY`; `pendingSagaType` set to `DELETE` until saga completes |
+  | Config Adapter (Orchestrator) | Receives saga trigger; de-provisions Redpanda → APISIX → FROST in reverse |
+  | FROST Server | Project removed |
+  | APISIX Gateway | Route + upstream removed |
+  | Redpanda Connect | Pipelines undeployed |
+}

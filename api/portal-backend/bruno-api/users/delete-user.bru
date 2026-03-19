@@ -26,3 +26,21 @@ tests {
     expect(res.getStatus()).to.equal(204);
   });
 }
+
+docs {
+  **Precondition:** `userId` is set.
+
+  **Expected Response**
+  - Status: `204 No Content`
+  - Body is empty
+
+  **Verification:** Issue TC-USER-02 for the same `userId` and confirm a `404` response.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | User record removed from `portal_backend` DB |
+  | Config Adapter | Consumes `de.civitascore.idm.user.deleted` Kafka event; forwards deletion to Keycloak |
+  | Keycloak | User removed from `civitas-core` realm |
+}

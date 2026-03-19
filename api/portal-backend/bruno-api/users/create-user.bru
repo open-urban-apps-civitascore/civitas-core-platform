@@ -45,3 +45,19 @@ tests {
     expect(res.body.email).to.be.a('string');
   });
 }
+
+docs {
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id` (non-empty string)
+
+  **Post-condition:** Save `userId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | User record created in `portal_backend` DB |
+  | Config Adapter | Consumes `de.civitascore.idm.user.created` Kafka event; forwards user creation to Keycloak |
+  | Keycloak | New user created in `civitas-core` realm (verify in Keycloak Admin Console → Users) |
+}

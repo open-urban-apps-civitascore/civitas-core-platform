@@ -1,9 +1,10 @@
 'use client'
 
 import { ChevronLeft, ChevronRight, Settings } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useActiveDiagram } from '../../hooks/use-active-diagram'
+import { useReadOnly } from '../../hooks/use-read-only'
 import { EdgePropertyEditor } from './EdgePropertyEditor'
 import { NodePropertyEditor } from './NodePropertyEditor'
 
@@ -13,7 +14,12 @@ interface PropertyInspectorProps {
 
 export const PropertyInspector: React.FC<PropertyInspectorProps> = ({ className = '' }) => {
   const { selectedNode, selectedEdge } = useActiveDiagram()
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const { isReadOnly } = useReadOnly()
+  const [isCollapsed, setIsCollapsed] = useState(isReadOnly)
+
+  useEffect(() => {
+    setIsCollapsed(isReadOnly)
+  }, [isReadOnly])
 
   // Get the currently selected element
   const selectedElement = selectedNode || selectedEdge

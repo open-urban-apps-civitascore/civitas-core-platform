@@ -968,6 +968,51 @@ class DataSetControllerIntegrationTest
     }
 
     @Test
+    @DisplayName("Should publish dataset with provide pipeline (APIs only, no datasources)")
+    void shouldPublishDataSetWithApisOnly() {
+      DataSet dataSet = new DataSet();
+      dataSet.setName("test_dataset_provide_" + System.currentTimeMillis());
+      dataSet.setDescription("Test dataset with provide pipeline");
+      dataSet.setDataSetStatus(DataSetStatus.DRAFT);
+      dataSet.setFormat("JSON");
+      dataSet.setOpenDataAccess(false);
+      dataSet = dataSetRepository.save(dataSet);
+
+      Pipeline pipeline = new Pipeline();
+      pipeline.setName("test_pipeline_provide_" + System.currentTimeMillis());
+      pipeline.setDescription("Provide pipeline with APIs only");
+      pipeline.setDataSet(dataSet);
+      pipeline.setStyles(createSampleStyles());
+      pipeline.setApis(Arrays.asList("/v1.1/Things", "/v1.1/Observations"));
+      pipelineRepository.save(pipeline);
+
+      UUID dataSetId = dataSet.getId();
+
+      ResponseEntity<DataSetOutputDTO> response =
+          exchange(
+              getEndpointPath() + "/" + dataSetId + "/publish",
+              org.springframework.http.HttpMethod.POST,
+              createAuthHeaders(),
+              null,
+              getOutputTypeReference());
+
+      assertThat(response.getStatusCode()).as("Should return OK status").isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getDataSetStatus())
+          .as("DataSet status should be READY after publishing")
+          .isEqualTo(DataSetStatus.READY);
+
+      long distributionCount =
+          distributionRepository.findAll().stream()
+              .filter(d -> d.getDataSet() != null && d.getDataSet().getId().equals(dataSetId))
+              .count();
+
+      assertThat(distributionCount)
+          .as("Should create 2 distributions for 2 API paths")
+          .isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("Should fail to publish dataset without pipelines")
     void shouldFailToPublishDataSetWithoutPipelines() {
       DataSet dataSet = new DataSet();

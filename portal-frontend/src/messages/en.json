@@ -28,7 +28,8 @@
       "exit": "Exit",
       "assignItem": "Assign {item}",
       "assignTo": "to {item}",
-      "back": "Back"
+      "back": "Back",
+      "import": "Import"
     },
     "errors": {
       "invalidPhone": "Invalid phone number",
@@ -50,7 +51,8 @@
       "descriptionMaxLength": "Description must be 150 characters or less",
       "formInvalid": "All required information must be provided correctly. Please, verify your input.",
       "statusChangeError": "An error occurred while changing the availability status.",
-      "updateError": "An error occurred while updating the {item}."
+      "updateError": "An error occurred while updating the {item}.",
+      "nameExists": "The name is already in use. Please, choose another name."
     },
     "items": {
       "data": "data",
@@ -82,7 +84,8 @@
     },
     "success": {
       "statusChangeSuccess": "The availability status has been successfully updated.",
-      "deletionSuccess": "{item} has successfully been deleted."
+      "deletionSuccess": "{item} has successfully been deleted.",
+      "creationSuccess": "{item} has been successfully created."
     },
     "status": {
       "DRAFT": "Draft",
@@ -256,7 +259,12 @@
       "updateSuccess": "Dataset has been successfully updated.",
       "deleteSuccess": "Dataset has been successfully deleted.",
       "deleteError": "An error occurred while deleting the dataset. Please try again.",
-      "updateAccessManagementSuccess": "Access management has been successfully updated."
+      "updateAccessManagementSuccess": "Access management has been successfully updated.",
+      "publishSuccess": "Dataset has been successfully published.",
+      "unpublishSuccess": "Dataset has been successfully unpublished.",
+      "releaseSuccess": "Dataset has been successfully released.",
+      "unreleaseSuccess": "Dataset has been successfully unreleased.",
+      "transitionError": "An error occurred while changing the dataset status. Please try again."
     },
     "warningModal": {
       "title": "Delete dataset?",
@@ -482,13 +490,47 @@
     }
   },
   "permissions": {
-    "title": "Permissions",
-    "systemPermissions": "System Permissions",
-    "dataPermissions": "Daten Permissions",
+    "title": "Overview: {permissionType}",
+    "infoBox": "Permissions are predefined and cannot be edited here.",
+    "systemPermissions": {
+      "title": "System Permissions",
+      "description": "System permissions control access to system-wide functions on the platform.\nThey are grouped into system roles and assigned to groups.",
+      "categories": {
+        "TENANT_ADMINISTRATION": "Tenant Administration",
+        "DATA": "Data Management",
+        "OTHER": "Other"
+      },
+      "entry": "{action} {permission}"
+    },
+    "dataPermissions": {
+      "title": "Data Permissions",
+      "description": "Data permissions control access to data objects on the platform.\nThey are grouped into data roles and assigned to groups within a specific scope."
+    },
+    "actions": {
+      "read": "Read",
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete",
+      "release": "Release"
+    },
     "tableHeaders": {
-      "title": "Name",
-      "category": "Category"
-    }
+      "name": "Object"
+    },
+    "accessible": {
+      "granted": "Granted",
+      "notGranted": "Not granted"
+    },
+    "values": {
+        "ASSIGNMENT": "Assignment",
+        "DATASET": "Dataset",
+        "DATASET_PAYLOAD": "Dataset Payload",
+        "DATASOURCE": "Datasource",
+        "DATASTRUCTURE": "Datastructure",
+        "GROUP": "Group",
+        "PERMISSION": "Permission",
+        "ROLE": "Role",
+        "USER": "User"
+      }
   },
   "roles": {
     "title": "Roles",
@@ -648,6 +690,8 @@
     "errors": {
       "invalidDsn": "Enter a valid URI (e.g. postgres://host:5432/db)",
       "invalidBrokerUrl": "Enter a valid broker URL (e.g. tcp://broker:1883)",
+      "creationError": "An error occurred while creating the data source.",
+      "updateError": "An error occurred while updating the data source.",
       "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
     },
     "connection": {
@@ -690,8 +734,25 @@
       "title1": "Connector",
       "title2": "Configuration",
       "type": "Type",
+      "typePlaceholder": "Select connector type",
       "connection": "Connection",
       "establishConnection": "Establish Connection"
+    },
+    "dataModel": {
+      "placeholder": {
+        "title": "No data structure imported",
+        "description1": "Import an existing data structure from the platform to use it in this data source.",
+        "noDatastructures": "Don't have a data structure yet?",
+        "creationSteps": {
+          "step1": "Save this data source as draft",
+          "step2": "Create a data structure in <link>Data Structures</link>",
+          "step3": "Return here and import it"
+        }
+      },
+      "importModal": {
+        "title": "Import Data Model",
+        "to": "into {name}"
+      }
     },
     "accessManagementTab": {
       "infoBoxes": {
@@ -727,7 +788,7 @@
     },
     "tabs": {
       "basicInfo": "Base Information",
-      "accessPermissions": "Access Permissions",
+      "accessManagement": "Access Management",
       "versions": "Versions"
     },
     "edit": {
@@ -742,7 +803,9 @@
       "isInUseStatusHint": "Can not be set to draft since this datastructure is already in use."
     },
     "errors": {
-      "deletionError": "An error occurred while deleting the datastructure."
+      "deletionError": "An error occurred while deleting the datastructure.",
+      "creationError": "An error occurred while creating the datastructure.",
+      "groupsWithoutRoles": "Groups with no assigned roles have not been saved."
     },
     "infoModal": {
       "title": "Datenstructure can not be deleted",
@@ -751,6 +814,11 @@
     "unsavedChangesModal": {
       "title": "Unsaved Changes",
       "description": "This action will take you to another page and your unsaved changes will be lost. Do you want to save them first?"
+    },
+    "accessManagementTab": {
+      "infoBoxes": {
+        "firstBox": "Via the groups-roles-assignments, permissions are assigned to this data structure to allow the usage in datasets and datasources."
+      }
     }
   },
   "datastructureVersion": {
@@ -907,7 +975,12 @@
       "validateBeforeSave": "Click Validate before saving",
       "validate": "Validate",
       "save": "Save",
-      "saving": "Saving..."
+      "saving": "Saving...",
+      "loading": "Loading pipelines...",
+      "pipelineSettings": "Pipeline settings",
+      "deletePipeline": "Delete Pipeline",
+      "deleteConfirmTitle": "Delete Pipeline?",
+      "deleteConfirmDescription": "Are you sure you want to delete this pipeline? This action cannot be undone."
     },
     "tabs": {
       "closeTab": "Close tab",
@@ -923,6 +996,11 @@
     "closeTabModal": {
       "title": "Discard model?",
       "description": "This action deletes the model. It can not be undone."
+    },
+    "import": {
+      "title": "Import",
+      "fromPlatform": "from the platform",
+      "fromFile": "from file"
     }
   }
 }

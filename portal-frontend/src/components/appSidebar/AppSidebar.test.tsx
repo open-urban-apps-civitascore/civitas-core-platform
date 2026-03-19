@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { SidebarProvider } from '@/components/ui/sidebar'
 import messages from '@/messages/de.json'
+import { CurrentUser } from '@/types/currentUser'
 
 // Mock the async components
 vi.mock('./components/AppSidebarContent', () => ({
@@ -21,14 +22,18 @@ vi.mock('@/auth', () => ({
 // Import after mocks
 import { AppSidebar } from './AppSidebar'
 
-describe('AppSidebar', () => {
-  const mockUser = {
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-  }
+const mockCurrentUser: CurrentUser = {
+  username: 'jdoe',
+  email: 'john.doe@example.com',
+  title: 'MR',
+  firstName: 'John',
+  lastName: 'Doe',
+  assignments: [],
+}
 
-  const renderWithProviders = async (user?: { name: string | null; email: string | null } | null) => {
-    const Component = await AppSidebar({ user })
+describe('AppSidebar', () => {
+  const renderWithProviders = async (currentUser: CurrentUser) => {
+    const Component = await AppSidebar({ currentUser })
     return render(
       <NextIntlClientProvider locale="de" messages={messages}>
         <SidebarProvider>{Component}</SidebarProvider>
@@ -42,7 +47,7 @@ describe('AppSidebar', () => {
 
   describe('structure', () => {
     it('renders navigation landmark with correct aria-label', async () => {
-      await renderWithProviders(mockUser)
+      await renderWithProviders(mockCurrentUser)
 
       const nav = screen.getByRole('navigation')
       expect(nav).toBeInTheDocument()
@@ -50,13 +55,13 @@ describe('AppSidebar', () => {
     })
 
     it('renders AppSidebarContent component', async () => {
-      await renderWithProviders(mockUser)
+      await renderWithProviders(mockCurrentUser)
 
       expect(screen.getByTestId('sidebar-content')).toBeInTheDocument()
     })
 
     it('renders AppSidebarHeader with tenant name and CIVITAS/CORE', async () => {
-      await renderWithProviders(mockUser)
+      await renderWithProviders(mockCurrentUser)
 
       // Tenant name comes from NEXT_PUBLIC_TENANT_NAME env var (falls back to 'Mandanten-Name')
       expect(screen.getByText('Mandanten-Name')).toBeInTheDocument()
@@ -64,24 +69,10 @@ describe('AppSidebar', () => {
     })
 
     it('renders AppSidebarFooter with user info', async () => {
-      await renderWithProviders(mockUser)
+      await renderWithProviders(mockCurrentUser)
 
       expect(screen.getByText('John Doe')).toBeInTheDocument()
       expect(screen.getByText('john.doe@example.com')).toBeInTheDocument()
-    })
-  })
-
-  describe('user prop handling', () => {
-    it('handles null user prop by displaying Guest', async () => {
-      await renderWithProviders(null)
-
-      expect(screen.getByText('Guest')).toBeInTheDocument()
-    })
-
-    it('handles undefined user prop by displaying Guest', async () => {
-      await renderWithProviders(undefined)
-
-      expect(screen.getByText('Guest')).toBeInTheDocument()
     })
   })
 
@@ -97,7 +88,7 @@ describe('AppSidebar', () => {
     }
 
     it('shows user name and email in dropdown content when opened', async () => {
-      await renderWithProviders(mockUser)
+      await renderWithProviders(mockCurrentUser)
 
       await openDropdownMenu()
 
@@ -109,7 +100,7 @@ describe('AppSidebar', () => {
     })
 
     it('shows logout button in dropdown menu', async () => {
-      await renderWithProviders(mockUser)
+      await renderWithProviders(mockCurrentUser)
 
       await openDropdownMenu()
 
@@ -117,7 +108,7 @@ describe('AppSidebar', () => {
     })
 
     it('triggers signOut when logout button is clicked', async () => {
-      await renderWithProviders(mockUser)
+      await renderWithProviders(mockCurrentUser)
 
       await openDropdownMenu()
 

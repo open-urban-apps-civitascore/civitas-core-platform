@@ -9,15 +9,21 @@ import de.civitascore.portal.repository.specification.DataStructureVersionSpec;
 import de.civitascore.portal.service.DataStructureVersionService;
 import de.civitascore.portal.util.InvalidInputException;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,6 +32,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.MethodNotAllowedException;
 
 @RestController
 @RequestMapping("/datastructures/{dataStructureId}/versions")
@@ -45,7 +52,7 @@ public class DataStructureVersionController
   @Operation(hidden = true)
   public ResponseEntity<Page<DataStructureVersionOutputDTO>> getAll(
       @ParameterObject DataStructureVersionSpec spec, @ParameterObject Pageable pageable) {
-    return super.getAll(spec, pageable);
+    throw new MethodNotAllowedException(HttpMethod.GET, Collections.emptySet());
   }
 
   @Override
@@ -62,13 +69,16 @@ public class DataStructureVersionController
   @Operation(
       operationId = "createDataStructureVersion",
       summary = "Create a new data structure version")
+  @ApiResponse(
+      responseCode = "502",
+      description = "Model Atlas upload failed",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataStructureVersionOutputDTO> create(
       @Valid @RequestBody DataStructureVersionInputDTO input) {
     ResponseEntity<DataStructureVersionOutputDTO> response = super.create(input);
     DataStructureVersionOutputDTO output = response.getBody();
     if (output != null) {
-      DataStructureVersion created = getService().findByIdOrThrow(output.getId());
-      getService().findModelForDataStructureVersion(created).ifPresent(output::setModel);
+      enrichWithModel(output);
     }
     return response;
   }
@@ -79,32 +89,24 @@ public class DataStructureVersionController
   public ResponseEntity<DataStructureVersionOutputDTO> getById(@PathVariable UUID id) {
     DataStructureVersion entity = getService().findByIdOrThrow(id);
     DataStructureVersionOutputDTO output = getAssembler().toOutput(entity);
-    getService().findModelForDataStructureVersion(entity).ifPresent(output::setModel);
+    enrichWithModel(output);
     return ResponseEntity.ok(output);
-  }
-
-  @Override
-  @Operation(
-      operationId = "updateDataStructureVersion",
-      summary = "Replace a data structure version")
-  public ResponseEntity<DataStructureVersionOutputDTO> update(
-      @PathVariable UUID id, @Valid @RequestBody DataStructureVersionInputDTO input) {
-    return super.update(id, input);
   }
 
   @Override
   @Operation(
       operationId = "patchDataStructureVersion",
       summary = "Partially update a data structure version")
+  @ApiResponse(
+      responseCode = "502",
+      description = "Model Atlas upload failed",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataStructureVersionOutputDTO> patch(
       @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
     ResponseEntity<DataStructureVersionOutputDTO> response = super.patch(id, updates);
     DataStructureVersionOutputDTO output = response.getBody();
-    if (output != null && !updates.has("model")) {
-      DataStructureVersion entity = getService().findByIdOrThrow(output.getId());
-      dataStructureVersionService
-          .findModelForDataStructureVersion(entity)
-          .ifPresent(output::setModel);
+    if (output != null) {
+      enrichWithModel(output);
     }
     return response;
   }
@@ -132,6 +134,23 @@ public class DataStructureVersionController
     return super.preProcessInput(input);
   }
 
+  @Override
+  @Operation(
+      operationId = "updateDataStructureVersion",
+      summary = "Replace a data structure version")
+  @ApiResponse(
+      responseCode = "502",
+      description = "Model Atlas upload failed",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  public ResponseEntity<DataStructureVersionOutputDTO> update(
+      @PathVariable UUID id, @Valid @RequestBody DataStructureVersionInputDTO input) {
+    DataStructureVersionInputDTO preProcessedInput = preProcessInput(input);
+    DataStructureVersion updated = getService().update(id, preProcessedInput);
+    DataStructureVersionOutputDTO output = getAssembler().toOutput(updated);
+    enrichWithModel(output);
+    return ResponseEntity.ok(output);
+  }
+
   @PutMapping("/{versionId}/published/meta")
   @Operation(
       operationId = "updateDataStructureVersionPublishedMeta",
@@ -142,6 +161,25 @@ public class DataStructureVersionController
               + " version, and styles can be updated. If the version is in use, only description"
               + " and modelName can be changed. For DRAFT versions, use PUT"
               + " /datastructures/{dataStructureId}/versions/{versionId} instead.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Published version metadata updated successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "Invalid input (e.g. version is DRAFT)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "Data structure version not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (e.g. unique constraint violation)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "502",
+      description = "Model Atlas upload failed",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataStructureVersionOutputDTO> updatePublishedMeta(
       @PathVariable UUID dataStructureId,
       @PathVariable UUID versionId,
@@ -150,6 +188,7 @@ public class DataStructureVersionController
     DataStructureVersion updated =
         dataStructureVersionService.updatePublishedMeta(versionId, preProcessedInput);
     DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(updated);
+    enrichWithModel(output);
     return ResponseEntity.ok(output);
   }
 
@@ -160,10 +199,20 @@ public class DataStructureVersionController
       description =
           "Publishes a data structure version by setting status to AVAILABLE. Requires"
               + " modelAtlasUri to be present.")
+  @ApiResponse(responseCode = "200", description = "Data structure version published successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "Invalid input (e.g. already published or missing modelAtlasUri)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "Data structure version not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataStructureVersionOutputDTO> publishDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     DataStructureVersion published = dataStructureVersionService.publish(versionId);
     DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(published);
+    enrichWithModel(output);
     return ResponseEntity.ok(output);
   }
 
@@ -175,10 +224,30 @@ public class DataStructureVersionController
           "Unpublishes a data structure version by setting status back to DRAFT. Cannot unpublish"
               + " if this is the only published version of a published DataStructure - unpublish"
               + " the DataStructure first in that case.")
+  @ApiResponse(
+      responseCode = "200",
+      description = "Data structure version unpublished successfully")
+  @ApiResponse(
+      responseCode = "400",
+      description = "Invalid input (e.g. already in DRAFT or only published version)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "404",
+      description = "Data structure version not found",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
+  @ApiResponse(
+      responseCode = "409",
+      description = "Conflict (version is in use by a DataSource)",
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<DataStructureVersionOutputDTO> unpublishDataStructureVersion(
       @PathVariable UUID dataStructureId, @PathVariable UUID versionId) {
     DataStructureVersion unpublished = dataStructureVersionService.unpublish(versionId);
     DataStructureVersionOutputDTO output = dataStructureVersionAssembler.toOutput(unpublished);
+    enrichWithModel(output);
     return ResponseEntity.ok(output);
+  }
+
+  private void enrichWithModel(DataStructureVersionOutputDTO output) {
+    getService().findModelByAtlasUri(output.getModelAtlasUri()).ifPresent(output::setModel);
   }
 }

@@ -24,3 +24,13 @@ tests {
     expect(res.body).to.be.an('array').that.has.length.greaterThan(0);
   });
 }
+
+docs {
+  **Saga step 10 of 18** — Verify dataset assignments after saga completion.
+
+  Fetches all assignments for the dataset to confirm that the scoped assignment created in step 6 is still intact after the saga ran. The response must contain at least one assignment.
+
+  **Precondition:** `sagaDataSetId` is set; dataset is `AVAILABLE`.
+
+  **Expected Response:** 200 OK, body is a flat array containing at least the assignment from step 6.
+}

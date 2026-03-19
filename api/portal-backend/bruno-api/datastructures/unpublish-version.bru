@@ -20,3 +20,17 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 }
+
+docs {
+  **Precondition:** `dataStructureId` and `dataStructureVersionId` are set; version is in published state.
+
+  **Expected Response:** 200 OK, body reflects version returned to draft state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Version status reverted to draft |
+  | Config Adapter | -- |
+  | Model Atlas / Apicurio Registry | Version schema unpublished/removed from registry |
+}

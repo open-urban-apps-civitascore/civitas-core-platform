@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -203,18 +204,22 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       throw new InvalidInputException("description", id, "DataSet description must not be blank");
     }
 
-    // Validate that dataset has at least one pipeline with data sources
+    // Validate that dataset has at least one pipeline
     if (dataSet.getPipelines() == null || dataSet.getPipelines().isEmpty()) {
       throw new InvalidInputException(
           "pipelines", id, "DataSet must contain at least one Pipeline before publishing");
     }
 
-    boolean hasDataSource =
+    // Each pipeline must have either datasources (feed-in) or APIs (provide)
+    boolean hasDataSourceOrApi =
         dataSet.getPipelines().stream()
-            .anyMatch(p -> p.getDataSources() != null && !p.getDataSources().isEmpty());
-    if (!hasDataSource) {
+            .anyMatch(
+                p ->
+                    (p.getDataSources() != null && !p.getDataSources().isEmpty())
+                        || (p.getApis() != null && !p.getApis().isEmpty()));
+    if (!hasDataSourceOrApi) {
       throw new InvalidInputException(
-          "dataSources", id, "DataSet must have at least one DataSource across its pipelines");
+          "pipelines", id, "DataSet must have at least one Pipeline with DataSources or APIs");
     }
 
     // Generate distributions from pipeline APIs
@@ -361,23 +366,23 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       log.warn(
           "Saga CREATE failed for dataset {}: step={}, error={}, compensated={}. Reverted to READY",
           datasetId,
-          failedStep,
-          error,
+          Encode.forJava(failedStep),
+          Encode.forJava(error),
           compensated);
     } else if (pendingType == PendingSagaType.UPDATE) {
       log.warn(
           "Saga UPDATE failed for dataset {}: step={}, error={}, compensated={}. Staying AVAILABLE",
           datasetId,
-          failedStep,
-          error,
+          Encode.forJava(failedStep),
+          Encode.forJava(error),
           compensated);
     } else if (pendingType == PendingSagaType.DELETE) {
       log.warn(
           "Saga DELETE failed for dataset {}: step={}, error={}, compensated={}. "
               + "Staying AVAILABLE — stale resources may exist",
           datasetId,
-          failedStep,
-          error,
+          Encode.forJava(failedStep),
+          Encode.forJava(error),
           compensated);
     }
 

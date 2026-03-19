@@ -2,7 +2,6 @@ import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 import { toast } from 'sonner'
 
-import { PageBackground } from '@/components/page-background/PageBackground'
 import { UseMultiSessionReturn } from '@/components/uml-modeler/types/session'
 import { UmlModeler } from '@/components/uml-modeler/UmlModeler'
 
@@ -24,16 +23,16 @@ export const StructureDefinitionTab = (props: StructureDefinitionTabProps) => {
       isReadOnly={isReadOnly || isInUse}
       modelSessionManager={modelSessionManager}
       isMultiSessionMode={false}
+      canExportXmi={false}
+      canImportXmi={false}
     />
   ) : (
-    <PageBackground className="overflow-y-auto p-0" hasBackground={!isReadOnly && !isInUse}>
-      <UmlModeler
-        isReadOnly={isReadOnly || isInUse}
-        modelSessionManager={modelSessionManager}
-        isMultiSessionMode={false}
-        canExportXmi={false}
-        canImportXmi={false}
-      />
-    </PageBackground>
+    <UmlModeler
+      isReadOnly={isReadOnly || isInUse}
+      modelSessionManager={modelSessionManager}
+      isMultiSessionMode={false}
+      canExportXmi={false}
+      canImportXmi={false}
+    />
   )
 }

@@ -694,7 +694,7 @@ export SPRING_DATASOURCE_USERNAME=admin
 export SPRING_DATASOURCE_PASSWORD=admin
 export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable&gssEncMode=disable"
 export MODEL_ATLAS_BASE_URL=http://localhost:8086
-mvn clean spring-boot:run -Dspring-boot.run.profiles=local,local-init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION
+mvn clean spring-boot:run -Dspring-boot.run.profiles=local,init,postgres -Dconfig-adapter.version=$DEV_VERSION -Dportal-model.version=$DEV_VERSION
 exec bash
 SCRIPT_EOF
     chmod +x /tmp/start-portal-backend.sh
@@ -714,7 +714,7 @@ else
     echo "Then start in your IDE:"
     echo "  Project: portal-backend"
     echo "  Main class: de.civitascore.portal.PortalBackendApplication"
-    echo "  Profiles: local,local-init,postgres"
+    echo "  Profiles: local,init,postgres"
     echo
     echo "Environment variables to set in IDE:"
     echo "  SPRING_DATASOURCE_USERNAME=admin"
@@ -727,7 +727,7 @@ fi
 cd "$SCRIPT_DIR"
 
 # ---- Wait for Backend Health (both authz modes) ---------------------
-# LocalUserInitializer must complete before OPA's is_authenticated check
+# UserInitializer must complete before OPA's is_authenticated check
 # can find the dev user. Without this wait, requests get 403 in allow-all mode.
 
 if [ "$backend_option" = "1" ]; then
@@ -748,22 +748,6 @@ if [ "$backend_option" = "1" ]; then
     echo
 fi
 
-# ---- Seed Dev Admin Data -------------------------------------------
-# Must run AFTER backend starts because PermissionRoleInitializer creates
-# the permissions table rows. The seed links DevAdmin role to those permissions.
-
-if [ "$authz_option" = "1" ]; then
-    echo "Seeding dev admin data (full authz mode)..."
-
-    SEED_SQL="$SCRIPT_DIR/apisix/seed-dev-admin.sql"
-    if [ -f "$SEED_SQL" ]; then
-        docker exec -i civitas-postgres-portal psql -U admin -d portal_backend -f /dev/stdin < "$SEED_SQL" 2>&1 | tail -5
-        echo "  Dev admin seeding complete"
-    else
-        echo "  WARNING: seed-dev-admin.sql not found"
-    fi
-    echo
-fi
 # Check if Keycloak client secret needs to be configured
 if [ -f "$FRONTEND_DIR/.env.local" ]; then
     CURRENT_SECRET=$(grep '^KEYCLOAK_CLIENT_SECRET=' "$FRONTEND_DIR/.env.local" | cut -d'=' -f2)

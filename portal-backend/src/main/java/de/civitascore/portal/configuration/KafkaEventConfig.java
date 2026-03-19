@@ -1,7 +1,9 @@
 package de.civitascore.portal.configuration;
 
+import jakarta.annotation.PostConstruct;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -20,6 +22,9 @@ import org.springframework.util.backoff.FixedBackOff;
 @Configuration
 public class KafkaEventConfig {
 
+  private static final Set<String> VALID_COMPRESSION_TYPES =
+      Set.of("none", "gzip", "snappy", "lz4", "zstd");
+
   @Value("${spring.kafka.bootstrap-servers:localhost:9092}")
   private String bootstrapServers;
 
@@ -34,6 +39,15 @@ public class KafkaEventConfig {
 
   @Value("${spring.kafka.producer.buffer-memory:33554432}")
   private long bufferMemory;
+
+  @PostConstruct
+  void validateCompressionType() {
+    if (!VALID_COMPRESSION_TYPES.contains(compressionType)) {
+      throw new IllegalArgumentException(
+          "Invalid kafka compression type: '%s'. Valid values: %s"
+              .formatted(compressionType, VALID_COMPRESSION_TYPES));
+    }
+  }
 
   @Bean
   public KafkaTemplate<String, String> eventKafkaTemplate() {

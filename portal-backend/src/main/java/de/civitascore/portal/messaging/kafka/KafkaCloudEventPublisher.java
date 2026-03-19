@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.owasp.encoder.Encode;
 
 /**
  * Kafka implementation of CloudEventPublisher.
@@ -86,15 +87,15 @@ public class KafkaCloudEventPublisher implements CloudEventPublisher {
               "Config Adapter SUCCESS: messageId={}, operation={}, resourceId={}",
               originalMessageId,
               resultEvent.operation(),
-              resultEvent.resourceId());
+              Encode.forJava(resultEvent.resourceId()));
           future.complete(resultEvent);
         } else {
           log.error(
               "Config Adapter FAILURE: messageId={}, operation={}, error={}, message={}",
               originalMessageId,
               resultEvent.operation(),
-              resultEvent.errorCode(),
-              resultEvent.message());
+              Encode.forJava(resultEvent.errorCode()),
+              Encode.forJava(resultEvent.message()));
           future.completeExceptionally(
               new CloudPublishException(
                   "Config Adapter processing failed: "

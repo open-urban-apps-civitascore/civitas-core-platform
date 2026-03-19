@@ -155,14 +155,22 @@ has_permission if {
 # endpoints per ADM spec. DATASPACE → child resource inheritance is deferred
 # (dataspaces not implemented in v2.0).
 
-# For collection endpoints with TENANT scope: always allowed
-# (TENANT scope users can see all resources in list endpoints)
+# For collection endpoints with TENANT-scoped assignments (DATA/GOVERNANCE roles)
 user_has_permission(permission) if {
 	resource_mapping.is_collection_endpoint
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
 	permission in assignment.permissions
-	assignment.scopeType == "TENANT"
+	is_tenant_scoped(assignment)
+}
+
+# For collection endpoints with unscoped assignments (scopeType=null)
+user_has_permission(permission) if {
+	resource_mapping.is_collection_endpoint
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	is_unscoped(assignment)
 }
 
 # For collection endpoints with matching scope type: allowed
@@ -176,14 +184,25 @@ user_has_permission(permission) if {
 }
 
 # For resource endpoints with TENANT-scoped resources (users, groups, roles, etc.):
-# User must have permission with scopeType=TENANT
+# User must have a TENANT-scoped assignment with the required permission
 user_has_permission(permission) if {
 	resource_mapping.is_resource_endpoint
 	resource_mapping.expected_scope_type == "TENANT"
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
 	permission in assignment.permissions
-	assignment.scopeType == "TENANT"
+	is_tenant_scoped(assignment)
+}
+
+# For resource endpoints with TENANT-scoped resources:
+# User must have an unscoped assignment (scopeType=null) with the required permission
+user_has_permission(permission) if {
+	resource_mapping.is_resource_endpoint
+	resource_mapping.expected_scope_type == "TENANT"
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	is_unscoped(assignment)
 }
 
 # For resource endpoints with DATASPACE/DATASET resources:
@@ -198,17 +217,44 @@ user_has_permission(permission) if {
 	assignment.scopeId == resource_mapping.resource_id
 }
 
-# SCOPE INHERITANCE: TENANT scope cascades to all resource endpoints (ADM spec).
-# A TENANT-scoped assignment satisfies any resource endpoint, regardless of the
-# resource's expected scope type. No upward inheritance — narrow scopes cannot
-# access broader resources.
+# SCOPE INHERITANCE: TENANT-scoped assignments cascade to all resource
+# endpoints (ADM spec), regardless of the resource's expected scope type.
+# No upward inheritance — narrow scopes cannot access broader resources.
 user_has_permission(permission) if {
 	resource_mapping.is_resource_endpoint
 	resource_mapping.expected_scope_type != "TENANT"
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
 	permission in assignment.permissions
+	is_tenant_scoped(assignment)
+}
+
+# SCOPE INHERITANCE: Unscoped assignments (scopeType=null) cascade to all resource
+# endpoints (ADM spec), regardless of the resource's expected scope type.
+user_has_permission(permission) if {
+	resource_mapping.is_resource_endpoint
+	resource_mapping.expected_scope_type != "TENANT"
+	some group in user_context_fetcher.user_context.groups
+	some assignment in group.assignments
+	permission in assignment.permissions
+	is_unscoped(assignment)
+}
+
+# =============================================================================
+# SCOPE CLASSIFICATION HELPERS
+# =============================================================================
+# Assignments are either scoped (with a scopeType like TENANT, DATASET, etc.)
+# or unscoped (scopeType=null). For permission and scope evaluation, unscoped
+# assignments grant the same tenant-wide access as scopeType=TENANT.
+
+# TENANT-scoped: assignment with explicit tenant-wide scope
+is_tenant_scoped(assignment) if {
 	assignment.scopeType == "TENANT"
+}
+
+# Unscoped: assignment with no scope (scopeType=null)
+is_unscoped(assignment) if {
+	assignment.scopeType == null
 }
 
 # =============================================================================

@@ -1,4 +1,3 @@
-import { headers as nextHeaders } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
@@ -27,18 +26,15 @@ const proxyRequest = async (request: NextRequest, context: RouteContext, method:
 
   logger.debug(RequestContext, 'Proxy request received')
 
-  const requestHeaders = await nextHeaders()
-
   // Determine if we should use secure cookies based on the forwarded protocol
   const forwardedProto =
-    requestHeaders.get('x-forwarded-scheme') ??
-    requestHeaders.get('x-scheme') ??
-    requestHeaders.get('x-forwarded-proto')
-
+    request.headers.get('x-forwarded-scheme') ??
+    request.headers.get('x-scheme') ??
+    request.headers.get('x-forwarded-proto')
   const isSecure = forwardedProto === 'https'
 
   const token = await getToken({
-    req: { headers: requestHeaders },
+    req: { headers: request.headers },
     secret: process.env.NEXTAUTH_SECRET,
     secureCookie: isSecure,
   })

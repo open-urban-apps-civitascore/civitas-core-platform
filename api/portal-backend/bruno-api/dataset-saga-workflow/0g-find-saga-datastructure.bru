@@ -29,3 +29,13 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 }
+
+docs {
+  **Saga setup step 0g** — Checks whether the DataStructure "Saga Sensor Data Structure" already exists.
+
+  Searches the `/datastructures` endpoint by name. If a match is found, `sagaDataStructureId` is stored so that subsequent steps (3b–3e, 16b) can skip creation or reference the existing resource.
+
+  **Expected Response:** 200 OK (search always returns 200; empty `content` array if not found).
+
+  **Post-condition:** If found, saves `sagaDataStructureId` from matching entry.
+}

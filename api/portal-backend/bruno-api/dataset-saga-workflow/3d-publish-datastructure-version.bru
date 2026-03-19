@@ -22,3 +22,13 @@ tests {
     expect(status === 200 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Saga step 3d of 18** — Prerequisites: DataStructure (step 3b), DataStructure version (step 3c).
+
+  Publishes the DataStructure version so it becomes immutable and can be referenced. A version must be published before the parent DataStructure itself can be published (step 3e).
+
+  **Expected Response:** 200 OK. 400 if not in DRAFT state (already published — idempotent).
+
+  **Post-condition:** DataStructure version status transitions from `DRAFT` to `PUBLISHED`.
+}

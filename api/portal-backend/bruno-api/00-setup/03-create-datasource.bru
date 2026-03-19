@@ -47,3 +47,17 @@ tests {
     expect(status === 201 || status === 409).to.be.true;
   });
 }
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`. 409 if the datasource already existed (idempotent setup).
+
+  **Post-condition:** Save `dataSourceId`, `setupDataSourceId`, `scopeType` (`DATASOURCE`), and `scopeId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource record created in `portal_backend` DB with status `DRAFT` |
+  | Config Adapter | — |
+  | External System | — |
+}

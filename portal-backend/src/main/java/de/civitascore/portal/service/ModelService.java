@@ -38,6 +38,16 @@ public class ModelService {
   }
 
   /**
+   * Delete a model from the external Model Atlas service.
+   *
+   * @param nsUri the namespace URI of the model to delete
+   */
+  public void deleteModel(String nsUri) {
+    log.info("Processing model deletion: {}", Encode.forJava(nsUri));
+    modelRestClientRequestService.deleteModel(nsUri);
+  }
+
+  /**
    * Process and forward the model file download request to the external Model Atlas service.
    *
    * @param nsUri the namespace URI of the model to download
@@ -48,7 +58,7 @@ public class ModelService {
     log.debug(
         "Processing model file download for nsUri: {} with accept header: {}",
         Encode.forJava(nsUri),
-        acceptHeader);
+        Encode.forJava(acceptHeader));
     return modelRestClientRequestService.downloadModelFile(nsUri, acceptHeader);
   }
 }

@@ -1,5 +1,7 @@
 package de.civitascore.portal.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
@@ -8,21 +10,28 @@ import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
+import de.civitascore.portal.util.ExternalSystemRejectionException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.owasp.encoder.Encode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DataStructureVersionService
     extends BaseService<DataStructureVersion, DataStructureVersionInputDTO> {
+
+  private static final String MODEL_ATLAS_OBJECT_ID_FIELD = "objectId";
 
   private final DataSourceRepository dataSourceRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
@@ -31,6 +40,7 @@ public class DataStructureVersionService
   private final ModelService modelService;
 
   private final DataStructureVersionMapper dataStructureVersionMapper;
+  private final ObjectMapper objectMapper;
 
   @Override
   protected DataStructureVersionRepository getRepository() {
@@ -59,11 +69,10 @@ public class DataStructureVersionService
     return postLoad(entity);
   }
 
-  public Optional<String> findModelForDataStructureVersion(DataStructureVersion entity) {
-    if (StringUtils.isNotBlank(entity.getModelAtlasUri())) {
+  public Optional<String> findModelByAtlasUri(String modelAtlasUri) {
+    if (StringUtils.isNotBlank(modelAtlasUri)) {
       try {
-        String modelContent =
-            modelService.downloadModel(entity.getModelAtlasUri(), "application/xml");
+        String modelContent = modelService.downloadModel(modelAtlasUri, "application/xml");
         return Optional.ofNullable(modelContent);
       } catch (Exception e) {
         // error has already been logged in ModelRestClientRequestService, so just return empty here
@@ -124,7 +133,8 @@ public class DataStructureVersionService
     } catch (InvalidInputException e) {
       throw e;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to process update input", e);
+      throw new InvalidInputException(
+          "DataStructureVersion", existingEntity.getId(), "Failed to process update input");
     }
     return super.preProcessUpdateInput(input, existingEntity);
   }
@@ -141,15 +151,62 @@ public class DataStructureVersionService
     if (StringUtils.isNotBlank(input.getModel())
         && StringUtils.isNotBlank(input.getModelAtlasUri())) {
       try {
-        modelService.uploadModelString(input.getModel(), input.getModelAtlasUri());
+        String response =
+            modelService.uploadModelString(input.getModel(), input.getModelAtlasUri());
+        parseAndSetExternalId(entity, response);
+      } catch (ExternalSystemRejectionException e) {
+        throw e;
       } catch (Exception e) {
-        throw new RuntimeException(
-            "Failed to upload model to Model Atlas for modelAtlasUri: " + input.getModelAtlasUri(),
-            e);
+        throw new ExternalSystemRejectionException("Failed to upload model to Model Atlas", e);
       }
     }
 
     return super.postSave(entity, input);
+  }
+
+  @Override
+  protected void postDelete(DataStructureVersion entity) {
+    if (entity != null && StringUtils.isNotBlank(entity.getModelAtlasUri())) {
+      try {
+        modelService.deleteModel(entity.getModelAtlasUri());
+      } catch (Exception e) {
+        log.warn(
+            "Failed to delete model from Model Atlas for modelAtlasUri: {}",
+            Encode.forJava(entity.getModelAtlasUri()),
+            e);
+      }
+    }
+  }
+
+  private void deleteOldModelIfUriChanged(String oldUri, DataStructureVersionInputDTO input) {
+    String newUri = input.getModelAtlasUri();
+    if (StringUtils.isNotBlank(oldUri) && !Objects.equals(oldUri, newUri)) {
+      try {
+        modelService.deleteModel(oldUri);
+      } catch (Exception e) {
+        log.warn(
+            "Failed to delete old model from Model Atlas for modelAtlasUri: {}",
+            Encode.forJava(oldUri),
+            e);
+      }
+    }
+  }
+
+  // externalId is non-critical metadata — modelAtlasUri is the authoritative reference for
+  // fetching models. If parsing fails, the model is already uploaded and accessible via
+  // modelAtlasUri; only the internal Atlas object reference is missing. This will become
+  // relevant once direct Model Atlas PUT calls replace the current upload workaround.
+  private void parseAndSetExternalId(DataStructureVersion entity, String uploadResponse) {
+    try {
+      JsonNode root = objectMapper.readTree(uploadResponse);
+      JsonNode objectIdNode = root.get(MODEL_ATLAS_OBJECT_ID_FIELD);
+      if (objectIdNode != null && !objectIdNode.isNull()) {
+        entity.setExternalId(objectIdNode.asText());
+        dataStructureVersionRepository.save(entity);
+      }
+    } catch (Exception e) {
+      log.warn("Failed to parse externalId from Model Atlas upload response", e);
+    }
   }
 
   private void validateUniqueVersion(DataStructureVersion entity) {
@@ -215,7 +272,10 @@ public class DataStructureVersionService
       throw new InvalidInputException(
           "dataStructureVersionStatus", id, "Cannot update non-DRAFT DataStructureVersion.");
     }
-    return super.update(id, input);
+    String oldModelAtlasUri = existingEntity.getModelAtlasUri();
+    DataStructureVersion result = super.update(id, input);
+    deleteOldModelIfUriChanged(oldModelAtlasUri, input);
+    return result;
   }
 
   /**
@@ -239,7 +299,10 @@ public class DataStructureVersionService
           "Cannot use updatePublishedMeta for DRAFT DataStructureVersion.");
     }
 
-    return super.update(id, input);
+    String oldModelAtlasUri = existingEntity.getModelAtlasUri();
+    DataStructureVersion result = super.update(id, input);
+    deleteOldModelIfUriChanged(oldModelAtlasUri, input);
+    return result;
   }
 
   /**

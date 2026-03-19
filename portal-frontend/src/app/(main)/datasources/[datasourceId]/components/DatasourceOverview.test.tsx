@@ -47,11 +47,29 @@ vi.mock('../hooks/useDatasourceForm', () => ({
     form: mockForm,
     readyConnectorType: 'MQTT',
     dataSourceStatus: 'DRAFT',
+    hasStatusChanged: false,
     handleStatusChange: vi.fn(),
     canSetAvailable: false,
     completedTabs: [],
     submitDatasource: mockSubmitDatasource,
+    resetToInitialState: vi.fn(),
     isLoading: false,
+  }),
+}))
+
+vi.mock('@/app/services/api/datastructures/versions/clientRequests', () => ({
+  useGetDatastructureVersion: () => ({
+    data: undefined,
+  }),
+}))
+
+vi.mock('@/app/(main)/datastructures/[datastructureId]/(versions)/hooks/useDatastructureVersion', () => ({
+  defaultDatastructureVersionFormData: {},
+  useDatastructureVersion: () => ({
+    modelSessionManager: null,
+    hasUserChanges: false,
+    resetToInitialState: vi.fn(),
+    resetFormAndSession: vi.fn(),
   }),
 }))
 
@@ -73,6 +91,12 @@ vi.mock('./access-management/AccessManagementTab', () => ({
   ),
 }))
 
+vi.mock('./datastructure-tab/DatastructureTab', () => ({
+  DatastructureTab: ({ isReadOnly }: { isReadOnly: boolean }) => (
+    <div data-testid="datastructureTab" data-readonly={isReadOnly} />
+  ),
+}))
+
 vi.mock('@/components/ui/form', () => ({
   Form: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
@@ -82,7 +106,33 @@ vi.mock('@/components/page-container/PageContainer', () => ({
 }))
 
 vi.mock('@/components/page-header/PageHeader', () => ({
-  PageHeader: ({ customElement }: { customElement: React.ReactNode }) => <div>{customElement}</div>,
+  PageHeader: ({
+    customElement,
+    segmentedControlBarProps,
+  }: {
+    customElement: React.ReactNode
+    segmentedControlBarProps?: {
+      tabs: { value: string; label: string }[]
+      onTabChange: (tab: string) => void
+    }
+  }) => (
+    <div>
+      {customElement}
+      {segmentedControlBarProps && (
+        <div data-testid="segmentedControlBar">
+          {segmentedControlBarProps.tabs.map(tab => (
+            <button
+              key={tab.value}
+              data-testid={`tab-${tab.value}`}
+              onClick={() => segmentedControlBarProps.onTabChange(tab.value)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  ),
 }))
 
 vi.mock('@/components/page-background/PageBackground', () => ({
@@ -132,6 +182,8 @@ const datasource = {
 
 const defaultProps = {
   datasource,
+  datastructure: null,
+  datastructureVersion: null,
   initialAssignments: [],
   groups: [],
   roles: [],
@@ -186,7 +238,6 @@ describe('DatasourceOverview', () => {
       fireEvent.click(screen.getByTestId('cancelButton'))
 
       expect(screen.getByTestId('editButton')).toBeInTheDocument()
-      expect(mockForm.reset).toHaveBeenCalled()
       expect(mockReplace).toHaveBeenCalledWith('/datasources/test-id', { scroll: false })
     })
 
@@ -200,7 +251,7 @@ describe('DatasourceOverview', () => {
       expect(screen.getByTestId('exitWarningModal')).toBeInTheDocument()
     })
 
-    it('discards changes and returns to view mode via modal', () => {
+    it('discards changes and returns to view mode via modal', async () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       mockForm.formState.isDirty = true
       render(<DatasourceOverview {...defaultProps} />)
@@ -208,9 +259,10 @@ describe('DatasourceOverview', () => {
       fireEvent.click(screen.getByTestId('cancelButton'))
       fireEvent.click(screen.getByTestId('discardButton'))
 
-      expect(screen.getByTestId('editButton')).toBeInTheDocument()
-      expect(mockForm.reset).toHaveBeenCalled()
-      expect(mockReplace).toHaveBeenCalledWith('/datasources/test-id', { scroll: false })
+      await waitFor(() => {
+        expect(screen.getByTestId('editButton')).toBeInTheDocument()
+        expect(mockReplace).toHaveBeenCalledWith('/datasources/test-id', { scroll: false })
+      })
     })
 
     it('saves and returns to view mode via modal', async () => {
@@ -226,6 +278,46 @@ describe('DatasourceOverview', () => {
         expect(mockSubmitDatasource).toHaveBeenCalled()
         expect(mockReplace).toHaveBeenCalledWith('/datasources/test-id', { scroll: false })
       })
+    })
+  })
+
+  describe('Tab switching', () => {
+    it('shows basicInfo tab by default', () => {
+      render(<DatasourceOverview {...defaultProps} />)
+      expect(screen.getByTestId('basicInfoTab')).toBeInTheDocument()
+      expect(screen.queryByTestId('datastructureTab')).not.toBeInTheDocument()
+    })
+
+    it('switches to dataStructure tab when clicked', () => {
+      render(<DatasourceOverview {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('tab-dataStructure'))
+
+      expect(screen.getByTestId('datastructureTab')).toBeInTheDocument()
+      expect(screen.queryByTestId('basicInfoTab')).not.toBeInTheDocument()
+    })
+
+    it('switches to connector tab when clicked', () => {
+      render(<DatasourceOverview {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('tab-connector'))
+
+      expect(screen.getByTestId('connectorTab')).toBeInTheDocument()
+      expect(screen.queryByTestId('basicInfoTab')).not.toBeInTheDocument()
+    })
+
+    it('switches to accessManagement tab when clicked', () => {
+      render(<DatasourceOverview {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('tab-accessManagement'))
+
+      expect(screen.getByTestId('accessManagementTab')).toBeInTheDocument()
+      expect(screen.queryByTestId('basicInfoTab')).not.toBeInTheDocument()
+    })
+
+    it('passes isReadOnly to dataStructure tab', () => {
+      mockSearchParams = new URLSearchParams('mode=edit')
+      render(<DatasourceOverview {...defaultProps} />)
+      fireEvent.click(screen.getByTestId('tab-dataStructure'))
+
+      expect(screen.getByTestId('datastructureTab')).toHaveAttribute('data-readonly', 'false')
     })
   })
 
