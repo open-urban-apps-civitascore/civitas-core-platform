@@ -1,5 +1,5 @@
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
-import { Assignment, AssignmentScopedInput } from '@/types/assignments'
+import { Assignment, ASSIGNMENT_SCOPE_TYPES, AssignmentScopedInput } from '@/types/assignments'
 import { Group } from '@/types/groups'
 
 export const mapAssignmentApiResponseToTable = (
@@ -74,3 +74,6 @@ export const hasAssignmentChanges = (
   const initialSet = toAssignmentSet(initial)
   return currentSet.size !== initialSet.size || [...currentSet].some(item => !initialSet.has(item))
 }
+
+export const isPlatformwideAssignment = (assignment: Assignment) =>
+  assignment.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT || assignment.scopeType === null

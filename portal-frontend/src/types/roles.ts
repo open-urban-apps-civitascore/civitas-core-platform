@@ -38,7 +38,7 @@ export type UserSummary = {
 export type BaseRole = {
   id: string
   name: string
-  description?: string
+  description: string | null
   roleType: RoleType
 }
 

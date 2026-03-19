@@ -68,7 +68,8 @@
       "datasource": "Datenquelle",
       "datastructures": "Datenstrukturen",
       "datastructure": "Datenstruktur",
-      "datastructureVersion": "Version"
+      "datastructureVersion": "Version",
+      "assignments": "Zuweisungen"
     },
     "messages": {
       "updateSuccess": "{item} wurde erfolgreich aktualisiert",
@@ -652,6 +653,9 @@
           "description": "Beschreibung"
         }
       }
+    },
+    "errors": {
+      "createError":"Beim Anlegen der Rolle ist ein Fehler aufgetreten"
     }
   },
   "datasources": {
