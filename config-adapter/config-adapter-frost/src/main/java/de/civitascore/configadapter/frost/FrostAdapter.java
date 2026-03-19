@@ -48,7 +48,9 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>Network errors (ProcessingException) → RetryableAdapterException (NETWORK_ERROR)
  *   <li>HTTP 5xx errors → RetryableAdapterException (SERVICE_UNAVAILABLE)
- *   <li>HTTP 4xx errors → FatalAdapterException (FROST_ENTITY_ERROR)
+ *   <li>HTTP 409 on CREATE → success (idempotent: entity already exists)
+ *   <li>HTTP 404 on DELETE → success (idempotent: entity already deleted)
+ *   <li>Other HTTP 4xx errors → FatalAdapterException (FROST_ENTITY_ERROR)
  *   <li>Unknown exceptions → FatalAdapterException (FROST_ENTITY_ERROR)
  * </ul>
  */
@@ -249,6 +251,17 @@ public class FrostAdapter extends AbstractConfigAdapter {
       return;
     }
 
+    if (status == 409 && operation == AdapterOperation.FROST_ENTITY_CREATE) {
+      logger.info("FROST entity already exists (409), treating create as success (idempotent)");
+      return;
+    }
+
+    if (status == 404 && operation == AdapterOperation.FROST_ENTITY_DELETE) {
+      logger.info(
+          "FROST entity not found (404), treating delete as success (already deleted, idempotent)");
+      return;
+    }
+
     String body = response.readEntity(String.class);
 
     if (status >= 500) {
@@ -282,7 +295,7 @@ public class FrostAdapter extends AbstractConfigAdapter {
     try (Response response = requestOperation.execute()) {
       handleHttpResponse(response, operation);
 
-      if (operation == AdapterOperation.FROST_ENTITY_CREATE) {
+      if (operation == AdapterOperation.FROST_ENTITY_CREATE && response.getStatus() == 201) {
         String locationHeader = response.getHeaderString("Location");
         resourceId = FrostUtils.extractIdFromLocation(locationHeader);
       }
