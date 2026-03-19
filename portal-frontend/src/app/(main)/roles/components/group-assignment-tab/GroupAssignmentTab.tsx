@@ -148,8 +148,7 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
       <div className="flex flex-col gap-4 h-full">
         {!isSystemRole && (
           <div className="flex items-center justify-between gap-4">
-            (
-            <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />)
+            <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />
             {!isTenantScope && (
               <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
                 <TriangleAlert className="h-4 w-4 shrink-0" />
