@@ -53,7 +53,7 @@ export const GroupsTab = (props: GroupsTabProps) => {
   } = useGetGroups({ isEnabled: formValues.groupIds.length > 0, params: getGroupsRequestParams() })
 
   const groups = useMemo(() => {
-    if (groupsData && formValues.id) {
+    if (groupsData) {
       const userGroups = groupsData?.data.filter(group => formValues.groupIds?.includes(group.id))
       return mapGroupsApiToListData(userGroups)
     } else {
