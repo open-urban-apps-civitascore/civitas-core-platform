@@ -1,0 +1,6 @@
+# Build override: config-adapter only (built from source)
+services:
+  config-adapter:
+    build:
+      context: ../../config-adapter
+      dockerfile: Dockerfile

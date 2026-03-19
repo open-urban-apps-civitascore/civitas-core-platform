@@ -155,7 +155,7 @@ test-config-adapter:
       - .m2/repository
   script:
     - cd config-adapter
-    - mvn $MAVEN_CLI_OPTS jacoco:prepare-agent surefire:test jacoco:report -Drevision=$CONFIG_ADAPTER_VERSION -T 2
+    - mvn $MAVEN_CLI_OPTS test -Drevision=$CONFIG_ADAPTER_VERSION -T 2
     # Aggregate coverage from all modules
     - |
       awk -F, \
@@ -270,6 +270,8 @@ build-config-adapter-image:
     - job: publish-config-adapter
     - job: build-config-adapter
     - job: test-config-adapter
+    - job: api-test-backend
+      optional: true
   services:
     - name: docker:27-dind
       command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']

@@ -78,6 +78,10 @@ services:
     depends_on:
       postgres-keycloak:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - civitas-keycloak
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
       interval: 10s
@@ -203,6 +207,10 @@ services:
     depends_on:
       authz-repository:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - civitas-opa
     healthcheck:
       test: ["CMD", "/opa", "eval", "-f", "pretty", "true"]
       interval: 10s
@@ -239,6 +247,31 @@ services:
       retries: 10
       start_period: 30s
 
+  # ── Model Atlas ─────────────────────────────────────────
+
+  apicurio-registry:
+    image: apicurio/apicurio-registry:3.0.15
+    environment:
+      APICURIO_REST_DELETION_GROUP_ENABLED: "true"
+      APICURIO_REST_DELETION_ARTIFACT_ENABLED: "true"
+      APICURIO_REST_DELETION_ARTIFACT-VERSION_ENABLED: "true"
+      APICURIO_REST_MUTABILITY_ARTIFACT_VERSION_CONTENT_ENABLED: "true"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/apis/registry/v3/system/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  model-atlas:
+    image: eclipsefennec/model.atlas:snapshot
+    environment:
+      APICURIO_HOST: apicurio-registry
+      APICURIO_PORT: 8080
+    depends_on:
+      apicurio-registry:
+        condition: service_healthy
+
   # ── Data Pipelines ──────────────────────────────────────
 
   redpanda-connect:
@@ -252,6 +285,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  # ── Email (SMTP sink for Keycloak verification emails) ──
+
+  mailpit:
+    image: axllent/mailpit:v1.28
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:8025/api/v1/messages"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
   # ── Application ──────────────────────────────────────────
 
@@ -273,7 +317,9 @@ services:
       KEYCLOAK_TARGET_REALM: civitas-core
       APP_URL: http://portal-backend:8089
       SERVER_PORT: 8089
-      SPRING_PROFILES_ACTIVE: local,postgres,local-init
+      SPRING_PROFILES_ACTIVE: local,postgres,init
+      MODEL_ATLAS_BASE_URL: http://model-atlas:8080
+      SPRING_KAFKA_PRODUCER_PROPERTIES_COMPRESSION_TYPE: lz4
     depends_on:
       postgres-portal:
         condition: service_healthy
@@ -281,6 +327,8 @@ services:
         condition: service_healthy
       keycloak:
         condition: service_healthy
+      model-atlas:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8089/v1/actuator/health"]
       interval: 15s

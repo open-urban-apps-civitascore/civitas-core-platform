@@ -1,0 +1,33 @@
+meta {
+  name: 3e. Publish DataStructure
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/datastructures/:dataStructureId/publish
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataStructureId: {{sagaDataStructureId}}
+}
+
+tests {
+  test("Published or already published", function() {
+    const status = res.getStatus();
+    // 200=published, 400=not in DRAFT state (already published)
+    expect(status === 200 || status === 400).to.be.true;
+  });
+}
+
+docs {
+  **Saga step 3e of 18** — Prerequisites: DataStructure version published (step 3d).
+
+  Publishes the DataStructure itself, making it available for use in datasets. All versions must be published before the parent DataStructure can be published.
+
+  **Expected Response:** 200 OK. 400 if not in DRAFT state (already published — idempotent).
+
+  **Post-condition:** DataStructure status transitions from `DRAFT` to `PUBLISHED`.
+}
