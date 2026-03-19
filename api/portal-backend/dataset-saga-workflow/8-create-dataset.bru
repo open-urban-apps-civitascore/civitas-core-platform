@@ -23,3 +23,21 @@ script:post-response {
     bru.setVar('sagaDataSetId', res.body.id);
   }
 }
+
+docs {
+  ## Assembly – Create DataSet
+
+  Creates the dataset that will be published and released.
+
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id`
+
+  **Post-condition:** Saves `sagaDataSetId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSet record created in `portal_backend` DB with status `DRAFT` |
+}

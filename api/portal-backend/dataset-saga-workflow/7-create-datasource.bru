@@ -36,3 +36,23 @@ script:post-response {
     bru.setVar('sagaDataSourceId', res.body.id);
   }
 }
+
+docs {
+  ## Setup – Create DataSource (MQTT)
+
+  **Precondition:** `sagaDataStructureVersionId` is set (from step 4).
+
+  Creates an MQTT data source linked to the published data structure version.
+
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id`
+
+  **Post-condition:** Saves `sagaDataSourceId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataSource record created in `portal_backend` DB with status `DRAFT` |
+}

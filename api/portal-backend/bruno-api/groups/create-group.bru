@@ -37,3 +37,17 @@ tests {
     expect(res.body.name).to.be.a('string');
   });
 }
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`.
+
+  **Post-condition:** Save `groupId` from `body.id`.
+
+  **System Impact:**
+
+  | Component | Effect |
+  |---|---|
+  | **Backend** | Group record created in `portal_backend` DB |
+  | **Config Adapter** | Consumes `de.civitascore.idm.group.created` Kafka event; forwards group creation to Keycloak |
+  | **Keycloak** | New group created in `civitas-core` realm |
+}

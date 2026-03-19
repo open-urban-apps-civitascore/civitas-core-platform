@@ -13,3 +13,22 @@ post {
 params:path {
   dataStructureId: {{sagaDataStructureId}}
 }
+
+docs {
+  ## Setup – Publish DataStructure
+
+  **Precondition:** `sagaDataStructureId` is set (from step 3); version is already published (step 5).
+
+  Publishes the data structure so the DataSource can reference it.
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body reflects the data structure in published state
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataStructure status updated to published in `portal_backend` DB |
+  | Model Atlas / Apicurio Registry | DataStructure schema becomes available in Model Atlas |
+}

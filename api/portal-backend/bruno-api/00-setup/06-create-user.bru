@@ -37,3 +37,17 @@ tests {
     expect(status === 201 || status === 409).to.be.true;
   });
 }
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`. 409 if the user already existed (idempotent setup).
+
+  **Post-condition:** Save `userId` and `setupUserId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | User record created in `portal_backend` DB |
+  | Config Adapter | Produces `de.civitascore.idm.user.created` Kafka event; forwards creation to Keycloak |
+  | Keycloak | User account created in `civitas-core` realm |
+}

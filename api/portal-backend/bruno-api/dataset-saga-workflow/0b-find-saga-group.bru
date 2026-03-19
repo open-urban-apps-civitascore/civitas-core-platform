@@ -25,3 +25,11 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 }
+
+docs {
+  **Purpose:** Idempotency guard — checks whether the "Saga Test Group" from a previous saga run already exists. If found, `sagaGroupId` is populated so step 2 can be skipped and step 18 targets the correct record for cleanup.
+
+  **Expected Response:** 200 OK, body is a paginated list (may be empty on a fresh run).
+
+  **Post-condition:** If a match is found, saves `sagaGroupId` from `body.content[].id`.
+}

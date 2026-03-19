@@ -484,13 +484,47 @@
     }
   },
   "permissions": {
-    "title": "Berechtigungen",
-    "systemPermissions": "Systemberechtigungen",
-    "dataPermissions": "Datenberechtigungen",
+    "title": "Übersicht: {permissionType}",
+    "infoBox": "Die Berechtigungen sind vordefiniert und hier nicht bearbeitbar.",
+    "systemPermissions": {
+      "title": "Systemberechtigungen",
+      "description": "Systemberechtigungen steuern den Zugriff auf systemweite Funktionen der Plattform.\nSie werden zu Systemrollen zusammengefasst und Gruppen zugeordnet.",
+      "categories": {
+        "TENANT_ADMINISTRATION": "Mandanten-Management",
+        "DATA": "Unsere Daten",
+        "OTHER": "Sonstiges"
+      },
+      "entry": "{permission} {action}"
+    },
+    "dataPermissions": {
+      "title": "Datenberechtigungen",
+      "description": "Datenberechtigungen steuern den Zugriff auf Datenobjekte der Plattform.\nSie werden zu Datenrollen zusammengefasst und Gruppen innerhalb eines bestimmten Geltungsbereichs zugeordnet."
+    },
+    "actions": {
+      "read": "Lesen",
+      "create": "Erstellen",
+      "update": "Aktualisieren",
+      "delete": "Löschen",
+      "release": "Freigeben"
+    },
     "tableHeaders": {
-      "title": "Name",
-      "category": "Kategorie"
-    }
+      "name": "Objekt"
+    },
+    "accessible": {
+      "granted": "Gewährt",
+      "notGranted": "Nicht gewährt"
+    },
+    "values": {
+        "ASSIGNMENT": "Zuweisung",
+        "DATASET": "Datensatz",
+        "DATASET_PAYLOAD": "Datensatz-Payload",
+        "DATASOURCE": "Datenquelle",
+        "DATASTRUCTURE": "Datenstruktur",
+        "GROUP": "Gruppe",
+        "PERMISSION": "Berechtigung",
+        "ROLE": "Rolle",
+        "USER": "Benutzer"
+      }
   },
   "roles": {
     "title": "Rollen",

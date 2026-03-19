@@ -491,13 +491,47 @@
     }
   },
   "permissions": {
-    "title": "Permissions",
-    "systemPermissions": "System Permissions",
-    "dataPermissions": "Daten Permissions",
+    "title": "Overview: {permissionType}",
+    "infoBox": "Permissions are predefined and cannot be edited here.",
+    "systemPermissions": {
+      "title": "System Permissions",
+      "description": "System permissions control access to system-wide functions on the platform.\nThey are grouped into system roles and assigned to groups.",
+      "categories": {
+        "TENANT_ADMINISTRATION": "Tenant Administration",
+        "DATA": "Data Management",
+        "OTHER": "Other"
+      },
+      "entry": "{action} {permission}"
+    },
+    "dataPermissions": {
+      "title": "Data Permissions",
+      "description": "Data permissions control access to data objects on the platform.\nThey are grouped into data roles and assigned to groups within a specific scope."
+    },
+    "actions": {
+      "read": "Read",
+      "create": "Create",
+      "update": "Update",
+      "delete": "Delete",
+      "release": "Release"
+    },
     "tableHeaders": {
-      "title": "Name",
-      "category": "Category"
-    }
+      "name": "Object"
+    },
+    "accessible": {
+      "granted": "Granted",
+      "notGranted": "Not granted"
+    },
+    "values": {
+        "ASSIGNMENT": "Assignment",
+        "DATASET": "Dataset",
+        "DATASET_PAYLOAD": "Dataset Payload",
+        "DATASOURCE": "Datasource",
+        "DATASTRUCTURE": "Datastructure",
+        "GROUP": "Group",
+        "PERMISSION": "Permission",
+        "ROLE": "Role",
+        "USER": "User"
+      }
   },
   "roles": {
     "title": "Roles",

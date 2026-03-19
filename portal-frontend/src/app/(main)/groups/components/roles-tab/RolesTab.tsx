@@ -1,7 +1,7 @@
 'use client'
 
 import { createColumnHelper, getCoreRowModel, getSortedRowModel, Row, useReactTable } from '@tanstack/react-table'
-import { Plus, TriangleAlert } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { UseFormReturn } from 'react-hook-form'
@@ -14,6 +14,7 @@ import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { TableContainer } from '@/components/table-container/TableContainer'
+import { AlertBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Assignment } from '@/types/assignments'
@@ -302,12 +303,7 @@ export const RolesTab = (props: RolesTabProps) => {
           ))}
         </div>
 
-        {infoBannerText && (
-          <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
-            <TriangleAlert className="h-4 w-4 shrink-0" />
-            <span>{infoBannerText}</span>
-          </div>
-        )}
+        {infoBannerText && <AlertBox text={infoBannerText} />}
       </div>
 
       {isEmpty ? (

@@ -38,3 +38,17 @@ tests {
     expect(res.getStatus()).to.equal(200);
   });
 }
+
+docs {
+  **Precondition:** `dataSetId` and `pipelineId` are set.
+
+  **Expected Response:** 200 OK, body reflects updated values.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Pipeline record updated in `portal_backend` DB |
+  | Config Adapter | -- |
+  | External System | -- (FROST reflects pipeline changes only after the DataSet is re-released) |
+}

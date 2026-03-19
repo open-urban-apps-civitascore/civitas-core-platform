@@ -18,6 +18,10 @@ params:query {
 docs {
   Note: This endpoint returns 403 via APISIX gateway (OPA policy missing for /v1/authorities).
   Use the local-direct environment (port 8089) to test this endpoint.
+
+  **Expected Response**
+  - Status: `200 OK`
+  - Body contains a list of authorities
 }
 
 tests {

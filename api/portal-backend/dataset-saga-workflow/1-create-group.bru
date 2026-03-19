@@ -26,3 +26,22 @@ script:post-response {
   }
 }
 
+docs {
+  ## Setup – Create Group
+
+  Creates a group to be used for the scoped assignment later in the workflow.
+
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id`
+
+  **Post-condition:** Saves `sagaGroupId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Group record created in `portal_backend` DB |
+  | Config Adapter | Consumes `de.civitascore.idm.group.created` Kafka event; forwards group creation to Keycloak |
+  | Keycloak | New group created in `civitas-core` realm |
+}

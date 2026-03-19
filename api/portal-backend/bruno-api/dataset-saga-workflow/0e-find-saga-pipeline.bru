@@ -30,3 +30,11 @@ tests {
     expect(status === 200 || status === 400 || status === 404).to.be.true;
   });
 }
+
+docs {
+  **Purpose:** Idempotency guard — checks whether the "Saga Test Pipeline" for the existing dataset already exists. If found, `sagaPipelineId` is populated so step 5 can be skipped and step 15 targets the correct record for cleanup.
+
+  **Expected Response:** 200 OK with paginated list, or 400/404 if the dataset does not exist yet (first run).
+
+  **Post-condition:** If a match is found, saves `sagaPipelineId` from `body.content[].id`.
+}

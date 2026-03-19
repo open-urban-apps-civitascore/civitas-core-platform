@@ -26,3 +26,19 @@ tests {
     expect(res.getStatus()).to.equal(204);
   });
 }
+
+docs {
+  **Precondition:** `groupId` is set.
+
+  **Expected Response:** 204 No Content.
+
+  **Verification:** Issue TC-GROUP-02 for same `groupId` and confirm 404.
+
+  **System Impact:**
+
+  | Component | Effect |
+  |---|---|
+  | **Backend** | Group record removed |
+  | **Config Adapter** | Consumes `de.civitascore.idm.group.deleted` Kafka event; forwards deletion to Keycloak |
+  | **Keycloak** | Group removed from `civitas-core` realm |
+}

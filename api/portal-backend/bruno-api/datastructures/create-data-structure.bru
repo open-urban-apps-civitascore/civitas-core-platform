@@ -42,3 +42,17 @@ tests {
     expect(res.body.dataStructureStatus).to.be.a('string');
   });
 }
+
+docs {
+  **Expected Response:** 201 Created, body contains `id`.
+
+  **Post-condition:** Save `dataStructureId` from `body.id`.
+
+  **System Impact:**
+
+  | Layer | Impact | Status |
+  |---|---|---|
+  | Backend | DataStructure record created in `portal_backend` DB | --- |
+  | Config Adapter | --- | --- |
+  | External System | --- | --- |
+}

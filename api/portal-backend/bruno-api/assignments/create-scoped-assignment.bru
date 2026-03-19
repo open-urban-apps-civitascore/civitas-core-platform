@@ -42,3 +42,21 @@ tests {
     }
   });
 }
+
+docs {
+  **Precondition:** `groupId`, `roleId`, `scopeType`, and `scopeId` are set. The role must be of type `DATA` to allow scoped assignments.
+
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id` and `scopeType`
+
+  **Post-condition:** Save `assignmentId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Assignment record created in `portal_backend` DB linking the group to the role within the given scope |
+  | Config Adapter | AuthZ Repository is notified to refresh its authorization data cache |
+  | AuthZ Repository (OPA) | Scoped role-group binding becomes visible in OPA policy data; verify at `http://localhost:8181/v1/data` |
+}

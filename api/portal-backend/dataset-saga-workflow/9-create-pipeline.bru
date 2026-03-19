@@ -47,3 +47,24 @@ script:post-response {
     bru.setVar('sagaPipelineId', res.body.id);
   }
 }
+
+docs {
+  ## Assembly – Create Pipeline
+
+  **Precondition:** `sagaDataSetId` and `sagaDataSourceId` are set (from steps 7–8).
+
+  Creates a pipeline that links the MQTT data source to the FROST Server output.
+  The pipeline model defines the data flow: MQTT input → HTTP output (FROST SensorThings API).
+
+  **Expected Response**
+  - Status: `201 Created`
+  - Body contains `id`
+
+  **Post-condition:** Saves `sagaPipelineId` from `body.id`.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Pipeline record created in `portal_backend` DB, linked to the DataSet |
+}

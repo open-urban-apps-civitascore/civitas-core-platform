@@ -1,7 +1,7 @@
 'use client'
 
 import { PaginationState, Row, RowSelectionState, SortingState } from '@tanstack/react-table'
-import { Info, Plus, TriangleAlert } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -11,6 +11,7 @@ import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
 import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
+import { AlertBox, InfoBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
 import { type Assignment, ASSIGNMENT_SCOPE_TYPES, type AssignmentScope } from '@/types/assignments'
 import { Group } from '@/types/groups'
@@ -149,18 +150,8 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
         {!isSystemRole && (
           <div className="flex items-center justify-between gap-4">
             <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />
-            {!isTenantScope && (
-              <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
-                <TriangleAlert className="h-4 w-4 shrink-0" />
-                <span>{t(`scopeReadOnlyMessage${selectedScope}`)}</span>
-              </div>
-            )}
-            {isTenantScope && (
-              <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
-                <Info className="h-4 w-4 shrink-0" />
-                <span>{t('infoBox')}</span>
-              </div>
-            )}
+            {!isTenantScope && <AlertBox text={t(`scopeReadOnlyMessage${selectedScope}`)} />}
+            {isTenantScope && <InfoBox text={t('infoBox')} />}
           </div>
         )}
 
@@ -193,19 +184,8 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
       {!isSystemRole && (
         <div className="flex items-center justify-between gap-4">
           <SegmentedControlBar tabs={SCOPE_TABS} selectedTab={selectedScope} onTabChange={setSelectedScope} />
-
-          {!isTenantScope && (
-            <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
-              <TriangleAlert className="h-4 w-4 shrink-0" />
-              <span>{t(`scopeReadOnlyMessage${selectedScope}`)}</span>
-            </div>
-          )}
-          {isTenantScope && (
-            <div className="flex items-center gap-2 bg-background border border-border rounded-lg px-4 py-2 text-sm font-medium">
-              <Info className="h-4 w-4 shrink-0" />
-              <span>{t('infoBox')}</span>
-            </div>
-          )}
+          {!isTenantScope && <AlertBox text={t(`scopeReadOnlyMessage${selectedScope}`)} />}
+          {isTenantScope && <InfoBox text={t('infoBox')} />}
         </div>
       )}
 

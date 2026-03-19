@@ -204,18 +204,22 @@ public class DataSetService extends BaseDataEntityService<DataSet, DataSetInputD
       throw new InvalidInputException("description", id, "DataSet description must not be blank");
     }
 
-    // Validate that dataset has at least one pipeline with data sources
+    // Validate that dataset has at least one pipeline
     if (dataSet.getPipelines() == null || dataSet.getPipelines().isEmpty()) {
       throw new InvalidInputException(
           "pipelines", id, "DataSet must contain at least one Pipeline before publishing");
     }
 
-    boolean hasDataSource =
+    // Each pipeline must have either datasources (feed-in) or APIs (provide)
+    boolean hasDataSourceOrApi =
         dataSet.getPipelines().stream()
-            .anyMatch(p -> p.getDataSources() != null && !p.getDataSources().isEmpty());
-    if (!hasDataSource) {
+            .anyMatch(
+                p ->
+                    (p.getDataSources() != null && !p.getDataSources().isEmpty())
+                        || (p.getApis() != null && !p.getApis().isEmpty()));
+    if (!hasDataSourceOrApi) {
       throw new InvalidInputException(
-          "dataSources", id, "DataSet must have at least one DataSource across its pipelines");
+          "pipelines", id, "DataSet must have at least one Pipeline with DataSources or APIs");
     }
 
     // Generate distributions from pipeline APIs

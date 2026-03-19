@@ -17,3 +17,15 @@ tests {
     expect(status === 204 || status === 404 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Expected Response:** 204 No Content.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Group record removed from `portal_backend` DB |
+  | Config Adapter | Produces `de.civitascore.idm.group.deleted` Kafka event; forwards deletion to Keycloak |
+  | Keycloak | Group removed from `civitas-core` realm |
+}

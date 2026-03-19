@@ -13,3 +13,21 @@ delete {
 params:path {
   id: {{sagaDataStructureId}}
 }
+
+docs {
+  ## Cleanup – Delete DataStructure
+
+  **Precondition:** `sagaDataStructureId` is set.
+
+  Deleting the data structure also cascades to its versions.
+
+  **Expected Response**
+  - Status: `204 No Content`
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | DataStructure and associated versions removed from `portal_backend` DB |
+  | Model Atlas / Apicurio Registry | Schema artifacts removed from registry |
+}

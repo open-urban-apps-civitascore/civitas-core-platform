@@ -21,3 +21,17 @@ tests {
     expect(status === 200 || status === 400).to.be.true;
   });
 }
+
+docs {
+  **Precondition:** `dataSourceId` is set and source is in `DRAFT` state.
+
+  **Expected Response:** 200 OK, body reflects data source in published state.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | DataSource status updated to published |
+  | Config Adapter | Consumes `de.civitascore.api.backend.created` Kafka event; registers the backend with APISIX |
+  | APISIX | New upstream/route registered (verify at `http://localhost:9180`) |
+}

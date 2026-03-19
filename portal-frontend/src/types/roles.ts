@@ -15,6 +15,15 @@ export const RoleTypeEnum = enumFromConst(ROLE_TYPES)
 
 export type RoleType = (typeof ROLE_TYPES)[keyof typeof ROLE_TYPES]
 
+export const ROLE_CATEGORIES = {
+  TENANTADMINISTRATION: 'TENANT_ADMINISTRATION',
+  DATA: 'DATA',
+} as const
+
+export const RoleCategoryEnum = enumFromConst(ROLE_CATEGORIES)
+
+export type RoleCategory = (typeof ROLE_CATEGORIES)[keyof typeof ROLE_CATEGORIES]
+
 export type PermissionSummary = {
   id: string
   name: string

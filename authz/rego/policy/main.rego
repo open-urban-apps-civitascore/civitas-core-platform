@@ -53,13 +53,14 @@ allow if {
 # resolution. The "priority" numbering below is for human readability only.
 #
 # Mutual exclusivity is guaranteed by these conditions:
-#   - Rules 1,2 require is_null_permission_endpoint; rules 3,4,5 require NOT
+#   - Rules 1,2 require is_null_permission_endpoint; rules 3-6 require NOT
 #   - Rules 1 vs 2: is_authenticated vs not is_authenticated
-#   - Rules 4 vs 5: has_permission vs not has_permission
-#   - Rules 3 vs 4,5: not has_user_context vs has_user_context
-#   - Rule 6: backend == "unknown" (rules 3,7 require backend != "unknown";
-#     rules 1,2,4,5 require is_known_endpoint which is false when backend is unknown)
-#   - Rule 7: not is_known_endpoint (rules 1-5 require is_known_endpoint or
+#   - Rules 4 vs 5: not is_unscoped_only vs is_unscoped_only
+#   - Rules 4,5 vs 6: has_permission vs not has_permission
+#   - Rules 3 vs 4,5,6: not has_user_context vs has_user_context
+#   - Rule 7: backend == "unknown" (rules 3,8 require backend != "unknown";
+#     rules 1,2,4,5,6 require is_known_endpoint which is false when backend is unknown)
+#   - Rule 8: not is_known_endpoint (rules 1-6 require is_known_endpoint or
 #     is_null_permission_endpoint, which implies is_known_endpoint)
 #
 # If adding new rules or providers, verify mutual exclusivity is preserved.
@@ -89,13 +90,14 @@ evaluate_request := {"allow": false, "reason": "missing_user_context"} if {
 	not has_user_context
 }
 
-# 4. Permission-based access (regular protected endpoints)
-# Include scope header for collection filtering (M5.5)
+# 4. Scoped access granted (TENANT or specific scopes)
+# Includes scope header for backend collection filtering (M5.5)
 evaluate_request := result if {
 	permission_eval.is_known_endpoint
 	not permission_eval.is_null_permission_endpoint
 	has_user_context
 	permission_eval.has_permission
+	not is_unscoped_only
 	result := {
 		"allow": true,
 		"reason": "permission_granted",
@@ -104,7 +106,22 @@ evaluate_request := result if {
 	}
 }
 
-# 5. Permission denied (user lacks required permission)
+# 5. Unscoped access granted (assignments with scopeType=null)
+# Unscoped assignments have no scope to filter on, so no header is needed.
+evaluate_request := result if {
+	permission_eval.is_known_endpoint
+	not permission_eval.is_null_permission_endpoint
+	has_user_context
+	permission_eval.has_permission
+	is_unscoped_only
+	result := {
+		"allow": true,
+		"reason": "permission_granted",
+		"required_permissions": permission_eval.required_permissions,
+	}
+}
+
+# 6. Permission denied (user lacks required permission)
 # Is a separate case for more specific error message
 evaluate_request := {"allow": false, "reason": "permission_denied", "required_permissions": permission_eval.required_permissions} if {
 	permission_eval.is_known_endpoint
@@ -113,12 +130,12 @@ evaluate_request := {"allow": false, "reason": "permission_denied", "required_pe
 	not permission_eval.has_permission
 }
 
-# 6. Unknown backend (no APISIX service metadata or unknown service name)
+# 7. Unknown backend (no APISIX service metadata or unknown service name)
 evaluate_request := {"allow": false, "reason": "unknown_backend"} if {
 	resource_mapping.backend == "unknown"
 }
 
-# 7. Unknown endpoint (path not in backend's mappings) - fail secure
+# 8. Unknown endpoint (path not in backend's mappings) - fail secure
 evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
 	resource_mapping.backend != "unknown"
 	not permission_eval.is_known_endpoint
@@ -133,7 +150,7 @@ evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
 # Header values:
 #   - "*"              : User has TENANT scope for all required permissions (collection-level wildcard)
 #   - "id1,id2,..."    : Comma-separated UUIDs for specific scope access
-#   - ""               : No scopes (backend returns empty results)
+#   - (no header)      : Unscoped access (scopeType=null) — rule 5 omits the header entirely
 #
 # Note: For resource endpoints, backend uses existing scope enforcement (M5.1).
 # This header enables efficient filtering for collection queries.
@@ -149,16 +166,24 @@ evaluate_request := {"allow": false, "reason": "unknown_endpoint"} if {
 has_tenant_scope if {
 	count(permission_eval.required_permissions) > 0
 	every perm in permission_eval.required_permissions {
-		tenant_has_permission(perm)
+		has_tenant_scoped_permission(perm)
 	}
 }
 
 # Helper: check if a single permission exists with TENANT scope
-tenant_has_permission(perm) if {
+has_tenant_scoped_permission(perm) if {
 	some group in user_context_fetcher.user_context.groups
 	some assignment in group.assignments
 	perm in assignment.permissions
-	assignment.scopeType == "TENANT"
+	permission_eval.is_tenant_scoped(assignment)
+}
+
+# User has permission but no scoped assignments — no scope header needed.
+# If has_permission is true (required by rule 5) and there's no tenant scope
+# and no specific scope IDs, the permission must come from an unscoped assignment.
+is_unscoped_only if {
+	not has_tenant_scope
+	count(specific_scope_ids) == 0
 }
 
 # Collect specific scope IDs where user has ALL required permissions (AND semantics)
