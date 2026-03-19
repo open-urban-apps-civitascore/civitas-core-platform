@@ -46,9 +46,20 @@ export const diagramReducer = (state: UMLDiagram, action: DiagramAction): UMLDia
 
     case 'NODE_CHANGES': {
       const areNodeChangesDirty = hasSemanticNodeChanges(action.payload)
+      const updatedNodes = applyNodeChanges(action.payload, state.nodes) as UMLNode[]
+
+      // Clean up orphaned edges when nodes are removed
+      const hasRemovals = action.payload.some(change => change.type === 'remove')
+      let updatedEdges = state.edges
+      if (hasRemovals) {
+        const nodeIds = new Set(updatedNodes.map(node => node.id))
+        updatedEdges = state.edges.filter(edge => nodeIds.has(edge.source) && nodeIds.has(edge.target))
+      }
+
       return {
         ...state,
-        nodes: applyNodeChanges(action.payload, state.nodes) as UMLNode[],
+        nodes: updatedNodes,
+        edges: updatedEdges,
         lastModified: areNodeChangesDirty ? new Date() : state.lastModified,
         isDirty: areNodeChangesDirty ? true : state.isDirty,
       }
