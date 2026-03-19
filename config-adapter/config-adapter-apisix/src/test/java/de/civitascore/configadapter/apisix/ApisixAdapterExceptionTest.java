@@ -14,7 +14,9 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -26,6 +28,7 @@ import de.civitascore.configadapter.messaging.EventPublisher;
 import de.civitascore.configadapter.model.AdapterErrorCode;
 import de.civitascore.configadapter.model.Config;
 import de.civitascore.configadapter.model.ConfigEvent;
+import de.civitascore.configadapter.model.ConfigResultEvent;
 import de.civitascore.configadapter.model.ConfigValue;
 import de.civitascore.configadapter.model.Metadata;
 import de.civitascore.configadapter.model.Operation;
@@ -44,6 +47,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Unit tests for ApisixAdapter exception handling. Tests verify correct exception types and error
@@ -243,21 +247,58 @@ class ApisixAdapterExceptionTest {
     }
 
     @Test
-    @DisplayName("shouldThrowFatalOn409ConflictResponse")
-    void shouldThrowFatalOn409ConflictResponse() {
+    @DisplayName("createUpstreamWithConflictReturnsSuccess")
+    void createUpstreamWithConflictReturnsSuccess()
+        throws FatalAdapterException, RetryableAdapterException {
       when(mockResponse.getStatus()).thenReturn(409);
-      when(mockResponse.readEntity(String.class)).thenReturn("Resource already exists");
       when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
 
+      EventPublisher publisher = mock(EventPublisher.class);
+      adapter.setEventPublisher(publisher);
       ConfigEvent event =
           createConfigEvent(Operation.CREATE, "upstreams", Map.of("type", "roundrobin"));
 
-      FatalAdapterException exception =
-          assertThrows(
-              FatalAdapterException.class, () -> adapter.processConfigEvent("test-topic", event));
+      adapter.processConfigEvent("test-topic", event);
 
-      assertEquals(AdapterErrorCode.APISIX_UPSTREAM_ERROR, exception.getErrorCode());
-      assertTrue(exception.getMessage().contains("HTTP 409"));
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(publisher).publish(eq("test-result-topic"), captor.capture());
+      assertEquals(ConfigResultEvent.Status.SUCCESS, captor.getValue().status());
+    }
+
+    @Test
+    @DisplayName("deleteUpstreamNotFoundReturnsSuccess")
+    void deleteUpstreamNotFoundReturnsSuccess()
+        throws FatalAdapterException, RetryableAdapterException {
+      when(mockResponse.getStatus()).thenReturn(404);
+      when(mockBuilder.delete()).thenReturn(mockResponse);
+
+      EventPublisher publisher = mock(EventPublisher.class);
+      adapter.setEventPublisher(publisher);
+      ConfigEvent event = createConfigEvent(Operation.DELETE, "upstreams/gone-id", null);
+
+      adapter.processConfigEvent("test-topic", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(publisher).publish(eq("test-result-topic"), captor.capture());
+      assertEquals(ConfigResultEvent.Status.SUCCESS, captor.getValue().status());
+    }
+
+    @Test
+    @DisplayName("deleteRouteNotFoundReturnsSuccess")
+    void deleteRouteNotFoundReturnsSuccess()
+        throws FatalAdapterException, RetryableAdapterException {
+      when(mockResponse.getStatus()).thenReturn(404);
+      when(mockBuilder.delete()).thenReturn(mockResponse);
+
+      EventPublisher publisher = mock(EventPublisher.class);
+      adapter.setEventPublisher(publisher);
+      ConfigEvent event = createConfigEvent(Operation.DELETE, "routes/gone-id", null);
+
+      adapter.processConfigEvent("test-topic", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(publisher).publish(eq("test-result-topic"), captor.capture());
+      assertEquals(ConfigResultEvent.Status.SUCCESS, captor.getValue().status());
     }
   }
 
