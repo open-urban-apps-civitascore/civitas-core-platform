@@ -63,7 +63,7 @@ export const UsersListContent = ({
     const params = new URLSearchParams(window.location.search)
 
     params.set('page', String(newState.pageIndex))
-    params.set('pageSize', String(newState.pageSize))
+    params.set('size', String(newState.pageSize))
 
     router.push(`?${params.toString()}`)
   }
