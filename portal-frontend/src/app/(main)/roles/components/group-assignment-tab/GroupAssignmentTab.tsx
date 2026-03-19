@@ -55,12 +55,14 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const [selectedScope, setSelectedScope] = useState<AssignmentScope>(ASSIGNMENT_SCOPE_TYPES.TENANT)
   const [groupToRemove, setGroupToRemove] = useState<GroupTableRow | null>(null)
 
-  console.log('is system role', isSystemRole)
   useEffect(() => {
     setGroupSelection(getGroupSelection(selectedGroupIds))
   }, [selectedGroupIds])
 
-  const { data: groupsData, isFetching } = useGetGroups()
+  const groupRequestIds = selectedGroupIds.join(',')
+  const requestParams = new URLSearchParams(`size=${pageSize}&page=${pageIndex}&id=${groupRequestIds}`)
+
+  const { data: groupsData, isFetching } = useGetGroups({ params: requestParams })
 
   // Build a map from group ID to scopeType from assignments
   const groupScopeMap = useMemo(() => {

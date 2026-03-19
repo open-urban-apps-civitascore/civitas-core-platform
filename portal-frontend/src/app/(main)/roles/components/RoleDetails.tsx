@@ -31,8 +31,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useQueryParams } from '@/hooks/use-query-params'
-import { Assignment, ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { FormRole, Role, ROLE_TYPES, roleSchema, RoleTab } from '@/types/roles'
+import { isPlatformwideAssignment } from '@/utils/assignments'
 
 import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
@@ -93,9 +94,6 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const isGroupTab = subTabValue === subTabValues.groupAssignment.value
 
-  const isPlatformwideAssignment = (assignment: Assignment) =>
-    assignment.scopeType === ASSIGNMENT_SCOPE_TYPES.TENANT || assignment.scopeType === null
-
   const {
     data: roleData,
     isFetching: isLoadingRole,
@@ -118,14 +116,14 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     [assignmentsData?.data],
   )
 
-  const initallyAssignedGroupsIds = useMemo(
+  const initiallyAssignedGroupsIds = useMemo(
     () => initialPlatformAssignments.map(assignment => assignment.group.id),
     [initialPlatformAssignments],
   )
 
   useEffect(() => {
-    setSelectedGroupIds(initallyAssignedGroupsIds)
-  }, [initallyAssignedGroupsIds])
+    setSelectedGroupIds(initiallyAssignedGroupsIds)
+  }, [initiallyAssignedGroupsIds])
 
   const createAssignment = useCreateAssignment()
   const deleteAssignment = useDeleteAssignment()
@@ -247,7 +245,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const saveGroupAssignment = async (roleId: string): Promise<void> => {
     try {
-      const groupIdsToAdd = selectedGroupIds.filter(id => !initallyAssignedGroupsIds.includes(id))
+      const groupIdsToAdd = selectedGroupIds.filter(id => !initiallyAssignedGroupsIds.includes(id))
       const assignmentsToRemove = initialPlatformAssignments.filter(a => !selectedGroupIds.includes(a.group.id))
 
       await Promise.all(
@@ -296,7 +294,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     }
     form.reset(mapRoleApiToFormData(initialRole))
     setPendingPermissionIds(initialPermissionIds)
-    setSelectedGroupIds(initallyAssignedGroupsIds)
+    setSelectedGroupIds(initiallyAssignedGroupsIds)
     setIsReadOnly(true)
     setIsExitModalOpen(false)
   }
@@ -334,7 +332,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       confirmButtonType="button"
       onCancelClick={handleExitButtonClick}
       onConfirmClick={handleSave}
-      isConfirmButtonDisabled={(!isAnyDirty && !areAssignmentsDirty) || isLoading}
+      isConfirmButtonDisabled={!isAnyDirty || isLoading}
       isCancelButtonDisabled={isLoading}
       cancelButtonTitle={tCommon('actions.exit')}
       hasCard={false}
