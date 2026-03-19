@@ -270,6 +270,8 @@ build-config-adapter-image:
     - job: publish-config-adapter
     - job: build-config-adapter
     - job: test-config-adapter
+    - job: api-test-backend
+      optional: true
   services:
     - name: docker:27-dind
       command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']

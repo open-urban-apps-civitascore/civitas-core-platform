@@ -269,18 +269,25 @@ api-test-backend:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ''
   script:
-    - export COMPOSE_BASE="-f dev-environment/ci/docker-compose.api-test.yml"
-    - export COMPOSE_BUILD="-f dev-environment/ci/docker-compose.api-test.build.yml"
-    # Check if source JARs are available (from build-config-adapter / build-authz jobs)
+    - export COMPOSE_FILES="-f dev-environment/ci/docker-compose.api-test.yml"
+    # Check which source JARs are available and add build overrides individually
     - |
-      if ls config-adapter/config-adapter-application/target/*.jar >/dev/null 2>&1 && \
-         ls authz/repository/target/*.jar >/dev/null 2>&1; then
-        echo "Source JARs found — building config-adapter and authz-repository from source"
-        export COMPOSE_FILES="$COMPOSE_BASE $COMPOSE_BUILD"
+      NEED_REGISTRY=true
+      if ls config-adapter/config-adapter-application/target/*.jar >/dev/null 2>&1; then
+        echo "Config-adapter JARs found — building from source"
+        export COMPOSE_FILES="$COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-ca.yml"
       else
-        echo "Source JARs not available — pulling pre-built images from registry"
+        echo "Config-adapter JARs not available — using registry image"
+      fi
+      if ls authz/repository/target/*.jar >/dev/null 2>&1; then
+        echo "AuthZ JARs found — building from source"
+        export COMPOSE_FILES="$COMPOSE_FILES -f dev-environment/ci/docker-compose.api-test.build-authz.yml"
+      else
+        echo "AuthZ JARs not available — using registry image"
+      fi
+      # Login to registry if any service still needs a pre-built image
+      if echo "$COMPOSE_FILES" | grep -qv "build-ca" || echo "$COMPOSE_FILES" | grep -qv "build-authz"; then
         echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
-        export COMPOSE_FILES="$COMPOSE_BASE"
       fi
     # Start full stack — blocks until all services are healthy
     - |
@@ -393,6 +400,8 @@ build-backend-image:
       artifacts: true
     - job: test-backend
     - job: integration-test-backend
+    - job: api-test-backend
+      optional: true
   services:
     - name: docker:27-dind
       command: ['--registry-mirror', 'https://docker-mirror01.extern.frachtwerk.de']

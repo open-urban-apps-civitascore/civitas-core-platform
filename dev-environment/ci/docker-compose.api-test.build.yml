@@ -1,5 +1,5 @@
 # ============================================================
-# Build override for API test stack
+# Build overrides for API test stack
 # ============================================================
 # Adds build directives for config-adapter and authz-repository
 # so they are built from source instead of pulled from registry.
@@ -7,7 +7,12 @@
 # Usage: Combine with the base file when JAR artifacts are available:
 #   docker compose -f docker-compose.api-test.yml -f docker-compose.api-test.build.yml up -d
 #
-# Without this override, the base file pulls pre-built images
+# For partial builds (only one service from source), use the
+# individual override files instead:
+#   docker-compose.api-test.build-ca.yml      — config-adapter only
+#   docker-compose.api-test.build-authz.yml   — authz-repository only
+#
+# Without any override, the base file pulls pre-built images
 # from the GitLab Container Registry (develop branch).
 # ============================================================
 
