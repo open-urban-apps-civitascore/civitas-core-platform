@@ -4,6 +4,7 @@
  * MR320 test plan — Feature 3: Groups list, Feature 4: Group detail
  *   - "New Group" button visible/hidden based on GROUP_CREATE
  *   - Group names are links vs plain text based on GROUP_READ
+ *   - Delete action visible/hidden based on GROUP_DELETE
  *   - Edit button visible/hidden based on GROUP_UPDATE
  *   - Users tab visible/hidden based on USER_READ
  */
@@ -29,6 +30,7 @@ test.describe('Groups List — Permission Gating', () => {
 
   let userWithCreate: TestUserProfile
   let userReadOnly: TestUserProfile
+  let userWithDelete: TestUserProfile
 
   test.beforeAll(async () => {
     adminApi = await ApiClient.asUser(TEST_USERNAME, TEST_PASSWORD)
@@ -61,6 +63,18 @@ test.describe('Groups List — Permission Gating', () => {
         lastName: `GrpReadOnly${Date.now()}`,
         email: `e2e-grpreadonly-${Date.now()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ'],
+      },
+      resources,
+    )
+
+    // User with GROUP_READ + GROUP_DELETE → sees delete action in row menu
+    userWithDelete = await createTestUserWithPermissions(
+      adminApi,
+      {
+        firstName: 'E2E',
+        lastName: `GrpDelete${Date.now()}`,
+        email: `e2e-grpdelete-${Date.now()}@e2e.civitas.dev`,
+        permissions: ['GROUP_READ', 'GROUP_DELETE'],
       },
       resources,
     )
@@ -125,6 +139,52 @@ test.describe('Groups List — Permission Gating', () => {
 
       // The group name should be rendered as a link
       await expect(page.getByRole('link', { name: testGroup.name })).toBeVisible()
+    } finally {
+      await page.close()
+      await context.close()
+    }
+  })
+
+  test('delete action visible with GROUP_DELETE', async ({ browser }) => {
+    const { page, context } = await loginAs(browser, {
+      email: userWithDelete.email,
+      password: userWithDelete.password,
+    })
+
+    try {
+      await page.goto('/groups')
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('searchArea')).toBeVisible({ timeout: 20_000 })
+
+      await page.getByTestId('searchArea').locator('input').fill(testGroup.name)
+      const row = page.getByRole('row').filter({ hasText: testGroup.name })
+      await expect(row).toBeVisible({ timeout: 10_000 })
+
+      // The row should have an "Open menu" button (actions column present)
+      await expect(row.getByRole('button', { name: 'Open menu' })).toBeVisible()
+    } finally {
+      await page.close()
+      await context.close()
+    }
+  })
+
+  test('no actions menu without GROUP_DELETE', async ({ browser }) => {
+    const { page, context } = await loginAs(browser, {
+      email: userReadOnly.email,
+      password: userReadOnly.password,
+    })
+
+    try {
+      await page.goto('/groups')
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('searchArea')).toBeVisible({ timeout: 20_000 })
+
+      await page.getByTestId('searchArea').locator('input').fill(testGroup.name)
+      const row = page.getByRole('row').filter({ hasText: testGroup.name })
+      await expect(row).toBeVisible({ timeout: 10_000 })
+
+      // No "Open menu" button — actions column is suppressed
+      await expect(row.getByRole('button', { name: 'Open menu' })).not.toBeVisible()
     } finally {
       await page.close()
       await context.close()

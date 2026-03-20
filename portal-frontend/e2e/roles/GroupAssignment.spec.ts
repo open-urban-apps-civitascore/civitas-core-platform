@@ -2,10 +2,12 @@
  * E2E tests for role detail — group assignment tab gating.
  *
  * MR320 test plan — Feature 8: Role detail, group assignment tab
- *   - "Add Groups" button visible in edit mode with ROLE_UPDATE
+ *   - "Add Groups" button visible in edit mode with ROLE_UPDATE on Platform tab
  *   - "Add Groups" button hidden in read-only mode without ROLE_UPDATE
- *   - Group row click navigates in read-only mode
- *   - Group row click does nothing in edit mode
+ *   - "Add Groups" hidden on non-Platform scope tabs
+ *   - Remove group assignment action visible in edit mode on Platform tab
+ *   - No remove action in read-only mode
+ *   - Group names are links with GROUP_READ in read-only mode
  */
 import { expect, test } from '@playwright/test'
 
@@ -26,6 +28,7 @@ test.describe('Role Group Assignment Tab — Permission Gating', () => {
   let adminApi: ApiClient
   let resources: TestResources
   let testRole: { id: string; name: string }
+  let testGroup: { id: string; name: string }
 
   let userWithUpdate: TestUserProfile
   let userReadOnly: TestUserProfile
@@ -41,26 +44,40 @@ test.describe('Role Group Assignment Tab — Permission Gating', () => {
     })
     resources.roleIds.push(testRole.id)
 
-    // User with ROLE_READ + ROLE_UPDATE + ASSIGNMENT_READ → sees "Add Groups" in edit mode
+    // Create a group and assign it to the role so the tab has content
+    testGroup = await adminApi.createGroup({
+      name: `e2e-grpassign-grp-${Date.now()}`,
+      description: 'Group for group assignment tab gating',
+    })
+    resources.groupIds.push(testGroup.id)
+
+    const assignment = await adminApi.createAssignment({
+      groupId: testGroup.id,
+      roleId: testRole.id,
+      scopeType: 'TENANT',
+    })
+    resources.assignmentIds.push(assignment.id)
+
+    // User with ROLE_READ + ROLE_UPDATE + ASSIGNMENT_READ + GROUP_READ → sees "Add Groups" in edit mode
     userWithUpdate = await createTestUserWithPermissions(
       adminApi,
       {
         firstName: 'E2E',
         lastName: `GrpAssignEdit${Date.now()}`,
         email: `e2e-grpassignedit-${Date.now()}@e2e.civitas.dev`,
-        permissions: ['ROLE_READ', 'ROLE_UPDATE', 'ASSIGNMENT_READ'],
+        permissions: ['ROLE_READ', 'ROLE_UPDATE', 'ASSIGNMENT_READ', 'GROUP_READ'],
       },
       resources,
     )
 
-    // User with ROLE_READ + ASSIGNMENT_READ but no ROLE_UPDATE → no "Add Groups"
+    // User with ROLE_READ + ASSIGNMENT_READ + GROUP_READ but no ROLE_UPDATE → no "Add Groups"
     userReadOnly = await createTestUserWithPermissions(
       adminApi,
       {
         firstName: 'E2E',
         lastName: `GrpAssignRO${Date.now()}`,
         email: `e2e-grpassignro-${Date.now()}@e2e.civitas.dev`,
-        permissions: ['ROLE_READ', 'ASSIGNMENT_READ'],
+        permissions: ['ROLE_READ', 'ASSIGNMENT_READ', 'GROUP_READ'],
       },
       resources,
     )
@@ -87,7 +104,7 @@ test.describe('Role Group Assignment Tab — Permission Gating', () => {
       // Navigate to Group Assignment tab
       await page.getByTestId('tab-groupAssignment').click()
 
-      // "Add Groups" button should be visible
+      // "Add Groups" button should be visible on Platform (TENANT) tab
       const addGroupsBtn = page.getByRole('button', { name: /add group|gruppe hinzufügen/i })
       await expect(addGroupsBtn).toBeVisible({ timeout: 10_000 })
     } finally {
@@ -113,8 +130,84 @@ test.describe('Role Group Assignment Tab — Permission Gating', () => {
       // Navigate to Group Assignment tab
       await page.getByTestId('tab-groupAssignment').click()
 
+      // Wait for group row to load
+      await expect(page.getByRole('row').filter({ hasText: testGroup.name })).toBeVisible({ timeout: 15_000 })
+
       // "Add Groups" button should NOT be visible
       await expect(page.getByRole('button', { name: /add group|gruppe hinzufügen/i })).not.toBeVisible()
+    } finally {
+      await page.close()
+      await context.close()
+    }
+  })
+
+  test('remove group assignment visible in edit mode on Platform tab', async ({ browser }) => {
+    const { page, context } = await loginAs(browser, {
+      email: userWithUpdate.email,
+      password: userWithUpdate.password,
+    })
+
+    try {
+      await page.goto(`/roles/${testRole.id}?tab=SYSTEM`)
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('pageHeader')).toContainText(testRole.name, { timeout: 20_000 })
+
+      // Enter edit mode
+      await page.getByTestId('editButton').click()
+
+      // Navigate to Group Assignment tab
+      await page.getByTestId('tab-groupAssignment').click()
+
+      // Group row should have a dropdown menu button (remove action)
+      const groupRow = page.getByRole('row').filter({ hasText: testGroup.name })
+      await expect(groupRow).toBeVisible({ timeout: 15_000 })
+      await expect(groupRow.getByRole('button', { name: 'Open menu' })).toBeVisible()
+    } finally {
+      await page.close()
+      await context.close()
+    }
+  })
+
+  test('no remove action in read-only mode', async ({ browser }) => {
+    const { page, context } = await loginAs(browser, {
+      email: userReadOnly.email,
+      password: userReadOnly.password,
+    })
+
+    try {
+      await page.goto(`/roles/${testRole.id}?tab=SYSTEM`)
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('pageHeader')).toContainText(testRole.name, { timeout: 20_000 })
+
+      // Navigate to Group Assignment tab
+      await page.getByTestId('tab-groupAssignment').click()
+
+      // Group row should be visible but no dropdown menu button
+      const groupRow = page.getByRole('row').filter({ hasText: testGroup.name })
+      await expect(groupRow).toBeVisible({ timeout: 15_000 })
+      await expect(groupRow.getByRole('button', { name: 'Open menu' })).not.toBeVisible()
+    } finally {
+      await page.close()
+      await context.close()
+    }
+  })
+
+  test('group names are links with GROUP_READ in read-only mode', async ({ browser }) => {
+    const { page, context } = await loginAs(browser, {
+      email: userReadOnly.email,
+      password: userReadOnly.password,
+    })
+
+    try {
+      await page.goto(`/roles/${testRole.id}?tab=SYSTEM`)
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('pageHeader')).toContainText(testRole.name, { timeout: 20_000 })
+
+      // Navigate to Group Assignment tab
+      await page.getByTestId('tab-groupAssignment').click()
+
+      // Group name should be a clickable link
+      await expect(page.getByRole('link', { name: testGroup.name })).toBeVisible({ timeout: 15_000 })
     } finally {
       await page.close()
       await context.close()

@@ -4,6 +4,7 @@
  * MR320 test plan — Feature 8: Role detail, permissions tab
  *   - Permission checkboxes editable in edit mode with ROLE_UPDATE
  *   - Permission checkboxes disabled in read-only mode without ROLE_UPDATE
+ *   - Role template selector visible in edit mode, hidden in read-only
  */
 import { expect, test } from '@playwright/test'
 
@@ -116,6 +117,56 @@ test.describe('Role Permissions Tab — Permission Gating', () => {
       const firstCheckbox = page.getByRole('checkbox').first()
       await expect(firstCheckbox).toBeVisible({ timeout: 10_000 })
       await expect(firstCheckbox).toBeDisabled()
+    } finally {
+      await page.close()
+      await context.close()
+    }
+  })
+
+  test('role template selector visible in edit mode', async ({ browser }) => {
+    const { page, context } = await loginAs(browser, {
+      email: userWithUpdate.email,
+      password: userWithUpdate.password,
+    })
+
+    try {
+      await page.goto(`/roles/${testRole.id}?tab=SYSTEM`)
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('pageHeader')).toContainText(testRole.name, { timeout: 20_000 })
+
+      // Enter edit mode
+      await page.getByTestId('editButton').click()
+
+      // Navigate to permissions tab
+      await page.getByTestId('tab-permissions').click()
+
+      // Role template selector (combobox) should be visible in edit mode
+      await expect(page.getByRole('combobox')).toBeVisible({ timeout: 10_000 })
+    } finally {
+      await page.close()
+      await context.close()
+    }
+  })
+
+  test('role template selector hidden in read-only mode', async ({ browser }) => {
+    const { page, context } = await loginAs(browser, {
+      email: userReadOnly.email,
+      password: userReadOnly.password,
+    })
+
+    try {
+      await page.goto(`/roles/${testRole.id}?tab=SYSTEM`)
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('pageHeader')).toContainText(testRole.name, { timeout: 20_000 })
+
+      // Navigate to permissions tab (no edit mode available)
+      await page.getByTestId('tab-permissions').click()
+
+      // Wait for checkboxes to load (tab content rendered)
+      await expect(page.getByRole('checkbox').first()).toBeVisible({ timeout: 10_000 })
+
+      // Role template selector should NOT be visible in read-only mode
+      await expect(page.getByRole('combobox')).not.toBeVisible()
     } finally {
       await page.close()
       await context.close()

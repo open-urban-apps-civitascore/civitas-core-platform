@@ -4,6 +4,9 @@
  * MR320 test plan — Feature 4: Group detail, roles tab
  *   - "Add role" button visible in edit mode with GROUP_UPDATE
  *   - "Add role" button hidden without GROUP_UPDATE
+ *   - "Add role" hidden on non-Platform scope tabs
+ *   - Remove role action visible in edit mode on Platform tab
+ *   - No remove role action in read-only mode
  *   - Role names are links with ROLE_READ, plain text without
  */
 import { expect, test } from '@playwright/test'
@@ -185,6 +188,81 @@ test.describe('Group Roles Tab — Permission Gating', () => {
       // Role name should be visible as text but NOT as a link
       await expect(page.getByRole('cell', { name: testRole.name })).toBeVisible({ timeout: 15_000 })
       await expect(page.getByRole('link', { name: testRole.name })).not.toBeVisible()
+    } finally {
+      await page.close()
+      await context.close()
+    }
+  })
+
+  test('remove role action visible in edit mode on Platform tab', async ({ browser }) => {
+    const { page, context } = await loginAs(browser, {
+      email: userWithUpdate.email,
+      password: userWithUpdate.password,
+    })
+
+    try {
+      await page.goto(`/groups/${testGroup.id}?mode=edit`)
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('pageHeader')).toContainText(testGroup.name, { timeout: 20_000 })
+
+      await page.getByTestId('tab-roles').click()
+
+      // Role row should have a dropdown menu button on the Platform tab
+      const roleRow = page.getByRole('row').filter({ hasText: testRole.name })
+      await expect(roleRow).toBeVisible({ timeout: 15_000 })
+      await expect(roleRow.getByRole('button', { name: 'Open menu' })).toBeVisible()
+    } finally {
+      await page.close()
+      await context.close()
+    }
+  })
+
+  test('no remove role action in read-only mode', async ({ browser }) => {
+    const { page, context } = await loginAs(browser, {
+      email: userReadOnly.email,
+      password: userReadOnly.password,
+    })
+
+    try {
+      await page.goto(`/groups/${testGroup.id}`)
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('pageHeader')).toContainText(testGroup.name, { timeout: 20_000 })
+
+      await page.getByTestId('tab-roles').click()
+
+      // Role row should be visible but no dropdown menu button
+      const roleRow = page.getByRole('row').filter({ hasText: testRole.name })
+      await expect(roleRow).toBeVisible({ timeout: 15_000 })
+      await expect(roleRow.getByRole('button', { name: 'Open menu' })).not.toBeVisible()
+    } finally {
+      await page.close()
+      await context.close()
+    }
+  })
+
+  test('"Add role" hidden on non-Platform scope tabs', async ({ browser }) => {
+    const { page, context } = await loginAs(browser, {
+      email: userWithUpdate.email,
+      password: userWithUpdate.password,
+    })
+
+    try {
+      await page.goto(`/groups/${testGroup.id}?mode=edit`)
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('pageHeader')).toContainText(testGroup.name, { timeout: 20_000 })
+
+      await page.getByTestId('tab-roles').click()
+
+      // On Platform tab, "Add role" should be visible
+      await expect(page.getByRole('button', { name: /add role|rolle hinzufügen/i })).toBeVisible({ timeout: 10_000 })
+
+      // Switch to a non-Platform scope tab (e.g. datasets)
+      const datasetsTab = page.getByRole('tab', { name: /dataset/i })
+      await expect(datasetsTab).toBeVisible({ timeout: 5_000 })
+      await datasetsTab.click()
+
+      // "Add role" button should NOT be visible on non-Platform tab
+      await expect(page.getByRole('button', { name: /add role|rolle hinzufügen/i })).not.toBeVisible()
     } finally {
       await page.close()
       await context.close()
