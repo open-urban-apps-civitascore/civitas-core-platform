@@ -52,7 +52,8 @@
       "formInvalid": "All required information must be provided correctly. Please, verify your input.",
       "statusChangeError": "An error occurred while changing the availability status.",
       "updateError": "An error occurred while updating the {item}.",
-      "nameExists": "The name is already in use. Please, choose another name."
+      "nameExists": "This name is already in use.",
+      "nameExistsToast": "The name {name} is already in use. Please, choose another name."
     },
     "items": {
       "data": "data",
@@ -522,16 +523,16 @@
       "notGranted": "Not granted"
     },
     "values": {
-        "ASSIGNMENT": "Assignment",
-        "DATASET": "Dataset",
-        "DATASET_PAYLOAD": "Dataset Payload",
-        "DATASOURCE": "Datasource",
-        "DATASTRUCTURE": "Datastructure",
-        "GROUP": "Group",
-        "PERMISSION": "Permission",
-        "ROLE": "Role",
-        "USER": "User"
-      }
+      "ASSIGNMENT": "Assignment",
+      "DATASET": "Dataset",
+      "DATASET_PAYLOAD": "Dataset Payload",
+      "DATASOURCE": "Datasource",
+      "DATASTRUCTURE": "Datastructure",
+      "GROUP": "Group",
+      "PERMISSION": "Permission",
+      "ROLE": "Role",
+      "USER": "User"
+    }
   },
   "roles": {
     "title": "Roles",
@@ -663,7 +664,11 @@
       }
     },
     "errors": {
-      "createError":"An error occurred while creating the role"
+      "createError": "An error occurred while creating the role",
+      "updateError": "An error occurred while updating the role"
+    },
+    "success": {
+      "assignmentSuccess": "The assignments have been successfully updated"
     }
   },
   "datasources": {

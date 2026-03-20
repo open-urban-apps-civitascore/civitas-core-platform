@@ -12,6 +12,7 @@ import {
   useUpdateDatasourcePublished,
 } from '@/app/services/api/datasources/clientRequests'
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
+import { useError } from '@/hooks/use-error'
 import { ConnectorFormToApiSchema, ConnectorStrictSchema, ConnectorType } from '@/types/connectors'
 import {
   Datasource,
@@ -26,6 +27,7 @@ import {
 } from '@/types/datasources'
 import { hasAssignmentChanges, mapGroupRoleAssignmentsToApiPayload } from '@/utils/assignments'
 import { getConnectorDefaults } from '@/utils/connectors'
+import { isNameConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
 export const useDatasourceForm = (
@@ -35,6 +37,7 @@ export const useDatasourceForm = (
 ) => {
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
+  const { handleNameError } = useError()
 
   const mapDatasourceToFormValues = (source: Datasource) => {
     const parsedDatasource = DatasourceApiToFormSchema.parse(source)
@@ -61,13 +64,6 @@ export const useDatasourceForm = (
     updatePublishedDatasource.isPending ||
     publishDatasource.isPending ||
     unpublishDatasource.isPending
-
-  const handleRequestError = (error: unknown) => {
-    if ((error as AxiosError).response?.status === 409) {
-      form.setError('name', { type: 'manual', message: 'common.errors.nameExists' })
-      toast.error(tCommon('errors.nameExists'))
-    } else toast.error(t('errors.updateError'))
-  }
 
   const form = useForm<DatasourceFormDraft>({
     resolver: zodResolver(DatasourceFormDraftSchema),
@@ -190,7 +186,9 @@ export const useDatasourceForm = (
       }
       return response.data
     } catch (error) {
-      handleRequestError(error)
+      if (isNameConflictError(error as AxiosError)) {
+        handleNameError(form, values.name)
+      } else toast.error(t('errors.updateError'))
       throw error
     }
   }

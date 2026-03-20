@@ -18,9 +18,11 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { useError } from '@/hooks/use-error'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Group, GroupBaseFormData, GroupBaseFormDataSchema, GroupTab } from '@/types/groups'
 import { Role } from '@/types/roles'
+import { isNameConflictError } from '@/utils/errors'
 import { mapGroupApiToFormData, mapGroupFormToApiData } from '@/utils/groups'
 
 import { BaseInfoTab } from './base-info-tab/BaseInfoTab'
@@ -66,6 +68,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   const [isReadOnly, setIsReadOnly] = useState(!isCreateMode && mode !== 'edit')
 
   const router = useRouter()
+  const { handleNameError } = useError()
   const createGroup = useCreateGroup()
   const updateGroup = useUpdateGroup()
   const replaceAssignments = useReplaceGroupAssignments()
@@ -89,11 +92,9 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     toast.error(tCommon('errors.formInvalid'))
   }
 
-  const handleGroupRequestError = (error: unknown, message: string) => {
-    if ((error as AxiosError).response?.status === 409) {
-      form.setError('name', { type: 'manual', message: 'groups.errors.groupNameExists' })
-      toast.error(tCommon('errors.formInvalid'))
-    } else toast.error(t(message))
+  const handleGroupRequestError = (error: AxiosError, defaultMessage: string) => {
+    if (isNameConflictError(error)) handleNameError(form, form.getValues('name'))
+    else toast.error(defaultMessage)
   }
 
   const handleCreateGroup = (formData: GroupBaseFormData) => {
@@ -126,7 +127,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
           navigateToGroup()
         }
       },
-      onError: (error: unknown) => handleGroupRequestError(error, 'errors.createError'),
+      onError: (error: unknown) => handleGroupRequestError(error as AxiosError, t('errors.createError')),
     })
   }
 
@@ -150,7 +151,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
           },
         )
       },
-      onError: (error: unknown) => handleGroupRequestError(error, 'errors.updateError'),
+      onError: (error: unknown) => handleGroupRequestError(error as AxiosError, t('errors.updateError')),
     })
   }
 

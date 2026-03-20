@@ -51,7 +51,8 @@
       "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden. Überprüfen Sie Ihre Eingaben.",
       "statusChangeError": "Beim Ändern des Verfügbarkeitsstatus ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten.",
-      "nameExists": "Der Name ist bereits vergeben. Bitte wählen sie einen anderen Namen."
+      "nameExists": "Dieser Name ist bereits vergeben.",
+      "nameExistsToast": "Der Name {name} ist bereits vergeben. Bitte wählen sie einen anderen Namen."
     },
     "items": {
       "data": "Daten",
@@ -655,7 +656,11 @@
       }
     },
     "errors": {
-      "createError":"Beim Anlegen der Rolle ist ein Fehler aufgetreten"
+      "createError":"Beim Anlegen der Rolle ist ein Fehler aufgetreten",
+      "updateError":"Beim Aktualisieren der Rolle ist ein Fehler aufgetreten"
+    },
+    "success": {
+      "assignmentSuccess": "Die Zuweisungen wurden erfolgreich aktualisiert"
     }
   },
   "datasources": {
