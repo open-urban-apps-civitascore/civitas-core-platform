@@ -17,7 +17,7 @@ export default defineConfig({
     },
     coverage: {
       provider: 'istanbul',
-      include: ['src/**/*.{ts,tsx}'],
+      include: ['src/**/*.{ts,tsx}', 'auth.config.ts'],
       exclude: [
         'node_modules/',
         'e2e/',
