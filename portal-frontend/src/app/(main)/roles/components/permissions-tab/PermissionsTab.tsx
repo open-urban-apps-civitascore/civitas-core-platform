@@ -14,6 +14,7 @@ import { ROLE_TYPES, RoleType } from '@/types/roles'
 import { CategoryList } from './CategoryList'
 import { DataPermissionsGrid } from './DataPermissionsGrid'
 import { RoleTemplateSelect } from './RoleTemplateSelect'
+import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 
 interface PermissionsTabProps {
   pendingPermissionIds: string[]
@@ -41,6 +42,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   const { pendingPermissionIds, onPendingPermissionIdsChange, isReadOnly, currentRoleId, roleType } = props
   const t = useTranslations('common')
   const tRoles = useTranslations('roles')
+  const tCommon = useTranslations('common')
   const { getApiRequestParams } = useQueryParams()
   const [roleTemplate, setRoleTemplate] = useState<string | null>(null)
   const [checkedPermissionItems, setCheckedPermissionItems] = useState<PermissionItem[]>([])
@@ -52,9 +54,13 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput }),
   )
 
-  const { data: rolesData } = useGetRoles({ params: rolesRequestParams })
+  const { data: rolesData, error: getRolesError } = useGetRoles({ params: rolesRequestParams })
 
-  const { data: permissionsData, isFetching: isFetchingPermissions } = useGetPermissions({
+  const {
+    data: permissionsData,
+    isFetching: isFetchingPermissions,
+    error: getPermissionsError,
+  } = useGetPermissions({
     params: permissionsRequestParams,
   })
 
@@ -109,6 +115,10 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
 
   if (isFetchingPermissions) {
     return <LoadingSpinner />
+  }
+
+  if (getRolesError || getPermissionsError) {
+    return <NoDataPage className="h-full" title={tCommon('errors.loadingError')} />
   }
 
   return (

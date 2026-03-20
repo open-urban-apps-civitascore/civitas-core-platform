@@ -15,3 +15,7 @@ export const isNameConflictError = (error: AxiosError) => {
   const errorDetail = apiError.detail || ''
   return isConflictError && errorDetail.includes('with name') && errorDetail.includes('already exists')
 }
+
+export const isPermissionsError = (error: AxiosError) => {
+  return error.status === 403
+}

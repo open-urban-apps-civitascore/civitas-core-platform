@@ -10,20 +10,24 @@ import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form, FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { FormRole } from '@/types/roles'
+import { ClassNames } from 'storybook/theming'
 
 interface BaseInfoTabProps {
   form: UseFormReturn<FormRole>
   isDefaultRole: boolean
   isReadOnly: boolean
   deleteRole?: () => void
+  getRoleError?: Error | null
 }
 
 export const BaseInfoTab = (props: BaseInfoTabProps) => {
-  const { form, isDefaultRole, isReadOnly, deleteRole } = props
+  const { form, isDefaultRole, isReadOnly, deleteRole, getRoleError } = props
   const tRolesBaseInfo = useTranslations('roles.baseInfoTab')
   const tRoles = useTranslations('roles')
+  const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
 
   const isReadonly = useMemo(() => isDefaultRole, [isDefaultRole])
@@ -31,6 +35,10 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   useEffect(() => {
     form.setValue('readonly', isReadonly)
   }, [isReadonly, form])
+
+  if (getRoleError) {
+    return <NoDataPage className='h-full' title={tCommon('errors.loadingError') } />
+  }
 
   return (
     <Form {...form}>

@@ -53,7 +53,8 @@
       "statusChangeError": "An error occurred while changing the availability status.",
       "updateError": "An error occurred while updating the {item}.",
       "nameExists": "This name is already in use.",
-      "nameExistsToast": "The name {name} is already in use. Please, choose another name."
+      "nameExistsToast": "The name {name} is already in use. Please, choose another name.",
+      "insufficientPermissions": "You do not have the necessary permissions to perform this action."
     },
     "items": {
       "data": "data",

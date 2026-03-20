@@ -28,6 +28,7 @@ interface GroupAssignmentTabProps {
   isReadOnly: boolean
   initialAssignments: Assignment[]
   isSystemRole: boolean
+  getAssignmentsError?: Error | null
 }
 
 const SCOPE_TABS: Tab<AssignmentScope>[] = [
@@ -41,9 +42,20 @@ const getGroupSelection = (groupIds: Group['id'][]) =>
   groupIds.reduce((acc, groupId) => ({ ...acc, [groupId]: true }), {})
 
 export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
-  const { selectedGroupIds, onGroupAssignmentUpdate, roleName, isReadOnly, initialAssignments, isSystemRole } = props
+  const {
+    selectedGroupIds,
+    onGroupAssignmentUpdate,
+    roleName,
+    isReadOnly,
+    initialAssignments,
+    isSystemRole,
+    getAssignmentsError,
+  } = props
   const t = useTranslations('roles.groupAssignmentTab')
+  const tRoles = useTranslations('roles')
+  const tCommon = useTranslations('common')
   const router = useRouter()
+
   const [searchInput, setSearchInput] = useState<string>('')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
@@ -144,6 +156,10 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
       <Plus /> {t('addGroup')}
     </Button>
   ) : null
+
+  if (getAssignmentsError) {
+    return <NoDataPage className="h-full" title={tCommon('errors.loadingError')} />
+  }
 
   // No data state
   if (!isFetching && scopeFilteredGroupIds.length === 0 && filteredGroups.length === 0) {
