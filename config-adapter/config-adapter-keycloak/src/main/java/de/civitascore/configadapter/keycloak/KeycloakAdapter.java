@@ -61,8 +61,10 @@ import org.slf4j.LoggerFactory;
  *   <li>Network errors (ProcessingException) → RetryableAdapterException
  *   <li>HTTP 5xx errors → RetryableAdapterException
  *   <li>HTTP 4xx errors → FatalAdapterException
- *   <li>NotFoundException → FatalAdapterException (RESOURCE_NOT_FOUND)
- *   <li>HTTP 409 Conflict → FatalAdapterException (KEYCLOAK_CONFLICT)
+ *   <li>NotFoundException on DELETE → success (idempotent: resource already absent)
+ *   <li>NotFoundException on UPDATE → FatalAdapterException (RESOURCE_NOT_FOUND)
+ *   <li>HTTP 409 Conflict on CREATE → success (idempotent: resource already present)
+ *   <li>HTTP 409 Conflict on UPDATE → FatalAdapterException (KEYCLOAK_CONFLICT)
  * </ul>
  */
 public class KeycloakAdapter extends AbstractConfigAdapter {
@@ -282,6 +284,13 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     } catch (ProcessingException e) {
       throw wrapNetworkException(e, KeycloakOperation.REALM_CREATION);
     } catch (WebApplicationException e) {
+      if (e.getResponse().getStatus() == 409) {
+        String realmName = ((RealmConfig) event.payload().config().value()).getRealm();
+        logger.info(
+            "Realm {} already exists, treating create as success", Encode.forJava(realmName));
+        publishSuccessResult(event, SuccessCode.REALM_CREATE_SUCCESS, realmName);
+        return;
+      }
       wrapWebException(e, KeycloakOperation.REALM_CREATION, AdapterErrorCode.KEYCLOAK_REALM_ERROR);
     }
   }
@@ -316,7 +325,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       publishSuccessResult(event, SuccessCode.REALM_DELETE_SUCCESS, realmName);
 
     } catch (NotFoundException e) {
-      throw new FatalAdapterException(AdapterErrorCode.RESOURCE_NOT_FOUND, e, "Realm " + realmName);
+      logger.info(
+          "Realm {} not found during delete, treating as success (already deleted)",
+          Encode.forJava(realmName));
+      publishSuccessResult(event, SuccessCode.REALM_DELETE_SUCCESS, realmName);
     } catch (ProcessingException e) {
       throw wrapNetworkException(e, KeycloakOperation.REALM_DELETION);
     } catch (WebApplicationException e) {
@@ -336,6 +348,13 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       RealmResource realmResource = keycloakClient.realm(realm);
 
       try (Response response = realmResource.clients().create(clientRep)) {
+        if (response.getStatus() == 409) {
+          logger.info(
+              "Client {} already exists, treating create as success",
+              Encode.forJava(clientRep.getClientId()));
+          publishSuccessResult(event, SuccessCode.CLIENT_CREATE_SUCCESS, clientRep.getClientId());
+          return;
+        }
         validateResponse(KeycloakOperation.CLIENT_CREATION, 201, response);
       }
 
@@ -390,8 +409,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       publishSuccessResult(event, SuccessCode.USER_DELETE_SUCCESS, clientId);
 
     } catch (NotFoundException e) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.RESOURCE_NOT_FOUND, e, "Client " + maskId(clientId));
+      logger.info(
+          "Client {} not found during delete, treating as success (already deleted)",
+          Encode.forJava(maskId(clientId)));
+      publishSuccessResult(event, SuccessCode.USER_DELETE_SUCCESS, clientId);
     } catch (ProcessingException e) {
       throw wrapNetworkException(e, KeycloakOperation.CLIENT_DELETION);
     } catch (WebApplicationException e) {
@@ -440,13 +461,12 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
         (realmResource, userRep) -> {
           try (Response response = realmResource.users().create(userRep)) {
             if (response.getStatus() == 409) {
-              // User already exists (e.g., pre-seeded via realm import) — return existing ID
-              String existingId = findExistingUserId(realmResource, userRep);
               logger.info(
-                  "User '{}' already exists in Keycloak (ID: {}), returning existing ID",
-                  Encode.forJava(userRep.getEmail()),
-                  Encode.forJava(maskId(existingId)));
-              return existingId;
+                  "User {} already exists, treating create as success and syncing roles",
+                  Encode.forJava(userRep.getUsername()));
+              List<UserRepresentation> existing =
+                  realmResource.users().searchByUsername(userRep.getUsername(), true);
+              return existing.isEmpty() ? null : existing.getFirst().getId();
             }
             validateResponse(KeycloakOperation.USER_CREATION, 201, response);
             String userId = CreatedResponseUtil.getCreatedId(response);
@@ -454,30 +474,6 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
             return userId;
           }
         });
-  }
-
-  /**
-   * Finds an existing Keycloak user by email or username. Used when user creation returns 409
-   * (conflict) to retrieve the existing user's ID for idempotent operation.
-   */
-  private String findExistingUserId(RealmResource realmResource, UserRepresentation userRep)
-      throws KeycloakOperationException {
-    if (userRep.getEmail() != null) {
-      List<UserRepresentation> users =
-          realmResource.users().searchByEmail(userRep.getEmail(), true);
-      if (!users.isEmpty()) {
-        return users.getFirst().getId();
-      }
-    }
-    if (userRep.getUsername() != null) {
-      List<UserRepresentation> users =
-          realmResource.users().searchByUsername(userRep.getUsername(), true);
-      if (!users.isEmpty()) {
-        return users.getFirst().getId();
-      }
-    }
-    throw new KeycloakOperationException(
-        "User creation returned 409 but user not found by email or username");
   }
 
   /**
@@ -581,8 +577,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       publishSuccessResult(event, SuccessCode.USER_DELETE_SUCCESS, userId);
 
     } catch (NotFoundException e) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.RESOURCE_NOT_FOUND, e, "User " + maskId(userId));
+      logger.info(
+          "User {} not found during delete, treating as success (already deleted)",
+          Encode.forJava(maskId(userId)));
+      publishSuccessResult(event, SuccessCode.USER_DELETE_SUCCESS, userId);
     } catch (ProcessingException e) {
       throw wrapNetworkException(e, KeycloakOperation.USER_DELETION);
     } catch (WebApplicationException e) {
@@ -610,6 +608,12 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
     } catch (ProcessingException e) {
       throw wrapNetworkException(e, KeycloakOperation.ROLE_CREATION);
     } catch (WebApplicationException e) {
+      if (e.getResponse().getStatus() == 409) {
+        String roleName = ((RoleConfig) event.payload().config().value()).getName();
+        logger.info("Role {} already exists, treating create as success", Encode.forJava(roleName));
+        publishSuccessResult(event, SuccessCode.ROLE_CREATE_SUCCESS, roleName);
+        return;
+      }
       wrapWebException(e, KeycloakOperation.ROLE_CREATION, AdapterErrorCode.KEYCLOAK_ROLE_ERROR);
     }
   }
@@ -666,7 +670,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       publishSuccessResult(event, SuccessCode.ROLE_DELETE_SUCCESS, roleId);
 
     } catch (NotFoundException e) {
-      throw new FatalAdapterException(AdapterErrorCode.RESOURCE_NOT_FOUND, e, "Role " + roleId);
+      logger.info(
+          "Role {} not found during delete, treating as success (already deleted)",
+          Encode.forJava(roleId));
+      publishSuccessResult(event, SuccessCode.ROLE_DELETE_SUCCESS, roleId);
     } catch (ProcessingException e) {
       throw wrapNetworkException(e, KeycloakOperation.ROLE_DELETION);
     } catch (WebApplicationException e) {
@@ -711,15 +718,30 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       throws KeycloakOperationException {
     if (parentId != null && !parentId.isEmpty()) {
       try (Response response = realmResource.groups().group(parentId).subGroup(groupRep)) {
+        if (response.getStatus() == 409) {
+          return findExistingGroupId(realmResource, groupRep.getName());
+        }
         validateResponse(KeycloakOperation.GROUP_CREATION, 201, response);
         return CreatedResponseUtil.getCreatedId(response);
       }
     } else {
       try (Response response = realmResource.groups().add(groupRep)) {
+        if (response.getStatus() == 409) {
+          return findExistingGroupId(realmResource, groupRep.getName());
+        }
         validateResponse(KeycloakOperation.GROUP_CREATION, 201, response);
         return CreatedResponseUtil.getCreatedId(response);
       }
     }
+  }
+
+  private String findExistingGroupId(RealmResource realmResource, String groupName) {
+    logger.info("Group {} already exists, treating create as success", Encode.forJava(groupName));
+    return realmResource.groups().groups(groupName, 0, 1).stream()
+        .filter(g -> g.getName().equals(groupName))
+        .map(GroupRepresentation::getId)
+        .findFirst()
+        .orElse(null);
   }
 
   private void assignRolesToGroup(
@@ -772,8 +794,10 @@ public class KeycloakAdapter extends AbstractConfigAdapter {
       publishSuccessResult(event, SuccessCode.GROUP_DELETE_SUCCESS, groupId);
 
     } catch (NotFoundException e) {
-      throw new FatalAdapterException(
-          AdapterErrorCode.RESOURCE_NOT_FOUND, e, "Group " + maskId(groupId));
+      logger.info(
+          "Group {} not found during delete, treating as success (already deleted)",
+          Encode.forJava(maskId(groupId)));
+      publishSuccessResult(event, SuccessCode.GROUP_DELETE_SUCCESS, groupId);
     } catch (ProcessingException e) {
       throw wrapNetworkException(e, KeycloakOperation.GROUP_DELETION);
     } catch (WebApplicationException e) {

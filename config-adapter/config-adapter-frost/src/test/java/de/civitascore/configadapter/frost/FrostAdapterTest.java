@@ -289,6 +289,21 @@ class FrostAdapterTest {
     }
 
     @Test
+    void createWithConflictReturnsSuccess()
+        throws RetryableAdapterException, FatalAdapterException {
+      when(mockResponse.getStatus()).thenReturn(409);
+      when(mockBuilder.post(any(Entity.class))).thenReturn(mockResponse);
+
+      ConfigEvent event = createConfigEvent(Operation.CREATE, "Things", Map.of("name", "Existing"));
+
+      adapter.processConfigEvent("de.civitascore.data.thing.created", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+      assertEquals(ConfigResultEvent.Status.SUCCESS, captor.getValue().status());
+    }
+
+    @Test
     void createWithClientErrorThrowsFatalException() {
       when(mockResponse.getStatus()).thenReturn(400);
       when(mockResponse.readEntity(String.class)).thenReturn("{\"error\":\"Invalid entity\"}");
@@ -550,9 +565,23 @@ class FrostAdapterTest {
     }
 
     @Test
-    void deleteWithClientErrorThrowsFatalException() {
+    void deleteNotFoundReturnsSuccess() throws RetryableAdapterException, FatalAdapterException {
       when(mockResponse.getStatus()).thenReturn(404);
-      when(mockResponse.readEntity(String.class)).thenReturn("{\"error\":\"Not found\"}");
+      when(mockBuilder.delete()).thenReturn(mockResponse);
+
+      ConfigEvent event = createConfigEvent(Operation.DELETE, "Things/999", null);
+
+      adapter.processConfigEvent("de.civitascore.data.thing.deleted", event);
+
+      ArgumentCaptor<ConfigResultEvent> captor = ArgumentCaptor.forClass(ConfigResultEvent.class);
+      verify(mockPublisher).publish(eq("test-result-topic"), captor.capture());
+      assertEquals(ConfigResultEvent.Status.SUCCESS, captor.getValue().status());
+    }
+
+    @Test
+    void deleteWithOtherClientErrorThrowsFatalException() {
+      when(mockResponse.getStatus()).thenReturn(403);
+      when(mockResponse.readEntity(String.class)).thenReturn("{\"error\":\"Forbidden\"}");
       when(mockBuilder.delete()).thenReturn(mockResponse);
 
       ConfigEvent event = createConfigEvent(Operation.DELETE, "Things/999", null);

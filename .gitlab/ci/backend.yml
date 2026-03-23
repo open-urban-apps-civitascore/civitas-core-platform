@@ -198,7 +198,6 @@ saga-e2e-test-backend:
       changes:
         - portal-backend/**/*
         - portal-model/**/*
-        - config-adapter/**/*
         - .gitlab-ci.yml
         - .gitlab/ci/backend.yml
   services:
