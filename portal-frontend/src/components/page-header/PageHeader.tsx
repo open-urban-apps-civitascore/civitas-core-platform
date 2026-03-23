@@ -27,7 +27,7 @@ export const PageHeader = <TabValue extends string>(props: PageHeaderProps<TabVa
       id="pageHeader"
       data-testid="pageHeader"
       className={cn(
-        'w-full max-w-full  flex flex-col gap-[var(--layout-padding)] h-[var(--title-height)] py-[var(--layout-padding)] border-b-1',
+        'w-full max-w-full flex flex-col gap-[var(--layout-padding)] h-[var(--title-height)] py-[var(--layout-padding)] border-b-1 overflow-hidden',
         className,
       )}
       style={style}
@@ -40,7 +40,7 @@ export const PageHeader = <TabValue extends string>(props: PageHeaderProps<TabVa
           selectedTab={tabsSectionProps.selectedTab}
         />
       )}
-      <div className={cn('flex')}>
+      <div className={cn('flex min-w-0')}>
         <div id="pageHeaderTitle" className={cn('flex-1 w-full min-w-0 px-[var(--layout-padding)]')}>
           {title && (
             <div className="flex flex-row items-center gap-4">

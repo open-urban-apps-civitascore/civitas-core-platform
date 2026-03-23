@@ -14,6 +14,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 export type Breadcrumb = {
   title: string
@@ -101,7 +102,7 @@ export const BreadcrumbNavigation = () => {
   if (!pathname) return null
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex items-center gap-4 min-w-0">
       {hasBackButton && parentPath && (
         <Button
           variant="outline"
@@ -113,8 +114,8 @@ export const BreadcrumbNavigation = () => {
           <ArrowLeft className="h-4 w-4" />
         </Button>
       )}
-      <Breadcrumb>
-        <BreadcrumbList>
+      <Breadcrumb className="min-w-0 ">
+        <BreadcrumbList className="flex-nowrap overflow-hidden">
           <BreadcrumbItem className="hidden md:block">
             <BreadcrumbLink href="/">Home</BreadcrumbLink>
           </BreadcrumbItem>
@@ -124,8 +125,12 @@ export const BreadcrumbNavigation = () => {
           {updatedBreadcrumbs.map(crumb => {
             return (
               <React.Fragment key={crumb.href}>
-                <BreadcrumbItem className={!crumb.isLast ? 'hidden md:block' : undefined}>
-                  <BreadcrumbLink href={crumb.href} aria-current={crumb.isLast ? 'page' : undefined}>
+                <BreadcrumbItem className={cn(!crumb.isLast ? 'hidden md:block' : 'min-w-0')}>
+                  <BreadcrumbLink
+                    href={crumb.href}
+                    aria-current={crumb.isLast ? 'page' : undefined}
+                    className={crumb.isLast ? 'truncate' : undefined}
+                  >
                     {crumb.title}
                   </BreadcrumbLink>
                 </BreadcrumbItem>
