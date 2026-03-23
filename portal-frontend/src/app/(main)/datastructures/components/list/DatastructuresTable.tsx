@@ -65,6 +65,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
         </ExpanderCell>
       ),
       meta: {
+        truncate: true,
         style: {
           minWidth: '200px',
           color: 'var(--foreground)',
@@ -76,6 +77,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       header: t('tableHeaders.description'),
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           minWidth: '200px',
         },
@@ -95,6 +97,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
       header: t('tableHeaders.versionNumber'),
       cell: info => info.getValue() || '-',
       meta: {
+        truncate: true,
         style: {
           minWidth: '100px',
         },

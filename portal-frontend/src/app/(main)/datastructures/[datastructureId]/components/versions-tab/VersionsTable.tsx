@@ -61,8 +61,9 @@ export const VersionsTable = (props: VersionsTableProps) => {
           </LinkCell>
         ),
       meta: {
+        truncate: true,
         style: {
-          width: '10%',
+          width: '20%',
           minWidth: '100px',
           color: 'var(--foreground)',
           fontWeight: '500',
@@ -73,6 +74,7 @@ export const VersionsTable = (props: VersionsTableProps) => {
       header: t('tableHeaders.description'),
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           width: '25%',
           minWidth: '200px',
@@ -84,7 +86,7 @@ export const VersionsTable = (props: VersionsTableProps) => {
       cell: info => (info.getValue() ? tVersion(`source.${info.getValue()}`) : '-'),
       meta: {
         style: {
-          width: '10%',
+          width: '5%',
           minWidth: '100px',
         },
       },
@@ -106,7 +108,7 @@ export const VersionsTable = (props: VersionsTableProps) => {
       },
       meta: {
         style: {
-          width: '10%',
+          width: '5%',
           minWidth: '120px',
         },
       },

@@ -51,6 +51,7 @@ export const GroupTable = (props: GroupTableProps) => {
       },
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           width: '20%',
         },
@@ -78,6 +79,7 @@ export const GroupTable = (props: GroupTableProps) => {
       header: () => t('tableHeaders.description'),
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           width: '30%',
           minWidth: '200px',

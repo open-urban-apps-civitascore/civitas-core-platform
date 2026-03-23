@@ -39,6 +39,7 @@ export const RolesAssignmentTable = (props: RolesAssignmentTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('columns.name')} />,
       cell: ({ row }) => <LinkCell href={`/roles/${row.original.role.id}`}>{row.original.role.name}</LinkCell>,
       meta: {
+        truncate: true,
         style: {
           width: '20%',
           minWidth: '150px',
@@ -50,13 +51,10 @@ export const RolesAssignmentTable = (props: RolesAssignmentTableProps) => {
       header: t('columns.description'),
       cell: info => info.getValue() || '-',
       meta: {
+        truncate: true,
         style: {
           width: '30%',
           minWidth: '200px',
-          whiteSpace: 'nowrap',
-          maxWidth: '300px',
-          textOverflow: 'ellipsis',
-          overflow: 'hidden',
         },
       },
     }),

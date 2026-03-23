@@ -20,7 +20,7 @@ export const LinkCell = (props: LinkCellProps) => {
       target={target}
       {...linkProps}
     >
-      <div className="flex-1">{children}</div>
+      <div className="flex-1 min-w-0 truncate">{children}</div>
       <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover/link:opacity-100 transition-opacity" />
     </Link>
   )

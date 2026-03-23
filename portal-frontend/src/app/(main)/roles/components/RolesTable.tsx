@@ -41,6 +41,7 @@ export const RolesTable = (props: RolesTableProps) => {
       },
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           width: '17.5%',
         },
@@ -51,6 +52,7 @@ export const RolesTable = (props: RolesTableProps) => {
       header: () => t('tableHeaders.description'),
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           width: '25%',
           minWidth: '200px',

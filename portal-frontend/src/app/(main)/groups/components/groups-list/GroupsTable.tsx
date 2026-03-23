@@ -49,6 +49,7 @@ export const GroupsTable = (props: GroupsTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('list.title')} />,
       cell: ({ row }) => <LinkCell href={`/groups/${row.id}`}>{row.original.name}</LinkCell>,
       meta: {
+        truncate: true,
         style: {
           minWidth: '150px',
           color: 'var(--foreground)',
@@ -68,12 +69,7 @@ export const GroupsTable = (props: GroupsTableProps) => {
       header: t('list.description'),
       cell: info => info.getValue(),
       meta: {
-        style: {
-          whiteSpace: 'nowrap',
-          maxWidth: '300px',
-          textOverflow: 'ellipsis',
-          overflow: 'hidden',
-        },
+        truncate: true,
       },
     }),
     {
