@@ -94,6 +94,13 @@ describe('BaseInfoTab Component Custom Roles', () => {
     const deleteButton = screen.queryByRole('button', { name: 'securityArea.deleteButton' })
     expect(deleteButton).toBeNull()
   })
+
+  it('renders NoDataPage when getRoleError is provided', () => {
+    const error = new Error('Failed to load role')
+    render(<BaseInfoTab {...defaultProps} getRoleError={error} />)
+
+    expect(screen.getByText('errors.loadingError')).toBeDefined()
+  })
 })
 
 describe('BaseInfoTab Component Default Roles', () => {
