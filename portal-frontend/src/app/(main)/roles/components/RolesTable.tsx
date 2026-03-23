@@ -10,7 +10,6 @@ import { resolveUpdater } from '@/utils/table'
 
 interface RolesTableProps extends TableProps<Role> {
   roles: Role[]
-  isLinkDisabled?: boolean
   selectedRoleType?: string
 }
 
@@ -27,7 +26,6 @@ export const RolesTable = (props: RolesTableProps) => {
     onRowClick,
     onPaginationChange,
     onSortingChange,
-    isLinkDisabled,
     selectedRoleType,
   } = props
   const t = useTranslations('roles')
@@ -45,10 +43,7 @@ export const RolesTable = (props: RolesTableProps) => {
         return <SortableTableHeader column={column} title={t('tableHeaders.name')} />
       },
       cell: ({ row }) => (
-        <LinkCell
-          href={`/roles/${row.original.id}${selectedRoleType ? `?tab=${selectedRoleType}` : ''}`}
-          isDisabled={isLinkDisabled}
-        >
+        <LinkCell href={`/roles/${row.original.id}${selectedRoleType ? `?tab=${selectedRoleType}` : ''}`}>
           {row.original.name}
         </LinkCell>
       ),

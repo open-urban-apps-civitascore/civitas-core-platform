@@ -336,7 +336,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const subTabs: Tab<RoleTab>[] = [
     subTabValues.basicInformation,
     ...(hasPermission(PERMISSION_NAMES.PERMISSION_READ) ? [subTabValues.permissions] : []),
-    ...(hasPermission(PERMISSION_NAMES.ASSIGNMENT_READ) ? [subTabValues.groupAssignment] : []),
+    ...(hasPermission(PERMISSION_NAMES.GROUP_READ) ? [subTabValues.groupAssignment] : []),
   ]
   const defaultSubTab = subTabValues.basicInformation.value
 

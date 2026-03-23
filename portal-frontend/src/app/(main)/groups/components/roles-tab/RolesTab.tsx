@@ -287,7 +287,9 @@ export const RolesTab = (props: RolesTabProps) => {
       <SearchHeader
         searchString={searchString}
         onChangeSearchString={setSearchString}
-        customElement={!isReadOnly && isPlatformTab ? AddRoleDropdown : undefined}
+        customElement={
+          !isReadOnly && isPlatformTab && hasPermission(PERMISSION_NAMES.ROLE_READ) ? AddRoleDropdown : undefined
+        }
       />
 
       <div className="flex items-center justify-between gap-4 mb-4">

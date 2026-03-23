@@ -130,7 +130,6 @@ const GroupsList = (props: GroupsListProps) => {
             onSortingChange={setSortingParams}
             onPaginationChange={setPaginationParams}
             onDeleteGroupClick={hasPermission(PERMISSION_NAMES.GROUP_DELETE) ? handleDeleteGroupClick : undefined}
-            isLinkDisabled={!hasPermission(PERMISSION_NAMES.GROUP_READ)}
           />
         </TableContainer>
       </PageBackground>

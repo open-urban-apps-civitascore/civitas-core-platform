@@ -106,7 +106,6 @@ export const UsersListContent = ({
         setRowSelection={setRowSelection}
         onSortingChange={handleSortingChange}
         onPaginationChange={handlePaginationChange}
-        isLinkDisabled={!hasPermission(PERMISSION_NAMES.USER_READ)}
       />
     </>
   )

@@ -68,13 +68,9 @@ const RolesPage = () => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, setTotalPages, pageSize])
 
-  const canReadRole = hasPermission(PERMISSION_NAMES.ROLE_READ)
-
-  const handleRowClick = canReadRole
-    ? (row: Row<Role>) => {
-        router.push(`/roles/${row.original.id}?tab=${selectedRoleType}`)
-      }
-    : undefined
+  const handleRowClick = (row: Row<Role>) => {
+    router.push(`/roles/${row.original.id}?tab=${selectedRoleType}`)
+  }
 
   return (
     <PageContainer headerType="withPrimaryTabs">
@@ -115,7 +111,6 @@ const RolesPage = () => {
             setRowSelection={setRowSelection}
             onSortingChange={setSortingParams}
             onPaginationChange={setPaginationParams}
-            isLinkDisabled={!canReadRole}
             selectedRoleType={selectedRoleType}
           />
         </TableContainer>

@@ -13,7 +13,9 @@ import { SearchHeader } from '@/components/search-area/SearchArea'
 import { SegmentedControlBar, Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { AlertBox, InfoBox } from '@/components/text-box/TextBox'
 import { Button } from '@/components/ui/button'
+import { usePermissions } from '@/hooks/use-permissions'
 import { type Assignment, ASSIGNMENT_SCOPE_TYPES, type AssignmentScope } from '@/types/assignments'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Group } from '@/types/groups'
 import { Role } from '@/types/roles'
 
@@ -54,7 +56,8 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
   const t = useTranslations('roles.groupAssignmentTab')
   const tCommon = useTranslations('common')
   const router = useRouter()
-
+  const { hasPermission } = usePermissions()
+  const canCreateAssignment = hasPermission(PERMISSION_NAMES.ASSIGNMENT_CREATE)
   const [searchInput, setSearchInput] = useState<string>('')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageSize, setPageSize] = useState(10)
@@ -150,11 +153,12 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     return <LoadingSpinner />
   }
 
-  const addGroupButton = canEdit ? (
-    <Button onClick={() => setIsModalOpen(true)}>
-      <Plus /> {t('addGroup')}
-    </Button>
-  ) : null
+  const addGroupButton =
+    canEdit && canCreateAssignment ? (
+      <Button onClick={() => setIsModalOpen(true)}>
+        <Plus /> {t('addGroup')}
+      </Button>
+    ) : null
 
   if (getAssignmentsError) {
     return <NoDataPage className="h-full" title={tCommon('errors.loadingError')} />
