@@ -42,7 +42,6 @@ import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
 import { GroupAssignmentTab } from './group-assignment-tab/GroupAssignmentTab'
 import { PermissionsTab } from './permissions-tab/PermissionsTab'
-import { getActiveResourcesInfo } from 'process'
 
 const subTabValues: Record<RoleTab, Tab<RoleTab>> = {
   basicInformation: {
@@ -103,7 +102,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     data: roleData,
     isFetching: isLoadingRole,
     refetch: refreshRole,
-    error: getRoleError
+    error: getRoleError,
   } = useGetRole({ id: roleId || '', isEnabled: isRoleQueryEnabled })
 
   // Fetch existing assignments for this role
@@ -112,7 +111,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     data: assignmentsData,
     refetch: refetchAssignments,
     isFetching: isLoadingAssignments,
-    error: getAssignmentsError
+    error: getAssignmentsError,
   } = useGetAssignments({
     params: assignmentsParams,
     isEnabled: !!roleId,

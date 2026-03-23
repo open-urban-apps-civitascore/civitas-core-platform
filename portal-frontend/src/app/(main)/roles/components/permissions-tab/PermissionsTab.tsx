@@ -6,6 +6,7 @@ import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useGetPermissions } from '@/app/services/api/permissions/clientRequests'
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
+import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Permission, PermissionItem } from '@/types/permissions'
@@ -14,7 +15,6 @@ import { ROLE_TYPES, RoleType } from '@/types/roles'
 import { CategoryList } from './CategoryList'
 import { DataPermissionsGrid } from './DataPermissionsGrid'
 import { RoleTemplateSelect } from './RoleTemplateSelect'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 
 interface PermissionsTabProps {
   pendingPermissionIds: string[]

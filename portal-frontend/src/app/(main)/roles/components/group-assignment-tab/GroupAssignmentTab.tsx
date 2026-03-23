@@ -52,7 +52,6 @@ export const GroupAssignmentTab = (props: GroupAssignmentTabProps) => {
     getAssignmentsError,
   } = props
   const t = useTranslations('roles.groupAssignmentTab')
-  const tRoles = useTranslations('roles')
   const tCommon = useTranslations('common')
   const router = useRouter()
 

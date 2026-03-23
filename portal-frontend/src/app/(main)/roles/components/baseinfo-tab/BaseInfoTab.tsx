@@ -6,14 +6,13 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
+import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form, FormItem, FormLabel } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { FormRole } from '@/types/roles'
-import { ClassNames } from 'storybook/theming'
 
 interface BaseInfoTabProps {
   form: UseFormReturn<FormRole>
@@ -37,7 +36,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   }, [isReadonly, form])
 
   if (getRoleError) {
-    return <NoDataPage className='h-full' title={tCommon('errors.loadingError') } />
+    return <NoDataPage className="h-full" title={tCommon('errors.loadingError')} />
   }
 
   return (
