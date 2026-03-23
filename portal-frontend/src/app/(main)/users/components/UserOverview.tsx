@@ -3,6 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { RowSelectionState } from '@tanstack/react-table'
+import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -16,8 +17,10 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
+import { useError } from '@/hooks/use-error'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { User, UserFormData, UserFormSchema, UserTab } from '@/types/users'
+import { isEmailConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 import { mapUserToFormData } from '@/utils/users'
 
@@ -62,9 +65,7 @@ export const UserOverview = (props: UserOverviewProps) => {
   const updateUser = useUpdateUser()
   const isLoading = createUser.isPending || updateUser.isPending
   const { setSubTabValueParam, subTabValue } = useQueryParams()
-  const onError = () => {
-    toast.error(tCommon('errors.unexpectedError'))
-  }
+  const { handleUserEmailError } = useError()
 
   const tabs: Tab<UserTab>[] = [tabValues.userData, tabValues.groups, tabValues.roles]
 
@@ -130,7 +131,13 @@ export const UserOverview = (props: UserOverviewProps) => {
           toast.success(t('messages.createSuccess'))
           router.push(`/users/${data.id}?mode=edit`)
         },
-        onError,
+        onError: error => {
+          if (isEmailConflictError(error as AxiosError)) {
+            handleUserEmailError(form, parsed.email)
+          } else {
+            toast.error(t('errors.creationError'))
+          }
+        },
       },
     )
   }
@@ -153,7 +160,13 @@ export const UserOverview = (props: UserOverviewProps) => {
           router.refresh()
           toast.success(t('messages.updateSuccess'))
         },
-        onError,
+        onError: error => {
+          if (isEmailConflictError(error as AxiosError)) {
+            handleUserEmailError(form, parsed.email)
+          } else {
+            toast.error(t('errors.updateError'))
+          }
+        },
       },
     )
   }

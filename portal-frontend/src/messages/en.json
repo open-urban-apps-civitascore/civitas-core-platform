@@ -359,6 +359,12 @@
     "messages": {
       "createSuccess": "User has been successfully created.",
       "updateSuccess": "User has been successfully updated."
+    },
+    "errors": {
+      "creationError": "An error occurred while creating the user.",
+      "updateError": "An error occurred while updating the user.",
+      "emailExists": "A user with this email already exists.",
+      "emailExistsToast": "A user with the email {email} already exists. Please, choose another email address."
     }
   },
   "groups": {

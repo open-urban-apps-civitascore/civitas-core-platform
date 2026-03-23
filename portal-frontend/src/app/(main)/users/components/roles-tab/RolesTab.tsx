@@ -108,7 +108,7 @@ export const RolesTab = (props: RolesTabProps) => {
             <SegmentedControlBar tabs={segments} selectedTab={activeSegment} onTabChange={handleSegmentChange} />
             {infoBannerText && <AlertBox text={infoBannerText} />}
           </div>
-          <TableContainer shouldRespectSearchHeight={false} className="h-[calc(100%-7.5rem)]">
+          <TableContainer shouldRespectSearchHeight shouldRespectSegmentedControlBar>
             <RolesAssignmentTable
               assignments={assignments}
               rowCount={rowCount}
