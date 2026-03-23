@@ -20,6 +20,13 @@ vi.mock('@/app/services/api/groups/clientRequests', () => ({
   })),
 }))
 
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: () => ({
+    hasPermission: (perm: string) => perm === 'ASSIGNMENT_CREATE',
+    hasAnyPermission: () => false,
+  }),
+}))
+
 const defaultProps = {
   selectedGroupIds: [] as string[],
   onGroupAssignmentUpdate: vi.fn(),

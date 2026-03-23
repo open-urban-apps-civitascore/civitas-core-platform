@@ -140,8 +140,11 @@ test.describe('Role Permissions Tab — Permission Gating', () => {
       // Navigate to permissions tab
       await page.getByTestId('tab-permissions').click()
 
-      // Role template selector (combobox) should be visible in edit mode
-      await expect(page.getByRole('combobox')).toBeVisible({ timeout: 10_000 })
+      // Role template selector (search header's custom element) should be visible in edit mode
+      // The template select is a BasicSelect rendered next to the search input
+      const searchHeader = page.getByTestId('searchArea')
+      await expect(searchHeader).toBeVisible({ timeout: 10_000 })
+      await expect(searchHeader.getByRole('combobox')).toBeVisible()
     } finally {
       await page.close()
       await context.close()
@@ -166,7 +169,9 @@ test.describe('Role Permissions Tab — Permission Gating', () => {
       await expect(page.getByRole('checkbox').first()).toBeVisible({ timeout: 10_000 })
 
       // Role template selector should NOT be visible in read-only mode
-      await expect(page.getByRole('combobox')).not.toBeVisible()
+      const searchHeader = page.getByTestId('searchArea')
+      await expect(searchHeader).toBeVisible({ timeout: 10_000 })
+      await expect(searchHeader.getByRole('combobox')).not.toBeVisible()
     } finally {
       await page.close()
       await context.close()

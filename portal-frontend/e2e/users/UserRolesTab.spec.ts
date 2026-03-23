@@ -163,11 +163,10 @@ test.describe('User Detail — Roles Tab Content', () => {
     })
     resources.groupIds.push(testGroup.id)
 
-    // Create an assignment: group + role + TENANT scope
+    // Create an assignment: group + role (SYSTEM roles are implicitly tenant-wide)
     const assignment = await adminApi.createAssignment({
       groupId: testGroup.id,
       roleId: testRole.id,
-      scopeType: 'TENANT',
     })
     resources.assignmentIds.push(assignment.id)
 

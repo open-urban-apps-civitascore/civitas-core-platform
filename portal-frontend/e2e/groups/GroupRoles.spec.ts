@@ -2,8 +2,9 @@
  * E2E tests for group detail — roles tab permission gating.
  *
  * MR320 test plan — Feature 4: Group detail, roles tab
- *   - "Add role" button visible in edit mode with GROUP_UPDATE
+ *   - "Add role" button visible in edit mode with GROUP_UPDATE + ROLE_READ
  *   - "Add role" button hidden without GROUP_UPDATE
+ *   - "Add role" button hidden without ROLE_READ (even in edit mode)
  *   - "Add role" hidden on non-Platform scope tabs
  *   - Remove role action visible in edit mode on Platform tab
  *   - No remove role action in read-only mode
@@ -31,6 +32,7 @@ test.describe('Group Roles Tab — Permission Gating', () => {
   let testRole: { id: string; name: string }
 
   let userWithUpdate: TestUserProfile
+  let userWithUpdateNoRoleRead: TestUserProfile
   let userReadOnly: TestUserProfile
   let userWithRoleRead: TestUserProfile
   let userNoRoleRead: TestUserProfile
@@ -56,11 +58,10 @@ test.describe('Group Roles Tab — Permission Gating', () => {
     const assignment = await adminApi.createAssignment({
       groupId: testGroup.id,
       roleId: testRole.id,
-      scopeType: 'TENANT',
     })
     resources.assignmentIds.push(assignment.id)
 
-    // User with GROUP_READ + GROUP_UPDATE → can enter edit mode, sees "Add role"
+    // User with GROUP_READ + GROUP_UPDATE + ROLE_READ → can enter edit mode, sees "Add role"
     userWithUpdate = await createTestUserWithPermissions(
       adminApi,
       {
@@ -68,6 +69,18 @@ test.describe('Group Roles Tab — Permission Gating', () => {
         lastName: `GrpRolesEdit${Date.now()}`,
         email: `e2e-grprolesedit-${Date.now()}@e2e.civitas.dev`,
         permissions: ['GROUP_READ', 'GROUP_UPDATE', 'ROLE_READ'],
+      },
+      resources,
+    )
+
+    // User with GROUP_READ + GROUP_UPDATE but no ROLE_READ → can edit but no "Add role"
+    userWithUpdateNoRoleRead = await createTestUserWithPermissions(
+      adminApi,
+      {
+        firstName: 'E2E',
+        lastName: `GrpRolesNoRole${Date.now()}`,
+        email: `e2e-grprolesnorole-${Date.now()}@e2e.civitas.dev`,
+        permissions: ['GROUP_READ', 'GROUP_UPDATE'],
       },
       resources,
     )
@@ -120,6 +133,28 @@ test.describe('Group Roles Tab — Permission Gating', () => {
 
       // "Add role" button should be visible
       await expect(page.getByRole('button', { name: /add role|rolle hinzufügen/i })).toBeVisible({ timeout: 10_000 })
+    } finally {
+      await page.close()
+      await context.close()
+    }
+  })
+
+  test('"Add role" button hidden without ROLE_READ in edit mode', async ({ browser }) => {
+    const { page, context } = await loginAs(browser, {
+      email: userWithUpdateNoRoleRead.email,
+      password: userWithUpdateNoRoleRead.password,
+    })
+
+    try {
+      await page.goto(`/groups/${testGroup.id}?mode=edit`)
+      await page.waitForLoadState('domcontentloaded')
+      await expect(page.getByTestId('pageHeader')).toContainText(testGroup.name, { timeout: 20_000 })
+
+      // Navigate to Roles tab
+      await page.getByTestId('tab-roles').click()
+
+      // "Add role" button should NOT be visible (has GROUP_UPDATE but not ROLE_READ)
+      await expect(page.getByRole('button', { name: /add role|rolle hinzufügen/i })).not.toBeVisible()
     } finally {
       await page.close()
       await context.close()

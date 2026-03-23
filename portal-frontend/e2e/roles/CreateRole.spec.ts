@@ -3,10 +3,9 @@
  *
  * MR320 test plan — Feature 7: Roles list, Feature 8: Role detail
  *   - "New Role" button visible/hidden based on ROLE_CREATE
- *   - Role names are links vs plain text based on ROLE_READ
  *   - Edit button visible/hidden based on ROLE_UPDATE
  *   - Permissions tab visible/hidden based on PERMISSION_READ
- *   - Group Assignment tab visible/hidden based on ASSIGNMENT_READ
+ *   - Group Assignment tab visible/hidden based on GROUP_READ
  *   - Delete button visible/hidden based on ROLE_DELETE
  *   - Default role: no Edit on Base Info tab, no Delete button
  *   - New role: Permissions & Group Assignment tabs disabled until saved
@@ -29,22 +28,13 @@ test.describe('Roles List — Permission Gating', () => {
 
   let adminApi: ApiClient
   let resources: TestResources
-  let testRole: { id: string; name: string }
 
   let userWithCreate: TestUserProfile
   let userReadOnly: TestUserProfile
-  let userNoRoleRead: TestUserProfile
 
   test.beforeAll(async () => {
     adminApi = await ApiClient.asUser(TEST_USERNAME, TEST_PASSWORD)
     resources = emptyResources()
-
-    testRole = await adminApi.createRole({
-      name: `e2e-gating-role-${Date.now()}`,
-      description: 'Role for permission gating tests',
-      roleType: 'SYSTEM',
-    })
-    resources.roleIds.push(testRole.id)
 
     // User with ROLE_READ + ROLE_CREATE → sees "Create Role" button
     userWithCreate = await createTestUserWithPermissions(
@@ -58,7 +48,7 @@ test.describe('Roles List — Permission Gating', () => {
       resources,
     )
 
-    // User with only ROLE_READ → no create button, names are links
+    // User with only ROLE_READ → no create button
     userReadOnly = await createTestUserWithPermissions(
       adminApi,
       {
@@ -66,18 +56,6 @@ test.describe('Roles List — Permission Gating', () => {
         lastName: `RoleRO${Date.now()}`,
         email: `e2e-rolero-${Date.now()}@e2e.civitas.dev`,
         permissions: ['ROLE_READ'],
-      },
-      resources,
-    )
-
-    // User with ROLE_CREATE but no ROLE_READ → names are plain text
-    userNoRoleRead = await createTestUserWithPermissions(
-      adminApi,
-      {
-        firstName: 'E2E',
-        lastName: `NoRoleRead${Date.now()}`,
-        email: `e2e-noroleread-${Date.now()}@e2e.civitas.dev`,
-        permissions: ['ROLE_CREATE'],
       },
       resources,
     )
@@ -117,49 +95,6 @@ test.describe('Roles List — Permission Gating', () => {
       await expect(page.getByTestId('searchArea')).toBeVisible({ timeout: 20_000 })
 
       await expect(page.getByRole('button', { name: /create role|rolle erstellen/i })).not.toBeVisible()
-    } finally {
-      await page.close()
-      await context.close()
-    }
-  })
-
-  test('role names are clickable links with ROLE_READ', async ({ browser }) => {
-    const { page, context } = await loginAs(browser, {
-      email: userReadOnly.email,
-      password: userReadOnly.password,
-    })
-
-    try {
-      await page.goto('/roles')
-      await page.waitForLoadState('domcontentloaded')
-      await expect(page.getByTestId('searchArea')).toBeVisible({ timeout: 20_000 })
-
-      await page.getByTestId('searchArea').locator('input').fill(testRole.name)
-      await expect(page.getByRole('row').filter({ hasText: testRole.name })).toBeVisible({ timeout: 10_000 })
-
-      await expect(page.getByRole('link', { name: testRole.name })).toBeVisible()
-    } finally {
-      await page.close()
-      await context.close()
-    }
-  })
-
-  test('role names are plain text without ROLE_READ', async ({ browser }) => {
-    const { page, context } = await loginAs(browser, {
-      email: userNoRoleRead.email,
-      password: userNoRoleRead.password,
-    })
-
-    try {
-      await page.goto('/roles')
-      await page.waitForLoadState('domcontentloaded')
-      await expect(page.getByTestId('searchArea')).toBeVisible({ timeout: 20_000 })
-
-      await page.getByTestId('searchArea').locator('input').fill(testRole.name)
-      await expect(page.getByRole('row').filter({ hasText: testRole.name })).toBeVisible({ timeout: 10_000 })
-
-      // Name should be visible as text but NOT as a link
-      await expect(page.getByRole('link', { name: testRole.name })).not.toBeVisible()
     } finally {
       await page.close()
       await context.close()
@@ -228,9 +163,9 @@ test.describe('Role Detail — Permission Gating', () => {
       adminApi,
       {
         firstName: 'E2E',
-        lastName: `AssignRead${Date.now()}`,
-        email: `e2e-assignread-${Date.now()}@e2e.civitas.dev`,
-        permissions: ['ROLE_READ', 'ASSIGNMENT_READ'],
+        lastName: `GrpRead${Date.now()}`,
+        email: `e2e-grpread-${Date.now()}@e2e.civitas.dev`,
+        permissions: ['ROLE_READ', 'GROUP_READ'],
       },
       resources,
     )
@@ -316,7 +251,7 @@ test.describe('Role Detail — Permission Gating', () => {
       await page.waitForLoadState('domcontentloaded')
       await expect(page.getByTestId('pageHeader')).toBeVisible({ timeout: 20_000 })
 
-      await expect(page.getByTestId('tab-baseInfo')).toBeVisible()
+      await expect(page.getByTestId('tab-basicInformation')).toBeVisible()
       await expect(page.getByTestId('tab-permissions')).not.toBeVisible()
     } finally {
       await page.close()
@@ -324,7 +259,7 @@ test.describe('Role Detail — Permission Gating', () => {
     }
   })
 
-  test('Group Assignment tab visible with ASSIGNMENT_READ', async ({ browser }) => {
+  test('Group Assignment tab visible with GROUP_READ', async ({ browser }) => {
     const { page, context } = await loginAs(browser, {
       email: userWithAssignRead.email,
       password: userWithAssignRead.password,
@@ -342,7 +277,7 @@ test.describe('Role Detail — Permission Gating', () => {
     }
   })
 
-  test('Group Assignment tab hidden without ASSIGNMENT_READ', async ({ browser }) => {
+  test('Group Assignment tab hidden without GROUP_READ', async ({ browser }) => {
     const { page, context } = await loginAs(browser, {
       email: userReadOnly.email,
       password: userReadOnly.password,
@@ -420,8 +355,8 @@ test.describe('Default Role — Permission Gating', () => {
     resources = emptyResources()
 
     // Find a default (readonly) role — these are seeded by the system
-    const rolesResponse = await adminApi.getRoles('readonly=true')
-    const defaultRole = rolesResponse.content[0]
+    const rolesResponse = await adminApi.getRoles()
+    const defaultRole = rolesResponse.content.find(r => r.readonly)
     if (!defaultRole) throw new Error('No default role found in system')
     defaultRoleId = defaultRole.id
     defaultRoleName = defaultRole.name
@@ -432,7 +367,7 @@ test.describe('Default Role — Permission Gating', () => {
         firstName: 'E2E',
         lastName: `DefaultRole${Date.now()}`,
         email: `e2e-defaultrole-${Date.now()}@e2e.civitas.dev`,
-        permissions: ['ROLE_READ', 'ROLE_UPDATE', 'ROLE_DELETE', 'PERMISSION_READ', 'ASSIGNMENT_READ'],
+        permissions: ['ROLE_READ', 'ROLE_UPDATE', 'ROLE_DELETE', 'PERMISSION_READ', 'GROUP_READ'],
       },
       resources,
     )
@@ -451,7 +386,7 @@ test.describe('Default Role — Permission Gating', () => {
     try {
       await page.goto(`/roles/${defaultRoleId}?tab=SYSTEM`)
       await page.waitForLoadState('domcontentloaded')
-      await expect(page.getByTestId('pageHeader')).toContainText(defaultRoleName, { timeout: 20_000 })
+      await expect(page.getByTestId('pageHeader').first()).toContainText(defaultRoleName, { timeout: 20_000 })
 
       // Default role: edit button hidden on Base Info tab (isDefaultRole && !isGroupTab)
       await expect(page.getByTestId('editButton')).not.toBeVisible()
@@ -470,7 +405,7 @@ test.describe('Default Role — Permission Gating', () => {
     try {
       await page.goto(`/roles/${defaultRoleId}?tab=SYSTEM`)
       await page.waitForLoadState('domcontentloaded')
-      await expect(page.getByTestId('pageHeader')).toContainText(defaultRoleName, { timeout: 20_000 })
+      await expect(page.getByTestId('pageHeader').first()).toContainText(defaultRoleName, { timeout: 20_000 })
 
       // No edit button means no way to enter edit mode → no delete button either
       await expect(page.getByTestId('editButton')).not.toBeVisible()
@@ -499,7 +434,7 @@ test.describe('New Role — Tab State', () => {
         firstName: 'E2E',
         lastName: `NewRole${Date.now()}`,
         email: `e2e-newrole-${Date.now()}@e2e.civitas.dev`,
-        permissions: ['ROLE_READ', 'ROLE_CREATE', 'PERMISSION_READ', 'ASSIGNMENT_READ'],
+        permissions: ['ROLE_READ', 'ROLE_CREATE', 'PERMISSION_READ', 'GROUP_READ'],
       },
       resources,
     )

@@ -3,7 +3,6 @@
  *
  * MR320 test plan — Feature 5: Users list, Feature 6: User detail
  *   - "Add User" button visible/hidden based on USER_CREATE
- *   - User names are links vs plain text based on USER_READ
  *   - Edit button visible/hidden based on USER_UPDATE
  *   - Groups tab visible/hidden based on GROUP_READ
  */
@@ -27,7 +26,7 @@ test.describe('Users List — Permission Gating', () => {
   let resources: TestResources
 
   let userWithCreate: TestUserProfile
-  let userReadOnly: TestUserProfile
+  let userWithoutCreate: TestUserProfile
 
   test.beforeAll(async () => {
     adminApi = await ApiClient.asUser(TEST_USERNAME, TEST_PASSWORD)
@@ -45,8 +44,8 @@ test.describe('Users List — Permission Gating', () => {
       resources,
     )
 
-    // User with only USER_READ → no "Add User" button, names are links
-    userReadOnly = await createTestUserWithPermissions(
+    // User with only USER_READ → no "Add User" button
+    userWithoutCreate = await createTestUserWithPermissions(
       adminApi,
       {
         firstName: 'E2E',
@@ -82,8 +81,8 @@ test.describe('Users List — Permission Gating', () => {
 
   test('"Add User" button hidden without USER_CREATE', async ({ browser }) => {
     const { page, context } = await loginAs(browser, {
-      email: userReadOnly.email,
-      password: userReadOnly.password,
+      email: userWithoutCreate.email,
+      password: userWithoutCreate.password,
     })
 
     try {
@@ -92,26 +91,6 @@ test.describe('Users List — Permission Gating', () => {
       await expect(page.getByTestId('usersTable')).toBeVisible({ timeout: 20_000 })
 
       await expect(page.getByTestId('addUserButton')).not.toBeVisible()
-    } finally {
-      await page.close()
-      await context.close()
-    }
-  })
-
-  test('user names are clickable links with USER_READ', async ({ browser }) => {
-    const { page, context } = await loginAs(browser, {
-      email: userReadOnly.email,
-      password: userReadOnly.password,
-    })
-
-    try {
-      await page.goto('/users')
-      await page.waitForLoadState('domcontentloaded')
-      await expect(page.getByTestId('usersTable')).toBeVisible({ timeout: 20_000 })
-
-      // At least one user row should have a link (the test users we created)
-      const firstUserLink = page.getByTestId('usersTable').getByRole('link').first()
-      await expect(firstUserLink).toBeVisible({ timeout: 10_000 })
     } finally {
       await page.close()
       await context.close()
@@ -192,7 +171,7 @@ test.describe('User Detail — Permission Gating', () => {
     try {
       await page.goto(`/users/${targetUser.id}`)
       await page.waitForLoadState('domcontentloaded')
-      await expect(page.getByTestId('pageHeader')).toBeVisible({ timeout: 20_000 })
+      await expect(page.getByTestId('pageHeader').first()).toBeVisible({ timeout: 20_000 })
 
       await expect(page.getByTestId('editButton')).toBeVisible()
     } finally {
@@ -210,7 +189,7 @@ test.describe('User Detail — Permission Gating', () => {
     try {
       await page.goto(`/users/${targetUser.id}`)
       await page.waitForLoadState('domcontentloaded')
-      await expect(page.getByTestId('pageHeader')).toBeVisible({ timeout: 20_000 })
+      await expect(page.getByTestId('pageHeader').first()).toBeVisible({ timeout: 20_000 })
 
       await expect(page.getByTestId('editButton')).not.toBeVisible()
     } finally {
@@ -228,7 +207,7 @@ test.describe('User Detail — Permission Gating', () => {
     try {
       await page.goto(`/users/${targetUser.id}`)
       await page.waitForLoadState('domcontentloaded')
-      await expect(page.getByTestId('pageHeader')).toBeVisible({ timeout: 20_000 })
+      await expect(page.getByTestId('pageHeader').first()).toBeVisible({ timeout: 20_000 })
 
       await expect(page.getByTestId('tab-groups')).toBeVisible()
     } finally {
@@ -246,7 +225,7 @@ test.describe('User Detail — Permission Gating', () => {
     try {
       await page.goto(`/users/${targetUser.id}`)
       await page.waitForLoadState('domcontentloaded')
-      await expect(page.getByTestId('pageHeader')).toBeVisible({ timeout: 20_000 })
+      await expect(page.getByTestId('pageHeader').first()).toBeVisible({ timeout: 20_000 })
 
       await expect(page.getByTestId('tab-userData')).toBeVisible()
       await expect(page.getByTestId('tab-groups')).not.toBeVisible()

@@ -40,6 +40,13 @@ vi.mock('@/app/services/api/roles/clientRequests', () => ({
   }),
 }))
 
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: () => ({
+    hasPermission: (perm: string) => perm === 'ROLE_READ',
+    hasAnyPermission: () => false,
+  }),
+}))
+
 const systemAssignment: Assignment = {
   id: 'a1',
   createdAt: '',

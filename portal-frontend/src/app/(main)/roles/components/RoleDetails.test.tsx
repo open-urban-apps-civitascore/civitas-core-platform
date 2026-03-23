@@ -65,13 +65,13 @@ describe('RoleDetails permission gating', () => {
   })
 
   describe('Group Assignment tab visibility', () => {
-    it('shows Group Assignment tab when user has ASSIGNMENT_READ', () => {
-      mockHasPermission([PERMISSION_NAMES.ASSIGNMENT_READ])
+    it('shows Group Assignment tab when user has GROUP_READ', () => {
+      mockHasPermission([PERMISSION_NAMES.GROUP_READ])
       render(<RoleDetails roleId="role-1" />)
       expect(screen.getByText('roles.tabLabels.groupAssignment')).toBeInTheDocument()
     })
 
-    it('hides Group Assignment tab when user lacks ASSIGNMENT_READ', () => {
+    it('hides Group Assignment tab when user lacks GROUP_READ', () => {
       mockHasPermission([PERMISSION_NAMES.ROLE_READ])
       render(<RoleDetails roleId="role-1" />)
       expect(screen.queryByText('roles.tabLabels.groupAssignment')).not.toBeInTheDocument()
