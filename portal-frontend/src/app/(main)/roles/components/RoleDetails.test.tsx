@@ -42,6 +42,7 @@ import { RoleDetails } from './RoleDetails'
 const mockHasPermission = (permissions: string[]) => {
   vi.mocked(usePermissions).mockReturnValue({
     hasPermission: (permission: string) => permissions.includes(permission),
+    hasAnyPermission: (...perms: string[]) => perms.some(p => permissions.includes(p)),
   })
 }
 
