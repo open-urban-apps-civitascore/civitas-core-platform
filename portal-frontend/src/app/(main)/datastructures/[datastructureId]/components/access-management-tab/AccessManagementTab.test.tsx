@@ -2,8 +2,6 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
-import { Group } from '@/types/groups'
-import { Role } from '@/types/roles'
 
 import { AccessManagementTab } from './AccessManagementTab'
 
@@ -30,36 +28,6 @@ vi.mock('@/components/access-management/GenericAssignmentsList', () => ({
   ),
 }))
 
-const mockGroups: Group[] = [
-  {
-    id: '1',
-    name: 'Admin Group',
-    description: 'Administrator group',
-    roles: null,
-    members: null,
-    contactUser: null,
-    assignments: null,
-    createdAt: '2024-01-01',
-    modifiedAt: '2024-01-01',
-  },
-]
-
-const mockRoles: Role[] = [
-  {
-    id: '1',
-    name: 'Admin',
-    description: 'Administrator role',
-    roleType: 'DATA',
-    permissions: [],
-    readonly: false,
-    modifiedBy: null,
-    modifiedAt: null,
-    createdAt: '2024-01-01',
-    groupCount: 0,
-    userCount: 0,
-  },
-]
-
 const mockAssignedGroups: GroupRoleAssignmentTable[] = [
   {
     groupId: '1',
@@ -72,8 +40,6 @@ const mockAssignedGroups: GroupRoleAssignmentTable[] = [
 const defaultProps = {
   assignedGroups: mockAssignedGroups,
   onAssignedGroupsChange: vi.fn(),
-  groups: mockGroups,
-  roles: mockRoles,
 }
 
 describe('AccessManagementTab', () => {
