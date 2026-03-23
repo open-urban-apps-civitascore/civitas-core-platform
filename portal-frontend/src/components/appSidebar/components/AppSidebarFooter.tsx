@@ -1,7 +1,7 @@
 import { ChevronsUpDown, LogOut } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
-import { signOut } from '@/auth'
+import { signOutAction } from '@/app/actions/auth'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -61,12 +61,7 @@ export const AppSidebarFooter = (props: AppSidebarFooterProps) => {
 
               <DropdownMenuSeparator />
 
-              <form
-                action={async () => {
-                  'use server'
-                  await signOut({ redirectTo: '/login' })
-                }}
-              >
+              <form action={signOutAction}>
                 <DropdownMenuItem asChild>
                   <button type="submit" className="w-full flex items-center">
                     <LogOut className="mr-2 size-4" />

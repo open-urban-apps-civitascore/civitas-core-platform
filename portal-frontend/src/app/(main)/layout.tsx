@@ -17,8 +17,9 @@ const MainLayout = async (props: MainLayoutProps) => {
   let currentUser: CurrentUser
   try {
     currentUser = await getCurrentUser()
-  } catch {
-    redirect('/login')
+  } catch (error) {
+    const isAuthError = error instanceof Error && error.message.includes('status 401')
+    redirect(isAuthError ? '/api/auth/signout' : '/error')
   }
 
   const queryClient = new QueryClient()

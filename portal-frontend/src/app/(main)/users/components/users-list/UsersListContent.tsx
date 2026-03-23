@@ -7,6 +7,8 @@ import { useState } from 'react'
 
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { Button } from '@/components/ui/button'
+import { usePermissions } from '@/hooks/use-permissions'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { ListUser } from '@/types/users'
 
 import UsersTable from './UsersTable'
@@ -34,6 +36,7 @@ export const UsersListContent = ({
 }: UsersListContentProps) => {
   const router = useRouter()
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const { hasPermission } = usePermissions()
 
   const handleSortingChange = (updater: Updater<SortingState>) => {
     const newSorting = typeof updater === 'function' ? updater(initialSorting) : updater
@@ -82,12 +85,12 @@ export const UsersListContent = ({
     router.push(`?${queryParts.join('&')}`)
   }
 
-  const CustomElement = (
+  const CustomElement = hasPermission(PERMISSION_NAMES.USER_CREATE) ? (
     <Button data-testid="addUserButton" onClick={() => router.push('/users/create')}>
       <Plus />
       {newUserLabel}
     </Button>
-  )
+  ) : undefined
 
   return (
     <>
