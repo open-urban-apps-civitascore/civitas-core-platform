@@ -125,11 +125,13 @@ export const BreadcrumbNavigation = () => {
           {updatedBreadcrumbs.map(crumb => {
             return (
               <React.Fragment key={crumb.href}>
-                <BreadcrumbItem className={cn(!crumb.isLast ? 'hidden md:block' : 'min-w-0')}>
+                <BreadcrumbItem
+                  className={cn('min-w-0', !crumb.isLast ? 'hidden md:block' : '', !crumb.isDynamic && 'shrink-0')}
+                >
                   <BreadcrumbLink
                     href={crumb.href}
                     aria-current={crumb.isLast ? 'page' : undefined}
-                    className={crumb.isLast ? 'truncate' : undefined}
+                    className={crumb.isDynamic ? 'truncate block' : undefined}
                   >
                     {crumb.title}
                   </BreadcrumbLink>
