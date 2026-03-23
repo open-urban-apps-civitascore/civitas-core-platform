@@ -53,11 +53,20 @@ const mockRoles: Role[] = [
   },
 ]
 
+const mockUseGetRoles = vi.fn().mockReturnValue({
+  data: { data: mockRoles, totalElements: mockRoles.length, totalPages: 1 },
+  isLoading: false,
+  isError: false,
+})
+
+vi.mock('@/app/services/api/roles/clientRequests', () => ({
+  useGetRoles: (...args: unknown[]) => mockUseGetRoles(...args),
+}))
+
 describe('AddRoleModal', () => {
   const defaultProps = {
     open: true,
     onOpenChange: vi.fn(),
-    roles: mockRoles,
     assignedRoleIds: ['1'], // Admin role already assigned
     onAddRoles: vi.fn(),
     groupName: 'Test Group',
@@ -83,17 +92,21 @@ describe('AddRoleModal', () => {
     expect(screen.getByText(/test group/i)).toBeInTheDocument()
   })
 
-  it('displays available roles excluding already assigned ones', () => {
+  it('displays all roles with assigned ones shown as disabled checkboxes', () => {
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
         <AddRoleModal {...defaultProps} />
       </NextIntlClientProvider>,
     )
 
+    expect(screen.getByText('Admin')).toBeInTheDocument()
     expect(screen.getByText('Editor')).toBeInTheDocument()
     expect(screen.getByText('Viewer')).toBeInTheDocument()
-    // Admin role should not be in the list (already assigned)
-    expect(screen.queryByText('Admin')).not.toBeInTheDocument()
+
+    // Admin role checkbox should be checked and disabled
+    const adminCheckbox = screen.getByLabelText(/rolle auswählen admin/i)
+    expect(adminCheckbox).toBeChecked()
+    expect(adminCheckbox).toBeDisabled()
   })
 
   it('shows selection counter when roles are selected', async () => {
@@ -103,8 +116,8 @@ describe('AddRoleModal', () => {
       </NextIntlClientProvider>,
     )
 
-    const checkboxes = screen.getAllByRole('checkbox')
-    fireEvent.click(checkboxes[1]) // Select first available role
+    const editorCheckbox = screen.getByLabelText(/rolle auswählen editor/i)
+    fireEvent.click(editorCheckbox)
 
     await waitFor(() => {
       expect(screen.getByText(/1.*ausgewählt/i)).toBeInTheDocument()
@@ -129,8 +142,8 @@ describe('AddRoleModal', () => {
       </NextIntlClientProvider>,
     )
 
-    const checkboxes = screen.getAllByRole('checkbox')
-    fireEvent.click(checkboxes[1])
+    const editorCheckbox = screen.getByLabelText(/rolle auswählen editor/i)
+    fireEvent.click(editorCheckbox)
 
     await waitFor(() => {
       const confirmButton = screen.getByRole('button', { name: /hinzufügen/i })
@@ -138,7 +151,7 @@ describe('AddRoleModal', () => {
     })
   })
 
-  it('calls onAddRoles with selected role IDs when confirmed', async () => {
+  it('calls onAddRoles with selected roles when confirmed', async () => {
     const onAddRoles = vi.fn()
 
     render(
@@ -147,25 +160,129 @@ describe('AddRoleModal', () => {
       </NextIntlClientProvider>,
     )
 
-    const checkboxes = screen.getAllByRole('checkbox')
-    fireEvent.click(checkboxes[1]) // Select Editor role (id: '2')
+    const editorCheckbox = screen.getByLabelText(/rolle auswählen editor/i)
+    fireEvent.click(editorCheckbox)
 
     const confirmButton = screen.getByRole('button', { name: /hinzufügen/i })
     fireEvent.click(confirmButton)
 
     await waitFor(() => {
-      expect(onAddRoles).toHaveBeenCalledWith(['2'])
+      expect(onAddRoles).toHaveBeenCalledWith([mockRoles[1]])
     })
   })
 
-  it('shows empty state when all roles are assigned', () => {
+  it('shows empty state when no roles exist', () => {
+    mockUseGetRoles.mockReturnValue({
+      data: { data: [], totalElements: 0, totalPages: 0 },
+      isLoading: false,
+      isError: false,
+    })
+
     render(
       <NextIntlClientProvider locale="de" messages={messages}>
-        <AddRoleModal {...defaultProps} assignedRoleIds={['1', '2', '3']} />
+        <AddRoleModal {...defaultProps} assignedRoleIds={[]} />
       </NextIntlClientProvider>,
     )
 
     expect(screen.getByText(/keine rollen verfügbar, die hinzugefügt werden können/i)).toBeInTheDocument()
+
+    // Restore default mock
+    mockUseGetRoles.mockReturnValue({
+      data: { data: mockRoles, totalElements: mockRoles.length, totalPages: 1 },
+      isLoading: false,
+      isError: false,
+    })
+  })
+
+  it('shows error message when roles fetch fails', () => {
+    mockUseGetRoles.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+    })
+
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <AddRoleModal {...defaultProps} assignedRoleIds={[]} />
+      </NextIntlClientProvider>,
+    )
+
+    expect(screen.getByText(/fehler beim laden der daten/i)).toBeInTheDocument()
+
+    // Restore default mock
+    mockUseGetRoles.mockReturnValue({
+      data: { data: mockRoles, totalElements: mockRoles.length, totalPages: 1 },
+      isLoading: false,
+      isError: false,
+    })
+  })
+
+  it('does not include assigned roles in onAddRoles callback', async () => {
+    const onAddRoles = vi.fn()
+
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <AddRoleModal {...defaultProps} onAddRoles={onAddRoles} />
+      </NextIntlClientProvider>,
+    )
+
+    // Select an unassigned role
+    fireEvent.click(screen.getByLabelText(/rolle auswählen editor/i))
+
+    const confirmButton = screen.getByRole('button', { name: /hinzufügen/i })
+    fireEvent.click(confirmButton)
+
+    await waitFor(() => {
+      // Should only contain Editor, not Admin (which is assigned)
+      expect(onAddRoles).toHaveBeenCalledWith([mockRoles[1]])
+      expect(onAddRoles).not.toHaveBeenCalledWith(expect.arrayContaining([mockRoles[0]]))
+    })
+  })
+
+  it('does not count assigned roles in selection counter', () => {
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <AddRoleModal {...defaultProps} />
+      </NextIntlClientProvider>,
+    )
+
+    // Admin role is assigned (checked+disabled) but counter should be 0
+    expect(screen.getByText(/0 ausgewählt/i)).toBeInTheDocument()
+  })
+
+  it('does not call onAddRoles when cancelled', async () => {
+    const onAddRoles = vi.fn()
+
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <AddRoleModal {...defaultProps} onAddRoles={onAddRoles} />
+      </NextIntlClientProvider>,
+    )
+
+    fireEvent.click(screen.getByLabelText(/rolle auswählen editor/i))
+
+    const cancelButton = screen.getByRole('button', { name: /abbrechen/i })
+    fireEvent.click(cancelButton)
+
+    expect(onAddRoles).not.toHaveBeenCalled()
+  })
+
+  it('passes pagination and roleType params to useGetRoles', () => {
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <AddRoleModal {...defaultProps} />
+      </NextIntlClientProvider>,
+    )
+
+    expect(mockUseGetRoles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.any(URLSearchParams),
+      }),
+    )
+    const params = mockUseGetRoles.mock.calls[0][0].params as URLSearchParams
+    expect(params.get('page')).toBe('0')
+    expect(params.get('size')).toBe('10')
+    expect(params.get('roleType')).toBe('DATA,GOVERNANCE')
   })
 
   it('allows selecting multiple roles', async () => {
@@ -184,7 +301,7 @@ describe('AddRoleModal', () => {
       expect(screen.getByText(/1 ausgewählt/i)).toBeInTheDocument()
     })
 
-    // Select Viewer role - re-query after the first selection
+    // Select Viewer role
     fireEvent.click(screen.getByLabelText(/rolle auswählen viewer/i))
 
     await waitFor(() => {
@@ -195,7 +312,7 @@ describe('AddRoleModal', () => {
     fireEvent.click(confirmButton)
 
     await waitFor(() => {
-      expect(onAddRoles).toHaveBeenCalledWith(['2', '3'])
+      expect(onAddRoles).toHaveBeenCalledWith([mockRoles[1], mockRoles[2]])
     })
   })
 })
