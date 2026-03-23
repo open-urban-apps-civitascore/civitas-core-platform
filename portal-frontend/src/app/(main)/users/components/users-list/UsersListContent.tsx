@@ -7,6 +7,7 @@ import { useState } from 'react'
 
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { Button } from '@/components/ui/button'
+import { QUERY_PARAMS } from '@/const/searchParams'
 import { ListUser } from '@/types/users'
 
 import UsersTable from './UsersTable'
@@ -62,8 +63,8 @@ export const UsersListContent = ({
     const newState = typeof updater === 'function' ? updater(currentState) : updater
     const params = new URLSearchParams(window.location.search)
 
-    params.set('page', String(newState.pageIndex))
-    params.set('size', String(newState.pageSize))
+    params.set(QUERY_PARAMS.pageIndex, String(newState.pageIndex))
+    params.set(QUERY_PARAMS.pageSize, String(newState.pageSize))
 
     router.push(`?${params.toString()}`)
   }
