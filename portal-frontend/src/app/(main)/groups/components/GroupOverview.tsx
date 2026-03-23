@@ -156,6 +156,10 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   }
 
   const handleExit = () => {
+    if (isCreateMode) {
+      router.push('/groups')
+      return
+    }
     form.reset()
     setIsReadOnly(true)
     setIsExitModalOpen(false)
