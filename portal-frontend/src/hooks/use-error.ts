@@ -13,5 +13,9 @@ export const useError = () => {
     toast.error(tCommon('errors.nameExistsToast', { name: name || '' }))
   }
 
-  return { handleNameError }
+  const handlePermissionsError = () => {
+    toast.error(tCommon('errors.insufficientPermissions'))
+  }
+
+  return { handleNameError, handlePermissionsError }
 }

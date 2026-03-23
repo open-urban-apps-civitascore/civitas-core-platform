@@ -52,7 +52,8 @@
       "statusChangeError": "Beim Ändern des Verfügbarkeitsstatus ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten.",
       "nameExists": "Dieser Name ist bereits vergeben.",
-      "nameExistsToast": "Der Name {name} ist bereits vergeben. Bitte wählen sie einen anderen Namen."
+      "nameExistsToast": "Der Name {name} ist bereits vergeben. Bitte wählen sie einen anderen Namen.",
+      "insufficientPermissions": "Sie verfügen nicht über die notwendigen Berechtigungen für diese Aktion."
     },
     "items": {
       "data": "Daten",

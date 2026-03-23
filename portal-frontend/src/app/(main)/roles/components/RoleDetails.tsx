@@ -36,7 +36,7 @@ import { useQueryParams } from '@/hooks/use-query-params'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { FormRole, Role, ROLE_TYPES, roleSchema, RoleTab } from '@/types/roles'
 import { isPlatformwideAssignment } from '@/utils/assignments'
-import { isNameConflictError } from '@/utils/errors'
+import { isNameConflictError, isPermissionsError } from '@/utils/errors'
 
 import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
@@ -82,7 +82,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const tCommon = useTranslations('common')
   const router = useRouter()
   const { setSubTabValueParam, subTabValue, tabValue } = useQueryParams()
-  const { handleNameError } = useError()
+  const { handleNameError, handlePermissionsError } = useError()
 
   const [isReadOnly, setIsReadOnly] = useState(!!roleId)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -102,6 +102,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     data: roleData,
     isFetching: isLoadingRole,
     refetch: refreshRole,
+    error: getRoleError,
   } = useGetRole({ id: roleId || '', isEnabled: isRoleQueryEnabled })
 
   // Fetch existing assignments for this role
@@ -110,6 +111,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     data: assignmentsData,
     refetch: refetchAssignments,
     isFetching: isLoadingAssignments,
+    error: getAssignmentsError,
   } = useGetAssignments({
     params: assignmentsParams,
     isEnabled: !!roleId,
@@ -155,6 +157,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const handleRoleRequestError = (error: AxiosError, defaultMessage: string) => {
     if (isNameConflictError(error as AxiosError)) handleNameError(form, form.getValues('name'))
+    if (isPermissionsError(error)) handlePermissionsError()
     else toast.error(defaultMessage)
   }
 
@@ -202,8 +205,9 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         toast.success(tCommon('success.deletionSuccess', { item: tCommon('items.role') }))
         router.push('/roles')
       },
-      onError: () => {
-        setIsDeleteErrorOpen(true)
+      onError: error => {
+        if (isPermissionsError(error as AxiosError)) handlePermissionsError()
+        else setIsDeleteErrorOpen(true)
       },
     })
   }
@@ -268,8 +272,11 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       await refetchAssignments()
       toast.success(tRoles('success.assignmentSuccess'))
     } catch (error) {
-      console.error('An error occurred while groups assignment')
-      toast.error(tCommon('errors.updateError', { item: tCommon('items.assignments') }))
+      if (isPermissionsError(error as AxiosError)) handlePermissionsError()
+      else {
+        console.error('An error occurred while groups assignment')
+        toast.error(tCommon('errors.updateError', { item: tCommon('items.assignments') }))
+      }
       throw error
     }
   }
@@ -385,6 +392,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
                 isDefaultRole={isDefaultRole}
                 isReadOnly={isReadOnly || isDefaultRole}
                 deleteRole={roleId ? () => setIsDeleteConfirmOpen(true) : undefined}
+                getRoleError={getRoleError}
               />
             )}
             {subTabValue === subTabValues.permissions.value && (
@@ -404,6 +412,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
                 isSystemRole={initialRole.roleType === ROLE_TYPES.SYSTEM}
                 isReadOnly={isReadOnly}
                 initialAssignments={assignmentsData?.data ?? []}
+                getAssignmentsError={getAssignmentsError}
               />
             )}
           </>

@@ -1,7 +1,7 @@
 import { AxiosError } from 'axios'
 import { describe, expect, it } from 'vitest'
 
-import { isNameConflictError } from './errors'
+import { isNameConflictError, isPermissionsError } from './errors'
 
 const getError = (status: number, detail?: string) => {
   return {
@@ -58,5 +58,17 @@ describe('isNameConflictError', () => {
   it('returns false when both required strings are missing', () => {
     const error = getError(409, 'Datasource validation failed')
     expect(isNameConflictError(error)).toBe(false)
+  })
+})
+
+describe('isPermissionsError', () => {
+  it('returns true for a 403 forbidden error', () => {
+    const error = getError(403, 'User does not have permission')
+    expect(isPermissionsError(error)).toBe(true)
+  })
+
+  it('returns false for non-403 status codes', () => {
+    const error = getError(401, 'Unauthorized')
+    expect(isPermissionsError(error)).toBe(false)
   })
 })
