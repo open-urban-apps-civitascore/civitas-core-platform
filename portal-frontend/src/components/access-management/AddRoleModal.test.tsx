@@ -282,7 +282,7 @@ describe('AddRoleModal', () => {
     const params = mockUseGetRoles.mock.calls[0][0].params as URLSearchParams
     expect(params.get('page')).toBe('0')
     expect(params.get('size')).toBe('10')
-    expect(params.get('roleType')).toBe('DATA,GOVERNANCE')
+    expect(params.get('roleType')).toBe('DATA')
   })
 
   it('allows selecting multiple roles', async () => {

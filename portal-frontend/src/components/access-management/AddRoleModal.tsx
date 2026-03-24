@@ -52,7 +52,7 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
     const params = new URLSearchParams({
       page: String(pagination.pageIndex),
       size: String(pagination.pageSize),
-      roleType: 'DATA,GOVERNANCE',
+      roleType: 'DATA',
     })
     if (sorting.length > 0) {
       params.set('sort', `${sorting[0].id},${sorting[0].desc ? 'desc' : 'asc'}`)
