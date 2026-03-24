@@ -8,7 +8,9 @@ interface GrindContainerProps extends Pick<HTMLAttributes<HTMLDivElement>, 'clas
 export const TableContainer = (props: GrindContainerProps) => {
   const { children, shouldRespectSearchHeight = true, shouldRespectSegmentedControlBar = false, className } = props
   const searchBarHeight = shouldRespectSearchHeight ? ' - var(--search-height)' : ''
-  const segmentedControlBarHeight = shouldRespectSegmentedControlBar ? ' - var(--segmented-control-bar-height) - 16px' : ''
+  const segmentedControlBarHeight = shouldRespectSegmentedControlBar
+    ? ' - var(--segmented-control-bar-height) - 16px'
+    : ''
   const height = `calc(100%${searchBarHeight}${segmentedControlBarHeight})`
   return (
     <div className={className} style={{ height: height }}>
