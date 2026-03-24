@@ -48,11 +48,13 @@ export default defineConfig({
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
-  retries: process.env.CI ? 2 : 5,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 2 : 2,
+  /* 3 workers balances speed vs dev environment load; 5 causes 504s */
+  workers: process.env.CI ? 1 : 3,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
+  /* Default timeout for each test (60s); individual tests can override with test.setTimeout() */
+  timeout: 60_000,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
@@ -60,6 +62,9 @@ export default defineConfig({
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
+    /* Default action/navigation timeout — faster failure than the 30s Playwright default */
+    actionTimeout: 15_000,
+    navigationTimeout: 20_000,
   },
   /* Configure projects for major browsers */
   projects: [

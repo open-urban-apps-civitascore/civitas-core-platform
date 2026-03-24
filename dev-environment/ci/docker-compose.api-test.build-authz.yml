@@ -1,0 +1,6 @@
+# Build override: authz-repository only (built from source)
+services:
+  authz-repository:
+    build:
+      context: ../../authz/repository
+      dockerfile: Dockerfile

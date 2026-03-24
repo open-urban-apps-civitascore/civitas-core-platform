@@ -60,7 +60,9 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>Network errors (ProcessingException) → RetryableAdapterException (NETWORK_ERROR)
  *   <li>HTTP 5xx errors → RetryableAdapterException (SERVICE_UNAVAILABLE)
- *   <li>HTTP 4xx errors → FatalAdapterException (APISIX_ROUTE_ERROR/APISIX_UPSTREAM_ERROR)
+ *   <li>HTTP 409 on CREATE → success (idempotent: resource already exists)
+ *   <li>HTTP 404 on DELETE → success (idempotent: resource already deleted)
+ *   <li>Other HTTP 4xx errors → FatalAdapterException (APISIX_ROUTE_ERROR/APISIX_UPSTREAM_ERROR)
  *   <li>Unknown exceptions → FatalAdapterException (UNKNOWN_ERROR)
  * </ul>
  */
@@ -287,6 +289,21 @@ public class ApisixAdapter extends AbstractConfigAdapter {
 
     // Success - nothing to throw
     if (status >= 200 && status < 300) {
+      return;
+    }
+
+    if (status == 409
+        && (operation == AdapterOperation.UPSTREAM_CREATE
+            || operation == AdapterOperation.ROUTE_CREATE)) {
+      logger.info("APISIX resource already exists (409), treating create as success (idempotent)");
+      return;
+    }
+
+    if (status == 404
+        && (operation == AdapterOperation.UPSTREAM_DELETE
+            || operation == AdapterOperation.ROUTE_DELETE)) {
+      logger.info(
+          "APISIX resource not found (404), treating delete as success (already deleted, idempotent)");
       return;
     }
 

@@ -51,7 +51,9 @@
       "formInvalid": "Alle Pflichtangaben müssen korrekt hinterlegt werden. Überprüfen Sie Ihre Eingaben.",
       "statusChangeError": "Beim Ändern des Verfügbarkeitsstatus ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten.",
-      "nameExists": "Der Name ist bereits vergeben. Bitte wählen sie einen anderen Namen."
+      "nameExists": "Dieser Name ist bereits vergeben.",
+      "nameExistsToast": "Der Name {name} ist bereits vergeben. Bitte wählen sie einen anderen Namen.",
+      "insufficientPermissions": "Sie verfügen nicht über die notwendigen Berechtigungen für diese Aktion."
     },
     "items": {
       "data": "Daten",
@@ -328,8 +330,7 @@
       },
       "roleTypes": {
         "SYSTEM": "Systemrolle",
-        "DATA": "Datenrolle",
-        "GOVERNANCE": "Governancerolle"
+        "DATA": "Datenrolle"
       },
       "types": {
         "standard": "Standard",
@@ -417,8 +418,7 @@
       },
       "objectLabels": {
         "SYSTEM": "Systemrolle",
-        "DATA": "Datenrolle",
-        "GOVERNANCE": "Governance-Rolle"
+        "DATA": "Datenrolle"
       },
       "originLabels": {
         "default": "Standard",
@@ -515,16 +515,16 @@
       "notGranted": "Nicht gewährt"
     },
     "values": {
-        "ASSIGNMENT": "Zuweisung",
-        "DATASET": "Datensatz",
-        "DATASET_PAYLOAD": "Datensatz-Payload",
-        "DATASOURCE": "Datenquelle",
-        "DATASTRUCTURE": "Datenstruktur",
-        "GROUP": "Gruppe",
-        "PERMISSION": "Berechtigung",
-        "ROLE": "Rolle",
-        "USER": "Benutzer"
-      }
+      "ASSIGNMENT": "Zuweisung",
+      "DATASET": "Datensatz",
+      "DATASET_PAYLOAD": "Datensatz-Payload",
+      "DATASOURCE": "Datenquelle",
+      "DATASTRUCTURE": "Datenstruktur",
+      "GROUP": "Gruppe",
+      "PERMISSION": "Berechtigung",
+      "ROLE": "Rolle",
+      "USER": "Benutzer"
+    }
   },
   "roles": {
     "title": "Rollen",
@@ -655,7 +655,11 @@
       }
     },
     "errors": {
-      "createError":"Beim Anlegen der Rolle ist ein Fehler aufgetreten"
+      "createError": "Beim Anlegen der Rolle ist ein Fehler aufgetreten",
+      "updateError": "Beim Aktualisieren der Rolle ist ein Fehler aufgetreten"
+    },
+    "success": {
+      "assignmentSuccess": "Die Zuweisungen wurden erfolgreich aktualisiert"
     }
   },
   "datasources": {

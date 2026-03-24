@@ -3,11 +3,25 @@ import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
 import messages from '@/messages/de.json'
-import { Group } from '@/types/groups'
-import { Role } from '@/types/roles'
 
 import { GroupRoleAssignmentTable } from './AccessManagementTable'
 import { GenericAssignmentsList } from './GenericAssignmentsList'
+
+vi.mock('@/app/services/api/groups/clientRequests', () => ({
+  useGetGroups: () => ({
+    data: { data: [], totalElements: 0 },
+    isLoading: false,
+    isError: false,
+  }),
+}))
+
+vi.mock('@/app/services/api/roles/clientRequests', () => ({
+  useGetRoles: () => ({
+    data: { data: [], totalElements: 0 },
+    isLoading: false,
+    isError: false,
+  }),
+}))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -19,36 +33,6 @@ vi.mock('next/navigation', () => ({
   }),
   usePathname: () => '/datasets/test-id/access-management',
 }))
-
-const mockGroups: Group[] = [
-  {
-    id: '1',
-    name: 'Admin Group',
-    description: 'Administrator group',
-    roles: null,
-    members: null,
-    contactUser: null,
-    assignments: null,
-    createdAt: '2024-01-01',
-    modifiedAt: '2024-01-01',
-  },
-]
-
-const mockRoles: Role[] = [
-  {
-    id: '1',
-    name: 'Admin',
-    description: 'Administrator role',
-    roleType: 'DATA',
-    permissions: [],
-    readonly: false,
-    modifiedBy: null,
-    modifiedAt: null,
-    createdAt: '2024-01-01',
-    groupCount: 0,
-    userCount: 0,
-  },
-]
 
 const mockAssignments: GroupRoleAssignmentTable[] = [
   {
@@ -64,8 +48,6 @@ describe('GenericAssignmentsList', () => {
     const defaultProps = {
       entityId: 'test-entity-1',
       initialAssignments: mockAssignments,
-      groups: mockGroups,
-      roles: mockRoles,
       onPatchEntity: vi.fn().mockResolvedValue(undefined),
       title: 'Zugriffsberechtigungen',
       subtitle: 'Hier werden Zuständigkeiten und Zugriffsrechte definiert.',
@@ -233,8 +215,6 @@ describe('GenericAssignmentsList', () => {
     const controlledProps = {
       assignedGroups: mockAssignments,
       onAssignedGroupsChange: vi.fn(),
-      groups: mockGroups,
-      roles: mockRoles,
     }
 
     it('renders without title and subtitle', () => {

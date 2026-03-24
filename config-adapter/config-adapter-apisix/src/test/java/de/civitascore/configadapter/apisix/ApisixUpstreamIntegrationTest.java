@@ -27,6 +27,7 @@ import de.civitascore.configadapter.model.Operation;
 import de.civitascore.configadapter.model.apisix.ApisixConfigValue;
 import de.civitascore.configadapter.model.apisix.UpstreamNodes;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /** Integration tests for ApisixAdapter upstream operations. */
@@ -104,6 +105,21 @@ class ApisixUpstreamIntegrationTest extends AbstractApisixIntegrationTest {
                 assertTrue(e.getMessage().contains("404") || e.getMessage().contains("not found"));
               }
             });
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
+  }
+
+  @Test
+  void deleteUpstream_whenUpstreamDoesNotExist_shouldPublishSuccess() throws Exception {
+    String nonExistentUpstreamId = UUID.randomUUID().toString();
+
+    ConfigEvent event =
+        ApisixTestFixtures.upstreamEventRandomIds(
+            "upstreams/" + nonExistentUpstreamId, Operation.DELETE, (ApisixConfigValue) null);
+
+    adapter.processConfigEvent(Topics.BACKEND_DELETED.toString(), event);
 
     assertEquals(1, eventPublisher.getPublishedEvents().size());
     ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();

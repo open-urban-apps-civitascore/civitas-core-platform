@@ -17,8 +17,10 @@ import { PageContainer } from '@/components/page-container/PageContainer'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { useError } from '@/hooks/use-error'
 import { cn } from '@/lib/utils'
 import { DatasourceCreateData, DatasourceCreateFormSchema } from '@/types/datasources'
+import { isNameConflictError } from '@/utils/errors'
 
 export const DatasourceCreateForm = () => {
   const t = useTranslations('datasources')
@@ -26,15 +28,10 @@ export const DatasourceCreateForm = () => {
 
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { handleNameError } = useError()
 
   const createDatasource = useCreateDatasource()
   const isLoading = createDatasource.isPending
-
-  const handleRequestError = (error: unknown) => {
-    if ((error as AxiosError).response?.status === 409) {
-      form.setError('name', { type: 'manual', message: 'common.errors.nameExists' })
-    } else toast.error(t('errors.creationError'))
-  }
 
   const form = useForm<DatasourceCreateData>({
     resolver: zodResolver(DatasourceCreateFormSchema),
@@ -51,7 +48,11 @@ export const DatasourceCreateForm = () => {
           toast.success(tCommon('messages.createSuccess', { item: tCommon('items.datasource') }))
           router.push(`/datasources/${data.id}`)
         },
-        onError: (error: unknown) => handleRequestError(error),
+        onError: (error: unknown) => {
+          if (isNameConflictError(error as AxiosError)) {
+            handleNameError(form, formData.name)
+          } else toast.error(t('errors.creationError'))
+        },
       },
     )
   }

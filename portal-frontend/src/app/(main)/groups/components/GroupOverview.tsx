@@ -18,10 +18,15 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
+import { useError } from '@/hooks/use-error'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Group, GroupBaseFormData, GroupBaseFormDataSchema, GroupTab } from '@/types/groups'
 import { Role } from '@/types/roles'
+import { isNameConflictError } from '@/utils/errors'
 import { mapGroupApiToFormData, mapGroupFormToApiData } from '@/utils/groups'
+import { getHeaderAction } from '@/utils/headerAction'
 
 import { BaseInfoTab } from './base-info-tab/BaseInfoTab'
 import { RolesTab } from './roles-tab/RolesTab'
@@ -59,13 +64,20 @@ export const GroupOverview = (props: GroupDetailsProps) => {
 
   const t = useTranslations('groups')
   const tCommon = useTranslations('common')
+  const { hasPermission } = usePermissions()
 
-  const tabs = Object.values(tabValues)
+  const tabs = [
+    tabValues.info,
+    ...(hasPermission(PERMISSION_NAMES.USER_READ) ? [tabValues.users] : []),
+    tabValues.roles,
+  ]
   const defaultTab = tabs[0].value
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(!isCreateMode && mode !== 'edit')
+  const canUpdate = isCreateMode || hasPermission(PERMISSION_NAMES.GROUP_UPDATE)
 
   const router = useRouter()
+  const { handleNameError } = useError()
   const createGroup = useCreateGroup()
   const updateGroup = useUpdateGroup()
   const replaceAssignments = useReplaceGroupAssignments()
@@ -89,11 +101,9 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     toast.error(tCommon('errors.formInvalid'))
   }
 
-  const handleGroupRequestError = (error: unknown, message: string) => {
-    if ((error as AxiosError).response?.status === 409) {
-      form.setError('name', { type: 'manual', message: 'groups.errors.groupNameExists' })
-      toast.error(tCommon('errors.formInvalid'))
-    } else toast.error(t(message))
+  const handleGroupRequestError = (error: AxiosError, defaultMessage: string) => {
+    if (isNameConflictError(error)) handleNameError(form, form.getValues('name'))
+    else toast.error(defaultMessage)
   }
 
   const handleCreateGroup = (formData: GroupBaseFormData) => {
@@ -126,7 +136,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
           navigateToGroup()
         }
       },
-      onError: (error: unknown) => handleGroupRequestError(error, 'errors.createError'),
+      onError: (error: unknown) => handleGroupRequestError(error as AxiosError, t('errors.createError')),
     })
   }
 
@@ -150,7 +160,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
           },
         )
       },
-      onError: (error: unknown) => handleGroupRequestError(error, 'errors.updateError'),
+      onError: (error: unknown) => handleGroupRequestError(error as AxiosError, t('errors.updateError')),
     })
   }
 
@@ -219,6 +229,13 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     </Button>
   )
 
+  const headerCustomElement = getHeaderAction({
+    isReadOnly,
+    canUpdate,
+    editButton: EditButton,
+    saveExitButtons: SaveAndExitButtons,
+  })
+
   return (
     <PageContainer headerType="withSubTabsOrSubtitle">
       <PageHeader
@@ -228,7 +245,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
           selectedTab: subTabValue || defaultTab,
           onTabChange: setSubTabValueParam,
         }}
-        customElement={isReadOnly ? EditButton : SaveAndExitButtons}
+        customElement={headerCustomElement}
       />
       <PageBackground className="flex flex-col" hasBackground={!isReadOnly}>
         <Form {...form}>

@@ -1,0 +1,41 @@
+meta {
+  name: 0g. Find Existing Saga DataStructure
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/datastructures?name=Saga Sensor Data Structure
+  body: none
+  auth: inherit
+}
+
+headers {
+  X-Allowed-Scope-Ids: *
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.body && res.body.content) {
+    const match = res.body.content.find(d => d.name === 'Saga Sensor Data Structure');
+    if (match) {
+      bru.setVar('sagaDataStructureId', match.id);
+    }
+  }
+}
+
+tests {
+  test("Lookup succeeded", function() {
+    // Always 200 — search returns empty page if entity doesn't exist
+    expect(res.getStatus()).to.equal(200);
+  });
+}
+
+docs {
+  **Saga setup step 0g** — Checks whether the DataStructure "Saga Sensor Data Structure" already exists.
+
+  Searches the `/datastructures` endpoint by name. If a match is found, `sagaDataStructureId` is stored so that subsequent steps (3b–3e, 16b) can skip creation or reference the existing resource.
+
+  **Expected Response:** 200 OK (search always returns 200; empty `content` array if not found).
+
+  **Post-condition:** If found, saves `sagaDataStructureId` from matching entry.
+}

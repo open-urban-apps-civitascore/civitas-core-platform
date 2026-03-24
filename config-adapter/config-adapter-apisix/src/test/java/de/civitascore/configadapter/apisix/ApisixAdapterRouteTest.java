@@ -137,12 +137,28 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
   }
 
   @Test
-  void testRouteDeleteFailure() {
+  void deleteRoute_whenRouteNotFound_shouldPublishSuccess()
+      throws FatalAdapterException, RetryableAdapterException {
     givenMockDeleteReturns(404, "{\"error\":\"Route not found\"}");
 
     ConfigEvent event =
         ApisixTestFixtures.routeEvent(
             Operation.DELETE, "routes/nonexistent-route", (RouteConfigValue) null);
+
+    adapter.processConfigEvent("de.civitascore.api.route.deleted", event);
+
+    ConfigResultEvent result = capturePublishedResult();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, result.status());
+    assertEquals("nonexistent-route", result.resourceId());
+  }
+
+  @Test
+  void deleteRoute_whenForbidden_shouldThrowFatalException() {
+    givenMockDeleteReturns(403, "{\"error\":\"Forbidden\"}");
+
+    ConfigEvent event =
+        ApisixTestFixtures.routeEvent(
+            Operation.DELETE, "routes/forbidden-route", (RouteConfigValue) null);
 
     FatalAdapterException exception =
         assertThrows(
@@ -150,7 +166,7 @@ class ApisixAdapterRouteTest extends AbstractApisixAdapterTest {
             () -> adapter.processConfigEvent("de.civitascore.api.route.deleted", event));
 
     assertEquals(AdapterErrorCode.APISIX_ROUTE_ERROR, exception.getErrorCode());
-    assertTrue(exception.getMessage().contains("HTTP 404"));
+    assertTrue(exception.getMessage().contains("HTTP 403"));
   }
 
   @Test

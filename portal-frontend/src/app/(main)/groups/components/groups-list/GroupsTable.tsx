@@ -18,7 +18,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface GroupsTableProps extends TableProps<Group> {
   groups: Group[]
-  onDeleteGroupClick: (groupId: string) => void
+  onDeleteGroupClick?: (groupId: string) => void
 }
 
 export const GroupsTable = (props: GroupsTableProps) => {
@@ -76,24 +76,27 @@ export const GroupsTable = (props: GroupsTableProps) => {
         },
       },
     }),
-    {
-      id: 'actions',
-      cell: ({ row }: { row: Row<Group> }) => (
-        <TableDropdownMenu
-          menuItems={[
-            {
-              label: tCommon('actions.removeItem', { item: tCommon('items.group') }),
-              onClick: () => onDeleteGroupClick(row.id),
+    ...(onDeleteGroupClick
+      ? [
+          {
+            id: 'actions',
+            cell: ({ row }: { row: Row<Group> }) => {
+              const menuItems = [
+                {
+                  label: tCommon('actions.removeItem', { item: tCommon('items.group') }),
+                  onClick: () => onDeleteGroupClick(row.id),
+                },
+              ]
+              return menuItems.length > 0 ? <TableDropdownMenu menuItems={menuItems} /> : null
             },
-          ]}
-        />
-      ),
-      meta: {
-        style: {
-          width: '50px',
-        },
-      },
-    },
+            meta: {
+              style: {
+                width: '50px',
+              },
+            },
+          },
+        ]
+      : []),
   ]
 
   const table = useReactTable({

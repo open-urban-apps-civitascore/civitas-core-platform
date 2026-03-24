@@ -1,6 +1,0 @@
-{
-  "version": "1",
-  "name": "Dataset Saga Workflow",
-  "type": "collection",
-  "ignore": ["node_modules"]
-}

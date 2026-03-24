@@ -13,7 +13,9 @@ import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { GroupBaseFormData } from '@/types/groups'
 import { mapGroupListUsers } from '@/utils/users'
 
@@ -30,6 +32,7 @@ export const UsersTab = (props: UsersTabProps) => {
   const { form, originalUsers, isReadOnly, isUpdatingGroup } = props
   const t = useTranslations('groups')
   const tCommon = useTranslations('common')
+  const { hasPermission } = usePermissions()
   const [userToRemove, setUserToRemove] = useState<string | null>(null)
   const [isAssignUsersOpen, setIsAssignUsersOpen] = useState(false)
   const [isRemoveUserWarningModalOpen, setIsRemoveUserWarningModalOpen] = useState(false)
@@ -131,6 +134,7 @@ export const UsersTab = (props: UsersTabProps) => {
               onRemoveUserClick={handleRemoveUserClick}
               isLoading={isLoading}
               isReadOnly={isReadOnly}
+              isLinkDisabled={!hasPermission(PERMISSION_NAMES.USER_READ)}
             />
             <WarningModal
               open={isRemoveUserWarningModalOpen}

@@ -7,9 +7,15 @@ interface LinkCellProps extends LinkProps {
   children: JSX.Element | string
   className?: string
   target?: React.HTMLAttributeAnchorTarget
+  isDisabled?: boolean
 }
 export const LinkCell = (props: LinkCellProps) => {
-  const { children, href, className, target, ...linkProps } = props
+  const { children, href, className, target, isDisabled, ...linkProps } = props
+
+  if (isDisabled) {
+    return <div className={cn('w-full h-full flex items-center', className)}>{children}</div>
+  }
+
   return (
     <Link
       className={cn(

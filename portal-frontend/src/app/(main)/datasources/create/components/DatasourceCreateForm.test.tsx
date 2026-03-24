@@ -92,8 +92,12 @@ describe('DatasourceCreateForm', () => {
   test('shows a name field error when the request returns a conflict error', async () => {
     mockMutate.mockImplementation((_data, options) => {
       options?.onError?.({
+        status: 409,
         response: {
           status: 409,
+          data: {
+            detail: 'Datasource with name "Test Datasource" already exists',
+          },
         },
       } as AxiosError)
     })

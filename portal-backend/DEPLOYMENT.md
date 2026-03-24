@@ -107,7 +107,7 @@ Defaults are tuned for production. Only adjust for specific throughput/latency r
 | `SPRING_KAFKA_PRODUCER_BUFFER_MEMORY` | `33554432` | Producer buffer in bytes |
 | `SPRING_KAFKA_PRODUCER_PROPERTIES_ENABLE_IDEMPOTENCE` | `true` | Exactly-once delivery per partition |
 | `SPRING_KAFKA_PRODUCER_PROPERTIES_MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION` | `5` | Max unacknowledged in-flight requests |
-| `SPRING_KAFKA_PRODUCER_PROPERTIES_COMPRESSION_TYPE` | `snappy` | Compression codec |
+| `SPRING_KAFKA_PRODUCER_PROPERTIES_COMPRESSION_TYPE` | `snappy` | Compression codec. **`snappy` requires glibc** — on Alpine/musl images (e.g. CI) use `lz4` instead (`SPRING_KAFKA_PRODUCER_PROPERTIES_COMPRESSION_TYPE=lz4`). |
 | `SPRING_KAFKA_PRODUCER_PROPERTIES_LINGER_MS` | `10` | Max ms to wait before sending a batch |
 
 ---

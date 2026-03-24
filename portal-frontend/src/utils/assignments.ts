@@ -1,11 +1,7 @@
 import { GroupRoleAssignmentTable } from '@/components/access-management/AccessManagementTable'
 import { Assignment, ASSIGNMENT_SCOPE_TYPES, AssignmentScopedInput } from '@/types/assignments'
-import { Group } from '@/types/groups'
 
-export const mapAssignmentApiResponseToTable = (
-  assignments: Assignment[],
-  groups: Group[],
-): GroupRoleAssignmentTable[] => {
+export const mapAssignmentApiResponseToTable = (assignments: Assignment[]): GroupRoleAssignmentTable[] => {
   const groupMap = new Map<
     string,
     {
@@ -27,12 +23,10 @@ export const mapAssignmentApiResponseToTable = (
         roleName: assignment.role.name,
       })
     } else {
-      // New group, create entry
-      const groupDetails = groups.find(g => g.id === groupId)
       groupMap.set(groupId, {
-        groupId: groupId, // Use group ID as unique key
+        groupId: groupId,
         groupName: assignment.group.name,
-        groupDescription: groupDetails?.description,
+        groupDescription: assignment.group.description,
         assignedRoles: [
           {
             roleId: assignment.role.id,

@@ -1,6 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
+import { AxiosError } from 'axios'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { JSX, useEffect, useMemo, useState } from 'react'
@@ -30,10 +31,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useError } from '@/hooks/use-error'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { FormRole, Role, ROLE_TYPES, roleSchema, RoleTab } from '@/types/roles'
 import { isPlatformwideAssignment } from '@/utils/assignments'
+import { isNameConflictError, isPermissionsError } from '@/utils/errors'
 
 import { DEFAULT_TAB } from '../page'
 import { BaseInfoTab } from './baseinfo-tab/BaseInfoTab'
@@ -78,7 +83,12 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   const tRoles = useTranslations('roles')
   const tCommon = useTranslations('common')
   const router = useRouter()
+  const { hasPermission } = usePermissions()
   const { setSubTabValueParam, subTabValue, tabValue } = useQueryParams()
+  const { handleNameError, handlePermissionsError } = useError()
+
+  const canUpdate = !roleId || hasPermission(PERMISSION_NAMES.ROLE_UPDATE)
+  const canDelete = hasPermission(PERMISSION_NAMES.ROLE_DELETE)
 
   const [isReadOnly, setIsReadOnly] = useState(!!roleId)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -98,6 +108,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     data: roleData,
     isFetching: isLoadingRole,
     refetch: refreshRole,
+    error: getRoleError,
   } = useGetRole({ id: roleId || '', isEnabled: isRoleQueryEnabled })
 
   // Fetch existing assignments for this role
@@ -106,6 +117,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     data: assignmentsData,
     refetch: refetchAssignments,
     isFetching: isLoadingAssignments,
+    error: getAssignmentsError,
   } = useGetAssignments({
     params: assignmentsParams,
     isEnabled: !!roleId,
@@ -148,6 +160,12 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
     resolver: zodResolver(roleSchema),
     defaultValues: mapRoleApiToFormData(initialRole),
   })
+
+  const handleRoleRequestError = (error: AxiosError, defaultMessage: string) => {
+    if (isNameConflictError(error as AxiosError)) handleNameError(form, form.getValues('name'))
+    if (isPermissionsError(error)) handlePermissionsError()
+    else toast.error(defaultMessage)
+  }
 
   // Initialize form and permissions from role data
   useEffect(() => {
@@ -193,8 +211,9 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
         toast.success(tCommon('success.deletionSuccess', { item: tCommon('items.role') }))
         router.push('/roles')
       },
-      onError: () => {
-        setIsDeleteErrorOpen(true)
+      onError: error => {
+        if (isPermissionsError(error as AxiosError)) handlePermissionsError()
+        else setIsDeleteErrorOpen(true)
       },
     })
   }
@@ -215,8 +234,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
           router.push(`/roles/${data.id}?tab=${tabValue}`)
         },
         onError: error => {
-          console.error('An error occurred while creating the role', error)
-          toast.error(tRoles('errors.createError'))
+          handleRoleRequestError(error as AxiosError, tRoles('errors.createError'))
         },
       },
     )
@@ -237,8 +255,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       refreshRole()
       toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.role') }))
     } catch (error) {
-      console.error('An error occurred while updating the role values.', error)
-      toast.error(tCommon('errors.updateError', { item: tCommon('items.role') }))
+      handleRoleRequestError(error as AxiosError, tRoles('errors.updateError'))
       throw error
     }
   }
@@ -259,10 +276,13 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
       )
       await Promise.all(assignmentsToRemove.map(a => deleteAssignment.mutateAsync(a.id)))
       await refetchAssignments()
-      toast.success(tCommon('messages.updateSuccess', { item: tCommon('items.assignments') }))
+      toast.success(tRoles('success.assignmentSuccess'))
     } catch (error) {
-      console.error('An error occurred while groups assignment')
-      toast.error(tCommon('errors.updateError', { item: tCommon('items.assignments') }))
+      if (isPermissionsError(error as AxiosError)) handlePermissionsError()
+      else {
+        console.error('An error occurred while groups assignment')
+        toast.error(tCommon('errors.updateError', { item: tCommon('items.assignments') }))
+      }
       throw error
     }
   }
@@ -309,12 +329,14 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   }
 
   // Tab configuration
+  // - Permission-gated tabs are hidden (no affordance = no confusion)
+  // - State-gated tabs (unsaved role) are disabled (visible but greyed out)
   const disabledTabs = !roleId ? ['permissions', 'groupAssignment'] : undefined
 
   const subTabs: Tab<RoleTab>[] = [
     subTabValues.basicInformation,
-    subTabValues.permissions,
-    subTabValues.groupAssignment,
+    ...(hasPermission(PERMISSION_NAMES.PERMISSION_READ) ? [subTabValues.permissions] : []),
+    ...(hasPermission(PERMISSION_NAMES.GROUP_READ) ? [subTabValues.groupAssignment] : []),
   ]
   const defaultSubTab = subTabValues.basicInformation.value
 
@@ -349,8 +371,8 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
 
   const getButtons = () => {
     if (isDefaultRole && !isGroupTab) return undefined
-    if (isReadOnly) return EditButton
-    else return SaveAndExitButtons
+    if (isReadOnly) return canUpdate ? EditButton : undefined
+    return SaveAndExitButtons
   }
 
   return (
@@ -377,7 +399,8 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
                 form={form}
                 isDefaultRole={isDefaultRole}
                 isReadOnly={isReadOnly || isDefaultRole}
-                deleteRole={roleId ? () => setIsDeleteConfirmOpen(true) : undefined}
+                deleteRole={roleId && canDelete ? () => setIsDeleteConfirmOpen(true) : undefined}
+                getRoleError={getRoleError}
               />
             )}
             {subTabValue === subTabValues.permissions.value && (
@@ -397,6 +420,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
                 isSystemRole={initialRole.roleType === ROLE_TYPES.SYSTEM}
                 isReadOnly={isReadOnly}
                 initialAssignments={assignmentsData?.data ?? []}
+                getAssignmentsError={getAssignmentsError}
               />
             )}
           </>

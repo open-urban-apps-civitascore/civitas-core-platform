@@ -31,6 +31,7 @@ import de.civitascore.configadapter.model.apisix.plugins.RewriteHeaders;
 import de.civitascore.configadapter.model.apisix.plugins.RoutePlugins;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /** Integration tests for ApisixAdapter route operations. */
@@ -161,6 +162,21 @@ class ApisixRouteIntegrationTest extends AbstractApisixIntegrationTest {
     adapter.processConfigEvent(Topics.ROUTE_CREATED.toString(), event);
 
     awaitRouteInApisix("/api/v1/full-plugins/*", "prometheus", "proxy-rewrite", "response-rewrite");
+  }
+
+  @Test
+  void deleteRoute_whenRouteDoesNotExist_shouldPublishSuccess() throws Exception {
+    String nonExistentRouteId = UUID.randomUUID().toString();
+
+    ConfigEvent event =
+        ApisixTestFixtures.routeEventRandomIds(
+            "routes/" + nonExistentRouteId, Operation.DELETE, (RouteConfigValue) null);
+
+    adapter.processConfigEvent(Topics.ROUTE_DELETED.toString(), event);
+
+    assertEquals(1, eventPublisher.getPublishedEvents().size());
+    ConfigResultEvent resultEvent = eventPublisher.getPublishedEvents().getFirst();
+    assertEquals(ConfigResultEvent.Status.SUCCESS, resultEvent.status());
   }
 
   @Test
