@@ -38,7 +38,6 @@ const RolesPage = () => {
     setSortingParams,
     setPaginationParams,
     setSearchParam,
-    getApiRequestParamsByUrl,
     setTabValueParam,
     setTotalPages,
     pageIndex,
@@ -52,8 +51,19 @@ const RolesPage = () => {
   const [selectedRoleType, setSelectedRoleType] = useState<string>(tabValue || DEFAULT_TAB)
 
   // TODO: Fetch all roles without type filter — backend RoleSpec does not support roleType filtering.
-  // Backend filter will be implemented in a later stage
-  const requestParams = new URLSearchParams(getApiRequestParamsByUrl())
+  // Backend filter will be implemented in a later stage.
+  // We intentionally omit pageIndex/pageSize from the API request so we get ALL roles,
+  // then filter by roleType and paginate entirely on the client side.
+  const requestParams = useMemo(() => {
+    const params = new URLSearchParams()
+    if (search && search.trim().length > 0) {
+      params.set('q', search.trim())
+    }
+    if (sorting?.[0]) {
+      params.set('sort', `${sorting[0].id},${sorting[0].desc ? 'desc' : 'asc'}`)
+    }
+    return params
+  }, [search, sorting])
 
   const { data: rolesData, isFetching } = useGetRoles({ params: requestParams })
 
@@ -67,6 +77,12 @@ const RolesPage = () => {
   useEffect(() => {
     setTotalPages(Math.ceil(rowCount / pageSize))
   }, [rowCount, setTotalPages, pageSize])
+
+  // Client-side pagination: slice the filtered roles for the current page
+  const paginatedRoles = useMemo(() => {
+    const start = pageIndex * pageSize
+    return filteredRoles.slice(start, start + pageSize)
+  }, [filteredRoles, pageIndex, pageSize])
 
   const handleRowClick = (row: Row<Role>) => {
     router.push(`/roles/${row.original.id}?tab=${selectedRoleType}`)
@@ -99,7 +115,7 @@ const RolesPage = () => {
         />
         <TableContainer>
           <RolesTable
-            roles={isFetching ? [] : filteredRoles}
+            roles={isFetching ? [] : paginatedRoles}
             isLoading={isFetching}
             rowCount={rowCount}
             pageIndex={pageIndex}
