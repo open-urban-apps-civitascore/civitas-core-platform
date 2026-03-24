@@ -117,6 +117,10 @@ export const UserOverview = (props: UserOverviewProps) => {
   }
 
   const handleExit = () => {
+    if (isCreateMode) {
+      router.push('/users')
+      return
+    }
     form.reset()
     setIsReadOnly(true)
     setIsExitModalOpen(false)
