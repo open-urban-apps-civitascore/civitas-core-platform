@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useCreateUser, useGetCurrentUser, useUpdateUser } from '@/app/services/api/users/clientRequests'
 import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
