@@ -300,9 +300,9 @@ services:
   # ── Application ──────────────────────────────────────────
 
   portal-backend:
-    build:
-      context: ../../portal-backend
-      dockerfile: Dockerfile
+    # Default: pull from registry. Override with docker-compose.api-test.build-portal.yml
+    # to build from source when JAR artifacts are available.
+    image: ${CI_REGISTRY_IMAGE}/portal-backend:${IMAGE_TAG:-develop}
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-portal:5432/portal_backend
       SPRING_DATASOURCE_USERNAME: admin

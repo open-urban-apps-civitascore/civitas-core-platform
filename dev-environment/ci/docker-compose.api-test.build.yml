@@ -1,14 +1,16 @@
 # ============================================================
 # Build overrides for API test stack
 # ============================================================
-# Adds build directives for config-adapter and authz-repository
-# so they are built from source instead of pulled from registry.
+# Adds build directives for portal-backend, config-adapter, and
+# authz-repository so they are built from source instead of
+# pulled from registry.
 #
 # Usage: Combine with the base file when JAR artifacts are available:
 #   docker compose -f docker-compose.api-test.yml -f docker-compose.api-test.build.yml up -d
 #
 # For partial builds (only one service from source), use the
 # individual override files instead:
+#   docker-compose.api-test.build-portal.yml  — portal-backend only
 #   docker-compose.api-test.build-ca.yml      — config-adapter only
 #   docker-compose.api-test.build-authz.yml   — authz-repository only
 #
@@ -17,6 +19,11 @@
 # ============================================================
 
 services:
+  portal-backend:
+    build:
+      context: ../../portal-backend
+      dockerfile: Dockerfile
+
   authz-repository:
     build:
       context: ../../authz/repository
