@@ -195,7 +195,8 @@ public class DataSetSagaPublisher {
           Encode.forJava(sagaType),
           Encode.forJava(datasetId),
           e);
-      throw new IllegalStateException("Interrupted while waiting for Kafka ack for saga trigger", e);
+      throw new IllegalStateException(
+          "Interrupted while waiting for Kafka ack for saga trigger", e);
     }
   }
 }
