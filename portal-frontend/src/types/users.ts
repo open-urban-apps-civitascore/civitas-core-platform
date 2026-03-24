@@ -19,6 +19,7 @@ export type TitleType = z.infer<typeof TitleSchema>
 
 export const PhoneSchema = z
   .string()
+  .transform(value => value?.trim())
   .transform(value => (value === '' ? undefined : value))
   .refine(value => !value || /^[0-9+()\s-]+$/.test(value), { message: 'common.errors.invalidPhone' })
   .superRefine((value, ctx) => {
@@ -36,13 +37,13 @@ export const PhoneSchema = z
 export const UserApiSchema = z.object({
   id: z.string(),
   title: TitleSchema,
-  firstName: z.string().min(2, {
+  firstName: z.string().trim().min(2, {
     message: 'common.errors.atLeast2',
   }),
-  lastName: z.string().min(2, {
+  lastName: z.string().trim().min(2, {
     message: 'common.errors.atLeast2',
   }),
-  email: z.email({
+  email: z.string().trim().email({
     message: 'common.errors.invalidEmail',
   }),
   phone: PhoneSchema.nullable(),
