@@ -3,7 +3,7 @@
 import { ArrowLeft, Slash } from 'lucide-react'
 import { useParams, usePathname, useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import React from 'react'
+import React, { useRef } from 'react'
 
 import { useGetBredcrumbs } from '@/app/services/api/breadcrumbs/clientRequests'
 import {
@@ -14,6 +14,8 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useIsTruncated } from '@/hooks/use-is-truncated'
 import { cn } from '@/lib/utils'
 
 export type Breadcrumb = {
@@ -30,6 +32,22 @@ export type BreadcrumbApiResponse = {
   lastName?: string
   title?: string
   version?: string
+}
+
+const BreadcrumbLinkWithTooltip = ({ href, title, isLast }: { href: string; title: string; isLast: boolean }) => {
+  const ref = useRef<HTMLAnchorElement>(null)
+  const isTruncated = useIsTruncated(ref)
+
+  return (
+    <Tooltip open={isTruncated ? undefined : false}>
+      <TooltipTrigger asChild>
+        <BreadcrumbLink ref={ref} href={href} aria-current={isLast ? 'page' : undefined} className="truncate block">
+          {title}
+        </BreadcrumbLink>
+      </TooltipTrigger>
+      <TooltipContent variant="secondary">{title}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 const getName = (firstName?: string, lastName?: string) => (firstName && lastName ? `${firstName} ${lastName}` : null)
@@ -128,13 +146,7 @@ export const BreadcrumbNavigation = () => {
                 <BreadcrumbItem
                   className={cn('min-w-0', !crumb.isLast ? 'hidden md:block' : '', !crumb.isDynamic && 'shrink-0')}
                 >
-                  <BreadcrumbLink
-                    href={crumb.href}
-                    aria-current={crumb.isLast ? 'page' : undefined}
-                    className={crumb.isDynamic ? 'truncate block' : undefined}
-                  >
-                    {crumb.title}
-                  </BreadcrumbLink>
+                  <BreadcrumbLinkWithTooltip href={crumb.href} title={crumb.title} isLast={crumb.isLast} />
                 </BreadcrumbItem>
                 {!crumb.isLast && <CustomBreadcrumbSeparator />}
               </React.Fragment>
