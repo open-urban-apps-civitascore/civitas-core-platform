@@ -28,7 +28,9 @@ import { BasicTooltip } from '@/components/tooltip/Tooltip'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
 import { useError } from '@/hooks/use-error'
+import { usePermissions } from '@/hooks/use-permissions'
 import { cn } from '@/lib/utils'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   CompletionStepData,
   Dataset,
@@ -57,6 +59,10 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const { dataset, groupCount, roleCount, testId } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
+
+  const { hasScopedPermission } = usePermissions()
+  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASET_UPDATE, 'DATASET', dataset.id)
+  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASET_RELEASE, 'DATASET', dataset.id)
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -286,14 +292,16 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
     {
       title: t('overview.completion.dataFlow.title'),
       isCompleted: pipelineNames?.length > 0 || distributionAccessURL?.length > 0,
-      buttons: [
-        {
-          text: isReadOnly
-            ? t('overview.completion.dataFlow.button.readOnly')
-            : t('overview.completion.dataFlow.button.editable'),
-          routeParam: 'data-flow',
-        },
-      ],
+      buttons: canUpdate
+        ? [
+            {
+              text: isReadOnly
+                ? t('overview.completion.dataFlow.button.readOnly')
+                : t('overview.completion.dataFlow.button.editable'),
+              routeParam: 'data-flow',
+            },
+          ]
+        : [],
       content:
         pipelineNames?.length > 0 || distributionAccessURL?.length > 0 ? (
           <>
@@ -358,6 +366,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       onStatusChange={handleStatusChange}
       statusOptions={Object.values(DATASET_STATUS_TYPES)}
       canSetAvailable={canSetAvailable}
+      canRelease={canRelease}
       confirmButtonType="submit"
       formId="dataset-form"
       isConfirmButtonDisabled={(!form.formState.isDirty && !hasStatusChanged) || isLoading}
@@ -367,6 +376,7 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
       hasCard={false}
       isReadOnly={isReadOnly}
       onEditClick={() => setIsReadOnly(false)}
+      canEdit={canUpdate}
       cancelButtonTitle={tCommon('actions.exit')}
     />
   )

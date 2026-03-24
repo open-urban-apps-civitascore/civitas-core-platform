@@ -1,6 +1,6 @@
 'use client'
 
-import { Row, RowSelectionState } from '@tanstack/react-table'
+import { RowSelectionState } from '@tanstack/react-table'
 import { Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -84,10 +84,6 @@ const RolesPage = () => {
     return filteredRoles.slice(start, start + pageSize)
   }, [filteredRoles, pageIndex, pageSize])
 
-  const handleRowClick = (row: Row<Role>) => {
-    router.push(`/roles/${row.original.id}?tab=${selectedRoleType}`)
-  }
-
   return (
     <PageContainer headerType="withPrimaryTabs">
       <PageHeader
@@ -122,7 +118,6 @@ const RolesPage = () => {
             pageSize={pageSize}
             totalPages={totalPages}
             sorting={sorting}
-            onRowClick={handleRowClick}
             rowSelection={rowSelection}
             setRowSelection={setRowSelection}
             onSortingChange={setSortingParams}

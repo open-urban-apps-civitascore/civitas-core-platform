@@ -3,9 +3,28 @@ import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
 import { mockDatasources } from '@/__mocks__/datasources/datasources.mock'
+import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
+import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 
 import { DatasourcesTable } from './DatasourcesTable'
+
+vi.mock('@/app/services/api/users/clientRequests', () => ({
+  useGetCurrentUser: vi.fn(),
+}))
+
+const mockCurrentUser = (permissions: PermissionName[]) => {
+  vi.mocked(useGetCurrentUser).mockReturnValue({
+    data: {
+      username: 'test',
+      email: 'test@test.com',
+      title: 'MR' as const,
+      firstName: 'Test',
+      lastName: 'User',
+      assignments: [{ scopeType: 'TENANT', scopeId: null, permissions }],
+    },
+  } as ReturnType<typeof useGetCurrentUser>)
+}
 
 const defaultProps = {
   datasources: mockDatasources,
@@ -29,6 +48,7 @@ const renderTable = (props = defaultProps) =>
 describe('DatasourcesTable', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockCurrentUser([PERMISSION_NAMES.DATASOURCE_READ, PERMISSION_NAMES.DATASOURCE_DELETE])
   })
 
   it('renders the table', () => {
@@ -76,5 +96,13 @@ describe('DatasourcesTable', () => {
     renderTable()
     const menuButtons = screen.getAllByRole('button', { name: 'Open menu' })
     expect(menuButtons).toHaveLength(3)
+  })
+
+  describe('Permission gating', () => {
+    it('action menu is hidden when user lacks DELETE permission', () => {
+      mockCurrentUser([])
+      renderTable()
+      expect(screen.queryByRole('button', { name: 'Open menu' })).toBeNull()
+    })
   })
 })

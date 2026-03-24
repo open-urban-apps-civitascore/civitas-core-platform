@@ -43,6 +43,8 @@ export const PERMISSION_NAMES = {
 
 export type PermissionName = (typeof PERMISSION_NAMES)[keyof typeof PERMISSION_NAMES]
 
+export type ScopedPermissionCheck = (permission: PermissionName, scopeType: AssignmentScope, scopeId: string) => boolean
+
 export type MeAssignment = {
   scopeType: AssignmentScope
   scopeId: string | null

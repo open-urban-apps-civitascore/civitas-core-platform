@@ -15,13 +15,14 @@ import { DataTable } from '@/components/table/DataTable'
 import { ExpanderCell } from '@/components/table/expander-cell/ExpanderCell'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { usePermissions } from '@/hooks/use-permissions'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DATASTRUCTURE_STATUS_TYPES, DatastructuresListData } from '@/types/datastructures'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
 
 interface DatastructuresTableProps extends TableProps<DatastructuresListData> {
   datastructures: DatastructuresListData[]
-  onDelete?: (id: string) => void
   onDeleteDatastructureClick: (id: string) => void
 }
 
@@ -38,6 +39,7 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     onSortingChange,
     onDeleteDatastructureClick,
   } = props
+  const { hasScopedPermission } = usePermissions()
   const t = useTranslations('datastructures')
   const tVersion = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
@@ -51,19 +53,15 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     columnHelper.accessor('name', {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
-      cell: ({ row }: CellContext<DatastructuresListData, unknown>) => (
-        <ExpanderCell row={row} className="font-medium">
-          <LinkCell
-            href={
-              row.depth === 0
-                ? `datastructures/${row.original.id}`
-                : `datastructures/${row.parentId}/${row.original.id}`
-            }
-          >
-            {row.original.name}
-          </LinkCell>
-        </ExpanderCell>
-      ),
+      cell: ({ row }: CellContext<DatastructuresListData, unknown>) => {
+        const href =
+          row.depth === 0 ? `datastructures/${row.original.id}` : `datastructures/${row.parentId}/${row.original.id}`
+        return (
+          <ExpanderCell row={row} className="font-medium">
+            <LinkCell href={href}>{row.original.name}</LinkCell>
+          </ExpanderCell>
+        )
+      },
       meta: {
         truncate: true,
         style: {
@@ -126,17 +124,20 @@ export const DatastructuresTable = (props: DatastructuresTableProps) => {
     }),
     {
       id: 'actions',
-      cell: ({ row }: { row: Row<DatastructuresListData> }) => (
-        <TableDropdownMenu
-          classNameDropdownContent="w-50"
-          menuItems={[
-            {
-              label: tCommon('actions.removeItem', { item: tCommon('items.datastructure') }),
-              onClick: () => onDeleteDatastructureClick(row.original.id),
-            },
-          ]}
-        />
-      ),
+      cell: ({ row }: { row: Row<DatastructuresListData> }) => {
+        const canDelete = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_DELETE, 'DATASTRUCTURE', row.original.id)
+        return canDelete ? (
+          <TableDropdownMenu
+            classNameDropdownContent="w-50"
+            menuItems={[
+              {
+                label: tCommon('actions.removeItem', { item: tCommon('items.datastructure') }),
+                onClick: () => onDeleteDatastructureClick(row.original.id),
+              },
+            ]}
+          />
+        ) : null
+      },
       meta: {
         style: {
           width: '50px',

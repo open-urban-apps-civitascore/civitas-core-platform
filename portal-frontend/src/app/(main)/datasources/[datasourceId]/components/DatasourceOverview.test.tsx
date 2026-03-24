@@ -1,7 +1,33 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
+import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
+
 import { DatasourceOverview } from './DatasourceOverview'
+
+vi.mock('@/app/services/api/users/clientRequests', () => ({
+  useGetCurrentUser: vi.fn(),
+}))
+
+const mockCurrentUser = (permissions: PermissionName[]) => {
+  vi.mocked(useGetCurrentUser).mockReturnValue({
+    data: {
+      username: 'current',
+      email: 'current@test.com',
+      title: 'MR' as const,
+      firstName: 'Current',
+      lastName: 'User',
+      assignments: [
+        {
+          scopeType: 'DATASOURCE',
+          scopeId: 'test-id',
+          permissions,
+        },
+      ],
+    },
+  } as unknown as ReturnType<typeof useGetCurrentUser>)
+}
 
 const mockPush = vi.fn()
 const mockReplace = vi.fn()
@@ -194,6 +220,7 @@ describe('DatasourceOverview', () => {
     vi.clearAllMocks()
     mockSearchParams = new URLSearchParams()
     mockForm.formState.isDirty = false
+    mockCurrentUser([PERMISSION_NAMES.DATASOURCE_UPDATE, PERMISSION_NAMES.ASSIGNMENT_READ])
   })
 
   describe('View/Edit mode initialization', () => {
@@ -331,6 +358,22 @@ describe('DatasourceOverview', () => {
       mockSearchParams = new URLSearchParams('mode=edit')
       render(<DatasourceOverview {...defaultProps} />)
       expect(screen.getByTestId('basicInfoTab')).toHaveAttribute('data-readonly', 'false')
+    })
+  })
+
+  describe('Permission gating', () => {
+    describe('Edit button (canUpdate)', () => {
+      it('shows Edit button when user has DATASOURCE_UPDATE permission', () => {
+        mockCurrentUser([PERMISSION_NAMES.DATASOURCE_UPDATE])
+        render(<DatasourceOverview {...defaultProps} />)
+        expect(screen.getByTestId('editButton')).toBeInTheDocument()
+      })
+
+      it('hides Edit button when user lacks DATASOURCE_UPDATE permission', () => {
+        mockCurrentUser([])
+        render(<DatasourceOverview {...defaultProps} />)
+        expect(screen.queryByTestId('editButton')).not.toBeInTheDocument()
+      })
     })
   })
 })

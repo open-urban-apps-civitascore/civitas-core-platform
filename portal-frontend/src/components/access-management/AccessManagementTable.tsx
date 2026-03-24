@@ -118,11 +118,11 @@ export const AccessManagementTable = ({
               assignedRoles={info.getValue()}
               onDeleteRole={roleId => onDeleteRole?.(info.row.original.groupId, roleId)}
             />
-            {!isReadOnly && !info.getValue().length && (
+            {!isReadOnly && !info.getValue().length && onAddRoleClick && (
               <Button
                 className="w-40 bg-secondary text-xs text-secondary-foreground hover:bg-secondary/90"
                 size="sm"
-                onClick={() => onAddRoleClick?.(info.row.original.groupId)}
+                onClick={() => onAddRoleClick(info.row.original.groupId)}
               >
                 <UserPlus />
                 {t('addRole')}
@@ -145,11 +145,15 @@ export const AccessManagementTable = ({
           <TableDropdownMenu
             classNameDropdownContent="w-45"
             menuItems={[
-              {
-                label: t('addRole'),
-                onClick: () => onAddRoleClick?.(row.original.groupId),
-                icon: UserPlus,
-              },
+              ...(onAddRoleClick
+                ? [
+                    {
+                      label: t('addRole'),
+                      onClick: () => onAddRoleClick(row.original.groupId),
+                      icon: UserPlus,
+                    },
+                  ]
+                : []),
               {
                 label: t('deleteGroup'),
                 onClick: () => onDeleteClick?.(row.original.groupId),

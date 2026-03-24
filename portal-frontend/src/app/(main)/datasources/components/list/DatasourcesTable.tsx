@@ -7,7 +7,9 @@ import { TableDropdownMenu } from '@/components/dropdown-menu/TableDropdownMenu'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { usePermissions } from '@/hooks/use-permissions'
 import { AppLocale, DATE_LOCALES } from '@/i18n/locales'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datasource, DATASOURCE_STATUS_TYPES } from '@/types/datasources'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
@@ -31,6 +33,7 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
     onSortingChange,
     onDelete,
   } = props
+  const { hasScopedPermission } = usePermissions()
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
   const locale = useLocale() as AppLocale
@@ -115,14 +118,21 @@ export const DatasourcesTable = (props: DatasourcesTableProps) => {
         },
       },
     }),
-    {
-      id: 'actions',
-      cell: ({ row }: { row: Row<Datasource> }) => (
-        <TableDropdownMenu
-          menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDelete?.(row.original) }]}
-        />
-      ),
-    },
+    ...(onDelete
+      ? [
+          {
+            id: 'actions',
+            cell: ({ row }: { row: Row<Datasource> }) => {
+              const canDelete = hasScopedPermission(PERMISSION_NAMES.DATASOURCE_DELETE, 'DATASOURCE', row.original.id)
+              return canDelete ? (
+                <TableDropdownMenu
+                  menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDelete(row.original) }]}
+                />
+              ) : null
+            },
+          },
+        ]
+      : []),
   ]
 
   const table = useReactTable({

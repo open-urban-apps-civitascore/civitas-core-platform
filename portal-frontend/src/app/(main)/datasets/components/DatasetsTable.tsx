@@ -7,6 +7,8 @@ import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { usePermissions } from '@/hooks/use-permissions'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatasetTableData } from '@/types/datasets'
 import { TableProps } from '@/types/table'
 import { formatDate } from '@/utils/formatDate'
@@ -14,7 +16,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface DatasetsTableProps extends TableProps<DatasetTableData> {
   datasets: DatasetTableData[]
-  onDeleteClick: (datasetId: string | null) => void
+  onDeleteClick?: (datasetId: string | null) => void
 }
 
 export const DatasetsTable = (props: DatasetsTableProps) => {
@@ -31,6 +33,7 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
     isLoading,
     onDeleteClick,
   } = props
+  const { hasScopedPermission } = usePermissions()
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
   const locale = useLocale()
@@ -127,20 +130,21 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
         },
       },
     }),
-    {
-      id: 'actions',
-      header: t('tableHeaders.action'),
-      cell: (info: { row: { id: string | null } }) => (
-        <TableDropdownMenu
-          menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDeleteClick(info.row.id) }]}
-        />
-      ),
-      meta: {
-        style: {
-          width: '8%',
-        },
-      },
-    },
+    ...(onDeleteClick
+      ? [
+          {
+            id: 'actions',
+            header: t('tableHeaders.action'),
+            cell: (info: { row: { id: string | null; original: DatasetTableData } }) =>
+              info.row.id && hasScopedPermission(PERMISSION_NAMES.DATASET_DELETE, 'DATASET', info.row.id) ? (
+                <TableDropdownMenu
+                  menuItems={[{ label: tCommon('actions.delete'), onClick: () => onDeleteClick(info.row.id) }]}
+                />
+              ) : null,
+            meta: { style: { width: '8%' } },
+          },
+        ]
+      : []),
   ]
 
   const table = useReactTable({

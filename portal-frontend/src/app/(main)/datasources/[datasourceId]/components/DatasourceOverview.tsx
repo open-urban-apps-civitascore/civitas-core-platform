@@ -19,7 +19,9 @@ import PageEditControls from '@/components/page-edit-controls/PageEditControls'
 import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Form } from '@/components/ui/form'
+import { usePermissions } from '@/hooks/use-permissions'
 import { cn } from '@/lib/utils'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
 import { Datastructure, DatastructureVersion } from '@/types/datastructures'
 import { getSelectedDatastructureVersion } from '@/utils/datasources'
@@ -53,6 +55,9 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
   } = props
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
+  const { hasScopedPermission } = usePermissions()
+  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASOURCE_UPDATE, 'DATASOURCE', datasource.id)
+  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASOURCE_RELEASE, 'DATASOURCE', datasource.id)
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -257,7 +262,7 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
       <PageHeader
         title={datasource.name}
         segmentedControlBarProps={{
-          tabs: tabs,
+          tabs,
           selectedTab: selectedTab,
           onTabChange: setSelectedTab,
           completedTabs,
@@ -270,12 +275,14 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
             onStatusChange={handleStatusChange}
             statusOptions={Object.values(DATASOURCE_STATUS_TYPES)}
             canSetAvailable={canSetAvailable}
+            canRelease={canRelease}
             confirmButtonType="button"
             onConfirmClick={handleSave}
             isConfirmButtonDisabled={isConfirmButtonDisabled}
             isCancelButtonDisabled={isLoadingDatasource}
             onCancelClick={handleExit}
             hasCard={false}
+            canEdit={canUpdate}
             isReadOnly={isReadOnly}
             onEditClick={() => updateMode(true)}
             cancelButtonTitle={tCommon('actions.exit')}

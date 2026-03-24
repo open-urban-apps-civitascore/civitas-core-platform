@@ -16,7 +16,9 @@ import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { QUERY_PARAMS } from '@/const/searchParams'
 import { useError } from '@/hooks/use-error'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   Datastructure,
   DATASTRUCTURE_STATUS_TYPES,
@@ -24,6 +26,7 @@ import {
   DatastructureVersionFormAvailableSchema,
   DatastructureVersionTab,
 } from '@/types/datastructures'
+import { getHeaderAction } from '@/utils/headerAction'
 
 import { useDatastructureVersion } from '../hooks/useDatastructureVersion'
 import { StructureDefinitionTab } from './structure-definition-tab/StructureDefinitionTab'
@@ -60,6 +63,9 @@ export const VersionOverview = (props: VersionOverviewProps) => {
   const router = useRouter()
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const { handleFormValidationError } = useError()
+  const { hasScopedPermission } = usePermissions()
+  const canUpdate = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_UPDATE, 'DATASTRUCTURE', datastructureId)
+  const canRelease = hasScopedPermission(PERMISSION_NAMES.DATASTRUCTURE_RELEASE, 'DATASTRUCTURE', datastructureId)
 
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit')
@@ -168,6 +174,7 @@ export const VersionOverview = (props: VersionOverviewProps) => {
         onStatusChange={handleStatusChange}
         canSetAvailable={canSetAvailable}
         canSetDraft={canSetDraft}
+        canRelease={canRelease}
         statusHint={statusHint}
       />
       <ActionButtons
@@ -214,7 +221,12 @@ export const VersionOverview = (props: VersionOverviewProps) => {
           completedTabs,
           hasCompletionStatus: true,
         }}
-        customElement={isReadOnly ? EditButton : ActionButtonsAndStatusSwitch}
+        customElement={getHeaderAction({
+          isReadOnly,
+          canUpdate,
+          editButton: EditButton,
+          saveExitButtons: ActionButtonsAndStatusSwitch,
+        })}
       />
       <PageBackground className="overflow-y-auto" hasBackground={!isReadOnly}>
         {isLoading ? <LoadingSpinner className="h-full" /> : renderTabContent()}

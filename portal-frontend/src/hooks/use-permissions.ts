@@ -1,12 +1,16 @@
 import { useCallback, useMemo } from 'react'
 
 import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
-import { PermissionName } from '@/types/currentUser'
+import { PermissionName, ScopedPermissionCheck } from '@/types/currentUser'
 
-// NOTE: This hook flattens all assignments into a single permission set,
-// discarding scopeType/scopeId. This is correct for tenant-level permissions
-// (users, groups, roles) but will need scope-aware overloads for resource-scoped
-// permissions (e.g. DATASET_CREATE on a specific dataset).
+// NOTE: This hook provides two types of permission checks:
+// 1. Flat checks (hasPermission, hasAnyPermission) that aggregate across all
+//    assignments and discard scope information. Correct for tenant-level
+//    permissions (users, groups, roles).
+// 2. Scope-aware checks (hasScopedPermission) for resource-scoped permissions
+//    (e.g. DATASET_CREATE on a specific dataset). Returns true if the user has
+//    the permission via a TENANT assignment (global) OR via an assignment
+//    matching the exact scopeType + scopeId.
 export const usePermissions = () => {
   const { data: currentUser } = useGetCurrentUser()
 
@@ -22,5 +26,20 @@ export const usePermissions = () => {
     [permissions],
   )
 
-  return { hasPermission, hasAnyPermission }
+  const assignments = currentUser?.assignments
+  const hasScopedPermission = useCallback<ScopedPermissionCheck>(
+    (permission, scopeType, scopeId) => {
+      if (!permissions.has(permission)) return false
+      return (
+        assignments?.some(
+          a =>
+            a.permissions.includes(permission) &&
+            (a.scopeType === 'TENANT' || (a.scopeType === scopeType && a.scopeId === scopeId)),
+        ) ?? false
+      )
+    },
+    [permissions, assignments],
+  )
+
+  return { hasPermission, hasAnyPermission, hasScopedPermission }
 }

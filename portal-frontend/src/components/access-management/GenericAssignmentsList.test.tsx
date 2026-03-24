@@ -2,7 +2,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { describe, expect, it, vi } from 'vitest'
 
+import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 
 import { GroupRoleAssignmentTable } from './AccessManagementTable'
 import { GenericAssignmentsList } from './GenericAssignmentsList'
@@ -21,6 +23,10 @@ vi.mock('@/app/services/api/roles/clientRequests', () => ({
     isLoading: false,
     isError: false,
   }),
+}))
+
+vi.mock('@/app/services/api/users/clientRequests', () => ({
+  useGetCurrentUser: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -44,6 +50,25 @@ const mockAssignments: GroupRoleAssignmentTable[] = [
 ]
 
 describe('GenericAssignmentsList', () => {
+  beforeEach(() => {
+    vi.mocked(useGetCurrentUser).mockReturnValue({
+      data: {
+        username: 'test',
+        email: 'test@test.com',
+        title: 'MR' as const,
+        firstName: 'Test',
+        lastName: 'User',
+        assignments: [
+          {
+            scopeType: 'TENANT',
+            scopeId: null,
+            permissions: [PERMISSION_NAMES.GROUP_READ, PERMISSION_NAMES.ROLE_READ],
+          },
+        ],
+      },
+    } as ReturnType<typeof useGetCurrentUser>)
+  })
+
   describe('uncontrolled mode', () => {
     const defaultProps = {
       entityId: 'test-entity-1',

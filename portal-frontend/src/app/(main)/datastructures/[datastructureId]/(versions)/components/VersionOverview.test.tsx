@@ -2,10 +2,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { NextIntlClientProvider } from 'next-intl'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureVersion } from '@/types/datastructures'
 
 import { VersionOverview } from './VersionOverview'
+
+vi.mock('@/app/services/api/users/clientRequests', () => ({
+  useGetCurrentUser: vi.fn(),
+}))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -87,6 +93,22 @@ describe('VersionOverview - hasUserChanges Modal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(useGetCurrentUser).mockReturnValue({
+      data: {
+        username: 'test',
+        email: 'test@test.com',
+        title: 'MR' as const,
+        firstName: 'Test',
+        lastName: 'User',
+        assignments: [
+          {
+            scopeType: 'TENANT',
+            scopeId: null,
+            permissions: [PERMISSION_NAMES.DATASTRUCTURE_UPDATE, PERMISSION_NAMES.DATASTRUCTURE_RELEASE],
+          },
+        ],
+      },
+    } as ReturnType<typeof useGetCurrentUser>)
   })
 
   const renderComponent = (props = {}) => {

@@ -5,6 +5,7 @@ import { AppHeader } from '@/components/appHeader/AppHeader'
 import { AppSidebar } from '@/components/appSidebar/AppSidebar'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
+import { AuthError } from '@/lib/serverFetch'
 import { CurrentUser } from '@/types/currentUser'
 
 import { getCurrentUser } from '../services/api/users/serverRequests'
@@ -18,8 +19,7 @@ const MainLayout = async (props: MainLayoutProps) => {
   try {
     currentUser = await getCurrentUser()
   } catch (error) {
-    const isAuthError = error instanceof Error && error.message.includes('status 401')
-    redirect(isAuthError ? '/api/auth/signout' : '/error')
+    redirect(error instanceof AuthError ? '/api/auth/signout' : '/error')
   }
 
   const queryClient = new QueryClient()
