@@ -53,7 +53,7 @@ public class DatasetSagaOrchestrator {
   private static final Logger LOG = LoggerFactory.getLogger(DatasetSagaOrchestrator.class);
 
   private static final long DEFAULT_PUBLISH_TIMEOUT_MS = 5000L;
-  private static final int PRODUCER_RETRIES = 3;
+  private static final int PRODUCER_RETRIES = Integer.MAX_VALUE;
 
   private static final Predicate<Map<String, Object>> HAS_PIPELINES =
       payload -> {
