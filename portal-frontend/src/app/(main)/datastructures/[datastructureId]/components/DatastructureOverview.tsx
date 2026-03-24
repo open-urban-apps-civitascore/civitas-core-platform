@@ -15,8 +15,6 @@ import { StatusDropdown } from '@/components/status-dropdown/StatusDropdown'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { Datastructure, DATASTRUCTURE_STATUS_TYPES, DatastructureTab } from '@/types/datastructures'
-import { Group } from '@/types/groups'
-import { Role } from '@/types/roles'
 import { mapDatastructureVersionsApiToListData } from '@/utils/datastructures'
 
 import { useDatastructure } from '../hooks/useDatastructure'
@@ -42,12 +40,10 @@ export const tabs: Tab<DatastructureTab>[] = [
 interface DatastructureOverviewProps {
   datastructure: Datastructure
   initialAssignments: GroupRoleAssignmentTable[]
-  groups: Group[]
-  roles: Role[]
 }
 
 export const DatastructureOverview = (props: DatastructureOverviewProps) => {
-  const { datastructure, initialAssignments, groups, roles } = props
+  const { datastructure, initialAssignments } = props
   const t = useTranslations('datastructures')
   const tCommon = useTranslations('common')
 
@@ -142,8 +138,6 @@ export const DatastructureOverview = (props: DatastructureOverviewProps) => {
           <AccessManagementTab
             assignedGroups={assignedGroups}
             onAssignedGroupsChange={setAssignedGroups}
-            groups={groups}
-            roles={roles}
             isReadOnly={isReadOnly}
           />
         )

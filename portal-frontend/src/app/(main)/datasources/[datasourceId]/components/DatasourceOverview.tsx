@@ -22,8 +22,6 @@ import { Form } from '@/components/ui/form'
 import { cn } from '@/lib/utils'
 import { Datasource, DATASOURCE_STATUS_TYPES, DatasourceStatusType, DatasourceTab } from '@/types/datasources'
 import { Datastructure, DatastructureVersion } from '@/types/datastructures'
-import { Group } from '@/types/groups'
-import { Role } from '@/types/roles'
 import { getSelectedDatastructureVersion } from '@/utils/datasources'
 import { mapDatastructureVersionApiToFormData } from '@/utils/datastructures'
 
@@ -38,8 +36,6 @@ interface DatasourceOverviewProps {
   datastructure: Datastructure | null
   datastructureVersion: DatastructureVersion | null
   initialAssignments: GroupRoleAssignmentTable[]
-  groups: Group[]
-  roles: Role[]
 }
 
 const tabs: Tab<DatasourceTab>[] = [
@@ -54,8 +50,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
     datastructure: initialDatastructure,
     datastructureVersion: initialDatastructureVersion,
     initialAssignments,
-    groups,
-    roles,
   } = props
   const t = useTranslations('datasources')
   const tCommon = useTranslations('common')
@@ -250,8 +244,6 @@ export const DatasourceOverview = (props: DatasourceOverviewProps) => {
           <AccessManagementTab
             assignedGroups={assignedGroups}
             onAssignedGroupsChange={setAssignedGroups}
-            groups={groups}
-            roles={roles}
             isReadOnly={isReadOnly}
           />
         )

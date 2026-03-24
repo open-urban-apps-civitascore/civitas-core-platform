@@ -3,35 +3,31 @@ import {
   CellContext,
   createColumnHelper,
   getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
   PaginationState,
   RowSelectionState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { useGetGroups } from '@/app/services/api/groups/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Group } from '@/types/groups'
-import { resolveUpdater } from '@/utils/table'
 
 import { SearchHeader } from '../search-area/SearchArea'
 
 interface AddGroupModalProps extends DialogProps {
-  groups: Group[]
   assignedGroupIds: string[]
-  onAddGroups: (groupIds: string[]) => void
+  onAddGroups: (groups: Group[]) => void
 }
 
 export const AddGroupModal = (props: AddGroupModalProps) => {
-  const { groups, assignedGroupIds, open, onOpenChange = () => {}, onAddGroups } = props
+  const { assignedGroupIds, open, onOpenChange = () => {}, onAddGroups } = props
 
   const t = useTranslations('accessManagement')
   const tCommon = useTranslations('common')
@@ -45,22 +41,72 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
   const [selection, setSelection] = useState<RowSelectionState>({})
   const [searchInput, setSearchInput] = useState('')
 
-  const availableGroups = useMemo(() => {
-    return groups.filter(group => !assignedGroupIds.includes(group.id))
-  }, [groups, assignedGroupIds])
+  // Track selected Group objects across pages since server-side pagination
+  // only keeps the current page's data in the response
+  const selectedGroupsRef = useRef<Map<string, Group>>(new Map())
 
-  const resetSelection = () => {
+  const assignedGroupIdsSet = useMemo(() => new Set(assignedGroupIds), [assignedGroupIds])
+
+  const queryParams = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(pagination.pageIndex),
+      size: String(pagination.pageSize),
+    })
+    if (sorting.length > 0) {
+      params.set('sort', `${sorting[0].id},${sorting[0].desc ? 'desc' : 'asc'}`)
+    }
+    if (searchInput) {
+      params.set('q', searchInput)
+    }
+    return params
+  }, [pagination.pageIndex, pagination.pageSize, sorting, searchInput])
+
+  const { data: groupsResponse, isLoading, isError } = useGetGroups({ params: queryParams })
+
+  const groups = groupsResponse?.data ?? []
+  const totalPages = groupsResponse?.totalPages ?? 0
+  const hasData = groups.length > 0 || isLoading
+
+  const resetState = () => {
     setSelection({})
     setPagination({ pageIndex: 0, pageSize: 10 })
     setSorting([])
     setSearchInput('')
+    selectedGroupsRef.current.clear()
   }
 
   useEffect(() => {
     if (!open) {
-      resetSelection()
+      resetState()
     }
   }, [open])
+
+  // Reset page index when search changes
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, pageIndex: 0 }))
+  }, [searchInput])
+
+  const handleSelectionChange = (updater: RowSelectionState | ((old: RowSelectionState) => RowSelectionState)) => {
+    const newSelection = typeof updater === 'function' ? updater(selection) : updater
+    // Track newly selected groups, ignore already-assigned ones
+    const addedIds = Object.keys(newSelection).filter(id => !selection[id] && !assignedGroupIdsSet.has(id))
+    const removedIds = Object.keys(selection).filter(id => !newSelection[id] && !assignedGroupIdsSet.has(id))
+    for (const id of addedIds) {
+      const group = groups.find(g => g.id === id)
+      if (group) selectedGroupsRef.current.set(id, group)
+    }
+    for (const id of removedIds) {
+      selectedGroupsRef.current.delete(id)
+    }
+    // Keep assigned IDs in selection (they're always checked)
+    const filtered: RowSelectionState = {}
+    for (const id of Object.keys(newSelection)) {
+      if (!assignedGroupIdsSet.has(id)) {
+        filtered[id] = true
+      }
+    }
+    setSelection(filtered)
+  }
 
   const columnHelper = createColumnHelper<Group>()
 
@@ -76,13 +122,17 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
             aria-label={t('addGroupModal.selectAll')}
           />
         ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={value => row.toggleSelected(!!value)}
-            aria-label={`${t('addGroupModal.selectGroup')} ${row.original.name}`}
-          />
-        ),
+        cell: ({ row }) => {
+          const isAssigned = assignedGroupIdsSet.has(row.original.id)
+          return (
+            <Checkbox
+              checked={isAssigned || row.getIsSelected()}
+              disabled={isAssigned}
+              onCheckedChange={value => row.toggleSelected(!!value)}
+              aria-label={`${t('addGroupModal.selectGroup')} ${row.original.name}`}
+            />
+          )
+        },
         meta: {
           style: { width: '50px' },
         },
@@ -104,38 +154,33 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
         },
       }),
     ],
-    [columnHelper, t],
+    [columnHelper, t, assignedGroupIdsSet],
   )
 
   const table = useReactTable({
     getRowId: row => row.id,
     columns,
-    data: availableGroups,
+    data: groups,
+    pageCount: totalPages,
     state: {
-      pagination: pagination,
+      pagination,
       sorting,
       rowSelection: selection,
-      globalFilter: searchInput,
     },
+    manualPagination: true,
+    manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    onRowSelectionChange: updater => {
-      setSelection(resolveUpdater(updater, selection))
-    },
+    enableRowSelection: row => !assignedGroupIdsSet.has(row.original.id),
+    onRowSelectionChange: handleSelectionChange,
     onPaginationChange: setPagination,
-    onSortingChange: updater => {
-      setSorting(resolveUpdater(updater, sorting))
-    },
-    getFilteredRowModel: getFilteredRowModel(),
-    onGlobalFilterChange: setSearchInput,
+    onSortingChange: setSorting,
   })
 
-  const selectedGroupIds = Object.keys(selection)
+  const newlySelectedCount = selectedGroupsRef.current.size
 
   const onConfirmClick = () => {
-    if (selectedGroupIds.length > 0) {
-      onAddGroups(selectedGroupIds)
+    if (newlySelectedCount > 0) {
+      onAddGroups(Array.from(selectedGroupsRef.current.values()))
     }
     onOpenChange(false)
   }
@@ -153,9 +198,13 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
         </DialogHeader>
 
         <div className="relative h-[calc(100%-var(--title-height)-var(--button-height))]">
-          {availableGroups.length === 0 ? (
+          {!hasData && !isError ? (
             <div className="flex items-center justify-center h-full text-center text-muted-foreground">
               {t('addGroupModal.noGroupsAvailable')}
+            </div>
+          ) : isError ? (
+            <div className="flex items-center justify-center h-full text-center text-muted-foreground">
+              {tCommon('errors.loadingError')}
             </div>
           ) : (
             <>
@@ -167,14 +216,14 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
                   table={table}
                   pageIndex={pagination.pageIndex}
                   pageSize={pagination.pageSize}
-                  totalPages={table.getPageCount()}
-                  isLoading={false}
+                  totalPages={totalPages}
+                  isLoading={isLoading}
                 />
               </div>
 
               <div className="absolute bottom-6 left-4 text-sm text-muted-foreground">
                 {t('addGroupModal.selectedGroups', {
-                  number: selectedGroupIds.length,
+                  number: newlySelectedCount,
                 })}
               </div>
             </>
@@ -185,7 +234,7 @@ export const AddGroupModal = (props: AddGroupModalProps) => {
           confirmButtonType="button"
           onConfirmClick={onConfirmClick}
           onCancelClick={onCancelClick}
-          isConfirmButtonDisabled={selectedGroupIds.length === 0}
+          isConfirmButtonDisabled={newlySelectedCount === 0}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.add')}
           cancelButtonTitle={tCommon('actions.cancel')}

@@ -333,8 +333,7 @@
       },
       "roleTypes": {
         "SYSTEM": "System Role",
-        "DATA": "Data Role",
-        "GOVERNANCE": "Governance Role"
+        "DATA": "Data Role"
       },
       "types": {
         "standard": "Standard",
@@ -422,8 +421,7 @@
       },
       "objectLabels": {
         "SYSTEM": "System role",
-        "DATA": "Data role",
-        "GOVERNANCE": "Governance role"
+        "DATA": "Data role"
       },
       "originLabels": {
         "default": "Standard",

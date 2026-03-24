@@ -3,17 +3,15 @@ import {
   CellContext,
   createColumnHelper,
   getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
   PaginationState,
   RowSelectionState,
   SortingState,
   useReactTable,
 } from '@tanstack/react-table'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { ActionButtons } from '@/components/action-buttons/ActionButtons'
 import { DataTable } from '@/components/table/DataTable'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
@@ -24,14 +22,13 @@ import { Role } from '@/types/roles'
 import { SearchHeader } from '../search-area/SearchArea'
 
 interface AddRoleModalProps extends DialogProps {
-  roles: Role[]
   assignedRoleIds: string[]
-  onAddRoles: (roleIds: string[]) => void
+  onAddRoles: (roles: Role[]) => void
   groupName: string
 }
 
 export const AddRoleModal = (props: AddRoleModalProps) => {
-  const { roles, assignedRoleIds, open, onOpenChange = () => {}, onAddRoles, groupName } = props
+  const { assignedRoleIds, open, onOpenChange = () => {}, onAddRoles, groupName } = props
 
   const t = useTranslations('accessManagement')
   const tCommon = useTranslations('common')
@@ -45,22 +42,73 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
   const [selection, setSelection] = useState<RowSelectionState>({})
   const [searchInput, setSearchInput] = useState('')
 
-  const availableRoles = useMemo(() => {
-    return roles.filter(role => !assignedRoleIds.includes(role.id))
-  }, [roles, assignedRoleIds])
+  // Track selected Role objects across pages since server-side pagination
+  // only keeps the current page's data in the response
+  const selectedRolesRef = useRef<Map<string, Role>>(new Map())
 
-  const resetSelection = () => {
+  const assignedRoleIdsSet = useMemo(() => new Set(assignedRoleIds), [assignedRoleIds])
+
+  const queryParams = useMemo(() => {
+    const params = new URLSearchParams({
+      page: String(pagination.pageIndex),
+      size: String(pagination.pageSize),
+      roleType: 'DATA',
+    })
+    if (sorting.length > 0) {
+      params.set('sort', `${sorting[0].id},${sorting[0].desc ? 'desc' : 'asc'}`)
+    }
+    if (searchInput) {
+      params.set('q', searchInput)
+    }
+    return params
+  }, [pagination.pageIndex, pagination.pageSize, sorting, searchInput])
+
+  const { data: rolesResponse, isLoading, isError } = useGetRoles({ params: queryParams })
+
+  const roles = rolesResponse?.data ?? []
+  const totalPages = rolesResponse?.totalPages ?? 0
+  const hasData = roles.length > 0 || isLoading
+
+  const resetState = () => {
     setSelection({})
     setPagination({ pageIndex: 0, pageSize: 10 })
     setSorting([])
     setSearchInput('')
+    selectedRolesRef.current.clear()
   }
 
   useEffect(() => {
     if (!open) {
-      resetSelection()
+      resetState()
     }
   }, [open])
+
+  // Reset page index when search changes
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, pageIndex: 0 }))
+  }, [searchInput])
+
+  const handleSelectionChange = (updater: RowSelectionState | ((old: RowSelectionState) => RowSelectionState)) => {
+    const newSelection = typeof updater === 'function' ? updater(selection) : updater
+    // Track newly selected roles, ignore already-assigned ones
+    const addedIds = Object.keys(newSelection).filter(id => !selection[id] && !assignedRoleIdsSet.has(id))
+    const removedIds = Object.keys(selection).filter(id => !newSelection[id] && !assignedRoleIdsSet.has(id))
+    for (const id of addedIds) {
+      const role = roles.find(r => r.id === id)
+      if (role) selectedRolesRef.current.set(id, role)
+    }
+    for (const id of removedIds) {
+      selectedRolesRef.current.delete(id)
+    }
+    // Keep assigned IDs out of selection (they're shown as checked+disabled via the cell renderer)
+    const filtered: RowSelectionState = {}
+    for (const id of Object.keys(newSelection)) {
+      if (!assignedRoleIdsSet.has(id)) {
+        filtered[id] = true
+      }
+    }
+    setSelection(filtered)
+  }
 
   const columnHelper = createColumnHelper<Role>()
 
@@ -76,13 +124,17 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
             aria-label={t('addRoleModal.selectAll')}
           />
         ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={value => row.toggleSelected(!!value)}
-            aria-label={`${t('addRoleModal.selectRole')} ${row.original.name}`}
-          />
-        ),
+        cell: ({ row }) => {
+          const isAssigned = assignedRoleIdsSet.has(row.original.id)
+          return (
+            <Checkbox
+              checked={isAssigned || row.getIsSelected()}
+              disabled={isAssigned}
+              onCheckedChange={value => row.toggleSelected(!!value)}
+              aria-label={`${t('addRoleModal.selectRole')} ${row.original.name}`}
+            />
+          )
+        },
         meta: {
           style: { width: '5%' },
         },
@@ -113,34 +165,33 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
         },
       }),
     ],
-    [columnHelper, t],
+    [columnHelper, t, assignedRoleIdsSet],
   )
 
   const table = useReactTable({
     getRowId: row => row.id,
-    data: availableRoles,
+    data: roles,
     columns,
+    pageCount: totalPages,
     state: {
       pagination,
       sorting,
       rowSelection: selection,
-      globalFilter: searchInput,
     },
+    manualPagination: true,
+    manualSorting: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    enableRowSelection: row => !assignedRoleIdsSet.has(row.original.id),
+    onRowSelectionChange: handleSelectionChange,
     onPaginationChange: setPagination,
     onSortingChange: setSorting,
-    onRowSelectionChange: setSelection,
-    getFilteredRowModel: getFilteredRowModel(),
-    onGlobalFilterChange: setSearchInput,
   })
 
-  const selectedRoleIds = Object.keys(selection)
+  const newlySelectedCount = selectedRolesRef.current.size
 
   const onConfirmClick = () => {
-    if (selectedRoleIds.length > 0) {
-      onAddRoles(selectedRoleIds)
+    if (newlySelectedCount > 0) {
+      onAddRoles(Array.from(selectedRolesRef.current.values()))
     }
     onOpenChange(false)
   }
@@ -158,9 +209,13 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
         </DialogHeader>
 
         <div className="relative h-[calc(100%-var(--title-height)-var(--button-height))]">
-          {availableRoles.length === 0 ? (
+          {!hasData && !isError ? (
             <div className="flex items-center justify-center h-full text-center text-muted-foreground">
               {t('addRoleModal.noRolesAvailable')}
+            </div>
+          ) : isError ? (
+            <div className="flex items-center justify-center h-full text-center text-muted-foreground">
+              {tCommon('errors.loadingError')}
             </div>
           ) : (
             <>
@@ -172,14 +227,14 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
                   table={table}
                   pageIndex={pagination.pageIndex}
                   pageSize={pagination.pageSize}
-                  totalPages={table.getPageCount()}
-                  isLoading={false}
+                  totalPages={totalPages}
+                  isLoading={isLoading}
                 />
               </div>
 
               <div className="absolute bottom-6 left-4 text-sm text-muted-foreground">
                 {t('addRoleModal.selectedRoles', {
-                  number: selectedRoleIds.length,
+                  number: newlySelectedCount,
                 })}
               </div>
             </>
@@ -190,7 +245,7 @@ export const AddRoleModal = (props: AddRoleModalProps) => {
           confirmButtonType="button"
           onConfirmClick={onConfirmClick}
           onCancelClick={onCancelClick}
-          isConfirmButtonDisabled={selectedRoleIds.length === 0}
+          isConfirmButtonDisabled={newlySelectedCount === 0}
           hasCard={false}
           confirmButtonTitle={tCommon('actions.add')}
           cancelButtonTitle={tCommon('actions.cancel')}
