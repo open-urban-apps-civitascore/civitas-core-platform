@@ -161,7 +161,8 @@
     },
     "messages": {
       "updateSuccess": "Permissions have been successfully updated.",
-      "groupsWithoutRoles": "Groups without assigned roles have not been saved."
+      "groupsWithoutRoles": "Groups without assigned roles have not been saved.",
+      "updateErrorNotDraft": "Permissions can only be updated when the dataset is in draft status."
     }
   },
   "sidebar": {
