@@ -1,12 +1,20 @@
 package de.civitascore.portal.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.DtoMapper;
+import de.civitascore.portal.model.entity.base.NamedEntity;
 import de.civitascore.portal.model.input.BaseInputDTO;
 import de.civitascore.portal.repository.BaseRepository;
+import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
+import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.io.Serializable;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import org.apache.commons.lang3.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -247,6 +255,62 @@ public abstract class BaseService<T, I extends BaseInputDTO> {
    */
   protected I preProcessUpdateInput(I input, T existingEntity) {
     return input;
+  }
+
+  /**
+   * Validate that the entity name is unique within the repository. Checks whether another entity
+   * with the same name already exists (excluding the entity itself for updates).
+   *
+   * @param entity the entity to validate
+   * @param findByName function to look up an existing entity by name
+   * @param <E> entity type extending NamedEntity
+   */
+  protected <E extends NamedEntity> void validateUniqueName(
+      E entity, Function<String, Optional<E>> findByName) {
+    findByName
+        .apply(entity.getName())
+        .ifPresent(
+            existing -> {
+              if (!existing.getId().equals(entity.getId())) {
+                throw new UniqueConstraintViolationException(
+                    entity.getClass().getSimpleName(), "name", entity.getName());
+              }
+            });
+  }
+
+  /**
+   * Validate that specified fields are not null or blank in the update input. Parses the input DTO
+   * as JSON and checks each specified field. Fields not present in the input are skipped (valid for
+   * partial updates).
+   *
+   * @param objectMapper the ObjectMapper for JSON processing
+   * @param input the input DTO
+   * @param entityId the entity ID for error messages
+   * @param fieldNames the field names to validate
+   */
+  protected void validateFieldsNotBlank(
+      ObjectMapper objectMapper, I input, UUID entityId, String... fieldNames) {
+    try {
+      JsonNode jsonNode = objectMapper.readTree(objectMapper.writeValueAsString(input));
+      for (String fieldName : fieldNames) {
+        if (jsonNode.has(fieldName)) {
+          JsonNode fieldNode = jsonNode.get(fieldName);
+          if (fieldNode.isNull() || StringUtils.isBlank(fieldNode.asText())) {
+            throw new InvalidInputException(
+                fieldName,
+                entityId,
+                Character.toUpperCase(fieldName.charAt(0))
+                    + fieldName.substring(1)
+                    + " cannot be null or blank");
+          }
+        }
+      }
+    } catch (InvalidInputException e) {
+      throw e;
+    } catch (JsonProcessingException e) {
+      throw new InvalidInputException(
+          "input", entityId, "Failed to process update input: " + e.getMessage());
+    }
   }
 
   /**

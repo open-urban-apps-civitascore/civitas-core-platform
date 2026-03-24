@@ -4,7 +4,6 @@ import de.civitascore.portal.mapper.DataSetSeriesMapper;
 import de.civitascore.portal.model.entity.DataSetSeries;
 import de.civitascore.portal.model.input.DataSetSeriesInputDTO;
 import de.civitascore.portal.repository.DataSetSeriesRepository;
-import de.civitascore.portal.util.UniqueConstraintViolationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -32,19 +31,7 @@ public class DataSetSeriesService extends BaseService<DataSetSeries, DataSetSeri
 
   @Override
   protected DataSetSeries preSave(DataSetSeries entity) {
-    validateUniqueName(entity);
+    validateUniqueName(entity, dataSetSeriesRepository::findByName);
     return super.preSave(entity);
-  }
-
-  private void validateUniqueName(DataSetSeries entity) {
-    dataSetSeriesRepository
-        .findByName(entity.getName())
-        .ifPresent(
-            existing -> {
-              if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException(
-                    DataSetSeries.class.getSimpleName(), "name", entity.getName());
-              }
-            });
   }
 }

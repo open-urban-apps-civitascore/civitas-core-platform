@@ -229,7 +229,7 @@ public class UserInitializer {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       log.error("Interrupted while waiting for Keycloak sync for user '{}'", user.getEmail());
-    } catch (Exception e) {
+    } catch (java.util.concurrent.ExecutionException e) {
       log.error("Failed to sync user '{}' to Keycloak", user.getEmail(), e);
     }
   }

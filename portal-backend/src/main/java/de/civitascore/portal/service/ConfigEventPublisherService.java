@@ -86,7 +86,7 @@ public class ConfigEventPublisherService {
     CloudEvent cloudEvent;
     try {
       cloudEvent = convertToCloudEvent(messageId, topic, configEvent);
-    } catch (Exception e) {
+    } catch (JsonProcessingException e) {
       log.error(
           "Error converting ConfigEvent: messageId={}, topic={}", messageId, topic.getValue(), e);
       return CompletableFuture.failedFuture(e);

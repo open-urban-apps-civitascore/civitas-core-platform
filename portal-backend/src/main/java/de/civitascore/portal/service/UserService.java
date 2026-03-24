@@ -1,6 +1,5 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.model.ConfigValue;
@@ -18,7 +17,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -126,32 +124,8 @@ public class UserService extends EventPublishingService<User, UserInputDTO> {
   @Override
   protected UserInputDTO preProcessUpdateInput(UserInputDTO input, User existingEntity) {
     validateGroupIdsExist(input.getGroupIds());
-
-    try {
-      String inputJson = objectMapper.writeValueAsString(input);
-      JsonNode jsonNode = objectMapper.readTree(inputJson);
-
-      if (jsonNode.has("title") && StringUtils.isBlank(jsonNode.get("title").asText())) {
-        throw new InvalidInputException(
-            "title", existingEntity.getId(), "Title cannot be null or blank");
-      }
-      if (jsonNode.has("firstName") && StringUtils.isBlank(jsonNode.get("firstName").asText())) {
-        throw new InvalidInputException(
-            "firstName", existingEntity.getId(), "First name cannot be null or blank");
-      }
-      if (jsonNode.has("lastName") && StringUtils.isBlank(jsonNode.get("lastName").asText())) {
-        throw new InvalidInputException(
-            "lastName", existingEntity.getId(), "Last name cannot be null or blank");
-      }
-      if (jsonNode.has("email") && StringUtils.isBlank(jsonNode.get("email").asText())) {
-        throw new InvalidInputException(
-            "email", existingEntity.getId(), "Email cannot be null or blank");
-      }
-    } catch (InvalidInputException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to process update input", e);
-    }
+    validateFieldsNotBlank(
+        objectMapper, input, existingEntity.getId(), "title", "firstName", "lastName", "email");
     return input;
   }
 

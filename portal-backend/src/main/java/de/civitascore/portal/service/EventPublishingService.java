@@ -105,7 +105,7 @@ public abstract class EventPublishingService<T, I extends BaseInputDTO> extends 
       throw new ExternalSystemTimeoutException("Config Adapter request was interrupted", e);
     } catch (ExternalSystemRejectionException | ExternalSystemTimeoutException e) {
       throw e;
-    } catch (Exception e) {
+    } catch (java.util.concurrent.ExecutionException e) {
       throw new ExternalSystemRejectionException(
           "Failed to validate with Config Adapter: " + e.getMessage());
     }

@@ -5,7 +5,6 @@ import de.civitascore.portal.model.entity.Catalog;
 import de.civitascore.portal.model.input.CatalogInputDTO;
 import de.civitascore.portal.repository.CatalogRepository;
 import de.civitascore.portal.repository.DataSetRepository;
-import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -53,19 +52,7 @@ public class CatalogService extends BaseService<Catalog, CatalogInputDTO> {
 
   @Override
   protected Catalog preSave(Catalog entity) {
-    validateUniqueName(entity);
+    validateUniqueName(entity, catalogRepository::findByName);
     return super.preSave(entity);
-  }
-
-  private void validateUniqueName(Catalog entity) {
-    catalogRepository
-        .findByName(entity.getName())
-        .ifPresent(
-            existing -> {
-              if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException(
-                    Catalog.class.getSimpleName(), "name", entity.getName());
-              }
-            });
   }
 }

@@ -1,6 +1,5 @@
 package de.civitascore.portal.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.model.entity.Assignment;
@@ -8,8 +7,6 @@ import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentGroupInputDTO;
 import de.civitascore.portal.repository.GroupRepository;
-import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
@@ -17,7 +14,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,20 +29,8 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
 
   @Override
   protected Group preSave(Group entity) {
-    validateUniqueName(entity);
+    validateUniqueName(entity, groupRepository::findByName);
     return super.preSave(entity);
-  }
-
-  private void validateUniqueName(Group entity) {
-    groupRepository
-        .findByName(entity.getName())
-        .ifPresent(
-            existing -> {
-              if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException(
-                    Group.class.getSimpleName(), "name", entity.getName());
-              }
-            });
   }
 
   @Override
@@ -116,19 +100,7 @@ public class GroupService extends BaseService<Group, GroupInputDTO> {
 
   @Override
   protected GroupInputDTO preProcessUpdateInput(GroupInputDTO input, Group existingEntity) {
-    try {
-      String inputJson = objectMapper.writeValueAsString(input);
-      JsonNode jsonNode = objectMapper.readTree(inputJson);
-
-      if (jsonNode.has("name") && StringUtils.isBlank(jsonNode.get("name").asText())) {
-        throw new InvalidInputException(
-            "name", existingEntity.getId(), "Name cannot be null or blank");
-      }
-    } catch (InvalidInputException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to process update input", e);
-    }
+    validateFieldsNotBlank(objectMapper, input, existingEntity.getId(), "name");
     return super.preProcessUpdateInput(input, existingEntity);
   }
 }

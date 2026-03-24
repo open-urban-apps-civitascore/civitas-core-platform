@@ -11,7 +11,6 @@ import de.civitascore.portal.repository.DataStructureRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
-import de.civitascore.portal.util.UniqueConstraintViolationException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -88,7 +87,7 @@ public class DataStructureService
 
   @Override
   protected DataStructure preSave(DataStructure entity) {
-    validateUniqueName(entity);
+    validateUniqueName(entity, dataStructureRepository::findByName);
     return super.preSave(entity);
   }
 
@@ -97,18 +96,6 @@ public class DataStructureService
     // Set DRAFT status for newly created data structures
     input.setDataStructureStatus(DataStructureStatus.DRAFT);
     return super.preProcessCreateInput(input);
-  }
-
-  private void validateUniqueName(DataStructure entity) {
-    dataStructureRepository
-        .findByName(entity.getName())
-        .ifPresent(
-            existing -> {
-              if (!existing.getId().equals(entity.getId())) {
-                throw new UniqueConstraintViolationException(
-                    DataStructure.class.getSimpleName(), "name", entity.getName());
-              }
-            });
   }
 
   @Override
