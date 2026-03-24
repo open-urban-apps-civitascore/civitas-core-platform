@@ -52,7 +52,9 @@
       "statusChangeError": "Beim Ändern des Verfügbarkeitsstatus ist ein Fehler aufgetreten.",
       "updateError": "Beim Aktualisieren der {item} ist ein Fehler aufgetreten.",
       "nameExists": "Dieser Name ist bereits vergeben.",
-      "nameExistsToast": "Der Name {name} ist bereits vergeben. Bitte wählen sie einen anderen Namen."
+      "nameExistsToast": "Der Name {name} ist bereits vergeben. Bitte wählen sie einen anderen Namen.",
+      "emailExists": "Diese E-Mail ist bereits vergeben.",
+      "emailExistsToast": "Die E-mail {email} ist bereits vergeben. Bitte wählen Sie eine andere E-Mail-Adresse."
     },
     "items": {
       "data": "Daten",
@@ -359,9 +361,7 @@
     },
     "errors": {
       "creationError": "Beim Anlegen des Users ist ein Fehler aufgetreten.",
-      "updateError": "Beim Aktualisieren des Users ist ein Fehler aufgetreten.",
-      "emailExists": "Es existiert bereits ein Nutzer mit dieser E-Mmail.",
-      "emailExistsToast": "Es existiert bereits ein Nutzer mit der E-Mail {email}. Bitte wählen Sie eine andere E-Mail-Adresse."
+      "updateError": "Beim Aktualisieren des Users ist ein Fehler aufgetreten."
     }
   },
   "groups": {

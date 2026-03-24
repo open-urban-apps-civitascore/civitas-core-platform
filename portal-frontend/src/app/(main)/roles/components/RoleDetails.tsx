@@ -154,7 +154,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
   })
 
   const handleRoleRequestError = (error: AxiosError, defaultMessage: string) => {
-    if (isNameConflictError(error as AxiosError)) handleNameError(form, form.getValues('name'))
+    if (isNameConflictError(error)) handleNameError(form, form.getValues('name'))
     else toast.error(defaultMessage)
   }
 
@@ -224,7 +224,7 @@ export const RoleDetails = (props: RoleDetailsProps): JSX.Element => {
           router.push(`/roles/${data.id}?tab=${tabValue}`)
         },
         onError: error => {
-          handleRoleRequestError(error as AxiosError, tRoles('errors.createError'))
+          handleRoleRequestError(error, tRoles('errors.createError'))
         },
       },
     )

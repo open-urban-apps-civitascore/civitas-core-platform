@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 
 export const useError = () => {
   const tCommon = useTranslations('common')
-  const tUsers = useTranslations('users')
 
   const handleNameError = <TFormData extends FieldValues & { name: string }>(
     form: UseFormReturn<TFormData>,
@@ -18,8 +17,8 @@ export const useError = () => {
     form: UseFormReturn<TFormData>,
     email?: string,
   ) => {
-    form.setError('email' as Path<TFormData>, { type: 'manual', message: 'users.errors.emailExists' })
-    toast.error(tUsers('errors.emailExistsToast', { email: email || '' }))
+    form.setError('email' as Path<TFormData>, { type: 'manual', message: 'common.errors.emailExists' })
+    toast.error(tCommon('errors.emailExistsToast', { email: email || '' }))
   }
 
   return { handleNameError, handleUserEmailError }

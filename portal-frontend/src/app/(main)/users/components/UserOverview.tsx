@@ -3,7 +3,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { RowSelectionState } from '@tanstack/react-table'
-import { AxiosError } from 'axios'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
@@ -132,7 +131,7 @@ export const UserOverview = (props: UserOverviewProps) => {
           router.push(`/users/${data.id}?mode=edit`)
         },
         onError: error => {
-          if (isEmailConflictError(error as AxiosError)) {
+          if (isEmailConflictError(error)) {
             handleUserEmailError(form, parsed.email)
           } else {
             toast.error(t('errors.creationError'))
@@ -161,7 +160,7 @@ export const UserOverview = (props: UserOverviewProps) => {
           toast.success(t('messages.updateSuccess'))
         },
         onError: error => {
-          if (isEmailConflictError(error as AxiosError)) {
+          if (isEmailConflictError(error)) {
             handleUserEmailError(form, parsed.email)
           } else {
             toast.error(t('errors.updateError'))

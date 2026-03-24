@@ -11,7 +11,7 @@ export const useDeleteMutation = <TResponse, TData>({
 }: DeleteMutationInput<TData>) => {
   const queryClient = useQueryClient()
 
-  return useMutation<ApiServiceResponse<TResponse>, Error, string>({
+  return useMutation<ApiServiceResponse<TResponse>, AxiosError, string>({
     mutationFn: (id: string) =>
       apiRequest<TResponse>({
         method: 'DELETE',
