@@ -6,6 +6,7 @@ import { type JSX, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { useGetPermissions } from '@/app/services/api/permissions/clientRequests'
 import { useGetRoles } from '@/app/services/api/roles/clientRequests'
 import { LoadingSpinner } from '@/components/loading-spinner/LoadingSpinner'
+import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { useQueryParams } from '@/hooks/use-query-params'
 import { Permission, PermissionItem } from '@/types/permissions'
@@ -41,6 +42,7 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
   const { pendingPermissionIds, onPendingPermissionIdsChange, isReadOnly, currentRoleId, roleType } = props
   const t = useTranslations('common')
   const tRoles = useTranslations('roles')
+  const tCommon = useTranslations('common')
   const { getApiRequestParams } = useQueryParams()
   const [roleTemplate, setRoleTemplate] = useState<string | null>(null)
   const [checkedPermissionItems, setCheckedPermissionItems] = useState<PermissionItem[]>([])
@@ -52,9 +54,13 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
     getApiRequestParams({ pageIndex: 0, pageSize: 9999, search: searchInput }),
   )
 
-  const { data: rolesData } = useGetRoles({ params: rolesRequestParams })
+  const { data: rolesData, error: getRolesError } = useGetRoles({ params: rolesRequestParams })
 
-  const { data: permissionsData, isFetching: isFetchingPermissions } = useGetPermissions({
+  const {
+    data: permissionsData,
+    isFetching: isFetchingPermissions,
+    error: getPermissionsError,
+  } = useGetPermissions({
     params: permissionsRequestParams,
   })
 
@@ -109,6 +115,10 @@ export const PermissionsTab = (props: PermissionsTabProps): JSX.Element => {
 
   if (isFetchingPermissions) {
     return <LoadingSpinner />
+  }
+
+  if (getRolesError || getPermissionsError) {
+    return <NoDataPage className="h-full" title={tCommon('errors.loadingError')} />
   }
 
   return (

@@ -55,7 +55,8 @@
       "nameExists": "This name is already in use.",
       "nameExistsToast": "The name {name} is already in use. Please, choose another name.",
       "emailExists": "This email is already in use.",
-      "emailExistsToast": "The email {email} is already in use. Please, choose another email address."
+      "emailExistsToast": "The email {email} is already in use. Please, choose another email address.",
+      "insufficientPermissions": "You do not have the necessary permissions to perform this action."
     },
     "items": {
       "data": "data",
@@ -334,8 +335,7 @@
       },
       "roleTypes": {
         "SYSTEM": "System Role",
-        "DATA": "Data Role",
-        "GOVERNANCE": "Governance Role"
+        "DATA": "Data Role"
       },
       "types": {
         "standard": "Standard",
@@ -427,8 +427,7 @@
       },
       "objectLabels": {
         "SYSTEM": "System role",
-        "DATA": "Data role",
-        "GOVERNANCE": "Governance role"
+        "DATA": "Data role"
       },
       "originLabels": {
         "default": "Standard",

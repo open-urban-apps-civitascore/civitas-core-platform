@@ -17,10 +17,13 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
 import { useError } from '@/hooks/use-error'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { User, UserFormData, UserFormSchema, UserTab } from '@/types/users'
 import { isEmailConflictError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
+import { getHeaderAction } from '@/utils/headerAction'
 import { mapUserToFormData } from '@/utils/users'
 
 import { UserBasicInfoTab } from './basic-info-tab/UserBasicInfoTab'
@@ -65,8 +68,17 @@ export const UserOverview = (props: UserOverviewProps) => {
   const isLoading = createUser.isPending || updateUser.isPending
   const { setSubTabValueParam, subTabValue } = useQueryParams()
   const { handleUserEmailError } = useError()
+  const { hasPermission } = usePermissions()
+  const canUpdate = isCreateMode || hasPermission(PERMISSION_NAMES.USER_UPDATE)
+  const onError = () => {
+    toast.error(tCommon('errors.unexpectedError'))
+  }
 
-  const tabs: Tab<UserTab>[] = [tabValues.userData, tabValues.groups, tabValues.roles]
+  const tabs: Tab<UserTab>[] = [
+    tabValues.userData,
+    ...(hasPermission(PERMISSION_NAMES.GROUP_READ) ? [tabValues.groups] : []),
+    ...(hasPermission(PERMISSION_NAMES.ASSIGNMENT_READ) ? [tabValues.roles] : []),
+  ]
 
   const defaultTab = tabValues.userData.value
 
@@ -108,6 +120,10 @@ export const UserOverview = (props: UserOverviewProps) => {
   }
 
   const handleExit = () => {
+    if (isCreateMode) {
+      router.push('/users')
+      return
+    }
     form.reset()
     setIsReadOnly(true)
     setIsExitModalOpen(false)
@@ -214,6 +230,13 @@ export const UserOverview = (props: UserOverviewProps) => {
     </Button>
   )
 
+  const headerCustomElement = getHeaderAction({
+    isReadOnly,
+    canUpdate,
+    editButton: EditButton,
+    saveExitButtons: SaveAndExitButtons,
+  })
+
   return (
     <PageContainer testId={testId} headerType="withSubTabsOrSubtitle" className="overflow-hidden">
       <PageHeader
@@ -223,7 +246,7 @@ export const UserOverview = (props: UserOverviewProps) => {
           selectedTab: subTabValue || defaultTab,
           onTabChange: newTab => handleSelectTab(newTab),
         }}
-        customElement={isReadOnly ? EditButton : SaveAndExitButtons}
+        customElement={headerCustomElement}
       />
       {renderTabContent()}
       <ExitWarningModal

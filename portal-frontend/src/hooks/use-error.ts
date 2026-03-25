@@ -21,5 +21,9 @@ export const useError = () => {
     toast.error(tCommon('errors.emailExistsToast', { email: email || '' }))
   }
 
-  return { handleNameError, handleUserEmailError }
+  const handlePermissionsError = () => {
+    toast.error(tCommon('errors.insufficientPermissions'))
+  }
+
+  return { handleNameError, handleUserEmailError, handlePermissionsError }
 }

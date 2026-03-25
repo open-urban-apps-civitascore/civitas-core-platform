@@ -13,6 +13,7 @@ interface UsersTableProps extends TableProps<ListUser> {
   users: ListUser[]
   onRemoveUserClick: (userId: string) => void
   isReadOnly: boolean
+  isLinkDisabled?: boolean
 }
 
 export const UsersTable = (props: UsersTableProps) => {
@@ -30,6 +31,7 @@ export const UsersTable = (props: UsersTableProps) => {
     onRemoveUserClick,
     isLoading,
     isReadOnly,
+    isLinkDisabled,
   } = props
   const tUsers = useTranslations('users')
   const tCommon = useTranslations('common')
@@ -44,8 +46,13 @@ export const UsersTable = (props: UsersTableProps) => {
     }),
     columnHelper.accessor('fullName', {
       header: ({ column }) => <SortableTableHeader column={column} title={tUsers('info.displayName')} />,
-      cell: ({ row }) => <LinkCell href={`/users/${row.id}`}>{row.original.fullName}</LinkCell>,
+      cell: ({ row }) => (
+        <LinkCell href={`/users/${row.id}`} isDisabled={isLinkDisabled}>
+          {row.original.fullName}
+        </LinkCell>
+      ),
       meta: {
+        truncate: true,
         style: {
           width: '22.22%',
           minWidth: '200px',

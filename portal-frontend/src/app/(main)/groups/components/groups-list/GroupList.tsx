@@ -16,7 +16,9 @@ import { PageHeader } from '@/components/page-header/PageHeader'
 import { SearchHeader } from '@/components/search-area/SearchArea'
 import { TableContainer } from '@/components/table-container/TableContainer'
 import { Button } from '@/components/ui/button'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Group } from '@/types/groups'
 
 import { GroupsTable } from './GroupsTable'
@@ -37,6 +39,7 @@ const GroupsList = (props: GroupsListProps) => {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false)
 
   const deleteGroup = useDeleteGroup()
+  const { hasPermission } = usePermissions()
 
   const {
     setSortingParams,
@@ -96,19 +99,19 @@ const GroupsList = (props: GroupsListProps) => {
     }
   }
 
-  const CustomElement = () => (
+  const CustomElement = hasPermission(PERMISSION_NAMES.GROUP_CREATE) ? (
     <Button onClick={() => router.push(`groups/create?${getApiRequestParamsByUrl()}`)}>
       <Plus />
       {t('newGroup')}
     </Button>
-  )
+  ) : undefined
 
   return (
     <PageContainer headerType="onlyTitle">
       <PageHeader title={t('title')} />
       <PageBackground>
         <SearchHeader
-          customElement={<CustomElement />}
+          customElement={CustomElement}
           onChangeSearchString={setSearchParam}
           searchString={search}
           placeholder={t('search')}
@@ -126,7 +129,7 @@ const GroupsList = (props: GroupsListProps) => {
             onRowClick={handleRowClick}
             onSortingChange={setSortingParams}
             onPaginationChange={setPaginationParams}
-            onDeleteGroupClick={handleDeleteGroupClick}
+            onDeleteGroupClick={hasPermission(PERMISSION_NAMES.GROUP_DELETE) ? handleDeleteGroupClick : undefined}
           />
         </TableContainer>
       </PageBackground>

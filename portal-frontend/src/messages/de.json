@@ -54,7 +54,8 @@
       "nameExists": "Dieser Name ist bereits vergeben.",
       "nameExistsToast": "Der Name {name} ist bereits vergeben. Bitte wählen sie einen anderen Namen.",
       "emailExists": "Diese E-Mail ist bereits vergeben.",
-      "emailExistsToast": "Die E-mail {email} ist bereits vergeben. Bitte wählen Sie eine andere E-Mail-Adresse."
+      "emailExistsToast": "Die E-mail {email} ist bereits vergeben. Bitte wählen Sie eine andere E-Mail-Adresse.",
+      "insufficientPermissions": "Sie verfügen nicht über die notwendigen Berechtigungen für diese Aktion."
     },
     "items": {
       "data": "Daten",
@@ -331,8 +332,7 @@
       },
       "roleTypes": {
         "SYSTEM": "Systemrolle",
-        "DATA": "Datenrolle",
-        "GOVERNANCE": "Governancerolle"
+        "DATA": "Datenrolle"
       },
       "types": {
         "standard": "Standard",
@@ -424,8 +424,7 @@
       },
       "objectLabels": {
         "SYSTEM": "Systemrolle",
-        "DATA": "Datenrolle",
-        "GOVERNANCE": "Governance-Rolle"
+        "DATA": "Datenrolle"
       },
       "originLabels": {
         "default": "Standard",

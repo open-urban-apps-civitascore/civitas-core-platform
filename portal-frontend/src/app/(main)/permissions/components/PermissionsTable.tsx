@@ -39,6 +39,7 @@ export const PermissionsTable = (props: PermissionsTableProps) => {
       },
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           width: shouldShowPermissionColumns ? '40%' : '100%',
         },

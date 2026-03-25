@@ -6,6 +6,12 @@ import messages from '@/messages/de.json'
 
 import { PageHeader } from './PageHeader'
 
+const mockUseIsTruncated = vi.fn().mockReturnValue(false)
+
+vi.mock('@/hooks/use-is-truncated', () => ({
+  useIsTruncated: () => mockUseIsTruncated(),
+}))
+
 const onTabClickMock = vi.fn()
 const tabsMock = [
   { value: 'testTab1', label: 'Test Tab 1' },
@@ -186,5 +192,33 @@ describe('PageHeader', () => {
     expect(onTabClickMock).toHaveBeenCalledOnce()
     fireEvent.click(tabs[2])
     expect(onTabClickMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not show tooltip when title is not truncated', async () => {
+    vi.useFakeTimers()
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <PageHeader title="Test Title" />
+      </NextIntlClientProvider>,
+    )
+    fireEvent.focus(screen.getByRole('heading'))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('shows tooltip when title is truncated', async () => {
+    vi.useFakeTimers()
+    mockUseIsTruncated.mockReturnValue(true)
+    render(
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <PageHeader title="Test Title" />
+      </NextIntlClientProvider>,
+    )
+    fireEvent.focus(screen.getByRole('heading'))
+    await vi.advanceTimersByTimeAsync(500)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Test Title')
+    vi.useRealTimers()
+    mockUseIsTruncated.mockReturnValue(false)
   })
 })

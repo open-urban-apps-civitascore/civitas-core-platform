@@ -12,8 +12,10 @@ import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
 import { useDebounce } from '@/hooks/use-debounce'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { usePermissions } from '@/hooks/use-permissions'
 import { cn } from '@/lib/utils'
 import { ItemType } from '@/types/common'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { GroupBaseFormData } from '@/types/groups'
 import { Contact } from '@/types/users'
 
@@ -39,6 +41,9 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   const { form, isReadOnly, initialContactUser } = props
   const t = useTranslations('groups')
   const isMobile = useIsMobile()
+  const { hasPermission } = usePermissions()
+  const canReadUsers = hasPermission(PERMISSION_NAMES.USER_READ)
+  const isContactDisabled = isReadOnly || !canReadUsers
 
   const [isContactListOpen, setIsContactListOpen] = useState(false)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
@@ -147,7 +152,7 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
           onSelectItem={handleSelectContact}
           onBlur={handleAutocompleteBlur}
           isLoading={isLoadingContacts}
-          disabled={isReadOnly}
+          disabled={isContactDisabled}
         />
       </DetailsFieldContainer>
     </ContentCard>

@@ -19,11 +19,14 @@ import { Tab } from '@/components/segmented-control-bar/SegmentedControlBar'
 import { Button } from '@/components/ui/button'
 import { Form } from '@/components/ui/form'
 import { useError } from '@/hooks/use-error'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useQueryParams } from '@/hooks/use-query-params'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { Group, GroupBaseFormData, GroupBaseFormDataSchema, GroupTab } from '@/types/groups'
 import { Role } from '@/types/roles'
 import { isNameConflictError } from '@/utils/errors'
 import { mapGroupApiToFormData, mapGroupFormToApiData } from '@/utils/groups'
+import { getHeaderAction } from '@/utils/headerAction'
 
 import { BaseInfoTab } from './base-info-tab/BaseInfoTab'
 import { RolesTab } from './roles-tab/RolesTab'
@@ -61,11 +64,17 @@ export const GroupOverview = (props: GroupDetailsProps) => {
 
   const t = useTranslations('groups')
   const tCommon = useTranslations('common')
+  const { hasPermission } = usePermissions()
 
-  const tabs = Object.values(tabValues)
+  const tabs = [
+    tabValues.info,
+    ...(hasPermission(PERMISSION_NAMES.USER_READ) ? [tabValues.users] : []),
+    tabValues.roles,
+  ]
   const defaultTab = tabs[0].value
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
   const [isReadOnly, setIsReadOnly] = useState(!isCreateMode && mode !== 'edit')
+  const canUpdate = isCreateMode || hasPermission(PERMISSION_NAMES.GROUP_UPDATE)
 
   const router = useRouter()
   const { handleNameError } = useError()
@@ -156,6 +165,10 @@ export const GroupOverview = (props: GroupDetailsProps) => {
   }
 
   const handleExit = () => {
+    if (isCreateMode) {
+      router.push('/groups')
+      return
+    }
     form.reset()
     setIsReadOnly(true)
     setIsExitModalOpen(false)
@@ -220,6 +233,13 @@ export const GroupOverview = (props: GroupDetailsProps) => {
     </Button>
   )
 
+  const headerCustomElement = getHeaderAction({
+    isReadOnly,
+    canUpdate,
+    editButton: EditButton,
+    saveExitButtons: SaveAndExitButtons,
+  })
+
   return (
     <PageContainer headerType="withSubTabsOrSubtitle">
       <PageHeader
@@ -229,7 +249,7 @@ export const GroupOverview = (props: GroupDetailsProps) => {
           selectedTab: subTabValue || defaultTab,
           onTabChange: setSubTabValueParam,
         }}
-        customElement={isReadOnly ? EditButton : SaveAndExitButtons}
+        customElement={headerCustomElement}
       />
       <PageBackground className="flex flex-col" hasBackground={!isReadOnly}>
         <Form {...form}>

@@ -90,6 +90,7 @@ export const AccessManagementTable = ({
         header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.group')} />,
         cell: info => info.getValue(),
         meta: {
+          truncate: true,
           style: {
             width: '25%',
             fontWeight: 500,
@@ -101,11 +102,9 @@ export const AccessManagementTable = ({
         header: t('tableHeaders.description'),
         cell: info => info.getValue() || '-',
         meta: {
+          truncate: true,
           style: {
-            whiteSpace: 'nowrap',
             width: '30%',
-            textOverflow: 'ellipsis',
-            overflow: 'hidden',
           },
         },
       }),

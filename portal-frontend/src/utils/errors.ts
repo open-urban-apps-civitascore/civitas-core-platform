@@ -23,3 +23,7 @@ export const isEmailConflictError = (error: AxiosError) => {
   const errorDetail = apiError.detail || ''
   return isConflictError && errorDetail.includes('with email') && errorDetail.includes('already exists')
 }
+
+export const isPermissionsError = (error: AxiosError) => {
+  return error.status === 403
+}

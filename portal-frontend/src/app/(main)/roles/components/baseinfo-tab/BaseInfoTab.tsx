@@ -6,6 +6,7 @@ import { ContentCard } from '@/components/content-card/ContentCard'
 import { DetailsFieldContainer } from '@/components/form/DetailsFieldContainer'
 import { FormTextArea } from '@/components/form/fields/FormTextArea'
 import { TextField } from '@/components/form/fields/TextField'
+import { NoDataPage } from '@/components/no-data-page/NoDataPage'
 import { SubHeader } from '@/components/page-header/sub-header/SubHeader'
 import { Button } from '@/components/ui/button'
 import { Form, FormItem, FormLabel } from '@/components/ui/form'
@@ -18,12 +19,14 @@ interface BaseInfoTabProps {
   isDefaultRole: boolean
   isReadOnly: boolean
   deleteRole?: () => void
+  getRoleError?: Error | null
 }
 
 export const BaseInfoTab = (props: BaseInfoTabProps) => {
-  const { form, isDefaultRole, isReadOnly, deleteRole } = props
+  const { form, isDefaultRole, isReadOnly, deleteRole, getRoleError } = props
   const tRolesBaseInfo = useTranslations('roles.baseInfoTab')
   const tRoles = useTranslations('roles')
+  const tCommon = useTranslations('common')
   const isMobile = useIsMobile()
 
   const isReadonly = useMemo(() => isDefaultRole, [isDefaultRole])
@@ -31,6 +34,10 @@ export const BaseInfoTab = (props: BaseInfoTabProps) => {
   useEffect(() => {
     form.setValue('readonly', isReadonly)
   }, [isReadonly, form])
+
+  if (getRoleError) {
+    return <NoDataPage className="h-full" title={tCommon('errors.loadingError')} />
+  }
 
   return (
     <Form {...form}>

@@ -61,6 +61,7 @@ export const DatasetsTable = (props: DatasetsTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('tableHeaders.name')} />,
       cell: info => (info.getValue() ? <LinkCell href={`datasets/${info.row.id}`}>{info.getValue()}</LinkCell> : '-'),
       meta: {
+        truncate: true,
         style: {
           width: '25%',
         },

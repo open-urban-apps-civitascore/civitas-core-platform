@@ -18,7 +18,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface GroupsTableProps extends TableProps<Group> {
   groups: Group[]
-  onDeleteGroupClick: (groupId: string) => void
+  onDeleteGroupClick?: (groupId: string) => void
 }
 
 export const GroupsTable = (props: GroupsTableProps) => {
@@ -49,6 +49,7 @@ export const GroupsTable = (props: GroupsTableProps) => {
       header: ({ column }) => <SortableTableHeader column={column} title={t('list.title')} />,
       cell: ({ row }) => <LinkCell href={`/groups/${row.id}`}>{row.original.name}</LinkCell>,
       meta: {
+        truncate: true,
         style: {
           minWidth: '150px',
           color: 'var(--foreground)',
@@ -68,32 +69,30 @@ export const GroupsTable = (props: GroupsTableProps) => {
       header: t('list.description'),
       cell: info => info.getValue(),
       meta: {
-        style: {
-          whiteSpace: 'nowrap',
-          maxWidth: '300px',
-          textOverflow: 'ellipsis',
-          overflow: 'hidden',
-        },
+        truncate: true,
       },
     }),
-    {
-      id: 'actions',
-      cell: ({ row }: { row: Row<Group> }) => (
-        <TableDropdownMenu
-          menuItems={[
-            {
-              label: tCommon('actions.removeItem', { item: tCommon('items.group') }),
-              onClick: () => onDeleteGroupClick(row.id),
+    ...(onDeleteGroupClick
+      ? [
+          {
+            id: 'actions',
+            cell: ({ row }: { row: Row<Group> }) => {
+              const menuItems = [
+                {
+                  label: tCommon('actions.removeItem', { item: tCommon('items.group') }),
+                  onClick: () => onDeleteGroupClick(row.id),
+                },
+              ]
+              return menuItems.length > 0 ? <TableDropdownMenu menuItems={menuItems} /> : null
             },
-          ]}
-        />
-      ),
-      meta: {
-        style: {
-          width: '50px',
-        },
-      },
-    },
+            meta: {
+              style: {
+                width: '50px',
+              },
+            },
+          },
+        ]
+      : []),
   ]
 
   const table = useReactTable({

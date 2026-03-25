@@ -2,6 +2,7 @@ import { createColumnHelper, getCoreRowModel, useReactTable } from '@tanstack/re
 import { useTranslations } from 'next-intl'
 
 import { DataTable } from '@/components/table/DataTable'
+import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
 import { Role } from '@/types/roles'
 import { TableProps } from '@/types/table'
@@ -9,6 +10,7 @@ import { resolveUpdater } from '@/utils/table'
 
 interface RolesTableProps extends TableProps<Role> {
   roles: Role[]
+  selectedRoleType?: string
 }
 
 export const RolesTable = (props: RolesTableProps) => {
@@ -24,6 +26,7 @@ export const RolesTable = (props: RolesTableProps) => {
     onRowClick,
     onPaginationChange,
     onSortingChange,
+    selectedRoleType,
   } = props
   const t = useTranslations('roles')
 
@@ -39,8 +42,13 @@ export const RolesTable = (props: RolesTableProps) => {
       header: ({ column }) => {
         return <SortableTableHeader column={column} title={t('tableHeaders.name')} />
       },
-      cell: info => info.getValue(),
+      cell: ({ row }) => (
+        <LinkCell href={`/roles/${row.original.id}${selectedRoleType ? `?tab=${selectedRoleType}` : ''}`}>
+          {row.original.name}
+        </LinkCell>
+      ),
       meta: {
+        truncate: true,
         style: {
           width: '17.5%',
         },
@@ -51,6 +59,7 @@ export const RolesTable = (props: RolesTableProps) => {
       header: () => t('tableHeaders.description'),
       cell: info => info.getValue(),
       meta: {
+        truncate: true,
         style: {
           width: '25%',
           minWidth: '200px',
